@@ -32,10 +32,15 @@ function InitScanController()
 		print "Initializing FileNum to 1 since it didn't exist before."
 		variable /g filenum=1
 	endif
+	
+	rebuildwindow()
+end
 
+function rebuildwindow()
 	dowindow /k ScanController
 	execute("ScanController()")
 end
+
 // In order to enable or disable a wave, call these two functions instead of messing with the waves sc_RawRecord and sc_CalcRecord directly
 function EnableScanControllerItem(wn)
 	string wn
@@ -95,7 +100,7 @@ Window ScanController() : Panel
 
 	PauseUpdate; Silent 1		// building window...
 	dowindow /K ScanController
-	NewPanel /W=(10,10,sc_InnerBoxW + 30,130+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing) ) /N=ScanController
+	NewPanel /W=(10,10,sc_InnerBoxW + 30,200+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing) ) /N=ScanController
 	ModifyPanel frameStyle=2
 	ModifyPanel fixedSize=1
 	SetDrawLayer UserBack
@@ -129,44 +134,130 @@ Window ScanController() : Panel
 		i+=1
 	while (i<numpnts( sc_RawWaveNames ))
 	i+=1
+	button addrowraw,pos={550,i*(sc_InnerBoxH + sc_InnerBoxSpacing)},size={110,20},proc=sc_addrow,title="Add Row"
+	button removerowraw,pos={430,i*(sc_InnerBoxH + sc_InnerBoxSpacing)},size={110,20},proc=sc_removerow,title="Remove Row"
 	SetDrawEnv fsize= 16,fstyle= 1
-	DrawText 13,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+25,"Wave Name"
+	DrawText 13,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Wave Name"
 	SetDrawEnv fsize= 16,fstyle= 1
-	DrawText 130,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+25,"Record"
+	DrawText 130,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Record"
 	SetDrawEnv fsize= 16,fstyle= 1
-	DrawText 200,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+25,"Plot"
+	DrawText 200,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Plot"
 	SetDrawEnv fsize= 16,fstyle= 1
-	DrawText 250,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+25,"Calculation Script ( example: dmm[i]*12.5)"
+	DrawText 250,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Calculation Script ( example: dmm[i]*12.5)"
 
 	i=0
 	do
-		DrawRect 9,60+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing),5+sc_InnerBoxW,60+sc_InnerBoxH+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)
-		cmd="SetVariable sc_CalcWaveNameBox" + num2str(i) + " pos={13, 67+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={110, 0}, fsize=14, title=\" \", value=sc_CalcWaveNames[i]"
+		DrawRect 9,85+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing),5+sc_InnerBoxW,85+sc_InnerBoxH+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)
+		cmd="SetVariable sc_CalcWaveNameBox" + num2str(i) + " pos={13, 92+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={110, 0}, fsize=14, title=\" \", value=sc_CalcWaveNames[i]"
 		execute(cmd)		
-		cmd="CheckBox sc_CalcRecordCheckBox" + num2str(i) + ", proc=sc_CheckBoxClicked, pos={150,70+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_CalcRecord[i]) + " , title=\"\""
+		cmd="CheckBox sc_CalcRecordCheckBox" + num2str(i) + ", proc=sc_CheckBoxClicked, pos={150,95+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_CalcRecord[i]) + " , title=\"\""
 		execute(cmd)
-		cmd="CheckBox sc_CalcPlotCheckBox" + num2str(i) + ", proc=sc_CheckBoxClicked, pos={210,70+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_CalcPlot[i]) + " , title=\"\""
+		cmd="CheckBox sc_CalcPlotCheckBox" + num2str(i) + ", proc=sc_CheckBoxClicked, pos={210,95+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_CalcPlot[i]) + " , title=\"\""
 		execute(cmd)
-		cmd="SetVariable sc_CalcScriptBox" + num2str(i) + " pos={250, 67+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={410, 0}, fsize=14, title=\" \", value=sc_CalcScripts[i]"
+		cmd="SetVariable sc_CalcScriptBox" + num2str(i) + " pos={250, 92+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={410, 0}, fsize=14, title=\" \", value=sc_CalcScripts[i]"
 		execute(cmd)		
 		i+=1
 	while (i<numpnts( sc_CalcWaveNames ))	
+	button addrowcalc,pos={550,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_addrow,title="Add Row"
+	button removerowcalc,pos={430,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_removerow,title="Remove Row"
 	
 	// box for logging functions
 	variable sc_Loggable
 	SetDrawEnv fsize= 16,fstyle= 1
-	DrawText 13,60+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25,"Logging Functions (example: getSRSstatus(srs1); getIPSstatus();)"
-	DrawRect 9,60+5+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25,5+sc_InnerBoxW,60+5+sc_InnerBoxH+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25
-	cmd="SetVariable sc_LogStr pos={13, 67+5+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25}, size={sc_InnerBoxW-12, 0}, fsize=14, title=\" \", value=sc_LogStr"
+	DrawText 13,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25,"Logging Functions (example: getSRSstatus(srs1); getIPSstatus();)"
+	DrawRect 9,120+5+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25,5+sc_InnerBoxW,120+5+sc_InnerBoxH+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25
+	cmd="SetVariable sc_LogStr pos={13, 127+5+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25}, size={sc_InnerBoxW-12, 0}, fsize=14, title=\" \", value=sc_LogStr"
 	execute(cmd)
 	
 	//Button BtnAbortSave, mode=2, pos={sc_InnerBoxW/2 - 150,},size={300,50},fsize=16,title="Abort Current Scan & Save Data", proc=sc_AbortSaveClicked
 	//SetDrawEnv fsize= 14
 	
 	// helpful text
-	DrawText 13,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing),"Press TAB to save changes."
-	DrawText 13,140+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing),"Press ESC to abort the scan and save data, while this window is active, "
+	DrawText 13,170+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing),"Press TAB to save changes."
+	DrawText 13,190+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing),"Press ESC to abort the scan and save data, while this window is active"
 EndMacro
+
+function sc_addrow(action) : ButtonControl
+	string action
+	wave/t sc_RawWaveNames=sc_RawWaveNames
+	wave sc_RawRecord=sc_RawRecord 
+	wave sc_RawPlot=sc_RawPlot
+	wave/t sc_RequestScripts=sc_RequestScripts
+	wave/t sc_GetResponseScripts=sc_GetResponseScripts
+	wave/t sc_CalcWaveNames=sc_CalcWaveNames
+	wave sc_CalcRecord=sc_CalcRecord 
+	wave sc_CalcPlot=sc_CalcPlot
+	wave/t sc_CalcScripts=sc_CalcScripts
+	
+	strswitch(action)
+		case "addrowraw":
+			AppendString(sc_RawWaveNames, "")
+			AppendValue(sc_RawRecord, 0)
+			AppendValue(sc_RawPlot, 0)
+			AppendString(sc_RequestScripts, "")
+			AppendString(sc_GetResponseScripts, "")
+		break
+		case "addrowcalc":
+			AppendString(sc_CalcWaveNames, "")
+			AppendValue(sc_CalcRecord, 0)
+			AppendValue(sc_CalcPlot, 0)
+			AppendString(sc_CalcScripts, "")
+		break
+	endswitch
+	rebuildwindow()
+end
+
+function sc_removerow(action) : Buttoncontrol
+	string action
+	wave/t sc_RawWaveNames=sc_RawWaveNames
+	wave sc_RawRecord=sc_RawRecord 
+	wave sc_RawPlot=sc_RawPlot
+	wave/t sc_RequestScripts=sc_RequestScripts
+	wave/t sc_GetResponseScripts=sc_GetResponseScripts
+	wave/t sc_CalcWaveNames=sc_CalcWaveNames
+	wave sc_CalcRecord=sc_CalcRecord 
+	wave sc_CalcPlot=sc_CalcPlot
+	wave/t sc_CalcScripts=sc_CalcScripts
+	
+	strswitch(action)
+		case "removerowraw":
+			if(numpnts(sc_RawWaveNames) > 1)
+				Redimension /N=(numpnts(sc_RawWaveNames)-1) sc_RawWaveNames
+				Redimension /N=(numpnts(sc_RawRecord)-1) sc_RawRecord
+				Redimension /N=(numpnts(sc_RawPlot)-1) sc_RawPlot
+				Redimension /N=(numpnts(sc_RequestScripts)-1) sc_RequestScripts
+				Redimension /N=(numpnts(sc_GetResponseScripts)-1) sc_GetResponseScripts
+			else
+				abort "Can't remove the last row!"
+			endif
+			break
+		case "removerowcalc":
+			if(numpnts(sc_CalcWaveNames) > 1)
+				Redimension /N=(numpnts(sc_CalcWaveNames)-1) sc_CalcWaveNames
+				Redimension /N=(numpnts(sc_CalcRecord)-1) sc_CalcRecord
+				Redimension /N=(numpnts(sc_CalcPlot)-1) sc_CalcPlot
+				Redimension /N=(numpnts(sc_CalcScripts)-1) sc_CalcScripts
+			else
+				abort "Can't remove the last row!"
+			endif
+			break
+	endswitch
+	rebuildwindow()
+end
+
+function AppendValue(thewave, thevalue)
+	wave thewave
+	variable thevalue
+	Redimension /N=(numpnts(thewave)+1) thewave
+	thewave[numpnts(thewave)-1] = thevalue
+end
+
+function AppendString(thewave, thestring)
+	wave/t thewave
+	string thestring
+	Redimension /N=(numpnts(thewave)+1) thewave
+	thewave[numpnts(thewave)-1] = thestring
+end
 
 // When a check-box is clicked, which means its value has probably changed, all I do is update the contents of the sc_DeviceRecord wave corresonding to that check-box.
 function sc_CheckboxClicked(ControlName, Value)
