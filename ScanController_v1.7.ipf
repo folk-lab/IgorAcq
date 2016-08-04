@@ -1,7 +1,7 @@
 #pragma rtGlobals=3		// Use modern global access method and strict wave access.
 
 // Scan Controller routines for 1d and 2d scans
-// Version 1.7 June 14, 2016
+// Version 1.7 August 4, 2016
 // Author: Mohammad Samani, Nik Hartman & Christian Olsen
 // Email: m@msamani.ca
 
@@ -302,6 +302,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	string /g sc_x_label, sc_y_label
 	variable /g sc_is2d, sc_scanstarttime = datetime
 	variable /g sc_startx, sc_finx, sc_numptsx, sc_starty, sc_finy, sc_numptsy
+	variable/g sc_abortsweep=0, sc_pause=0
 	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, activegraphs="", cmd1=""
 	variable index, graphopen, graphopen2d
 	//do some sanity checks on wave names: they should not start or end with numbers.
@@ -523,6 +524,8 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		i+= 1
 	while(i<numpnts(sc_CalcWaveNames))
 	
+	execute("abortmeasurement()")
+	
 	cmd1 = "TileWindows/O=1/A=(3,4) "
 	// Tile graphs
 	for(i=0;i<itemsinlist(activegraphs);i=i+1)
@@ -530,6 +533,41 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	endfor
 	execute(cmd1)
 end
+
+window abortmeasurement() : Panel
+	PauseUpdate; Silent 1 // building window
+	NewPanel /W=(500,700,750,750) // window size
+	ModifyPanel frameStyle=2
+	SetDrawLayer UserBack
+	Button pausesweep, pos={10,15},size={110,20},proc=pausesweep,title="Pause"
+	Button stopsweep, pos={130,15},size={110,20},proc=stopsweep,title="Abort"
+endmacro
+
+function stopsweep(action) : Buttoncontrol
+	string action
+	nvar sc_abortsweep
+	
+	sc_abortsweep = 1
+end 
+
+function pausesweep(action) : Buttoncontrol
+	string action
+	nvar sc_pause, sc_abortsweep
+	
+	Button pausesweep,proc=resumesweep,title="Resume"
+	sc_pause=1
+	print "Sweep paused by user"
+end
+
+function resumesweep(action) : Buttoncontrol
+	string action
+	nvar sc_pause
+	
+	Button pausesweep,proc=pausesweep,title="Pause"
+	sc_pause = 0
+	print "Sweep resumed"
+end
+
 // In a 1d scan, i is the index of the loop. j will be ignored.
 // In a 2d scan, i is the index of the outer (slow) loop, and j is the index of the inner (fast) loop. 
 // In a 2D scan, if scandirection=1 (scan up), the 1d wave gets saved into the matrix when j=numptsy. If scandirection=-1(scan down), the 1d matrix gets saved when j=0. Default is 1 (up)
@@ -541,6 +579,7 @@ function RecordValues(i, j, [scandirection])
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
 	string script = ""
 	variable innerindex, outerindex
+	nvar sc_abortsweep, sc_pause
 	
 	if (sc_is2d)
 		// 2d
@@ -628,6 +667,23 @@ function RecordValues(i, j, [scandirection])
 		SaveWaves(msg="The scan was aborted during the execution.")
 		abort
 	endif
+	
+	if(sc_abortsweep)
+		// Abort sweep
+		SaveWaves(msg="The scan was aborted during the execution.")
+		dowindow /k abortmeasurement
+		abort "Measurement aborted by user"
+	elseif(sc_pause)
+		// Pause sweep
+		do
+			sleep/s 1
+			if(sc_abortsweep)
+				SaveWaves(msg="The scan was aborted during the execution.")
+				dowindow /k abortmeasurement
+				abort "Measurement aborted by user"
+			endif
+		while(sc_pause)
+	endif
 end
 
 // the message will be printed in the history, and will be saved in the winf file corresponding to this scan
@@ -693,4 +749,5 @@ function SaveWaves([msg])
 		filenum+=1
 	endif
 	SaveExperiment/p=data
+	dowindow /k abortmeasurement
 end
