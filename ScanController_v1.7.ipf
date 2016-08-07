@@ -531,13 +531,15 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	for(i=0;i<itemsinlist(activegraphs);i=i+1)
 		cmd1+= stringfromlist(i,activegraphs)+","
 	endfor
+	cmd1 += "SweepControl"
 	execute(cmd1)
 end
 
 window abortmeasurement() : Panel
 	PauseUpdate; Silent 1 // building window
-	NewPanel /W=(500,700,750,750) // window size
+	NewPanel /W=(500,700,750,750) /N=SweepControl// window size
 	ModifyPanel frameStyle=2
+	ModifyPanel fixedSize=1
 	SetDrawLayer UserBack
 	Button pausesweep, pos={10,15},size={110,20},proc=pausesweep,title="Pause"
 	Button stopsweep, pos={130,15},size={110,20},proc=stopsweep,title="Abort"
@@ -671,7 +673,7 @@ function RecordValues(i, j, [scandirection])
 	if(sc_abortsweep)
 		// Abort sweep
 		SaveWaves(msg="The scan was aborted during the execution.")
-		dowindow /k abortmeasurement
+		dowindow /k SweepControl
 		abort "Measurement aborted by user"
 	elseif(sc_pause)
 		// Pause sweep
@@ -679,7 +681,7 @@ function RecordValues(i, j, [scandirection])
 			sleep/s 1
 			if(sc_abortsweep)
 				SaveWaves(msg="The scan was aborted during the execution.")
-				dowindow /k abortmeasurement
+				dowindow /k SweepControl
 				abort "Measurement aborted by user"
 			endif
 		while(sc_pause)
@@ -690,6 +692,7 @@ end
 function SaveWaves([msg])
 	string msg
 	nvar sc_is2d
+	nvar sc_scanstarttime
 	svar sc_x_label, sc_y_label, sc_LogStr
 	string filename, wn, logs=""
 	nvar filenum
@@ -748,6 +751,7 @@ function SaveWaves([msg])
 		saveScanComments(msg=msg, logs=logs)
 		filenum+=1
 	endif
+	printf "Time elapsed: %.2f s \r", datetime-sc_scanstarttime
 	SaveExperiment/p=data
-	dowindow /k abortmeasurement
+	dowindow /k SweepControl
 end
