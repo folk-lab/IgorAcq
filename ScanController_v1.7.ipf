@@ -12,19 +12,18 @@ function InitScanController()
 	make/o sc_RawRecord = {0,0,0,0,0,0,0,0,0,0} // Whether you want to record and save the data for this wave
 	make/o sc_RawPlot = {0,0,0,0,0,0,0,0,0,0} // Whether you want to record and save the data for this wave
 	make/t/o sc_RequestScripts = {"", "", "", "","","","","","",""}
-	make/t/o sc_GetResponseScripts = {"getg1x()", "getg1y()","getg2x()", "getg2y()","getg3x()", "getg3y()","GeTemp(\"mc\")","GetTemp(\"4k\")","GetTemp(\"50k\")","GetTemp(\"magnet\")"}
+	make/t/o sc_GetResponseScripts = {"getg1x()", "getg1y()","getg2x()", "getg2y()","getg3x()", "getg3y()","GetTemp(\"mc\")","GetTemp(\"4k\")","GetTemp(\"50k\")","GetTemp(\"magnet\")"}
 	// End of same-size waves
 	
 	// And these waves should be the same size too
 	make/t/o sc_CalcWaveNames = {"", "", "", ""} // Calculated wave names
 	make/t/o sc_CalcScripts = {"","","",""} // Scripts to calculate stuff
-	//"getsrsstatus(srs1,"1"); getsrsstatus(srs2,"2"); getsrsstatus(srs3,"3");getsrsstatus(srs4,"4");
 	make/o sc_CalcRecord = {0,0,0,0} // Include this calculated field or not
 	make/o sc_CalcPlot = {0,0,0,0} // Include this calculated field or not
 	// end of same-size waves
 	
 	// Print variables
-	variable/g sc_PrintRaw = 0,sc_PrintCalc = 0
+	variable/g sc_PrintRaw = 1,sc_PrintCalc = 1
 	
 	// logging string
 	string /g sc_LogStr = "GetSRSStatus(srs1);GetSRSStatus(srs2);GetSRSStatus(srs3);GetIPSStatus();GetDACStatus();"
@@ -346,8 +345,12 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		i+=1
 	while (i<numpnts(sc_CalcWaveNames))	
 	i=0
-	// TODO Make sure data exists as a path
 	
+	//Check if Data exsits as a path
+	GetFileFolderInfo/Z/Q/P=Data
+	if(V_Flag != 0 || V_isFolder != 1)
+		abort "The path Data is not defined correctly."
+	endif
 	
 	// The status of the upcoming scan will be set when waves are initialized.
 	if(!paramisdefault(starty) && !paramisdefault(finy) && !paramisdefault(numptsy))
@@ -534,7 +537,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		i+= 1
 	while(i<numpnts(sc_CalcWaveNames))
 	
-	execute("abortmeasurement()")
+	execute("abortmeasurementwindow()")
 	
 	cmd1 = "TileWindows/O=1/A=(3,4) "
 	// Tile graphs
@@ -545,7 +548,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	execute(cmd1)
 end
 
-window abortmeasurement() : Panel
+window abortmeasurementwindow() : Panel
 	PauseUpdate; Silent 1 // building window
 	NewPanel /W=(500,700,750,750) /N=SweepControl// window size
 	ModifyPanel frameStyle=2
