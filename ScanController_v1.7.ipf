@@ -23,6 +23,9 @@ function InitScanController()
 	make/o sc_CalcPlot = {0,0,0,0} // Include this calculated field or not
 	// end of same-size waves
 	
+	// Print variables
+	variable/g sc_PrintRaw = 0,sc_PrintCalc = 0
+	
 	// logging string
 	string /g sc_LogStr = "GetSRSStatus(srs1);GetSRSStatus(srs2);GetSRSStatus(srs3);GetIPSStatus();GetDACStatus();"
 	
@@ -136,6 +139,7 @@ Window ScanController() : Panel
 	i+=1
 	button addrowraw,pos={550,i*(sc_InnerBoxH + sc_InnerBoxSpacing)},size={110,20},proc=sc_addrow,title="Add Row"
 	button removerowraw,pos={430,i*(sc_InnerBoxH + sc_InnerBoxSpacing)},size={110,20},proc=sc_removerow,title="Remove Row"
+	checkbox sc_PrintRawBox, pos={370,i*(sc_InnerBoxH + sc_InnerBoxSpacing)}, proc=sc_CheckBoxClicked, value=sc_PrintRaw,side=1,title="\Z14Print filenames"
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 13,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Wave Name"
 	SetDrawEnv fsize= 16,fstyle= 1
@@ -160,6 +164,7 @@ Window ScanController() : Panel
 	while (i<numpnts( sc_CalcWaveNames ))	
 	button addrowcalc,pos={550,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_addrow,title="Add Row"
 	button removerowcalc,pos={430,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_removerow,title="Remove Row"
+	checkbox sc_PrintCalcBox, pos={370,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)}, proc=sc_CheckBoxClicked, value=sc_PrintCalc,side=1,title="\Z14Print filenames"
 	
 	// box for logging functions
 	variable sc_Loggable
@@ -265,6 +270,7 @@ function sc_CheckboxClicked(ControlName, Value)
 	variable value
 	string indexstring
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
+	nvar sc_PrintRaw, sc_PrintCalc
 	variable index
 	String expr
 	if (stringmatch(ControlName,"sc_RawRecordCheckBox*"))
@@ -286,7 +292,11 @@ function sc_CheckboxClicked(ControlName, Value)
 		expr="sc_CalcPlotCheckBox([[:digit:]]+)"
 		SplitString/E=(expr) controlname, indexstring
 		index = str2num(indexstring)
-		sc_CalcPlot[index] = value		
+		sc_CalcPlot[index] = value
+	elseif(stringmatch(ControlName,"sc_PrintRawBox"))
+		sc_PrintRaw = value
+	elseif(stringmatch(ControlName,"sc_PrintCalcBox"))
+		sc_PrintCalc = value
 	endif
 end
 
@@ -691,7 +701,7 @@ end
 // the message will be printed in the history, and will be saved in the winf file corresponding to this scan
 function SaveWaves([msg])
 	string msg
-	nvar sc_is2d
+	nvar sc_is2d, sc_PrintRaw, sc_PrintCalc
 	nvar sc_scanstarttime
 	svar sc_x_label, sc_y_label, sc_LogStr
 	string filename, wn, logs=""
@@ -720,7 +730,9 @@ function SaveWaves([msg])
 			endif
 			filename =  "dat" + num2str(filenum) + wn
 			duplicate $wn $filename
-			print filename
+			if(sc_PrintRaw == 1)
+				print filename
+			endif
 			Save/C/P=data $filename;
 			SaveInitialWaveComments(wn, x_label=sc_x_label, y_label=sc_y_label)
 			//Save/C/P=backup $filename;
@@ -739,13 +751,18 @@ function SaveWaves([msg])
 			endif
 			filename =  "dat" + num2str(filenum) + wn
 			duplicate $wn $filename
-			print filename
+			if(sc_PrintCalc == 1)
+				print filename
+			endif
 			Save/C/P=data $filename;
 			SaveInitialWaveComments(wn, x_label=sc_x_label, y_label=sc_y_label)
 		endif
 		ii+=1
 	while (ii < numpnts(sc_CalcWaveNames))
 	
+	if(sc_PrintRaw == 0 && sc_PrintCalc == 0 && Rawadd+Calcadd > 0)
+		print "dat"+ num2str(filenum)
+	endif
 	if(Rawadd+Calcadd > 0)
 		// Save WINF for this sweep
 		saveScanComments(msg=msg, logs=logs)
