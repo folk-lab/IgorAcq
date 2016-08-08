@@ -586,15 +586,15 @@ end
 // In a 1d scan, i is the index of the loop. j will be ignored.
 // In a 2d scan, i is the index of the outer (slow) loop, and j is the index of the inner (fast) loop. 
 // In a 2D scan, if scandirection=1 (scan up), the 1d wave gets saved into the matrix when j=numptsy. If scandirection=-1(scan down), the 1d matrix gets saved when j=0. Default is 1 (up)
-function RecordValues(i, j, [scandirection])
-	variable i, j, scandirection
+function RecordValues(i, j, [scandirection,redim])
+	variable i, j, scandirection, redim
 	nvar sc_is2d, sc_startx, sc_finx, sc_numptsx, sc_starty, sc_finy, sc_numptsy
 	variable ii = 0, jj=0
 	wave /t sc_RawWaveNames, sc_RequestScripts, sc_GetResponseScripts, sc_CalcWaveNames, sc_CalcScripts
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
-	string script = ""
+	string script = "",cmd
 	variable innerindex, outerindex
-	nvar sc_abortsweep, sc_pause
+	nvar sc_abortsweep, sc_pause,sc_scanstarttime
 	
 	if (sc_is2d)
 		// 2d
@@ -609,6 +609,11 @@ function RecordValues(i, j, [scandirection])
 	// Default scan direction is up
 	if (paramisdefault(scandirection))
 		scandirection=1
+	endif
+	
+	// Set redim to 0 if it's not defined
+	if(paramisdefault(redim))
+		redim=0
 	endif
 	
 	// Send requests to machines
@@ -629,6 +634,12 @@ function RecordValues(i, j, [scandirection])
 		if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
 			jj=0;
 			script = sc_GetResponseScripts[ii];
+			// Redimension waves if redim is set to 1
+			if (redim == 1)
+				redimension /n=(innerindex+1) $sc_RawWaveNames[ii]
+				cmd = "setscale/I x 0, " + num2str(datetime - sc_scanstarttime) + ", \"\", " + sc_RawWaveNames[ii]
+				execute(cmd)
+			endif
 			do
 				if (jj < ItemsInList(script)-1)
 					execute(StringFromList(jj, script))
@@ -654,6 +665,12 @@ function RecordValues(i, j, [scandirection])
 		if (sc_CalcRecord[ii] == 1 || sc_CalcPlot[ii] == 1)
 			jj=0;
 			script = sc_CalcScripts[ii];
+			// Redimension waves if redim is set to 1
+			if (redim == 1)
+				redimension /n=(innerindex+1) $sc_CalcWaveNames[ii]
+				cmd = "setscale/I x 0, " + num2str(datetime - sc_scanstarttime) + ", \"\", " + sc_CalcWaveNames[ii]
+				execute(cmd)
+			endif
 			// Allow the use of the keyword '[i]' in calculated fields where i is the inner loop's current index
 			script = ReplaceString("[i]", script, "["+num2str(innerindex)+"]")
 			do
@@ -776,7 +793,7 @@ function SaveWaves([msg])
 	dowindow /k SweepControl
 end
 
-// Reads values until the procedure is aborted by the ESC button.
+// Reads values until the procedure is aborted.
 // Only works with 1D data.
 // delay : delay between readings in seconds. This excludes the time it takes to read values from machines.
 // The scale is reset so that the x-axis is always is in seconds.
@@ -787,7 +804,6 @@ function ReadUntilEscaped(delay)
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
 	nvar sc_scanstarttime
 	string cmd 
-	nvar srs5
 	InitializeWaves(0, 1, 1)
 	do
 		ii=0
