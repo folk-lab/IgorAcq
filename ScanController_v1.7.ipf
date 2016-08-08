@@ -616,6 +616,10 @@ function RecordValues(i, j, [scandirection,redim])
 		redim=0
 	endif
 	
+	if(redim ==1 && sc_is2d)
+		abort "Read vs Time is only supported for 1D sweeps."
+	endif
+	
 	// Send requests to machines
 	do
 		if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
