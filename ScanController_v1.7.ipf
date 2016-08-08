@@ -1,7 +1,7 @@
 #pragma rtGlobals=3		// Use modern global access method and strict wave access.
 
 // Scan Controller routines for 1d and 2d scans
-// Version 1.7 August 4, 2016
+// Version 1.7 August 8, 2016
 // Author: Mohammad Samani, Nik Hartman & Christian Olsen
 // Email: m@msamani.ca
 
@@ -774,4 +774,42 @@ function SaveWaves([msg])
 	printf "Time elapsed: %.2f s \r", datetime-sc_scanstarttime
 	SaveExperiment/p=data
 	dowindow /k SweepControl
+end
+
+// Reads values until the procedure is aborted by the ESC button.
+// Only works with 1D data.
+// delay : delay between readings in seconds. This excludes the time it takes to read values from machines.
+// The scale is reset so that the x-axis is always is in seconds.
+function ReadUntilEscaped(delay)
+	variable delay
+	variable i=0, ii=0
+	wave /t sc_RawWaveNames, sc_CalcWaveNames
+	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
+	nvar sc_scanstarttime
+	string cmd 
+	nvar srs5
+	InitializeWaves(0, 1, 1)
+	do
+		ii=0
+		do
+			if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
+				redimension /n=(i+1) $sc_RawWaveNames[ii]
+				cmd = "setscale/I x 0, " + num2str(datetime - sc_scanstarttime) + ", \"\", " + sc_RawWaveNames[ii]
+				execute(cmd)
+			endif
+			ii+=1
+		while (ii < numpnts(sc_RawWaveNames))
+		ii=0
+		do
+			if (sc_CalcRecord[ii] == 1 || sc_CalcRecord[ii] == 1)
+				redimension /n=(i+1) $sc_CalcWaveNames[ii]
+				cmd = "setscale/I x 0, " + num2str(datetime - sc_scanstarttime) + ", \"\", " + sc_CalcWaveNames[ii]
+				execute(cmd)				
+			endif
+			ii+=1
+		while (ii < numpnts(sc_CalcWaveNames))
+		sleep /s delay
+		RecordValues(i, 0)
+		i+=1
+	while (1==1)
 end
