@@ -549,14 +549,16 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 end
 
 window abortmeasurementwindow() : Panel
-	PauseUpdate; Silent 1 // building window
+	//Silent 1 // building window
 	NewPanel /W=(500,700,750,750) /N=SweepControl// window size
 	ModifyPanel frameStyle=2
 	ModifyPanel fixedSize=1
 	SetDrawLayer UserBack
 	Button pausesweep, pos={10,15},size={110,20},proc=pausesweep,title="Pause"
 	Button stopsweep, pos={130,15},size={110,20},proc=stopsweep,title="Abort"
+	DoUpdate /W=SweepControl /E=1
 endmacro
+
 
 function stopsweep(action) : Buttoncontrol
 	string action
