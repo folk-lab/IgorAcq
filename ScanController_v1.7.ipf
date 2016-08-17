@@ -1,7 +1,7 @@
 #pragma rtGlobals=3		// Use modern global access method and strict wave access.
 
 // Scan Controller routines for 1d and 2d scans
-// Version 1.7 August 4, 2016
+// Version 1.7 August 8, 2016
 // Author: Mohammad Samani, Nik Hartman & Christian Olsen
 // Email: m@msamani.ca
 
@@ -12,16 +12,18 @@ function InitScanController()
 	make/o sc_RawRecord = {0,0,0,0,0,0,0,0,0,0} // Whether you want to record and save the data for this wave
 	make/o sc_RawPlot = {0,0,0,0,0,0,0,0,0,0} // Whether you want to record and save the data for this wave
 	make/t/o sc_RequestScripts = {"", "", "", "","","","","","",""}
-	make/t/o sc_GetResponseScripts = {"getg1x()", "getg1y()","getg2x()", "getg2y()","getg3x()", "getg3y()","GeTemp(\"mc\")","GetTemp(\"4k\")","GetTemp(\"50k\")","GetTemp(\"magnet\")"}
+	make/t/o sc_GetResponseScripts = {"getg1x()", "getg1y()","getg2x()", "getg2y()","getg3x()", "getg3y()","GetTemp(\"mc\")","GetTemp(\"4k\")","GetTemp(\"50k\")","GetTemp(\"magnet\")"}
 	// End of same-size waves
 	
 	// And these waves should be the same size too
 	make/t/o sc_CalcWaveNames = {"", "", "", ""} // Calculated wave names
 	make/t/o sc_CalcScripts = {"","","",""} // Scripts to calculate stuff
-	//"getsrsstatus(srs1,"1"); getsrsstatus(srs2,"2"); getsrsstatus(srs3,"3");getsrsstatus(srs4,"4");
 	make/o sc_CalcRecord = {0,0,0,0} // Include this calculated field or not
 	make/o sc_CalcPlot = {0,0,0,0} // Include this calculated field or not
 	// end of same-size waves
+	
+	// Print variables
+	variable/g sc_PrintRaw = 1,sc_PrintCalc = 1
 	
 	// logging string
 	string /g sc_LogStr = "GetSRSStatus(srs1);GetSRSStatus(srs2);GetSRSStatus(srs3);GetIPSStatus();GetDACStatus();"
@@ -136,6 +138,7 @@ Window ScanController() : Panel
 	i+=1
 	button addrowraw,pos={550,i*(sc_InnerBoxH + sc_InnerBoxSpacing)},size={110,20},proc=sc_addrow,title="Add Row"
 	button removerowraw,pos={430,i*(sc_InnerBoxH + sc_InnerBoxSpacing)},size={110,20},proc=sc_removerow,title="Remove Row"
+	checkbox sc_PrintRawBox, pos={370,i*(sc_InnerBoxH + sc_InnerBoxSpacing)}, proc=sc_CheckBoxClicked, value=sc_PrintRaw,side=1,title="\Z14Print filenames"
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 13,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Wave Name"
 	SetDrawEnv fsize= 16,fstyle= 1
@@ -160,6 +163,7 @@ Window ScanController() : Panel
 	while (i<numpnts( sc_CalcWaveNames ))	
 	button addrowcalc,pos={550,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_addrow,title="Add Row"
 	button removerowcalc,pos={430,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_removerow,title="Remove Row"
+	checkbox sc_PrintCalcBox, pos={370,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)}, proc=sc_CheckBoxClicked, value=sc_PrintCalc,side=1,title="\Z14Print filenames"
 	
 	// box for logging functions
 	variable sc_Loggable
@@ -265,6 +269,7 @@ function sc_CheckboxClicked(ControlName, Value)
 	variable value
 	string indexstring
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
+	nvar sc_PrintRaw, sc_PrintCalc
 	variable index
 	String expr
 	if (stringmatch(ControlName,"sc_RawRecordCheckBox*"))
@@ -286,7 +291,11 @@ function sc_CheckboxClicked(ControlName, Value)
 		expr="sc_CalcPlotCheckBox([[:digit:]]+)"
 		SplitString/E=(expr) controlname, indexstring
 		index = str2num(indexstring)
-		sc_CalcPlot[index] = value		
+		sc_CalcPlot[index] = value
+	elseif(stringmatch(ControlName,"sc_PrintRawBox"))
+		sc_PrintRaw = value
+	elseif(stringmatch(ControlName,"sc_PrintCalcBox"))
+		sc_PrintCalc = value
 	endif
 end
 
@@ -336,8 +345,12 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		i+=1
 	while (i<numpnts(sc_CalcWaveNames))	
 	i=0
-	// TODO Make sure data exists as a path
 	
+	//Check if Data exsits as a path
+	GetFileFolderInfo/Z/Q/P=Data
+	if(V_Flag != 0 || V_isFolder != 1)
+		abort "The path Data is not defined correctly."
+	endif
 	
 	// The status of the upcoming scan will be set when waves are initialized.
 	if(!paramisdefault(starty) && !paramisdefault(finy) && !paramisdefault(numptsy))
@@ -524,24 +537,28 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		i+= 1
 	while(i<numpnts(sc_CalcWaveNames))
 	
-	execute("abortmeasurement()")
+	execute("abortmeasurementwindow()")
 	
 	cmd1 = "TileWindows/O=1/A=(3,4) "
 	// Tile graphs
 	for(i=0;i<itemsinlist(activegraphs);i=i+1)
 		cmd1+= stringfromlist(i,activegraphs)+","
 	endfor
+	cmd1 += "SweepControl"
 	execute(cmd1)
 end
 
-window abortmeasurement() : Panel
-	PauseUpdate; Silent 1 // building window
-	NewPanel /W=(500,700,750,750) // window size
+window abortmeasurementwindow() : Panel
+	//Silent 1 // building window
+	NewPanel /W=(500,700,750,750) /N=SweepControl// window size
 	ModifyPanel frameStyle=2
+	ModifyPanel fixedSize=1
 	SetDrawLayer UserBack
 	Button pausesweep, pos={10,15},size={110,20},proc=pausesweep,title="Pause"
 	Button stopsweep, pos={130,15},size={110,20},proc=stopsweep,title="Abort"
+	DoUpdate /W=SweepControl /E=1
 endmacro
+
 
 function stopsweep(action) : Buttoncontrol
 	string action
@@ -571,15 +588,15 @@ end
 // In a 1d scan, i is the index of the loop. j will be ignored.
 // In a 2d scan, i is the index of the outer (slow) loop, and j is the index of the inner (fast) loop. 
 // In a 2D scan, if scandirection=1 (scan up), the 1d wave gets saved into the matrix when j=numptsy. If scandirection=-1(scan down), the 1d matrix gets saved when j=0. Default is 1 (up)
-function RecordValues(i, j, [scandirection])
-	variable i, j, scandirection
+function RecordValues(i, j, [scandirection,readvstime])
+	variable i, j, scandirection, readvstime
 	nvar sc_is2d, sc_startx, sc_finx, sc_numptsx, sc_starty, sc_finy, sc_numptsy
 	variable ii = 0, jj=0
 	wave /t sc_RawWaveNames, sc_RequestScripts, sc_GetResponseScripts, sc_CalcWaveNames, sc_CalcScripts
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
-	string script = ""
+	string script = "",cmd
 	variable innerindex, outerindex
-	nvar sc_abortsweep, sc_pause
+	nvar sc_abortsweep, sc_pause,sc_scanstarttime
 	
 	if (sc_is2d)
 		// 2d
@@ -594,6 +611,15 @@ function RecordValues(i, j, [scandirection])
 	// Default scan direction is up
 	if (paramisdefault(scandirection))
 		scandirection=1
+	endif
+	
+	// Set redim to 0 if it's not defined
+	if(paramisdefault(readvstime))
+		readvstime=0
+	endif
+	
+	if(readvstime ==1 && sc_is2d)
+		abort "Read vs Time is only supported for 1D sweeps."
 	endif
 	
 	// Send requests to machines
@@ -614,6 +640,12 @@ function RecordValues(i, j, [scandirection])
 		if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
 			jj=0;
 			script = sc_GetResponseScripts[ii];
+			// Redimension waves if redim is set to 1
+			if (readvstime == 1)
+				redimension /n=(innerindex+1) $sc_RawWaveNames[ii]
+				cmd = "setscale/I x 0, " + num2str(datetime - sc_scanstarttime) + ", \"\", " + sc_RawWaveNames[ii]
+				execute(cmd)
+			endif
 			do
 				if (jj < ItemsInList(script)-1)
 					execute(StringFromList(jj, script))
@@ -639,6 +671,12 @@ function RecordValues(i, j, [scandirection])
 		if (sc_CalcRecord[ii] == 1 || sc_CalcPlot[ii] == 1)
 			jj=0;
 			script = sc_CalcScripts[ii];
+			// Redimension waves if redim is set to 1
+			if (readvstime == 1)
+				redimension /n=(innerindex+1) $sc_CalcWaveNames[ii]
+				cmd = "setscale/I x 0, " + num2str(datetime - sc_scanstarttime) + ", \"\", " + sc_CalcWaveNames[ii]
+				execute(cmd)
+			endif
 			// Allow the use of the keyword '[i]' in calculated fields where i is the inner loop's current index
 			script = ReplaceString("[i]", script, "["+num2str(innerindex)+"]")
 			do
@@ -671,7 +709,7 @@ function RecordValues(i, j, [scandirection])
 	if(sc_abortsweep)
 		// Abort sweep
 		SaveWaves(msg="The scan was aborted during the execution.")
-		dowindow /k abortmeasurement
+		dowindow /k SweepControl
 		abort "Measurement aborted by user"
 	elseif(sc_pause)
 		// Pause sweep
@@ -679,7 +717,7 @@ function RecordValues(i, j, [scandirection])
 			sleep/s 1
 			if(sc_abortsweep)
 				SaveWaves(msg="The scan was aborted during the execution.")
-				dowindow /k abortmeasurement
+				dowindow /k SweepControl
 				abort "Measurement aborted by user"
 			endif
 		while(sc_pause)
@@ -689,7 +727,8 @@ end
 // the message will be printed in the history, and will be saved in the winf file corresponding to this scan
 function SaveWaves([msg])
 	string msg
-	nvar sc_is2d
+	nvar sc_is2d, sc_PrintRaw, sc_PrintCalc
+	nvar sc_scanstarttime
 	svar sc_x_label, sc_y_label, sc_LogStr
 	string filename, wn, logs=""
 	nvar filenum
@@ -717,7 +756,9 @@ function SaveWaves([msg])
 			endif
 			filename =  "dat" + num2str(filenum) + wn
 			duplicate $wn $filename
-			print filename
+			if(sc_PrintRaw == 1)
+				print filename
+			endif
 			Save/C/P=data $filename;
 			SaveInitialWaveComments(wn, x_label=sc_x_label, y_label=sc_y_label)
 			//Save/C/P=backup $filename;
@@ -736,18 +777,61 @@ function SaveWaves([msg])
 			endif
 			filename =  "dat" + num2str(filenum) + wn
 			duplicate $wn $filename
-			print filename
+			if(sc_PrintCalc == 1)
+				print filename
+			endif
 			Save/C/P=data $filename;
 			SaveInitialWaveComments(wn, x_label=sc_x_label, y_label=sc_y_label)
 		endif
 		ii+=1
 	while (ii < numpnts(sc_CalcWaveNames))
 	
+	if(sc_PrintRaw == 0 && sc_PrintCalc == 0 && Rawadd+Calcadd > 0)
+		print "dat"+ num2str(filenum)
+	endif
 	if(Rawadd+Calcadd > 0)
 		// Save WINF for this sweep
 		saveScanComments(msg=msg, logs=logs)
 		filenum+=1
 	endif
+	printf "Time elapsed: %.2f s \r", datetime-sc_scanstarttime
 	SaveExperiment/p=data
-	dowindow /k abortmeasurement
+	dowindow /k SweepControl
+end
+
+// Reads values until the procedure is aborted.
+// Only works with 1D data.
+// delay : delay between readings in seconds. This excludes the time it takes to read values from machines.
+// The scale is reset so that the x-axis is always is in seconds.
+function ReadUntilEscaped(delay)
+	variable delay
+	variable i=0, ii=0
+	wave /t sc_RawWaveNames, sc_CalcWaveNames
+	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
+	nvar sc_scanstarttime
+	string cmd 
+	InitializeWaves(0, 1, 1)
+	do
+		ii=0
+		do
+			if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
+				redimension /n=(i+1) $sc_RawWaveNames[ii]
+				cmd = "setscale/I x 0, " + num2str(datetime - sc_scanstarttime) + ", \"\", " + sc_RawWaveNames[ii]
+				execute(cmd)
+			endif
+			ii+=1
+		while (ii < numpnts(sc_RawWaveNames))
+		ii=0
+		do
+			if (sc_CalcRecord[ii] == 1 || sc_CalcRecord[ii] == 1)
+				redimension /n=(i+1) $sc_CalcWaveNames[ii]
+				cmd = "setscale/I x 0, " + num2str(datetime - sc_scanstarttime) + ", \"\", " + sc_CalcWaveNames[ii]
+				execute(cmd)				
+			endif
+			ii+=1
+		while (ii < numpnts(sc_CalcWaveNames))
+		sleep /s delay
+		RecordValues(i, 0)
+		i+=1
+	while (1==1)
 end
