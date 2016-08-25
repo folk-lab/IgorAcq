@@ -63,7 +63,7 @@ function ChangeScanControllerItemStatus(wn, ison)
 	do
 		if (stringmatch(sc_RawWaveNames[i], wn))
 			sc_RawRecord[i]=ison
-			cmd = "CheckBox sc_RawRecordCheckBox" + num2str(i) + " value=" + num2str(ison)
+			cmd = "CheckBox sc_RawRecordCheckBox" + num2istr(i) + " value=" + num2istr(ison)
 			execute(cmd)
 			done=1
 		endif
@@ -74,7 +74,7 @@ function ChangeScanControllerItemStatus(wn, ison)
 	do
 		if (stringmatch(sc_CalcWaveNames[i], wn))
 			sc_CalcRecord[i]=ison
-			cmd = "CheckBox sc_CalcRecordCheckBox" + num2str(i) + " value=" + num2str(ison)
+			cmd = "CheckBox sc_CalcRecordCheckBox" + num2istr(i) + " value=" + num2istr(ison)
 			execute(cmd)	
 		endif
 		i+=1
@@ -123,15 +123,15 @@ Window ScanController() : Panel
 	do
 		DrawRect 9,30+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing),5+sc_InnerBoxW,30+sc_InnerBoxH+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)
 		//DrawText 13,54+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing), sc_RawWaveNames[i]
-		cmd="SetVariable sc_RawWaveNameBox" + num2str(i) + " pos={13, 37+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={110, 0}, fsize=14, title=\" \", value=sc_RawWaveNames[i]"
+		cmd="SetVariable sc_RawWaveNameBox" + num2istr(i) + " pos={13, 37+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={110, 0}, fsize=14, title=\" \", value=sc_RawWaveNames[i]"
 		execute(cmd)
-		cmd="CheckBox sc_RawRecordCheckBox" + num2str(i) + ", proc=sc_CheckBoxClicked, pos={150,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_RawRecord[i]) + " , title=\"\""
+		cmd="CheckBox sc_RawRecordCheckBox" + num2istr(i) + ", proc=sc_CheckBoxClicked, pos={150,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_RawRecord[i]) + " , title=\"\""
 		execute(cmd)
-		cmd="CheckBox sc_RawPlotCheckBox" + num2str(i) + ", proc=sc_CheckBoxClicked, pos={210,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_RawPlot[i]) + " , title=\"\""
+		cmd="CheckBox sc_RawPlotCheckBox" + num2istr(i) + ", proc=sc_CheckBoxClicked, pos={210,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_RawPlot[i]) + " , title=\"\""
 		execute(cmd)
-		cmd="SetVariable sc_RequestScriptBox" + num2str(i) + " pos={250, 37+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={200, 0}, fsize=14, title=\" \", value=sc_RequestScripts[i]"
+		cmd="SetVariable sc_RequestScriptBox" + num2istr(i) + " pos={250, 37+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={200, 0}, fsize=14, title=\" \", value=sc_RequestScripts[i]"
 		execute(cmd)
-		cmd="SetVariable sc_GetResponseScriptBox" + num2str(i) + " pos={460, 37+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={200, 0}, fsize=14, title=\" \", value=sc_GetResponseScripts[i]"
+		cmd="SetVariable sc_GetResponseScriptBox" + num2istr(i) + " pos={460, 37+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={200, 0}, fsize=14, title=\" \", value=sc_GetResponseScripts[i]"
 		execute(cmd)		
 		i+=1
 	while (i<numpnts( sc_RawWaveNames ))
@@ -151,13 +151,13 @@ Window ScanController() : Panel
 	i=0
 	do
 		DrawRect 9,85+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing),5+sc_InnerBoxW,85+sc_InnerBoxH+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)
-		cmd="SetVariable sc_CalcWaveNameBox" + num2str(i) + " pos={13, 92+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={110, 0}, fsize=14, title=\" \", value=sc_CalcWaveNames[i]"
+		cmd="SetVariable sc_CalcWaveNameBox" + num2istr(i) + " pos={13, 92+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={110, 0}, fsize=14, title=\" \", value=sc_CalcWaveNames[i]"
 		execute(cmd)		
-		cmd="CheckBox sc_CalcRecordCheckBox" + num2str(i) + ", proc=sc_CheckBoxClicked, pos={150,95+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_CalcRecord[i]) + " , title=\"\""
+		cmd="CheckBox sc_CalcRecordCheckBox" + num2istr(i) + ", proc=sc_CheckBoxClicked, pos={150,95+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_CalcRecord[i]) + " , title=\"\""
 		execute(cmd)
-		cmd="CheckBox sc_CalcPlotCheckBox" + num2str(i) + ", proc=sc_CheckBoxClicked, pos={210,95+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_CalcPlot[i]) + " , title=\"\""
+		cmd="CheckBox sc_CalcPlotCheckBox" + num2istr(i) + ", proc=sc_CheckBoxClicked, pos={210,95+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_CalcPlot[i]) + " , title=\"\""
 		execute(cmd)
-		cmd="SetVariable sc_CalcScriptBox" + num2str(i) + " pos={250, 92+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={410, 0}, fsize=14, title=\" \", value=sc_CalcScripts[i]"
+		cmd="SetVariable sc_CalcScriptBox" + num2istr(i) + " pos={250, 92+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={410, 0}, fsize=14, title=\" \", value=sc_CalcScripts[i]"
 		execute(cmd)		
 		i+=1
 	while (i<numpnts( sc_CalcWaveNames ))	
@@ -384,14 +384,14 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	do
 		if (sc_RawRecord[i] == 1 && cmpstr(sc_RawWaveNames[i], "") || sc_RawPlot[i] == 1 && cmpstr(sc_RawWaveNames[i], ""))
 			wn = sc_RawWaveNames[i]
-			cmd = "make /o/n=(" + num2str(sc_numptsx) + ") " + wn + "=NaN"
+			cmd = "make /o/n=(" + num2istr(sc_numptsx) + ") " + wn + "=NaN"
 			execute(cmd)
 			cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn
 			execute(cmd)
 			if(sc_is2d)
 				// In case this is a 2D measurement
 				wn2d = wn + "2d"
-				cmd = "make /o/n=(" + num2str(sc_numptsx) + ", " + num2str(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd)
+				cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd)
 				cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn2d; execute(cmd)
 				cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
 			endif			
@@ -404,14 +404,14 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	do
 		if (sc_CalcRecord[i] == 1 && cmpstr(sc_CalcWaveNames[i], "") || sc_CalcPlot[i] == 1 && cmpstr(sc_CalcWaveNames[i], ""))
 			wn = sc_CalcWaveNames[i]
-			cmd = "make /o/n=(" + num2str(sc_numptsx) + ") " + wn + "=NaN"
+			cmd = "make /o/n=(" + num2istr(sc_numptsx) + ") " + wn + "=NaN"
 			execute(cmd)
 			cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn
 			execute(cmd)		
 			if(sc_is2d)
 				// In case this is a 2D measurement
 				wn2d = wn + "2d"
-				cmd = "make /o/n=(" + num2str(sc_numptsx) + ", " + num2str(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd)
+				cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd)
 				cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn2d; execute(cmd)
 				cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
 			endif			
@@ -598,6 +598,8 @@ function RecordValues(i, j, [scandirection,readvstime])
 	variable innerindex, outerindex
 	nvar sc_abortsweep, sc_pause,sc_scanstarttime
 	
+	DoUpdate /W=SweepControl /E=1
+	
 	if (sc_is2d)
 		// 2d
 		innerindex = j
@@ -633,29 +635,28 @@ function RecordValues(i, j, [scandirection,readvstime])
 		endif
 		ii+=1
 	while (ii < numpnts(sc_RawWaveNames))
-
+	
 	// Read responses from machines
 	ii=0
 	do
 		if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
 			jj=0;
 			script = sc_GetResponseScripts[ii];
-			// Redimension waves if redim is set to 1
+			// Redimension waves if readvstime is set to 1
 			if (readvstime == 1)
 				redimension /n=(innerindex+1) $sc_RawWaveNames[ii]
-				cmd = "setscale/I x 0, " + num2str(datetime - sc_scanstarttime) + ", \"\", " + sc_RawWaveNames[ii]
-				execute(cmd)
+				setscale/I x 0,  datetime - sc_scanstarttime, $sc_RawWaveNames[ii]
 			endif
 			do
 				if (jj < ItemsInList(script)-1)
 					execute(StringFromList(jj, script))
 				else
-					execute(sc_RawWaveNames[ii] + "[" + num2str(innerindex) + "]=" + StringFromList(jj, script))
+					execute(sc_RawWaveNames[ii] + "[" + num2istr(innerindex) + "]=" + StringFromList(jj, script))
 					if (sc_is2d)
 						// 2D Wave
 						// If this is the last point in a row on a 2d scan, save the row in the 2d wave
 						if ((innerindex == sc_numptsx-1 && scandirection == 1) || (innerindex == 0 && scandirection == -1))
-							execute(sc_RawWaveNames[ii] + "2d[][" + num2str(outerindex) + "] = " + sc_RawWaveNames[ii] + "[p]")
+							execute(sc_RawWaveNames[ii] + "2d[][" + num2istr(outerindex) + "] = " + sc_RawWaveNames[ii] + "[p]")
 						endif
 					endif
 				endif
@@ -664,32 +665,31 @@ function RecordValues(i, j, [scandirection,readvstime])
 		endif
 		ii+=1
 	while (ii < numpnts(sc_RawWaveNames))
-
+	
 	// Calculate interpreted numbers and store them in calculated waves
 	ii=0
 	do
 		if (sc_CalcRecord[ii] == 1 || sc_CalcPlot[ii] == 1)
 			jj=0;
 			script = sc_CalcScripts[ii];
-			// Redimension waves if redim is set to 1
+			// Redimension waves if readvstimeis set to 1
 			if (readvstime == 1)
 				redimension /n=(innerindex+1) $sc_CalcWaveNames[ii]
-				cmd = "setscale/I x 0, " + num2str(datetime - sc_scanstarttime) + ", \"\", " + sc_CalcWaveNames[ii]
-				execute(cmd)
+				setscale/I x 0, datetime - sc_scanstarttime, $sc_CalcWaveNames[ii]
 			endif
 			// Allow the use of the keyword '[i]' in calculated fields where i is the inner loop's current index
-			script = ReplaceString("[i]", script, "["+num2str(innerindex)+"]")
+			script = ReplaceString("[i]", script, "["+num2istr(innerindex)+"]")
 			do
 				// If multiple commands are present, assign the value returned by the last command to the corresponding wave
 				if (jj < ItemsInList(script)-1)
 					execute(StringFromList(jj, script))
 				else
-					execute(sc_CalcWaveNames[ii] + "[" + num2str(innerindex) + "]=" + StringFromList(jj, script))
+					execute(sc_CalcWaveNames[ii] + "[" + num2istr(innerindex) + "]=" + StringFromList(jj, script))
 					if (sc_is2d)
 						// 2D Wave						
 						// If this is the last point in a row on a 2d scan, save the row in the 2d wave
 						if ((innerindex == sc_numptsx-1 && scandirection == 1) || (innerindex == 0 && scandirection == -1))
-							execute(sc_CalcWaveNames[ii] + "2d[][" + num2str(outerindex) + "] = " + sc_CalcWaveNames[ii] + "[p]")
+							execute(sc_CalcWaveNames[ii] + "2d[][" + num2istr(outerindex) + "] = " + sc_CalcWaveNames[ii] + "[p]")
 						endif												
 					endif
 				endif
@@ -709,8 +709,8 @@ function RecordValues(i, j, [scandirection,readvstime])
 	if(sc_abortsweep)
 		// Abort sweep
 		SaveWaves(msg="The scan was aborted during the execution.")
-		dowindow /k SweepControl
 		abort "Measurement aborted by user"
+		dowindow /k SweepControl
 	elseif(sc_pause)
 		// Pause sweep
 		do
