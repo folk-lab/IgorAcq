@@ -610,8 +610,6 @@ function RecordValues(i, j, [scandirection,readvstime])
 	variable innerindex, outerindex
 	nvar sc_abortsweep, sc_pause,sc_scanstarttime
 	
-	DoUpdate /W=SweepControl /E=1
-	
 	if (sc_is2d)
 		// 2d
 		innerindex = j
