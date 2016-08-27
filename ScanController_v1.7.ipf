@@ -173,13 +173,18 @@ Window ScanController() : Panel
 	cmd="SetVariable sc_LogStr pos={13, 127+5+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25}, size={sc_InnerBoxW-12, 0}, fsize=14, title=\" \", value=sc_LogStr"
 	execute(cmd)
 	
-	//Button BtnAbortSave, mode=2, pos={sc_InnerBoxW/2 - 150,},size={300,50},fsize=16,title="Abort Current Scan & Save Data", proc=sc_AbortSaveClicked
-	//SetDrawEnv fsize= 14
-	
 	// helpful text
-	DrawText 13,170+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing),"Press TAB to save changes."
+	DrawText 13,170+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing),"Press Update to save changes."
 	DrawText 13,190+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing),"Press ESC to abort the scan and save data, while this window is active"
+	
+	//Update button
+	button updatebutton, pos={550,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_updatewindow,title="Update"
 EndMacro
+
+function sc_updatewindow(action) : ButtonControl
+	string action
+	// Nothing happens!
+end
 
 function sc_addrow(action) : ButtonControl
 	string action
