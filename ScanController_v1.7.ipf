@@ -271,7 +271,7 @@ function sc_CheckboxClicked(ControlName, Value)
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
 	nvar sc_PrintRaw, sc_PrintCalc
 	variable index
-	String expr
+	string expr
 	if (stringmatch(ControlName,"sc_RawRecordCheckBox*"))
 		expr="sc_RawRecordCheckBox([[:digit:]]+)"
 		SplitString/E=(expr) controlname, indexstring
@@ -299,21 +299,34 @@ function sc_CheckboxClicked(ControlName, Value)
 	endif
 end
 
-
+Function/S RemoveEndingWhitespace(str)
+	// stolen from http://www.igorexchange.com/node/2957
+	String str
+ 
+	do
+		String str2= RemoveEnding(str," ")
+		if( CmpStr(str2, str) == 0 )
+			break
+		endif
+		str= str2
+	while( 1 )
+	return str
+End
 
 function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_label])
 	variable start, fin, numpts, starty, finy, numptsy
 	string x_label, y_label
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
-	wave /T sc_RawWaveNames, sc_CalcWaveNames
+	wave /T sc_RawWaveNames, sc_CalcWaveNames, sc_RequestScripts, sc_GetResponseScripts
 	variable i=0, j=0
-	string cmd = "", wn = "", wn2d="", s
+	string cmd = "", wn = "", wn2d="", s, script = "", script0 = "", script1 = ""
 	string /g sc_x_label, sc_y_label
 	variable /g sc_is2d, sc_scanstarttime = datetime
 	variable /g sc_startx, sc_finx, sc_numptsx, sc_starty, sc_finy, sc_numptsy
 	variable/g sc_abortsweep=0, sc_pause=0
 	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, activegraphs="", cmd1=""
 	variable index, graphopen, graphopen2d
+	
 	//do some sanity checks on wave names: they should not start or end with numbers.
 	do
 		if (sc_RawRecord[i])
@@ -345,6 +358,44 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		i+=1
 	while (i<numpnts(sc_CalcWaveNames))	
 	i=0
+	
+	// check that request and response scripts are defined correctly
+	// check request scripts first
+	variable ii=0
+	do
+		if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
+			script = RemoveEndingWhitespace(sc_RequestScripts[ii])
+			if(cmpstr(script, "")!=0) // it's ok if this one is empty
+				// check if there is more than one command
+				script0 = RemoveEndingWhitespace(stringfromlist(0, script)) // should be something here
+				script1 = RemoveEndingWhitespace(stringfromlist(1, script)) // should be nothing here
+				if(cmpstr(script1, "")!=0 ||  strsearch(script0, "()", 0)==-1) // check that script1 is empty and script0 contains ()
+					abort "Request scripts should be formatted as: setParam() with no arguments and only a single function call"
+				else
+					sc_RequestScripts[ii] = script0
+				endif
+			endif
+		endif
+		ii+=1
+	while (ii < numpnts(sc_RawWaveNames))
+	
+	// check response scripts
+	ii=0
+	do
+		if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
+			script = RemoveEndingWhitespace(sc_GetResponseScripts[ii])
+			
+			// check if there is more than one command
+			script0 = RemoveEndingWhitespace(stringfromlist(0, script)) // should be something here
+			script1 = RemoveEndingWhitespace(stringfromlist(1, script)) // should be nothing here
+			if(cmpstr(script1, "")!=0 ||  strsearch(script0, "()", 0)==-1) // check that script1 is empty and script0 contains ()
+				abort "Response scripts should be formatted as: getParam() with no arguments and only a single function call"
+			else
+				sc_GetResponseScripts[ii] = script0
+			endif
+		endif
+		ii+=1
+	while (ii < numpnts(sc_RawWaveNames))
 	
 	//Check if Data exsits as a path
 	GetFileFolderInfo/Z/Q/P=Data
