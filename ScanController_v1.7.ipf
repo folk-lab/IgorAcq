@@ -329,7 +329,8 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	variable /g sc_is2d, sc_scanstarttime = datetime
 	variable /g sc_startx, sc_finx, sc_numptsx, sc_starty, sc_finy, sc_numptsy
 	variable/g sc_abortsweep=0, sc_pause=0
-	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, activegraphs="", cmd1=""
+	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, activegraphs="", cmd1="",window_string=""
+	string cmd2=""
 	variable index, graphopen, graphopen2d
 	
 	//do some sanity checks on wave names: they should not start or end with numbers.
@@ -598,7 +599,10 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	cmd1 = "TileWindows/O=1/A=(3,4) "
 	// Tile graphs
 	for(i=0;i<itemsinlist(activegraphs);i=i+1)
-		cmd1+= stringfromlist(i,activegraphs)+","
+		window_string = stringfromlist(i,activegraphs)
+		cmd1+= window_string +","
+		cmd2 = "DoWindow/F " + window_string
+		execute(cmd2)
 	endfor
 	cmd1 += "SweepControl"
 	execute(cmd1)
