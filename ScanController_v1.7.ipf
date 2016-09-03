@@ -173,13 +173,18 @@ Window ScanController() : Panel
 	cmd="SetVariable sc_LogStr pos={13, 127+5+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25}, size={sc_InnerBoxW-12, 0}, fsize=14, title=\" \", value=sc_LogStr"
 	execute(cmd)
 	
-	//Button BtnAbortSave, mode=2, pos={sc_InnerBoxW/2 - 150,},size={300,50},fsize=16,title="Abort Current Scan & Save Data", proc=sc_AbortSaveClicked
-	//SetDrawEnv fsize= 14
-	
 	// helpful text
-	DrawText 13,170+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing),"Press TAB to save changes."
+	DrawText 13,170+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing),"Press Update to save changes."
 	DrawText 13,190+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing),"Press ESC to abort the scan and save data, while this window is active"
+	
+	//Update button
+	button updatebutton, pos={550,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_updatewindow,title="Update"
 EndMacro
+
+function sc_updatewindow(action) : ButtonControl
+	string action
+	// Nothing happens!
+end
 
 function sc_addrow(action) : ButtonControl
 	string action
@@ -271,7 +276,7 @@ function sc_CheckboxClicked(ControlName, Value)
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
 	nvar sc_PrintRaw, sc_PrintCalc
 	variable index
-	String expr
+	string expr
 	if (stringmatch(ControlName,"sc_RawRecordCheckBox*"))
 		expr="sc_RawRecordCheckBox([[:digit:]]+)"
 		SplitString/E=(expr) controlname, indexstring
@@ -299,21 +304,35 @@ function sc_CheckboxClicked(ControlName, Value)
 	endif
 end
 
-
+Function/S RemoveEndingWhitespace(str)
+	// stolen from http://www.igorexchange.com/node/2957
+	String str
+ 
+	do
+		String str2= RemoveEnding(str," ")
+		if( CmpStr(str2, str) == 0 )
+			break
+		endif
+		str= str2
+	while( 1 )
+	return str
+End
 
 function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_label])
 	variable start, fin, numpts, starty, finy, numptsy
 	string x_label, y_label
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
-	wave /T sc_RawWaveNames, sc_CalcWaveNames
+	wave /T sc_RawWaveNames, sc_CalcWaveNames, sc_RequestScripts, sc_GetResponseScripts
 	variable i=0, j=0
-	string cmd = "", wn = "", wn2d="", s
+	string cmd = "", wn = "", wn2d="", s, script = "", script0 = "", script1 = ""
 	string /g sc_x_label, sc_y_label
 	variable /g sc_is2d, sc_scanstarttime = datetime
 	variable /g sc_startx, sc_finx, sc_numptsx, sc_starty, sc_finy, sc_numptsy
 	variable/g sc_abortsweep=0, sc_pause=0
-	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, activegraphs="", cmd1=""
+	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, activegraphs="", cmd1="",window_string=""
+	string cmd2=""
 	variable index, graphopen, graphopen2d
+	
 	//do some sanity checks on wave names: they should not start or end with numbers.
 	do
 		if (sc_RawRecord[i])
@@ -345,6 +364,44 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		i+=1
 	while (i<numpnts(sc_CalcWaveNames))	
 	i=0
+	
+	// check that request and response scripts are defined correctly
+	// check request scripts first
+	variable ii=0
+	do
+		if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
+			script = RemoveEndingWhitespace(sc_RequestScripts[ii])
+			if(cmpstr(script, "")!=0) // it's ok if this one is empty
+				// check if there is more than one command
+				script0 = RemoveEndingWhitespace(stringfromlist(0, script)) // should be something here
+				script1 = RemoveEndingWhitespace(stringfromlist(1, script)) // should be nothing here
+				if(cmpstr(script1, "")!=0 ||  strsearch(script0, "()", 0)==-1) // check that script1 is empty and script0 contains ()
+					abort "Request scripts should be formatted as: setParam() with no arguments and only a single function call"
+				else
+					sc_RequestScripts[ii] = script0
+				endif
+			endif
+		endif
+		ii+=1
+	while (ii < numpnts(sc_RawWaveNames))
+	
+	// check response scripts
+	ii=0
+	do
+		if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
+			script = RemoveEndingWhitespace(sc_GetResponseScripts[ii])
+			
+			// check if there is more than one command
+			script0 = RemoveEndingWhitespace(stringfromlist(0, script)) // should be something here
+			script1 = RemoveEndingWhitespace(stringfromlist(1, script)) // should be nothing here
+			if(cmpstr(script1, "")!=0 ||  strsearch(script0, "()", 0)==-1) // check that script1 is empty and script0 contains ()
+				abort "Response scripts should be formatted as: getParam() with no arguments and only a single function call"
+			else
+				sc_GetResponseScripts[ii] = script0
+			endif
+		endif
+		ii+=1
+	while (ii < numpnts(sc_RawWaveNames))
 	
 	//Check if Data exsits as a path
 	GetFileFolderInfo/Z/Q/P=Data
@@ -542,7 +599,10 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	cmd1 = "TileWindows/O=1/A=(3,4) "
 	// Tile graphs
 	for(i=0;i<itemsinlist(activegraphs);i=i+1)
-		cmd1+= stringfromlist(i,activegraphs)+","
+		window_string = stringfromlist(i,activegraphs)
+		cmd1+= window_string +","
+		cmd2 = "DoWindow/F " + window_string
+		execute(cmd2)
 	endfor
 	cmd1 += "SweepControl"
 	execute(cmd1)
@@ -585,6 +645,18 @@ function resumesweep(action) : Buttoncontrol
 	print "Sweep resumed"
 end
 
+function protofunc()
+	/// this function will be used to format function calls from strings
+	/// in this revision, all functions in requestscripts and responsescripts must take no arguments
+	///
+	/// for example:
+	/// getTemp("mc")
+	/// should be replaced with a function like
+	/// function getMCTemp()
+ 	/// 	return getTemp("mc")
+ 	/// end
+ end	
+ 	
 // In a 1d scan, i is the index of the loop. j will be ignored.
 // In a 2d scan, i is the index of the outer (slow) loop, and j is the index of the inner (fast) loop. 
 // In a 2D scan, if scandirection=1 (scan up), the 1d wave gets saved into the matrix when j=numptsy. If scandirection=-1(scan down), the 1d matrix gets saved when j=0. Default is 1 (up)
@@ -594,11 +666,9 @@ function RecordValues(i, j, [scandirection,readvstime])
 	variable ii = 0, jj=0
 	wave /t sc_RawWaveNames, sc_RequestScripts, sc_GetResponseScripts, sc_CalcWaveNames, sc_CalcScripts
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
-	string script = "",cmd
+	string script = "",cmd = "", wstr = ""
 	variable innerindex, outerindex
 	nvar sc_abortsweep, sc_pause,sc_scanstarttime
-	
-	DoUpdate /W=SweepControl /E=1
 	
 	if (sc_is2d)
 		// 2d
@@ -630,7 +700,8 @@ function RecordValues(i, j, [scandirection,readvstime])
 			jj=0;
 			script = sc_RequestScripts[ii];
 			if (cmpstr(script, ""))
-				execute(script)
+				FUNCREF protofunc fscript = $script[0,strlen(script)-3]
+				fscript()
 			endif
 		endif
 		ii+=1
@@ -640,28 +711,27 @@ function RecordValues(i, j, [scandirection,readvstime])
 	ii=0
 	do
 		if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
-			jj=0;
-			script = sc_GetResponseScripts[ii];
+			script = sc_GetResponseScripts[ii]; // assume i'm just getting one function back here like "readFunc()"
+			
 			// Redimension waves if readvstime is set to 1
 			if (readvstime == 1)
 				redimension /n=(innerindex+1) $sc_RawWaveNames[ii]
 				setscale/I x 0,  datetime - sc_scanstarttime, $sc_RawWaveNames[ii]
 			endif
-			do
-				if (jj < ItemsInList(script)-1)
-					execute(StringFromList(jj, script))
-				else
-					execute(sc_RawWaveNames[ii] + "[" + num2istr(innerindex) + "]=" + StringFromList(jj, script))
-					if (sc_is2d)
-						// 2D Wave
-						// If this is the last point in a row on a 2d scan, save the row in the 2d wave
-						if ((innerindex == sc_numptsx-1 && scandirection == 1) || (innerindex == 0 && scandirection == -1))
-							execute(sc_RawWaveNames[ii] + "2d[][" + num2istr(outerindex) + "] = " + sc_RawWaveNames[ii] + "[p]")
-						endif
-					endif
+
+			// execute response script
+			wave wref1d = $sc_RawWaveNames[ii]
+			FUNCREF protofunc fscript = $script[0,strlen(script)-3]
+			wref1d[innerindex] = fscript()
+			
+			if (sc_is2d)
+				// 2D Wave
+				// If this is the last point in a row on a 2d scan, save the row in the 2d wave
+				if ((innerindex == sc_numptsx-1 && scandirection == 1) || (innerindex == 0 && scandirection == -1))
+					wave wref2d = $sc_RawWaveNames[ii] + "2d"
+					wref2d[][outerindex] = wref1d[p]
 				endif
-				jj+=1
-			while (jj<ItemsInList(script))
+			endif
 		endif
 		ii+=1
 	while (ii < numpnts(sc_RawWaveNames))
@@ -670,31 +740,27 @@ function RecordValues(i, j, [scandirection,readvstime])
 	ii=0
 	do
 		if (sc_CalcRecord[ii] == 1 || sc_CalcPlot[ii] == 1)
-			jj=0;
-			script = sc_CalcScripts[ii];
+			script = sc_CalcScripts[ii]; // assume i'm just getting one function back here like "readFunc()"
+			
 			// Redimension waves if readvstimeis set to 1
 			if (readvstime == 1)
 				redimension /n=(innerindex+1) $sc_CalcWaveNames[ii]
 				setscale/I x 0, datetime - sc_scanstarttime, $sc_CalcWaveNames[ii]
 			endif
+			
 			// Allow the use of the keyword '[i]' in calculated fields where i is the inner loop's current index
 			script = ReplaceString("[i]", script, "["+num2istr(innerindex)+"]")
-			do
-				// If multiple commands are present, assign the value returned by the last command to the corresponding wave
-				if (jj < ItemsInList(script)-1)
-					execute(StringFromList(jj, script))
-				else
-					execute(sc_CalcWaveNames[ii] + "[" + num2istr(innerindex) + "]=" + StringFromList(jj, script))
-					if (sc_is2d)
-						// 2D Wave						
-						// If this is the last point in a row on a 2d scan, save the row in the 2d wave
-						if ((innerindex == sc_numptsx-1 && scandirection == 1) || (innerindex == 0 && scandirection == -1))
-							execute(sc_CalcWaveNames[ii] + "2d[][" + num2istr(outerindex) + "] = " + sc_CalcWaveNames[ii] + "[p]")
-						endif												
-					endif
-				endif
-				jj+=1
-			while (jj<ItemsInList(script))
+			execute(sc_CalcWaveNames[ii] + "[" + num2istr(innerindex) + "]=" + script)
+			
+			if (sc_is2d)
+				// 2D Wave						
+				// If this is the last point in a row on a 2d scan, save the row in the 2d wave
+				if ((innerindex == sc_numptsx-1 && scandirection == 1) || (innerindex == 0 && scandirection == -1))
+					wave wref1d = $sc_CalcWaveNames[ii]
+					wave wref2d = $sc_CalcWaveNames[ii] + "2d"
+					wref2d[][outerindex] = wref1d[p]
+				endif												
+			endif
 		endif
 		ii+=1
 	while (ii < numpnts(sc_CalcWaveNames))
