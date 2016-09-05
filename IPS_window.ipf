@@ -9,6 +9,8 @@
 ///// Initiate Magnet /////
 
 function InitMagnet()
+	// BF 10T magnet: x.xx A/T, 10000 mT, 300 mT/min
+	// IGH 12T magnet: 8.2061452674 A/T, 12000 mT, 400 mT/min
 	variable/g ampspertesla = 8.2061452674 // A/T
 	variable/g maxfield = 12000 // mT
 	variable/g maxramprate = 400 // mT/min
@@ -24,6 +26,8 @@ function InitMagnet()
 	string/g oldsweeprate = magnetvalsstr[4][1]
 	string/g oldsetpoint = "0"
 	execute("IPS_window()")
+	execute("Reminder_window()")
+	PauseForUser Reminder_window
 end
 
 function TestMagnet()
@@ -307,6 +311,23 @@ Window IPS_Window() : Panel
 	Button setrate,pos={290,250},size={130,20},proc=update_magnet,title="Change sweep rate"
 	Button updatevals, pos={10,250},size={150,20},proc=update_magnet,title="Update current values"
 EndMacro
+
+Window Reminder_window() : Panel
+	PauseUpdate; Silent 1 // building window
+	NewPanel /W=(0,0, 210,130) // window size
+	ModifyPanel frameStyle=2
+	SetDrawLayer UserBack
+	SetDrawEnv fsize= 20,fstyle= 1 
+	DrawText 25, 40,"Magnet Settings" // Headline
+	DrawText 10, 80, "Remember to change Amp/Tesla,"
+	DrawText 10, 95, "max field and max sweep rate!"
+	Button ok_button,pos={40,100},size={110,20},proc=ok_button,title="OK"
+end
+
+function ok_button(action) : ButtonControl
+	string action
+	dowindow /k Reminder_window
+end
 
 function update_magnet(action) : ButtonControl
 	string action
