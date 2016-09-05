@@ -3,7 +3,6 @@
 //	Driver communicates over serial, remenber to set the correct port in SetSerial()
 //	Adding an interavtive window
 //	Currents are returned in amps, while field values are return in mT
-//	Edit ampspertesla, maxfield and maxramprate according to the magnet in use
 //	Procedure written by Christian Olsen 2016-01-26
 
 ///// Initiate Magnet /////
@@ -11,23 +10,23 @@
 function InitMagnet()
 	// BF 10T magnet: x.xx A/T, 10000 mT, 300 mT/min
 	// IGH 12T magnet: 8.2061452674 A/T, 12000 mT, 400 mT/min
-	variable/g ampspertesla = 8.2061452674 // A/T
-	variable/g maxfield = 12000 // mT
-	variable/g maxramprate = 400 // mT/min
-	MagnetSetup() // Setting up serial communication
-	WriteMagnetCheckResponse("C3") // Remote and unlocked
-	WriteMagnetCheckResponse("M9") // Set display to Tesla
-	WriteMagnet("Q4") // Use extented resolusion (0.0001 amp/0.01 mT), no return given by magnet
-	WriteMagnetCheckResponse("A0") // Set to Hold
-	dowindow/k IPS_Window
-	make /t/o magnetvalsstr = {{"Current field [mT]","Current amp [A]","Set point [mT]","Set point [A]","Sweep rate [mT/min]","Sweep rate [A/min]","Switch heater"},{"0","0","0","0","0","0","OFF"}}
-	make /o listboxattr_mag={{0,0,0,0,0,0,0},{0,0,2,0,2,0,0}} // Setting list attributes. 0 = non-interactive, 2 = interactive
-	SetSweepRate(100)
-	string/g oldsweeprate = magnetvalsstr[4][1]
-	string/g oldsetpoint = "0"
-	execute("IPS_window()")
-	execute("Reminder_window()")
-	PauseForUser Reminder_window
+	variable/g ampspertesla // A/T
+	variable/g maxfield // mT
+	variable/g maxramprate //mT/min
+//	MagnetSetup() // Setting up serial communication
+//	WriteMagnetCheckResponse("C3") // Remote and unlocked
+//	WriteMagnetCheckResponse("M9") // Set display to Tesla
+//	WriteMagnet("Q4") // Use extented resolusion (0.0001 amp/0.01 mT), no return given by magnet
+//	WriteMagnetCheckResponse("A0") // Set to Hold
+//	dowindow/k IPS_Window
+//	make /t/o magnetvalsstr = {{"Current field [mT]","Current amp [A]","Set point [mT]","Set point [A]","Sweep rate [mT/min]","Sweep rate [A/min]","Switch heater"},{"0","0","0","0","0","0","OFF"}}
+//	make /o listboxattr_mag={{0,0,0,0,0,0,0},{0,0,2,0,2,0,0}} // Setting list attributes. 0 = non-interactive, 2 = interactive
+//	SetSweepRate(100)
+//	string/g oldsweeprate = magnetvalsstr[4][1]
+//	string/g oldsetpoint = "0"
+//	execute("IPS_window()")
+	execute("Magnetsettings_window()")
+	PauseForUser Magnetsettings
 end
 
 function TestMagnet()
@@ -312,21 +311,34 @@ Window IPS_Window() : Panel
 	Button updatevals, pos={10,250},size={150,20},proc=update_magnet,title="Update current values"
 EndMacro
 
-Window Reminder_window() : Panel
+Window Magnetsettings_window() : Panel
 	PauseUpdate; Silent 1 // building window
-	NewPanel /W=(0,0, 210,130) // window size
+	NewPanel /W=(0,0, 250,100)/N=MagnetSettings // window size
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv fsize= 20,fstyle= 1 
-	DrawText 25, 40,"Magnet Settings" // Headline
-	DrawText 10, 80, "Remember to change Amp/Tesla,"
-	DrawText 10, 95, "max field and max sweep rate!"
-	Button ok_button,pos={40,100},size={110,20},proc=ok_button,title="OK"
+	DrawText 50, 40,"Choose Magnet" // Headline
+	Button BFmagnet,pos={10,60},size={110,20},proc=magnet_button,title="BF 10T Magnet"
+	Button IGHmagnet,pos={130,60},size={110,20},proc=magnet_button,title="IGH 12T Magnet"
 end
 
-function ok_button(action) : ButtonControl
+function magnet_button(action) : ButtonControl
 	string action
-	dowindow /k Reminder_window
+	nvar ampspertesla, maxfield, maxramprate
+	strswitch(action)
+		case "BFmagnet":
+			ampspertesla = 1//A/T
+			maxfield = 10000//mT
+			maxramprate = 300//mT/min
+			dowindow /k MagnetSettings
+			break
+		case "IGHmagnet":
+			ampspertesla = 8.2061452674//A/T
+			maxfield = 12000//mT
+			maxramprate = 400//mT/min
+			dowindow /k MagnetSettings
+			break
+	endswitch
 end
 
 function update_magnet(action) : ButtonControl
