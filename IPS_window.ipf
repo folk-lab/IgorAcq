@@ -4,6 +4,7 @@
 //	Adding an interavtive window
 //	Currents are returned in amps, while field values are return in mT
 //	Procedure written by Christian Olsen 2016-01-26
+// 	Updated by Christian to automatically set the magnet settings. 2016-09-05
 
 ///// Initiate Magnet /////
 
@@ -13,18 +14,18 @@ function InitMagnet()
 	variable/g ampspertesla // A/T
 	variable/g maxfield // mT
 	variable/g maxramprate //mT/min
-//	MagnetSetup() // Setting up serial communication
-//	WriteMagnetCheckResponse("C3") // Remote and unlocked
-//	WriteMagnetCheckResponse("M9") // Set display to Tesla
-//	WriteMagnet("Q4") // Use extented resolusion (0.0001 amp/0.01 mT), no return given by magnet
-//	WriteMagnetCheckResponse("A0") // Set to Hold
-//	dowindow/k IPS_Window
-//	make /t/o magnetvalsstr = {{"Current field [mT]","Current amp [A]","Set point [mT]","Set point [A]","Sweep rate [mT/min]","Sweep rate [A/min]","Switch heater"},{"0","0","0","0","0","0","OFF"}}
-//	make /o listboxattr_mag={{0,0,0,0,0,0,0},{0,0,2,0,2,0,0}} // Setting list attributes. 0 = non-interactive, 2 = interactive
-//	SetSweepRate(100)
-//	string/g oldsweeprate = magnetvalsstr[4][1]
-//	string/g oldsetpoint = "0"
-//	execute("IPS_window()")
+	MagnetSetup() // Setting up serial communication
+	WriteMagnetCheckResponse("C3") // Remote and unlocked
+	WriteMagnetCheckResponse("M9") // Set display to Tesla
+	WriteMagnet("Q4") // Use extented resolusion (0.0001 amp/0.01 mT), no return given by magnet
+	WriteMagnetCheckResponse("A0") // Set to Hold
+	dowindow/k IPS_Window
+	make /t/o magnetvalsstr = {{"Current field [mT]","Current amp [A]","Set point [mT]","Set point [A]","Sweep rate [mT/min]","Sweep rate [A/min]","Switch heater"},{"0","0","0","0","0","0","OFF"}}
+	make /o listboxattr_mag={{0,0,0,0,0,0,0},{0,0,2,0,2,0,0}} // Setting list attributes. 0 = non-interactive, 2 = interactive
+	SetSweepRate(100)
+	string/g oldsweeprate = magnetvalsstr[4][1]
+	string/g oldsetpoint = "0"
+	execute("IPS_window()")
 	execute("Magnetsettings_window()")
 	PauseForUser Magnetsettings
 end
