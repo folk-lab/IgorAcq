@@ -9,7 +9,7 @@
 ///// Initiate Magnet /////
 
 function InitMagnet()
-	// BF 10T magnet: x.xx A/T, 10000 mT, 300 mT/min
+	// BF 10T magnet: 9.6768 A/T, 10000 mT, 300 mT/min
 	// IGH 12T magnet: 8.2061452674 A/T, 12000 mT, 400 mT/min
 	variable/g ampspertesla // A/T
 	variable/g maxfield // mT
@@ -328,7 +328,7 @@ function magnet_button(action) : ButtonControl
 	nvar ampspertesla, maxfield, maxramprate
 	strswitch(action)
 		case "BFmagnet":
-			ampspertesla = 1//A/T
+			ampspertesla = 9.6768//A/T
 			maxfield = 10000//mT
 			maxramprate = 300//mT/min
 			dowindow /k MagnetSettings
