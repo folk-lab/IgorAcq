@@ -501,11 +501,14 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 				if(stringmatch(wn,stringfromlist(j,graphtitle)))
 					graphopen = 1
 					activegraphs+= stringfromlist(j,graphnumlist)+";"
+					Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
 				endif
 				if(sc_is2d)
 					if(stringmatch(wn+"2d",stringfromlist(j,graphtitle)))
 						graphopen2d = 1
 						activegraphs+= stringfromlist(j,graphnumlist)+";"
+						Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
+						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
 					endif
 				endif
 			endfor
@@ -553,11 +556,14 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 				if(stringmatch(wn,stringfromlist(j,graphtitle)))
 					graphopen = 1
 					activegraphs+= stringfromlist(j,graphnumlist)+";"
+					Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
 				endif
 				if(sc_is2d)
 					if(stringmatch(wn+"2d",stringfromlist(j,graphtitle)))
 						graphopen2d = 1
 						activegraphs+= stringfromlist(j,graphnumlist)+";"
+						Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
+						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
 					endif
 				endif
 			endfor
