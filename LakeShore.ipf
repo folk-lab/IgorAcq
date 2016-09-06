@@ -601,6 +601,13 @@ function ReadResponseString(responsestr,key)
 	endfor
 end
 
+function /S check_command(command)
+	string command
+	string url
+	url = CreateURL("createCommand", writeurl = "1", cmd = command)
+	return QueryLakeShore(url)
+end
+
 //// User interface ////
 
 window LakeShore_Window() : Panel
@@ -740,14 +747,7 @@ function Update_control(action) : ButtonControl
 	UpdateCurrentValues()
 end
 
-//function stupid()
-//	string response
-//	nvar control_channel,filter_channel,units_control,delay_control,cp_control,heaterrange_control,heaterres_control
-//	variable heaterrange_max
-//	response = "   10.000, 000010, 000000"
-//	sscanf response, "%g,%g,%g", control_channel,filter_channel,units_control
-//	return filter_channel
-//end
+//// xxx ////
 
 function HeatUpMagnetToRoomTemperature()
 	variable magnet_temperature = GetTemp("magnet"), heater_is_on
@@ -763,11 +763,4 @@ function HeatUpMagnetToRoomTemperature()
 		magnet_temperature = GetTemp("magnet")
 	while (GetTemp("still")<280)
 	magnetheater("off")
-end
-
-function /S check_command(command)
-	string command
-	string url
-	url = CreateURL("createCommand", writeurl = "1", cmd = command)
-	return QueryLakeShore(url)
 end
