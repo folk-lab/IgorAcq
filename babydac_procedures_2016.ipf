@@ -595,7 +595,7 @@ function/s GetDACStatus()
 	do
 		if(numtype(boardnumbers[i])==0)
 			for(j=0;j<4;j+=1)
-				sprintf buffer, "CH%d = %s\r\t", (4*i+j), dacvalsstr[4*i+j][1]
+				sprintf buffer, "CH%d = %s mV\r\t", (4*i+j), dacvalsstr[4*i+j][1]
 				winfcomments+=buffer
 			endfor
 		endif
