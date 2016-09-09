@@ -11,6 +11,12 @@
 function InitBabyDACs(b1, [b2, b3, b4, range])
 	variable b1, b2, b3, b4, range
 	
+	// set DAC output range
+	if(ParamIsDefault(range))
+		range=2
+	endif
+	SetChannelRange(range) // set to 1 for +-10V or 2 for +-5V
+	
 	CheckForOldInit() // Will update the user window to the last known values.
 	
 	// handle board numbering
@@ -25,13 +31,7 @@ function InitBabyDACs(b1, [b2, b3, b4, range])
 	endif
 	SetBoardNumbers(b1, b2=b2, b3=b3, b4=b4) // Set the boards numbers of the used boards.
 	
-	DACSetup() // setup DAC com port
-	
-	// set DAC output range
-	if(ParamIsDefault(range))
-		range=2
-	endif
-	SetChannelRange(range) // set to 1 for +-10V or 2 for +-5V
+	//DACSetup() // setup DAC com port
 	
 	// open window
 	dowindow /k BabyDACWindow
