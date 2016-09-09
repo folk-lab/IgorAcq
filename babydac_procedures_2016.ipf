@@ -88,7 +88,7 @@ function AskUser()
 end
 
 function SetSerialPort()
-	string/g bd_comport = "COM5" // Set to the right COM Port
+	string/g bd_comport = "COM19" // Set to the right COM Port
 	execute("VDTOperationsPort2 $bd_comport")
 end
 
@@ -347,17 +347,18 @@ function RampOutputBD(channel, output, [ramprate, noupdate])
 	return 1
 end
 
-function UpdateMultipleBD([action])
+function UpdateMultipleBD([action, ramprate])
 
 	// usage:
 	// function Experiment(....)
 	//         ...
 	//         wave /t dacvalsstr = dacvalsstr // this wave keeps track of new DAC values
-	//         dacvalsstr[channelA][1] = num2str(1000 // set new values with a strings
+	//         dacvalsstr[channelA][1] = num2str(1000) // set new values with a strings
 	//         dacvalsstr[channelB][1] = num2str(-500)
 	//         UpdateMultipleBD(action="ramp") // ramps all channels to updated values
 	
 	string action // "set" or "ramp"
+	variable ramprate
 	wave/t dacvalsstr=dacvalsstr
 	wave/t oldvalue=oldvalue
 	variable output,i
@@ -365,6 +366,10 @@ function UpdateMultipleBD([action])
 
 	if(ParamIsDefault(action))
 		action="ramp"
+	endif
+	
+	if(paramisdefault(ramprate))
+		ramprate = 1000    // (mV/s) ~~equivalent to old rate
 	endif
 
 	for(i=0;i<16;i+=1)
@@ -374,7 +379,7 @@ function UpdateMultipleBD([action])
 				case "set":
 					check = SetOutputBD(i,output)
 				case "ramp":
-					check = RampOutputBD(i,output)
+					check = RampOutputBD(i,output,ramprate=ramprate)
 			endswitch
 			if(check == 1)
 				oldvalue[i][1] = dacvalsstr[i][1]
@@ -384,6 +389,23 @@ function UpdateMultipleBD([action])
 		endif
 	endfor
 	return 1
+end
+
+function RampMultipleBD(channels, setpoint, nChannels, [ramprate])
+	variable setpoint, ramprate, nChannels
+	string channels
+	variable i, channel
+	wave /t dacvalsstr = dacvalsstr
+
+	if(paramisdefault(ramprate))
+		ramprate = 1000    // (mV/s)
+	endif
+	
+	for(i=0;i<nChannels;i+=1)
+		channel = str2num(StringFromList(i, channels, ","))
+		dacvalsstr[channel][1] = num2str(setpoint) // set new values with a strings
+	endfor
+	UpdateMultipleBD(action="ramp", ramprate=ramprate)
 end
 
 ///// ACD readings /////

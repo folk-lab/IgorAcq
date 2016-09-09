@@ -1,62 +1,20 @@
 #pragma rtGlobals=3		// Use modern global access method and strict wave access.
 
-// get temperatures
-// get these from Lakeshore driver instead
-//
-//function GetCurrentBFStatus(workingstr, loggable_name)
-//	string workingstr, loggable_name
-//	string keyname
-//	variable numvals, i
-//	numvals = ItemsInList(workingstr)
-//	Make/O/T/N=(numvals) textWave= StringFromList(p,workingstr)
-//	for (i=0; i<numvals; i+=1)
-//		keyname = stringfromlist(0,textwave[i],"=")
-//		if (stringmatch(keyname, loggable_name))
-//			return str2num(stringfromlist(1,textwave[i],"="))
-//		endif
-//	endfor
-//end
-////
-//function GetBFMixChTemp()
-//
-//	String url = "http://qdot-server.phas.ubc.ca:8081/webService/logger.php?action=getCurrentState"
-//	url = url + "&loggable_category_id=4"
-//	String response = FetchURL(url)
-//	return GetCurrentBFStatus(response, "bfs_mc_temp")
-//	
-//end
-////
-//function GetBFMagnetTemp()
-//
-//	String url = "http://qdot-server.phas.ubc.ca:8081/webService/logger.php?action=getCurrentState"
-//	url = url + "&loggable_category_id=4"
-//	String response = FetchURL(url)
-//	return GetCurrentBFStatus(response, "bfs_magnet_temp")
-//	
-//end
-//
-//function GetBF4KTemp()
-//
-//	String url = "http://qdot-server.phas.ubc.ca:8081/webService/logger.php?action=getCurrentState"
-//	url = url + "&loggable_category_id=4"
-//	String response = FetchURL(url)
-//	return GetCurrentBFStatus(response, "bfs_4K_temp")
-//	
-//end
+// temperature commands require LakeShore.ipf
 
-// Lakeshore commands below
-
-function /s SendLSCommand(command)
-	string command
-	string response
-	command = ReplaceString(" ", command, "%20")
-	String url = "http://qdot-server.phas.ubc.ca:8081/webService/commandmanager.php?action=createCommand"
-	url = url + "&port_id=3&cmd=" + command
-	response = FetchURL(url)
-	return response
+function getMCtemp()
+	return GetTemp("mc")
 end
 
-// get Pressure values
+function get4Ktemp()
+	return GetTemp("4k")
+end
+
+function get50Ktemp()
+	return GetTemp("50k")
+end
+
+// pressure readings straight from the server
 
 function GetBFPressure(sensor)
 	variable sensor
@@ -65,4 +23,18 @@ function GetBFPressure(sensor)
 	url = url+ "bfs_p" + num2str(sensor)+"&yes_calc=false"
 	response = FetchURL(url)
 	return str2num(response)
+end
+
+// bluefors status for logging
+
+function /S GetBFStatus()
+	string winfcomments=""
+	string  buffer=""
+
+	sprintf  winfcomments "BF250:\r\t"
+	sprintf buffer "MC = %.3f K\r\tStill = %.3f K\r\t4K = %.3f K\r\tMagnet = %.3f K\r\t50K = %.3f K\r\t", GetTemp("mc"), GetTemp("still"), GetTemp("4k"), GetTemp("magnet"), GetTemp("50k")
+	winfcomments += buffer
+	sprintf buffer "P1 = %.2e mbar\r\tP2 = %.3f mbar\r\tP3 = %.3f mbar\r\tP4 = %.3f mbar\r\tP5 = %.3f mbar\r\tP6 = %.3f mbar\r\t", GetBFPressure(1), GetBFPressure(2), GetBFPressure(3), GetBFPressure(4), GetBFPressure(5), GetBFPressure(6)
+	winfcomments += buffer
+	return winfcomments
 end
