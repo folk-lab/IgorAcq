@@ -9,9 +9,9 @@
 ///// Initiate Magnet /////
 
 function InitMagnet()
-	variable/g ampspertesla = 8.2061452674 // A/T
-	variable/g maxfield = 12000 // mT
-	variable/g maxramprate = 400 // mT/min
+	variable/g ampspertesla = 9.6768 // A/T
+	variable/g maxfield = 10000 // mT
+	variable/g maxramprate = 300 // mT/min
 	MagnetSetup() // Setting up serial communication
 	WriteMagnetCheckResponse("C3") // Remote and unlocked
 	WriteMagnetCheckResponse("M9") // Set display to Tesla
@@ -36,7 +36,7 @@ function TestMagnet()
 end
 
 function SetSerial()
-	string/g comport = "COM3" // Set to the right COM Port
+	string/g comport = "COM4" // Set to the right COM Port
 	string cmd
 	sprintf cmd, "VDTOperationsPort2 %s", comport
 	execute(cmd)
@@ -215,8 +215,8 @@ end
 function SetFieldWait(field) // in mT
 	// Setting new set point and waiting for magnet to reach new set point
 	variable field
-	variable err = 0.06 // this should really be 0.01, but I find it gets stuck in that case --Nik
-					// even with 0.05 it gets stuck. I changed to it 0.06 -- Mohammad
+	variable err = 0.075 // this should really be 0.01, but I find it gets stuck in that case --Nik
+					  // even with 0.05 it gets stuck. I changed to it 0.06 -- Mohammad
 	variable currentfield
 	variable sweeprate
 	variable sweeptime

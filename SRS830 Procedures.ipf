@@ -282,52 +282,32 @@ function ReadSRSjunk(srs)
 	// for those times when your srs gpib got messed up and there's something in the buffer, and
 	// your scans are always off by some buffered reading... call this procedure.
 	variable srs
-	Variable/G junkvariable,flagnolocal
-
-	variable /g v_flag
+	variable/g junkvariable
+	variable/g v_flag
+	v_flag = 1
+	junkvariable = 0
+	variable i
 	do
 		execute "GPIB device "+num2istr(srs)
-//	execute "GPIBwrite/F=\"%s\"  \"OUTP? 1\""
-		execute "GPIBread/Q/T=\"\\r\" junkvariable"
+		execute "GPIBread/Q/N=1 junkvariable"
+		i+=1
 	while(v_flag)
+	printf "this read %d characters of junk \r", i-1
 	return junkvariable
 End
 
-
-function/s GetSRSStatus(srs,str)
+function/s GetSRSStatus(srs)
 	variable srs
-	string str // GPIB address
-	string winfcomments ="Lock-in "+str+":\r\t", buffer=""
-	sprintf buffer "Amplitude = %.3f V\r\tTime Constant = %.2fms\r\tFrequency = %.2fHz\r\tPhase = %.2fdeg\r\tSensitivity = %.4fV\r\tHarmonic = %d\r", GetSRSAmplitude(srs), GetSRSTimeConstInSeconds(srs)*1000, GetSRSFrequency(srs), GetSRSPhase(srs), GetSRSSensitivityInVolts(srs), GetSRSHarmonic(srs)
+	nvar pad
+	string cmd
+	string winfcomments
+	string  buffer
+	
+	sprintf cmd "gpib_return(%d)", srs
+	execute(cmd)
+	sprintf  winfcomments "Lock-in GPIB%d:\r\t", pad
+	sprintf buffer "Amplitude = %.3f V\r\tTime Constant = %.2f ms\r\tFrequency = %.2f Hz\r\tPhase = %.2f deg\r\tSensitivity = %.4f V\r\tHarmonic = %d\r", GetSRSAmplitude(srs), GetSRSTimeConstInSeconds(srs)*1000, GetSRSFrequency(srs), GetSRSPhase(srs), GetSRSSensitivityInVolts(srs), GetSRSHarmonic(srs)
 
 	winfcomments += buffer
 	return winfcomments
 end
-
-//
-//function/S GetStatusStringForWINF()
-//	nvar srs8, srs9
-//	wave dacvals=root:dacvals
-//	string winfcomments = "", buffer = "";
-//	variable i=0
-//	sprintf buffer, "Mixing Chamber: %.1fmK\r", GetMixChTemp()
-//	winfcomments += buffer
-//	winfcomments += "BabyDAC:\r"
-//	do
-//		sprintf buffer, "\tChannel %d = %.2f\r", i, dacvals[i][1]; winfcomments += buffer;
-//		i+=1
-//	while (i<4)
-//	i=8
-//	do
-//		sprintf buffer, "\tChannel %d = %.2f\r", i, dacvals[i][1]; winfcomments += buffer;
-//		i+=1
-//	while (i<12)
-//	sprintf buffer "Lock-in 8:\r\tAmplitude = %.3f V\r\tTime Constant = %.2fms\r\tFrequency = %.2fHz\r\tPhase = %.2fdeg\r\tSensitivity = %.4fV\r\tHarmonic = %d\r", GetSRSAmplitude(srs8), GetSRSTimeConstInSeconds(srs8)*1000, GetSRSFrequency(srs8), GetSRSPhase(srs8), GetSRSSensitivityInVolts(srs8), GetSRSHarmonic(srs8)
-//	winfcomments += buffer
-//	sprintf buffer "Lock-in 9:\r\tAmplitude = %.3f V\r\tTime Constant = %.2fms\r\tFrequency = %.2fHz\r\tPhase = %.2fdeg\r\tSensitivity = %.4fV\r\tHarmonic = %d\r", GetSRSAmplitude(srs9), GetSRSTimeConstInSeconds(srs9)*1000, GetSRSFrequency(srs9), GetSRSPhase(srs9), GetSRSSensitivityInVolts(srs9), GetSRSHarmonic(srs9)
-//	winfcomments += buffer		
-//	variable AmpToTesla = 1/8.2061452674
-//	sprintf  buffer, "IPS:\r\tMagnetic Field = %.4f T\r\tSweep Rate = %.4f T/min\r\r", ipsAReadTargetCurrent()*AmpToTesla, ipsAReadSweepRate()*AmpToTesla
-//	winfcomments += buffer
-//	return winfcomments
-//end

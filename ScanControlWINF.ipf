@@ -23,11 +23,24 @@ function /s str2WINF(datname, s)
 	filename =  "dat" + num2istr(filenum) + datname + extension
 	pathinfo data; datapath=S_path
 	winfpath = datapath+"winfs:"
+	
+	//	GetFileFolderInfo /Q /Z=1 winfpath // check if directory exists
+	//	if (V_flag!=0)
+	//		// create folder
+	//	endif
 
 	newpath /C/O/Q winfs winfpath // easier just to add/create a path
 	
 	open /A refnum as winfpath+filename
-	fprintf refnum, "%s", s
+	do
+		if(strlen(s)<500)
+			fprintf refnum, "%s", s
+			break
+		else
+			fprintf refnum, "%s", s[0,499]
+			s = s[500,inf]
+		endif
+	while(1)
 	close refnum
 	return filename
 end
