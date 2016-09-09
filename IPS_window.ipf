@@ -3,15 +3,17 @@
 //	Driver communicates over serial, remenber to set the correct port in SetSerial()
 //	Adding an interavtive window
 //	Currents are returned in amps, while field values are return in mT
-//	Edit ampspertesla, maxfield and maxramprate according to the magnet in use
 //	Procedure written by Christian Olsen 2016-01-26
+// 	Updated by Christian to automatically set the magnet settings. 2016-09-05
 
 ///// Initiate Magnet /////
 
 function InitMagnet()
-	variable/g ampspertesla = 9.6768 // A/T
-	variable/g maxfield = 10000 // mT
-	variable/g maxramprate = 300 // mT/min
+	// BF 10T magnet: 9.6768 A/T, 10000 mT, 300 mT/min
+	// IGH 12T magnet: 8.2061452674 A/T, 12000 mT, 400 mT/min
+	variable/g ampspertesla // A/T
+	variable/g maxfield // mT
+	variable/g maxramprate //mT/min
 	MagnetSetup() // Setting up serial communication
 	WriteMagnetCheckResponse("C3") // Remote and unlocked
 	WriteMagnetCheckResponse("M9") // Set display to Tesla
@@ -24,6 +26,8 @@ function InitMagnet()
 	string/g oldsweeprate = magnetvalsstr[4][1]
 	string/g oldsetpoint = "0"
 	execute("IPS_window()")
+	execute("Magnetsettings_window()")
+	PauseForUser Magnetsettings
 end
 
 function TestMagnet()
@@ -307,6 +311,36 @@ Window IPS_Window() : Panel
 	Button setrate,pos={290,250},size={130,20},proc=update_magnet,title="Change sweep rate"
 	Button updatevals, pos={10,250},size={150,20},proc=update_magnet,title="Update current values"
 EndMacro
+
+Window Magnetsettings_window() : Panel
+	PauseUpdate; Silent 1 // building window
+	NewPanel /W=(0,0, 250,100)/N=MagnetSettings // window size
+	ModifyPanel frameStyle=2
+	SetDrawLayer UserBack
+	SetDrawEnv fsize= 20,fstyle= 1 
+	DrawText 50, 40,"Choose Magnet" // Headline
+	Button BFmagnet,pos={10,60},size={110,20},proc=magnet_button,title="BF 10T Magnet"
+	Button IGHmagnet,pos={130,60},size={110,20},proc=magnet_button,title="IGH 12T Magnet"
+end
+
+function magnet_button(action) : ButtonControl
+	string action
+	nvar ampspertesla, maxfield, maxramprate
+	strswitch(action)
+		case "BFmagnet":
+			ampspertesla = 9.6768//A/T
+			maxfield = 10000//mT
+			maxramprate = 300//mT/min
+			dowindow /k MagnetSettings
+			break
+		case "IGHmagnet":
+			ampspertesla = 8.2061452674//A/T
+			maxfield = 12000//mT
+			maxramprate = 400//mT/min
+			dowindow /k MagnetSettings
+			break
+	endswitch
+end
 
 function update_magnet(action) : ButtonControl
 	string action
