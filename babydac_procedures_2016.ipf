@@ -410,7 +410,7 @@ end
 
 ///// ACD readings /////
 
-function Reading2Voltage()
+function BD_Reading2Voltage()
 	wave bd_response_wave
 	variable a, b, c, int_reading // declare a bunch of integers
 	variable frac, volts // should be floats
@@ -512,7 +512,7 @@ function ReadADCBD(channel, board_number)
 	while(bd_response_wave[1]!=bd_cmd_wave[1]) // stop when the right response comes back
 	
 	// get the reading out of that mess
-	reading = Reading2Voltage()
+	reading = BD_Reading2Voltage()
 
 	return reading
 end

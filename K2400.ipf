@@ -49,7 +49,7 @@ function rampkvoltage(device, volts, rate, [range, cmpli])
 		range=abs(volts)
 	endif
 	if( ParamIsDefault(cmpli))
-		cmpli=40e-9
+		cmpli=20e-6
 	endif
 	
 	
@@ -71,9 +71,6 @@ function rampkvoltage(device, volts, rate, [range, cmpli])
 	setkvoltage(finvolts,range,cmpli,device)
 	//print finvolts
 end
-
-
-
 
 function setkVoltage(V, range, compl, device)   // 27 milliseconds
 	variable V, range, compl, device

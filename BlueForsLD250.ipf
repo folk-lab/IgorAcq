@@ -1,19 +1,5 @@
 #pragma rtGlobals=3		// Use modern global access method and strict wave access.
 
-// temperature commands require LakeShore.ipf
-
-function getMCtemp()
-	return GetTemp("mc")
-end
-
-function get4Ktemp()
-	return GetTemp("4k")
-end
-
-function get50Ktemp()
-	return GetTemp("50k")
-end
-
 // pressure readings straight from the server
 
 function GetBFPressure(sensor)
