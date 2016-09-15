@@ -3,6 +3,13 @@
 //	Supports a single AnalogShield/Arduino
 //	Procedure written by Nik Sept 2016 (borrows heavily from babyDAC procedures)
 
+///// CALIBRATION CONSTANTS /////
+
+variable /g as_adc0_mult = 0.97807
+variable /g as_adc0_offset = 18.27185
+variable /g as_adc2_mult = 0.97490
+variable /g as_adc2_offset = -18.90508
+
 ///// Initiate board /////
 
 function InitAnalogShield()
@@ -235,12 +242,19 @@ end
 
 ///// ACD readings /////
 
-function AS_Reading2Voltage(int_reading)
+function AS_Reading2mV(int_reading)
 	variable int_reading
 	variable /g as_adc_low=-5000, as_adc_high=5000
 
        return((int_reading/(2^16-1))*(as_adc_high-as_adc_low)+as_adc_low)
 end
+
+function AS_get_time()
+	wave as_response_wave=as_response_wave
+	variable telapsed
+	variable n = numpnts(as_response_wave)
+	return as_response_wave[n-4] + as_response_wave[n-3]*2^8 + as_response_wave[n-2]*2^16 + as_response_wave[n-1]*2^32
+end	
 
 function ReadBytesAS(bytes)
 	// creates a wave of 8 bit integers with a given number of bytes //
@@ -279,9 +293,10 @@ function ReadADCsingleAS(channel, numavg)
 	// will read up to 100 points of data at ~64kHz
 	variable channel // 0 or 2
 	variable numavg // number of points to average over (< 100 )
-	variable reading
+	variable reading, readingmV
 	string cmd
 	wave as_response_wave=as_response_wave
+	nvar as_adc0_mult,  as_adc0_offset,  as_adc2_mult, as_adc2_offset
 
 	// check channel number	
 	if(channel!=0 && channel!=2)
@@ -289,7 +304,6 @@ function ReadADCsingleAS(channel, numavg)
 	endif
 	
 	// adc command
-	
 	sprintf cmd, "ADCF %d,%d", channel, numavg
 	WriteAS(cmd)
 	
@@ -301,14 +315,49 @@ function ReadADCsingleAS(channel, numavg)
 		reading += as_response_wave[2*i] + as_response_wave[2*i+1]*256
 	endfor
 	
-	return AS_Reading2Voltage(reading/numavg)
+	readingmV = AS_Reading2mV(reading/numavg)
+	if(channel == 0)
+		return (readingmV - as_adc0_offset)/as_adc0_mult
+	else
+		return (readingmV - as_adc2_offset)/as_adc2_mult
+	endif
 end
 
-//function ReadADCtimeAS(channel, numavg)
-//
-//	// function here
-//	
-//end
+function ReadADCtimeAS(channel, numpts)
+	// will read unlimited data as fast as the serial port will allow
+	// this is  significantly faster on a UNIX system (~40kHz)
+	// compared to a Windows system (11 kHz)
+	variable channel // 0 or 2
+	variable numpts // number of points to average over (< 100 )
+	string cmd
+	wave as_response_wave=as_response_wave
+	nvar as_adc0_mult,  as_adc0_offset,  as_adc2_mult, as_adc2_offset
+
+	// check channel number	
+	if(channel!=0 && channel!=2)
+		abort "pick a valid input channel, 0 or 2"
+	endif
+	
+	// adc command
+	sprintf cmd, "ADC %d,%d", channel, numpts
+	WriteAS(cmd)
+	
+	// read response
+	ReadBytesAS(2*numpts + 4) // reads into as_response_wave
+	
+	// create wave to hold results
+	make /o/n=(numpts) as_adc_readings
+	setscale/I x 0, AS_get_time(), "", as_adc_readings
+	variable i=0
+	for(i=0;i<numpts;i+=1)
+		as_adc_readings[i] = AS_Reading2mV(as_response_wave[2*i] + as_response_wave[2*i+1]*256)
+		if(channel == 0)
+			 as_adc_readings[i] = (as_adc_readings[i] - as_adc0_offset)/as_adc0_mult
+		else
+			 as_adc_readings[i] = (as_adc_readings[i] - as_adc2_offset)/as_adc2_mult
+		endif
+	endfor
+end
 
 ///// User interface /////
 
