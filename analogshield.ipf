@@ -3,6 +3,15 @@
 //	Supports a single AnalogShield/Arduino
 //	Procedure written by Nik Sept 2016 (borrows heavily from babyDAC procedures)
 
+///// CALIBRATION CONSTANTS /////
+
+function AS_setADCcalibration()
+	variable /g as_adc0_mult = 0.97807
+	variable /g as_adc0_offset = 18.27185
+	variable /g as_adc2_mult = 0.97490
+	variable /g as_adc2_offset = -18.90508
+end
+
 ///// Initiate board /////
 
 function InitAnalogShield()
@@ -12,6 +21,8 @@ function InitAnalogShield()
 	as_range_high = 5000
 	as_range_span = abs(as_range_low-as_range_high)
 	
+	AS_setADCcalibration()
+	
 	AS_CheckForOldInit()
 	
 	AS_SetSerialPort() // setup DAC com port
@@ -20,6 +31,8 @@ function InitAnalogShield()
 	// open window
 	dowindow /k AnalogShieldWindow
 	execute("AnalogShieldWindow()")
+	
+	ClearBufferAS()
 end
 
 function AS_CheckForOldInit()
@@ -78,19 +91,48 @@ end
 
 //// WRITE/READ Functions ////
 
-function WriteAS(command)	// Writes command without expecting a response
+function WriteAS(command, [timeout])	// Writes command without expecting a response
 	string command
+	variable timeout
 	SVAR comport=comport
 	string cmd
 	NVAR V_VDT
+	
+	if(paramisdefault(timeout))
+		timeout = 1.0 // seconds
+	endif
 
 	// Insert serial communication commands
 	AS_SetSerialPort()
-	cmd = "VDTWrite2 /O=2 /Q \""+command+"\n\""
+	sprintf cmd, "VDTWrite2 /O=%.2f /Q \"%s\\n\"", timeout, command
 	execute(cmd)
 	if (V_VDT == 0)
 		abort "Write failed on command "+cmd
 	endif
+end
+
+function ReadBytesAS(bytes, [timeout])
+	// creates a wave of 8 bit integers with a given number of bytes //
+	variable bytes, timeout // number of bytes to read
+	string response // response string
+	string cmd
+	NVAR V_VDT
+	
+	if(paramisdefault(timeout))
+		timeout = 1.0 // seconds
+	endif
+	
+	// read serial port here
+	make /O/B/U/N=(bytes) as_response_wave
+	AS_SetSerialPort()
+	sprintf cmd, "VDTReadBinaryWave2 /O=%.2f /Q as_response_wave", timeout
+	execute (cmd)
+	
+	if(V_VDT == 0)
+		abort "Failed to read"
+	endif
+	
+	return 1
 end
 
 //// SET and RAMP outputs ////
@@ -235,53 +277,45 @@ end
 
 ///// ACD readings /////
 
-function AS_Reading2Voltage(int_reading)
+function AS_Reading2mV(int_reading)
 	variable int_reading
 	variable /g as_adc_low=-5000, as_adc_high=5000
 
        return((int_reading/(2^16-1))*(as_adc_high-as_adc_low)+as_adc_low)
 end
 
-function ReadBytesAS(bytes)
-	// creates a wave of 8 bit integers with a given number of bytes //
-	variable bytes // number of bytes to read
-	string response // response string
-	string cmd
-	NVAR V_VDT
-	
-	// read serial port here
-	make /O/B/U/N=(bytes) as_response_wave
-	AS_SetSerialPort()
-	cmd="VDTReadBinaryWave2 /O=1.0 /Q as_response_wave"
-	execute (cmd)
-	
-	if(V_VDT == 0)
-		abort "Failed to read"
-	endif
-	
-	return 1
-end
+function AS_get_time()
+	wave as_response_wave=as_response_wave
+	variable telapsed
+	variable n = numpnts(as_response_wave)
+	return as_response_wave[n-4] + as_response_wave[n-3]*2^8 + as_response_wave[n-2]*2^16 + as_response_wave[n-1]*2^32
+end	
 
 Function ClearBufferAS()
 	// probably smart to put this at the beginning of any script that reads the ADC //
 	string cmd
 	string /g as_response
+	variable i=0
 	NVAR V_VDT
 	AS_SetSerialPort()
 	do
 		cmd="VDTReadBinary2 /O=1.0 /S=1/Q as_response"
 		execute (cmd)
-		print as_response
+		i+=1
 	while(V_VDT)
+	if(i>1)
+		print "Cleared " + num2istr(4*(i-1)) + " bytes of junk"
+	endif
 end
 
 function ReadADCsingleAS(channel, numavg)
 	// will read up to 100 points of data at ~64kHz
 	variable channel // 0 or 2
 	variable numavg // number of points to average over (< 100 )
-	variable reading
+	variable reading, readingmV
 	string cmd
 	wave as_response_wave=as_response_wave
+	nvar as_adc0_mult,  as_adc0_offset,  as_adc2_mult, as_adc2_offset
 
 	// check channel number	
 	if(channel!=0 && channel!=2)
@@ -289,26 +323,60 @@ function ReadADCsingleAS(channel, numavg)
 	endif
 	
 	// adc command
-	
 	sprintf cmd, "ADCF %d,%d", channel, numavg
-	WriteAS(cmd)
+	WriteAS(cmd, timeout=0.5)
 	
 	// read response
-	ReadBytesAS(2*numavg + 4) // reads into as_response_wave
+	ReadBytesAS(2*numavg + 4, timeout = 0.001*numavg) // reads into as_response_wave
 	
 	variable i=0
 	for(i=0;i<numavg;i+=1)
 		reading += as_response_wave[2*i] + as_response_wave[2*i+1]*256
 	endfor
 	
-	return AS_Reading2Voltage(reading/numavg)
+	readingmV = AS_Reading2mV(reading/numavg)
+	if(channel == 0)
+		return (readingmV - as_adc0_offset)/as_adc0_mult
+	else
+		return (readingmV - as_adc2_offset)/as_adc2_mult
+	endif
 end
 
-//function ReadADCtimeAS(channel, numavg)
-//
-//	// function here
-//	
-//end
+function ReadADCtimeAS(channel, numpts)
+	// will read unlimited data as fast as the serial port will allow
+	// this is  significantly faster on a UNIX system (~40kHz)
+	// compared to a Windows system (11 kHz)
+	variable channel // 0 or 2
+	variable numpts // number of points to average over (< 100 )
+	string cmd
+	wave as_response_wave=as_response_wave
+	nvar as_adc0_mult,  as_adc0_offset,  as_adc2_mult, as_adc2_offset
+
+	// check channel number	
+	if(channel!=0 && channel!=2)
+		abort "pick a valid input channel, 0 or 2"
+	endif
+	
+	// adc command
+	sprintf cmd, "ADC %d,%d", channel, numpts
+	WriteAS(cmd, timeout=0.5)
+	
+	// read response
+	ReadBytesAS(2*numpts + 4, timeout=0.001*numpts) // reads into as_response_wave
+	
+	// create wave to hold results
+	make /o/n=(numpts) as_adc_readings
+	setscale/I x 0, AS_get_time()/1e6, "", as_adc_readings
+	variable i=0
+	for(i=0;i<numpts;i+=1)
+		as_adc_readings[i] = AS_Reading2mV(as_response_wave[2*i] + as_response_wave[2*i+1]*256)
+		if(channel == 0)
+			 as_adc_readings[i] = (as_adc_readings[i] - as_adc0_offset)/as_adc0_mult
+		else
+			 as_adc_readings[i] = (as_adc_readings[i] - as_adc2_offset)/as_adc2_mult
+		endif
+	endfor
+end
 
 ///// User interface /////
 
