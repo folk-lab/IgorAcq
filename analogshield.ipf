@@ -5,10 +5,12 @@
 
 ///// CALIBRATION CONSTANTS /////
 
-variable /g as_adc0_mult = 0.97807
-variable /g as_adc0_offset = 18.27185
-variable /g as_adc2_mult = 0.97490
-variable /g as_adc2_offset = -18.90508
+function AS_setADCcalibration()
+	variable /g as_adc0_mult = 0.97807
+	variable /g as_adc0_offset = 18.27185
+	variable /g as_adc2_mult = 0.97490
+	variable /g as_adc2_offset = -18.90508
+end
 
 ///// Initiate board /////
 
@@ -19,14 +21,18 @@ function InitAnalogShield()
 	as_range_high = 5000
 	as_range_span = abs(as_range_low-as_range_high)
 	
+	AS_setADCcalibration()
+	
 	AS_CheckForOldInit()
 	
 	AS_SetSerialPort() // setup DAC com port
-	execute("VDT2 baud=921600, databits=8, stopbits=1, parity=0, killio") // Communication Settings
+	execute("VDT2 baud=115200, databits=8, stopbits=1, parity=0, killio") // Communication Settings
 	
 	// open window
 	dowindow /k AnalogShieldWindow
 	execute("AnalogShieldWindow()")
+	
+	ClearBufferAS()
 end
 
 function AS_CheckForOldInit()
@@ -85,19 +91,48 @@ end
 
 //// WRITE/READ Functions ////
 
-function WriteAS(command)	// Writes command without expecting a response
+function WriteAS(command, [timeout])	// Writes command without expecting a response
 	string command
+	variable timeout
 	SVAR comport=comport
 	string cmd
 	NVAR V_VDT
+	
+	if(paramisdefault(timeout))
+		timeout = 1.0 // seconds
+	endif
 
 	// Insert serial communication commands
 	AS_SetSerialPort()
-	cmd = "VDTWrite2 /O=2 /Q \""+command+"\n\""
+	sprintf cmd, "VDTWrite2 /O=%.2f /Q \"%s\\n\"", timeout, command
 	execute(cmd)
 	if (V_VDT == 0)
 		abort "Write failed on command "+cmd
 	endif
+end
+
+function ReadBytesAS(bytes, [timeout])
+	// creates a wave of 8 bit integers with a given number of bytes //
+	variable bytes, timeout // number of bytes to read
+	string response // response string
+	string cmd
+	NVAR V_VDT
+	
+	if(paramisdefault(timeout))
+		timeout = 1.0 // seconds
+	endif
+	
+	// read serial port here
+	make /O/B/U/N=(bytes) as_response_wave
+	AS_SetSerialPort()
+	sprintf cmd, "VDTReadBinaryWave2 /O=%.2f /Q as_response_wave", timeout
+	execute (cmd)
+	
+	if(V_VDT == 0)
+		abort "Failed to read"
+	endif
+	
+	return 1
 end
 
 //// SET and RAMP outputs ////
@@ -256,37 +291,21 @@ function AS_get_time()
 	return as_response_wave[n-4] + as_response_wave[n-3]*2^8 + as_response_wave[n-2]*2^16 + as_response_wave[n-1]*2^32
 end	
 
-function ReadBytesAS(bytes)
-	// creates a wave of 8 bit integers with a given number of bytes //
-	variable bytes // number of bytes to read
-	string response // response string
-	string cmd
-	NVAR V_VDT
-	
-	// read serial port here
-	make /O/B/U/N=(bytes) as_response_wave
-	AS_SetSerialPort()
-	cmd="VDTReadBinaryWave2 /O=1.0 /Q as_response_wave"
-	execute (cmd)
-	
-	if(V_VDT == 0)
-		abort "Failed to read"
-	endif
-	
-	return 1
-end
-
 Function ClearBufferAS()
 	// probably smart to put this at the beginning of any script that reads the ADC //
 	string cmd
 	string /g as_response
+	variable i=0
 	NVAR V_VDT
 	AS_SetSerialPort()
 	do
 		cmd="VDTReadBinary2 /O=1.0 /S=1/Q as_response"
 		execute (cmd)
-		print as_response
+		i+=1
 	while(V_VDT)
+	if(i>1)
+		print "Cleared " + num2istr(4*(i-1)) + " bytes of junk"
+	endif
 end
 
 function ReadADCsingleAS(channel, numavg)
@@ -305,10 +324,10 @@ function ReadADCsingleAS(channel, numavg)
 	
 	// adc command
 	sprintf cmd, "ADCF %d,%d", channel, numavg
-	WriteAS(cmd)
+	WriteAS(cmd, timeout=0.5)
 	
 	// read response
-	ReadBytesAS(2*numavg + 4) // reads into as_response_wave
+	ReadBytesAS(2*numavg + 4, timeout = 0.001*numavg) // reads into as_response_wave
 	
 	variable i=0
 	for(i=0;i<numavg;i+=1)
@@ -340,14 +359,14 @@ function ReadADCtimeAS(channel, numpts)
 	
 	// adc command
 	sprintf cmd, "ADC %d,%d", channel, numpts
-	WriteAS(cmd)
+	WriteAS(cmd, timeout=0.5)
 	
 	// read response
-	ReadBytesAS(2*numpts + 4) // reads into as_response_wave
+	ReadBytesAS(2*numpts + 4, timeout=0.001*numpts) // reads into as_response_wave
 	
 	// create wave to hold results
 	make /o/n=(numpts) as_adc_readings
-	setscale/I x 0, AS_get_time(), "", as_adc_readings
+	setscale/I x 0, AS_get_time()/1e6, "", as_adc_readings
 	variable i=0
 	for(i=0;i<numpts;i+=1)
 		as_adc_readings[i] = AS_Reading2mV(as_response_wave[2*i] + as_response_wave[2*i+1]*256)
