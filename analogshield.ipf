@@ -25,7 +25,7 @@ function InitAnalogShield()
 	
 	AS_CheckForOldInit()
 	
-	AS_SetSerialPort() // setup DAC com port
+	AS_SetSerialPort() // setup COM port
 	execute("VDT2 baud=256000, databits=8, stopbits=1, parity=0, killio") // Communication Settings
 	
 	// open window
@@ -236,44 +236,68 @@ function RampOutputAS(channel, output, [ramprate, noupdate])
 	return 1
 end
 
-//function UpdateMultipleBD([action])
-//
-//	// usage:
-//	// function Experiment(....)
-//	//         ...
-//	//         wave /t dacvalsstr = dacvalsstr // this wave keeps track of new DAC values
-//	//         dacvalsstr[channelA][1] = num2str(1000 // set new values with a strings
-//	//         dacvalsstr[channelB][1] = num2str(-500)
-//	//         UpdateMultipleBD(action="ramp") // ramps all channels to updated values
-//	
-//	string action // "set" or "ramp"
-//	wave/t dacvalsstr=dacvalsstr
-//	wave/t oldvalue=oldvalue
-//	variable output,i
-//	variable check = nan
-//
-//	if(ParamIsDefault(action))
-//		action="ramp"
-//	endif
-//
-//	for(i=0;i<16;i+=1)
-//		if(str2num(dacvalsstr[i][1]) != str2num(oldvalue[i][1]))
-//			output = str2num(dacvalsstr[i][1])
-//			strswitch(action)
-//				case "set":
-//					check = SetOutputBD(i,output)
-//				case "ramp":
-//					check = RampOutputBD(i,output)
-//			endswitch
-//			if(check == 1)
-//				oldvalue[i][1] = dacvalsstr[i][1]
-//			else
-//				dacvalsstr[i][1] = oldvalue[i][1]
-//			endif
-//		endif
-//	endfor
-//	return 1
-//end
+function UpdateMultipleAS([action, ramprate])
+
+	// usage:
+	// function Experiment(....)
+	//         ...
+	//         wave /t as_valsstr = as_valsstr // this wave keeps track of new DAC values
+	//         as_valsstr[channelA][1] = num2str(1000) // set new values with a strings
+	//         as_valsstr[channelB][1] = num2str(-500)
+	//         UpdateMultipleAS(action="ramp") // ramps all channels to updated values
+	
+	string action // "set" or "ramp"
+	variable ramprate
+	wave/t as_valsstr=as_valsstr
+	wave/t as_oldvalue=as_oldvalue
+	variable output,i
+	variable check = nan
+
+	if(ParamIsDefault(action))
+		action="ramp"
+	endif
+	
+	if(paramisdefault(ramprate))
+		ramprate = 1000  
+	endif
+
+	for(i=0;i<4;i+=1)
+		if(str2num(as_valsstr[i][1]) != str2num(as_oldvalue[i][1]))
+			output = str2num(as_valsstr[i][1])
+			strswitch(action)
+				case "set":
+					check = SetOutputAS(i,output)
+				case "ramp":
+					check = RampOutputAS(i,output, ramprate=ramprate)
+			endswitch
+			if(check == 1)
+				as_oldvalue[i][1] = as_valsstr[i][1]
+			else
+				as_valsstr[i][1] = as_oldvalue[i][1]
+			endif
+		endif
+	endfor
+	return 1
+end
+
+function RampMultipleAS(channels, setpoint, nChannels, [ramprate])
+	// this can be used to replace the single channel ramp function 
+	// it is slightly more trouble to use and a tiny bit slower, but offers a huge amount of flexibility
+	variable setpoint, ramprate, nChannels
+	string channels
+	variable i, channel
+	wave /t as_valsstr = as_valsstr
+
+	if(paramisdefault(ramprate))
+		ramprate = 1000    // (mV/s)
+	endif
+	
+	for(i=0;i<nChannels;i+=1)
+		channel = str2num(StringFromList(i, channels, ","))
+		as_valsstr[channel][1] = num2str(setpoint) // set new values with a strings
+	endfor
+	UpdateMultipleAS(action="ramp", ramprate=ramprate)
+end
 
 ///// ACD readings /////
 
@@ -382,7 +406,7 @@ end
 
 Window AnalogShieldWindow() : Panel
 	PauseUpdate; Silent 1 // building window
-	NewPanel /W=(0,0,320,530) // window size
+	NewPanel /W=(0,0,320,250) // window size
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv fsize= 25,fstyle= 1
@@ -393,10 +417,10 @@ Window AnalogShieldWindow() : Panel
 	DrawText 108,85,"VOLT (mV)"
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 208,85,"LIM (mV)"
-	ListBox daclist,pos={10,90},size={300,370},fsize=16,frame=2 // interactive list
+	ListBox daclist,pos={10,90},size={300,96},fsize=16,frame=2 // interactive list
 	ListBox daclist,fStyle=1,listWave=root:as_valsstr,selWave=root:as_listboxattr,mode= 1
-	Button ramp,pos={40,490},size={65,20},proc=update_AnalogShield,title="RAMP"
-	Button rampallzero,pos={170,490},size={90,20},proc=update_AnalogShield,title="RAMP ALL 0"
+	Button ramp,pos={40,200},size={65,20},proc=update_AnalogShield,title="RAMP"
+	Button rampallzero,pos={170,200},size={90,20},proc=update_AnalogShield,title="RAMP ALL 0"
 EndMacro
 
 function update_AnalogShield(action) : ButtonControl
@@ -434,7 +458,7 @@ end
 
 Window AskUserWindowAS() : Panel
 	PauseUpdate; Silent 1 // building window
-	NewPanel /W=(100,100,400,630) // window size
+	NewPanel /W=(100,100,400,350) // window size
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv fsize= 25,fstyle= 1
@@ -443,10 +467,10 @@ Window AskUserWindowAS() : Panel
 	DrawText 40,80,"Old init"
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 170,80,"Default"
-	ListBox initlist,pos={10,90},size={280,390},fsize=16,frame=2
+	ListBox initlist,pos={10,90},size={280,96},fsize=16,frame=2
 	ListBox initlist,fStyle=1,listWave=root:as_initwave,selWave=root:attinitlist,mode= 0
-	Button oldinit,pos={40,490},size={70,20},proc=AskUserUpdateAS,title="OLD INIT"
-	Button defaultinit,pos={170,490},size={70,20},proc=AskUserUpdateAS,title="DEFAULT"
+	Button oldinit,pos={40,200},size={70,20},proc=AskUserUpdateAS,title="OLD INIT"
+	Button defaultinit,pos={170,200},size={70,20},proc=AskUserUpdateAS,title="DEFAULT"
 EndMacro
 
 function AskUserUpdateAS(action) : ButtonControl
@@ -465,24 +489,17 @@ function AskUserUpdateAS(action) : ButtonControl
 end
 
 ////// Status String for Logging ////
-//
-//function/s GetDACStatus()
-//	string winfcomments="", buffer=""
-//	wave /t dacvalsstr = dacvalsstr
-//	wave boardnumbers = boardnumbers
-//
-//	winfcomments += "BabyDAC:\r\t"
-//
-//	variable i=0, j=0
-//	variable dacval
-//	do
-//		if(numtype(boardnumbers[i])==0)
-//			for(j=0;j<4;j+=1)
-//				sprintf buffer, "CH%d = %s\r\t", (4*i+j), dacvalsstr[4*i+j][1]
-//				winfcomments+=buffer
-//			endfor
-//		endif
-//		i+=1
-//	while(i<numpnts(boardnumbers))	
-//	return winfcomments
-//end
+
+function/s GetASStatus()
+	string winfcomments="", buffer=""
+	wave /t as_valsstr = as_valsstr
+
+	winfcomments += "AnalogShield:\r\t"
+
+	variable j=0
+	for(j=0;j<4;j+=1)
+		sprintf buffer, "CH%d = %s\r\t", (j), as_valsstr[j][1]
+		winfcomments+=buffer
+	endfor
+	return winfcomments
+end
