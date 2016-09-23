@@ -26,7 +26,7 @@ function InitAnalogShield()
 	AS_CheckForOldInit()
 	
 	AS_SetSerialPort() // setup COM port
-	execute("VDT2 baud=256000, databits=8, stopbits=1, parity=0, killio") // Communication Settings
+	execute("VDT2 baud=921600, databits=8, stopbits=1, parity=0, killio") // Communication Settings
 	
 	// open window
 	dowindow /k AnalogShieldWindow
@@ -85,7 +85,7 @@ function AS_AskUser()
 end
 
 function AS_SetSerialPort()
-	string/g as_comport = "COM3" // Set to the right COM Port
+	string/g as_comport = "usbmodem1421" // Set to the right COM Port
 	execute("VDTOperationsPort2 $as_comport")
 end
 
