@@ -371,7 +371,7 @@ function ReadADCtimeAS(channel, numpts)
 	// this is  significantly faster on a UNIX system (~40kHz)
 	// compared to a Windows system (11 kHz)
 	variable channel // 0 or 2
-	variable numpts // number of points to average over (< 100 )
+	variable numpts 
 	string cmd
 	wave as_response_wave=as_response_wave
 	nvar as_adc0_mult,  as_adc0_offset,  as_adc2_mult, as_adc2_offset
