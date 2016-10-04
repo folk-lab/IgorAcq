@@ -11,13 +11,15 @@
 function InitLakeshore()
 	SetSystem("bfs") // Set the correct fridge. Blue Fors small = bfs, Blue Fors big = bfb
 	CreateGlobal() // Create global variables for GUI
+	// Build window
+	dowindow/k LakeShore_Window
+	execute("LakeShore_Window()")
+	// Update values
 	UpdateCurrentValues() // Get current Lakeshore state
 	SetPointTemp(GetTemp("mc")*1000) // Set temp control setpoint to current MC temp
 	SetControlParameters() // Set temp control parameters. Set parameters explicitly if defualt is not desiered
 	TempSequence(preset="normal") // Set temperature reading to normal mode
-	// Build window
-	dowindow/k LakeShore_Window
-	execute("LakeShore_Window()")
+	
 end
 
 function CreateGlobal()
@@ -441,7 +443,6 @@ function/s GetPIDParameters()
 	command = "PID?"
 	url = CreateURL("createCommand", writeurl = "1", cmd = command)
 	response = QueryLakeShore(url)
-	print response
 	sscanf response, "%g,%g,%g", pid_1, pid_2, pid_3
 	sprintf param, "P=%g, I=%g, D=%g", pid_1, pid_2, pid_3
 	p_value =pid_1
