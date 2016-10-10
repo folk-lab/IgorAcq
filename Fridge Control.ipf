@@ -670,7 +670,7 @@ window Fridge_Window() : Panel
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv fsize= 25,fstyle= 1
-	DrawText 130, 45,"Fridge (Lakeshore)"
+	DrawText 100, 45,"Fridge (LS370)"
 	ValDisplay PIDLed, pos={40,20}, size={45,20}, mode=2,value=led_val, zerocolor=(65535,0,0), limits={0,1,-1}, highcolor=(65535,0,0),lowcolor=(0,65535,0),barmisc={0,0},title="\\Z14PID"
 	ValDisplay HeaterLed, pos={280,17}, size={65,20}, mode=2,value=magnetheater_control, zerocolor=(65535,0,0), limits={0,1,-1}, highcolor=(65535,0,0),lowcolor=(0,65535,0),barmisc={0,0},title="\\Z10Magnet\rHeater"
 	PopupMenu ControlMode, pos={20,50},size={250,50},mode=4,title="\\Z16Control Mode:",value=("Closed Loop PID;Zone Tuning;Open Loop;Off"), proc=ControlMode_control

@@ -9,9 +9,9 @@ macro initGPIB()
 //	NI488 ibdev 0, 18, 0,10, 1,0,dmm18
 ////	
 
-//	variable /g srs1
-//	//NI488 ibfind "dev8", srs1
-//	NI488 ibdev 0, 1, 0,10, 1,0, srs1
+	variable /g srs1
+	//NI488 ibfind "dev8", srs1
+	NI488 ibdev 0, 1, 0,10, 1,0, srs1
 ////	
 	variable /g srs2
 	//NI488 ibfind "dev8", srs8
@@ -21,9 +21,9 @@ macro initGPIB()
 	//NI488 ibfind "dev8", srs8
 	NI488 ibdev 0, 3, 0,10, 1,0,srs3
 	
-//	variable /g srs4
-////	//NI488 ibfind "dev8", srs8
-//	NI488 ibdev 0, 4, 0,10, 1,0,srs4
+	variable /g srs4
+//	//NI488 ibfind "dev8", srs8
+	NI488 ibdev 0, 4, 0,10, 1,0,srs4
 
 	variable /g srs5
 ////	//NI488 ibfind "dev8", srs8
