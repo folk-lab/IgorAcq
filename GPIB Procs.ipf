@@ -1,29 +1,29 @@
 #pragma rtGlobals=1		// Use modern global access method.
 
 macro initGPIB()
-	variable /g dmm22
-//	NI488 ibfind "dev22", dmm22
-	NI488 ibdev 0, 22, 0,10, 1,0,dmm22
+//	variable /g dmm22
+//	//NI488 ibfind "dev22", dmm22
+//	NI488 ibdev 0, 22, 0,10, 1,0,dmm22
 //	
 //	variable /g dmm18
 //	NI488 ibdev 0, 18, 0,10, 1,0,dmm18
 ////	
 
-	variable /g srs1
-	//NI488 ibfind "dev8", srs1
-	NI488 ibdev 0, 1, 0,10, 1,0, srs1
+//	variable /g srs1
+//	//NI488 ibfind "dev8", srs1
+//	NI488 ibdev 0, 1, 0,10, 1,0, srs1
 ////	
-	variable /g srs2
-	//NI488 ibfind "dev8", srs8
-	NI488 ibdev 0, 2, 0,10, 1,0,srs2
+//	variable /g srs2
+//	//NI488 ibfind "dev8", srs8
+//	NI488 ibdev 0, 2, 0,10, 1,0,srs2
 //	
 	variable /g srs3
 	//NI488 ibfind "dev8", srs8
 	NI488 ibdev 0, 3, 0,10, 1,0,srs3
 	
-	variable /g srs4
+//	variable /g srs4
 //	//NI488 ibfind "dev8", srs8
-	NI488 ibdev 0, 4, 0,10, 1,0,srs4
+//	NI488 ibdev 0, 4, 0,10, 1,0,srs4
 
 	variable /g srs5
 ////	//NI488 ibfind "dev8", srs8
@@ -47,7 +47,7 @@ macro initGPIB()
 //	
 	variable /g k2400
 	//NI488 ibfind "dev14", k2400
-	NI488 ibdev 0, 14, 0,10, 1,0,k2400	
+	NI488 ibdev 0, 8, 0,10, 1,0,k2400	
 //
 //	variable /g k2300
 //	//NI488 ibfind "dev24", k2300
