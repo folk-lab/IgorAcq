@@ -3,7 +3,7 @@
 // Keithley 2400 driver
 // Initiate a Keithley 2400 by calling InitK2400, pass id and GPIB adresse.
 // Voltages are in mV and Currents in nA
-// By Christian Olsen, 2016-10-18
+// By Christian Olsen, 2016-10-19
 
 function InitK2400(id,gpibadresse)
 	string id
@@ -53,10 +53,63 @@ end
 
 //// Ramp functions ////
 
-function RampK2400Voltage() // Units: mV
+function RampK2400Voltage(output,id,[ramprate]) // Units: mV, mV/s
+	variable output, id, ramprate
+	variable startpoint, sgn, step, new_output
+	variable sleeptime = 0.01 //s
+	
+	if(paramisdefault(ramprate))
+		ramprate = 500  // mV/s 
+	endif
+	
+	startpoint = GetK2400Voltage(id)
+	sgn = sign(output-startpoint)
+	
+	step = ramprate*sleeptime
+	
+	if(abs(output-startpoint) <= step)
+		// We are within one step of the final output
+		SetK2400Voltage(output,id)
+		return 1
+	endif
+	new_output = startpoint
+	do
+		new_output += step*sgn
+		SetK2400Voltage(new_output,id)
+		sleep/s sleeptime
+	while(sgn*new_output < sgn*output-step)
+	SetK2400Voltage(output,id) // Set final value
+end
+	
+	
 end
 
-function RampK2400Current() // Units: nA
+function RampK2400Current(output, id, [ramprate]) // Units: nA
+	variable output, id, ramprate
+	variable startpoint, sgn, step, new_output
+	variable sleeptime = 0.01 //s
+	
+	if(paramisdefault(ramprate))
+		ramprate = 1  // nA/s 
+	endif
+	
+	startpoint = GetK2400Current(id)
+	sgn = sign(output-startpoint)
+	
+	step = ramprate*sleeptime
+	
+	if(abs(output-startpoint) <= step)
+		// We are within one step of the final output
+		SetK2400Current(output,id)
+		return 1
+	endif
+	new_output = startpoint
+	do
+		new_output += step*sgn
+		SetK2400Current(new_output,id)
+		sleep/s sleeptime
+	while(sgn*new_output < sgn*output-step)
+	SetK2400Current(output,id) // Set final value
 end
 
 //// Util ////
