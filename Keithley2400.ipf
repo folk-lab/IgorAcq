@@ -23,7 +23,7 @@ function SetK2400Current(curr,id) //Units: nA
 	variable curr, id
 	string cmd
 	
-	sprintf cmd, "sour:func curr;sour:curr:mode fix;sour:curr:lev %.10f", curr*1e-9
+	sprintf cmd, ":sour:func curr;:sour:curr:mode fix;:sour:curr:lev %.10f", curr*1e-9
 	WriteK2400(cmd,id)
 end
 
@@ -31,7 +31,7 @@ function SetK2400Voltage(volt,id) // Units: mV
 	variable volt, id
 	string cmd
 	
-	sprintf cmd, "sour:func volt;sour:volt:mode fix;sour:volt:lev %.10f", volt*1e-3
+	sprintf cmd, ":sour:func volt;:sour:volt:mode fix;:sour:volt:lev %.10f", volt*1e-3
 	WriteK2400(cmd,id)
 end
 
@@ -39,7 +39,7 @@ function GetK2400Current(id) // Units: nA
 	variable id
 	variable answer
 	
-	answer = QueryK2400("sens:func curr;form:elem curr",id)
+	answer = QueryK2400(":sens:func \"curr\";:form:elem curr",id)
 	return answer*1e9
 end
 
@@ -47,7 +47,7 @@ function GetK2400Voltage(id) // Units: mV
 	variable id
 	variable answer
 	
-	answer = QueryK2400("sens:func volt;form:elem volt",id)
+	answer = QueryK2400(":sens:func \"volt\";:form:elem volt",id)
 	return answer*1e3
 end
 
@@ -79,9 +79,6 @@ function RampK2400Voltage(output,id,[ramprate]) // Units: mV, mV/s
 		sleep/s sleeptime
 	while(sgn*new_output < sgn*output-step)
 	SetK2400Voltage(output,id) // Set final value
-end
-	
-	
 end
 
 function RampK2400Current(output, id, [ramprate]) // Units: nA
@@ -157,7 +154,7 @@ function WriteK2400(command,id)
 	variable id
 	string cmd, msg
 	
-	cmd = command+"\n"
+	cmd = command+"\r"
 	GPIB2 device=id
 	GPIBWrite2 cmd
 	
@@ -186,10 +183,11 @@ end
 
 //// Logging functions ////
 
-function/s GetK2400Status(id) //FIX
+function/s GetK2400Status(id)
 	variable id
 	string winfcomments, buffer
 	
-	NI4882 ibask={id,1} //FIX
+	NI4882 ibask={id,01}
 	sprintf  winfcomments "Keithley 2400 GPIB%d:\r\t", v_flag
+	return winfcomments
 end
