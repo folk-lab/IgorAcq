@@ -177,9 +177,26 @@ Window ScanController() : Panel
 	DrawText 13,170+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing),"Press Update to save changes."
 	DrawText 13,190+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing),"Press ESC to abort the scan and save data, while this window is active"
 	
+	// Close all open graphs
+	button killgraphs, pos={420,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={120,20},proc=sc_killgraphs,title="Close All Graphs"
+	
 	//Update button
 	button updatebutton, pos={550,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_updatewindow,title="Update"
 EndMacro
+
+function sc_killgraphs(action) : Buttoncontrol
+	string action
+	string opengraphs
+	variable ii
+	
+	opengraphs = winlist("*",";","WIN:1")
+	print opengraphs+"bla"
+	if(itemsinlist(opengraphs)>0)
+		for(ii=0;ii<itemsinlist(opengraphs);ii+=1)
+			killwindow $stringfromlist(ii,opengraphs)	
+		endfor
+	endif
+end
 
 function sc_updatewindow(action) : ButtonControl
 	string action
