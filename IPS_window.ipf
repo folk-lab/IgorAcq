@@ -40,41 +40,49 @@ function TestMagnet()
 end
 
 function SetSerial()
-	//svar comport
+	svar comport
 	string cmd
 	sprintf cmd, "VDTOperationsPort2 %s", "COM4"
 	execute(cmd)
 end
 
 function MagnetSetup()
-	string comports, usecomport, cmd, cmd1, answer
-	variable ii
-	
-	cmd = "V"
-	
-	VDTGetPortList2
-	comports = s_vdt
-	
-	for(ii=0;ii<Itemsinlist(comports);ii+=1)
-		usecomport = stringfromlist(ii,comports)
-		print usecomport
-		VDTOperationsPort2 $usecomport
-		try
-			cmd1 = "VDTWrite2 /O=2 /Q \""+cmd+"\\r\""
-			execute(cmd1)
-			VDTRead2 /O=2 /Q answer
-			print answer
-		catch
-			// Not the right port
-		endtry
-		if(cmpstr(answer,"  IPS120-10  Version 3.07  (c) OXFORD 1996")==0)
-			string/g comport = usecomport
-			print "Juhu" 
-		endif
-	endfor
-	
+	string cmd
 	SetSerial()
+	sprintf cmd, "VDT2 baud=9600, stopbits=2, terminalEOL=0, killio"
+	execute(cmd)
 end
+
+//function MagnetSetupAuto()
+
+	///// this is not working /////
+
+//	string comports, usecomport, cmd, cmd1, answer
+//	variable ii
+//	
+//	cmd = "\"V\\r\""
+//	
+//	VDTGetPortList2
+//	comports = s_vdt
+//	
+//	for(ii=0;ii<Itemsinlist(comports);ii+=1)
+//		answer = ""
+//		usecomport = stringfromlist(ii,comports)
+//		print usecomport
+//		VDTOperationsPort2 $usecomport
+//
+//		VDTWrite2 /O=2 /Q cmd
+//		VDTRead2 /O=2 /Q answer
+//		print answer
+//
+//		if(cmpstr(answer,"IPS120-10  Version 3.07  (c) OXFORD 1996")==0)
+//			// string/g comport = usecomport
+//			// SetSerial()
+//			print "FOUND IT!"
+//			break
+//		endif
+//	endfor
+//end
 
 ///// Talk to Magnet /////
 
