@@ -88,7 +88,7 @@ function AskUser()
 end
 
 function SetSerialPort()
-	string/g bd_comport = "COM19" // Set to the right COM Port
+	svar bd_comport
 	execute("VDTOperationsPort2 $bd_comport")
 end
 

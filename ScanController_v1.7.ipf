@@ -8,31 +8,33 @@
 function InitScanController()
 	nvar filenum
 	// These arrays should have the same size. Their indeces correspond to each other.
-	make/t/o sc_RawWaveNames = {"g1x", "g1y","g2x", "g2y","g3x", "g3y","Tmc","T4K","T50K","Tmagnet"} // Wave names to be created and saved
-	make/o sc_RawRecord = {0,0,0,0,0,0,0,0,0,0} // Whether you want to record and save the data for this wave
-	make/o sc_RawPlot = {0,0,0,0,0,0,0,0,0,0} // Whether you want to record and save the data for this wave
-	make/t/o sc_RequestScripts = {"", "", "", "","","","","","",""}
-	make/t/o sc_GetResponseScripts = {"getg1x()", "getg1y()","getg2x()", "getg2y()","getg3x()", "getg3y()","GetTemp(\"mc\")","GetTemp(\"4k\")","GetTemp(\"50k\")","GetTemp(\"magnet\")"}
+	make/t/o sc_RawWaveNames = {"g1x", "g1y"} // Wave names to be created and saved
+	make/o sc_RawRecord = {0,0} // Whether you want to record and save the data for this wave
+	make/o sc_RawPlot = {0,0} // Whether you want to record and save the data for this wave
+	make/t/o sc_RequestScripts = {"", ""}
+	make/t/o sc_GetResponseScripts = {"getg1x()", "getg1y()"}
 	// End of same-size waves
 	
 	// And these waves should be the same size too
-	make/t/o sc_CalcWaveNames = {"", "", "", ""} // Calculated wave names
-	make/t/o sc_CalcScripts = {"","","",""} // Scripts to calculate stuff
-	make/o sc_CalcRecord = {0,0,0,0} // Include this calculated field or not
-	make/o sc_CalcPlot = {0,0,0,0} // Include this calculated field or not
+	make/t/o sc_CalcWaveNames = {"", ""} // Calculated wave names
+	make/t/o sc_CalcScripts = {"",""} // Scripts to calculate stuff
+	make/o sc_CalcRecord = {0,0} // Include this calculated field or not
+	make/o sc_CalcPlot = {0,0} // Include this calculated field or not
 	// end of same-size waves
 	
 	// Print variables
 	variable/g sc_PrintRaw = 1,sc_PrintCalc = 1
 	
 	// logging string
-	string /g sc_LogStr = "GetSRSStatus(srs1);GetSRSStatus(srs2);GetSRSStatus(srs3);GetIPSStatus();GetDACStatus();"
+	string /g sc_LogStr = "GetSRSStatus(srs1);"
 	
 	variable /g sc_AbortSave = 0
 
 	if (numtype(filenum) == 2)
-		print "Initializing FileNum to 1 since it didn't exist before."
-		variable /g filenum=1
+		print "Initializing FileNum to 0 since it didn't exist before."
+		variable /g filenum=0
+	else
+		printf "Current FileNum is %d", filenum
 	endif
 	
 	rebuildwindow()
