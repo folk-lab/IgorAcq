@@ -292,7 +292,7 @@ function ReadSRSjunk(srs)
 		execute "GPIBread/Q/N=1 junkvariable"
 		i+=1
 	while(v_flag)
-	printf "this read %d characters of junk \r", i-1
+	//printf "this read %d characters of junk \r", i-1
 	return junkvariable
 End
 

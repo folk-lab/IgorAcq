@@ -45,9 +45,9 @@ macro initGPIB()
 //	//NI488 ibfind "dev3", dmm3
 //	//NI488 ibdev 0, 3, 0,10, 1,0,dmm3
 //	
-	variable /g k2400
-	//NI488 ibfind "dev14", k2400
-	NI488 ibdev 0, 8, 0,10, 1,0,k2400	
+//	variable /g k2400
+//	//NI488 ibfind "dev14", k2400
+//	NI488 ibdev 0, 8, 0,10, 1,0,k2400	
 //
 //	variable /g k2300
 //	//NI488 ibfind "dev24", k2300
