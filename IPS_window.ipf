@@ -40,9 +40,9 @@ function TestMagnet()
 end
 
 function SetSerial()
-	string/g comport = "COM4" // Set to the right COM Port
+	svar comport
 	string cmd
-	sprintf cmd, "VDTOperationsPort2 %s", comport
+	sprintf cmd, "VDTOperationsPort2 %s", "COM4"
 	execute(cmd)
 end
 
@@ -52,6 +52,37 @@ function MagnetSetup()
 	sprintf cmd, "VDT2 baud=9600, stopbits=2, terminalEOL=0, killio"
 	execute(cmd)
 end
+
+//function MagnetSetupAuto()
+
+	///// this is not working /////
+
+//	string comports, usecomport, cmd, cmd1, answer
+//	variable ii
+//	
+//	cmd = "\"V\\r\""
+//	
+//	VDTGetPortList2
+//	comports = s_vdt
+//	
+//	for(ii=0;ii<Itemsinlist(comports);ii+=1)
+//		answer = ""
+//		usecomport = stringfromlist(ii,comports)
+//		print usecomport
+//		VDTOperationsPort2 $usecomport
+//
+//		VDTWrite2 /O=2 /Q cmd
+//		VDTRead2 /O=2 /Q answer
+//		print answer
+//
+//		if(cmpstr(answer,"IPS120-10  Version 3.07  (c) OXFORD 1996")==0)
+//			// string/g comport = usecomport
+//			// SetSerial()
+//			print "FOUND IT!"
+//			break
+//		endif
+//	endfor
+//end
 
 ///// Talk to Magnet /////
 
