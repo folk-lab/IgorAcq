@@ -622,7 +622,6 @@ function/s CreateURL(command,[readurl,writeurl,cmd,timeout])
 	string url, readwritestr
 	svar readsql, writesql
 	
-	
 	if(ParamIsDefault(readurl) == 0 && ParamIsDefault(writeurl))
 		sprintf url,"http://qdot-server.phas.ubc.ca:8081/webService/logger.php?action=%s", command
 		sprintf readwritestr,"&loggable_category_id=%s", readsql

@@ -192,7 +192,7 @@ function sc_killgraphs(action) : Buttoncontrol
 	variable ii
 	
 	opengraphs = winlist("*",";","WIN:1")
-	print opengraphs+"bla"
+	// print opengraphs
 	if(itemsinlist(opengraphs)>0)
 		for(ii=0;ii<itemsinlist(opengraphs);ii+=1)
 			killwindow $stringfromlist(ii,opengraphs)	
