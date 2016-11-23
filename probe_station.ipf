@@ -33,9 +33,15 @@ function iv_curve(startx, endx, numptsx, delayx)
 	wave w_coef=w_coef
 	nvar voltage_divider, current_amp, bias_channel, adc_channel, adc_avg, ps_inline_resistance
 	variable output = str2num(as_valsstr[bias_channel][1])*voltage_divider
+	variable calibrate_offset = 427.883
+	variable calibrate_slope = 1.31188
+	string resistance
 	
 	make /o/n=(numptsx) current=NaN
 	setscale/I x startx, endx, "", current
+	dowindow /k Current_plot
+	display /n=Current_plot current
+	
 	
 	RampOutputAS(bias_channel, startx/voltage_divider, ramprate=500)
 	sleep /S 0.5
@@ -49,8 +55,11 @@ function iv_curve(startx, endx, numptsx, delayx)
 		i+=1
 	while(i<numptsx)
 
-	CurveFit /Q line, current
-	print (1e-3/w_coef[1])-ps_inline_resistance
+	CurveFit /Q line, current /D
+	sprintf resistance, num2str((((1e-3/w_coef[1])-ps_inline_resistance)-calibrate_offset)/calibrate_slope)
+	execute("AppendToGraph fit_current")
+	legend resistance
+	print resistance
 	
 	RampOutputAS(bias_channel, 0, ramprate=500) // ramp back to zero so you can move the probes safely
 	
