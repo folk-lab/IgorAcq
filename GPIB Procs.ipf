@@ -86,8 +86,8 @@ function InitAllGPIB()
 	variable ii, jj, board, numdevices, adresse
 	string instype, idname, summary
 	
-	make/o/n=(limitparam) adlist // GPIB adresse list wave. Only adresses 0-30 are supported by IEEE-448
-	make/o/n=(limitparam) aclist // Active GPIB list reutrned by FindLstn
+	make/o/n=(limitparam) adlist=0 // GPIB adresse list wave. Only adresses 0-30 are supported by IEEE-448
+	make/o/n=(limitparam) aclist=0 // Active GPIB list reutrned by FindLstn
 	make/o/t/n=(limitparam) idwave // Holds the instrument id's
 	make/o/n=5 counter=0 // Keeps track of how many instruments of the same type is connected
 	
@@ -95,11 +95,11 @@ function InitAllGPIB()
 		adlist[ii] = ii
 	endfor
 	
-	NI4882 ibrsc={board,1} // Configure the GPIB board 0 as system controller
-	NI4882 ibsic={board} // Clear GPIB 0 interface
-	
 	NI4882 ibfind={"gpib0"} // Get id for GPIB board 0
 	board=v_flag
+	
+	NI4882 ibrsc={board,1} // Configure the GPIB board 0 as system controller
+	NI4882 ibsic={board} // Clear GPIB 0 interface
 	
 	NI4882 FindLstn={0,adlist,aclist,limitparam} // Find all connected GPIB instruments on board 0. 
 	numdevices = v_ibcnt-1
