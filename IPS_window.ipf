@@ -40,9 +40,9 @@ function TestMagnet()
 end
 
 function SetSerial()
-	svar comport
+	svar ips_comport = ips_comport
 	string cmd
-	sprintf cmd, "VDTOperationsPort2 %s", "COM4"
+	sprintf cmd, "VDTOperationsPort2 %s", ips_comport
 	execute(cmd)
 end
 
@@ -276,7 +276,6 @@ end
 
 function WriteMagnet(command)	// Writes command without expecting a response
 	string command
-	SVAR comport=comport
 	string cmd
 	NVAR V_VDT
 

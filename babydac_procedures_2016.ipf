@@ -31,7 +31,7 @@ function InitBabyDACs(b1, [b2, b3, b4, range])
 	endif
 	SetBoardNumbers(b1, b2=b2, b3=b3, b4=b4) // Set the boards numbers of the used boards.
 	
-	//DACSetup() // setup DAC com port
+	DACSetup() // setup DAC com port
 	
 	// open window
 	dowindow /k BabyDACWindow
@@ -88,7 +88,7 @@ function AskUser()
 end
 
 function SetSerialPort()
-	string/g bd_comport = "COM19" // Set to the right COM Port
+	svar bd_comport
 	execute("VDTOperationsPort2 $bd_comport")
 end
 
@@ -218,6 +218,63 @@ function GetBoardChannel(channel)
 	return index
 end
 
+//// UTILITY ////
+
+function ResetStartupVoltageBD(board_number)
+	// sometimes you will find that when a board is powered on 
+	// all of the output voltages are -5V or -10V
+	// this command will reset that default so the board powers on at 0V
+	variable board_number
+	variable setpoint
+
+	ClearBufferBD()
+
+	// set all channels to 0V
+	setpoint = GetSetpointBD(0.0) // DAC setpoint as an integer
+	print setpoint
+	
+	// build output 0V command
+	variable id_byte, alt_id_byte, command_byte, parity_byte
+	variable data_byte_1, data_byte_2, data_byte_3
+	
+	id_byte = 0xc0+board_number // 11{gggggg}, g = board number
+	alt_id_byte = 0x40+board_number // id_byte with MSB = 0
+	
+	data_byte_1 = (setpoint & 0xfc000)/0x4000 // 00{aaaaaa}, a = most significant 6 bits
+	data_byte_2 = (setpoint & 0x3f80)/0x80 // 0{bbbbbbb}, b = middle 7 bits
+	data_byte_3 = (setpoint & 0x7f) // 0{ccccccc}, c = least significant 7 bits
+
+	variable i = 0
+	for(i=0;i<4;i+=1)
+		command_byte = 0x40+i // 010000{hh}, h = channel number
+		parity_byte=alt_id_byte%^command_byte%^data_byte_1%^data_byte_2%^data_byte_3 // XOR all previous bytes
+		make/o bd_cmd_wave={id_byte, command_byte, data_byte_1, data_byte_2, data_byte_3, parity_byte, 0}
+	
+		// send command to DAC
+		SetSerialPort()
+		execute "VDTWriteBinaryWave2 /O=10 bd_cmd_wave"
+	
+		// read the response from the buffer
+		ReadBytesBD(7) // does not seem to slow things down significantly
+					     // prevents the buffer from over filling with crap
+		sleep /s 0.3
+	endfor
+
+	// backup settings to non-volatile memory
+	command_byte = 0x8 // 00001000
+	parity_byte=alt_id_byte%^command_byte // XOR all previous bytes
+	make/o bd_cmd_wave={id_byte, command_byte, parity_byte, 0}
+	
+	// send command to DAC
+	SetSerialPort()
+	execute "VDTWriteBinaryWave2 /O=10 bd_cmd_wave"
+	
+	// read the response from the buffer
+	print ReadBytesBD(4) // does not seem to slow things down significantly
+	   			             // prevents the buffer from over filling with crap
+	sleep /s 0.3
+end
+
 //// SET and RAMP outputs ////
 	
 function GetSetpointBD(output)
@@ -315,7 +372,7 @@ function RampOutputBD(channel, output, [ramprate, noupdate])
 	endif
 	
 	if(paramisdefault(ramprate))
-		ramprate = 1000  // (~mV/s) 
+		ramprate = 50  // (~mV/s) 
 	endif
 	
 	step = ramprate*sleeptime
@@ -369,7 +426,7 @@ function UpdateMultipleBD([action, ramprate])
 	endif
 	
 	if(paramisdefault(ramprate))
-		ramprate = 1000    // (mV/s) ~~equivalent to old rate
+		ramprate = 100    // (mV/s) ~~equivalent to old rate
 	endif
 
 	for(i=0;i<16;i+=1)
@@ -638,7 +695,7 @@ function rampvolts(channel, mV, [ramprate, noupdate])
 	variable channel, mV, ramprate, noupdate
 	
 	if(paramisdefault(ramprate))
-		ramprate = 1000    // (mV/s) ~~equivalent to old rate
+		ramprate = 50    // (mV/s) ~~equivalent to old rate
 	endif
 	
 	if(paramisdefault(noupdate))

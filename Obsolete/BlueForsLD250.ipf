@@ -1,19 +1,19 @@
 #pragma rtGlobals=1	// Use modern global access method
 
-// Driver for controling the Lakeshore, via an intermidiate server
-// Set the system in SetSsystem().
+// Driver for controling a dil fridge, via a LakeShore controller and an intermidiate server
+// Set the system in SetSystem() -- not really in use now, will take some effort to expand later
 // Communicates with server over http.
 // Adding gui for temperature control
 // Procedure written by Christian Olsen 2016-04-xx
 
 //// Initiate Lakeshore ////
 
-function InitLakeshore()
+function InitFridge()
 	SetSystem("bfs") // Set the correct fridge. Blue Fors small = bfs, Blue Fors big = bfb
 	CreateGlobal() // Create global variables for GUI
 	// Build window
-	dowindow/k LakeShore_Window
-	execute("LakeShore_Window()")
+	dowindow/k Fridge_Window
+	execute("Fridge_Window()")
 	// Update values
 	UpdateCurrentValues() // Get current Lakeshore state
 	SetPointTemp(GetTemp("mc")*1000) // Set temp control setpoint to current MC temp
@@ -128,6 +128,20 @@ function UpdateCurrentValues()
 	dump7 = GetTempSetpoint() // Update temperature setpoint
 end
 
+///// Status strings for logging /////
+
+function /S GetBFStatus()
+	string winfcomments=""
+	string  buffer=""
+
+	sprintf  winfcomments "BF250:\r\t"
+	sprintf buffer "MC = %.3f K\r\tStill = %.3f K\r\t4K = %.3f K\r\tMagnet = %.3f K\r\t50K = %.3f K\r\t", GetTemp("mc"), GetTemp("still"), GetTemp("4k"), GetTemp("magnet"), GetTemp("50k")
+	winfcomments += buffer
+	sprintf buffer "P1 = %.2e mbar\r\tP2 = %.3f mbar\r\tP3 = %.3f mbar\r\tP4 = %.3f mbar\r\tP5 = %.3f mbar\r\tP6 = %.3f mbar\r\t", GetBFPressure(1), GetBFPressure(2), GetBFPressure(3), GetBFPressure(4), GetBFPressure(5), GetBFPressure(6)
+	winfcomments += buffer
+	return winfcomments
+end
+
 //// Change temperature recording sequence ////
 
 function TempSequence([preset,temp_50k,temp_4k,temp_magnet,temp_still,temp_mc])
@@ -225,6 +239,18 @@ function GetHeatSwitch(heatswitch)
 	url = CreateURL("getCurrentState",readurl="1")
 	response = FetchURL(url)
 	return ReadResponseString(response, key)
+end
+
+///// pressure readings straight from the server /////
+
+function GetBFSPressure(sensor)
+	// think about how to rewrite this to work with the Kelvinox
+	variable sensor
+	string response = ""
+	string url = "http://qdot-server.phas.ubc.ca:8081/webService/logger.php?action=getCurrentValue&loggable_name="
+	url = url+ "bfs_p" + num2str(sensor)+"&yes_calc=false"
+	response = FetchURL(url)
+	return str2num(response)
 end
 
 //// Temperature control Set functions ////
@@ -537,6 +563,28 @@ function MagnetHeater(newstate)
 	WriteLakeShore(url)
 end
 
+function HeatUpMagnetToRoomTemperature()
+	variable magnet_temperature = GetTemp("magnet")
+	nvar magnetheater_control
+	do
+		if (magnet_temperature > 297 && magnetheater_control == 1)
+			magnetheater("off")
+			magnetheater_control = 0
+		elseif (magnet_temperature < 287 && magnetheater_control == 0)
+			magnetheater("on")
+			magnetheater_control=1
+		endif
+		sleep /s 15
+		magnet_temperature = GetTemp("magnet")
+	while (GetTemp("still")<285)
+	
+	// turn off all the heaters
+	StillHeater(0.0)
+	MCHeater(0.0)
+	SetControlMode(4)
+	magnetheater("off")
+end
+
 //// Communication ////
 
 function/s WriteLakeShore(url)
@@ -611,13 +659,13 @@ end
 
 //// User interface ////
 
-window LakeShore_Window() : Panel
+window Fridge_Window() : Panel
 	PauseUpdate; Silent 1 // building window
 	NewPanel /W=(0,0,380,400) // window size
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv fsize= 25,fstyle= 1
-	DrawText 130, 45,"LakeShore"
+	DrawText 130, 45,"Fridge (Lakeshore)"
 	ValDisplay PIDLed, pos={40,20}, size={45,20}, mode=2,value=led_val, zerocolor=(65535,0,0), limits={0,1,-1}, highcolor=(65535,0,0),lowcolor=(0,65535,0),barmisc={0,0},title="\\Z14PID"
 	ValDisplay HeaterLed, pos={280,17}, size={65,20}, mode=2,value=magnetheater_control, zerocolor=(65535,0,0), limits={0,1,-1}, highcolor=(65535,0,0),lowcolor=(0,65535,0),barmisc={0,0},title="\\Z10Magnet\rHeater"
 	PopupMenu ControlMode, pos={20,50},size={250,50},mode=4,title="\\Z16Control Mode:",value=("Closed Loop PID;Zone Tuning;Open Loop;Off"), proc=ControlMode_control
@@ -746,22 +794,4 @@ function Update_control(action) : ButtonControl
 	string action
 	
 	UpdateCurrentValues()
-end
-
-//// xxx ////
-
-function HeatUpMagnetToRoomTemperature()
-	variable magnet_temperature = GetTemp("magnet"), heater_is_on
-	do
-		if (magnet_temperature > 295 && heater_is_on == 1)
-			magnetheater("off")
-			heater_is_on=0
-		elseif (magnet_temperature < 273 && heater_is_on == 0)
-			magnetheater("on")
-			heater_is_on=1
-		endif
-		sleep /s 15
-		magnet_temperature = GetTemp("magnet")
-	while (GetTemp("still")<280)
-	magnetheater("off")
 end

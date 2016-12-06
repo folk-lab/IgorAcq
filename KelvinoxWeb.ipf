@@ -32,7 +32,7 @@ function SendIGHCommand(command)
 	String url = "http://qdot-server.phas.ubc.ca:8081/webService/commandmanager.php?action=createCommand"
 	url = url + "&port_id=2&cmd=" + command
 	response = FetchURL(url)
-	// print response
+	print response
 end
 
 function GetP2()
@@ -60,35 +60,35 @@ function GetNV()
 end
 
 function checkP2(lowerlimit)
-variable lowerlimit
-IGHRemoteMode()
-variable currentP2, currentNV
-string str
-currentP2=getp2(); print currentP2
-if (currentP2<lowerlimit)
-currentNV=getnv()
-str=num2str(currentNV*10+1)
-str="N"+str
-	SendIGHCommand(str)
-	str=" adjusted NV to:"+str; print str
-endif
-return currentP2
+	variable lowerlimit
+	IGHRemoteMode()
+	variable currentP2, currentNV
+	string str
+	currentP2=getp2(); print currentP2
+	if (currentP2<lowerlimit)
+		currentNV=getnv()
+		str=num2str(currentNV*10+1)
+		str="N"+str
+		SendIGHCommand(str)
+		str=" adjusted NV to:"+str; print str
+	endif
+	return currentP2
 end
 
 function reduceP2(upperlimit)
-variable upperlimit
-IGHRemoteMode()
-variable currentP2, currentNV
-string str
-currentP2=getp2(); print currentP2
-if (currentP2>upperlimit)
-currentNV=getnv()
-str=num2str(currentNV*10-2)
-str="N"+str
-	SendIGHCommand(str)
-	str=" adjusted NV to:"+str; print str
-endif
-return currentP2
+	variable upperlimit
+	IGHRemoteMode()
+	variable currentP2, currentNV
+	string str
+	currentP2=getp2(); print currentP2
+	if (currentP2>upperlimit)
+		currentNV=getnv()
+		str=num2str(currentNV*10-2)
+		str="N"+str
+		SendIGHCommand(str)
+		str=" adjusted NV to:"+str; print str
+	endif
+	return currentP2
 end
 
 function IGHRemoteMode()
@@ -107,11 +107,8 @@ function IGHRootsOFF()
 end
 
 
-
-
-
-
 //// all of the below are stolen from Kelvinox Procedures.ipf and adapted for KelvinoxWeb.ipf ////
+
 
 // Power is in microwatt units.
 Function IGHCalcPower(temp, roots)
