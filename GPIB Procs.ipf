@@ -13,14 +13,15 @@ function InitAllGPIB()
 		adlist[ii] = ii
 	endfor
 	
-	NI4882 ibrsc={board,1} // Configure the GPIB board 0 as system controller
-	NI4882 ibsic={board} // Clear GPIB 0 interface
-	
 	NI4882 ibfind={"gpib0"} // Get id for GPIB board 0
 	board=v_flag
 	
+	NI4882 ibrsc={board,1} // Configure the GPIB board 0 as system controller
+	NI4882 ibsic={board} // Clear GPIB 0 interface
+	
 	NI4882 FindLstn={0,adlist,aclist,limitparam} // Find all connected GPIB instruments on board 0. 
 	numdevices = v_ibcnt-1
+	print aclist
 	
 	for(jj=0;jj<numpnts(aclist);jj=jj+1)
 		if(aclist[jj] != 0)
