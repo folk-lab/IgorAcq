@@ -255,8 +255,7 @@ function ResetStartupVoltageBD(board_number)
 		execute "VDTWriteBinaryWave2 /O=10 bd_cmd_wave"
 	
 		// read the response from the buffer
-		ReadBytesBD(7) // does not seem to slow things down significantly
-					     // prevents the buffer from over filling with crap
+		ReadBytesBD(7)
 		sleep /s 0.3
 	endfor
 
@@ -372,7 +371,7 @@ function RampOutputBD(channel, output, [ramprate, noupdate])
 	endif
 	
 	if(paramisdefault(ramprate))
-		ramprate = 50  // (~mV/s) 
+		ramprate = 200  // (~mV/s) 
 	endif
 	
 	step = ramprate*sleeptime
@@ -426,7 +425,7 @@ function UpdateMultipleBD([action, ramprate])
 	endif
 	
 	if(paramisdefault(ramprate))
-		ramprate = 100    // (mV/s) ~~equivalent to old rate
+		ramprate = 200    // (mV/s)
 	endif
 
 	for(i=0;i<16;i+=1)
@@ -455,7 +454,7 @@ function RampMultipleBD(channels, setpoint, nChannels, [ramprate])
 	wave /t dacvalsstr = dacvalsstr
 
 	if(paramisdefault(ramprate))
-		ramprate = 1000    // (mV/s)
+		ramprate = 200    // (mV/s)
 	endif
 	
 	for(i=0;i<nChannels;i+=1)
@@ -695,7 +694,7 @@ function rampvolts(channel, mV, [ramprate, noupdate])
 	variable channel, mV, ramprate, noupdate
 	
 	if(paramisdefault(ramprate))
-		ramprate = 50    // (mV/s) ~~equivalent to old rate
+		ramprate = 200    // (mV/s)
 	endif
 	
 	if(paramisdefault(noupdate))

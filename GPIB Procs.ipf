@@ -1,10 +1,17 @@
 #pragma rtGlobals=1		// Use modern global access method.
-function InitAllGPIB()
+
+function InitAllGPIB([gpib_board])
+	string gpib_board // GPIB boards are named like GPIB0, GPIB1, ....
 	variable limitparam = 30
 	variable ii, jj, board, numdevices, adresse
 	string instype, idname, summary
 	
-	make/o/n=(limitparam) adlist=0 // GPIB adresse list wave. Only adresses 0-30 are supported by IEEE-448
+	if(paramisdefault(gpib_board))
+		gpib_board="gpib0"
+	endif
+	variable gpib_index = str2num(gpib_board[strlen(gpib_board)-1]) // assumes the last character is the board index
+	
+	make/o/n=(limitparam) adlist=0 // GPIB address list wave. Only adresses 0-30 are supported by IEEE-448
 	make/o/n=(limitparam) aclist=0 // Active GPIB list reutrned by FindLstn
 	make/o/t/n=(limitparam) idwave // Holds the instrument id's
 	make/o/n=5 counter=0 // Keeps track of how many instruments of the same type is connected
@@ -13,19 +20,18 @@ function InitAllGPIB()
 		adlist[ii] = ii
 	endfor
 	
-	NI4882 ibfind={"gpib0"} // Get id for GPIB board 0
+	NI4882 ibfind={gpib_board} // Get id for GPIB board
 	board=v_flag
 	
-	NI4882 ibrsc={board,1} // Configure the GPIB board 0 as system controller
-	NI4882 ibsic={board} // Clear GPIB 0 interface
+	NI4882 ibrsc={board,1} // Configure the GPIB board as system controller
+	NI4882 ibsic={board} // Clear interface
 	
-	NI4882 FindLstn={0,adlist,aclist,limitparam} // Find all connected GPIB instruments on board 0. 
+	NI4882 FindLstn={gpib_index,adlist,aclist,limitparam} // Find all connected GPIB instruments on board 0. 
 	numdevices = v_ibcnt-1
-	print aclist
 	
 	for(jj=0;jj<numpnts(aclist);jj=jj+1)
 		if(aclist[jj] != 0)
-			NI4882 ibdev={0,aclist[jj],0,10,1,0} //Init device and get identifier
+			NI4882 ibdev={gpib_index,aclist[jj],0,10,1,0} //Init device and get identifier
 			if(v_flag == -1)
 				printf "Encoutered a problem trying to initiate the instrument on GPIB adresse %d/r", aclist[jj]
 			else
@@ -47,7 +53,6 @@ function/s CreateSummary()
 	string header, srsline, k2400line, dmmline, awgline, unknownline, expr, type, gpibadresse
 	string srsid = " ", k2400id = " ", dmmid = " ", awgid = " ", unknownid = " "
 	variable ii
-	
 	
 	for(ii=0;ii<30;ii+=1)
 		if(aclist[ii] != 0)
