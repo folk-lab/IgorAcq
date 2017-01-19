@@ -131,6 +131,26 @@ function SetK2400Compl(voltcurr,compl,id) // Pass "volt" or "curr", the value an
 	endswitch
 end
 
+function SetK2400Range(voltcurr,range,id)
+	string voltcurr
+	variable range, id
+	string cmd
+	
+	strswitch(voltcurr)
+		case "volt":
+			sprintf cmd, ":sens:vol:rang %g", range*1e-3 //Units: mV
+			WriteK2400(cmd,id)
+			break
+		case "curr":
+			sprintf cmd, ":sens:curr:range %g", range*1e-9 //Units: nA
+			WriteK2400(cmd,id)
+			break
+		default:
+			abort "Pass \"volt\" or \"curr\""
+			break
+	endswitch
+end
+
 function K2400Output(onoff,id) // "on" or "off"
 	string onoff
 	variable id
@@ -190,4 +210,46 @@ function/s GetK2400Status(id)
 	NI4882 ibask={id,01}
 	sprintf  winfcomments "Keithley 2400 GPIB%d:\r\t", v_flag
 	return winfcomments
+end
+
+
+//// Old functions //// DON'T EVER USE THEM!
+
+function readCurrent(id)
+	variable id
+	return GetK2400Current(id)*1e9 //Unit: A
+end
+
+function readVoltage(id)
+	variable id
+	return GetK2400Voltage(id)*1e3 //Unit: V
+end
+
+function setCurrent(current,range,compl,id) //Unit: A
+	variable current,range,compl,id
+	SetK2400Range("curr",range,id)
+	SetK2400Compl("curr",compl,id)
+	SetK2400Current(current*1e9,id)
+end
+
+function setVoltage(volts,range,compl,id) //Unit: V
+	variable volts,range,compl,id
+	SetK2400Range("volt",range,id)
+	SetK2400Compl("volt",compl,id)
+	SetK2400Voltage(volts*1e3,id)
+end
+
+function rampCurrent(id,curr) //Unit: A
+	variable id,curr
+	RampK2400Current(curr*1e9,id)
+end
+
+function rampVoltage(id,volts,rate,[range,compl]) //Units: V & mV/s
+	variable id,volts,rate,range,compl
+	if( ParamIsDefault(compl))
+		compl=20e-6
+	endif
+	SetK2400Range("volt",range,id)
+	SetK2400Compl("volt",compl,id)
+	RampK2400Voltage(volts*1e3,id,ramprate=rate)
 end
