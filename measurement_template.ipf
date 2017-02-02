@@ -7,9 +7,9 @@
 // make a copy and edit from there
 // if you have a good addition -- submit changes to this template through GitHub
 
-////////////////////
+/////////////////////////////
 /////    SETUP    /////
-////////////////////
+/////////////////////////////
 
 macro initexp()
     // comment out what you don't need to use
@@ -24,13 +24,13 @@ macro initexp()
 	sc_ColorMap = "VioletOrangeYellow" // change the colormap (default=Grays)
 	
 	/////// auto-initialize GPIB instruments /////////
-	// make sure you have the board number set correctly
+	// check that you have the board number set correctly
 	
 	InitAllGPIB(gpib_board="GPIB0")
 	
 	/////// initialize serial instruments //////////
 	// COM ports must be set here
-	// this makes sure the code works on all measurement setup
+	// this ensures that the code works on all measurement setup
 	
 	string /g ips_comport = "COM3" // set magnet COM port
 	initmagnet()
@@ -48,9 +48,9 @@ macro initexp()
 	
 end
 
-///////////////////////////
+////////////////////////////////////////////
 /////    THINGS TO READ   /////
-///////////////////////////
+////////////////////////////////////////////
 
 // SRS830 //
 
@@ -158,13 +158,13 @@ end
 
 function getADC51()
 	// BabyDAC board 5 ADC channel 1
-	// board 5 has a gain of 10 for some reason
+	// board 5 has a gain of 10
 	return ReadADCBD(1, 5)/10.0
 end
 
 function getADC52()
 	// BabyDAC board 5 ADC channel 2
-	// board 5 has a gain of 10 for some reason
+	// board 5 has a gain of 10
 	return ReadADCBD(1, 5)/10.0
 end
 
@@ -201,13 +201,13 @@ end
 //	return GetTemp("50k")
 //end
 
-////////////////////////////
+////////////////////////////////////////////////
 //// MEAUREMENT SCRIPTS ////
-////////////////////////////
+///////////////////////////////////////////////
 
-////////////////////
+////////////////////////////////////
 //     Read VS Time      //
-////////////////////
+////////////////////////////////////
 
 function ReadvsTimeforever(delay) //Units: s
 	variable delay
@@ -262,9 +262,9 @@ function ReadvsTimeUntil(delay, checkwave, value, timeout, [comments, operator])
 	SaveWaves(msg=comments)
 end
 
-////////////////////
+////////////////////////////////////
 //         BabyDAC         //
-////////////////////
+////////////////////////////////////
 
 function ScanBabyDAC(start, fin, channels, numpts, delay, ramprate, [offsetx, comments]) //Units: mV
 	// sweep one or more babyDAC channels
@@ -513,9 +513,9 @@ function ScanBabyDACRepeatOneWay(startx, finx, channelsx, numptsx, delayx, rampr
 	SaveWaves(msg=comments)
 end
 
-//////////////////////
+////////////////////////////////////
 //       Keithley 2400     //
-//////////////////////
+////////////////////////////////////
 
 function ScanK2400(device, start, fin, numpts, delay, ramprate, [offsetx, compl, comments]) //Units: mV
 	// sweep K2400 output voltage
@@ -633,9 +633,9 @@ function ScanBabyDACIPS(startx, finx, channelsx, numptsx, delayx, rampratex, sta
 	SaveWaves(msg=comments)
 end
 
-/////////////////////
+////////////////////////////////////
 //     Small Magnet       //
-/////////////////////
+////////////////////////////////////
 
 //function ScanSmallMagnet(start, fin, channels, numpts, delay, ramprate, [comments]) //Units: mT (mT/min)
 //	// sweep small magnet using babyDAC and Kepco current source
