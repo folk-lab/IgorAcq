@@ -21,6 +21,7 @@ macro initexp()
     // this will automatically handle the filenum variable
     
 	InitScanController() 
+	sc_ColorMap = "VioletOrangeYellow" // change the colormap (default=Grays)
 	
 	/////// auto-initialize GPIB instruments /////////
 	// make sure you have the board number set correctly
@@ -169,7 +170,7 @@ end
 
 // K2400 //
 
-function getK2400current()
+function getCurrentK2400()
 	nvar k240014
 	return readCurrent(k240014)
 end
@@ -516,9 +517,9 @@ end
 //       Keithley 2400     //
 //////////////////////
 
-function ScanK2400(device, start, fin, numpts, delay, ramprate, [offsetx, cmpli, comments]) //Units: mV
+function ScanK2400(device, start, fin, numpts, delay, ramprate, [offsetx, compl, comments]) //Units: mV
 	// sweep K2400 output voltage
-	variable device, start, fin, numpts, delay, ramprate, offsetx, cmpli
+	variable device, start, fin, numpts, delay, ramprate, offsetx, compl
 	string comments
 	string x_label
 	variable i=0, j=0, setpoint
@@ -527,8 +528,8 @@ function ScanK2400(device, start, fin, numpts, delay, ramprate, [offsetx, cmpli,
 		offsetx=0
 	endif
 	
-	if( ParamIsDefault(cmpli))
-		cmpli = 20e-9
+	if( ParamIsDefault(compl))
+		compl = 20e-9
 	endif
 
 	if(paramisdefault(comments))
@@ -539,13 +540,13 @@ function ScanK2400(device, start, fin, numpts, delay, ramprate, [offsetx, cmpli,
 
 	// set starting values
 	setpoint = start-offsetx
-	rampkvoltage(device, setpoint/1000, ramprate, cmpli = cmpli)
+	rampkvoltage(device, setpoint/1000, ramprate, compl = compl)
 		
 	sleep /S 1.0
 	InitializeWaves(start, fin, numpts, x_label=x_label)
 	do
 		setpoint = start-offsetx + (i*(fin-start)/(numpts-1))
-		rampkvoltage(device, setpoint/1000, ramprate, cmpli = cmpli)
+		rampkvoltage(device, setpoint/1000, ramprate, compl = compl)
 		sleep /s delay
 		RecordValues(i, 0) 
 		i+=1
@@ -553,9 +554,9 @@ function ScanK2400(device, start, fin, numpts, delay, ramprate, [offsetx, cmpli,
 	SaveWaves(msg=comments)
 end
 
-//////////////////
+//////////////////////////////
 //          IPS           //
-//////////////////
+//////////////////////////////
 
 function ScanIPS(start, fin, numpts, delay, ramprate, [comments]) //Units: mT
 	variable start, fin, numpts, delay, ramprate

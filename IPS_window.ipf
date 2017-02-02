@@ -109,7 +109,7 @@ function GetField() // return in mT
 	return round_field
 end
 
-function SetCurrent(amps) // in A
+function SetCurrentIPS(amps) // in A
 	variable amps
 	NVAR maxfield=maxfield
 	NVAR ampspertesla=ampspertesla

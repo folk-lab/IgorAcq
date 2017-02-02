@@ -190,7 +190,8 @@ function readVoltage(device)
 	string cmd
 	
 	sprintf cmd, "GPIB device %d", device; execute cmd
-	execute "GPIBwrite/F=\":syst:rsen 0\""	//Use 2-wire sense
+	//execute "GPIBwrite/F=\":syst:rsen 0\""	//Use 2-wire sense
+	execute "GPIBwrite/F=\":syst:rsen 1\""	//Use 4-wire sense
 	execute "GPIBwrite/F=\":outp on\"" //turn the output on
 	execute "GPIBwrite/F=\"sens:func \\\"VOLT\\\"\""	//configure to measure Voltage
 	execute "GPIBwrite/F=\"form:elem volt, curr\""

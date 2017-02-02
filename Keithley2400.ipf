@@ -239,12 +239,12 @@ function setVoltage(volts,range,compl,id) //Unit: V
 	SetK2400Voltage(volts*1e3,id)
 end
 
-function rampCurrent(id,curr) //Unit: A
+function rampkcurrent(id,curr) //Unit: A
 	variable id,curr
 	RampK2400Current(curr*1e9,id)
 end
 
-function rampVoltage(id,volts,rate,[range,compl]) //Units: V & mV/s
+function rampkvoltage(id,volts,rate,[range,compl]) //Units: V & mV/s
 	variable id,volts,rate,range,compl
 	if( ParamIsDefault(compl))
 		compl=20e-6
