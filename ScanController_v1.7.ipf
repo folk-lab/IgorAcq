@@ -2,11 +2,11 @@
 
 // Scan Controller routines for 1d and 2d scans
 // Version 1.7 August 8, 2016
-// Author: Mohammad Samani, Nik Hartman & Christian Olsen
-// Email: m@msamani.ca
+// Authors: Mohammad Samani, Nik Hartman & Christian Olsen
 
 function InitScanController()
 	nvar filenum
+	
 	// These arrays should have the same size. Their indeces correspond to each other.
 	make/t/o sc_RawWaveNames = {"g1x", "g1y"} // Wave names to be created and saved
 	make/o sc_RawRecord = {0,0} // Whether you want to record and save the data for this wave
@@ -22,12 +22,16 @@ function InitScanController()
 	make/o sc_CalcPlot = {0,0} // Include this calculated field or not
 	// end of same-size waves
 	
+	// default colormap
+	string /g sc_ColorMap = "Grays"
+	
 	// Print variables
 	variable/g sc_PrintRaw = 1,sc_PrintCalc = 1
 	
 	// logging string
 	string /g sc_LogStr = "GetSRSStatus(srs1);"
 	
+	// variable to keep track of abort operations
 	variable /g sc_AbortSave = 0
 
 	if (numtype(filenum) == 2)
@@ -351,6 +355,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, activegraphs="", cmd1="",window_string=""
 	string cmd2=""
 	variable index, graphopen, graphopen2d
+	svar sc_ColorMap
 	
 	//do some sanity checks on wave names: they should not start or end with numbers.
 	do
@@ -541,7 +546,8 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 					wn2d = wn + "2d"
 					display
 					appendimage $wn2d
-					colorscale /c/n=Grays /e/a=rc
+					modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
+					colorscale /c/n=$sc_ColorMap /e/a=rc
 					Label left, sc_y_label
 					Label bottom, sc_x_label
 					activegraphs+= winname(0,1)+";"
@@ -554,7 +560,8 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 				if(sc_is2d)
 					display
 					appendimage $wn2d
-					colorscale /c/n=Grays /e/a=rc
+					modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
+					colorscale /c/n=$sc_ColorMap /e/a=rc
 					Label left, sc_y_label
 					Label bottom, sc_x_label
 					activegraphs+= winname(0,1)+";"
@@ -596,7 +603,8 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 					wn2d = wn + "2d"
 					display
 					appendimage $wn2d
-					colorscale /c/n=Grays /e/a=rc
+					modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
+					colorscale /c/n=$sc_ColorMap /e/a=rc
 					Label left, sc_y_label
 					Label bottom, sc_x_label
 					activegraphs+= winname(0,1)+";"
@@ -609,7 +617,8 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 				if(sc_is2d)
 					display
 					appendimage $wn2d
-					colorscale /c/n=Grays /e/a=rc
+					modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
+					colorscale /c/n=$sc_ColorMap /e/a=rc
 					Label left, sc_y_label
 					Label bottom, sc_x_label
 					activegraphs+= winname(0,1)+";"
