@@ -513,6 +513,111 @@ function ScanBabyDACRepeatOneWay(startx, finx, channelsx, numptsx, delayx, rampr
 	SaveWaves(msg=comments)
 end
 
+function ScanBabyDACMultiRange(startvalues,finvalues,channels,numpts,delay,ramprate, [comments]) //Units: mV
+	// This function will sweep multiple dac channels in seperate defined ranges.
+	// startvalues, finvalues and channels must be comma seperated lists.
+	string  startvalues, finvalues, channels
+	variable numpts, delay, ramprate
+	string comments
+	string x_label
+	variable i=0, j=0,k=0, setpoint, nChannels, start, fin, channel
+
+	nChannels = ItemsInList(channels, ",")
+	
+	if(paramisdefault(comments))
+		comments=""
+	endif
+	
+	sprintf x_label, "BD %s (mV)", channels
+	
+	// set starting values
+	for(k=0;k<nChannels;k+=1)
+		channel = Str2num(StringFromList(k,channels,","))
+		start = Str2num(StringFromList(k,startvalues,","))
+		RampOutputBD(channel, start, ramprate=ramprate)
+	endfor
+		
+	sleep /S 1.0
+	start = Str2num(StringFromList(0,startvalues,","))
+	fin = Str2num(StringFromList(0,finvalues,","))
+	InitializeWaves(start, fin, numpts, x_label=x_label)
+	do
+		for(k=0;k<nChannels;k+=1)
+			start = Str2num(StringFromList(k,startvalues,","))
+			fin = Str2num(StringFromList(k,finvalues,","))
+			channel = Str2num(StringFromList(k,channels,","))
+			setpoint = start + (i*(fin-start)/(numpts-1))
+			RampOutputBD(channel, setpoint, ramprate=ramprate)
+		endfor
+		sleep /s delay
+		RecordValues(i, 0) 
+		i+=1
+	while (i<numpts)
+	SaveWaves(msg=comments)
+end
+
+function ScanBabyDAC2DSlice(startx, finx, channelsx, numpts_slice, delayx, rampratex, starty, finy, channelsy, numptsy, delayy, rampratey,slicewidthx, [comments]) //Units: mV
+	// This function will scan a slice in a 2D plane. channelsx will run on the inner loop.
+	variable startx, finx, numpts_slice, delayx, rampratex, starty, finy, numptsy, delayy, rampratey, slicewidthx
+	string channelsx, channelsy, comments
+	variable i=0, j=0, setpointx, setpointy, nChannelsx, nChannelsy, slope, stepsizey, stepsizex, startslice, scandirection=0,omega, numptsx,endslice
+	string x_label, y_label
+	
+	nChannelsx = ItemsInList(channelsx, ",")
+	nChannelsy = ItemsInList(channelsy, ",")
+	
+	if(paramisdefault(comments))
+		comments=""
+	endif
+	
+	if(abs(finx-startx)-slicewidthx<0)
+		abort("Slice size can't be lager than the difference in x coordinates.")
+	endif
+	sprintf x_label, "BD %s (mV)", channelsx
+	sprintf y_label, "BD %s (mV)", channelsy
+	
+	// set starting values
+	setpointx = startx
+	setpointy = starty
+	RampMultipleBD(channelsx, setpointx, nChannelsx, ramprate=rampratex)
+	RampMultipleBD(channelsy, setpointy, nChannelsy, ramprate=rampratey)
+	
+	omega = abs(finx-startx)/slicewidthx
+	numptsx = omega*numpts_slice
+	
+	// initialize waves
+	InitializeWaves(startx, finx, numptsx, starty=starty, finy=finy, numptsy=numptsy, x_label=x_label, y_label=y_label)
+	
+	
+	slope = (finy - starty)/(finx-(startx + sign(finx-startx)*slicewidthx))
+	stepsizey = (finy-starty)/(numptsy-1)
+	stepsizex = stepsizey/slope
+
+	// main loop
+	do
+		startslice = startx + i*stepsizex
+		endslice = startslice-slicewidthx
+		setpointy = starty + (i*(finy-starty)/(numptsy-1))
+		RampMultipleBD(channelsx, startslicex, nChannelsx, ramprate=rampratex)
+		RampMultipleBD(channelsy, setpointy, nChannelsy, ramprate=rampratey)
+		sleep /s delayy
+		j=0
+		do
+			setpointx = startx + (j*(finx-startx)/(numptsx-1))
+			if(startslice < setpointx || setpointx < endslice)
+				RecordValues(i, j,sliceaddnan=1)
+			else
+				RampMultipleBD(channelsx, setpointx, nChannelsx, ramprate=rampratex)
+				sleep /s delayx
+				RecordValues(i, j)
+			endif
+			j+=1
+		while (j<numptsx)
+		i+=1
+	while (i<numptsy)
+	SaveWaves(msg=comments)
+end
+
 ////////////////////////////////////
 //       Keithley 2400     //
 ////////////////////////////////////

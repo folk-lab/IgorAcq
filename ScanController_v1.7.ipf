@@ -694,8 +694,8 @@ function protofunc()
 // In a 1d scan, i is the index of the loop. j will be ignored.
 // In a 2d scan, i is the index of the outer (slow) loop, and j is the index of the inner (fast) loop. 
 // In a 2D scan, if scandirection=1 (scan up), the 1d wave gets saved into the matrix when j=numptsy. If scandirection=-1(scan down), the 1d matrix gets saved when j=0. Default is 1 (up)
-function RecordValues(i, j, [scandirection,readvstime])
-	variable i, j, scandirection, readvstime
+function RecordValues(i, j, [scandirection,readvstime,sliceaddNaN])
+	variable i, j, scandirection, readvstime, sliceaddnan
 	nvar sc_is2d, sc_startx, sc_finx, sc_numptsx, sc_starty, sc_finy, sc_numptsy
 	variable ii = 0, jj=0
 	wave /t sc_RawWaveNames, sc_RequestScripts, sc_GetResponseScripts, sc_CalcWaveNames, sc_CalcScripts
@@ -724,28 +724,37 @@ function RecordValues(i, j, [scandirection,readvstime])
 		readvstime=0
 	endif
 	
+	// Set sliceaddNaN to 0 if not defined
+	if(paramisdefault(sliceaddnan))
+		sliceaddnan=0
+	endif
+	
 	if(readvstime ==1 && sc_is2d)
 		abort "Read vs Time is only supported for 1D sweeps."
 	endif
 	
 	// Send requests to machines
-	do
-		if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
-			jj=0;
-			script = sc_RequestScripts[ii];
-			if (cmpstr(script, ""))
-				FUNCREF protofunc fscript = $script[0,strlen(script)-3]
-				fscript()
+	if(sliceaddnan == 0)
+		do
+			if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
+				jj=0;
+				script = sc_RequestScripts[ii];
+				if (cmpstr(script, ""))
+					FUNCREF protofunc fscript = $script[0,strlen(script)-3]
+					fscript()
+				endif
 			endif
-		endif
-		ii+=1
-	while (ii < numpnts(sc_RawWaveNames))
+			ii+=1
+		while (ii < numpnts(sc_RawWaveNames))
+	endif
 	
 	// Read responses from machines
 	ii=0
 	do
 		if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
-			script = sc_GetResponseScripts[ii]; // assume i'm just getting one function back here like "readFunc()"
+			if(sliceaddnan == 0)
+				script = sc_GetResponseScripts[ii]; // assume i'm just getting one function back here like "readFunc()"
+			endif
 			
 			// Redimension waves if readvstime is set to 1
 			if (readvstime == 1)
@@ -755,8 +764,12 @@ function RecordValues(i, j, [scandirection,readvstime])
 
 			// execute response script
 			wave wref1d = $sc_RawWaveNames[ii]
-			FUNCREF protofunc fscript = $script[0,strlen(script)-3]
-			wref1d[innerindex] = fscript()
+			if(sliceaddnan == 0)
+				FUNCREF protofunc fscript = $script[0,strlen(script)-3]
+				wref1d[innerindex] = fscript()
+			elseif(sliceaddnan == 1)
+				wref1d[innerindex] = nan
+			endif
 			
 			if (sc_is2d)
 				// 2D Wave
@@ -786,14 +799,17 @@ function RecordValues(i, j, [scandirection,readvstime])
 			script = ReplaceString("[i]", script, "["+num2istr(innerindex)+"]")
 			execute(sc_CalcWaveNames[ii] + "[" + num2istr(innerindex) + "]=" + script)
 			
-			if (sc_is2d)
+			if (sc_is2d && sliceaddnan == 0)
 				// 2D Wave						
 				// If this is the last point in a row on a 2d scan, save the row in the 2d wave
 				if ((innerindex == sc_numptsx-1 && scandirection == 1) || (innerindex == 0 && scandirection == -1))
 					wave wref1d = $sc_CalcWaveNames[ii]
 					wave wref2d = $sc_CalcWaveNames[ii] + "2d"
 					wref2d[][outerindex] = wref1d[p]
-				endif												
+				endif
+			elseif(sc_is2d && sliceaddnan == 1)
+				wave wref2d = $sc_CalcWaveNames[ii] + "2d"
+				wref2d[innerindex][outerindex] = nan							
 			endif
 		endif
 		ii+=1
