@@ -232,6 +232,20 @@ function GetTemp(plate)
 	return ReadResponseString(response, key)
 end
 
+function GetHeaterPower(plate)
+	// plate = "mc" or "still"
+	// Returns temp in K
+	string plate
+	string response, url, key
+	svar readsql = readsql
+	svar systemid = systemid
+	
+	sprintf key,"%s_%s_heater", systemid, plate
+	url = CreateURL("getCurrentState",readurl="1")
+	response = FetchURL(url)
+	return ReadResponseString(response, key)
+end
+
 function GetHeatSwitch(heatswitch)
 	// still, mc
 	// Returns 1 for "on" and 0 for "off"
@@ -529,17 +543,19 @@ function GetStillHeater()
 end
 
 function GetMCHeater()
+	// get MC heater current in mA
 	string command,url,response
 	variable fullscale,output
 	nvar mcheat, heaterrange_control
 	wave heatertable = heatertable
 	
 	fullscale = heatertable[heaterrange_control][1]
-	command = "MOUT?"
+	command = "HTR?"
 	url = CreateURL("createCommand", writeurl = "1", cmd = command)
 	response = QueryLakeShore(url)
+	print response
 	output = str2num(response)*fullscale/100
-	mcheat = output
+	mcheat = output // mA
 	return output
 end
 
