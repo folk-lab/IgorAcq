@@ -65,11 +65,30 @@ function InitDT8824(channels, [gain, frequency, chunk])
 	string channels // comma-separated list of channels to enable (channels are 1-4 not 0-3)
 				    // for example: channels = "1,3" is a valid input
 	variable gain, frequency, chunk
-	variable nChannels = 0
+	variable nChannels, i
 	variable /g dt8824_gain, dt8824_high, dt8824_low, dt8824_frequency, dt8824_chunk
-	string /g dt8824_channels
+	string /g dt8824_channels, cmd
+	nvar V_value
 	dt8824_channels = ReplaceString(" ", channels, "" )
-	string cmd=""
+	nChannels = ItemsInList(dt8824_channels, ",")
+	
+	// checks input channels
+	// especially: abort if channel number out of range, i.e. contains <=0 or >4
+	if (nChannels<=0 || nChannels>=5)
+		abort "Wrong number of channels. Available channels are 1 to 4. Example: InitDT8824(\"1,3,4\")."
+	endif 
+	make/o validChannels	= {1,2,3,4}
+	cmd = ""
+	for (i=0; i<nChannels; i+=1)
+		sprintf cmd, "FindValue /V=%d validChannels", str2num(StringFromList(i, channels, ","))
+		execute cmd
+		if (V_value == -1)
+			abort "Channels are 1-4, not 0-3."
+		endif
+	endfor
+	
+	
+	cmd=""
 	
 	SetupAddrDT8824() // setup global variable for IP address
 	svar dt8824_addr
@@ -118,15 +137,29 @@ function InitDT8824(channels, [gain, frequency, chunk])
 	// the buffer in a single AD:FETCH call
 	// dt8824_chunk is an integer < 512 that sets this size
 	if(paramisdefault(chunk))
-		dt8824_chunk = 512
-	elseif(chunk > 512)
-		dt8824_frequency = 512
+		switch( nChannels )
+		// dt8824_chunk is about 1000/nChannels.
+			case 1:
+				dt8824_chunk = 1000
+				break
+			case 2:
+				dt8824_chunk = 500
+				break
+			case 3:
+				dt8824_chunk = 330
+				break
+			case 4:
+				dt8824_chunk = 250
+				break
+			default:
+				// not possible, checked at start of function
+				break
+		endswitch
 	else
 		dt8824_chunk = chunk
 	endif
 	
 	// setup some waves for readings (only works for 1 channel now)
-	nChannels = ItemsInList(dt8824_channels, ",")
 	make /O/B/U/N=(4*dt8824_chunk*nChannels+20) dt_response_wave
 	make /O/N=(dt8824_chunk, nChannels) dt_val_wave
 	make /O/N=(dt8824_chunk, nChannels) dt_readings
@@ -234,13 +267,17 @@ function CheckPWstateDT8824()
 	string response
 	response = queryDT8824(":SYST:PASS:CEN:STAT?")
 	if(str2num(response) == 1) // commands already enabled
+		// print "PASSWORD SUCCESS!"
 		return 1
 	else
 		writeDT8824(":SYST:PASS:CEN admin")
 		sleep /S 0.1
 		response = queryDT8824(":SYST:PASS:CEN:STAT?")
 		if(str2num(response) == 1) // commands now enabled
+			// print "PASSWORD SUCCESS!"
 			return 1
+		else
+			abort "PASSWORD ERROR"
 		endif
 	endif
 	abort "ERROR enabling password protected commands"
@@ -313,6 +350,14 @@ function getTimeSeriesDT8824(length, [update])
 
 	viOpenDefaultRM(defaultRM)
 	viOpen(defaultRM, dt8824_addr, 0, 0, dt8824)
+	
+//	// check status //
+//	string binResponse
+//	variable numResponse
+//	VISAWrite dt8824, "AD:STAT?"+"\r\n" 
+//	VISARead /T="\r\n" dt8824, response
+//	sprintf binResponse, "%08b", numResponse
+//	print binResponse
 
 	VISAWrite dt8824, ":AD:ARM"+"\r\n" // arm measurement subsystem (clears buffer)
 	VISAWrite dt8824, ":AD:INIT"+"\r\n"   // trigger readings to start
@@ -324,7 +369,7 @@ function getTimeSeriesDT8824(length, [update])
 				VISAWrite dt8824, ":AD:STATus:SCAn?"+"\r\n" 
 				VISARead /T="\r\n" dt8824, response
 				maxIndex = str2num(StringFromList(1, response, ","))	
-			while(maxIndex<(dt8824_chunk*(i+1)))
+			while(maxIndex<(dt8824_chunk*(i+1))) // stop when the number of readings stored in buffer is greater than requested number
 		endif	
 		sprintf cmd, "AD:FETCh? %d, %d", dt8824_chunk*i, dt8824_chunk
 		VISAWrite dt8824, cmd+"\r\n" 

@@ -23,7 +23,7 @@ function InitFridge()
 	UpdateCurrentValues() // Get current Lakeshore state
 	SetPointTemp(GetTemp("mc")*1000) // Set temp control setpoint to current MC temp
 	SetControlParameters() // Set temp control parameters. Set parameters explicitly if defualt is not desiered
-	TempSequence(preset="normal") // Set temperature reading to normal mode
+	SetTempSequence(preset="normal") // Set temperature reading to normal mode
 	
 end
 
@@ -126,7 +126,7 @@ function UpdateCurrentValues()
 	dump0 = GetControlParameters() // Update control variables
 	dump1 = GetRamp() // Update Ramp status
 	dump2 = GetControlMode() // Update Control mode
-	dump3 = GetHeaterRange() // Update current heater range
+	dump3 = GetMCHeaterRange() // Update current heater range
 	dump4 = GetMCHeater() // Update current MC heat
 	dump5 = GetStillHeater() // Update current Still heat
 	dump6 = GetPIDParameters() // Update PID parameters
@@ -149,7 +149,7 @@ end
 
 //// Change temperature recording sequence ////
 
-function TempSequence([preset,temp_50k,temp_4k,temp_magnet,temp_still,temp_mc])
+function SetTempSequence([preset,temp_50k,temp_4k,temp_magnet,temp_still,temp_mc])
 	// Choose a preset, e.g. cooldown, normal, temp_control or warm_up. Or set how often they should be read in s
 	string preset
 	variable temp_50k,temp_4k,temp_magnet,temp_still,temp_mc
@@ -465,7 +465,7 @@ function GetTempSetPoint()
 	return temp*1000
 end
 
-function GetHeaterRange()
+function GetMCHeaterRange()
 	string command, url, response
 	wave heatertable = heatertable
 	variable range
@@ -553,7 +553,6 @@ function GetMCHeater()
 	command = "HTR?"
 	url = CreateURL("createCommand", writeurl = "1", cmd = command)
 	response = QueryLakeShore(url)
-	print response
 	output = str2num(response)*fullscale/100
 	mcheat = output // mA
 	return output
