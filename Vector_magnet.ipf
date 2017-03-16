@@ -185,7 +185,7 @@ function GetFieldy() // Units: mT
 	variable field, current
 	
 	current = GetCurrentx()
-	field = current/(ampsperteslay*1000)
+	field = Round_Number(current/ampsperteslay*1000,4)
 	
 	return field
 end
@@ -195,7 +195,8 @@ function GetFieldz() // Units: mT
 	variable current,field
 	
 	current = GetCurrentz()
-	field = Round_Number(current/ampsperteslaz*1000,3)
+	field = Round_Number(current/ampsperteslaz*1000,4)
+	
 	return field
 end
 
