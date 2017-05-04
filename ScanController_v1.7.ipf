@@ -680,6 +680,82 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	execute(cmd1)
 end
 
+function InitializeTmpWaves(call_num) 
+	// these waves only need to be 1d
+	variable call_num
+	string x_label = "time (s)" // the x axis will always be time
+	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot // waves that tell me what to record and plot
+	wave /T sc_RawWaveNames, sc_CalcWaveNames, sc_RequestScripts, sc_GetResponseScripts // wave names and scripts
+	variable i=0, j=0
+	string cmd = "", wn = "", wn2d="", s, script = "", script0 = "", script1 = ""
+	variable/g sc_abortsweep=0, sc_pause=0
+	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, activegraphs="", cmd1="",window_string=""
+	string cmd2=""
+	variable index, graphopen
+	svar sc_ColorMap
+	
+	// Initialize waves for raw data
+	do
+		if (sc_RawRecord[i] == 1 && cmpstr(sc_RawWaveNames[i], "") || sc_RawPlot[i] == 1 && cmpstr(sc_RawWaveNames[i], ""))
+			wn = "tmp_"+sc_RawWaveNames[i]
+			cmd = "make /o/n=(" + num2istr(1) + ") " + wn + "=NaN"
+			execute(cmd)
+			cmd = "setscale/I x " + num2str(0) + ", " + num2str(1) + ", \"\", " + wn
+			execute(cmd)
+		endif
+		i+=1
+	while (i<numpnts(sc_RawWaveNames))
+	
+	if(call_num==0)
+		// Find all open plots
+		graphlist = winlist("*",";","WIN:1")
+		j=0
+		for (i=0;i<round(strlen(graphlist)/6);i=i+1)
+			index = strsearch(graphlist,";",j)
+			graphname = graphlist[j,index-1]
+			getwindow $graphname wtitle
+			splitstring /e="(.*):(.*)" s_value, graphnum, plottitle
+			graphtitle+= plottitle+";"
+			graphnumlist+= graphnum+";"
+			j=index+1
+		endfor
+		
+		//Initialize plots for tmp raw data waves
+		i=0
+		do
+			if (sc_RawPlot[i] == 1 && cmpstr(sc_RawWaveNames[i], ""))
+				wn = "tmp_" + sc_RawWaveNames[i]
+				graphopen=0
+				for(j=0;j<ItemsInList(graphtitle);j=j+1)
+					if(stringmatch(wn,stringfromlist(j,graphtitle)))
+						graphopen=1
+						activegraphs+= stringfromlist(j,graphnumlist)+";"
+						Label /W=$stringfromlist(j,graphnumlist) bottom,  x_label
+					endif
+				endfor
+				if(graphopen==0)
+					display $wn
+					Label bottom, x_label
+					activegraphs+= winname(0,1)+";"
+				endif
+			endif
+			i+= 1
+		while(i<numpnts(sc_RawWaveNames))
+		
+		cmd1 = "TileWindows/O=1/A=(3,4) "
+		// Tile graphs
+		for(i=0;i<itemsinlist(activegraphs);i=i+1)
+			window_string = stringfromlist(i,activegraphs)
+			cmd1+= window_string +","
+			cmd2 = "DoWindow/F " + window_string
+			execute(cmd2)
+		endfor
+		cmd1 += "SweepControl"
+		execute(cmd1)
+		
+	endif
+end
+
 window abortmeasurementwindow() : Panel
 	//Silent 1 // building window
 	NewPanel /W=(500,700,750,750) /N=SweepControl// window size
@@ -690,7 +766,6 @@ window abortmeasurementwindow() : Panel
 	Button stopsweep, pos={130,15},size={110,20},proc=stopsweep,title="Abort"
 	DoUpdate /W=SweepControl /E=1
 endmacro
-
 
 function stopsweep(action) : Buttoncontrol
 	string action
@@ -729,11 +804,20 @@ function protofunc()
  	/// end
  end	
  	
-// In a 1d scan, i is the index of the loop. j will be ignored.
-// In a 2d scan, i is the index of the outer (slow) loop, and j is the index of the inner (fast) loop. 
-// In a 2D scan, if scandirection=1 (scan up), the 1d wave gets saved into the matrix when j=numptsy. If scandirection=-1(scan down), the 1d matrix gets saved when j=0. Default is 1 (up)
-function RecordValues(i, j, [scandirection,readvstime,sliceaddNaN])
-	variable i, j, scandirection, readvstime, sliceaddnan
+function RecordValues(i, j, [scandirection, readvstime, timeavg, timeavg_delay, fillnan])
+	// In a 1d scan, i is the index of the loop. j will be ignored.
+	// In a 2d scan, i is the index of the outer (slow) loop, and j is the index of the inner (fast) loop. 
+
+	// In a 2D scan, if scandirection=1 (scan up), the 1d wave gets saved into the matrix when j=numptsy. 
+	// If scandirection=-1(scan down), the 1d matrix gets saved when j=0. Default is 1 (up)
+	
+	// readvstime works only in 1d and rescales (grows) the wave at each index
+	
+	// timeavg and timeavg_delay set the parameters to average over many read calls for each record value call
+	
+	// fillnan skips any read or calculation functions entirely and fills point [i,j] with nan
+	
+	variable i, j, scandirection, readvstime, fillnan, timeavg, timeavg_delay
 	nvar sc_is2d, sc_startx, sc_finx, sc_numptsx, sc_starty, sc_finy, sc_numptsy
 	variable ii = 0, jj=0
 	wave /t sc_RawWaveNames, sc_RequestScripts, sc_GetResponseScripts, sc_CalcWaveNames, sc_CalcScripts
@@ -757,69 +841,122 @@ function RecordValues(i, j, [scandirection,readvstime,sliceaddNaN])
 		scandirection=1
 	endif
 	
-	// Set redim to 0 if it's not defined
+	// Set readvstime to 0 if it's not defined
 	if(paramisdefault(readvstime))
 		readvstime=0
 	endif
 	
-	// Set sliceaddNaN to 0 if not defined
-	if(paramisdefault(sliceaddnan))
-		sliceaddnan=0
+	if (paramisdefault(timeavg))
+		timeavg = -1
+	endif
+	
+	if(paramisdefault(timeavg_delay))
+		if(timeavg>0)
+			abort("Set a timeavg_delay if you are going to use the timeavg feature.")
+		endif
+	endif
+	
+	// Set fillnan to 0 if not defined
+	if(paramisdefault(fillnan))
+		fillnan=0
 	endif
 	
 	if(readvstime ==1 && sc_is2d)
 		abort "Read vs Time is only supported for 1D sweeps."
 	endif
 	
-	// Send requests to machines
-	if(sliceaddnan == 0)
+	if(timeavg<0) // this is the normal behavior, one read per setpoint
+		
+		// Send requests to machines
+		if(fillnan == 0)
+			do
+				if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
+					jj=0;
+					script = sc_RequestScripts[ii];
+					if (cmpstr(script, ""))
+						FUNCREF protofunc fscript = $script[0,strlen(script)-3]
+						fscript()
+					endif
+				endif
+				ii+=1
+			while (ii < numpnts(sc_RawWaveNames))
+		endif
+		
+		// Read responses from machines
+		ii=0
 		do
 			if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
-				jj=0;
-				script = sc_RequestScripts[ii];
-				if (cmpstr(script, ""))
+				if(fillnan == 0)
+					script = sc_GetResponseScripts[ii]; // assume i'm just getting one function back here like "readFunc()"
+				endif
+				
+				// Redimension waves if readvstime is set to 1
+				if (readvstime == 1)
+					redimension /n=(innerindex+1) $sc_RawWaveNames[ii]
+					setscale/I x 0,  datetime - sc_scanstarttime, $sc_RawWaveNames[ii]
+				endif
+	
+				// execute response script
+				wave wref1d = $sc_RawWaveNames[ii]
+				if(fillnan == 0)
 					FUNCREF protofunc fscript = $script[0,strlen(script)-3]
-					fscript()
+					wref1d[innerindex] = fscript()
+				elseif(fillnan == 1)
+					wref1d[innerindex] = nan
+				endif
+				
+				if (sc_is2d)
+					// 2D Wave
+					// If this is the last point in a row on a 2d scan, save the row in the 2d wave
+					if ((innerindex == sc_numptsx-1 && scandirection == 1) || (innerindex == 0 && scandirection == -1))
+						wave wref2d = $sc_RawWaveNames[ii] + "2d"
+						wref2d[][outerindex] = wref1d[p]
+					endif
 				endif
 			endif
 			ii+=1
 		while (ii < numpnts(sc_RawWaveNames))
-	endif
+		
+	else // here we will time average a number of reads at each setpoint
+		
+		// get all the data vs time
+		if(fillnan == 0)
+			sc_readvstime(i+j, timeavg_delay, timeavg)
+		endif
+		
+		// get all averages into proper waves
+		ii=0
+		do
+			if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
+				
+				// Redimension waves if readvstime is set to 1
+				// it would be strange if this came up, but i'm not here to judge
+				if (readvstime == 1)
+					redimension /n=(innerindex+1) $sc_RawWaveNames[ii]
+					setscale/I x 0,  datetime - sc_scanstarttime, $sc_RawWaveNames[ii]
+				endif
 	
-	// Read responses from machines
-	ii=0
-	do
-		if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
-			if(sliceaddnan == 0)
-				script = sc_GetResponseScripts[ii]; // assume i'm just getting one function back here like "readFunc()"
-			endif
-			
-			// Redimension waves if readvstime is set to 1
-			if (readvstime == 1)
-				redimension /n=(innerindex+1) $sc_RawWaveNames[ii]
-				setscale/I x 0,  datetime - sc_scanstarttime, $sc_RawWaveNames[ii]
-			endif
-
-			// execute response script
-			wave wref1d = $sc_RawWaveNames[ii]
-			if(sliceaddnan == 0)
-				FUNCREF protofunc fscript = $script[0,strlen(script)-3]
-				wref1d[innerindex] = fscript()
-			elseif(sliceaddnan == 1)
-				wref1d[innerindex] = nan
-			endif
-			
-			if (sc_is2d)
-				// 2D Wave
+				// get mean of tmp_ wave
+				wave wref1d = $sc_RawWaveNames[ii]
+				wave tempref = $("tmp_"+sc_RawWaveNames[ii])
+				if(fillnan == 0)
+					wref1d[innerindex] = mean(tempref)
+				else
+					wref1d[innerindex] = nan
+				endif
+				
 				// If this is the last point in a row on a 2d scan, save the row in the 2d wave
-				if ((innerindex == sc_numptsx-1 && scandirection == 1) || (innerindex == 0 && scandirection == -1))
-					wave wref2d = $sc_RawWaveNames[ii] + "2d"
-					wref2d[][outerindex] = wref1d[p]
+				if (sc_is2d)
+					if ((innerindex == sc_numptsx-1 && scandirection == 1) || (innerindex == 0 && scandirection == -1))
+						wave wref2d = $sc_RawWaveNames[ii] + "2d"
+						wref2d[][outerindex] = wref1d[p]
+					endif
 				endif
 			endif
-		endif
-		ii+=1
-	while (ii < numpnts(sc_RawWaveNames))
+			ii+=1
+		while (ii < numpnts(sc_RawWaveNames))
+		
+	endif
 	
 	// Calculate interpreted numbers and store them in calculated waves
 	ii=0
@@ -837,21 +974,90 @@ function RecordValues(i, j, [scandirection,readvstime,sliceaddNaN])
 			script = ReplaceString("[i]", script, "["+num2istr(innerindex)+"]")
 			execute(sc_CalcWaveNames[ii] + "[" + num2istr(innerindex) + "]=" + script)
 			
-			if (sc_is2d && sliceaddnan == 0)
-				// 2D Wave						
-				// If this is the last point in a row on a 2d scan, save the row in the 2d wave
+			if (sc_is2d && fillnan == 0)				
+				// if this is the last point in a row on a 2d scan, save the row in the 2d wave
 				if ((innerindex == sc_numptsx-1 && scandirection == 1) || (innerindex == 0 && scandirection == -1))
 					wave wref1d = $sc_CalcWaveNames[ii]
 					wave wref2d = $sc_CalcWaveNames[ii] + "2d"
 					wref2d[][outerindex] = wref1d[p]
 				endif
-			elseif(sc_is2d && sliceaddnan == 1)
+			elseif(sc_is2d && fillnan != 0)
+				// fill every point with NaN as you go
 				wave wref2d = $sc_CalcWaveNames[ii] + "2d"
 				wref2d[innerindex][outerindex] = nan							
 			endif
 		endif
 		ii+=1
 	while (ii < numpnts(sc_CalcWaveNames))
+	
+	//// check abort/pause status block ////
+	if (GetKeyState(0) & 32)
+		// If the ESC button is pressed during the scan, save existing data and stop the scan.
+		SaveWaves(msg="The scan was aborted during the execution.")
+		abort
+	endif
+	
+	if(sc_abortsweep)
+		// Abort sweep
+		SaveWaves(msg="The scan was aborted during the execution.")
+		abort "Measurement aborted by user"
+		dowindow /k SweepControl
+	elseif(sc_pause)
+		// Pause sweep
+		do
+			sleep/s 1
+			if(sc_abortsweep)
+				SaveWaves(msg="The scan was aborted during the execution.")
+				dowindow /k SweepControl
+				abort "Measurement aborted by user"
+			endif
+		while(sc_pause)
+	endif
+	//// end check abort/pause status block ////
+	
+end
+
+function RecordTmpValues(i)
+	// only for use with sc_readvstime()
+	variable i
+	variable ii = 0
+	wave /t sc_RawWaveNames, sc_RequestScripts, sc_GetResponseScripts, sc_CalcWaveNames, sc_CalcScripts
+	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
+	string script = "",cmd = "", wstr = "", tmp_wavename = ""
+	variable innerindex = i
+	nvar sc_abortsweep, sc_pause,sc_scanstarttime
+	
+	// Send requests to machines
+	do
+		if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
+			script = sc_RequestScripts[ii];
+			if (cmpstr(script, ""))
+				FUNCREF protofunc fscript = $script[0,strlen(script)-3]
+				fscript()
+			endif
+		endif
+		ii+=1
+	while (ii < numpnts(sc_RawWaveNames))
+	
+	// Read responses from machines
+	ii=0
+	do
+		if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
+		
+			tmp_wavename = "tmp_"+sc_RawWaveNames[ii]
+			script = sc_GetResponseScripts[ii]; // assume i'm just getting one function back here like "readFunc()"
+			
+			redimension /n=(innerindex+1) $tmp_wavename
+			setscale/I x 0,  datetime - sc_scanstarttime, $tmp_wavename
+
+			// execute response script
+			wave wref1d = $tmp_wavename
+			FUNCREF protofunc fscript = $script[0,strlen(script)-3]
+			wref1d[innerindex] = fscript()
+
+		endif
+		ii+=1
+	while (ii < numpnts(sc_RawWaveNames))
 	
 	if (GetKeyState(0) & 32)
 		// If the ESC button is pressed during the scan, save existing data and stop the scan.
@@ -875,6 +1081,21 @@ function RecordValues(i, j, [scandirection,readvstime,sliceaddNaN])
 			endif
 		while(sc_pause)
 	endif
+end
+
+function sc_readvstime(index, delay, timeout)
+	variable index, delay, timeout
+	
+	InitializeTmpWaves(index) 
+	variable start_time = datetime, i=0
+	do
+		sc_sleep(delay)
+		RecordTmpValues(i) 
+		if((datetime-start_time)>timeout)
+			break
+		endif
+		i+=1
+	while (1==1)
 end
 
 // the message will be printed in the history, and will be saved in the winf file corresponding to this scan

@@ -42,9 +42,9 @@ macro initexp()
 	// assuming the magnet is using a kepco current source
 	// in voltage control mode
 	
-//	variable /g kepco_cal = 4 // Amps/Volt
-//	variable /g magnet_cal = 85.86 //Amps/Tesla
-//	variable /g power_resistor = 0.0131 //Ohms
+	// variable /g kepco_cal = 4 // Amps/Volt
+	// variable /g magnet_cal = 85.86 //Amps/Tesla
+	// variable /g power_resistor = 0.0131 //Ohms
 	
 end
 
@@ -219,6 +219,34 @@ end
 //// MEAUREMENT SCRIPTS ////
 ///////////////////////////////////////////////
 
+// DUMMY //
+
+function ScanNumbersTimeavg(start, fin, numpts, delay, timeavg, [comments]) 
+	variable start, fin, numpts, delay, timeavg
+	string comments
+	string x_label = ""
+	variable i=0, setpoint, nChannels
+
+	if(paramisdefault(comments))
+		comments=""
+	endif
+
+	// set starting values
+	setpoint = start
+	InitializeWaves(start, fin, numpts, x_label=x_label)
+	
+	do
+		setpoint = start + (i*(fin-start)/(numpts-1))
+		sc_sleep(delay)
+		RecordValues(i, 0, timeavg = timeavg, timeavg_delay = delay/5) 
+		i+=1
+	while (i<numpts)
+	
+	SaveWaves(msg=comments)
+	
+end
+
+
 ////////////////////////////////////
 //     Read VS Time      //
 ////////////////////////////////////
@@ -226,7 +254,7 @@ end
 function ReadvsTimeForever(delay) //Units: s
 	variable delay
 	string comments
-	variable  i
+	variable i = 0
 
 	InitializeWaves(0, 1, 1, x_label="time (s)")
 	do
@@ -268,7 +296,7 @@ function ReadvsTimeUntil(delay, checkwave, value, timeout, [comments, operator])
 	
 	variable delay, value, timeout
 	string checkwave, comments, operator
-	variable i
+	variable i = 0
 
 	if(paramisdefault(comments))
 		comments=""
@@ -644,7 +672,7 @@ function ScanBabyDAC2DSlice(startx, finx, channelsx, numpts_slice, delayx, rampr
 		do
 			setpointx = startx + (j*(finx-startx)/(numptsx-1))
 			if(startslice < setpointx || setpointx < endslice)
-				RecordValues(i, j,sliceaddnan=1)
+				RecordValues(i, j,fillnan=1)
 			else
 				RampMultipleBD(channelsx, setpointx, nChannelsx, ramprate=rampratex)
 				sc_sleep(delayx)
