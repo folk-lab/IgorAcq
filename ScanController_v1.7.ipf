@@ -688,7 +688,7 @@ function InitializeTmpWaves(call_num)
 	wave /T sc_RawWaveNames, sc_CalcWaveNames, sc_RequestScripts, sc_GetResponseScripts // wave names and scripts
 	variable i=0, j=0
 	string cmd = "", wn = "", wn2d="", s, script = "", script0 = "", script1 = ""
-	variable/g sc_abortsweep=0, sc_pause=0
+	variable/g sc_abortsweep=0, sc_pause=0, tmp_scanstarttime = datetime
 	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, activegraphs="", cmd1="",window_string=""
 	string cmd2=""
 	variable index, graphopen
@@ -1025,7 +1025,7 @@ function RecordTmpValues(i)
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
 	string script = "",cmd = "", wstr = "", tmp_wavename = ""
 	variable innerindex = i
-	nvar sc_abortsweep, sc_pause,sc_scanstarttime
+	nvar sc_abortsweep, sc_pause, tmp_scanstarttime
 	
 	// Send requests to machines
 	do
@@ -1048,7 +1048,7 @@ function RecordTmpValues(i)
 			script = sc_GetResponseScripts[ii]; // assume i'm just getting one function back here like "readFunc()"
 			
 			redimension /n=(innerindex+1) $tmp_wavename
-			setscale/I x 0,  datetime - sc_scanstarttime, $tmp_wavename
+			setscale/I x 0,  datetime - tmp_scanstarttime, $tmp_wavename
 
 			// execute response script
 			wave wref1d = $tmp_wavename
@@ -1083,23 +1083,8 @@ function RecordTmpValues(i)
 	endif
 end
 
-function sc_readvstime(index, delay, timeout)
-	variable index, delay, timeout
-	
-	InitializeTmpWaves(index) 
-	variable start_time = datetime, i=0
-	do
-		sc_sleep(delay)
-		RecordTmpValues(i) 
-		if((datetime-start_time)>timeout)
-			break
-		endif
-		i+=1
-	while (1==1)
-end
-
-// the message will be printed in the history, and will be saved in the winf file corresponding to this scan
 function SaveWaves([msg, save_experiment])
+	// the message will be printed in the history, and will be saved in the winf file corresponding to this scan
 	string msg
 	variable save_experiment
 	nvar sc_is2d, sc_PrintRaw, sc_PrintCalc
@@ -1183,5 +1168,56 @@ function SaveWaves([msg, save_experiment])
 	if(save_experiment == 1)
 		SaveExperiment/p=data
 	endif
+end
+
+function SaveTmpWaves()
+	// for use with sc_readvstime() only
+	nvar sc_PrintRaw, sc_PrintCalc
+	nvar tmp_scanstarttime
+	svar sc_LogStr
+	string filename, wn, logs=""
+	nvar filenum
+	wave /t sc_RawWaveNames, sc_CalcWaveNames
+	wave sc_RawRecord, sc_CalcRecord
+	variable ii=0, Rawadd =0, Calcadd = 0
+
+	// Raw Data
+	do
+		Rawadd += sc_RawRecord[ii]
+		if (sc_RawRecord[ii] == 1)
+			wn = "tmp_"+sc_RawWaveNames[ii]
+			filename =  "dat" + num2str(filenum) + "_" + wn
+			duplicate $wn $filename
+			if(sc_PrintRaw == 1)
+				print filename
+			endif
+			Save/C/P=data $filename;
+			SaveInitialWaveComments(wn, x_label="time (s)")
+		endif
+		ii+=1
+	while (ii < numpnts(sc_RawWaveNames))
 	
+	if(Rawadd+Calcadd > 0)
+		// Save WINF for this sweep
+		saveScanComments(msg="This is a temporary wave saved for time averaging purposes.", logs="")
+		filenum+=1
+	endif
+
+end
+
+function sc_readvstime(index, delay, timeout)
+	variable index, delay, timeout
+	
+	InitializeTmpWaves(index) 
+	nvar tmp_scanstarttime
+	variable i=0
+	do
+		sc_sleep(delay)
+		RecordTmpValues(i) 
+		if((datetime-tmp_scanstarttime)>timeout)
+			break
+		endif
+		i+=1
+	while (1==1)
+	SaveTmpWaves()
 end

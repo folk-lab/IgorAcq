@@ -219,10 +219,8 @@ end
 //// MEAUREMENT SCRIPTS ////
 ///////////////////////////////////////////////
 
-// DUMMY //
-
-function ScanNumbersTimeavg(start, fin, numpts, delay, timeavg, [comments]) 
-	variable start, fin, numpts, delay, timeavg
+function TimeAvgExample(start, fin, numpts, delay, timeavg, timeavg_delay, [comments]) 
+	variable start, fin, numpts, delay, timeavg, timeavg_delay
 	string comments
 	string x_label = ""
 	variable i=0, setpoint, nChannels
@@ -238,7 +236,7 @@ function ScanNumbersTimeavg(start, fin, numpts, delay, timeavg, [comments])
 	do
 		setpoint = start + (i*(fin-start)/(numpts-1))
 		sc_sleep(delay)
-		RecordValues(i, 0, timeavg = timeavg, timeavg_delay = delay/5) 
+		RecordValues(i, 0, timeavg = timeavg, timeavg_delay = timeavg_delay) 
 		i+=1
 	while (i<numpts)
 	
