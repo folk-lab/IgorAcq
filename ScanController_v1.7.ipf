@@ -4,6 +4,44 @@
 // Version 1.7 August 8, 2016
 // Authors: Mohammad Samani, Nik Hartman & Christian Olsen
 
+function sc_sleep(delay)
+	// sleep for delay seconds while 
+	// checking for breaks and doing other tasks
+	variable delay
+	nvar sc_abortsweep, sc_pause
+	
+	variable i=0, start_time = datetime
+	do
+
+		if(i==0)
+			doupdate // update plots on first iteration only
+		endif
+		
+		if (GetKeyState(0) & 32)
+			// If the ESC button is pressed during the scan, save existing data and stop the scan.
+			SaveWaves(msg="The scan was aborted during the execution.")
+			abort
+		endif
+		
+		if(sc_abortsweep)
+			// If the Abort button is pressed during the scan, save existing data and stop the scan.
+			SaveWaves(msg="The scan was aborted during the execution.")
+			abort "Measurement aborted by user"
+			dowindow /k SweepControl
+		elseif(sc_pause)
+			// Pause sweep if button is pressed
+			do
+				sleep/s 1
+				if(sc_abortsweep)
+					SaveWaves(msg="The scan was aborted during the execution.")
+					dowindow /k SweepControl
+					abort "Measurement aborted by user"
+				endif
+			while(sc_pause)
+		endif
+	while(datetime-start_time < delay)
+end
+
 function InitScanController()
 	nvar filenum
 	
@@ -814,7 +852,6 @@ function RecordValues(i, j, [scandirection,readvstime,sliceaddNaN])
 		endif
 		ii+=1
 	while (ii < numpnts(sc_CalcWaveNames))
-	doupdate
 	
 	if (GetKeyState(0) & 32)
 		// If the ESC button is pressed during the scan, save existing data and stop the scan.
@@ -841,8 +878,9 @@ function RecordValues(i, j, [scandirection,readvstime,sliceaddNaN])
 end
 
 // the message will be printed in the history, and will be saved in the winf file corresponding to this scan
-function SaveWaves([msg])
+function SaveWaves([msg, save_experiment])
 	string msg
+	variable save_experiment
 	nvar sc_is2d, sc_PrintRaw, sc_PrintCalc
 	nvar sc_scanstarttime
 	svar sc_x_label, sc_y_label, sc_LogStr
@@ -856,6 +894,12 @@ function SaveWaves([msg])
 		print msg
 	else
 		msg=""
+	endif
+	
+	if (paramisdefault(save_experiment))
+		save_experiment = 1 // save the experiment by default
+	else
+		save_experiment = 0 // do not save the experiment 
 	endif
 	
 	if (strlen(sc_LogStr)!=0)
@@ -905,49 +949,18 @@ function SaveWaves([msg])
 	if(sc_PrintRaw == 0 && sc_PrintCalc == 0 && Rawadd+Calcadd > 0)
 		print "dat"+ num2str(filenum)
 	endif
+	
 	if(Rawadd+Calcadd > 0)
 		// Save WINF for this sweep
 		saveScanComments(msg=msg, logs=logs)
 		filenum+=1
 	endif
+	
 	printf "Time elapsed: %.2f s \r", datetime-sc_scanstarttime
-	SaveExperiment/p=data
 	dowindow /k SweepControl
-end
-
-// Reads values until the procedure is aborted.
-// Only works with 1D data.
-// delay : delay between readings in seconds. This excludes the time it takes to read values from machines.
-// The scale is reset so that the x-axis is always is in seconds.
-function ReadUntilEscaped(delay)
-	variable delay
-	variable i=0, ii=0
-	wave /t sc_RawWaveNames, sc_CalcWaveNames
-	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
-	nvar sc_scanstarttime
-	string cmd 
-	InitializeWaves(0, 1, 1)
-	do
-		ii=0
-		do
-			if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
-				redimension /n=(i+1) $sc_RawWaveNames[ii]
-				cmd = "setscale/I x 0, " + num2str(datetime - sc_scanstarttime) + ", \"\", " + sc_RawWaveNames[ii]
-				execute(cmd)
-			endif
-			ii+=1
-		while (ii < numpnts(sc_RawWaveNames))
-		ii=0
-		do
-			if (sc_CalcRecord[ii] == 1 || sc_CalcRecord[ii] == 1)
-				redimension /n=(i+1) $sc_CalcWaveNames[ii]
-				cmd = "setscale/I x 0, " + num2str(datetime - sc_scanstarttime) + ", \"\", " + sc_CalcWaveNames[ii]
-				execute(cmd)				
-			endif
-			ii+=1
-		while (ii < numpnts(sc_CalcWaveNames))
-		sleep /s delay
-		RecordValues(i, 0)
-		i+=1
-	while (1==1)
+	
+	if(save_experiment == 1)
+		SaveExperiment/p=data
+	endif
+	
 end
