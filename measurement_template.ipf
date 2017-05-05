@@ -686,7 +686,7 @@ function ScanK2400(device, start, fin, numpts, delay, ramprate, [offsetx, compl,
 	setpoint = start-offsetx
 	rampkvoltage(device, setpoint/1000, ramprate, compl = compl)
 		
-	sleep /S 1.0
+	sc_sleep(1.0)
 	InitializeWaves(start, fin, numpts, x_label=x_label)
 	do
 		setpoint = start-offsetx + (i*(fin-start)/(numpts-1))

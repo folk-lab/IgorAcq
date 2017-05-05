@@ -130,7 +130,6 @@ function ChangeScanControllerItemStatus(wn, ison)
 	execute("doupdate")
 end
 
-
 Window ScanController() : Panel
 	variable sc_InnerBoxW = 660, sc_InnerBoxH = 32, sc_InnerBoxSpacing = 2
 
@@ -680,33 +679,40 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	execute(cmd1)
 end
 
-function InitializeTmpWaves(call_num) 
+function InitializeTmpWaves(innerindex, outerindex, timeavg, timeavg_delay) 
 	// these waves only need to be 1d
-	variable call_num
+	variable innerindex, outerindex, timeavg, timeavg_delay
 	string x_label = "time (s)" // the x axis will always be time
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot // waves that tell me what to record and plot
 	wave /T sc_RawWaveNames, sc_CalcWaveNames, sc_RequestScripts, sc_GetResponseScripts // wave names and scripts
 	variable i=0, j=0
 	string cmd = "", wn = "", wn2d="", s, script = "", script0 = "", script1 = ""
-	variable/g sc_abortsweep=0, sc_pause=0, tmp_scanstarttime = datetime
+	variable/g sc_abortsweep=0, sc_pause=0
 	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, activegraphs="", cmd1="",window_string=""
 	string cmd2=""
 	variable index, graphopen
 	svar sc_ColorMap
 	
 	// Initialize waves for raw data
+	variable start = 0
+	variable /g sc_tmp_numpts = round(timeavg/timeavg_delay)
+	
+	if(sc_tmp_numpts<5)
+		abort("You are time averaging over less than 5 points. You should reconsider.")
+	endif
+	
 	do
 		if (sc_RawRecord[i] == 1 && cmpstr(sc_RawWaveNames[i], "") || sc_RawPlot[i] == 1 && cmpstr(sc_RawWaveNames[i], ""))
 			wn = "tmp_"+sc_RawWaveNames[i]
-			cmd = "make /o/n=(" + num2istr(1) + ") " + wn + "=NaN"
+			cmd = "make /o/n=(" + num2istr(sc_tmp_numpts) + ") " + wn + "=NaN"
 			execute(cmd)
-			cmd = "setscale/I x " + num2str(0) + ", " + num2str(1) + ", \"\", " + wn
+			cmd = "setscale/I x " + num2str(0) + ", " + num2str(timeavg) + ", \"\", " + wn
 			execute(cmd)
 		endif
 		i+=1
 	while (i<numpnts(sc_RawWaveNames))
 	
-	if(call_num==0)
+	if(innerindex==0 && outerindex==0)
 		// Find all open plots
 		graphlist = winlist("*",";","WIN:1")
 		j=0
@@ -826,6 +832,8 @@ function RecordValues(i, j, [scandirection, readvstime, timeavg, timeavg_delay, 
 	variable innerindex, outerindex
 	nvar sc_abortsweep, sc_pause,sc_scanstarttime
 	
+	//// setup all sorts of logic so we can store values correctly ////
+	
 	if (sc_is2d)
 		// 2d
 		innerindex = j
@@ -856,16 +864,21 @@ function RecordValues(i, j, [scandirection, readvstime, timeavg, timeavg_delay, 
 		endif
 	endif
 	
-	// Set fillnan to 0 if not defined
 	if(paramisdefault(fillnan))
 		fillnan=0
+	endif
+	
+	if(readvstime!=0 && timeavg>0)
+		abort("Are you time averaging during your time series data? You should reconsider.")
 	endif
 	
 	if(readvstime ==1 && sc_is2d)
 		abort "Read vs Time is only supported for 1D sweeps."
 	endif
 	
-	if(timeavg<0) // this is the normal behavior, one read per setpoint
+	//// end setup ////
+	
+	if(timeavg<0) // this is the normal behavior -- one read per setpoint
 		
 		// Send requests to machines
 		if(fillnan == 0)
@@ -921,7 +934,7 @@ function RecordValues(i, j, [scandirection, readvstime, timeavg, timeavg_delay, 
 		
 		// get all the data vs time
 		if(fillnan == 0)
-			sc_readvstime(i+j, timeavg_delay, timeavg)
+			sc_readvstime(i, j, timeavg_delay, timeavg)
 		endif
 		
 		// get all averages into proper waves
@@ -1017,14 +1030,14 @@ function RecordValues(i, j, [scandirection, readvstime, timeavg, timeavg_delay, 
 	
 end
 
-function RecordTmpValues(i)
+function RecordTmpValues(index)
 	// only for use with sc_readvstime()
-	variable i
+	variable index
 	variable ii = 0
 	wave /t sc_RawWaveNames, sc_RequestScripts, sc_GetResponseScripts, sc_CalcWaveNames, sc_CalcScripts
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
 	string script = "",cmd = "", wstr = "", tmp_wavename = ""
-	variable innerindex = i
+	// variable innerindex = i, outerindex = j
 	nvar sc_abortsweep, sc_pause, tmp_scanstarttime
 	
 	// Send requests to machines
@@ -1046,14 +1059,11 @@ function RecordTmpValues(i)
 		
 			tmp_wavename = "tmp_"+sc_RawWaveNames[ii]
 			script = sc_GetResponseScripts[ii]; // assume i'm just getting one function back here like "readFunc()"
-			
-			redimension /n=(innerindex+1) $tmp_wavename
-			setscale/I x 0,  datetime - tmp_scanstarttime, $tmp_wavename
 
 			// execute response script
 			wave wref1d = $tmp_wavename
 			FUNCREF protofunc fscript = $script[0,strlen(script)-3]
-			wref1d[innerindex] = fscript()
+			wref1d[index] = fscript()
 
 		endif
 		ii+=1
@@ -1205,19 +1215,16 @@ function SaveTmpWaves()
 
 end
 
-function sc_readvstime(index, delay, timeout)
-	variable index, delay, timeout
+function sc_readvstime(i, j, delay, timeout)
+	variable i, j, delay, timeout
 	
-	InitializeTmpWaves(index) 
-	nvar tmp_scanstarttime
-	variable i=0
+	InitializeTmpWaves(i, j, timeout, delay) 
+	nvar sc_tmp_numpts
+	variable ii=0
 	do
 		sc_sleep(delay)
-		RecordTmpValues(i) 
-		if((datetime-tmp_scanstarttime)>timeout)
-			break
-		endif
-		i+=1
-	while (1==1)
+		RecordTmpValues(ii) 
+		ii+=1
+	while (ii<sc_tmp_numpts)
 	SaveTmpWaves()
 end
