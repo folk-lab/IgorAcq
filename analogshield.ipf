@@ -85,7 +85,7 @@ function AS_AskUser()
 end
 
 function AS_SetSerialPort()
-	string/g as_comport = "usbmodem1421" // Set to the right COM Port
+	string/g as_comport = "usbmodem1431" // Set to the right COM Port
 	execute("VDTOperationsPort2 $as_comport")
 end
 
