@@ -821,7 +821,7 @@ end
 function TimeAvgExample(start, fin, numpts, delay, timeavg, timeavg_delay, [comments]) 
 	variable start, fin, numpts, delay, timeavg, timeavg_delay
 	string comments
-	string x_label = ""
+	string x_label = "dummy1"
 	variable i=0, setpoint, nChannels
 
 	if(paramisdefault(comments))
@@ -838,6 +838,38 @@ function TimeAvgExample(start, fin, numpts, delay, timeavg, timeavg_delay, [comm
 		RecordValues(i, 0, timeavg = timeavg, timeavg_delay = timeavg_delay) 
 		i+=1
 	while (i<numpts)
+	
+	SaveWaves(msg=comments)
+	
+end
+
+function TimeAvg2dExample(startx, finx, numptsx, delayx, starty, finy, numptsy, delayy, timeavg, timeavg_delay, [comments]) 
+	variable startx, finx, numptsx, delayx, starty, finy, numptsy, delayy, timeavg, timeavg_delay
+	string comments
+	string x_label = "dummy1", y_label = "dummy2"
+	variable i=0, j=0, setpointx, setpointy
+
+	if(paramisdefault(comments))
+		comments=""
+	endif
+
+	// set starting values
+	InitializeWaves(startx, finx, numptsx, starty=starty, finy=finy, numptsy=numptsy, x_label=x_label, y_label = y_label)
+
+	// main loop
+	do
+		setpointx = startx
+		setpointy = starty + (i*(finy-starty)/(numptsy-1))
+		sc_sleep(delayy)
+		j=0
+		do
+			setpointx = startx - (j*(finx-startx)/(numptsx-1))
+			sc_sleep(delayx)
+			RecordValues(i, j, timeavg = timeavg, timeavg_delay = timeavg_delay)
+			j+=1
+		while (j<numptsx)
+		i+=1
+	while (i<numptsy)
 	
 	SaveWaves(msg=comments)
 	

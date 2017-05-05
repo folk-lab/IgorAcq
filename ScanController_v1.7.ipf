@@ -680,7 +680,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 end
 
 function InitializeTmpWaves(innerindex, outerindex, timeavg, timeavg_delay) 
-	// these waves only need to be 1d
+	// initializes additional waves necessary for time averaging
 	variable innerindex, outerindex, timeavg, timeavg_delay
 	string x_label = "time (s)" // the x axis will always be time
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot // waves that tell me what to record and plot
@@ -691,6 +691,7 @@ function InitializeTmpWaves(innerindex, outerindex, timeavg, timeavg_delay)
 	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, activegraphs="", cmd1="",window_string=""
 	string cmd2=""
 	variable index, graphopen
+	nvar sc_is2d, sc_startx, sc_finx, sc_numptsx, sc_scandirection
 	svar sc_ColorMap
 	
 	// Initialize waves for raw data
@@ -703,11 +704,20 @@ function InitializeTmpWaves(innerindex, outerindex, timeavg, timeavg_delay)
 	
 	do
 		if (sc_RawRecord[i] == 1 && cmpstr(sc_RawWaveNames[i], "") || sc_RawPlot[i] == 1 && cmpstr(sc_RawWaveNames[i], ""))
+			// make 1d waves to plot live data
 			wn = "tmp_"+sc_RawWaveNames[i]
 			cmd = "make /o/n=(" + num2istr(sc_tmp_numpts) + ") " + wn + "=NaN"
 			execute(cmd)
 			cmd = "setscale/I x " + num2str(0) + ", " + num2str(timeavg) + ", \"\", " + wn
 			execute(cmd)
+			if ((innerindex == 0 && sc_scandirection == 1) || (innerindex == sc_numptsx-1 && sc_scandirection == -1))
+				// make 2d waves to record time series versus x values
+				// only if this is the beginning of an x sweep
+				wn2d = "tmp_"+sc_RawWaveNames[i]+"2d"
+				cmd = "make /o/n=(" + num2istr(sc_tmp_numpts) + ", " + num2istr(sc_numptsx) + ") " + wn2d + "=NaN"; execute(cmd)
+				cmd = "setscale /i x, " + num2str(0) + ", " + num2str(timeavg) + ", " + wn2d; execute(cmd)
+				cmd = "setscale /i y, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn2d; execute(cmd)
+			endif
 		endif
 		i+=1
 	while (i<numpnts(sc_RawWaveNames))
@@ -726,7 +736,7 @@ function InitializeTmpWaves(innerindex, outerindex, timeavg, timeavg_delay)
 			j=index+1
 		endfor
 		
-		//Initialize plots for tmp raw data waves
+		//Initialize plots for 1d tmp raw data waves
 		i=0
 		do
 			if (sc_RawPlot[i] == 1 && cmpstr(sc_RawWaveNames[i], ""))
@@ -848,6 +858,7 @@ function RecordValues(i, j, [scandirection, readvstime, timeavg, timeavg_delay, 
 	if (paramisdefault(scandirection))
 		scandirection=1
 	endif
+	variable /g sc_scandirection = scandirection // create global variable for this
 	
 	// Set readvstime to 0 if it's not defined
 	if(paramisdefault(readvstime))
@@ -1030,15 +1041,16 @@ function RecordValues(i, j, [scandirection, readvstime, timeavg, timeavg_delay, 
 	
 end
 
-function RecordTmpValues(index)
+function RecordTmpValues(index, innerindex, outerindex)
 	// only for use with sc_readvstime()
-	variable index
+	variable index, innerindex, outerindex
 	variable ii = 0
 	wave /t sc_RawWaveNames, sc_RequestScripts, sc_GetResponseScripts, sc_CalcWaveNames, sc_CalcScripts
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
 	string script = "",cmd = "", wstr = "", tmp_wavename = ""
 	// variable innerindex = i, outerindex = j
 	nvar sc_abortsweep, sc_pause, tmp_scanstarttime
+	nvar sc_tmp_numpts
 	
 	// Send requests to machines
 	do
@@ -1065,9 +1077,16 @@ function RecordTmpValues(index)
 			FUNCREF protofunc fscript = $script[0,strlen(script)-3]
 			wref1d[index] = fscript()
 
+			// fill 2d wave if necessary
+			if (index == sc_tmp_numpts-1)
+				wave wref2d = $(tmp_wavename+"2d")
+				wref2d[][innerindex] = wref1d[p]
+			endif
+
 		endif
 		ii+=1
 	while (ii < numpnts(sc_RawWaveNames))
+	
 	
 	if (GetKeyState(0) & 32)
 		// If the ESC button is pressed during the scan, save existing data and stop the scan.
@@ -1184,8 +1203,8 @@ function SaveTmpWaves()
 	// for use with sc_readvstime() only
 	nvar sc_PrintRaw, sc_PrintCalc
 	nvar tmp_scanstarttime
-	svar sc_LogStr
-	string filename, wn, logs=""
+	svar sc_x_label
+	string filename="", wn2d="", logs=""
 	nvar filenum
 	wave /t sc_RawWaveNames, sc_CalcWaveNames
 	wave sc_RawRecord, sc_CalcRecord
@@ -1195,14 +1214,14 @@ function SaveTmpWaves()
 	do
 		Rawadd += sc_RawRecord[ii]
 		if (sc_RawRecord[ii] == 1)
-			wn = "tmp_"+sc_RawWaveNames[ii]
-			filename =  "dat" + num2str(filenum) + "_" + wn
-			duplicate $wn $filename
+			wn2d = "tmp_"+sc_RawWaveNames[ii]+"2d"
+			filename =  "dat" + num2str(filenum) + "_" + wn2d
+			duplicate $wn2d $filename
 			if(sc_PrintRaw == 1)
 				print filename
 			endif
 			Save/C/P=data $filename;
-			SaveInitialWaveComments("_"+wn, x_label="time (s)")
+			SaveInitialWaveComments("_"+wn2d, x_label="time (s)", y_label = sc_x_label)
 		endif
 		ii+=1
 	while (ii < numpnts(sc_RawWaveNames))
@@ -1217,14 +1236,17 @@ end
 
 function sc_readvstime(i, j, delay, timeout)
 	variable i, j, delay, timeout
+	nvar sc_is2d, sc_numptsx, sc_scandirection
 	
 	InitializeTmpWaves(i, j, timeout, delay) 
 	nvar sc_tmp_numpts
 	variable ii=0
 	do
 		sc_sleep(delay)
-		RecordTmpValues(ii) 
+		RecordTmpValues(ii, i, j) 
 		ii+=1
 	while (ii<sc_tmp_numpts)
-	SaveTmpWaves()
+	if ((i == sc_numptsx-1 && sc_scandirection == 1) || (i == 0 && sc_scandirection == -1))
+		SaveTmpWaves() // save tmp_[.....]2d at the end of each x sweep
+	endif
 end
