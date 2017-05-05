@@ -26,25 +26,25 @@ macro initexp()
 	/////// auto-initialize GPIB instruments /////////
 	// check that you have the board number set correctly
 	
-	InitAllGPIB(gpib_board="GPIB0")
+	InitAllGPIB(gpib_board="GPIB1")
 	
 	/////// initialize serial instruments //////////
 	// COM ports must be set here
 	// this ensures that the code works on all measurement setup
 	
-	string /g ips_comport = "COM3" // set magnet COM port
-	initmagnet()
+	// string /g ips_comport = "COM3" // set magnet COM port
+	// initmagnet()
 	
-	string/g bd_comport = "COM5" // set babydac COM port
-	initbabydacs(5, b2=6, range=2)
+	// string/g bd_comport = "COM5" // set babydac COM port
+	// initbabydacs(5, b2=6, range=2)
 	
 	// small magnet calibration
 	// assuming the magnet is using a kepco current source
 	// in voltage control mode
 	
-//	variable /g kepco_cal = 4 // Amps/Volt
-//	variable /g magnet_cal = 85.86 //Amps/Tesla
-//	variable /g power_resistor = 0.0131 //Ohms
+	// variable /g kepco_cal = 4 // Amps/Volt
+	// variable /g magnet_cal = 85.86 //Amps/Tesla
+	// variable /g power_resistor = 0.0131 //Ohms
 	
 end
 
@@ -201,6 +201,20 @@ end
 //	return GetTemp("50k")
 //end
 
+// TIME //
+
+function getUnixTime()
+	return DateTime - date2secs(1970,1,1) - date2secs(-1,-1,-1)
+end
+
+// RANDOM //
+
+function getRandom()
+	// generates a random number in range [-lim, lim]
+	variable lim = 1
+	return enoise(lim)
+end
+
 ////////////////////////////////////////////////
 //// MEAUREMENT SCRIPTS ////
 ///////////////////////////////////////////////
@@ -209,18 +223,43 @@ end
 //     Read VS Time      //
 ////////////////////////////////////
 
-function ReadvsTimeforever(delay) //Units: s
+function ReadvsTimeForever(delay) //Units: s
 	variable delay
 	string comments
-	variable  i
+	variable i = 0
 
 	InitializeWaves(0, 1, 1, x_label="time (s)")
 	do
-		sleep /s delay
+		sc_sleep(delay)
 		RecordValues(i, 0,readvstime=1) 
 		i+=1
 	while (1==1)
 	// no point in SaveWaves since the program will never reach this point
+end
+
+function ReadvsTimeOut(delay, timeout, [comments]) //Units: s
+	// read versus time until condition is met or timeout is reached
+	// operator is "<" or ">", meaning end on "checkwave[i] < value" or "checkwave[i] > value" 
+	
+	variable delay, timeout
+	string  comments
+	variable i = 0
+
+	if(paramisdefault(comments))
+		comments=""
+	endif
+
+	InitializeWaves(0, 1, 1, x_label="time (s)")
+	nvar sc_scanstarttime
+	do
+		sc_sleep(delay)
+		RecordValues(i, 0,readvstime=1) 
+		if((datetime-sc_scanstarttime)>timeout)
+			break
+		endif
+		i+=1
+	while (1==1)
+	SaveWaves(msg=comments)
 end
 
 function ReadvsTimeUntil(delay, checkwave, value, timeout, [comments, operator]) //Units: s
@@ -229,7 +268,7 @@ function ReadvsTimeUntil(delay, checkwave, value, timeout, [comments, operator])
 	
 	variable delay, value, timeout
 	string checkwave, comments, operator
-	variable i
+	variable i = 0
 
 	if(paramisdefault(comments))
 		comments=""
@@ -248,7 +287,7 @@ function ReadvsTimeUntil(delay, checkwave, value, timeout, [comments, operator])
 	wave w = $checkwave
 	nvar sc_scanstarttime
 	do
-		sleep /s delay
+		sc_sleep(delay)
 		RecordValues(i, 0,readvstime=1) 
 		if( a*(w[i] - value) < 0 )
 			print "Exit on checkwave"
@@ -294,7 +333,7 @@ function ScanBabyDAC(start, fin, channels, numpts, delay, ramprate, [offsetx, co
 	do
 		setpoint = start-offsetx + (i*(fin-start)/(numpts-1))
 		RampMultipleBD(channels, setpoint, nChannels, ramprate=ramprate)
-		sleep /s delay
+		sc_sleep(delay)
 		RecordValues(i, 0) 
 		i+=1
 	while (i<numpts)
@@ -340,7 +379,7 @@ function ScanBabyDACUntil(start, fin, channels, numpts, delay, ramprate, checkwa
 	do
 		setpoint = start + (i*(fin-start)/(numpts-1))
 		RampMultipleBD(channels, setpoint, nChannels, ramprate=ramprate)
-		sleep /s delay
+		sc_sleep(delay)
 		RecordValues(i, 0)
 		if( a*(w[i] - value) < 0 )
 			print "Exit on checkwave"
@@ -386,12 +425,12 @@ function ScanBabyDAC2D(startx, finx, channelsx, numptsx, delayx, rampratex, star
 		setpointy = starty + (i*(finy-starty)/(numptsy-1))
 		RampMultipleBD(channelsx, setpointx, nChannelsx, ramprate=rampratex)
 		RampMultipleBD(channelsy, setpointy, nChannelsy, ramprate=rampratey)
-		sleep /s delayy
+		sc_sleep(delayy)
 		j=0
 		do
 			setpointx = startx - offsetx + (j*(finx-startx)/(numptsx-1))
 			RampMultipleBD(channelsx, setpointx, nChannelsx, ramprate=rampratex)
-			sleep /s delayx
+			sc_sleep(delayx)
 			RecordValues(i, j)
 			j+=1
 		while (j<numptsx)
@@ -428,7 +467,7 @@ function ScanBabyDACRepeat(startx, finx, channelsx, numptsx, delayx, rampratex, 
 	// set starting values
 	setpointx = startx-offsetx
 	RampMultipleBD(channelsx, setpointx, nChannelsx, ramprate=rampratex)
-	sleep /S 2.0
+	sc_sleep(2.0)
 	
 	// intialize waves
 	variable starty = 0, finy = numptsy, scandirection=0
@@ -446,12 +485,12 @@ function ScanBabyDACRepeat(startx, finx, channelsx, numptsx, delayx, rampratex, 
 		
 		setpointx = startx - offsetx + (j*(finx-startx)/(numptsx-1)) // reset start point
 		RampMultipleBD(channelsx, setpointx, nChannelsx, ramprate=rampratex)
-		sleep /s delayy // wait at start point
+		sc_sleep(delayy) // wait at start point
 		do
 			// switch directions with if statement?
 			setpointx = startx - offsetx + (j*(finx-startx)/(numptsx-1))
 			RampMultipleBD(channelsx, setpointx, nChannelsx, ramprate=rampratex)
-			sleep /s delayx
+			sc_sleep(delayx)
 			RecordValues(i, j, scandirection=scandirection)
 			j+=scandirection
 		while (j>-1 && j<numptsx)
@@ -488,7 +527,7 @@ function ScanBabyDACRepeatOneWay(startx, finx, channelsx, numptsx, delayx, rampr
 	// set starting values
 	setpointx = startx-offsetx
 	RampMultipleBD(channelsx, setpointx, nChannelsx, ramprate=rampratex)
-	sleep /S 2.0
+	sc_sleep(2.0)
 	
 	// intialize waves
 	variable starty = 0, finy = numptsy, scandirection=0
@@ -499,12 +538,12 @@ function ScanBabyDACRepeatOneWay(startx, finx, channelsx, numptsx, delayx, rampr
 		j=0
 		setpointx = startx - offsetx + (j*(finx-startx)/(numptsx-1)) // reset start point
 		RampMultipleBD(channelsx, setpointx, nChannelsx, ramprate=rampratex)
-		sleep /s delayy // wait at start point
+		sc_sleep(delayy) // wait at start point
 		
 		do
 			setpointx = startx - offsetx + (j*(finx-startx)/(numptsx-1))
 			RampMultipleBD(channelsx, setpointx, nChannelsx, ramprate=rampratex)
-			sleep /s delayx
+			sc_sleep(delayx)
 			RecordValues(i, j)
 			j+=1
 		while (j>-1 && j<numptsx)
@@ -537,7 +576,7 @@ function ScanBabyDACMultiRange(startvalues,finvalues,channels,numpts,delay,rampr
 		RampOutputBD(channel, start, ramprate=ramprate)
 	endfor
 		
-	sleep /S 1.0
+	sc_sleep(1.0)
 	start = Str2num(StringFromList(0,startvalues,","))
 	fin = Str2num(StringFromList(0,finvalues,","))
 	InitializeWaves(start, fin, numpts, x_label=x_label)
@@ -549,7 +588,7 @@ function ScanBabyDACMultiRange(startvalues,finvalues,channels,numpts,delay,rampr
 			setpoint = start + (i*(fin-start)/(numpts-1))
 			RampOutputBD(channel, setpoint, ramprate=ramprate)
 		endfor
-		sleep /s delay
+		sc_sleep(delay)
 		RecordValues(i, 0) 
 		i+=1
 	while (i<numpts)
@@ -598,17 +637,17 @@ function ScanBabyDAC2DSlice(startx, finx, channelsx, numpts_slice, delayx, rampr
 		startslice = startx + i*stepsizex
 		endslice = startslice-slicewidthx
 		setpointy = starty + (i*(finy-starty)/(numptsy-1))
-		RampMultipleBD(channelsx, startslicex, nChannelsx, ramprate=rampratex)
+		RampMultipleBD(channelsx, startslice, nChannelsx, ramprate=rampratex)
 		RampMultipleBD(channelsy, setpointy, nChannelsy, ramprate=rampratey)
-		sleep /s delayy
+		sc_sleep(delayy)
 		j=0
 		do
 			setpointx = startx + (j*(finx-startx)/(numptsx-1))
 			if(startslice < setpointx || setpointx < endslice)
-				RecordValues(i, j,sliceaddnan=1)
+				RecordValues(i, j,fillnan=1)
 			else
 				RampMultipleBD(channelsx, setpointx, nChannelsx, ramprate=rampratex)
-				sleep /s delayx
+				sc_sleep(delayx)
 				RecordValues(i, j)
 			endif
 			j+=1
@@ -647,12 +686,12 @@ function ScanK2400(device, start, fin, numpts, delay, ramprate, [offsetx, compl,
 	setpoint = start-offsetx
 	rampkvoltage(device, setpoint/1000, ramprate, compl = compl)
 		
-	sleep /S 1.0
+	sc_sleep(1.0)
 	InitializeWaves(start, fin, numpts, x_label=x_label)
 	do
 		setpoint = start-offsetx + (i*(fin-start)/(numpts-1))
 		rampkvoltage(device, setpoint/1000, ramprate, compl = compl)
-		sleep /s delay
+		sc_sleep(delay)
 		RecordValues(i, 0) 
 		i+=1
 	while (i<numpts)
@@ -674,11 +713,11 @@ function ScanIPS(start, fin, numpts, delay, ramprate, [comments]) //Units: mT
 	
 	SetSweepRate(ramprate) // mT/min
 	SetFieldWait(start)
-	sleep/s 5 // wait 5 seconds at start point
+	sc_sleep(5.0) // wait 5 seconds at start point
 	InitializeWaves(start, fin, numpts, x_label="Field (mT)")
 	do
 		SetFieldWait(start + (i*(fin-start)/(numpts-1)))
-		sleep /s delay
+		sc_sleep(delay)
 		RecordValues(i, 0) 
 		i+=1
 	while (i<numpts)
@@ -714,7 +753,7 @@ function ScanBabyDACIPS(startx, finx, channelsx, numptsx, delayx, rampratex, sta
 	SetSweepRate(rampratey)
 	SetFieldWait(setpointy)
 	RampMultipleBD(channelsx, setpointx, nChannelsx, ramprate=rampratex)
-	sleep /S 2.0
+	sc_sleep(2.0)
 	
 	// intialize waves
 	InitializeWaves(startx, finx, numptsx, starty=starty, finy=finy, numptsy=numptsy, x_label=x_label, y_label=y_label)
@@ -724,12 +763,12 @@ function ScanBabyDACIPS(startx, finx, channelsx, numptsx, delayx, rampratex, sta
 		setpointy = starty + (i*(finy-starty)/(numptsy-1))
 		SetFieldWait(setpointy)
 		RampMultipleBD(channelsx, setpointx, nChannelsx, ramprate=rampratex)
-		sleep /s delayy
+		sc_sleep(delayy)
 		j=0
 		do
 			setpointx = startx - offsetx + (j*(finx-startx)/(numptsx-1))
 			RampMultipleBD(channelsx, setpointx, nChannelsx, ramprate=rampratex)
-			sleep /s delayx
+			sc_sleep(delayx)
 			RecordValues(i, j)
 			j+=1
 		while (j<numptsx)
@@ -763,14 +802,75 @@ end
 //	setpoint = start
 //	RampMultipleBD(channels, setpoint*scaling, 1, ramprate=corrected_ramp)
 //		
-//	sleep /S 1.0
+//	sc_sleep(1.0)
 //	InitializeWaves(start, fin, numpts, x_label=x_label)
 //	do
 //		setpoint = start + (i*(fin-start)/(numpts-1))
 //		RampMultipleBD(channels, setpoint*scaling, 1, ramprate=corrected_ramp)
-//		sleep /s delay
+//		sc_sleep(delay)
 //		//RecordValues(i, 0) 
 //		i+=1
 //	while (i<numpts)
-//	//SaveWaves(msg=comments)
+//	SaveWaves(msg=comments)
 //end
+
+/////////////////////////////////////////////////////
+///////    TIME AVERAGING   ///////////
+/////////////////////////////////////////////////////
+
+function TimeAvgExample(start, fin, numpts, delay, timeavg, timeavg_delay, [comments]) 
+	variable start, fin, numpts, delay, timeavg, timeavg_delay
+	string comments
+	string x_label = "dummy1"
+	variable i=0, setpoint, nChannels
+
+	if(paramisdefault(comments))
+		comments=""
+	endif
+
+	// set starting values
+	setpoint = start
+	InitializeWaves(start, fin, numpts, x_label=x_label)
+
+	do
+		setpoint = start + (i*(fin-start)/(numpts-1))
+		sc_sleep(delay)
+		RecordValues(i, 0, timeavg = timeavg, timeavg_delay = timeavg_delay) 
+		i+=1
+	while (i<numpts)
+	
+	SaveWaves(msg=comments)
+	
+end
+
+function TimeAvg2dExample(startx, finx, numptsx, delayx, starty, finy, numptsy, delayy, timeavg, timeavg_delay, [comments]) 
+	variable startx, finx, numptsx, delayx, starty, finy, numptsy, delayy, timeavg, timeavg_delay
+	string comments
+	string x_label = "dummy1", y_label = "dummy2"
+	variable i=0, j=0, setpointx, setpointy
+
+	if(paramisdefault(comments))
+		comments=""
+	endif
+
+	// set starting values
+	InitializeWaves(startx, finx, numptsx, starty=starty, finy=finy, numptsy=numptsy, x_label=x_label, y_label = y_label)
+
+	// main loop
+	do
+		setpointx = startx
+		setpointy = starty + (i*(finy-starty)/(numptsy-1))
+		sc_sleep(delayy)
+		j=0
+		do
+			setpointx = startx - (j*(finx-startx)/(numptsx-1))
+			sc_sleep(delayx)
+			RecordValues(i, j, timeavg = timeavg, timeavg_delay = timeavg_delay)
+			j+=1
+		while (j<numptsx)
+		i+=1
+	while (i<numptsy)
+	
+	SaveWaves(msg=comments)
+	
+end

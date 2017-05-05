@@ -202,18 +202,24 @@ function SwitchHeater(newstate) // Call with "ON" or "OFF"
 	string oldstate
 	variable heaterstate
 	wave/t magnetvalsstr=magnetvalsstr
+	
 	heaterstate = GetHeaterStatus()
+	
 	if (heaterstate == 5)
 		print "Heater error"
 		return -1
 	endif
+	
+	variable start_time = datetime
 	strswitch(newstate)
 		case "ON":
 			if (heaterstate == 0)
 				WriteMagnetCheckResponse("H1")
 				print "waiting 20 sec for heater to respond"
 				magnetvalsstr[6][1] = newstate
-				sleep/S 20
+				do
+					sleep /T 1
+				while(datetime - start_time < 20.0)
 			elseif (heaterstate == 1)
 				print "Heater already on"
 			else
@@ -227,7 +233,9 @@ function SwitchHeater(newstate) // Call with "ON" or "OFF"
 				WriteMagnetCheckResponse("H0")
 				print "waiting 20 sec for heater to respond"
 				magnetvalsstr[6][1] = newstate
-				sleep/S 20
+				do
+					sleep /T 1
+				while(datetime - start_time < 20.0)
 			else
 				printf "Heater state is H%d, check manual",heaterstate
 			endif
