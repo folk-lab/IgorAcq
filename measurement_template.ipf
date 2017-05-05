@@ -831,7 +831,7 @@ function TimeAvgExample(start, fin, numpts, delay, timeavg, timeavg_delay, [comm
 	// set starting values
 	setpoint = start
 	InitializeWaves(start, fin, numpts, x_label=x_label)
-	
+
 	do
 		setpoint = start + (i*(fin-start)/(numpts-1))
 		sc_sleep(delay)

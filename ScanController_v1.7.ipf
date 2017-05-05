@@ -1202,7 +1202,7 @@ function SaveTmpWaves()
 				print filename
 			endif
 			Save/C/P=data $filename;
-			SaveInitialWaveComments(wn, x_label="time (s)")
+			SaveInitialWaveComments("_"+wn, x_label="time (s)")
 		endif
 		ii+=1
 	while (ii < numpnts(sc_RawWaveNames))
