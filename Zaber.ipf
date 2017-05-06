@@ -204,7 +204,7 @@ end
 
 function UpdatePositionZaber()
 	nvar curposx, curposy
-	string cmdx,cmdy, xanswer, yanswer, statusx, statusy
+	string cmdx,cmdy, xanswer, yanswer, statusx, statusy, warnflagx, warnflagy
 	
 	// Clear buffer
 	ReadAllHistory()
@@ -216,8 +216,8 @@ function UpdatePositionZaber()
 		xanswer = ReadZaber()
 		WriteZaber(cmdy)
 		yanswer = ReadZaber()
-		sscanf xanswer, "@02 0 OK %s -- %d", statusx, curposx
-		sscanf yanswer, "@03 0 OK %s -- %d", statusy, curposy
+		sscanf xanswer, "@02 0 OK %s %s %d", statusx, warnflagx, curposx
+		sscanf yanswer, "@03 0 OK %s %s %d", statusy, warnflagy, curposy
 		doupdate
 		sleep/s 0.5
 	while(stringmatch(statusx,"BUSY") || stringmatch(statusy,"BUSY"))
@@ -251,12 +251,12 @@ window ZaberWindow() : Panel
 	DrawText 75, 200, "\\Z14Current position [micro step]"
 	SetVariable curposx, pos={30,210}, size={110,50},value=curposx,title="\\Z14X:",disable=2,limits={-xmax,xmax,0}
 	SetVariable curposy, pos={200,210}, size={110,50},value=curposy,title="\\Z14Y:",disable=2,limits={-ymax,ymax,0}
-	Button setpos1, pos={30,230}, size={80,20},title="Set pos 1",proc=pos1_button
-	Button setpos2, pos={120,230}, size={80,20},title="Set pos 2",proc=pos2_button
-	Button setpos3, pos={210,230}, size={80,20},title="Set pos 3",proc=pos3_button
-	Button recall1, pos={30,260}, size={80,20},title="Recall 1",proc=recall1_button
-	Button recall1, pos={120,260}, size={80,20},title="Recall 2",proc=recall2_button
-	Button recall1, pos={210,260}, size={80,20},title="Recall 3",proc=recall3_button
+	Button setpos1, pos={50,250}, size={80,20},title="Set pos 1",proc=pos1_button
+	Button setpos2, pos={140,250}, size={80,20},title="Set pos 2",proc=pos2_button
+	Button setpos3, pos={230,250}, size={80,20},title="Set pos 3",proc=pos3_button
+	Button recall1, pos={50,270}, size={80,20},title="Recall 1",proc=recall1_button
+	Button recall2, pos={140,270}, size={80,20},title="Recall 2",proc=recall2_button
+	Button recall3, pos={230,270}, size={80,20},title="Recall 3",proc=recall3_button
 endmacro
 
 function home_button(action) : Buttoncontrol
@@ -333,7 +333,7 @@ function relabsy_set(action,popnum,popstr) : PopupMenuControl
 	relabsy = popstr
 end
 
-function setpos1_button(action) : Buttoncontrol
+function pos1_button(action) : Buttoncontrol
 	string action
 	nvar pos1x,pos1y, curposx, curposy
 	
@@ -342,7 +342,7 @@ function setpos1_button(action) : Buttoncontrol
 	pos1y = curposy
 end
 
-function setpos2_button(action) : Buttoncontrol
+function pos2_button(action) : Buttoncontrol
 	string action
 	nvar pos2x,pos2y, curposx, curposy
 	
@@ -351,7 +351,7 @@ function setpos2_button(action) : Buttoncontrol
 	pos2y = curposy
 end
 
-function setpos3_button(action) : Buttoncontrol
+function pos3_button(action) : Buttoncontrol
 	string action
 	nvar pos3x,pos3y, curposx, curposy
 	
@@ -366,6 +366,7 @@ function recall1_button(action) : Buttoncontrol
 	
 	MoveXMicrosteps(pos1x, "abs")
 	MoveYMicrosteps(pos1y, "abs")
+	UpdatePositionZaber()
 end
 
 function recall2_button(action) : Buttoncontrol
@@ -374,6 +375,7 @@ function recall2_button(action) : Buttoncontrol
 	
 	MoveXMicrosteps(pos2x, "abs")
 	MoveYMicrosteps(pos2y, "abs")
+	UpdatePositionZaber()
 end
 
 function recall3_button(action) : Buttoncontrol
@@ -382,4 +384,5 @@ function recall3_button(action) : Buttoncontrol
 	
 	MoveXMicrosteps(pos3x, "abs")
 	MoveYMicrosteps(pos3y, "abs")
+	UpdatePositionZaber()
 end
