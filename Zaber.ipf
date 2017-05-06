@@ -3,7 +3,7 @@
 // Figure out how to deal with device responses
 
 function InitZaber()
-	variable/g xmax, ymax,xposition=0,yposition=0,curposx,curposy
+	variable/g xmax, ymax,xposition=0,yposition=0,curposx,curposy,pos1x=0,pos1y=0,pos2x=0,pos2y=0,pos3x=0,pos3y=0
 	string/g unitx="micro step",unity="micro step",relabsx = "abs",relabsy = "abs"
 	
 	// Max position in microsteps
@@ -251,6 +251,12 @@ window ZaberWindow() : Panel
 	DrawText 75, 200, "\\Z14Current position [micro step]"
 	SetVariable curposx, pos={30,210}, size={110,50},value=curposx,title="\\Z14X:",disable=2,limits={-xmax,xmax,0}
 	SetVariable curposy, pos={200,210}, size={110,50},value=curposy,title="\\Z14Y:",disable=2,limits={-ymax,ymax,0}
+	Button setpos1, pos={30,230}, size={80,20},title="Set pos 1",proc=pos1_button
+	Button setpos2, pos={120,230}, size={80,20},title="Set pos 2",proc=pos2_button
+	Button setpos3, pos={210,230}, size={80,20},title="Set pos 3",proc=pos3_button
+	Button recall1, pos={30,260}, size={80,20},title="Recall 1",proc=recall1_button
+	Button recall1, pos={120,260}, size={80,20},title="Recall 2",proc=recall2_button
+	Button recall1, pos={210,260}, size={80,20},title="Recall 3",proc=recall3_button
 endmacro
 
 function home_button(action) : Buttoncontrol
@@ -325,4 +331,55 @@ function relabsy_set(action,popnum,popstr) : PopupMenuControl
 	svar relabsy
 	
 	relabsy = popstr
+end
+
+function setpos1_button(action) : Buttoncontrol
+	string action
+	nvar pos1x,pos1y, curposx, curposy
+	
+	UpdatePositionZaber()
+	pos1x = curposx
+	pos1y = curposy
+end
+
+function setpos2_button(action) : Buttoncontrol
+	string action
+	nvar pos2x,pos2y, curposx, curposy
+	
+	UpdatePositionZaber()
+	pos2x = curposx
+	pos2y = curposy
+end
+
+function setpos3_button(action) : Buttoncontrol
+	string action
+	nvar pos3x,pos3y, curposx, curposy
+	
+	UpdatePositionZaber()
+	pos3x = curposx
+	pos3y = curposy
+end
+
+function recall1_button(action) : Buttoncontrol
+	string action
+	nvar pos1x,pos1y
+	
+	MoveXMicrosteps(pos1x, "abs")
+	MoveYMicrosteps(pos1y, "abs")
+end
+
+function recall2_button(action) : Buttoncontrol
+	string action
+	nvar pos2x,pos2y
+	
+	MoveXMicrosteps(pos2x, "abs")
+	MoveYMicrosteps(pos2y, "abs")
+end
+
+function recall3_button(action) : Buttoncontrol
+	string action
+	nvar pos3x,pos3y
+	
+	MoveXMicrosteps(pos3x, "abs")
+	MoveYMicrosteps(pos3y, "abs")
 end
