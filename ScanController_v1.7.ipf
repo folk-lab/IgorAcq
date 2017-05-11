@@ -43,41 +43,46 @@ function sc_sleep(delay)
 end
 
 function InitScanController()
-	nvar filenum
 	
-	// These arrays should have the same size. Their indeces correspond to each other.
-	make/t/o sc_RawWaveNames = {"g1x", "g1y"} // Wave names to be created and saved
-	make/o sc_RawRecord = {0,0} // Whether you want to record and save the data for this wave
-	make/o sc_RawPlot = {0,0} // Whether you want to record and save the data for this wave
-	make/t/o sc_RequestScripts = {"", ""}
-	make/t/o sc_GetResponseScripts = {"getg1x()", "getg1y()"}
-	// End of same-size waves
-	
-	// And these waves should be the same size too
-	make/t/o sc_CalcWaveNames = {"", ""} // Calculated wave names
-	make/t/o sc_CalcScripts = {"",""} // Scripts to calculate stuff
-	make/o sc_CalcRecord = {0,0} // Include this calculated field or not
-	make/o sc_CalcPlot = {0,0} // Include this calculated field or not
-	// end of same-size waves
-	
-	// default colormap
-	string /g sc_ColorMap = "Grays"
-	
-	// Print variables
-	variable/g sc_PrintRaw = 1,sc_PrintCalc = 1
-	
-	// logging string
-	string /g sc_LogStr = "GetSRSStatus(srs1);"
-	
+	GetFileFolderInfo/z/q/p=data "config.txt"
+	if(v_isfile)
+		// read content into waves
+		loadconfig()
+	else
+		// These arrays should have the same size. Their indeces correspond to each other.
+		make/t/o sc_RawWaveNames = {"g1x", "g1y"} // Wave names to be created and saved
+		make/o sc_RawRecord = {0,0} // Whether you want to record and save the data for this wave
+		make/o sc_RawPlot = {0,0} // Whether you want to record and save the data for this wave
+		make/t/o sc_RequestScripts = {"", ""}
+		make/t/o sc_GetResponseScripts = {"getg1x()", "getg1y()"}
+		// End of same-size waves
+		
+		// And these waves should be the same size too
+		make/t/o sc_CalcWaveNames = {"", ""} // Calculated wave names
+		make/t/o sc_CalcScripts = {"",""} // Scripts to calculate stuff
+		make/o sc_CalcRecord = {0,0} // Include this calculated field or not
+		make/o sc_CalcPlot = {0,0} // Include this calculated field or not
+		// end of same-size waves
+		
+		// default colormap
+		string /g sc_ColorMap = "Grays"
+		
+		// Print variables
+		variable/g sc_PrintRaw = 1,sc_PrintCalc = 1
+		
+		// logging string
+		string /g sc_LogStr = "GetSRSStatus(srs1);"
+			
+		nvar filenum
+		if (numtype(filenum) == 2)
+			print "Initializing FileNum to 0 since it didn't exist before."
+			variable /g filenum=0
+		else
+			printf "Current FileNum is %d", filenum
+		endif
+	endif
 	// variable to keep track of abort operations
 	variable /g sc_AbortSave = 0
-
-	if (numtype(filenum) == 2)
-		print "Initializing FileNum to 0 since it didn't exist before."
-		variable /g filenum=0
-	else
-		printf "Current FileNum is %d", filenum
-	endif
 	
 	rebuildwindow()
 end
@@ -243,7 +248,8 @@ end
 
 function sc_updatewindow(action) : ButtonControl
 	string action
-	// Nothing happens!
+	// Write (or overwrite) a config file
+	createconfig()
 end
 
 function sc_addrow(action) : ButtonControl
@@ -1249,4 +1255,110 @@ function sc_readvstime(i, j, delay, timeout)
 	if ((i == sc_numptsx-1 && sc_scandirection == 1) || (i == 0 && sc_scandirection == -1))
 		SaveTmpWaves() // save tmp_[.....]2d at the end of each x sweep
 	endif
+end
+
+function createconfig()
+	wave/t sc_RawWaveNames
+	wave sc_RawRecord
+	wave sc_RawPlot
+	wave/t sc_RequestScripts
+	wave/t sc_GetResponseScripts
+	wave/t sc_CalcWaveNames
+	wave/t sc_CalcScripts
+	wave sc_CalcRecord
+	wave sc_CalcPlot
+	nvar sc_PrintRaw
+	nvar sc_PrintCalc
+	svar sc_LogStr
+	svar sc_ColorMap
+	nvar filenum
+	variable refnum
+	
+	// Check if data path is definded
+	GetFileFolderInfo/Z/Q/P=data
+	if(v_flag != 0 || v_isfolder != 1)
+		print "Data path no defined. No config file created!"
+		return 0
+	endif
+	
+	// Try to open config file or create it otherwise
+	open /z/p=data refnum as "config.txt"
+	wfprintf refnum, "%s,", sc_RawWaveNames
+	fprintf refnum, "\r"
+	wfprintf refnum, "%g,", sc_RawRecord
+	fprintf refnum, "\r"
+	wfprintf refnum, "%g,", sc_RawPlot
+	fprintf refnum, "\r"
+	wfprintf refnum, "%s,", sc_RequestScripts
+	fprintf refnum, "\r"
+	wfprintf refnum, "%s,", sc_GetResponseScripts
+	fprintf refnum, "\r"
+	wfprintf refnum, "%s,", sc_CalcWaveNames
+	fprintf refnum, "\r"
+	wfprintf refnum, "%s,", sc_CalcScripts
+	fprintf refnum, "\r"
+	wfprintf refnum, "%g,", sc_CalcRecord
+	fprintf refnum, "\r"
+	wfprintf refnum, "%g,", sc_CalcPlot
+	fprintf refnum, "\r"
+	fprintf refnum, "%g\r", sc_PrintRaw
+	fprintf refnum, "%g\r", sc_PrintCalc
+	fprintf refnum, "%s\r", sc_LogStr
+	fprintf refnum, "%s\r", sc_ColorMap
+	fprintf refnum, "%g\r", filenum
+	close refnum
+end
+
+function loadconfig()
+	variable refnum
+	string loadcontainer
+	nvar sc_PrintRaw
+	nvar sc_PrintCalc
+	svar sc_LogStr
+	svar sc_ColorMap
+	nvar filenum
+	
+	open /z/r/p=data refnum as "config.txt"
+	freadline/t=(num2char(13)) refnum, loadcontainer
+	list2textwave(removeending(loadcontainer,"\r"),"sc_RawWaveNames")
+	freadline/t=(num2char(13)) refnum, loadcontainer
+	list2numwave(removeending(loadcontainer,"\r"),"sc_RawRecord")
+	freadline/t=(num2char(13)) refnum, loadcontainer
+	list2numwave(removeending(loadcontainer,"\r"),"sc_RawPlot")
+	freadline/t=(num2char(13)) refnum, loadcontainer
+	list2textwave(removeending(loadcontainer,"\r"),"sc_RequestScripts")
+	freadline/t=(num2char(13)) refnum, loadcontainer
+	list2textwave(removeending(loadcontainer,"\r"),"sc_GetResponseScripts")
+	freadline/t=(num2char(13)) refnum, loadcontainer
+	list2textwave(removeending(loadcontainer,"\r"),"sc_CalcWaveNames")
+	freadline/t=(num2char(13)) refnum, loadcontainer
+	list2textwave(removeending(loadcontainer,"\r"),"sc_CalcScripts")
+	freadline/t=(num2char(13)) refnum, loadcontainer
+	list2numwave(removeending(loadcontainer,"\r")," sc_CalcRecord")
+	freadline/t=(num2char(13)) refnum, loadcontainer
+	list2numwave(removeending(loadcontainer,"\r")," sc_CalcPlot")
+	freadline/t=(num2char(13)) refnum, loadcontainer
+	sc_PrintRaw = str2num(removeending(loadcontainer,"\r"))
+	freadline/t=(num2char(13)) refnum, loadcontainer
+	sc_PrintCalc = str2num(removeending(loadcontainer,"\r"))
+	freadline/t=(num2char(13)) refnum, loadcontainer
+	sc_LogStr = removeending(loadcontainer,"\r")
+	freadline/t=(num2char(13)) refnum, loadcontainer
+	sc_ColorMap = removeending(loadcontainer,"\r")
+	freadline/t=(num2char(13)) refnum, loadcontainer
+	filenum = str2num(removeending(loadcontainer,"\r"))
+	close refnum
+end
+
+function list2textwave(stringlistwave,namewave)
+	string stringlistwave, namewave
+	variable n = ItemsInList(stringlistwave,",")
+	make/o/t/n=(n) $namewave=StringFromList(p,stringlistwave, ",")
+end
+
+function list2numwave(stringlistwave,namewave)
+	string stringlistwave, namewave
+	variable n = ItemsInList(stringlistwave,",")
+	make/o/t/n=(n) blawave=StringFromList(p,stringlistwave, ",")
+	make/o/n=(n) $namewave= str2num(blawave)
 end
