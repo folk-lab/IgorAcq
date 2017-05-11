@@ -222,6 +222,7 @@ Window ScanController() : Panel
 	
 	// Close all open graphs
 	button killgraphs, pos={420,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={120,20},proc=sc_killgraphs,title="Close All Graphs"
+	button killabout, pos={280,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={130,20},proc=sc_controlwindows,title="Kill About Windows"
 	
 	//Update button
 	button updatebutton, pos={550,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_updatewindow,title="Update"
@@ -233,12 +234,12 @@ function sc_killgraphs(action) : Buttoncontrol
 	variable ii
 	
 	opengraphs = winlist("*",";","WIN:1")
-	// print opengraphs
 	if(itemsinlist(opengraphs)>0)
 		for(ii=0;ii<itemsinlist(opengraphs);ii+=1)
 			killwindow $stringfromlist(ii,opengraphs)	
 		endfor
 	endif
+	sc_controlwindows("") // Kill all open control windows
 end
 
 function sc_updatewindow(action) : ButtonControl
@@ -1018,7 +1019,8 @@ function RecordValues(i, j, [scandirection, readvstime, timeavg, timeavg_delay, 
 	if (GetKeyState(0) & 32)
 		// If the ESC button is pressed during the scan, save existing data and stop the scan.
 		SaveWaves(msg="The scan was aborted during the execution.")
-		abort
+		dowindow /k SweepControl
+		abort "Measurement aborted by user"
 	endif
 	
 	if(sc_abortsweep)
@@ -1091,21 +1093,22 @@ function RecordTmpValues(index, innerindex, outerindex)
 	if (GetKeyState(0) & 32)
 		// If the ESC button is pressed during the scan, save existing data and stop the scan.
 		SaveWaves(msg="The scan was aborted during the execution.")
-		abort
+		sc_controlwindows("")
+		abort "Measurement aborted by user"
 	endif
 	
 	if(sc_abortsweep)
 		// Abort sweep
 		SaveWaves(msg="The scan was aborted during the execution.")
+		sc_controlwindows("")
 		abort "Measurement aborted by user"
-		dowindow /k SweepControl
 	elseif(sc_pause)
 		// Pause sweep
 		do
 			sleep/s 1
 			if(sc_abortsweep)
 				SaveWaves(msg="The scan was aborted during the execution.")
-				dowindow /k SweepControl
+				sc_controlwindows("")
 				abort "Measurement aborted by user"
 			endif
 		while(sc_pause)
@@ -1248,5 +1251,18 @@ function sc_readvstime(i, j, delay, timeout)
 	while (ii<sc_tmp_numpts)
 	if ((i == sc_numptsx-1 && sc_scandirection == 1) || (i == 0 && sc_scandirection == -1))
 		SaveTmpWaves() // save tmp_[.....]2d at the end of each x sweep
+	endif
+end
+
+function sc_controlwindows(action)
+	string action
+	string openaboutwindows
+	variable ii
+	
+	openaboutwindows = winlist("SweepControl*",";","WIN:64")
+	if(itemsinlist(openaboutwindows)>0)
+		for(ii=0;ii<itemsinlist(openaboutwindows);ii+=1)
+			killwindow $stringfromlist(ii,openaboutwindows)	
+		endfor
 	endif
 end
