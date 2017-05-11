@@ -43,7 +43,7 @@ function sc_sleep(delay)
 end
 
 function InitScanController()
-	string filelist
+	string filelist = ""
 	
 	GetFileFolderInfo/z/q/p=data
 	if(v_flag==0)
@@ -231,7 +231,7 @@ Window ScanController() : Panel
 	
 	// Close all open graphs
 	button killgraphs, pos={420,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={120,20},proc=sc_killgraphs,title="Close All Graphs"
-	button killabout, pos={280,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={130,20},proc=sc_controlwindows,title="Kill About Windows"
+	button killabout, pos={220,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={190,20},proc=sc_controlwindows,title="Kill Sweep Control Windows"
 	
 	//Update button
 	button updatebutton, pos={550,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_updatewindow,title="Update"
