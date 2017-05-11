@@ -43,11 +43,15 @@ function sc_sleep(delay)
 end
 
 function InitScanController()
+	string filelist
 	
-	GetFileFolderInfo/z/q/p=data "config.txt"
-	if(v_isfile)
+	GetFileFolderInfo/z/q/p=data
+	if(v_flag==0)
+		filelist = greplist(indexedfile(data,-1,".txt"),"config")
+	endif
+	if(itemsinlist(filelist)>0)
 		// read content into waves
-		loadconfig()
+		loadconfig(filelist)
 	else
 		// These arrays should have the same size. Their indeces correspond to each other.
 		make/t/o sc_RawWaveNames = {"g1x", "g1y"} // Wave names to be created and saved
@@ -1276,6 +1280,7 @@ function createconfig()
 	svar sc_ColorMap
 	nvar filenum
 	variable refnum
+	string configfile
 	
 	// Check if data path is definded
 	GetFileFolderInfo/Z/Q/P=data
@@ -1284,8 +1289,10 @@ function createconfig()
 		return 0
 	endif
 	
+	configfile = "config" + num2istr(unixtime()) + ".txt"
+	
 	// Try to open config file or create it otherwise
-	open /z/p=data refnum as "config.txt"
+	open /z/p=data refnum as configfile
 	wfprintf refnum, "%s,", sc_RawWaveNames
 	fprintf refnum, "\r"
 	wfprintf refnum, "%g,", sc_RawRecord
@@ -1312,7 +1319,8 @@ function createconfig()
 	close refnum
 end
 
-function loadconfig()
+function loadconfig(filelist)
+	string filelist
 	variable refnum
 	string loadcontainer
 	nvar sc_PrintRaw
@@ -1320,8 +1328,21 @@ function loadconfig()
 	svar sc_LogStr
 	svar sc_ColorMap
 	nvar filenum
+	variable i, confignum=0
+	string file_string, configunix
+	make/o/d/n=(itemsinlist(filelist)) configmax=0
 	
-	open /z/r/p=data refnum as "config.txt"
+	for(i=0;i<itemsinlist(filelist);i=i+1)
+		file_string = stringfromlist(i,filelist)
+		splitstring/e=("config([[:digit:]]+).txt") file_string, configunix
+		confignum = str2num(configunix)
+		configmax[i] = confignum
+	endfor
+	confignum = wavemax(configmax)
+	print configmax
+	print confignum
+	
+	open /z/r/p=data refnum as "config"+num2istr(confignum)+".txt"
 	freadline/t=(num2char(13)) refnum, loadcontainer
 	list2textwave(removeending(loadcontainer,"\r"),"sc_RawWaveNames")
 	freadline/t=(num2char(13)) refnum, loadcontainer
