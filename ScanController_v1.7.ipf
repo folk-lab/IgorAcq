@@ -222,7 +222,7 @@ Window ScanController() : Panel
 	
 	// Close all open graphs
 	button killgraphs, pos={420,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={120,20},proc=sc_killgraphs,title="Close All Graphs"
-	button killabout, pos={280,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={130,20},proc=sc_aboutwindows,title="Kill About Windows"
+	button killabout, pos={280,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={130,20},proc=sc_controlwindows,title="Kill About Windows"
 	
 	//Update button
 	button updatebutton, pos={550,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_updatewindow,title="Update"
@@ -239,6 +239,7 @@ function sc_killgraphs(action) : Buttoncontrol
 			killwindow $stringfromlist(ii,opengraphs)	
 		endfor
 	endif
+	sc_controlwindows("") // Kill all open control windows
 end
 
 function sc_updatewindow(action) : ButtonControl
@@ -1092,14 +1093,14 @@ function RecordTmpValues(index, innerindex, outerindex)
 	if (GetKeyState(0) & 32)
 		// If the ESC button is pressed during the scan, save existing data and stop the scan.
 		SaveWaves(msg="The scan was aborted during the execution.")
-		sc_aboutwindows("")
+		sc_controlwindows("")
 		abort "Measurement aborted by user"
 	endif
 	
 	if(sc_abortsweep)
 		// Abort sweep
 		SaveWaves(msg="The scan was aborted during the execution.")
-		sc_aboutwindows("")
+		sc_controlwindows("")
 		abort "Measurement aborted by user"
 	elseif(sc_pause)
 		// Pause sweep
@@ -1107,7 +1108,7 @@ function RecordTmpValues(index, innerindex, outerindex)
 			sleep/s 1
 			if(sc_abortsweep)
 				SaveWaves(msg="The scan was aborted during the execution.")
-				sc_aboutwindows("")
+				sc_controlwindows("")
 				abort "Measurement aborted by user"
 			endif
 		while(sc_pause)
@@ -1253,7 +1254,7 @@ function sc_readvstime(i, j, delay, timeout)
 	endif
 end
 
-function sc_aboutwindows(action)
+function sc_controlwindows(action)
 	string action
 	string openaboutwindows
 	variable ii
