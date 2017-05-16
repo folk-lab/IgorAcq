@@ -173,7 +173,7 @@ function resetGPIB(boardnum)
 	GPIB2 board=boardnum
 	GPIB2 KillIO
 	InitAllGPIB()
-	printf "GPIB%d RESET", boardnum
+	printf "GPIB%d RESET \n", boardnum
 end
 
 
