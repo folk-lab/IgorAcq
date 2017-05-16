@@ -26,7 +26,7 @@ macro initexp()
 	/////// auto-initialize GPIB instruments /////////
 	// check that you have the board number set correctly
 	
-	InitAllGPIB(gpib_board="GPIB1")
+	// InitAllGPIB(gpib_board="GPIB0")
 	
 	/////// initialize serial instruments //////////
 	// COM ports must be set here

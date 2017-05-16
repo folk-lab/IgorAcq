@@ -4,20 +4,9 @@
 // Version 1.7 August 8, 2016
 // Authors: Mohammad Samani, Nik Hartman & Christian Olsen
 
-function sc_sleep(delay)
-	// sleep for delay seconds while 
-	// checking for breaks and doing other tasks
-	variable delay
+function sc_checksweepstate()
 	nvar sc_abortsweep, sc_pause
-	
-	variable i=0, start_time = datetime
-	do
-
-		if(i==0)
-			doupdate // update plots on first iteration only
-		endif
-		
-		if (GetKeyState(0) & 32)
+	if (GetKeyState(0) & 32)
 			// If the ESC button is pressed during the scan, save existing data and stop the scan.
 			SaveWaves(msg="The scan was aborted during the execution.")
 			abort
@@ -31,7 +20,6 @@ function sc_sleep(delay)
 		elseif(sc_pause)
 			// Pause sweep if button is pressed
 			do
-				sleep/s 1
 				if(sc_abortsweep)
 					SaveWaves(msg="The scan was aborted during the execution.")
 					dowindow /k SweepControl
@@ -39,6 +27,23 @@ function sc_sleep(delay)
 				endif
 			while(sc_pause)
 		endif
+end
+
+function sc_sleep(delay)
+	// sleep for delay seconds while 
+	// checking for breaks and doing other tasks
+	variable delay
+	nvar sc_abortsweep, sc_pause
+	
+	variable i=0, start_time = datetime
+	do
+
+		if(i==0)
+			doupdate // update plots on first iteration only
+		endif
+		
+		sc_checksweepstate()
+		
 	while(datetime-start_time < delay)
 end
 
@@ -1025,31 +1030,8 @@ function RecordValues(i, j, [scandirection, readvstime, timeavg, timeavg_delay, 
 		ii+=1
 	while (ii < numpnts(sc_CalcWaveNames))
 	
-	//// check abort/pause status block ////
-	if (GetKeyState(0) & 32)
-		// If the ESC button is pressed during the scan, save existing data and stop the scan.
-		SaveWaves(msg="The scan was aborted during the execution.")
-		dowindow /k SweepControl
-		abort "Measurement aborted by user"
-	endif
-	
-	if(sc_abortsweep)
-		// Abort sweep
-		SaveWaves(msg="The scan was aborted during the execution.")
-		abort "Measurement aborted by user"
-		dowindow /k SweepControl
-	elseif(sc_pause)
-		// Pause sweep
-		do
-			sleep/s 1
-			if(sc_abortsweep)
-				SaveWaves(msg="The scan was aborted during the execution.")
-				dowindow /k SweepControl
-				abort "Measurement aborted by user"
-			endif
-		while(sc_pause)
-	endif
-	//// end check abort/pause status block ////
+	// check abort/pause status
+	sc_checksweepstate()
 	
 end
 
@@ -1099,30 +1081,9 @@ function RecordTmpValues(index, innerindex, outerindex)
 		ii+=1
 	while (ii < numpnts(sc_RawWaveNames))
 	
+	// check abort/pause status
+	sc_checksweepstate()
 	
-	if (GetKeyState(0) & 32)
-		// If the ESC button is pressed during the scan, save existing data and stop the scan.
-		SaveWaves(msg="The scan was aborted during the execution.")
-		sc_controlwindows("")
-		abort "Measurement aborted by user"
-	endif
-	
-	if(sc_abortsweep)
-		// Abort sweep
-		SaveWaves(msg="The scan was aborted during the execution.")
-		sc_controlwindows("")
-		abort "Measurement aborted by user"
-	elseif(sc_pause)
-		// Pause sweep
-		do
-			sleep/s 1
-			if(sc_abortsweep)
-				SaveWaves(msg="The scan was aborted during the execution.")
-				sc_controlwindows("")
-				abort "Measurement aborted by user"
-			endif
-		while(sc_pause)
-	endif
 end
 
 function SaveWaves([msg, save_experiment])
