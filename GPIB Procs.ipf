@@ -140,49 +140,57 @@ function/s DetermineInsType(id)
 	return instype
 end
 
-
-
-
-
-
-macro gpib_return(srs)
-	variable srs
-	variable/g pad
+function returnGPIBaddress(ud)
+	variable ud
+	variable address = -1
 	
-	NI488 ibask srs, 1, pad
-end
-
-macro gpibprobe(devnum)
-	variable devnum
+	NI4882 ibask={ud, 1}
+	address = v_flag
 	
-	string devstr = "dev"+num2str(devnum)
-//	print devstr
-	variable /g gpibprobenum
-	NI488 ibfind devstr, gpibprobenum
-	gpib device gpibprobenum
-	gpibwrite "*IDN?"
-	string manu,model,serial,version
-	gpibread manu,model,serial,version
-	print manu + "  " + model + "  " + serial + "  " + version
+	return address
 end
 
-macro gpibreset()
-	gpib board 0
-	gpib killio
-	initgpib()
+function /S getInstIDN(boardnum, devnum)
+	// get IDN string for a particular device
+	// boardnum specifies which GPIB interface, boardnum=0 for "GPIB0"
+	// devnum is the GPIB address of the device (0-15)
+	variable boardnum, devnum
+	variable ud
+	string readstr=""
+
+	NI4882 ibdev={boardnum,devnum,0,10,1,0}
+	ud = v_flag
+	GPIB2 device=ud
+	GPIBWrite2 "*IDN?"
+	GPIBRead2 /Q/T="\n" readstr
+	
+	return readstr
 end
 
-function FindListeners(address)		// Test whether the device is online
-	variable address
-	string cmd
-	NVAR V_ibcnt
-	Make/O gAddressList = {address, -1}		// -1 is NOADDR - marks end of list.
-	Make/O/N=0 gResultList
-	cmd="NI488 FindLstn 0, gAddressList, gResultList, 5"
-	execute cmd
-	if(V_ibcnt)
+function resetGPIB(boardnum)
+	// reset GPIB{boardnum}
+	variable boardnum
+	GPIB2 board=boardnum
+	GPIB2 KillIO
+	InitAllGPIB()
+	printf "GPIB%d RESET", boardnum
+end
+
+
+function FindListeners(boardnum, devnum)  
+	// Look for device on GPIB{boardnum} at address=devnum
+	// returns 1 if there is a device
+	// returns 0 if no devices are at that {boardnum, devnum}
+	variable boardnum, devnum
+
+	Make/O gAddressList = {devnum, -1} // -1 is NOADDR - marks end of list.
+	Make/O/N=(numpnts(gAddressList)), gResultList
+	NI4882 FindLstn={boardnum, gAddressList, gResultList, numpnts(gResultList)}
+	
+	if(V_ibcnt==1)
 		return 1
 	else
 		return 0
 	endif
+	
 End

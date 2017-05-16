@@ -301,9 +301,7 @@ function/s GetSRSStatus(srs)
 	string winfcomments
 	string  buffer
 	
-	sprintf cmd "gpib_return(%d)", srs
-	execute(cmd)
-	sprintf  winfcomments "Lock-in GPIB%d:\r\t", pad
+	sprintf  winfcomments "Lock-in GPIB%d:\r\t", returnGPIBaddress(srs)
 	sprintf buffer "Amplitude = %.3f V\r\tTime Constant = %.2f ms\r\tFrequency = %.2f Hz\r\tPhase = %.2f deg\r\tSensitivity = %.4f V\r\tHarmonic = %d\r", GetSRSAmplitude(srs), GetSRSTimeConst(srs,realtime=1)*1000, GetSRSFrequency(srs), GetSRSPhase(srs), GetSRSSensitivity(srs, realsens=1), GetSRSHarmonic(srs)
 
 	winfcomments += buffer
