@@ -140,6 +140,11 @@ function/s DetermineInsType(id)
 	return instype
 end
 
+
+
+
+
+
 macro gpib_return(srs)
 	variable srs
 	variable/g pad

@@ -195,7 +195,7 @@ Window ScanController() : Panel
 	i+=1
 	button addrowraw,pos={550,i*(sc_InnerBoxH + sc_InnerBoxSpacing)},size={110,20},proc=sc_addrow,title="Add Row"
 	button removerowraw,pos={430,i*(sc_InnerBoxH + sc_InnerBoxSpacing)},size={110,20},proc=sc_removerow,title="Remove Row"
-	checkbox sc_PrintRawBox, pos={370,i*(sc_InnerBoxH + sc_InnerBoxSpacing)}, proc=sc_CheckBoxClicked, value=sc_PrintRaw,side=1,title="\Z14Print filenames"
+	checkbox sc_PrintRawBox, pos={300,i*(sc_InnerBoxH + sc_InnerBoxSpacing)}, proc=sc_CheckBoxClicked, value=sc_PrintRaw,side=1,title="\Z14Print filenames"
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 13,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Wave Name"
 	SetDrawEnv fsize= 16,fstyle= 1
@@ -220,7 +220,7 @@ Window ScanController() : Panel
 	while (i<numpnts( sc_CalcWaveNames ))	
 	button addrowcalc,pos={550,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_addrow,title="Add Row"
 	button removerowcalc,pos={430,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_removerow,title="Remove Row"
-	checkbox sc_PrintCalcBox, pos={370,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)}, proc=sc_CheckBoxClicked, value=sc_PrintCalc,side=1,title="\Z14Print filenames"
+	checkbox sc_PrintCalcBox, pos={300,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)}, proc=sc_CheckBoxClicked, value=sc_PrintCalc,side=1,title="\Z14Print filenames"
 	
 	// box for logging functions
 	variable sc_Loggable
@@ -1300,8 +1300,8 @@ function loadconfig(filelist)
 		configmax[i] = confignum
 	endfor
 	confignum = wavemax(configmax)
-	print configmax
-	print confignum
+	// print configmax
+	// print confignum
 	
 	open /z/r/p=data refnum as "config"+num2istr(confignum)+".txt"
 	freadline/t=(num2char(13)) refnum, loadcontainer

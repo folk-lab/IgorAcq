@@ -3,112 +3,110 @@
 // Modified by Mark Lundeberg Nov-05-2008 - Added ReadSRSjunk
 // Modified by Sergey Frolov Aug-08-2007 - Added SetSRSAmplitude, SetSRSFrequency
 // Modified by Yuan Ren Jun-27-2008 - Added GetSRSSensitivity, SRSAutoSens, SRSAutoPhase, SRSSensUp, SRSSenDown, GetSRSFrequency
+// Updated to NIGPIB2 by Nik -- May 16 2017
 
 function InitSRS(srs)
-	Variable srs
-	execute "NI488 ibtmo "+num2istr(srs)+", 11"  // one second timeouts
-	execute "GPIB device "+num2istr(srs)
-	execute "GPIBwrite/F=\"%s\" \"OUTX 1\""
-	execute "GPIBwrite/F=\"%s\" \"OVRM 1\""
+	variable srs
+	
+	GPIB2 device = srs
+	GPIBWrite2 "OUTX 1"
+	GPIBWrite2 "OVRM 1"
+	
+	NI4882 ibtmo={srs, 1}
+	
 End
 
 function SetSRSHarmonic(srs,harm)
 	variable srs, harm
-	execute "GPIB device "+num2istr(srs)
-	execute "GPIBwrite/F=\"%s\" \"HARM "+num2str(harm)+"\""
+	
+	GPIB2 device = srs
+	GPIBWrite2 "HARM "+num2str(harm)
+	
 End
 
 function GetSRSHarmonic(srs)
 	Variable srs
-	Variable/G junkvariable
-	execute "GPIB device "+num2istr(srs)
-	execute "GPIBwrite/F=\"%s\" \"HARM? \""
-	execute "GPIBread/T=\"\n\" junkvariable"
-	return junkvariable
+	Variable readval
+	GPIB2 device = srs
+	GPIBWrite2 "HARM?"
+	GPIBRead2/T="\n" readval
+	return readval
 End
 
-function SetSRSTimeConst(srs, i)	// Set time constant
-// i=8, t=100ms; i=9 t=300ms
+function SetSRSTimeConst(srs, i)	
+	// Set time constant
+	// i=8, t=100ms; i=9 t=300ms
 	variable srs, i
-	execute "GPIB device "+num2istr(srs)
-	execute "GPIBwrite/F=\"%s\" \"OFLT "+num2str(i)+"\""
+	
+	GPIB2 device = srs
+	GPIBWrite2 "OFLT "+num2str(i)
 End
 
-function GetSRSTimeConst(srs)
-	Variable srs
-	Variable/G junkvariable
-	execute "GPIB device "+num2istr(srs)
-	execute "GPIBwrite/F=\"%s\" \"OFLT?\" "
-	execute "GPIBread/T=\"\n\" junkvariable"
-	return junkvariable
-End
-
-function GetSRSTimeConstInSeconds(srs)
-	variable srs
-	variable timecode = GetSRSTimeConst(srs)
-	if (mod(timecode, 2)==0)
-		return 10^(timecode/2-5)
-	else
-		return 3*10^((timecode-1)/2-5)
+function GetSRSTimeConst(srs, [realtime])
+	// use realtime=1 to return values in seconds
+	Variable srs, realtime
+	Variable readval
+	
+	GPIB2 device = srs
+	GPIBWrite2 "OFLT?"
+	GPIBRead2/T="\n" readval
+	
+	if (realtime==1)
+		return readval
 	endif
+	
+	if (mod(readval, 2)==0)
+		return 10^(readval/2-5)
+	else
+		return 3*10^((readval-1)/2-5)
+	endif
+	
 End
 
-function GetSRSSensitivityInVolts(srs)
-	variable srs
-	variable senscode = GetSRSSensitivity(srs)
-	if (mod(senscode, 3)==0)
-		return 2*10^(senscode/3-9)
-	elseif (mod(senscode, 3)==1)
-		return 5*10^((senscode-1)/3-9)
-	else
-		return 10*10^((senscode-2)/3-9)
-	endif
+function SetSRSPhase(srs,phase)
+	Variable srs,phase
+	GPIB2 device = srs
+	GPIBWrite2 "PHAS "+num2str(phase)
 End
 
 function GetSRSPhase(srs)
 	Variable srs
-	Variable/G junkvariable
-	execute "GPIB device "+num2istr(srs)
-	execute "GPIBwrite/F=\"%s\" \"PHAS? \""
-	execute "GPIBread/T=\"\n\" junkvariable"
-	return junkvariable
+	Variable readval
+	GPIB2 device = srs
+	GPIBWrite2 "PHAS?"
+	GPIBRead2/T="\n" readval
+	return readval
 End
 
 function SetSRSAmplitude(srs,volts)
 	Variable srs,volts
-	execute "GPIB device "+num2istr(srs)
-	execute "GPIBwrite/F=\"%s\" \"SLVL "+num2str(volts)+"\""
+	GPIB2 device = srs
+	GPIBWrite2 "SLVL "+num2str(volts)
 End
 
        	
 function GetSRSAmplitude(srs)
 	Variable srs
-	Variable/G junkvariable
-	execute "GPIB device "+num2istr(srs)
-	execute "GPIBwrite/F=\"%s\" \"SLVL? \""
-	execute "GPIBread/T=\"\n\" junkvariable"
-	return junkvariable
-End
-
-function SetSRSPhase(srs,phase)
-	Variable srs,phase
-	execute "GPIB device "+num2istr(srs)
-	execute "GPIBwrite/F=\"%s\" \"PHAS "+num2str(phase)+"\""
+	Variable readval
+	GPIB2 device = srs
+	GPIBWrite2 "SLVL?"
+	GPIBRead2/T="\n" readval
+	return readval
 End
 
 function SetSRSFrequency(srs,hertz)
 	Variable srs,hertz
-	execute "GPIB device "+num2istr(srs)
-	execute "GPIBwrite/F=\"%s\" \"FREQ "+num2str(hertz)+"\""
+	GPIB2 device = srs
+	GPIBWrite2 "FREQ "+num2str(hertz)
 End
 
 function GetSRSFrequency(srs)
 	Variable srs
-	Variable/G junkvariable
-	execute "GPIB device "+num2istr(srs)
-	execute "GPIBwrite/F=\"%s\" \"FREQ? \""
-	execute "GPIBread/T=\"\n\" junkvariable"
-	return junkvariable
+	Variable readval
+	GPIB2 device = srs
+	GPIBWrite2 "FREQ?"
+	GPIBRead2/T="\n" readval
+	return readval
 End
 
 // note, here you need to pass in an integer which maps to a full scale.
@@ -116,8 +114,9 @@ End
 function SetSRSSensitivity(srs,sens)
 //
 	Variable srs,sens
-	execute "GPIB device "+num2istr(srs)
-	execute "GPIBwrite/F=\"%s\" \"SENS "+num2str(sens)+"\""
+	GPIB2 device = srs
+	GPIBwrite2 "SENS " + num2str(sens)
+	
 End
 
 // MBL Jan'12: like SetSRSSensitivity, but here you pass in the maximum expected lock-in signal.
@@ -148,12 +147,13 @@ function SetSRSSensitivityRange(srs,signalmax)
 	
 	variable choice // will hold the real sensitivity setting number: choiceneg + offset.
 	
-	// now, let's check if we're doing current or voltage.
-	variable /g junkvariable
-	execute "GPIB device "+num2istr(srs)
-	execute "GPIBwrite/F=\"%s\" \"ISRC?\" "
-	execute "GPIBread/T=\"\n\" junkvariable"
-	if(junkvariable >= 2)
+	// now, let's check if we're doing current or voltage.	
+	variable readval
+	GPIB2 device = srs
+	GPIBWrite2 "ISRC?"
+	GPIBRead2/T="\n" readval
+	
+	if(readval >= 2)
 		// current measurements: lowest setting (0) corresponds to 2e-15, or choiceneg = -44
 		choice = choiceneg + 44
 	else
@@ -169,30 +169,31 @@ function SetSRSSensitivityRange(srs,signalmax)
 		choice = 26 // user requested a too-high range. Overload will probably occur, too bad for them.
 	endif
 	
-	execute "GPIBwrite/F=\"%s\" \"SENS "+num2str(choice)+"\""
+	GPIBWrite2 "SENS "+num2str(choice)
 	return choice
 End
 
 ///MBL Apr'10: pass realsens=1 to get the actual fullscale sensitivity (in Volts or Amps)
 function GetSRSSensitivity(srs,[realsens])
-//
 	Variable srs,realsens
-	Variable/G junkvariable
-	execute "GPIB device "+num2istr(srs)
-	execute "GPIBwrite/F=\"%s\" \"SENS?\" "
-	execute "GPIBread/T=\"\n\" junkvariable"
+	variable readval
+	GPIB2 device = srs
+	GPIBWrite2 "SENS?"
+	GPIBRead2/T="\n" readval
+	
 	if(realsens == 0)
-		return junkvariable
+		return readval
 	endif
 	
 	/// otherwise, return the real sensitivity... first, break it down:
-	variable modulo = mod(junkvariable,3)
-	variable expo = (junkvariable-modulo)/3
+	variable modulo = mod(readval,3)
+	variable expo = (readval-modulo)/3
 	
 	// now, are we measuring current or voltage?
-	execute "GPIBwrite/F=\"%s\" \"ISRC?\" "
-	execute "GPIBread/T=\"\n\" junkvariable"
-	if(junkvariable >= 2)
+	GPIBWrite2 "ISRC?"
+	GPIBRead2/T="\n" readval
+	
+	if(readval >= 2)
 		expo -= 15 /// current measurement
 	else
 		expo -= 9 /// voltage measurement
@@ -209,70 +210,70 @@ End
 
 function ReadSRSx(srs)  // 20 milliseconds
 	variable srs
-	Variable/G junkvariable,flagnolocal
-	//ReadSRSjunk(srs)
-	execute "GPIB device "+num2istr(srs)
-	execute "GPIBwrite/F=\"%s\"  \"OUTP? 1\""
-	execute "GPIBread/T=\"\n\" junkvariable"
-//	if(!flagnolocal)	// acj 4/02 - send the dmm to local mode unless turned off during a sweep
-//		execute "GPIB gotolocal"
-//	endif
-	return junkvariable
+	variable readval
+	
+	GPIB2 device = srs
+	GPIBWrite2 "OUTP? 1"
+	GPIBRead2/T="\n" readval
+
+	return readval
 End
 
 function ReadSRSy(srs)  // 20 milliseconds
 	variable srs
-	Variable/G junkvariable,flagnolocal
+	variable readval
+	
+	GPIB2 device = srs
+	GPIBWrite2 "OUTP? 2"
+	GPIBRead2/T="\n" readval
 
-	execute "GPIB device "+num2istr(srs)
-//	execute "GPIBwrite/F=\"%s\"  \"SYNC 1\""
-	execute "GPIBwrite/F=\"%s\"  \"OUTP? 2\""
-	execute "GPIBread/T=\"\n\" junkvariable"
-//	if(!flagnolocal)	// acj 4/02 - send the dmm to local mode unless turned off during a sweep
-//		execute "GPIB gotolocal"
-//	endif
-	return junkvariable
+	return readval
 End
 
 function ReadSRSr(srs)
 	variable srs
-	Variable/G junkvariable,flagnolocal
+	variable readval
+	
+	GPIB2 device = srs
+	GPIBWrite2 "OUTP? 2"
+	GPIBRead2/T="\n" readval
 
-	execute "GPIB device "+num2istr(srs)
-	execute "GPIBwrite/F=\"%s\"  \"OUTP? 3\""
-	execute "GPIBread/T=\"\n\" junkvariable"
-	return junkvariable
+	return readval
 End
 
 function ReadSRSt(srs)   // t means theta
 	variable srs
-	Variable/G junkvariable,flagnolocal
+	variable readval
+	
+	GPIB2 device = srs
+	GPIBWrite2 "OUTP? 4"
+	GPIBRead2/T="\n" readval
 
-	execute "GPIB device "+num2istr(srs)
-	execute "GPIBwrite/F=\"%s\"  \"OUTP? 4\""
-	execute "GPIBread/T=\"\n\" junkvariable"
-	return junkvariable
+	return readval
 End
 
 function SRSAutoSens(srs)
 	variable srs
-	execute "GPIB device "+num2istr(srs)
-	execute "GPIBwrite/F=\"%s\"  \"AGAN\""
+
+	GPIB2 device = srs
+	GPIBWrite2 "AGAN"
 end
 
 function SRSAutoPhase(srs)
 	variable srs
-	execute "GPIB device "+num2istr(srs)
-	execute "GPIBwrite/F=\"%s\"  \"APHS\""
+	
+	GPIB2 device = srs
+	GPIBWrite2 "APHS"
 end
 
-function SRSSensUp(srs)
+function setSRSSensUp(srs)
 	variable srs
 	variable ind=getsrssensitivity(srs)
+	
 	SetSRSSensitivity(srs,ind+1)
 end
 
-function SRSSensDown(srs)
+function setSRSSensDown(srs)
 	variable srs
 	variable ind=getsrssensitivity(srs)
 	SetSRSSensitivity(srs,ind-1)
@@ -280,20 +281,17 @@ end
 
 function ReadSRSjunk(srs)
 	// for those times when your srs gpib got messed up and there's something in the buffer, and
-	// your scans are always off by some buffered reading... call this procedure.
+	// your scans are always off by sgetome buffered reading... call this procedure.
 	variable srs
-	variable/g junkvariable
-	variable/g v_flag
-	v_flag = 1
-	junkvariable = 0
+	variable readval
+
 	variable i
 	do
-		execute "GPIB device "+num2istr(srs)
-		execute "GPIBread/Q/N=1 junkvariable"
+		GPIB2 device = srs
+		GPIBRead2 /Q/N=1 readval
 		i+=1
 	while(v_flag)
 	printf "this read %d characters of junk \r", i-1
-	return junkvariable
 End
 
 function/s GetSRSStatus(srs)
@@ -306,7 +304,7 @@ function/s GetSRSStatus(srs)
 	sprintf cmd "gpib_return(%d)", srs
 	execute(cmd)
 	sprintf  winfcomments "Lock-in GPIB%d:\r\t", pad
-	sprintf buffer "Amplitude = %.3f V\r\tTime Constant = %.2f ms\r\tFrequency = %.2f Hz\r\tPhase = %.2f deg\r\tSensitivity = %.4f V\r\tHarmonic = %d\r", GetSRSAmplitude(srs), GetSRSTimeConstInSeconds(srs)*1000, GetSRSFrequency(srs), GetSRSPhase(srs), GetSRSSensitivityInVolts(srs), GetSRSHarmonic(srs)
+	sprintf buffer "Amplitude = %.3f V\r\tTime Constant = %.2f ms\r\tFrequency = %.2f Hz\r\tPhase = %.2f deg\r\tSensitivity = %.4f V\r\tHarmonic = %d\r", GetSRSAmplitude(srs), GetSRSTimeConst(srs,realtime=1)*1000, GetSRSFrequency(srs), GetSRSPhase(srs), GetSRSSensitivity(srs, realsens=1), GetSRSHarmonic(srs)
 
 	winfcomments += buffer
 	return winfcomments
