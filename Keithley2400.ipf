@@ -213,43 +213,45 @@ function/s GetK2400Status(id)
 end
 
 
-//// Old functions //// DON'T EVER USE THEM!
+//// wrappers for old functions ////
 
-function readCurrent(id)
-	variable id
-	return GetK2400Current(id)*1e9 //Unit: A
-end
+// try not to use these
 
-function readVoltage(id)
-	variable id
-	return GetK2400Voltage(id)*1e3 //Unit: V
-end
-
-function setCurrent(current,range,compl,id) //Unit: A
-	variable current,range,compl,id
-	SetK2400Range("curr",range,id)
-	SetK2400Compl("curr",compl,id)
-	SetK2400Current(current*1e9,id)
-end
-
-function setVoltage(volts,range,compl,id) //Unit: V
-	variable volts,range,compl,id
-	SetK2400Range("volt",range,id)
-	SetK2400Compl("volt",compl,id)
-	SetK2400Voltage(volts*1e3,id)
-end
-
-function rampkcurrent(id,curr) //Unit: A
-	variable id,curr
-	RampK2400Current(curr*1e9,id)
-end
-
-function rampkvoltage(id,volts,rate,[range,compl]) //Units: V & mV/s
-	variable id,volts,rate,range,compl
-	if( ParamIsDefault(compl))
-		compl=20e-6
-	endif
-	SetK2400Range("volt",range,id)
-	SetK2400Compl("volt",compl,id)
-	RampK2400Voltage(volts*1e3,id,ramprate=rate)
-end
+//function readCurrent(id)
+//	variable id
+//	return GetK2400Current(id)*1e9 //Unit: A
+//end
+//
+//function readVoltage(id)
+//	variable id
+//	return GetK2400Voltage(id)*1e3 //Unit: V
+//end
+//
+//function setCurrent(current,range,compl,id) //Unit: A
+//	variable current,range,compl,id
+//	SetK2400Range("curr",range,id)
+//	SetK2400Compl("curr",compl,id)
+//	SetK2400Current(current*1e9,id)
+//end
+//
+//function setVoltage(volts,range,compl,id) //Unit: V
+//	variable volts,range,compl,id
+//	SetK2400Range("volt",range,id)
+//	SetK2400Compl("volt",compl,id)
+//	SetK2400Voltage(volts*1e3,id)
+//end
+//
+//function rampkcurrent(id,curr) //Unit: A
+//	variable id,curr
+//	RampK2400Current(curr*1e9,id)
+//end
+//
+//function rampkvoltage(id,volts,rate,[range,compl]) //Units: V & mV/s
+//	variable id,volts,rate,range,compl
+//	if( ParamIsDefault(compl))
+//		compl=20e-6
+//	endif
+//	SetK2400Range("volt",range,id)
+//	SetK2400Compl("volt",compl,id)
+//	RampK2400Voltage(volts*1e3,id,ramprate=rate)
+//end

@@ -7,9 +7,9 @@
 // make a copy and edit from there
 // if you have a good addition -- submit changes to this template through GitHub
 
-/////////////////////////////
+///////////////////////
 /////    SETUP    /////
-/////////////////////////////
+///////////////////////
 
 macro initexp()
     // comment out what you don't need to use
@@ -26,7 +26,7 @@ macro initexp()
 	/////// auto-initialize GPIB instruments /////////
 	// check that you have the board number set correctly
 	
-	// InitAllGPIB(gpib_board="GPIB0")
+	InitAllGPIB(gpib_board="GPIB0")
 	
 	/////// initialize serial instruments //////////
 	// COM ports must be set here
@@ -48,9 +48,9 @@ macro initexp()
 	
 end
 
-////////////////////////////////////////////
+///////////////////////////////
 /////    THINGS TO READ   /////
-////////////////////////////////////////////
+///////////////////////////////
 
 // SRS830 //
 
@@ -171,8 +171,9 @@ end
 // K2400 //
 
 function getCurrentK2400()
-	nvar k240014
-	return readCurrent(k240014)
+	// returns current in uA
+	nvar k2400
+	return GetK2400Current(k2400)*1e3 
 end
 
 // SMALL MAGNET //
@@ -215,13 +216,13 @@ function getRandom()
 	return enoise(lim)
 end
 
-////////////////////////////////////////////////
+////////////////////////////
 //// MEAUREMENT SCRIPTS ////
-///////////////////////////////////////////////
+////////////////////////////
 
-////////////////////////////////////
+///////////////////////////
 //     Read VS Time      //
-////////////////////////////////////
+///////////////////////////
 
 function ReadvsTimeForever(delay) //Units: s
 	variable delay
@@ -301,9 +302,9 @@ function ReadvsTimeUntil(delay, checkwave, value, timeout, [comments, operator])
 	SaveWaves(msg=comments)
 end
 
-////////////////////////////////////
+/////////////////////////////
 //         BabyDAC         //
-////////////////////////////////////
+/////////////////////////////
 
 function ScanBabyDAC(start, fin, channels, numpts, delay, ramprate, [offsetx, comments]) //Units: mV
 	// sweep one or more babyDAC channels
@@ -657,12 +658,13 @@ function ScanBabyDAC2DSlice(startx, finx, channelsx, numpts_slice, delayx, rampr
 	SaveWaves(msg=comments)
 end
 
-////////////////////////////////////
+/////////////////////////////
 //       Keithley 2400     //
-////////////////////////////////////
+/////////////////////////////
 
 function ScanK2400(device, start, fin, numpts, delay, ramprate, [offsetx, compl, comments]) //Units: mV
 	// sweep K2400 output voltage
+	// [start, fin] = mV, [ramprate] = mV/s, [compl = nA
 	variable device, start, fin, numpts, delay, ramprate, offsetx, compl
 	string comments
 	string x_label
@@ -683,14 +685,15 @@ function ScanK2400(device, start, fin, numpts, delay, ramprate, [offsetx, compl,
 	sprintf x_label, "K2400 (mV)"
 
 	// set starting values
+	SetK2400Compl("curr",compl,device)
 	setpoint = start-offsetx
-	rampkvoltage(device, setpoint/1000, ramprate, compl = compl)
+	RampK2400Voltage(device, setpoint, ramprate=ramprate)
 		
 	sc_sleep(1.0)
 	InitializeWaves(start, fin, numpts, x_label=x_label)
 	do
 		setpoint = start-offsetx + (i*(fin-start)/(numpts-1))
-		rampkvoltage(device, setpoint/1000, ramprate, compl = compl)
+		RampK2400Voltage(device, setpoint, ramprate=ramprate)
 		sc_sleep(delay)
 		RecordValues(i, 0) 
 		i+=1
@@ -698,9 +701,9 @@ function ScanK2400(device, start, fin, numpts, delay, ramprate, [offsetx, compl,
 	SaveWaves(msg=comments)
 end
 
-//////////////////////////////
+////////////////////////////
 //          IPS           //
-//////////////////////////////
+////////////////////////////
 
 function ScanIPS(start, fin, numpts, delay, ramprate, [comments]) //Units: mT
 	variable start, fin, numpts, delay, ramprate
@@ -777,9 +780,9 @@ function ScanBabyDACIPS(startx, finx, channelsx, numptsx, delayx, rampratex, sta
 	SaveWaves(msg=comments)
 end
 
-////////////////////////////////////
+////////////////////////////
 //     Small Magnet       //
-////////////////////////////////////
+////////////////////////////
 
 //function ScanSmallMagnet(start, fin, channels, numpts, delay, ramprate, [comments]) //Units: mT (mT/min)
 //	// sweep small magnet using babyDAC and Kepco current source
@@ -814,9 +817,9 @@ end
 //	SaveWaves(msg=comments)
 //end
 
-/////////////////////////////////////////////////////
+///////////////////////////////////////
 ///////    TIME AVERAGING   ///////////
-/////////////////////////////////////////////////////
+///////////////////////////////////////
 
 function TimeAvgExample(start, fin, numpts, delay, timeavg, timeavg_delay, [comments]) 
 	variable start, fin, numpts, delay, timeavg, timeavg_delay
