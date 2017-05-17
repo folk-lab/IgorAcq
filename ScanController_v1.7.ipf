@@ -51,12 +51,14 @@ function InitScanController()
 	string filelist = ""
 	
 	GetFileFolderInfo/z/q/p=data
+	
 	if(v_flag==0)
 		filelist = greplist(indexedfile(data,-1,".txt"),"config")
 	endif
+	
 	if(itemsinlist(filelist)>0)
 		// read content into waves
-		loadconfig(filelist)
+		sc_loadconfig(filelist)
 	else
 		// These arrays should have the same size. Their indeces correspond to each other.
 		make/t/o sc_RawWaveNames = {"g1x", "g1y"} // Wave names to be created and saved
@@ -93,10 +95,10 @@ function InitScanController()
 	// variable to keep track of abort operations
 	variable /g sc_AbortSave = 0
 	
-	rebuildwindow()
+	sc_rebuildwindow()
 end
 
-function rebuildwindow()
+function sc_rebuildwindow()
 	dowindow /k ScanController
 	execute("ScanController()")
 end
@@ -259,7 +261,7 @@ end
 function sc_updatewindow(action) : ButtonControl
 	string action
 	// Write (or overwrite) a config file
-	createconfig()
+	sc_createconfig()
 end
 
 function sc_addrow(action) : ButtonControl
@@ -289,7 +291,7 @@ function sc_addrow(action) : ButtonControl
 			AppendString(sc_CalcScripts, "")
 		break
 	endswitch
-	rebuildwindow()
+	sc_rebuildwindow()
 end
 
 function sc_removerow(action) : Buttoncontrol
@@ -327,7 +329,7 @@ function sc_removerow(action) : Buttoncontrol
 			endif
 			break
 	endswitch
-	rebuildwindow()
+	sc_rebuildwindow()
 end
 
 function AppendValue(thewave, thevalue)
@@ -1225,7 +1227,7 @@ function sc_readvstime(i, j, delay, timeout)
 	endif
 end
 
-function createconfig()
+function sc_createconfig()
 	wave/t sc_RawWaveNames
 	wave sc_RawRecord
 	wave sc_RawPlot
@@ -1241,19 +1243,25 @@ function createconfig()
 	svar sc_ColorMap
 	nvar filenum
 	variable refnum
-	string configfile
+	string configfile, datapath, configpath
 	
 	// Check if data path is definded
 	GetFileFolderInfo/Z/Q/P=data
+	
 	if(v_flag != 0 || v_isfolder != 1)
-		print "Data path no defined. No config file created!"
+		print "Data path no defined. No config file created!\n"
 		return 0
+	else
+		pathinfo data; datapath=S_path
+		configpath = datapath+"config:"
+		newpath /C/O/Q config configpath // easier just to add/create a path than to check
 	endif
 	
-	configfile = "config" + num2istr(unixtime()) + ".txt"
+	configfile = "sc" + num2istr(unixtime()) + ".config"
 	
 	// Try to open config file or create it otherwise
-	open /z/p=data refnum as configfile
+	open /z/p=config refnum as configfile
+	
 	wfprintf refnum, "%s,", sc_RawWaveNames
 	fprintf refnum, "\r"
 	wfprintf refnum, "%g,", sc_RawRecord
@@ -1277,10 +1285,11 @@ function createconfig()
 	fprintf refnum, "%s\r", sc_LogStr
 	fprintf refnum, "%s\r", sc_ColorMap
 	fprintf refnum, "%g\r", filenum
+	
 	close refnum
 end
 
-function loadconfig(filelist)
+function sc_loadconfig(filelist)
 	string filelist
 	variable refnum
 	string loadcontainer
@@ -1291,19 +1300,18 @@ function loadconfig(filelist)
 	nvar filenum
 	variable i, confignum=0
 	string file_string, configunix
+	
 	make/o/d/n=(itemsinlist(filelist)) configmax=0
 	
 	for(i=0;i<itemsinlist(filelist);i=i+1)
 		file_string = stringfromlist(i,filelist)
-		splitstring/e=("config([[:digit:]]+).txt") file_string, configunix
+		splitstring/e=("sc([[:digit:]]+).config") file_string, configunix
 		confignum = str2num(configunix)
 		configmax[i] = confignum
 	endfor
 	confignum = wavemax(configmax)
-	// print configmax
-	// print confignum
 	
-	open /z/r/p=data refnum as "config"+num2istr(confignum)+".txt"
+	open /z/r/p=config refnum as "sc"+num2istr(confignum)+".config"
 	freadline/t=(num2char(13)) refnum, loadcontainer
 	list2textwave(removeending(loadcontainer,"\r"),"sc_RawWaveNames")
 	freadline/t=(num2char(13)) refnum, loadcontainer
