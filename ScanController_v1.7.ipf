@@ -4,20 +4,9 @@
 // Version 1.7 August 8, 2016
 // Authors: Mohammad Samani, Nik Hartman & Christian Olsen
 
-function sc_sleep(delay)
-	// sleep for delay seconds while 
-	// checking for breaks and doing other tasks
-	variable delay
+function sc_checksweepstate()
 	nvar sc_abortsweep, sc_pause
-	
-	variable i=0, start_time = datetime
-	do
-
-		if(i==0)
-			doupdate // update plots on first iteration only
-		endif
-		
-		if (GetKeyState(0) & 32)
+	if (GetKeyState(0) & 32)
 			// If the ESC button is pressed during the scan, save existing data and stop the scan.
 			SaveWaves(msg="The scan was aborted during the execution.")
 			abort
@@ -31,7 +20,6 @@ function sc_sleep(delay)
 		elseif(sc_pause)
 			// Pause sweep if button is pressed
 			do
-				sleep/s 1
 				if(sc_abortsweep)
 					SaveWaves(msg="The scan was aborted during the execution.")
 					dowindow /k SweepControl
@@ -39,6 +27,23 @@ function sc_sleep(delay)
 				endif
 			while(sc_pause)
 		endif
+end
+
+function sc_sleep(delay)
+	// sleep for delay seconds while 
+	// checking for breaks and doing other tasks
+	variable delay
+	nvar sc_abortsweep, sc_pause
+	
+	variable i=0, start_time = datetime
+	do
+
+		if(i==0)
+			doupdate // update plots on first iteration only
+		endif
+		
+		sc_checksweepstate()
+		
 	while(datetime-start_time < delay)
 end
 
@@ -190,7 +195,7 @@ Window ScanController() : Panel
 	i+=1
 	button addrowraw,pos={550,i*(sc_InnerBoxH + sc_InnerBoxSpacing)},size={110,20},proc=sc_addrow,title="Add Row"
 	button removerowraw,pos={430,i*(sc_InnerBoxH + sc_InnerBoxSpacing)},size={110,20},proc=sc_removerow,title="Remove Row"
-	checkbox sc_PrintRawBox, pos={370,i*(sc_InnerBoxH + sc_InnerBoxSpacing)}, proc=sc_CheckBoxClicked, value=sc_PrintRaw,side=1,title="\Z14Print filenames"
+	checkbox sc_PrintRawBox, pos={300,i*(sc_InnerBoxH + sc_InnerBoxSpacing)}, proc=sc_CheckBoxClicked, value=sc_PrintRaw,side=1,title="\Z14Print filenames"
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 13,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Wave Name"
 	SetDrawEnv fsize= 16,fstyle= 1
@@ -215,7 +220,7 @@ Window ScanController() : Panel
 	while (i<numpnts( sc_CalcWaveNames ))	
 	button addrowcalc,pos={550,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_addrow,title="Add Row"
 	button removerowcalc,pos={430,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_removerow,title="Remove Row"
-	checkbox sc_PrintCalcBox, pos={370,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)}, proc=sc_CheckBoxClicked, value=sc_PrintCalc,side=1,title="\Z14Print filenames"
+	checkbox sc_PrintCalcBox, pos={300,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)}, proc=sc_CheckBoxClicked, value=sc_PrintCalc,side=1,title="\Z14Print filenames"
 	
 	// box for logging functions
 	variable sc_Loggable
@@ -1025,31 +1030,8 @@ function RecordValues(i, j, [scandirection, readvstime, timeavg, timeavg_delay, 
 		ii+=1
 	while (ii < numpnts(sc_CalcWaveNames))
 	
-	//// check abort/pause status block ////
-	if (GetKeyState(0) & 32)
-		// If the ESC button is pressed during the scan, save existing data and stop the scan.
-		SaveWaves(msg="The scan was aborted during the execution.")
-		dowindow /k SweepControl
-		abort "Measurement aborted by user"
-	endif
-	
-	if(sc_abortsweep)
-		// Abort sweep
-		SaveWaves(msg="The scan was aborted during the execution.")
-		abort "Measurement aborted by user"
-		dowindow /k SweepControl
-	elseif(sc_pause)
-		// Pause sweep
-		do
-			sleep/s 1
-			if(sc_abortsweep)
-				SaveWaves(msg="The scan was aborted during the execution.")
-				dowindow /k SweepControl
-				abort "Measurement aborted by user"
-			endif
-		while(sc_pause)
-	endif
-	//// end check abort/pause status block ////
+	// check abort/pause status
+	sc_checksweepstate()
 	
 end
 
@@ -1099,30 +1081,9 @@ function RecordTmpValues(index, innerindex, outerindex)
 		ii+=1
 	while (ii < numpnts(sc_RawWaveNames))
 	
+	// check abort/pause status
+	sc_checksweepstate()
 	
-	if (GetKeyState(0) & 32)
-		// If the ESC button is pressed during the scan, save existing data and stop the scan.
-		SaveWaves(msg="The scan was aborted during the execution.")
-		sc_controlwindows("")
-		abort "Measurement aborted by user"
-	endif
-	
-	if(sc_abortsweep)
-		// Abort sweep
-		SaveWaves(msg="The scan was aborted during the execution.")
-		sc_controlwindows("")
-		abort "Measurement aborted by user"
-	elseif(sc_pause)
-		// Pause sweep
-		do
-			sleep/s 1
-			if(sc_abortsweep)
-				SaveWaves(msg="The scan was aborted during the execution.")
-				sc_controlwindows("")
-				abort "Measurement aborted by user"
-			endif
-		while(sc_pause)
-	endif
 end
 
 function SaveWaves([msg, save_experiment])
@@ -1339,8 +1300,8 @@ function loadconfig(filelist)
 		configmax[i] = confignum
 	endfor
 	confignum = wavemax(configmax)
-	print configmax
-	print confignum
+	// print configmax
+	// print confignum
 	
 	open /z/r/p=data refnum as "config"+num2istr(confignum)+".txt"
 	freadline/t=(num2char(13)) refnum, loadcontainer
