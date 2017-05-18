@@ -363,11 +363,16 @@ function RampOutputBD(channel, output, [ramprate, noupdate])
 	voltage = str2num(oldvalue[channel][1])
 	sgn = sign(output-voltage)
 	
-	if(noupdate)
+	if(paramisdefault(noupdate))
+		noupdate = 0
+	endif
+	
+	if(noupdate==0)
+		// pauseupdate
+		sleeptime = 0.01 // account for screen-update delays
+	else
 		pauseupdate
 		sleeptime = 0.002 // can ramp finely if there's no updating!
-	else
-		sleeptime = 0.01 // account for screen-update delays
 	endif
 	
 	if(paramisdefault(ramprate))
@@ -400,10 +405,15 @@ function RampOutputBD(channel, output, [ramprate, noupdate])
 		voltage+=sgn*step
 	while(sgn*voltage<sgn*output-step)
 	SetOutputBD(channel, output)
+	
+	if(noupdate!=0)
+		resumeupdate
+	endif
+	
 	return 1
 end
 
-function UpdateMultipleBD([action, ramprate])
+function UpdateMultipleBD([action, ramprate, noupdate])
 
 	// usage:
 	// function Experiment(....)
@@ -414,7 +424,7 @@ function UpdateMultipleBD([action, ramprate])
 	//         UpdateMultipleBD(action="ramp") // ramps all channels to updated values
 	
 	string action // "set" or "ramp"
-	variable ramprate
+	variable ramprate, noupdate
 	wave/t dacvalsstr=dacvalsstr
 	wave/t oldvalue=oldvalue
 	variable output,i
@@ -427,6 +437,10 @@ function UpdateMultipleBD([action, ramprate])
 	if(paramisdefault(ramprate))
 		ramprate = 200    // (mV/s)
 	endif
+	
+	if(paramisdefault(noupdate))
+		noupdate=0
+	endif
 
 	for(i=0;i<16;i+=1)
 		if(str2num(dacvalsstr[i][1]) != str2num(oldvalue[i][1]))
@@ -435,7 +449,7 @@ function UpdateMultipleBD([action, ramprate])
 				case "set":
 					check = SetOutputBD(i,output)
 				case "ramp":
-					check = RampOutputBD(i,output,ramprate=ramprate)
+					check = RampOutputBD(i,output,ramprate=ramprate, noupdate=noupdate)
 			endswitch
 			if(check == 1)
 				oldvalue[i][1] = dacvalsstr[i][1]
@@ -447,8 +461,8 @@ function UpdateMultipleBD([action, ramprate])
 	return 1
 end
 
-function RampMultipleBD(channels, setpoint, nChannels, [ramprate])
-	variable setpoint, ramprate, nChannels
+function RampMultipleBD(channels, setpoint, nChannels, [ramprate, noupdate])
+	variable setpoint, nChannels, ramprate, noupdate
 	string channels
 	variable i, channel
 	wave /t dacvalsstr = dacvalsstr
@@ -457,11 +471,15 @@ function RampMultipleBD(channels, setpoint, nChannels, [ramprate])
 		ramprate = 200    // (mV/s)
 	endif
 	
+	if(paramisdefault(noupdate))
+		noupdate = 0	
+	endif
+	
 	for(i=0;i<nChannels;i+=1)
 		channel = str2num(StringFromList(i, channels, ","))
 		dacvalsstr[channel][1] = num2str(setpoint) // set new values with a strings
 	endfor
-	UpdateMultipleBD(action="ramp", ramprate=ramprate)
+	UpdateMultipleBD(action="ramp", ramprate=ramprate, noupdate = noupdate)
 end
 
 ///// ACD readings /////
@@ -682,24 +700,42 @@ function/s GetDACStatus()
 	return winfcomments
 end
 
+//// testing ////
+function testBabyDACramprate(start, fin, channels, ramprate, noupdate)
+	string channels
+	variable start, fin, ramprate, noupdate
+	variable nChannels = ItemsInList(channels, ",")
+
+	RampMultipleBD(channels, start, nChannels, ramprate=ramprate, noupdate=0)
+	
+	print "ramping..."
+	variable ttotal = 0, tstart = datetime
+	RampMultipleBD(channels, fin, nChannels, ramprate=ramprate, noupdate=noupdate)
+	ttotal = datetime - tstart
+	printf "the effective ramprate is: %.1fmV/s\n", abs(fin-start)/ttotal
+	
+end
+
 //// for backwards compatibility ////
-// for the record, the names of these functions are way too ambiguous, which is why they were changed in this procedure
 
-function setvolts(channel, mV)
-	variable channel, mV
-	SetOutputBD(channel, mV)
-end
+// for the record, the names of these functions are way too ambiguous, 
+// which is why they were changed in this procedure
 
-function rampvolts(channel, mV, [ramprate, noupdate])
-	variable channel, mV, ramprate, noupdate
-	
-	if(paramisdefault(ramprate))
-		ramprate = 200    // (mV/s)
-	endif
-	
-	if(paramisdefault(noupdate))
-		RampOutputBD(channel, mV, ramprate=ramprate)
-	else
-		RampOutputBD(channel, mV, ramprate=ramprate, noupdate=noupdate)
-	endif
-end
+//function setvolts(channel, mV)
+//	variable channel, mV
+//	SetOutputBD(channel, mV)
+//end
+//
+//function rampvolts(channel, mV, [ramprate, noupdate])
+//	variable channel, mV, ramprate, noupdate
+//	
+//	if(paramisdefault(ramprate))
+//		ramprate = 200    // (mV/s)
+//	endif
+//	
+//	if(paramisdefault(noupdate))
+//		RampOutputBD(channel, mV, ramprate=ramprate)
+//	else
+//		RampOutputBD(channel, mV, ramprate=ramprate, noupdate=noupdate)
+//	endif
+//end

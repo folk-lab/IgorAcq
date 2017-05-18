@@ -1227,6 +1227,21 @@ function sc_readvstime(i, j, delay, timeout)
 	endif
 end
 
+function sc_testreadtime(numpts, delay) //Units: s
+	variable numpts, delay
+
+	InitializeWaves(0, numpts, numpts, x_label="index")
+	variable i=0, ttotal = 0, tstart = datetime
+	do
+		sc_sleep(delay)
+		RecordValues(i, 0) 
+		i+=1
+	while (i<numpts)
+	ttotal = datetime-tstart
+	printf "each sc_sleep(...) + RecordValues(...) call takes ~%.1fms \n", ttotal/numpts*1000
+	// no point in SaveWaves since the program will never reach this point
+end
+
 function sc_createconfig()
 	wave/t sc_RawWaveNames
 	wave sc_RawRecord
