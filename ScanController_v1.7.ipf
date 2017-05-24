@@ -1350,10 +1350,6 @@ function sc_loadconfig(filelist)
 	freadline/t=(num2char(13)) refnum, loadcontainer
 	sc_ColorMap = removeending(loadcontainer,"\r")
 	
-	// load filenum
-//	freadline/t=(num2char(13)) refnum, loadcontainer
-//	filenum = str2num(removeending(loadcontainer,"\r"))
-	
 	close refnum
 end
 
