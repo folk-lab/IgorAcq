@@ -26,7 +26,7 @@ function sc_checksweepstate()
 					abort "Measurement aborted by user"
 				endif
 			while(sc_pause)
-		endif
+	endif
 end
 
 function sc_sleep(delay)
@@ -560,6 +560,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	for (i=0;i<round(strlen(graphlist)/6);i=i+1)
 		index = strsearch(graphlist,";",j)
 		graphname = graphlist[j,index-1]
+		setaxis/w=$graphname /a
 		getwindow $graphname wtitle
 		splitstring /e="(.*):(.*)" s_value, graphnum, plottitle
 		graphtitle+= plottitle+";"
