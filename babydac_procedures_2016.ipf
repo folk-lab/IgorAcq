@@ -33,6 +33,8 @@ function InitBabyDACs(b1, [b2, b3, b4, range])
 	
 	DACSetup() // setup DAC com port
 	
+	variable /g bd_ramprate = 200 // default ramprate
+	
 	// open window
 	dowindow /k BabyDACWindow
 	execute("BabyDACWindow()")
@@ -269,8 +271,8 @@ function ResetStartupVoltageBD(board_number)
 	execute "VDTWriteBinaryWave2 /O=10 bd_cmd_wave"
 	
 	// read the response from the buffer
-	print ReadBytesBD(4) // does not seem to slow things down significantly
-	   			             // prevents the buffer from over filling with crap
+	print ReadBytesBD(4) 
+	
 	sleep /s 0.3
 end
 
@@ -376,7 +378,8 @@ function RampOutputBD(channel, output, [ramprate, noupdate])
 	endif
 	
 	if(paramisdefault(ramprate))
-		ramprate = 200  // (~mV/s) 
+		nvar bd_ramprate
+		ramprate = bd_ramprate 
 	endif
 	
 	step = ramprate*sleeptime
@@ -435,7 +438,8 @@ function UpdateMultipleBD([action, ramprate, noupdate])
 	endif
 	
 	if(paramisdefault(ramprate))
-		ramprate = 200    // (mV/s)
+		nvar bd_ramprate
+		ramprate = bd_ramprate    // (mV/s)
 	endif
 	
 	if(paramisdefault(noupdate))
@@ -468,7 +472,8 @@ function RampMultipleBD(channels, setpoint, nChannels, [ramprate, noupdate])
 	wave /t dacvalsstr = dacvalsstr
 
 	if(paramisdefault(ramprate))
-		ramprate = 200    // (mV/s)
+		nvar bd_ramprate
+		ramprate = bd_ramprate    // (mV/s)
 	endif
 	
 	if(paramisdefault(noupdate))
@@ -730,7 +735,8 @@ end
 //	variable channel, mV, ramprate, noupdate
 //	
 //	if(paramisdefault(ramprate))
-//		ramprate = 200    // (mV/s)
+//		nvar bd_ramprate
+//		ramprate = bd_ramprate    // (mV/s)
 //	endif
 //	
 //	if(paramisdefault(noupdate))

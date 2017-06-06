@@ -15,14 +15,16 @@ function sc_checksweepstate()
 		if(sc_abortsweep)
 			// If the Abort button is pressed during the scan, save existing data and stop the scan.
 			SaveWaves(msg="The scan was aborted during the execution.")
-			abort "Measurement aborted by user"
 			dowindow /k SweepControl
+			sc_abortsweep=0
+			abort "Measurement aborted by user"
 		elseif(sc_pause)
 			// Pause sweep if button is pressed
 			do
 				if(sc_abortsweep)
 					SaveWaves(msg="The scan was aborted during the execution.")
 					dowindow /k SweepControl
+					sc_abortsweep=0
 					abort "Measurement aborted by user"
 				endif
 			while(sc_pause)
@@ -92,8 +94,6 @@ function InitScanController()
 			printf "Current FileNum is %d\n", filenum
 		endif
 	endif
-	// variable to keep track of abort operations
-	variable /g sc_AbortSave = 0
 	
 	sc_rebuildwindow()
 end

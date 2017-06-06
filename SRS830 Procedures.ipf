@@ -51,7 +51,7 @@ function GetSRSTimeConst(srs, [realtime])
 	GPIBWrite2 "OFLT?"
 	GPIBRead2/T="\n" readval
 	
-	if (realtime==1)
+	if (realtime == 0)
 		return readval
 	endif
 	
@@ -208,6 +208,18 @@ function GetSRSSensitivity(srs,[realsens])
 	endif
 End
 
+function /t ReadSRSxy(srs)  // 20 milliseconds
+	variable srs
+	string response
+	
+	GPIB2 device = srs
+	GPIBWrite2 "SNAP ? 1,2"
+	GPIBRead2/T="\n" response
+	
+	return response
+
+end
+
 function ReadSRSx(srs)  // 20 milliseconds
 	variable srs
 	variable readval
@@ -235,7 +247,7 @@ function ReadSRSr(srs)
 	variable readval
 	
 	GPIB2 device = srs
-	GPIBWrite2 "OUTP? 2"
+	GPIBWrite2 "OUTP? 3"
 	GPIBRead2/T="\n" readval
 
 	return readval

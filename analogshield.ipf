@@ -26,7 +26,7 @@ function InitAnalogShield()
 	AS_CheckForOldInit()
 	
 	AS_SetSerialPort() // setup COM port
-	execute("VDT2 baud=256000, databits=8, stopbits=1, parity=0, killio") // Communication Settings
+	execute("VDT2 baud=115200, databits=8, stopbits=1, parity=0, killio") // Communication Settings
 	
 	// open window
 	dowindow /k AnalogShieldWindow
@@ -85,7 +85,7 @@ function AS_AskUser()
 end
 
 function AS_SetSerialPort()
-	string/g as_comport = "COM3" // Set to the right COM Port
+	string/g as_comport = "COM6" // Set to the right COM Port
 	execute("VDTOperationsPort2 $as_comport")
 end
 
@@ -371,7 +371,7 @@ function ReadADCtimeAS(channel, numpts)
 	// this is  significantly faster on a UNIX system (~40kHz)
 	// compared to a Windows system (11 kHz)
 	variable channel // 0 or 2
-	variable numpts // number of points to average over (< 100 )
+	variable numpts 
 	string cmd
 	wave as_response_wave=as_response_wave
 	nvar as_adc0_mult,  as_adc0_offset,  as_adc2_mult, as_adc2_offset

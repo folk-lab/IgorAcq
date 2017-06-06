@@ -253,12 +253,12 @@ function round_num(number,decimalplace) //for integer pass 0 as decimalplace
 	return round(number*multiplier)/multiplier
 end
 
-	//// Advanced functions ////
+//// Advanced functions ////
 
 function SetFieldWait(field) // in mT
 	// Setting new set point and waiting for magnet to reach new set point
 	variable field
-	variable err = 0.075 // this should really be 0.01, but I find it gets stuck in that case --Nik
+	variable err = 0.06 // this should really be 0.01, but I find it gets stuck in that case --Nik
 					  // even with 0.05 it gets stuck. I changed to it 0.06 -- Mohammad
 	variable currentfield
 	variable sweeprate
@@ -268,8 +268,11 @@ function SetFieldWait(field) // in mT
 	//sweeptime = CalcSweepTime(currentfield,field,sweeprate)
 	SetField(field)
 	do
-		sleep/s 0.1
-		currentfield = GetField()
+		
+		do
+			sc_sleep(0.05)
+			currentfield = GetField()
+		while(numtype(currentfield)==2)
 	while (abs(currentfield - field) > err)
 end
 
@@ -352,13 +355,14 @@ EndMacro
 
 Window Magnetsettings_window() : Panel
 	PauseUpdate; Silent 1 // building window
-	NewPanel /W=(0,0, 250,100)/N=MagnetSettings // window size
+	NewPanel /W=(0,0, 370,100)/N=MagnetSettings // window size
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv fsize= 20,fstyle= 1 
 	DrawText 50, 40,"Choose Magnet" // Headline
 	Button BFmagnet,pos={10,60},size={110,20},proc=magnet_button,title="BF 10T Magnet"
 	Button IGHmagnet,pos={130,60},size={110,20},proc=magnet_button,title="IGH 12T Magnet"
+	Button AMmagnet,pos={250,60},size={110,20},proc=magnet_button,title="AM z-axis 6T"
 end
 
 function magnet_button(action) : ButtonControl
@@ -375,6 +379,12 @@ function magnet_button(action) : ButtonControl
 			ampspertesla = 8.2061452674//A/T
 			maxfield = 12000//mT
 			maxramprate = 400//mT/min
+			dowindow /k MagnetSettings
+			break
+		case "AMmagnet":
+			ampspertesla =9.9502//A/T
+			maxfield = 6000 //mT
+			maxramprate = 1150 //mT/min
 			dowindow /k MagnetSettings
 			break
 	endswitch
