@@ -85,7 +85,7 @@ function AS_AskUser()
 end
 
 function AS_SetSerialPort()
-	string/g as_comport = "COM6" // Set to the right COM Port
+	svar as_comport
 	execute("VDTOperationsPort2 $as_comport")
 end
 

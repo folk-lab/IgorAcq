@@ -611,10 +611,10 @@ Window BabyDACWindow() : Panel
 	DrawText 108,85,"VOLT (mV)"
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 208,85,"LIM (mV)"
-	ListBox daclist,pos={10,90},size={300,370},fsize=16,frame=2 // interactive list
+	ListBox daclist,pos={10,90},size={300,390},fsize=16,frame=2 // interactive list
 	ListBox daclist,fStyle=1,listWave=root:dacvalsstr,selWave=root:listboxattr,mode= 1
-	Button ramp,pos={40,490},size={65,20},proc=update_BabyDAC,title="RAMP"
-	Button rampallzero,pos={170,490},size={90,20},proc=update_BabyDAC,title="RAMP ALL 0"
+	Button ramp,pos={40,495},size={65,20},proc=update_BabyDAC,title="RAMP"
+	Button rampallzero,pos={170,495},size={90,20},proc=update_BabyDAC,title="RAMP ALL 0"
 EndMacro
 
 function update_BabyDAC(action) : ButtonControl
