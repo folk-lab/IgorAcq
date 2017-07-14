@@ -1016,17 +1016,17 @@ function RecordValues(i, j, [scandirection, readvstime, timeavg, timeavg_delay, 
 			script = ReplaceString("[i]", script, "["+num2istr(innerindex)+"]")
 			execute(sc_CalcWaveNames[ii] + "[" + num2istr(innerindex) + "]=" + script)
 			
-			if (sc_is2d && fillnan == 0)				
+			if (sc_is2d)				
 				// if this is the last point in a row on a 2d scan, save the row in the 2d wave
 				if ((innerindex == sc_numptsx-1 && scandirection == 1) || (innerindex == 0 && scandirection == -1))
 					wave wref1d = $sc_CalcWaveNames[ii]
 					wave wref2d = $sc_CalcWaveNames[ii] + "2d"
 					wref2d[][outerindex] = wref1d[p]
 				endif
-			elseif(sc_is2d && fillnan != 0)
-				// fill every point with NaN as you go
-				wave wref2d = $sc_CalcWaveNames[ii] + "2d"
-				wref2d[innerindex][outerindex] = nan							
+//			elseif(sc_is2d && fillnan != 0)
+//				// fill every point with NaN as you go
+//				wave wref2d = $sc_CalcWaveNames[ii] + "2d"
+//				wref2d[innerindex][outerindex] = nan							
 			endif
 		endif
 		ii+=1
@@ -1234,7 +1234,7 @@ function sc_testreadtime(numpts, delay) //Units: s
 	variable i=0, ttotal = 0, tstart = datetime
 	do
 		sc_sleep(delay)
-		RecordValues(i, 0) 
+		RecordValues(i, 0, fillnan=1) 
 		i+=1
 	while (i<numpts)
 	ttotal = datetime-tstart
