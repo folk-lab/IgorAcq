@@ -1234,7 +1234,7 @@ function sc_testreadtime(numpts, delay) //Units: s
 	variable i=0, ttotal = 0, tstart = datetime
 	do
 		sc_sleep(delay)
-		RecordValues(i, 0, fillnan=1) 
+		RecordValues(i, 0, fillnan=0) 
 		i+=1
 	while (i<numpts)
 	ttotal = datetime-tstart
