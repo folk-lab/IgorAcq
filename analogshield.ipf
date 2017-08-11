@@ -16,6 +16,7 @@ end
 
 function InitAnalogShield()
 	variable /g as_range_low, as_range_high, as_range_span
+	variable /g as_ramprate = 50 // default ramprate
 
 	as_range_low = -5000
 	as_range_high = 5000
@@ -191,6 +192,7 @@ function RampOutputAS(channel, output, [ramprate, noupdate])
 	wave /t as_oldvalue=as_oldvalue
 	variable voltage, sgn, step
 	variable sleeptime // seconds per ramp cycle (must be at least 0.002)
+	nvar as_ramprate
 	
 	// calculate step direction
 	voltage = str2num(as_oldvalue[channel][1])
@@ -204,7 +206,7 @@ function RampOutputAS(channel, output, [ramprate, noupdate])
 	endif
 	
 	if(paramisdefault(ramprate))
-		ramprate = 1000  // (~mV/s) 
+		ramprate = as_ramprate  // (~mV/s) 
 	endif
 	
 	step = ramprate*sleeptime
@@ -252,13 +254,14 @@ function UpdateMultipleAS([action, ramprate])
 	wave/t as_oldvalue=as_oldvalue
 	variable output,i
 	variable check = nan
+	nvar as_ramprate
 
 	if(ParamIsDefault(action))
 		action="ramp"
 	endif
 	
 	if(paramisdefault(ramprate))
-		ramprate = 1000  
+		ramprate = as_ramprate  
 	endif
 
 	for(i=0;i<4;i+=1)
@@ -286,10 +289,11 @@ function RampMultipleAS(channels, setpoint, nChannels, [ramprate])
 	variable setpoint, ramprate, nChannels
 	string channels
 	variable i, channel
+	nvar as_ramprate
 	wave /t as_valsstr = as_valsstr
 
 	if(paramisdefault(ramprate))
-		ramprate = 1000    // (mV/s)
+		ramprate = as_ramprate    // (mV/s)
 	endif
 	
 	for(i=0;i<nChannels;i+=1)

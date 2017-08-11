@@ -25,6 +25,7 @@ function InitAllGPIB([gpib_board])
 	
 	NI4882 ibrsc={board,1} // Configure the GPIB board as system controller
 	NI4882 ibsic={board} // Clear interface
+	NI4882 ibsre={board, 1} // set controller to remote-enable
 	
 	NI4882 FindLstn={gpib_index,adlist,aclist,limitparam} // Find all connected GPIB instruments on board 0. 
 	numdevices = v_ibcnt-1

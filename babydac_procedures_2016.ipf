@@ -287,60 +287,122 @@ function GetBoardChannel(channel)
 end
 
 //// UTILITY ////
-//
-//function ResetStartupVoltageBD(board_number)
-//	// sometimes you will find that when a board is powered on 
-//	// all of the output voltages are -5V or -10V
-//	// this command will reset that default so the board powers on at 0V
-//	variable board_number
-//	variable setpoint
-//
-//	ClearBufferBD()
-//
-//	// set all channels to 0V
-//	setpoint = GetSetpointBD(0.0) // DAC setpoint as an integer
-//	print setpoint
-//	
-//	// build output 0V command
-//	variable id_byte, alt_id_byte, command_byte, parity_byte
-//	variable data_byte_1, data_byte_2, data_byte_3
-//	
-//	id_byte = 0xc0+board_number // 11{gggggg}, g = board number
-//	alt_id_byte = 0x40+board_number // id_byte with MSB = 0
-//	
-//	data_byte_1 = (setpoint & 0xfc000)/0x4000 // 00{aaaaaa}, a = most significant 6 bits
-//	data_byte_2 = (setpoint & 0x3f80)/0x80 // 0{bbbbbbb}, b = middle 7 bits
-//	data_byte_3 = (setpoint & 0x7f) // 0{ccccccc}, c = least significant 7 bits
-//
-//	variable i = 0
-//	for(i=0;i<4;i+=1)
-//		command_byte = 0x40+i // 010000{hh}, h = channel number
-//		parity_byte=alt_id_byte%^command_byte%^data_byte_1%^data_byte_2%^data_byte_3 // XOR all previous bytes
-//		make/o bd_cmd_wave={id_byte, command_byte, data_byte_1, data_byte_2, data_byte_3, parity_byte, 0}
-//	
-//		// send command to DAC
-//		SetSerialPort()
-//		execute "VDTWriteBinaryWave2 /O=10 bd_cmd_wave"
-//	
-//		// read the response from the buffer
-//		ReadBytesBD(7)
-//		sleep /s 0.3
-//	endfor
-//
-//	// backup settings to non-volatile memory
-//	command_byte = 0x8 // 00001000
-//	parity_byte=alt_id_byte%^command_byte // XOR all previous bytes
-//	make/o bd_cmd_wave={id_byte, command_byte, parity_byte, 0}
-//	
-//	// send command to DAC
-//	SetSerialPort()
-//	execute "VDTWriteBinaryWave2 /O=10 bd_cmd_wave"
-//	
-//	// read the response from the buffer
-//	print ReadBytesBD(4) 
-//	
-//	sleep /s 0.3
-//end
+
+function MakeAllZeroBD()
+	// ramp all gates to +/-10mV
+	
+	wave bd_boardnumbers, bd_range_high
+	variable numCh = 0, i=0, idxBrd
+	
+	do
+		if(numtype(bd_boardnumbers[i])==0)
+			numCh += 4
+		endif
+		i += 1
+	while(i<numpnts(bd_boardnumbers))
+	
+	print "Set all channels to +/-10mV."
+	
+	for(i=0;i<numCh;i+=1)
+		idxBrd =floor(i/4)
+		if(bd_range_high[idxBrd] > 0)
+			RampOutputBD(i, 10.0)
+		else
+			RampOutputBD(i, -10.0)
+		endif
+	endfor
+	
+	sc_sleep(2.0)
+	print "Set all channels back to 0mV."
+	
+	for(i=0;i<numCh;i+=1)
+		RampOutputBD(i, 0.0)
+	endfor
+	
+end
+
+function ResetStartupVoltageBD(board_number, range)
+	// sometimes you will find that when a board is powered on 
+	// all of the output voltages are non-zero
+	// this command will reset that default so the board powers on at 0V
+	
+	// ranges: 
+	//     1010 = -10 to +10
+	//     55 = -5 to +5
+	//     05 = 0 to +5
+	//     50 = -5 to 0
+	//     010 = 0 to +10
+	//     100 = -10 to 0
+	
+	variable board_number
+	string range
+	variable setpoint, frac
+
+	ClearBufferBD()
+
+	strswitch(range)
+		case "1010": // -10 to +10
+			frac = (0.0-(-10000))/20000
+			break
+		case "010":  // 0 to +10
+			frac = (0.0-(0))/10000
+			break
+ 		case "100":  // -10 to 0
+			frac = (0.0-(-10000))/10000
+			break
+ 		case "55":   // -5 to +5
+			frac = (0.0-(-5000))/10000
+			break
+ 		case "05":   // 0 to +5
+			frac = (0.0-(0))/5000
+			break
+ 		case "50":   // -5 to 0
+			frac = (0.0-(-5000))/5000
+			break
+	endswitch
+			
+	setpoint = round((2^20-1)*frac)
+	
+	// build output 0V command
+	variable id_byte, alt_id_byte, command_byte, parity_byte
+	variable data_byte_1, data_byte_2, data_byte_3
+	
+	id_byte = 0xc0+board_number // 11{gggggg}, g = board number
+	alt_id_byte = 0x40+board_number // id_byte with MSB = 0
+	
+	data_byte_1 = (setpoint & 0xfc000)/0x4000 // 00{aaaaaa}, a = most significant 6 bits
+	data_byte_2 = (setpoint & 0x3f80)/0x80 // 0{bbbbbbb}, b = middle 7 bits
+	data_byte_3 = (setpoint & 0x7f) // 0{ccccccc}, c = least significant 7 bits
+
+	variable i = 0
+	for(i=0;i<4;i+=1)
+		command_byte = 0x40+i // 010000{hh}, h = channel number
+		parity_byte=alt_id_byte%^command_byte%^data_byte_1%^data_byte_2%^data_byte_3 // XOR all previous bytes
+		make/o bd_cmd_wave={id_byte, command_byte, data_byte_1, data_byte_2, data_byte_3, parity_byte, 0}
+	
+		// send command to DAC
+		SetSerialPort()
+		execute "VDTWriteBinaryWave2 /O=10 bd_cmd_wave"
+	
+		// read the response from the buffer
+		ReadBytesBD(7)
+		sleep /s 0.3
+	endfor
+
+	// backup settings to non-volatile memory
+	command_byte = 0x8 // 00001000
+	parity_byte=alt_id_byte%^command_byte // XOR all previous bytes
+	make/o bd_cmd_wave={id_byte, command_byte, parity_byte, 0}
+	
+	// send command to DAC
+	SetSerialPort()
+	execute "VDTWriteBinaryWave2 /O=10 bd_cmd_wave"
+	
+	// read the response from the buffer
+	print ReadBytesBD(4) 
+	
+	sleep /s 0.3
+end
 
 //// SET and RAMP outputs ////
 	
@@ -774,6 +836,7 @@ function/s GetDACStatus()
 end
 
 //// testing ////
+
 function testBabyDACramprate(start, fin, channels, ramprate, noupdate)
 	string channels
 	variable start, fin, ramprate, noupdate

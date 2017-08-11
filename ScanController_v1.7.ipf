@@ -1239,7 +1239,8 @@ function sc_testreadtime(numpts, delay) //Units: s
 	while (i<numpts)
 	ttotal = datetime-tstart
 	printf "each sc_sleep(...) + RecordValues(...) call takes ~%.1fms \n", ttotal/numpts*1000
-	// no point in SaveWaves since the program will never reach this point
+	
+	sc_controlwindows("") // kill sweep control windows
 end
 
 function sc_createconfig()
