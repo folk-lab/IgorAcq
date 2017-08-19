@@ -306,26 +306,52 @@ function /S SaveInitialWaveComments(datname, [title, x_label, y_label, z_label, 
 	//return "\r"+comments
 end
 
-function getSlackNotice([message, username, channel]):
+function /S getSlackNotice([message, username, channel, botname])
 	// this function will send a notification to Slack
-	string message, username, channel
+	// message = string to include in Slack post
+	// username = slack user to tag in post e.g. "@nik.hartman your measurement is done."
+	// channel = slack channel to post the message in, defaults to "#measurement_webhook"
+	// botname = slack user that will post the message, defaults to @jarvis
+	string username, channel, message, botname
+	nvar filenum, sc_scanstarttime
+	svar slack_url
+	string output="", buffer="", payload=""
 	
-	// create header with corresponding .ibw name and date
-	string output="", buffer="" 
+	if (!paramisdefault(username))
+		output += "@"+username+"\r"
+	endif
 	
+	if (!paramisdefault(message))
+		output += RemoveTrailingWhitespace(message) + "\r"
+	endif
+		
 	// date/time info
-	sprintf buffer, "dat%d completed:  %s %s \r", filenum, Secs2Date(DateTime, 1), Secs2Time(DateTime, 3);
-	output+=buffer 
-	sprintf buffer, "time elapsed:  %.2f s \r", datetime-sc_scanstarttime; 
-	output+=buffer
+	sprintf buffer, "dat%d completed:  %s %s \r", filenum, Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); output+=buffer 
+	sprintf buffer, "time elapsed:  %.2f s \r", datetime-sc_scanstarttime; output+=buffer
 	
-	// scan control info
-	sprintf buffer, "raw data waves:  %s \r", rawWaveStrs(); output+=buffer // path to data 
-	sprintf buffer, "calculated data waves:  %s \r", calcWaveStrs(); output+=buffer // path to data
-
-	print(buffer)
+	// build payload
+	sprintf buffer, "{\"text\":\"%s\"", output; payload+=buffer
+	if (!paramisdefault(botname))
+		sprintf buffer, ", \"username\":\"%s\"", botname; payload+=buffer
+	endif
+	if (!paramisdefault(channel))
+		sprintf buffer, ", \"channel\":\"@%s\"", channel; payload+=buffer
+	endif
 	
+	payload += "}"
+	
+	URLRequest /DSTR=payload url=slack_url, method=post
+	if (V_flag == 0)    // No error
+        if (V_responseCode != 200)  // 200 is the HTTP OK code
+            print "Slack post failed!"
+        endif
+    else
+        print "HTTP connection error. Slack post not attempted."
+    endif
 end
+
+
+
 
 // these should live in the procedures for the instrument
 // that way not all of the procedures need to be loaded for this WINF thing to compile correctly

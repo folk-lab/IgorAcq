@@ -51,6 +51,7 @@ end
 
 function InitScanController()
 	string filelist = ""
+	string /g slack_url =  "https://hooks.slack.com/services/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"
 	
 	GetFileFolderInfo/z/q/p=config
 	
