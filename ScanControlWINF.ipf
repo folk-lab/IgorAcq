@@ -306,19 +306,25 @@ function /S SaveInitialWaveComments(datname, [title, x_label, y_label, z_label, 
 	//return "\r"+comments
 end
 
-function AddWaveComments(datname, fnum, [msg, title, x_label, y_label, z_label, x_multiplier, y_multiplier, z_multiplier, display_thumbnail])
-	variable  x_multiplier, y_multiplier, z_multiplier, fnum
-	string datname, msg, title, x_label, y_label, z_label, display_thumbnail
+function getSlackNotice([message, username, channel]):
+	// this function will send a notification to Slack
+	string message, username, channel
 	
-	// look for newest version of winf
+	// create header with corresponding .ibw name and date
+	string output="", buffer="" 
 	
+	// date/time info
+	sprintf buffer, "dat%d completed:  %s %s \r", filenum, Secs2Date(DateTime, 1), Secs2Time(DateTime, 3);
+	output+=buffer 
+	sprintf buffer, "time elapsed:  %.2f s \r", datetime-sc_scanstarttime; 
+	output+=buffer
 	
-	// find and replace any plot parameters
-	
-	
-	// add msg at end of file
-	
+	// scan control info
+	sprintf buffer, "raw data waves:  %s \r", rawWaveStrs(); output+=buffer // path to data 
+	sprintf buffer, "calculated data waves:  %s \r", calcWaveStrs(); output+=buffer // path to data
 
+	print(buffer)
+	
 end
 
 // these should live in the procedures for the instrument

@@ -308,7 +308,6 @@ End
 
 function/s GetSRSStatus(srs)
 	variable srs
-	nvar pad
 	string cmd
 	string winfcomments
 	string  buffer
