@@ -318,10 +318,10 @@ function /S getSlackNotice([message, username, channel, botname])
 	string output="", buffer="", payload=""
 	
 	if (!paramisdefault(username))
-		output += "@"+username+"\r"
+		output += "<@"+username+">\r"
 	endif
 	
-	if (!paramisdefault(message))
+	if (!paramisdefault(message) && strlen(message)>0)
 		output += RemoveTrailingWhitespace(message) + "\r"
 	endif
 		
