@@ -306,20 +306,92 @@ function /S SaveInitialWaveComments(datname, [title, x_label, y_label, z_label, 
 	//return "\r"+comments
 end
 
-function AddWaveComments(datname, fnum, [msg, title, x_label, y_label, z_label, x_multiplier, y_multiplier, z_multiplier, display_thumbnail])
-	variable  x_multiplier, y_multiplier, z_multiplier, fnum
-	string datname, msg, title, x_label, y_label, z_label, display_thumbnail
+function getSlackNotice(username, [message, channel, botname, emoji, min_time])
+	// this function will send a notification to Slack
+	// username = your slack username
 	
-	// look for newest version of winf
+	// message = string to include in Slack message
+	// channel = slack channel to post the message in
+	//            if no channel is provided a DM will be sent to username
+	// botname = slack user that will post the message, defaults to @qdotbot
+	// emoji = emoji that will be used as the bots avatar, defaults to :the_horns:
+	// min_time = if time elapsed for this current scan is less than min_time no notification will be sent
+	//					defaults to 60 seconds
+	string username, channel, message, botname, emoji
+	variable min_time
+	nvar filenum, sc_scanstarttime, sc_abortsweep
+	svar slack_url
+	string txt="", buffer="", payload=""
+	
+	//// check if I need a notification ////
+	variable t_elapsed = datetime-sc_scanstarttime;
+	if (paramisdefault(min_time))
+		min_time = 60.0 // seconds
+	endif
+	
+	if(t_elapsed < min_time)
+		return 0 // no notification if min_time is not exceeded
+	endif
+	
+	if(sc_abortsweep)
+		return 0 // no notification if sweep was aborted by the user
+	endif
+	//// end notification checks //// 
 	
 	
-	// find and replace any plot parameters
+	//// build notification text ////
+	if (!paramisdefault(channel)) 
+		// message will be sent to public channel
+		// user who sent it will be mentioned at the beginning of the message
+		txt += "<@"+username+">\r" 
+	endif
+	
+	if (!paramisdefault(message) && strlen(message)>0)
+		txt += RemoveTrailingWhitespace(message) + "\r"
+	endif
+		
+	sprintf buffer, "dat%d completed:  %s %s \r", filenum, Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); txt+=buffer 
+	sprintf buffer, "time elapsed:  %.2f s \r", datetime-sc_scanstarttime; txt+=buffer
+	//// end build txt ////
 	
 	
-	// add msg at end of file
+	//// build payload ////
+	sprintf buffer, "{\"text\": \"%s\"", txt; payload+=buffer // 
 	
-
+	if (paramisdefault(botname))
+		botname = "qdotbot"
+	endif	
+	sprintf buffer, ", \"username\": \"%s\"", botname; payload+=buffer
+	
+	if (paramisdefault(channel))
+		sprintf buffer, ", \"channel\": \"@%s\"", username; payload+=buffer
+	else
+		sprintf buffer, ", \"channel\": \"#%s\"", channel; payload+=buffer
+	endif
+	
+	if (paramisdefault(emoji))
+		emoji = ":the_horns:"
+	endif	
+	sprintf buffer, ", \"icon_emoji\": \"%s\"", emoji; payload+=buffer // 
+	
+	payload += "}"
+	//// end payload ////
+	
+	URLRequest /DSTR=payload url=slack_url, method=post
+	if (V_flag == 0)    // No error
+        if (V_responseCode != 200)  // 200 is the HTTP OK code
+            print "Slack post failed!"
+            return 0
+        else
+            return 1
+        endif
+    else
+        print "HTTP connection error. Slack post not attempted."
+        return 0
+    endif
 end
+
+
 
 // these should live in the procedures for the instrument
 // that way not all of the procedures need to be loaded for this WINF thing to compile correctly

@@ -15,14 +15,16 @@ function sc_checksweepstate()
 		if(sc_abortsweep)
 			// If the Abort button is pressed during the scan, save existing data and stop the scan.
 			SaveWaves(msg="The scan was aborted during the execution.")
-			abort "Measurement aborted by user"
 			dowindow /k SweepControl
+			sc_abortsweep=0
+			abort "Measurement aborted by user"
 		elseif(sc_pause)
 			// Pause sweep if button is pressed
 			do
 				if(sc_abortsweep)
 					SaveWaves(msg="The scan was aborted during the execution.")
 					dowindow /k SweepControl
+					sc_abortsweep=0
 					abort "Measurement aborted by user"
 				endif
 			while(sc_pause)
@@ -49,6 +51,7 @@ end
 
 function InitScanController()
 	string filelist = ""
+	string /g slack_url =  "https://hooks.slack.com/services/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"
 	
 	GetFileFolderInfo/z/q/p=config
 	
@@ -92,8 +95,6 @@ function InitScanController()
 			printf "Current FileNum is %d\n", filenum
 		endif
 	endif
-	// variable to keep track of abort operations
-	variable /g sc_AbortSave = 0
 	
 	sc_rebuildwindow()
 end
@@ -1017,17 +1018,17 @@ function RecordValues(i, j, [scandirection, readvstime, timeavg, timeavg_delay, 
 			script = ReplaceString("[i]", script, "["+num2istr(innerindex)+"]")
 			execute(sc_CalcWaveNames[ii] + "[" + num2istr(innerindex) + "]=" + script)
 			
-			if (sc_is2d && fillnan == 0)				
+			if (sc_is2d)				
 				// if this is the last point in a row on a 2d scan, save the row in the 2d wave
 				if ((innerindex == sc_numptsx-1 && scandirection == 1) || (innerindex == 0 && scandirection == -1))
 					wave wref1d = $sc_CalcWaveNames[ii]
 					wave wref2d = $sc_CalcWaveNames[ii] + "2d"
 					wref2d[][outerindex] = wref1d[p]
 				endif
-			elseif(sc_is2d && fillnan != 0)
-				// fill every point with NaN as you go
-				wave wref2d = $sc_CalcWaveNames[ii] + "2d"
-				wref2d[innerindex][outerindex] = nan							
+//			elseif(sc_is2d && fillnan != 0)
+//				// fill every point with NaN as you go
+//				wave wref2d = $sc_CalcWaveNames[ii] + "2d"
+//				wref2d[innerindex][outerindex] = nan							
 			endif
 		endif
 		ii+=1
@@ -1226,6 +1227,22 @@ function sc_readvstime(i, j, delay, timeout)
 	if ((i == sc_numptsx-1 && sc_scandirection == 1) || (i == 0 && sc_scandirection == -1))
 		SaveTmpWaves() // save tmp_[.....]2d at the end of each x sweep
 	endif
+end
+
+function sc_testreadtime(numpts, delay) //Units: s
+	variable numpts, delay
+
+	InitializeWaves(0, numpts, numpts, x_label="index")
+	variable i=0, ttotal = 0, tstart = datetime
+	do
+		sc_sleep(delay)
+		RecordValues(i, 0, fillnan=0) 
+		i+=1
+	while (i<numpts)
+	ttotal = datetime-tstart
+	printf "each sc_sleep(...) + RecordValues(...) call takes ~%.1fms \n", ttotal/numpts*1000
+	
+	sc_controlwindows("") // kill sweep control windows
 end
 
 function sc_createconfig()

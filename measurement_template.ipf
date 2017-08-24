@@ -1,12 +1,5 @@
 #pragma rtGlobals=1		// Use modern global access method.
 
-// These scripts are all based around ScanController.ipf
-// Nik -- Dec 2016
-
-// do not import this into your Igor experiment
-// make a copy and edit from there
-// if you have a good addition -- submit changes to this template through GitHub
-
 ///////////////////////
 /////    SETUP    /////
 ///////////////////////
@@ -32,20 +25,37 @@ macro initexp()
 	// COM ports must be set here
 	// this ensures that the code works on all measurement setup
 	
-	// string /g ips_comport = "COM3" // set magnet COM port
-	// initmagnet()
+	string /g ips_comport = "COM3" // set magnet COM port
+	initmagnet()
 	
-	// string/g bd_comport = "COM5" // set babydac COM port
-	// initbabydacs(5, b2=6, range=2)
+	string/g bd_comport = "COM5" // set babydac COM port
+	initbabydacs()
 	
-	// small magnet calibration
-	// assuming the magnet is using a kepco current source
-	// in voltage control mode
+	string /g as_comport = "COM9"
+	InitAnalogShield()
 	
-	// variable /g kepco_cal = 4 // Amps/Volt
-	// variable /g magnet_cal = 85.86 //Amps/Tesla
-	// variable /g power_resistor = 0.0131 //Ohms
+//	InitFridge()
 	
+	//// Small magnet setup with Analog Shield as a controller ////
+//	variable /g sm_mag_channel = 0
+//	variable /g kepco_cal = 4 // Amps/Volt
+//	variable /g sm_mag_offset = -6.9719 // mV
+//	variable /g sm_mag_cal = 85.86 //A/T
+//	variable /g pwr_resistor = 0.2/3 //Ohms
+	
+end
+
+function /S getNotification()
+	// this function wraps getSlackNotice
+	// so you it is a little easier to work with and doesn't require a bunch of gobal variables
+	svar slack_msg
+	variable result
+	result = getSlackNotice("slack.user", message=slack_msg, botname="botbotbot", emoji=":the_horns:", min_time=300.0)
+	if(result==1)
+		return "notified on Slack"
+	else
+		return ""
+	endif
 end
 
 ///////////////////////////////
@@ -168,21 +178,40 @@ function getADC52()
 	return ReadADCBD(1, 5)/10.0
 end
 
+// Analog Shield //
+
+function getASch0()
+	// get ADC reading from channel 0-1
+	return ReadADCsingleAS(0, 96)
+end
+
+function getASch2()
+	// get ADC reading from channel 2-3
+	return ReadADCsingleAS(2, 96)
+end
+
 // K2400 //
 
 function getCurrentK2400()
-	// returns current in uA
-	nvar k2400
-	return GetK2400Current(k2400)*1e3 
+	nvar k240014
+	return GetK2400Current(k240014)
+end
+
+// HP 34401A //
+
+function getDMMval()
+	nvar dmm23
+	return ReadDMM(dmm23)
 end
 
 // SMALL MAGNET //
 
-//function getSmallField()
-//    nvar magnet_cal, power_resistor
-//   // get the value of the small field magnet in mT
-//    return (((ReadADCBD(1, 6))/power_resistor)/magnet_cal)  // measured offset
-//end
+function getSmField() 
+    // get the value of the small field magnet in mT
+    nvar pwr_resistor, kepco_cal, sm_mag_offset, sm_mag_cal
+   
+    return (-1000.0/0.953)*((ReadADCsingleAS(0, 64)-sm_mag_offset)*0.001*kepco_cal/pwr_resistor)/sm_mag_cal // Amps
+end
 
 // FRIDGE //
 
@@ -202,20 +231,6 @@ end
 //	return GetTemp("50k")
 //end
 
-// TIME //
-
-function getUnixTime()
-	return DateTime - date2secs(1970,1,1) - date2secs(-1,-1,-1)
-end
-
-// RANDOM //
-
-function getRandom()
-	// generates a random number in range [-lim, lim]
-	variable lim = 1
-	return enoise(lim)
-end
-
 ////////////////////////////
 //// MEAUREMENT SCRIPTS ////
 ////////////////////////////
@@ -227,7 +242,7 @@ end
 function ReadvsTimeForever(delay) //Units: s
 	variable delay
 	string comments
-	variable i = 0
+	variable  i
 
 	InitializeWaves(0, 1, 1, x_label="time (s)")
 	do
@@ -238,28 +253,22 @@ function ReadvsTimeForever(delay) //Units: s
 	// no point in SaveWaves since the program will never reach this point
 end
 
-function ReadvsTimeOut(delay, timeout, [comments]) //Units: s
-	// read versus time until condition is met or timeout is reached
-	// operator is "<" or ">", meaning end on "checkwave[i] < value" or "checkwave[i] > value" 
-	
+function ReadVsTimeOut(delay, timeout, [comments]) // Units: s
 	variable delay, timeout
-	string  comments
-	variable i = 0
-
-	if(paramisdefault(comments))
+	string comments
+	variable i=0
+	
+	if (paramisdefault(comments))
 		comments=""
 	endif
 
-	InitializeWaves(0, 1, 1, x_label="time (s)")
-	nvar sc_scanstarttime
+	InitializeWaves(0, 1, 1, x_label="time (s)")    
+	nvar sc_scanstarttime // Global variable set when InitializeWaves is called
 	do
 		sc_sleep(delay)
 		RecordValues(i, 0,readvstime=1) 
-		if((datetime-sc_scanstarttime)>timeout)
-			break
-		endif
 		i+=1
-	while (1==1)
+	while (datetime-sc_scanstarttime < timeout)
 	SaveWaves(msg=comments)
 end
 
@@ -269,7 +278,7 @@ function ReadvsTimeUntil(delay, checkwave, value, timeout, [comments, operator])
 	
 	variable delay, value, timeout
 	string checkwave, comments, operator
-	variable i = 0
+	variable i
 
 	if(paramisdefault(comments))
 		comments=""
@@ -329,7 +338,7 @@ function ScanBabyDAC(start, fin, channels, numpts, delay, ramprate, [offsetx, co
 	setpoint = start-offsetx
 	RampMultipleBD(channels, setpoint, nChannels, ramprate=ramprate)
 		
-	sleep /S 1.0
+	sc_sleep(1.0)
 	InitializeWaves(start, fin, numpts, x_label=x_label)
 	do
 		setpoint = start-offsetx + (i*(fin-start)/(numpts-1))
@@ -341,11 +350,11 @@ function ScanBabyDAC(start, fin, channels, numpts, delay, ramprate, [offsetx, co
 	SaveWaves(msg=comments)
 end
 
-function ScanBabyDACUntil(start, fin, channels, numpts, delay, ramprate, checkwave, value, [operator, comments]) //Units: mV
+function ScanBabyDACUntil(start, fin, channels, numpts, delay, ramprate, checkwave, value, [operator, comments, scansave]) //Units: mV
 	// sweep one or more babyDAC channels until checkwave < (or >) value
 	// channels should be a comma-separated string ex: "0, 4, 5"
 	// operator is "<" or ">", meaning end on "checkwave[i] < value" or "checkwave[i] > value" 
-	variable start, fin, numpts, delay, ramprate, value
+	variable start, fin, numpts, delay, ramprate, value, scansave
 	string channels, operator, checkwave, comments
 	string x_label
 	variable i=0, j=0, setpoint, nChannels
@@ -357,6 +366,10 @@ function ScanBabyDACUntil(start, fin, channels, numpts, delay, ramprate, checkwa
 	
 	if(paramisdefault(operator))
 		operator = "<"
+	endif
+
+	if(paramisdefault(scansave))
+		scansave=1
 	endif
 		
 	variable a = 0
@@ -374,8 +387,9 @@ function ScanBabyDACUntil(start, fin, channels, numpts, delay, ramprate, checkwa
 	setpoint = start
 	RampMultipleBD(channels, setpoint, nChannels, ramprate=ramprate)
 		
-	sleep /S 1.0
 	InitializeWaves(start, fin, numpts, x_label=x_label)
+	sc_sleep(1.0)
+	
 	wave w = $checkwave
 	do
 		setpoint = start + (i*(fin-start)/(numpts-1))
@@ -383,12 +397,15 @@ function ScanBabyDACUntil(start, fin, channels, numpts, delay, ramprate, checkwa
 		sc_sleep(delay)
 		RecordValues(i, 0)
 		if( a*(w[i] - value) < 0 )
-			print "Exit on checkwave"
 			break
 		endif
 		i+=1	
 	while (i<numpts)
-	SaveWaves(msg=comments)
+	
+	if(scansave==1)
+		SaveWaves(msg=comments)
+	endif
+	
 end
 
 function ScanBabyDAC2D(startx, finx, channelsx, numptsx, delayx, rampratex, starty, finy, channelsy, numptsy, delayy, rampratey, [offsetx, comments]) //Units: mV
@@ -465,15 +482,14 @@ function ScanBabyDACRepeat(startx, finx, channelsx, numptsx, delayx, rampratex, 
 	sprintf x_label, "BD %s (mV)", channelsx
 	y_label = "Sweep Num"
 	
+	// intialize waves
+	variable starty = 0, finy = numptsy, scandirection=0
+	InitializeWaves(startx, finx, numptsx, starty=starty, finy=finy, numptsy=numptsy, x_label=x_label, y_label=y_label)
+	
 	// set starting values
 	setpointx = startx-offsetx
 	RampMultipleBD(channelsx, setpointx, nChannelsx, ramprate=rampratex)
 	sc_sleep(2.0)
-	
-	// intialize waves
-	variable starty = 0, finy = numptsy, scandirection=0
-
-	InitializeWaves(startx, finx, numptsx, starty=starty, finy=finy, numptsy=numptsy, x_label=x_label, y_label=y_label)
 	
 	do
 		if(mod(i,2)==0)
@@ -488,7 +504,6 @@ function ScanBabyDACRepeat(startx, finx, channelsx, numptsx, delayx, rampratex, 
 		RampMultipleBD(channelsx, setpointx, nChannelsx, ramprate=rampratex)
 		sc_sleep(delayy) // wait at start point
 		do
-			// switch directions with if statement?
 			setpointx = startx - offsetx + (j*(finx-startx)/(numptsx-1))
 			RampMultipleBD(channelsx, setpointx, nChannelsx, ramprate=rampratex)
 			sc_sleep(delayx)
@@ -553,6 +568,72 @@ function ScanBabyDACRepeatOneWay(startx, finx, channelsx, numptsx, delayx, rampr
 	SaveWaves(msg=comments)
 end
 
+function cutFunc(valx, valy)
+	// this is a dummy function
+	// do not remove it
+	// it acts as a template for the function you pass to ScanBabyDAC2Dcut
+	// your function takes valx, valy
+	// returns 1 if a measureent should be made
+	// returns 0 to fill that point with NaN
+	variable valx, valy
+end
+
+function ScanBabyDAC2Dcut(startx, finx, channelsx, numptsx, delayx, rampratex, starty, finy, channelsy, numptsy, delayy, rampratey, func, [offsetx, comments]) //Units: mV
+	// func should return 1 when a point is to be read
+	// func returns 0 when a point is to be skipped and filled with NaN
+	variable startx, finx, numptsx, delayx, rampratex, starty, finy, numptsy, delayy, rampratey, offsetx
+	string channelsx, channelsy, func, comments
+	variable i=0, j=0, setpointx, setpointy, nChannelsx, nChannelsy
+	string x_label, y_label
+	
+	FUNCREF cutFunc fcheck = $func
+	
+	nChannelsx = ItemsInList(channelsx, ",")
+	nChannelsy = ItemsInList(channelsy, ",")
+	
+	if(paramisdefault(comments))
+		comments=""
+	endif
+	
+	if( ParamIsDefault(offsetx))
+		offsetx=0
+	endif
+
+	sprintf x_label, "BD %s (mV)", channelsx
+	sprintf y_label, "BD %s (mV)", channelsy
+	
+	// set starting values
+	setpointx = startx-offsetx
+	setpointy = starty
+	
+	// initialize waves
+	InitializeWaves(startx, finx, numptsx, starty=starty, finy=finy, numptsy=numptsy, x_label=x_label, y_label=y_label)
+	
+	
+	// main loop
+	do
+		setpointx = startx - offsetx
+		setpointy = starty + (i*(finy-starty)/(numptsy-1))
+		RampMultipleBD(channelsx, setpointx, nChannelsx, ramprate=rampratex, noupdate=0)
+		RampMultipleBD(channelsy, setpointy, nChannelsy, ramprate=rampratey, noupdate=0)
+		sc_sleep(delayy)
+		j=0
+		do
+			setpointx = startx - offsetx + (j*(finx-startx)/(numptsx-1))
+			if (fcheck(setpointx, setpointy) == 0)
+				RecordValues(i, j, fillnan=1)
+			else
+				RampMultipleBD(channelsx, setpointx, nChannelsx, ramprate=rampratex, noupdate=1)
+				sc_sleep(delayx)
+				RecordValues(i, j)
+			endif
+			j+=1
+		while (j<numptsx)
+		i+=1
+	while (i<numptsy)
+	SaveWaves(msg=comments)
+end
+
 function ScanBabyDACMultiRange(startvalues,finvalues,channels,numpts,delay,ramprate, [comments]) //Units: mV
 	// This function will sweep multiple dac channels in seperate defined ranges.
 	// startvalues, finvalues and channels must be comma seperated lists.
@@ -596,75 +677,12 @@ function ScanBabyDACMultiRange(startvalues,finvalues,channels,numpts,delay,rampr
 	SaveWaves(msg=comments)
 end
 
-function ScanBabyDAC2DSlice(startx, finx, channelsx, numpts_slice, delayx, rampratex, starty, finy, channelsy, numptsy, delayy, rampratey,slicewidthx, [comments]) //Units: mV
-	// This function will scan a slice in a 2D plane. channelsx will run on the inner loop.
-	variable startx, finx, numpts_slice, delayx, rampratex, starty, finy, numptsy, delayy, rampratey, slicewidthx
-	string channelsx, channelsy, comments
-	variable i=0, j=0, setpointx, setpointy, nChannelsx, nChannelsy, slope, stepsizey, stepsizex, startslice, scandirection=0,omega, numptsx,endslice
-	string x_label, y_label
-	
-	nChannelsx = ItemsInList(channelsx, ",")
-	nChannelsy = ItemsInList(channelsy, ",")
-	
-	if(paramisdefault(comments))
-		comments=""
-	endif
-	
-	if(abs(finx-startx)-slicewidthx<0)
-		abort("Slice size can't be lager than the difference in x coordinates.")
-	endif
-	sprintf x_label, "BD %s (mV)", channelsx
-	sprintf y_label, "BD %s (mV)", channelsy
-	
-	// set starting values
-	setpointx = startx
-	setpointy = starty
-	RampMultipleBD(channelsx, setpointx, nChannelsx, ramprate=rampratex)
-	RampMultipleBD(channelsy, setpointy, nChannelsy, ramprate=rampratey)
-	
-	omega = abs(finx-startx)/slicewidthx
-	numptsx = omega*numpts_slice
-	
-	// initialize waves
-	InitializeWaves(startx, finx, numptsx, starty=starty, finy=finy, numptsy=numptsy, x_label=x_label, y_label=y_label)
-	
-	
-	slope = (finy - starty)/(finx-(startx + sign(finx-startx)*slicewidthx))
-	stepsizey = (finy-starty)/(numptsy-1)
-	stepsizex = stepsizey/slope
-
-	// main loop
-	do
-		startslice = startx + i*stepsizex
-		endslice = startslice-slicewidthx
-		setpointy = starty + (i*(finy-starty)/(numptsy-1))
-		RampMultipleBD(channelsx, startslice, nChannelsx, ramprate=rampratex)
-		RampMultipleBD(channelsy, setpointy, nChannelsy, ramprate=rampratey)
-		sc_sleep(delayy)
-		j=0
-		do
-			setpointx = startx + (j*(finx-startx)/(numptsx-1))
-			if(startslice < setpointx || setpointx < endslice)
-				RecordValues(i, j,fillnan=1)
-			else
-				RampMultipleBD(channelsx, setpointx, nChannelsx, ramprate=rampratex)
-				sc_sleep(delayx)
-				RecordValues(i, j)
-			endif
-			j+=1
-		while (j<numptsx)
-		i+=1
-	while (i<numptsy)
-	SaveWaves(msg=comments)
-end
-
 /////////////////////////////
 //       Keithley 2400     //
 /////////////////////////////
 
-function ScanK2400(device, start, fin, numpts, delay, ramprate, [offsetx, compl, comments]) //Units: mV
+function ScanK2400(device, start, fin, numpts, delay, ramprate, [offsetx, compl, comments]) //Units: mV, nA (compliance)
 	// sweep K2400 output voltage
-	// [start, fin] = mV, [ramprate] = mV/s, [compl = nA
 	variable device, start, fin, numpts, delay, ramprate, offsetx, compl
 	string comments
 	string x_label
@@ -675,7 +693,7 @@ function ScanK2400(device, start, fin, numpts, delay, ramprate, [offsetx, compl,
 	endif
 	
 	if( ParamIsDefault(compl))
-		compl = 20e-9
+		compl = 20 // nA
 	endif
 
 	if(paramisdefault(comments))
@@ -685,15 +703,16 @@ function ScanK2400(device, start, fin, numpts, delay, ramprate, [offsetx, compl,
 	sprintf x_label, "K2400 (mV)"
 
 	// set starting values
-	SetK2400Compl("curr",compl,device)
+	SetK2400Compl("curr", compl, device)
+	
 	setpoint = start-offsetx
-	RampK2400Voltage(device, setpoint, ramprate=ramprate)
+	RampK2400Voltage(setpoint/1000, device, ramprate = ramprate)
 		
 	sc_sleep(1.0)
 	InitializeWaves(start, fin, numpts, x_label=x_label)
 	do
 		setpoint = start-offsetx + (i*(fin-start)/(numpts-1))
-		RampK2400Voltage(device, setpoint, ramprate=ramprate)
+		RampK2400Voltage(setpoint/1000, device, ramprate = ramprate)
 		sc_sleep(delay)
 		RecordValues(i, 0) 
 		i+=1
@@ -714,17 +733,21 @@ function ScanIPS(start, fin, numpts, delay, ramprate, [comments]) //Units: mT
 		comments=""
 	endif
 	
+	InitializeWaves(start, fin, numpts, x_label="Field (mT)")
+	
 	SetSweepRate(ramprate) // mT/min
 	SetFieldWait(start)
 	sc_sleep(5.0) // wait 5 seconds at start point
-	InitializeWaves(start, fin, numpts, x_label="Field (mT)")
+	
 	do
 		SetFieldWait(start + (i*(fin-start)/(numpts-1)))
 		sc_sleep(delay)
 		RecordValues(i, 0) 
 		i+=1
 	while (i<numpts)
+	
 	SaveWaves(msg=comments)
+	
 end
 
 function ScanBabyDACIPS(startx, finx, channelsx, numptsx, delayx, rampratex, starty, finy, numptsy, delayy, rampratey, [offsetx, comments]) //Units: mV, mT
@@ -750,6 +773,9 @@ function ScanBabyDACIPS(startx, finx, channelsx, numptsx, delayx, rampratex, sta
 	sprintf x_label, "BD %s (mV)", channelsx
 	y_label = "Field (mT)"
 	
+	// intialize waves
+	InitializeWaves(startx, finx, numptsx, starty=starty, finy=finy, numptsy=numptsy, x_label=x_label, y_label=y_label)
+	
 	// set starting values
 	setpointx = startx-offsetx
 	setpointy = starty
@@ -757,10 +783,7 @@ function ScanBabyDACIPS(startx, finx, channelsx, numptsx, delayx, rampratex, sta
 	SetFieldWait(setpointy)
 	RampMultipleBD(channelsx, setpointx, nChannelsx, ramprate=rampratex)
 	sc_sleep(2.0)
-	
-	// intialize waves
-	InitializeWaves(startx, finx, numptsx, starty=starty, finy=finy, numptsy=numptsy, x_label=x_label, y_label=y_label)
-	
+
 	do
 		setpointx = startx - offsetx
 		setpointy = starty + (i*(finy-starty)/(numptsy-1))
@@ -780,100 +803,485 @@ function ScanBabyDACIPS(startx, finx, channelsx, numptsx, delayx, rampratex, sta
 	SaveWaves(msg=comments)
 end
 
+function ScanIPSRepeat(startx, finx, numptsx, delayx, rampratex, numptsy, delayy, [comments]) //Units: mT, mT/min
+	// x-axis is the dac sweep
+	// y-axis is an index
+	// this will sweep: start -> fin, fin -> start, start -> fin, ....
+	// each sweep (whether up or down) will count as 1 y-index
+	
+	variable startx, finx, numptsx, delayx, rampratex, numptsy, delayy
+	string comments
+	variable i=0, j=0, setpointx
+	string x_label, y_label
+	
+	if(paramisdefault(comments))
+		comments=""
+	endif
+
+	// setup labels
+	sprintf x_label, "Field (mT)"
+	y_label = "Sweep Num"
+	
+	// intialize waves
+	variable starty = 0, finy = numptsy-1, scandirection=0
+	InitializeWaves(startx, finx, numptsx, starty=starty, finy=finy, numptsy=numptsy, x_label=x_label, y_label=y_label)
+	
+	// set starting values
+	SetSweepRate(rampratex) // mT/min
+	SetFieldWait(startx)
+	sc_sleep(5.0) // wait 5 seconds at start point
+	
+	do
+		if(mod(i,2)==0)
+			j=0
+			scandirection=1
+		else
+			j=numptsx-1
+			scandirection=-1
+		endif
+		
+		setpointx = startx + (j*(finx-startx)/(numptsx-1)) // reset start point
+		SetFieldWait(setpointx)
+		sc_sleep(delayy) // wait at start point
+		do
+			// switch directions with if statement?
+			setpointx = startx + (j*(finx-startx)/(numptsx-1))
+			SetFieldWait(setpointx)
+			sc_sleep(delayx)
+			RecordValues(i, j, scandirection=scandirection)
+			j+=scandirection
+		while (j>-1 && j<numptsx)
+		i+=1
+	while (i<numptsy)
+	SaveWaves(msg=comments)
+end
+
 ////////////////////////////
 //     Small Magnet       //
 ////////////////////////////
 
-//function ScanSmallMagnet(start, fin, channels, numpts, delay, ramprate, [comments]) //Units: mT (mT/min)
-//	// sweep small magnet using babyDAC and Kepco current source
-//	variable start, fin, numpts, delay, ramprate
-//	string channels, comments
-//	string x_label
-//	variable i=0, j=0, setpoint
-//	nvar kepco_cal // Amps/Volt
-//	nvar magnet_cal //Amps/Tesla
-//	variable scaling = magnet_cal/kepco_cal // mV/mT
-//	variable corrected_ramp = ramprate*scaling/60 // mV/s 
-//	
-//	if(paramisdefault(comments))
-//		comments=""
-//	endif
-//	
-//	sprintf x_label, "Field (mT)"
-//
-//	// set starting values
-//	setpoint = start
-//	RampMultipleBD(channels, setpoint*scaling, 1, ramprate=corrected_ramp)
-//		
-//	sc_sleep(1.0)
-//	InitializeWaves(start, fin, numpts, x_label=x_label)
-//	do
-//		setpoint = start + (i*(fin-start)/(numpts-1))
-//		RampMultipleBD(channels, setpoint*scaling, 1, ramprate=corrected_ramp)
-//		sc_sleep(delay)
-//		//RecordValues(i, 0) 
-//		i+=1
-//	while (i<numpts)
-//	SaveWaves(msg=comments)
-//end
+function RampSmallMagnet(setpoint, ramprate, [noupdate])
+	// ramp small magnet to a given value
+	variable setpoint, ramprate, noupdate
+	nvar sm_mag_channel // analog shield channel connected to kepco
+	nvar kepco_cal // A/V
+	nvar sm_mag_cal //A/T
+	variable scaling = (sm_mag_cal)/(kepco_cal) // mV/mT
+	variable corrected_ramp = ramprate*scaling/60.0 // mV/s
 
-///////////////////////////////////////
-///////    TIME AVERAGING   ///////////
-///////////////////////////////////////
+	if(paramisdefault(noupdate))
+		noupdate=0
+	endif
+	
+	RampOutputAS(sm_mag_channel, setpoint*scaling, ramprate=corrected_ramp, noupdate=noupdate)
+end
+	
 
-function TimeAvgExample(start, fin, numpts, delay, timeavg, timeavg_delay, [comments]) 
-	variable start, fin, numpts, delay, timeavg, timeavg_delay
+function ScanSmallMagnet(start, fin, numpts, delay, ramprate, [comments]) //Units: mT, mT/min
+	// sweep small magnet using analog shield and Kepco current source
+	variable start, fin, numpts, delay, ramprate
 	string comments
-	string x_label = "dummy1"
-	variable i=0, setpoint, nChannels
+	string x_label
+	variable i=0, setpoint
+	
+	
+	if(paramisdefault(comments))
+		comments=""
+	endif
+	
+	sprintf x_label, "mag current (A)"
+
+	// set starting values
+	setpoint = start
+	RampSmallMagnet(setpoint, ramprate, noupdate=0)
+	sc_sleep(1.0)
+	InitializeWaves(start, fin, numpts, x_label=x_label)
+	do
+		setpoint = start + (i*(fin-start)/(numpts-1))
+		RampSmallMagnet(setpoint, ramprate, noupdate=1)
+		sc_sleep(delay)
+		RecordValues(i, 0) 
+		i+=1
+	while (i<numpts)
+	SaveWaves(msg=comments)
+end
+
+function ScanSmMagnetRepeat(startx, finx, numptsx, delayx, rampratex, numptsy, delayy, [comments]) //Units: mT, mT/min
+	// x-axis is the dac sweep
+	// y-axis is an index
+	// this will sweep: start -> fin, fin -> start, start -> fin, ....
+	// each sweep (whether up or down) will count as 1 y-index
+	
+	variable startx, finx, numptsx, delayx, rampratex, numptsy, delayy
+	string comments
+	variable i=0, j=0, setpointx
+	string x_label, y_label
+	
+	if(paramisdefault(comments))
+		comments=""
+	endif
+
+	// setup labels
+	sprintf x_label, "Field (mT)"
+	y_label = "Sweep Num"
+	
+	// intialize waves
+	variable starty = 0, finy = numptsy-1, scandirection=0
+	InitializeWaves(startx, finx, numptsx, starty=starty, finy=finy, numptsy=numptsy, x_label=x_label, y_label=y_label)
+	
+	// set starting values
+	RampSmallMagnet(startx, rampratex, noupdate=0)
+	sc_sleep(5.0) // wait 5 seconds at start point
+	
+	do
+		if(mod(i,2)==0)
+			j=0
+			scandirection=1
+		else
+			j=numptsx-1
+			scandirection=-1
+		endif
+		
+		setpointx = startx + (j*(finx-startx)/(numptsx-1)) // reset start point
+		RampSmallMagnet(setpointx, rampratex, noupdate=1)
+		sc_sleep(delayy) // wait at start point
+		do
+			// switch directions with if statement?
+			setpointx = startx + (j*(finx-startx)/(numptsx-1))
+			RampSmallMagnet(setpointx, rampratex, noupdate=1)
+			sc_sleep(delayx)
+			RecordValues(i, j, scandirection=scandirection)
+			j+=scandirection
+		while (j>-1 && j<numptsx)
+		i+=1
+	while (i<numptsy)
+	SaveWaves(msg=comments)
+end
+
+//////////////////////////////
+///////      SRS      ////////
+//////////////////////////////
+
+function ScanSRSAmplitude(start, fin, numpts, delay, readtime, [comments])
+	// take time series data at different SRS amplitudes
+	// save each time series
+	variable start, fin, numpts, delay, readtime
+	string comments
+	variable i=0, setpoint=0
+	
+	nvar srs8, srs6
 
 	if(paramisdefault(comments))
 		comments=""
 	endif
 
+	InitializeWaves(start, fin, numpts, x_label="SRS Output(V)")
+
 	// set starting values
 	setpoint = start
-	InitializeWaves(start, fin, numpts, x_label=x_label)
+	SetSRSAmplitude(srs8, setpoint)
+	SetSRSAmplitude(srs6, setpoint)	
+	sc_sleep(30)
 
 	do
 		setpoint = start + (i*(fin-start)/(numpts-1))
-		sc_sleep(delay)
-		RecordValues(i, 0, timeavg = timeavg, timeavg_delay = timeavg_delay) 
+		SetSRSAmplitude(srs8, setpoint)
+		SetSRSAmplitude(srs6, setpoint)
+		sc_sleep(30)
+		RecordValues(i, 0, timeavg = readtime, timeavg_delay = delay)
 		i+=1
 	while (i<numpts)
 	
 	SaveWaves(msg=comments)
 	
-end
+end	
 
-function TimeAvg2dExample(startx, finx, numptsx, delayx, starty, finy, numptsy, delayy, timeavg, timeavg_delay, [comments]) 
-	variable startx, finx, numptsx, delayx, starty, finy, numptsy, delayy, timeavg, timeavg_delay
-	string comments
-	string x_label = "dummy1", y_label = "dummy2"
-	variable i=0, j=0, setpointx, setpointy
+//////////////////////////
+/////      Fridge    /////
+//////////////////////////
 
-	if(paramisdefault(comments))
-		comments=""
-	endif
-
-	// set starting values
-	InitializeWaves(startx, finx, numptsx, starty=starty, finy=finy, numptsy=numptsy, x_label=x_label, y_label = y_label)
-
-	// main loop
-	do
-		setpointx = startx
-		setpointy = starty + (i*(finy-starty)/(numptsy-1))
-		sc_sleep(delayy)
-		j=0
-		do
-			setpointx = startx - (j*(finx-startx)/(numptsx-1))
-			sc_sleep(delayx)
-			RecordValues(i, j, timeavg = timeavg, timeavg_delay = timeavg_delay)
-			j+=1
-		while (j<numptsx)
-		i+=1
-	while (i<numptsy)
-	
-	SaveWaves(msg=comments)
-	
-end
+//function WaitTillPlateTempStable(plate, targetTmK, times, delay, err)
+//	variable targetTmK, times, delay, err
+//	string plate
+//	variable passCount, targetT=targetTmK/1000, currentT = 0
+//	
+//	// check for stable temperature
+//	print "Target temperature: ", targetT, "K"
+//	
+//	variable j = 0
+//	for (passCount=0; passCount<times; )
+//		sc_sleep(delay)
+//		for (j = 0; j<10; j+=1)
+//			currentT += GetTemp(plate)/10
+//			sc_sleep(1.0)
+//		endfor
+//		if (ABS(currentT-targetT) < err*targetT)
+//			passCount+=1
+//			print "Accepted", passCount, " @ ", GetTemp(plate), "K"
+//		else
+//			print "Rejected", passCount, " @ ", GetTemp(plate), "K"
+//			passCount = 0
+//		endif
+//		currentT = 0
+//	endfor
+//end
+//
+//macro sweep_temp_readvstime()
+//	make/o targettemps =  { 800, 700, 600, 500, 400, 350, 300, 250, 200, 180, 160, 140, 120, 100, 80, 60, 40, 20 }
+//	make/o heaterranges = { 31.6, 31.6, 31.6, 31.6, 31.6, 31.6, 31.6, 10, 10, 10, 10, 10, 10, 3, 3, 1, 1 }
+//
+//	variable i=0, j=0
+//	string comments
+//	
+//	// set fridge controls
+//	StillHeater(10.0)  								// set still heater to 10mW
+//	sc_sleep(2.0)
+//	SetTempSequence(preset="temp_control") 			// set temperature sequence on LS
+//	sc_sleep(2.0)
+//	SetControlMode(1) 							// set control mode to closed loop PID
+//	sc_sleep(2.0)
+//	SetControlParameters(channel=6)				// set control channel to Mixing Chamber
+//	sc_sleep(2.0)
+//	SetPIDParameters(10,5,0)
+//	sc_sleep(2.0)
+//		
+//	SetSRSAmplitude(srs8, 0.144)					// 0.072V = 0.5nA
+//	
+//	// set temperatures and measure
+//	i=0
+//	do
+//		SetPointTemp(targettemps[i])				// mK
+//		sc_sleep(2.0)
+//		SetHeaterRange(heaterranges[i])
+//		sc_sleep(2.0)
+//		WaitTillPlateTempStable("mc", targettemps[i], 6, 30, 0.05)
+//		sc_sleep(3*60)
+//		
+//		sprintf comments, "Closed Loop PID=10, 5, 0. MC Heater Range (mA)=  %g mA", GetMCHeaterRange()
+//		ReadVsTimeOut(0.3, 240, comments=comments)
+//		i+=1
+//	while ( i<numpnts(targettemps))
+//
+//end
+//
+//function WaitTillMCStable(times, delay, delta)
+//	variable times, delay, delta
+//	string plate = "mc"
+//	
+//	variable j = 0, passCount = 0, dirCount = 0, lastT = GetTemp(plate), currentT = 0
+//	do
+//		sc_sleep(delay)
+//		for (j = 0; j<10; j+=1)
+//			currentT += GetTemp(plate)*1000/10
+//			sc_sleep(2.0)
+//		endfor
+//		if (ABS(currentT-lastT) < delta)
+//			passCount+=1
+//			if (currentT-lastT < 0)
+//				dirCount += -1
+//			else
+//				dirCount +=1
+//			endif
+//			print "Accepted", passCount, " @ ", GetTemp(plate)*1000, "mK"
+//		else
+//			print "Rejected", passCount, " @ ", GetTemp(plate)*1000, "mK"
+//			passCount = 0
+//			dirCount = 0
+//		endif
+//		lastT = currentT
+//		currentT = 0
+//		if (passCount==times && ABS(dirCount)<passCount) 
+//			print "Accepted: Stable temperature reached."
+//			break
+//		elseif (passCount==times && ABS(dirCount)>=passCount) 
+//			print "Rejected: Temperature drifting"
+//			passCount = 0
+//			dirCount = 0
+//		endif
+//	while (1 == 1)
+//end
+//
+//function cooling_power_test()
+//	make/o targetpowers =  { 50, 40, 30, 20, 10, 8, 6, 4, 2, 1 }
+//	make/o heaterranges =  { 1.0, 1.0, 1.0, 1.0, 0.316, 0.316, 0.316, 0.316, 0.316, 0.1}
+//	
+//	string comments = "Heater Powers: "
+//	
+//	variable ii = 0
+//	do
+//		if (ii < numpnts(targetpowers) - 1)
+//			comments+=num2str(targetpowers[ii]) + ", "
+//		else
+//			comments+=num2str(targetpowers[ii]) + "uW \n"
+//		endif
+//		ii+=1
+//	while ( ii<numpnts(targetpowers))
+//	
+//	print comments
+//
+//	// intialize waves
+//	InitializeWaves(0, numpnts(targetpowers), numpnts(targetpowers), x_label="Power (uW)")
+//	
+//	// set fridge controls
+//	StillHeater(5.0)  								// set still heater to 10mW
+//	sc_sleep(2.0)
+//	SetTempSequence(preset="temp_control") 			// set temperature sequence on LS
+//	sc_sleep(2.0)
+//	SetControlMode(3) 							// set control mode to open loop
+//	sc_sleep(2.0)
+//	SetControlParameters(channel=6)				// set control channel to Mixing Chamber
+//	sc_sleep(2.0)
+//	
+//	// set temperatures and measure
+//	variable i=0, setpoint = 0, delay = 0.3
+//	do
+//		setpoint = sqrt(targetpowers[i]/120)
+//		printf "MC power set to: %.1f uW with %.3f mA \r", targetpowers[i], setpoint
+//		SetHeaterRange(heaterranges[i])
+//		sc_sleep(2.0)
+//		MCHeater(setpoint)  // mA
+//		sc_sleep(2.0)
+//		WaitTillMCStable(8, 60, 0.25)
+//		sc_sleep(30)
+//
+//		RecordValues(i, 0, timeavg = 120, timeavg_delay = delay)
+//
+//		i+=1
+//	while ( i<numpnts(targetpowers))
+//
+//	SaveWaves(msg=comments)
+//
+//end
+//
+//function WaitTillCarbonStable(times, delay, delta)
+//	variable times, delay, delta
+//	string plate = "mc"
+//	
+//	variable j = 0, passCount = 0, dirCount = 0, lastR = ((20e-6)/(getg8x()*1e-7)-1200), currentR = 0
+//	do
+//		sc_sleep(delay)
+//		for (j = 0; j<50; j+=1)
+//			currentR +=((20e-6)/(getg8x()*1e-7)-1200)/50
+//			sc_sleep(0.3)
+//		endfor
+//		if (ABS(currentR-lastR) < delta)
+//			passCount+=1
+//			if (currentR-lastR < 0)
+//				dirCount += -1
+//			else
+//				dirCount +=1
+//			endif
+//			print "Accepted", passCount, " @ ", ((20e-6)/(getg8x()*1e-7)-1200), "Ohms"
+//		else
+//			print "Rejected", passCount, " @ ", ((20e-6)/(getg8x()*1e-7)-1200), "Ohms"
+//			passCount = 0
+//			dirCount = 0
+//		endif
+//		lastR = currentR
+//		currentR = 0
+//		if (passCount==times && ABS(dirCount)<passCount) 
+//			print "Accepted: Stable temperature reached."
+//			break
+//		elseif (passCount==times && ABS(dirCount)>=passCount) 
+//			print "Rejected: Temperature drifting"
+//			passCount = 0
+//			dirCount = 0
+//		endif
+//	while (1 == 1)
+//end
+//
+//function cooling_power_test_2()
+//	make/o targetpowers =  { 50, 40, 30, 20, 10, 8, 6, 4, 2, 1 }
+//	variable Rgraphene = 3400
+//	nvar k2400
+//	
+//	string comments = "Heater Powers: "
+//	
+//	variable ii = 0
+//	do
+//		if (ii < numpnts(targetpowers) - 1)
+//			comments+=num2str(targetpowers[ii]) + ", "
+//		else
+//			comments+=num2str(targetpowers[ii]) + "uW \n"
+//		endif
+//		ii+=1
+//	while ( ii<numpnts(targetpowers))
+//	
+//	print comments
+//
+//	// intialize waves
+//	InitializeWaves(0, numpnts(targetpowers)-1, numpnts(targetpowers))
+//	
+//	// set fridge controls
+//	StillHeater(5.0)  	// set still heater to 10mW
+//	sc_sleep(2.0)
+//	SetTempSequence(preset="temp_control") 	// set temperature sequence on LS
+//	sc_sleep(2.0)
+//	
+//	// set temperatures and measure
+//	variable i=0, setpoint = 0, delay = 0.3
+//	do
+//		// set graphene current for approximate power
+//		setpoint = sqrt(targetpowers[i]/Rgraphene)*1e6 // setpoint current in nA
+//		SetK2400Current(setpoint, k2400)
+//		sc_sleep(30)
+//		
+//		// update graphene resistance and tweek bias current
+//		Rgraphene = (GetK2400Voltage(k2400)*1e-3)/(setpoint*1e-9) - 1200 
+//		printf "Current graphene resistance = %.3f Ohms \r", Rgraphene
+//		setpoint = sqrt(targetpowers[i]/Rgraphene)*1e6 
+//		SetK2400Current(setpoint, k2400)
+//		printf "graphene power set to: %.1f uW with %.3f uA \r", targetpowers[i], setpoint/1000
+//		
+//		WaitTillCarbonStable(8, 60, 5)
+//		sc_sleep(3*60)
+//
+//		RecordValues(i, 0, timeavg = 120, timeavg_delay = delay)
+//
+//		i+=1
+//	while ( i<numpnts(targetpowers))
+//
+//	SaveWaves(msg=comments)
+//
+//end
+//
+//macro step_temp_scanIPS()
+//
+////	make/o targettemps =  { 800, 700, 600, 500, 400, 350, 300, 250, 200, 180, 160, 140, 120, 100, 80, 60, 40, 20 }
+////	make/o heaterranges = { 31.6, 31.6, 31.6, 31.6, 31.6, 31.6, 31.6, 10, 10, 10, 10, 10, 10, 3, 3, 1, 1 }
+//
+//	make/o targettemps =  {20, 200, 400, 600, 800}
+//	make/o heaterranges = {1, 10, 31.6, 31.6, 31.6}
+//	
+//	variable i=0
+//	string comments
+//	
+//	// set fridge controls
+//	StillHeater(10.0)  	// set still heater to 10mW
+//	sc_sleep(2.0)
+//	SetTempSequence(preset="temp_control") // set temperature sequence on LS
+//	sc_sleep(2.0)
+//	SetControlMode(1)  // set control mode to closed loop PID
+//	sc_sleep(2.0)
+//	SetControlParameters(channel=6) // set control channel to Mixing Chamber
+//	sc_sleep(2.0)
+//	SetPIDParameters(10,5,0)
+//	sc_sleep(2.0)
+//	
+//	// set temperatures and sweep field
+//	i=0
+//	do
+//		SetHeaterRange(heaterranges[i])
+//		sc_sleep(2.0)
+//		SetPointTemp(targettemps[i]) // mK
+//		sc_sleep(2.0)
+//		WaitTillPlateTempStable("mc", targettemps[i], 6, 30, 0.05)
+//		sc_sleep(3*60.0)
+//		
+//		sprintf comments, "Setpoint: MC Heater Range (mA)=  %g mA", targettemps[i], GetMCHeaterRange()
+//		ScanIPSRepeat(1000, -1000, 2001, 0.3, 80, 2, 1.2, comments=comments)
+//		
+//		i+=1
+//	while ( i<numpnts(targettemps))
+//
+//end

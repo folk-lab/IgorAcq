@@ -176,10 +176,10 @@ function SetTempSequence([preset,temp_50k,temp_4k,temp_magnet,temp_still,temp_mc
 				temp_seq = "Normal"
 				break
 			case "temp_control":
-				set_50k = 120
-				set_4k = 120
-				set_magnet = 20
-				set_still = 100
+				set_50k = 180
+				set_4k = 180
+				set_magnet = 60
+				set_still = 120
 				set_mc = 1
 				temp_seq = "Temperature Control"
 				break

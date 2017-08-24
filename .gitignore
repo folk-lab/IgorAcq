@@ -1,0 +1,15 @@
+# ignore Igor experiment/data/config/winf files
+*.pxp
+*.ibw
+*.config
+*.winf
+
+# mac junk
+
+.DS_Store
+
+# python junk
+
+*examples/.ipynb_checkpoints/
+*.pyc
+*.egg-info
