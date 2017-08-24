@@ -306,7 +306,7 @@ function /S SaveInitialWaveComments(datname, [title, x_label, y_label, z_label, 
 	//return "\r"+comments
 end
 
-function getSlackNotice(username, [message, channel, botname, min_time])
+function getSlackNotice(username, [message, channel, botname, emoji, min_time])
 	// this function will send a notification to Slack
 	// username = your slack username
 	
@@ -317,11 +317,11 @@ function getSlackNotice(username, [message, channel, botname, min_time])
 	// emoji = emoji that will be used as the bots avatar, defaults to :the_horns:
 	// min_time = if time elapsed for this current scan is less than min_time no notification will be sent
 	//					defaults to 60 seconds
-	string username, channel, message, botname
+	string username, channel, message, botname, emoji
 	variable min_time
 	nvar filenum, sc_scanstarttime, sc_abortsweep
 	svar slack_url
-	string msg="", buffer="", payload=""
+	string txt="", buffer="", payload=""
 	
 	//// check if I need a notification ////
 	variable t_elapsed = datetime-sc_scanstarttime;
@@ -338,28 +338,44 @@ function getSlackNotice(username, [message, channel, botname, min_time])
 	endif
 	//// end notification checks //// 
 	
-	if (!paramisdefault(username))
-		output += "<@"+username+">\r"
+	
+	//// build notification text ////
+	if (!paramisdefault(channel)) 
+		// message will be sent to public channel
+		// user who sent it will be mentioned at the beginning of the message
+		txt += "<@"+username+">\r" 
 	endif
 	
 	if (!paramisdefault(message) && strlen(message)>0)
-		output += RemoveTrailingWhitespace(message) + "\r"
+		txt += RemoveTrailingWhitespace(message) + "\r"
 	endif
 		
-	// date/time info
-	sprintf buffer, "dat%d completed:  %s %s \r", filenum, Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); output+=buffer 
-	sprintf buffer, "time elapsed:  %.2f s \r", datetime-sc_scanstarttime; output+=buffer
+	sprintf buffer, "dat%d completed:  %s %s \r", filenum, Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); txt+=buffer 
+	sprintf buffer, "time elapsed:  %.2f s \r", datetime-sc_scanstarttime; txt+=buffer
+	//// end build txt ////
 	
-	// build payload
-	sprintf buffer, "{\"text\":\"%s\"", output; payload+=buffer
-	if (!paramisdefault(botname))
-		sprintf buffer, ", \"username\":\"%s\"", botname; payload+=buffer
+	
+	//// build payload ////
+	sprintf buffer, "{\"text\": \"%s\"", txt; payload+=buffer // 
+	
+	if (paramisdefault(botname))
+		botname = "qdotbot"
+	endif	
+	sprintf buffer, ", \"username\": \"%s\"", botname; payload+=buffer
+	
+	if (paramisdefault(channel))
+		sprintf buffer, ", \"channel\": \"@%s\"", username; payload+=buffer
+	else
+		sprintf buffer, ", \"channel\": \"#%s\"", channel; payload+=buffer
 	endif
-	if (!paramisdefault(channel))
-		sprintf buffer, ", \"channel\":\"@%s\"", channel; payload+=buffer
-	endif
+	
+	if (paramisdefault(emoji))
+		emoji = ":the_horns:"
+	endif	
+	sprintf buffer, ", \"icon_emoji\": \"%s\"", emoji; payload+=buffer // 
 	
 	payload += "}"
+	//// end payload ////
 	
 	URLRequest /DSTR=payload url=slack_url, method=post
 	if (V_flag == 0)    // No error
@@ -374,7 +390,6 @@ function getSlackNotice(username, [message, channel, botname, min_time])
         return 0
     endif
 end
-
 
 
 
