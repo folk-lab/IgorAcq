@@ -49,15 +49,91 @@ function sc_sleep(delay)
 	while(datetime-start_time < delay)
 end
 
+// system information //
+
+function /S getHostName()
+	// find the name of the computer Igor is running on
+	string sysinfo = igorinfo(3)
+	string cmd, hostname
+	if(strsearch(sysinfo, "Macintosh", 2)!=-1)
+		sprintf cmd, "do shell script \"%s\"", "hostname"
+		ExecuteScriptText cmd
+		string location
+		splitstring /E="([a-zA-Z0-9\-]+).(.+)" S_Value, hostname, location
+		return hostname
+	elseif(strsearch(sysinfo, "Windows", 2)!=-1)
+		print "you're on windows!"
+		return ""
+	else
+		abort "What operating system are you running?! How?!"
+	endif
+end
+
+// path information //
+
+function /S getExpPath(whichpath, [full])
+	// whichpath determines which path will be returned
+	// if full==1, the full path on the local machine is returned
+	// if full==0, the path relative to local_measurement_data is returned
+	string whichpath
+	variable full
+	
+	if(paramisdefault(full))
+		full=0
+	endif
+	
+	pathinfo data // get path info
+	
+	if(V_flag == 0) // check if path is defined
+		abort "data path is not defined!\n"
+	endif
+	
+	// get relative path to data
+	string temp1, temp2, temp3
+	SplitString/E="([\w\s\-\:]+)(?i)(local[\s\_]measurement[\s\_]data)([\w\s\-\:]+)" S_path, temp1, temp2, temp3
+		
+	strswitch(whichpath)
+		case "root":
+			// returns path to local_measurement_data on local machine
+			return temp1+temp2
+		case "data":
+			// returns path to data relative to local_measurement_data
+			if(full==0)
+				return  temp3
+			else
+				return temp1+temp2+temp3
+			endif
+		case "winf":
+			if(full==0)
+				return  temp3+"winfs:"
+			else
+				return temp1+temp2+temp3+"winfs:"
+			endif
+		case "config":
+			if(full==0)
+				return  temp3+"config:"
+			else
+				return temp1+temp2+temp3+"config:"
+			endif
+	endswitch
+end
+
 function InitScanController()
 	string filelist = ""
-	string /g slack_url =  "https://hooks.slack.com/services/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"
-	
-	GetFileFolderInfo/z/q/p=config
-	
-	if(v_flag==0)
-		filelist = greplist(indexedfile(config,-1,".config"),"sc")
+	string /g slack_url =  "https://hooks.slack.com/services/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" // url for slack alert
+	string /g sc_hostname = getHostName() // machine name
+
+	// Check if data path is definded
+	GetFileFolderInfo/Z/Q/P=data
+	if(v_flag != 0 || v_isfolder != 1)
+		abort "Data path not defined!\n"
 	endif
+	
+	newpath /C/O/Q winfs getExpPath("winf", full=1) // create/overwrite winf path
+	newpath /C/O/Q config getExpPath("config", full=1) // create/overwrite config path
+	
+	// look for config files
+	filelist = greplist(indexedfile(config,-1,".config"),"sc")
 	
 	if(itemsinlist(filelist)>0)
 		// read content into waves
@@ -482,12 +558,6 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		endif
 		ii+=1
 	while (ii < numpnts(sc_RawWaveNames))
-	
-	//Check if Data exsits as a path
-	GetFileFolderInfo/Z/Q/P=Data
-	if(V_Flag != 0 || V_isFolder != 1)
-		abort "The path Data is not defined correctly."
-	endif
 	
 	// The status of the upcoming scan will be set when waves are initialized.
 	if(!paramisdefault(starty) && !paramisdefault(finy) && !paramisdefault(numptsy))
@@ -1260,19 +1330,7 @@ function sc_createconfig()
 	svar sc_ColorMap
 	nvar filenum
 	variable refnum
-	string configfile, datapath, configpath
-	
-	// Check if data path is definded
-	GetFileFolderInfo/Z/Q/P=data
-	
-	if(v_flag != 0 || v_isfolder != 1)
-		print "Data path no defined. No config file created!\n"
-		return 0
-	else
-		pathinfo data; datapath=S_path
-		configpath = datapath+"config:"
-		newpath /C/O/Q config configpath // easier just to add/create a path than to check
-	endif
+	string configfile
 	
 	configfile = "sc" + num2istr(unixtime()) + ".config"
 	

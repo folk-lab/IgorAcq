@@ -21,17 +21,8 @@ function /s str2WINF(datname, s)
 	string extension, filename, datapath, winfpath
 	extension = "." + num2istr(unixtime()) + ".winf"
 	filename =  "dat" + num2istr(filenum) + datname + extension
-	pathinfo data; datapath=S_path
-	winfpath = datapath+"winfs:"
+	open /A/P=winfs refnum as filename
 	
-	//	GetFileFolderInfo /Q /Z=1 winfpath // check if directory exists
-	//	if (V_flag!=0)
-	//		// create folder
-	//	endif
-
-	newpath /C/O/Q winfs winfpath // easier just to add/create a path
-	
-	open /A refnum as winfpath+filename
 	do
 		if(strlen(s)<500)
 			fprintf refnum, "%s", s
@@ -136,15 +127,14 @@ function /s getExpStatus()
 	// date/time info
 	sprintf buffer, "dataset:  dat%d*.ibw \r", filenum; output+=buffer
 	sprintf buffer, "filenum: %d \r", filenum; output+=buffer
-	pathinfo data
-	sprintf buffer, "data path:  %s \r", ReplaceString(":", S_path, "/"); output+=buffer // path to data 
+	sprintf buffer, "data path:  %s \r", ReplaceString(":", getExpPath("data"), "/"); output+=buffer // path to data 
 	sprintf buffer, "system info: %s \r", ReplaceString(":",igorinfo(3),"="); output+=buffer // system information
 	sprintf buffer, "measurement completed:  %s %s \r", Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); output+=buffer // time of file save
 	sprintf buffer, "time elapsed:  %.2f s \r", datetime-sc_scanstarttime; output+=buffer
 	
 	// scan control info
-	sprintf buffer, "raw data waves:  %s \r", rawWaveStrs(); output+=buffer // path to data 
-	sprintf buffer, "calculated data waves:  %s \r", calcWaveStrs(); output+=buffer // path to data
+	sprintf buffer, "raw data waves:  %s \r", rawWaveStrs(); output+=buffer 
+	sprintf buffer, "calculated data waves:  %s \r", calcWaveStrs(); output+=buffer
 
 	return output
 end
