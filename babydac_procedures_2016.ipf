@@ -24,7 +24,7 @@ function InitBabyDACs(boards, ranges)
 	string boards, ranges
 	variable /g bd_ramprate = 200 // default ramprate
 	
-	DACSetup() // setup DAC com port
+	//DACSetup() // setup DAC com port
 	SetBoardNumbers(boards) // handle board numbering
 	
 	SetChannelRange(ranges) // set DAC output ranges
@@ -62,7 +62,7 @@ function InitToZero()
 	wave bd_boardnumbers
 
 	// Init all channels to 0V.
-	make/t/o dacvalsstr = {{"0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15"},{"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}, {"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}}
+	make/t/o dacvalsstr = {{"0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15"},{"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}, {"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"},{"CH0","CH1","CH2","CH3","CH4","CH5","CH6","CH7","CH8","CH9","CH10","CH11","CH12","CH13","CH14","CH15"}}
 	make/t/o oldvalue = {{"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}}
 
 	// setup software limit
@@ -110,7 +110,7 @@ function SetBoardNumbers(boards)
 	variable numBoards = ItemsInList(boards, ",")
 	wave/t dacvalsstr=dacvalsstr
 	
-	make/o listboxattr = {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},{2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0}, {2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0}}
+	make/o listboxattr = {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},{2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0}, {2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0},{2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0}}
 	
 	switch(numBoards)
 		case 1:
@@ -138,6 +138,11 @@ function SetBoardNumbers(boards)
 		listboxattr[5][2] = 2
 		listboxattr[6][2] = 2
 		listboxattr[7][2] = 2
+		
+		listboxattr[4][3] = 2
+		listboxattr[5][3] = 2
+		listboxattr[6][3] = 2
+		listboxattr[7][3] = 2
 	endif
 	
 	if(numtype(bd_boardnumbers[2])==2)
@@ -155,6 +160,11 @@ function SetBoardNumbers(boards)
 		listboxattr[9][2] = 2
 		listboxattr[10][2] = 2
 		listboxattr[11][2] = 2
+		
+		listboxattr[8][3] = 2
+		listboxattr[9][3] = 2
+		listboxattr[10][3] = 2
+		listboxattr[11][3] = 2
 	endif
 	
 	if(numtype(bd_boardnumbers[3])==2)
@@ -172,6 +182,11 @@ function SetBoardNumbers(boards)
 		listboxattr[13][2] = 2
 		listboxattr[14][2] = 2
 		listboxattr[15][2] = 2
+		
+		listboxattr[12][3] = 2
+		listboxattr[13][3] = 2
+		listboxattr[14][3] = 2
+		listboxattr[15][3] = 2
 	endif
 	
 end
@@ -730,21 +745,23 @@ end
 
 Window BabyDACWindow() : Panel
 	PauseUpdate; Silent 1 // building window
-	NewPanel /W=(0,0,320,530) // window size
+	NewPanel /W=(0,0,420,530) // window size
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv fsize= 25,fstyle= 1
-	DrawText 90, 45,"BabyDAC" // Headline
+	DrawText 140, 45,"BabyDAC" // Headline
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 12,85,"CHANNEL"
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 108,85,"VOLT (mV)"
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 208,85,"LIM (mV)"
-	ListBox daclist,pos={10,90},size={300,390},fsize=16,frame=2 // interactive list
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 308,85,"Scale Func"
+	ListBox daclist,pos={10,90},size={400,390},fsize=16,frame=2 // interactive list
 	ListBox daclist,fStyle=1,listWave=root:dacvalsstr,selWave=root:listboxattr,mode= 1
-	Button ramp,pos={40,495},size={65,20},proc=update_BabyDAC,title="RAMP"
-	Button rampallzero,pos={170,495},size={90,20},proc=update_BabyDAC,title="RAMP ALL 0"
+	Button ramp,pos={90,495},size={65,20},proc=update_BabyDAC,title="RAMP"
+	Button rampallzero,pos={210,495},size={90,20},proc=update_BabyDAC,title="RAMP ALL 0"
 EndMacro
 
 function update_BabyDAC(action) : ButtonControl
@@ -851,6 +868,143 @@ function testBabyDACramprate(start, fin, channels, ramprate, noupdate)
 	printf "the effective ramprate is: %.1fmV/s\n", abs(fin-start)/ttotal
 	
 end
+
+//// Wave rescaling for BabyDAC scans ////
+
+function Rescale_BabyDAC(startx,finx,channelsx,[starty,finy,channelsy])
+	variable startx, finx
+	string channelsx
+	variable starty, finy
+	string channelsy
+	wave/t dacvalsstr, sc_RawWaveNames, sc_CalcWaveNames
+	wave sc_RawPlot, sc_RawRecord, sc_CalcPlot, sc_CalcRecord
+	variable i=0, j=0
+	string rescalefuncx, rescalefuncy, channelx_index, channely_index, channelx, channely
+	string rescalestartx, rescalefinx, rescalestarty, rescalefiny, wn, wn2d, cmd
+	string sweep_channelx_check, sweep_channely_check
+	
+	if(ParamIsDefault(channelsy))
+		// 1D scan, only x rescaling
+		rescalefuncx = dacvalsstr[str2num(stringfromlist(0,channelsx,","))][3]
+		channelx_index = SearchFullString(rescalefuncx,"CH")
+		sweep_channelx_check = SearchFullString(rescalefuncx,"CH"+channelsx[0])
+		if(itemsinlist(sweep_channelx_check,",") == 0)
+			abort "Rescale function must contain CH"+channelsx[0]
+		endif
+		rescalestartx = rescalefuncx
+		rescalefinx = rescalefuncx
+		do
+			channelx = rescalefuncx[str2num(stringfromlist(j,channelx_index,","))+2]
+			if(str2num(channelx) == str2num(stringfromlist(0,channelsx,",")))
+				rescalestartx = ReplaceString("CH"+channelx, rescalestartx, num2str(startx))
+				rescalefinx = ReplaceString("CH"+channelx, rescalefinx, num2str(finx))
+			else
+				rescalestartx = ReplaceString("CH"+channelx, rescalestartx, dacvalsstr[str2num(channelx)][1])
+				rescalefinx = ReplaceString("CH"+channelx, rescalefinx, dacvalsstr[str2num(channelx)][1])
+			endif
+			j=j+1
+		while(j<itemsinlist(channelx_index,","))
+		do
+			if(sc_RawRecord[i] == 1 && cmpstr(sc_RawWaveNames[i], "") || sc_RawPlot[i] == 1 && cmpstr(sc_RawWaveNames[i], ""))
+				wn = sc_RawWaveNames[i]
+				cmd = "setscale/I x " + rescalestartx + ", " + rescalefinx + ", \"\", " + wn
+				execute(cmd)
+			endif
+			i=i+1
+		while(i<numpnts(sc_RawWaveNames))
+		i=0
+		do
+			if (sc_CalcRecord[i] == 1 && cmpstr(sc_CalcWaveNames[i], "") || sc_CalcPlot[i] == 1 && cmpstr(sc_CalcWaveNames[i], ""))
+				wn = sc_CalcWaveNames[i]
+				cmd = "setscale/I x " + rescalestartx + ", " + rescalefinx + ", \"\", " + wn
+				execute(cmd)
+			endif
+			i=i+1
+		while(i<numpnts(sc_CalcWaveNames))
+	else
+		// 2D scan, both x and y rescaling
+		rescalefuncx = dacvalsstr[str2num(stringfromlist(0,channelsx,","))][3]
+		rescalefuncy = dacvalsstr[str2num(stringfromlist(0,channelsy,","))][3]
+		channelx_index = SearchFullString(rescalefuncx,"CH")
+		channely_index = SearchFullString(rescalefuncy,"CH")
+		sweep_channelx_check = SearchFullString(rescalefuncx,"CH"+channelsx[0])
+		sweep_channely_check = SearchFullString(rescalefuncy,"CH"+channelsy[0])
+		if(itemsinlist(sweep_channelx_check,",") == 0 || itemsinlist(sweep_channely_check,",") == 0)
+			abort "Rescale function must contain CH"+channelsx[0]
+		endif
+		rescalestartx = rescalefuncx
+		rescalefinx = rescalefuncx
+		rescalestarty = rescalefuncy
+		rescalefiny = rescalefuncy
+		do
+			channelx = rescalefuncx[str2num(stringfromlist(j,channelx_index,","))+2]
+			if(str2num(channelx) == str2num(stringfromlist(0,channelsx,",")))
+				rescalestartx = ReplaceString("CH"+channelx, rescalestartx, num2str(startx))
+				rescalefinx = ReplaceString("CH"+channelx, rescalefinx, num2str(finx))
+			else
+				rescalestartx = ReplaceString("CH"+channelx, rescalestartx, dacvalsstr[str2num(channelx)][1])
+				rescalefinx = ReplaceString("CH"+channelx, rescalefinx, dacvalsstr[str2num(channelx)][1])
+			endif
+			j=j+1
+		while(j<itemsinlist(channelx_index,","))
+		j=0
+		do
+			channely = rescalefuncy[str2num(stringfromlist(j,channely_index,","))+2]
+			if(str2num(channely) == str2num(stringfromlist(0,channelsy,",")))
+				rescalestarty = ReplaceString("CH"+channely, rescalestarty, num2str(starty))
+				rescalefiny = ReplaceString("CH"+channely, rescalefiny, num2str(finy))
+			else
+				rescalestarty = ReplaceString("CH"+channely, rescalestarty, dacvalsstr[str2num(channely)][1])
+				rescalefiny = ReplaceString("CH"+channely, rescalefiny, dacvalsstr[str2num(channely)][1])
+			endif
+			j=j+1
+		while(j<itemsinlist(channely_index,","))
+		do
+			if(sc_RawRecord[i] == 1 && cmpstr(sc_RawWaveNames[i], "") || sc_RawPlot[i] == 1 && cmpstr(sc_RawWaveNames[i], ""))
+				wn = sc_RawWaveNames[i]
+				cmd = "setscale/I x " + rescalestartx + ", " + rescalefinx + ", \"\", " + wn
+				execute(cmd)
+				wn2d = wn+"2d"
+				cmd = "setscale/I x " + rescalestartx + ", " + rescalefinx + ", \"\", " + wn2d
+				execute(cmd)
+				cmd = "setscale/I y " + rescalestarty + ", " + rescalefiny + ", \"\", " + wn2d
+				execute(cmd)
+			endif
+			i=i+1
+		while(i<numpnts(sc_RawWaveNames))
+		i=0
+		do
+			if (sc_CalcRecord[i] == 1 && cmpstr(sc_CalcWaveNames[i], "") || sc_CalcPlot[i] == 1 && cmpstr(sc_CalcWaveNames[i], ""))
+				wn = sc_CalcWaveNames[i]
+				cmd = "setscale/I x " + rescalestartx + ", " + rescalefinx + ", \"\", " + wn
+				execute(cmd)
+				wn2d = wn+"2d"
+				cmd = "setscale/I x " + rescalestartx + ", " + rescalefinx + ", \"\", " + wn2d
+				execute(cmd)
+				cmd = "setscale/I y " + rescalestarty + ", " + rescalefiny + ", \"\", " + wn2d
+				execute(cmd)
+			endif
+			i=i+1
+		while(i<numpnts(sc_CalcWaveNames))
+	endif
+end
+
+function/s SearchFullString(StringToSearch,SearchForString)
+	string StringToSearch, SearchForString
+	string index_list=""
+	variable test, startpoint=0
+	
+	do
+		test = strsearch(StringToSearch,SearchForString,startpoint)
+		if(test != -1)
+			index_list = index_list+num2istr(test)+","
+			startpoint = test+1
+		endif
+	while(test > -1)
+	
+	return index_list
+end
+
 
 //// for backwards compatibility ////
 
