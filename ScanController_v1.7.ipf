@@ -132,25 +132,25 @@ function /S getExpPath(whichpath, [full])
 	strswitch(whichpath)
 		case "root":
 			// returns path to local_measurement_data on local machine
-			return temp1+temp2
+			return ParseFilePath(5, temp1+temp2, "*", 0, 0)
 		case "data":
 			// returns path to data relative to local_measurement_data
 			if(full==0)
-				return  temp3
+				return ParseFilePath(5, temp3, "*", 0, 0)
 			else
-				return temp1+temp2+temp3
+				return ParseFilePath(5, temp1+temp2+temp3, "*", 0, 0)
 			endif
 		case "winfs":
 			if(full==0)
-				return  temp3+"winfs:"
+				return ParseFilePath(5, temp3+"winfs:", "*", 0, 0)
 			else
-				return temp1+temp2+temp3+"winfs:"
+				return ParseFilePath(5, temp1+temp2+temp3+"winfs:", "*", 0, 0)
 			endif
 		case "config":
 			if(full==0)
-				return  temp3+"config:"
+				return ParseFilePath(5, temp3+"config:", "*", 0, 0)
 			else
-				return temp1+temp2+temp3+"config:"
+				return ParseFilePath(5, temp1+temp2+temp3+"config:", "*", 0, 0)
 			endif
 	endswitch
 end
@@ -169,7 +169,7 @@ function sc_NewFileAdded(path, filename)
 		open /A/P=data refnum as "qdot-server.notify"
 	endif
 	
-	string fileloc = ReplaceString(":",getExpPath(path, full=0)[1,inf],"/")
+	string fileloc = getExpPath(path, full=0)
 	fileloc = removeAllWhitespace(fileloc)+removeAllWhitespace(filename)
 	fprintf refnum, "%s\n", fileloc
 	
@@ -215,9 +215,8 @@ function sc_NotifyServer()
 	
 	print url
 	print payload
-end
 	
-//	URLRequest /DSTR=payload url=url, method=post
+//	URLRequest /TIME=2.0 /DSTR=payload url=url, method=post
 //	if (V_flag == 0)    // No error
 //        if (V_responseCode != 200)  // 200 is the HTTP OK code
 //            print "New file notification failed!"
@@ -229,6 +228,7 @@ end
 //        print "HTTP connection error. New file notification not attempted."
 //        return 0
 //    endif
+
 end
 
 function InitScanController()
