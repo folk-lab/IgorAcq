@@ -110,8 +110,9 @@ end
 
 function /S getExpPath(whichpath, [full])
 	// whichpath determines which path will be returned (data, winfs, config)
-	// if full==1, the full path on the local machine is returned
-	// if full==0, the path relative to local_measurement_data is returned
+	// root always gives the path to local_measurement_data
+	// if full==1, the full path on the local machine is returned in native style
+	// if full==0, the path relative to local_measurement_data is returned in Unix style
 	string whichpath
 	variable full
 	
@@ -136,19 +137,19 @@ function /S getExpPath(whichpath, [full])
 		case "data":
 			// returns path to data relative to local_measurement_data
 			if(full==0)
-				return ParseFilePath(5, temp3, "*", 0, 0)
+				return "./"+ReplaceString(":", temp3[1,inf], "/")
 			else
 				return ParseFilePath(5, temp1+temp2+temp3, "*", 0, 0)
 			endif
 		case "winfs":
 			if(full==0)
-				return ParseFilePath(5, temp3+"winfs:", "*", 0, 0)
+				return "./"+ReplaceString(":", temp3[1,inf], "/")+"winfs/"
 			else
 				return ParseFilePath(5, temp1+temp2+temp3+"winfs:", "*", 0, 0)
 			endif
 		case "config":
 			if(full==0)
-				return ParseFilePath(5, temp3+"config:", "*", 0, 0)
+				return "./"+ReplaceString(":", temp3[1,inf], "/")+"config/"
 			else
 				return ParseFilePath(5, temp1+temp2+temp3+"config:", "*", 0, 0)
 			endif
@@ -213,8 +214,7 @@ function sc_NotifyServer()
 	
 	close refnum
 	
-	print url
-	print payload
+	payload += "\n\n"
 	
 //	URLRequest /TIME=2.0 /DSTR=payload url=url, method=post
 //	if (V_flag == 0)    // No error
@@ -1282,7 +1282,7 @@ function saveExp()
 	endif
 	
 	string buffer=""
-	string fullname = ReplaceString(":",getExpPath("data", full=0)[1,inf],"/")+expname
+	string fullname = getExpPath("data", full=0)+expname
 	do
 		FReadLine refnum, buffer
 		buffer = removeAllWhitespace(buffer)
