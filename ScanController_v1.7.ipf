@@ -51,28 +51,62 @@ end
 
 // system information //
 
+function/S executeWinCmd(command)
+	// http://www.igorexchange.com/node/938
+	string command
+	string IPUFpath = SpecialDirPath("Igor Pro User Files",0,1,0)	// guaranteed writeable path in IP6
+	string batchFileName = "ExecuteWinCmd.bat", outputFileName = "ExecuteWinCmd.out"
+	string outputLine, result = ""
+	variable refNum
+	 
+	NewPath/O/Q IgorProUserFiles, IPUFpath
+	Open/P=IgorProUserFiles refNum as batchFileName	// overwrites previous batchfile
+	fprintf refNum,"cmd/c \"%s > \"%s%s\"\"\r", command, IPUFpath, outputFileName
+	Close refNum
+	ExecuteScriptText/B "\"" + IPUFpath + "\\" + batchFileName + "\""
+	Open/P=IgorProUserFiles/R refNum as outputFileName
+	
+	do
+		FReadLine refNum, outputLine
+		if( strlen(outputLine) == 0 )
+			break
+		endif
+		result += outputLine
+	while( 1 )
+	Close refNum
+	return result
+end
+
+function/S executeMacCmd(command)
+	// http://www.igorexchange.com/node/938
+	string command
+
+	string cmd
+	sprintf cmd, "do shell script \"%s\"", command
+	ExecuteScriptText cmd
+
+	return S_value
+end
+
+
 function /S getHostName()
 	// find the name of the computer Igor is running on
 	string platform = igorinfo(2)
-	string cmd, hostname
+	string result, hostname, location
 	
 	strswitch(platform)
 		case "Macintosh":
-			sprintf cmd, "do shell script \"%s\"", "hostname"
-			ExecuteScriptText cmd
-			string location
-			splitstring /E="([a-zA-Z0-9\-]+).(.+)" S_Value, hostname, location
-			return hostname
+			result = executeMacCmd("hostname")
+			splitstring /E="([a-zA-Z0-9\-]+).(.+)" result, hostname, location
+			return LowerStr(hostname)
 		case "Windows":
-			print "you're on windows!"
-			return ""
+			hostname = executeWinCmd("hostname")
+			return LowerStr(hostname)
 		default:
 			abort "What operating system are you running?! How?!"
 	endswitch
 	
 end
-
-// path information //
 
 function /S getExpPath(whichpath, [full])
 	// whichpath determines which path will be returned (data, winfs, config)
@@ -121,7 +155,6 @@ function /S getExpPath(whichpath, [full])
 	endswitch
 end
 
-// add line to qdot-server.notify (if it does not exist, create it with hostname on first line)
 function sc_NewFileAdded(path, filename)
 	// path -- loction of new file: "data", "winfs", "config"
 	// filename -- name of new file
@@ -136,23 +169,66 @@ function sc_NewFileAdded(path, filename)
 		open /A/P=data refnum as "qdot-server.notify"
 	endif
 	
-	fprintf refnum, "%s\n", ReplaceString(":",getExpPath(path, full=0)[1,inf],"/")+filename
+	string fileloc = ReplaceString(":",getExpPath(path, full=0)[1,inf],"/")
+	fileloc = removeAllWhitespace(fileloc)+removeAllWhitespace(filename)
+	fprintf refnum, "%s\n", fileloc
 	
 	close refnum
 end
 
-// clear qdot-server.notify
 function sc_DeleteNotificationFile()
 	// delete qdot-server.notify
 	deletefile /Z/P=data "qdot-server.notify"
+	if(V_flag!=0)
+		print "Failed to delete 'qdot-server.notify'"
+	endif
 end
 
 function sc_NotifyServer()
 	// send notification to qdot server
-	string host = ""
+	string server = "qdot-server.phas.ubc.ca"
 	variable port = 9999
+	string url = ""
+	sprintf url, "http://%s:%d", server, port
 	
+	string payload = "", buffer=""
+	variable refnum
+	open /R /Z=1 /P=data refnum as "qdot-server.notify"
 	
+	if(refnum==0)
+		// if there is not qdot-server.notify file
+		// I don't need to do anything
+		print "No new files available."
+		return 0
+	endif
+
+	do
+		FReadLine refnum, buffer
+		if (strlen(buffer) <= 0)
+			break
+		else
+			payload += buffer
+		endif
+	while (1)	
+	
+	close refnum
+	
+	print url
+	print payload
+end
+	
+//	URLRequest /DSTR=payload url=url, method=post
+//	if (V_flag == 0)    // No error
+//        if (V_responseCode != 200)  // 200 is the HTTP OK code
+//            print "New file notification failed!"
+//            return 0
+//        else
+//            return 1
+//        endif
+//    else
+//        print "HTTP connection error. New file notification not attempted."
+//        return 0
+//    endif
 end
 
 function InitScanController()
@@ -496,20 +572,6 @@ function sc_CheckboxClicked(ControlName, Value)
 	endif
 end
 
-Function/S RemoveEndingWhitespace(str)
-	// stolen from http://www.igorexchange.com/node/2957
-	String str
- 
-	do
-		String str2= RemoveEnding(str," ")
-		if( CmpStr(str2, str) == 0 )
-			break
-		endif
-		str= str2
-	while( 1 )
-	return str
-End
-
 function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_label])
 	variable start, fin, numpts, starty, finy, numptsy
 	string x_label, y_label
@@ -563,11 +625,11 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	variable ii=0
 	do
 		if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
-			script = RemoveEndingWhitespace(sc_RequestScripts[ii])
+			script = RemoveTrailingWhitespace(sc_RequestScripts[ii])
 			if(cmpstr(script, "")!=0) // it's ok if this one is empty
 				// check if there is more than one command
-				script0 = RemoveEndingWhitespace(stringfromlist(0, script)) // should be something here
-				script1 = RemoveEndingWhitespace(stringfromlist(1, script)) // should be nothing here
+				script0 = RemoveTrailingWhitespace(stringfromlist(0, script)) // should be something here
+				script1 = RemoveTrailingWhitespace(stringfromlist(1, script)) // should be nothing here
 				if(cmpstr(script1, "")!=0 ||  strsearch(script0, "()", 0)==-1) // check that script1 is empty and script0 contains ()
 					abort "Request scripts should be formatted as: setParam() with no arguments and only a single function call"
 				else
@@ -582,11 +644,11 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	ii=0
 	do
 		if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
-			script = RemoveEndingWhitespace(sc_GetResponseScripts[ii])
+			script = RemoveTrailingWhitespace(sc_GetResponseScripts[ii])
 			
 			// check if there is more than one command
-			script0 = RemoveEndingWhitespace(stringfromlist(0, script)) // should be something here
-			script1 = RemoveEndingWhitespace(stringfromlist(1, script)) // should be nothing here
+			script0 = RemoveTrailingWhitespace(stringfromlist(0, script)) // should be something here
+			script1 = RemoveTrailingWhitespace(stringfromlist(1, script)) // should be nothing here
 			if(cmpstr(script1, "")!=0 ||  strsearch(script0, "()", 0)==-1) // check that script1 is empty and script0 contains ()
 				abort "Response scripts should be formatted as: getParam() with no arguments and only a single function call"
 			else
@@ -1196,8 +1258,52 @@ function RecordTmpValues(index, innerindex, outerindex)
 	
 end
 
+function saveWaveAsIBW(filename)
+	// save ibw file
+	string filename
+	Save/C/P=data $filename;
+	sc_NewFileAdded("data", filename+".ibw")
+end
+
+function saveExp()
+	// save current experiment as .pxp
+	SaveExperiment /P=data
+	
+	string expname = igorinfo(1)+".pxp"
+	
+	variable refnum
+	open /R /Z=1 /P=data refnum as "qdot-server.notify"
+	
+	if(refnum==0)
+		// if there is not qdot-server.notify file
+		// create one and add the experiment file to the list
+		sc_NewFileAdded("data", expname)
+		return 1
+	endif
+	
+	string buffer=""
+	string fullname = ReplaceString(":",getExpPath("data", full=0)[1,inf],"/")+expname
+	do
+		FReadLine refnum, buffer
+		buffer = removeAllWhitespace(buffer)
+		if (strlen(buffer) <= 0)
+			// if i get to the end of the file without finding the experiment 
+			// file in the list, add it
+			sc_NewFileAdded("data", expname)
+			break
+		elseif(CmpStr(buffer, fullname)==0)
+			// if the experiment file is on the list
+			// do nothing
+			break
+		endif
+	while (1)	
+	
+	close refnum
+end
+
 function SaveWaves([msg, save_experiment])
 	// the message will be printed in the history, and will be saved in the winf file corresponding to this scan
+	// save_experiment=1 to save the experiment file
 	string msg
 	variable save_experiment
 	nvar sc_is2d, sc_PrintRaw, sc_PrintCalc
@@ -1217,8 +1323,6 @@ function SaveWaves([msg, save_experiment])
 	
 	if (paramisdefault(save_experiment))
 		save_experiment = 1 // save the experiment by default
-	else
-		save_experiment = 0 // do not save the experiment 
 	endif
 	
 	if (strlen(sc_LogStr)!=0)
@@ -1238,13 +1342,12 @@ function SaveWaves([msg, save_experiment])
 			if(sc_PrintRaw == 1)
 				print filename
 			endif
-			Save/C/P=data $filename;
+			saveWaveAsIBW(filename)
 			SaveInitialWaveComments(wn, x_label=sc_x_label, y_label=sc_y_label)
-			//Save/C/P=backup $filename;
-
 		endif
 		ii+=1
 	while (ii < numpnts(sc_RawWaveNames))
+	
 	// Calculated Data
 	ii=0
 	do
@@ -1259,7 +1362,7 @@ function SaveWaves([msg, save_experiment])
 			if(sc_PrintCalc == 1)
 				print filename
 			endif
-			Save/C/P=data $filename;
+			saveWaveAsIBW(filename)
 			SaveInitialWaveComments(wn, x_label=sc_x_label, y_label=sc_y_label)
 		endif
 		ii+=1
@@ -1279,7 +1382,7 @@ function SaveWaves([msg, save_experiment])
 	dowindow /k SweepControl
 	
 	if(save_experiment == 1)
-		SaveExperiment/p=data
+		saveExp()
 	endif
 end
 
@@ -1305,6 +1408,7 @@ function SaveTmpWaves()
 				print filename
 			endif
 			Save/C/P=data $filename;
+			sc_NewFileAdded("data", filename)
 			SaveInitialWaveComments("_"+wn2d, x_label="time (s)", y_label = sc_x_label)
 		endif
 		ii+=1
@@ -1399,6 +1503,8 @@ function sc_createconfig()
 	fprintf refnum, "%g\r", filenum
 	
 	close refnum
+	
+	sc_NewFileAdded("config", configfile)
 end
 
 function sc_loadconfig(filelist)

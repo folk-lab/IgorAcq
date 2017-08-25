@@ -33,6 +33,8 @@ function /s str2WINF(datname, s)
 		endif
 	while(1)
 	close refnum
+	
+	sc_NewFileAdded("winfs", filename)
 	return filename
 end
 
@@ -233,7 +235,6 @@ function /S saveScanComments([msg, logs])
 		comments = comments[0,strlen(comments)-2]
 	endif
 	str2WINF("", comments)
-	// return "\r" + comments
 end
 
 function /S SaveInitialWaveComments(datname, [title, x_label, y_label, z_label, x_multiplier, y_multiplier, z_multiplier, display_thumbnail])
@@ -292,7 +293,6 @@ function /S SaveInitialWaveComments(datname, [title, x_label, y_label, z_label, 
 	comments += "\r"+"comments:  \r"
 	
 	str2WINF(datname, comments)
-	//return "\r"+comments
 end
 
 function getSlackNotice(username, [message, channel, botname, emoji, min_time])
