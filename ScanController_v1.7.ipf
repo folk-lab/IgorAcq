@@ -53,26 +53,29 @@ end
 
 function /S getHostName()
 	// find the name of the computer Igor is running on
-	string sysinfo = igorinfo(3)
+	string platform = igorinfo(2)
 	string cmd, hostname
-	if(strsearch(sysinfo, "Macintosh", 2)!=-1)
-		sprintf cmd, "do shell script \"%s\"", "hostname"
-		ExecuteScriptText cmd
-		string location
-		splitstring /E="([a-zA-Z0-9\-]+).(.+)" S_Value, hostname, location
-		return hostname
-	elseif(strsearch(sysinfo, "Windows", 2)!=-1)
-		print "you're on windows!"
-		return ""
-	else
-		abort "What operating system are you running?! How?!"
-	endif
+	
+	strswitch(platform)
+		case "Macintosh":
+			sprintf cmd, "do shell script \"%s\"", "hostname"
+			ExecuteScriptText cmd
+			string location
+			splitstring /E="([a-zA-Z0-9\-]+).(.+)" S_Value, hostname, location
+			return hostname
+		case "Windows":
+			print "you're on windows!"
+			return ""
+		default:
+			abort "What operating system are you running?! How?!"
+	endswitch
+	
 end
 
 // path information //
 
 function /S getExpPath(whichpath, [full])
-	// whichpath determines which path will be returned
+	// whichpath determines which path will be returned (data, winfs, config)
 	// if full==1, the full path on the local machine is returned
 	// if full==0, the path relative to local_measurement_data is returned
 	string whichpath
@@ -103,7 +106,7 @@ function /S getExpPath(whichpath, [full])
 			else
 				return temp1+temp2+temp3
 			endif
-		case "winf":
+		case "winfs":
 			if(full==0)
 				return  temp3+"winfs:"
 			else
@@ -116,6 +119,40 @@ function /S getExpPath(whichpath, [full])
 				return temp1+temp2+temp3+"config:"
 			endif
 	endswitch
+end
+
+// add line to qdot-server.notify (if it does not exist, create it with hostname on first line)
+function sc_NewFileAdded(path, filename)
+	// path -- loction of new file: "data", "winfs", "config"
+	// filename -- name of new file
+	string path, filename
+	variable refnum
+	
+	getfilefolderinfo /Q/Z/P=data "qdot-server.notify"
+	if(V_isFile==0) // if the file does not exist, create it with hostname/n at the top
+		open /A/P=data refnum as "qdot-server.notify"
+		fprintf refnum, "%s\n", getHostName()
+	else // if the file does exist, open it for appending
+		open /A/P=data refnum as "qdot-server.notify"
+	endif
+	
+	fprintf refnum, "%s\n", ReplaceString(":",getExpPath(path, full=0)[1,inf],"/")+filename
+	
+	close refnum
+end
+
+// clear qdot-server.notify
+function sc_DeleteNotificationFile()
+	// delete qdot-server.notify
+	deletefile /Z/P=data "qdot-server.notify"
+end
+
+function sc_NotifyServer()
+	// send notification to qdot server
+	string host = ""
+	variable port = 9999
+	
+	
 end
 
 function InitScanController()

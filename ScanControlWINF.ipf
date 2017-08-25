@@ -18,7 +18,7 @@ function /s str2WINF(datname, s)
 	variable refnum
 	nvar filenum
 	
-	string extension, filename, datapath, winfpath
+	string extension, filename
 	extension = "." + num2istr(unixtime()) + ".winf"
 	filename =  "dat" + num2istr(filenum) + datname + extension
 	open /A/P=winfs refnum as filename
@@ -149,8 +149,7 @@ function /s getWaveStatus(datname)
 	// date/time info
 	sprintf buffer, "wave name:  dat%d%s.ibw \r", filenum, datname; output+=buffer
 	sprintf buffer, "filenum: %d \r", filenum; output+=buffer
-	pathinfo data
-	sprintf buffer, "data path:  %sdat%d%s.ibw \r", ReplaceString(":", S_path, "/"), filenum,datname; output+=buffer
+	sprintf buffer, "data path:  %sdat%d%s.ibw \r", ReplaceString(":", getExpPath("data"), "/"), filenum, datname; output+=buffer
 	
 	// wave info
 	//check if wave is 1d or 2d
