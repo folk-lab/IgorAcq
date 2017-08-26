@@ -104,7 +104,8 @@ function sc_rebuildwindow()
 	execute("ScanController()")
 end
 
-// In order to enable or disable a wave, call these two functions instead of messing with the waves sc_RawRecord and sc_CalcRecord directly
+// In order to enable or disable a wave, call these two functions
+// instead of messing with the waves sc_RawRecord and sc_CalcRecord directly
 function EnableScanControllerItem(wn)
 	string wn
 	ChangeScanControllerItemStatus(wn, 1)
@@ -162,7 +163,7 @@ Window ScanController() : Panel
 
 	PauseUpdate; Silent 1		// building window...
 	dowindow /K ScanController
-	NewPanel /W=(10,10,sc_InnerBoxW + 30,200+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing) ) /N=ScanController
+	NewPanel /W=(10,10,sc_InnerBoxW + 30,210+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing) ) /N=ScanController
 	ModifyPanel frameStyle=2
 	ModifyPanel fixedSize=1
 	SetDrawLayer UserBack
@@ -230,20 +231,32 @@ Window ScanController() : Panel
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 13,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25,"Logging Functions (example: getSRSstatus(srs1); getIPSstatus();)"
 	DrawRect 9,120+5+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25,5+sc_InnerBoxW,120+5+sc_InnerBoxH+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25
-	cmd="SetVariable sc_LogStr pos={13, 127+5+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25}, size={sc_InnerBoxW-12, 0}, fsize=14, title=\" \", value=sc_LogStr"
-	execute(cmd)
+	SetVariable sc_LogStr, pos={13, 127+5+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25}, size={sc_InnerBoxW-12, 0}, fsize=14, title=" ", value=sc_LogStr
 	
 	// helpful text
 	DrawText 13,170+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing),"Press Update to save changes."
-	DrawText 13,190+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing),"Press ESC to abort the scan and save data, while this window is active"
+	//DrawText 13,190+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing),"Press ESC to abort the scan and save data, while this window is active"
 	
 	// Close all open graphs
 	button killgraphs, pos={420,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={120,20},proc=sc_killgraphs,title="Close All Graphs"
 	button killabout, pos={220,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={190,20},proc=sc_controlwindows,title="Kill Sweep Control Windows"
 	
-	//Update button
+	// Update button
 	button updatebutton, pos={550,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_updatewindow,title="Update"
+
+	// Estimate point aqc time
+	button estimatebutton, pos={220,176+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={190,20},proc=sc_estimatetime,title="Estimate Acquisition Time"
+	SetVariable acqtime, pos={420,176+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={110,60}, fsize=14, title=":",value=sc_acq_time, disable=2
+	DrawText 530,195+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing),"\\Z14ms"
 EndMacro
+
+function sc_estimatetime(action) : Buttoncontrol
+	string action
+	svar sc_acq_time
+	variable delay
+	
+	sc_testreadtime(100, 0.05)
+end
 
 function sc_killgraphs(action) : Buttoncontrol
 	string action
@@ -1231,6 +1244,7 @@ end
 
 function sc_testreadtime(numpts, delay) //Units: s
 	variable numpts, delay
+	svar sc_acq_time
 
 	InitializeWaves(0, numpts, numpts, x_label="index")
 	variable i=0, ttotal = 0, tstart = datetime
@@ -1240,6 +1254,7 @@ function sc_testreadtime(numpts, delay) //Units: s
 		i+=1
 	while (i<numpts)
 	ttotal = datetime-tstart
+	sprintf sc_acq_time, "%.1f", ((ttotal/numpts)-(delay*numpts))*1000
 	printf "each sc_sleep(...) + RecordValues(...) call takes ~%.1fms \n", ttotal/numpts*1000
 	
 	sc_controlwindows("") // kill sweep control windows
@@ -1395,4 +1410,50 @@ function sc_controlwindows(action)
 			killwindow $stringfromlist(ii,openaboutwindows)	
 		endfor
 	endif
+end
+
+function EstimateSweepTime(startx, finx, numptsx, delayx, rampratex, [numbabychx, starty, finy, numptsy, delayy, rampratey, numbabychy])
+	// To-do: Get more accurate ramprates (BabyDAC)
+	//        Find correct startup time
+	//        Add scale factors if needed
+	variable startx, finx, numptsx, delayx, rampratex, numbabychx, starty, finy, numptsy, delayy, rampratey, numbabychy
+	svar sc_acq_time
+	variable acq_time, delay_time, point_move_time, move_time, total_time, startup_time
+	
+	if(paramisdefault(starty))
+		starty = 1
+	endif
+	
+	if(paramisdefault(finy))
+		finy = 1
+	endif
+	
+	if(paramisdefault(numptsy))
+		numptsy = 1
+	endif
+	
+	if(paramisdefault(delayy))
+		delayy = 0
+	endif
+	
+	if(paramisdefault(rampratey))
+		rampratey = 1000
+	endif
+	
+	if(paramisdefault(numbabychx))
+		numbabychx = 1
+	endif
+	
+	if(paramisdefault(numbabychy))
+		numbabychy = 1
+	endif
+	
+	startup_time = 5 //Not sure about this one
+	acq_time = numptsx*numptsy*str2num(sc_acq_time)/1000
+	delay_time = numptsx*numptsy*delayx + numptsy*delayy
+	point_move_time = numbabychx*abs(finx-startx)/(numptsx*rampratex)*(numptsx*numptsy) + numbabychy*abs(finy-starty)/(numptsy*rampratey)*numptsy
+	move_time = numbabychx*abs(finx-startx)/rampratex*(numptsy-1)
+	
+	total_time = startup_time+acq_time+delay_time+point_move_time+move_time
+	printf "Sweep time: %.1f s\n" total_time
 end
