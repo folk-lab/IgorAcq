@@ -165,16 +165,57 @@ function sc_NewFileAdded(path, filename)
 	getfilefolderinfo /Q/Z/P=data "qdot-server.notify"
 	if(V_isFile==0) // if the file does not exist, create it with hostname/n at the top
 		open /A/P=data refnum as "qdot-server.notify"
-		fprintf refnum, "%s\n", getHostName()
+		fprintf refnum, "%s\n", removeAllWhitespace(getHostName())
 	else // if the file does exist, open it for appending
 		open /A/P=data refnum as "qdot-server.notify"
 	endif
 	
 	string fileloc = getExpPath(path, full=0)
-	fileloc = removeAllWhitespace(fileloc)+removeAllWhitespace(filename)
+	fileloc = removeAllWhitespace(fileloc[1,inf])+removeAllWhitespace(filename)
 	fprintf refnum, "%s\n", fileloc
 	
 	close refnum
+end
+
+function sc_NotifyServer()
+	// send notification to qdot server
+	string server = "10.5.254.1"
+	variable port = 7965
+	string url = ""
+	sprintf url, "http://%s:%d", server, port
+	
+	string payload = "", buffer=""
+	variable refnum
+	open /A/P=data refnum as "qdot-server.notify"
+	
+	if(refnum==0)
+		// if there is not qdot-server.notify file
+		// I don't need to do anything
+		print "No new files available."
+		return 0
+	endif
+	
+	// add extra newline if I'm sending
+	fprintf refnum, "\n"
+	
+	close refnum
+	
+	print "sending payload to: "+url
+	URLRequest /TIME=5.0 /P=data /DFIL="qdot-server.notify" url=url, method=post
+	if (V_flag == 0)    // No error
+        if (V_responseCode != 200)  // 200 is the HTTP OK code
+            print "New file notification failed!"
+            return 0
+        else
+            // print "payload sent successfully!"
+            sc_DeleteNotificationFile()
+            return 1
+        endif
+    else
+        print "HTTP connection error. New file notification not attempted."
+        return 0
+    endif
+
 end
 
 function sc_DeleteNotificationFile()
@@ -183,52 +224,6 @@ function sc_DeleteNotificationFile()
 	if(V_flag!=0)
 		print "Failed to delete 'qdot-server.notify'"
 	endif
-end
-
-function sc_NotifyServer()
-	// send notification to qdot server
-	string server = "qdot-server.phas.ubc.ca"
-	variable port = 9999
-	string url = ""
-	sprintf url, "http://%s:%d", server, port
-	
-	string payload = "", buffer=""
-	variable refnum
-	open /R /Z=1 /P=data refnum as "qdot-server.notify"
-	
-	if(refnum==0)
-		// if there is not qdot-server.notify file
-		// I don't need to do anything
-		print "No new files available."
-		return 0
-	endif
-
-	do
-		FReadLine refnum, buffer
-		if (strlen(buffer) <= 0)
-			break
-		else
-			payload += buffer
-		endif
-	while (1)	
-	
-	close refnum
-	
-	payload += "\n\n"
-	
-//	URLRequest /TIME=2.0 /DSTR=payload url=url, method=post
-//	if (V_flag == 0)    // No error
-//        if (V_responseCode != 200)  // 200 is the HTTP OK code
-//            print "New file notification failed!"
-//            return 0
-//        else
-//            return 1
-//        endif
-//    else
-//        print "HTTP connection error. New file notification not attempted."
-//        return 0
-//    endif
-
 end
 
 function InitScanController()
