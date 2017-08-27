@@ -8,13 +8,13 @@ function sc_checksweepstate()
 	nvar sc_abortsweep, sc_pause
 	if (GetKeyState(0) & 32)
 			// If the ESC button is pressed during the scan, save existing data and stop the scan.
-			SaveWaves(msg="The scan was aborted during the execution.")
+			SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0)
 			abort
 		endif
 		
 		if(sc_abortsweep)
 			// If the Abort button is pressed during the scan, save existing data and stop the scan.
-			SaveWaves(msg="The scan was aborted during the execution.")
+			SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0)
 			dowindow /k SweepControl
 			sc_abortsweep=0
 			abort "Measurement aborted by user"
@@ -22,7 +22,7 @@ function sc_checksweepstate()
 			// Pause sweep if button is pressed
 			do
 				if(sc_abortsweep)
-					SaveWaves(msg="The scan was aborted during the execution.")
+					SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0)
 					dowindow /k SweepControl
 					sc_abortsweep=0
 					abort "Measurement aborted by user"
@@ -98,10 +98,10 @@ function /S getHostName()
 		case "Macintosh":
 			result = executeMacCmd("hostname")
 			splitstring /E="([a-zA-Z0-9\-]+).(.+)" result, hostname, location
-			return LowerStr(hostname)
+			return removeallwhitespace(LowerStr(hostname))
 		case "Windows":
 			hostname = executeWinCmd("hostname")
-			return LowerStr(hostname)
+			return removeallwhitespace(LowerStr(hostname))
 		default:
 			abort "What operating system are you running?! How?!"
 	endswitch
@@ -137,93 +137,23 @@ function /S getExpPath(whichpath, [full])
 		case "data":
 			// returns path to data relative to local_measurement_data
 			if(full==0)
-				return "./"+ReplaceString(":", temp3[1,inf], "/")
+				return "/"+ReplaceString(":", temp3[1,inf], "/")
 			else
 				return ParseFilePath(5, temp1+temp2+temp3, "*", 0, 0)
 			endif
 		case "winfs":
 			if(full==0)
-				return "./"+ReplaceString(":", temp3[1,inf], "/")+"winfs/"
+				return "/"+ReplaceString(":", temp3[1,inf], "/")+"winfs/"
 			else
 				return ParseFilePath(5, temp1+temp2+temp3+"winfs:", "*", 0, 0)
 			endif
 		case "config":
 			if(full==0)
-				return "./"+ReplaceString(":", temp3[1,inf], "/")+"config/"
+				return "/"+ReplaceString(":", temp3[1,inf], "/")+"config/"
 			else
 				return ParseFilePath(5, temp1+temp2+temp3+"config:", "*", 0, 0)
 			endif
 	endswitch
-end
-
-function sc_NewFileAdded(path, filename)
-	// path -- loction of new file: "data", "winfs", "config"
-	// filename -- name of new file
-	string path, filename
-	variable refnum
-	
-	getfilefolderinfo /Q/Z/P=data "qdot-server.notify"
-	if(V_isFile==0) // if the file does not exist, create it with hostname/n at the top
-		open /A/P=data refnum as "qdot-server.notify"
-		fprintf refnum, "%s\n", removeAllWhitespace(getHostName())
-	else // if the file does exist, open it for appending
-		open /A/P=data refnum as "qdot-server.notify"
-	endif
-	
-	string fileloc = getExpPath(path, full=0)
-	fileloc = removeAllWhitespace(fileloc[1,inf])+removeAllWhitespace(filename)
-	fprintf refnum, "%s\n", fileloc
-	
-	close refnum
-end
-
-function sc_NotifyServer()
-	// send notification to qdot server
-	string server = "10.5.254.1"
-	variable port = 7965
-	string url = ""
-	sprintf url, "http://%s:%d", server, port
-	
-	string payload = "", buffer=""
-	variable refnum
-	open /A/P=data refnum as "qdot-server.notify"
-	
-	if(refnum==0)
-		// if there is not qdot-server.notify file
-		// I don't need to do anything
-		print "No new files available."
-		return 0
-	endif
-	
-	// add extra newline if I'm sending
-	fprintf refnum, "\n"
-	
-	close refnum
-	
-	print "sending payload to: "+url
-	URLRequest /TIME=5.0 /P=data /DFIL="qdot-server.notify" url=url, method=post
-	if (V_flag == 0)    // No error
-        if (V_responseCode != 200)  // 200 is the HTTP OK code
-            print "New file notification failed!"
-            return 0
-        else
-            // print "payload sent successfully!"
-            sc_DeleteNotificationFile()
-            return 1
-        endif
-    else
-        print "HTTP connection error. New file notification not attempted."
-        return 0
-    endif
-
-end
-
-function sc_DeleteNotificationFile()
-	// delete qdot-server.notify
-	deletefile /Z/P=data "qdot-server.notify"
-	if(V_flag!=0)
-		print "Failed to delete 'qdot-server.notify'"
-	endif
 end
 
 function InitScanController()
@@ -237,7 +167,7 @@ function InitScanController()
 		abort "Data path not defined!\n"
 	endif
 	
-	newpath /C/O/Q winfs getExpPath("winf", full=1) // create/overwrite winf path
+	newpath /C/O/Q winfs getExpPath("winfs", full=1) // create/overwrite winf path
 	newpath /C/O/Q config getExpPath("config", full=1) // create/overwrite config path
 	
 	// look for config files
@@ -245,7 +175,8 @@ function InitScanController()
 	
 	if(itemsinlist(filelist)>0)
 		// read content into waves
-		sc_loadconfig(filelist)
+		filelist = SortList(filelist, ";", 1+16)
+		sc_loadconfig(StringFromList(0,filelist, ";"))
 	else
 		// These arrays should have the same size. Their indeces correspond to each other.
 		make/t/o sc_RawWaveNames = {"g1x", "g1y"} // Wave names to be created and saved
@@ -1258,43 +1189,11 @@ function saveWaveAsIBW(filename)
 	// save ibw file
 	string filename
 	Save/C/P=data $filename;
-	sc_NewFileAdded("data", filename+".ibw")
 end
 
 function saveExp()
 	// save current experiment as .pxp
 	SaveExperiment /P=data
-	
-	string expname = igorinfo(1)+".pxp"
-	
-	variable refnum
-	open /R /Z=1 /P=data refnum as "qdot-server.notify"
-	
-	if(refnum==0)
-		// if there is not qdot-server.notify file
-		// create one and add the experiment file to the list
-		sc_NewFileAdded("data", expname)
-		return 1
-	endif
-	
-	string buffer=""
-	string fullname = getExpPath("data", full=0)+expname
-	do
-		FReadLine refnum, buffer
-		buffer = removeAllWhitespace(buffer)
-		if (strlen(buffer) <= 0)
-			// if i get to the end of the file without finding the experiment 
-			// file in the list, add it
-			sc_NewFileAdded("data", expname)
-			break
-		elseif(CmpStr(buffer, fullname)==0)
-			// if the experiment file is on the list
-			// do nothing
-			break
-		endif
-	while (1)	
-	
-	close refnum
 end
 
 function SaveWaves([msg, save_experiment])
@@ -1320,6 +1219,7 @@ function SaveWaves([msg, save_experiment])
 	if (paramisdefault(save_experiment))
 		save_experiment = 1 // save the experiment by default
 	endif
+	variable /g sc_save_exp = save_experiment
 	
 	if (strlen(sc_LogStr)!=0)
 		logs = sc_LogStr
@@ -1364,22 +1264,26 @@ function SaveWaves([msg, save_experiment])
 		ii+=1
 	while (ii < numpnts(sc_CalcWaveNames))
 	
-	if(sc_PrintRaw == 0 && sc_PrintCalc == 0 && Rawadd+Calcadd > 0)
-		print "dat"+ num2str(filenum)
-	endif
+	variable t_elapsed = datetime-sc_scanstarttime
+	printf "Time elapsed: %.2f s \r", t_elapsed
+	
+	dowindow /k SweepControl
 	
 	if(Rawadd+Calcadd > 0)
-		// Save WINF for this sweep
+		printf "saving all dat%d files...\r", filenum
+		
 		saveScanComments(msg=msg, logs=logs)
+		
+		if(sc_save_exp == 1 & t_elapsed>10.0)
+			saveExp()
+		endif
+		
+		sc_findNewFiles(filenum)
+		sc_NotifyServer()
+		
 		filenum+=1
 	endif
 	
-	printf "Time elapsed: %.2f s \r", datetime-sc_scanstarttime
-	dowindow /k SweepControl
-	
-	if(save_experiment == 1)
-		saveExp()
-	endif
 end
 
 function SaveTmpWaves()
@@ -1404,7 +1308,6 @@ function SaveTmpWaves()
 				print filename
 			endif
 			Save/C/P=data $filename;
-			sc_NewFileAdded("data", filename)
 			SaveInitialWaveComments("_"+wn2d, x_label="time (s)", y_label = sc_x_label)
 		endif
 		ii+=1
@@ -1417,6 +1320,9 @@ function SaveTmpWaves()
 	endif
 
 end
+	
+
+
 
 function sc_readvstime(i, j, delay, timeout)
 	variable i, j, delay, timeout
@@ -1500,11 +1406,10 @@ function sc_createconfig()
 	
 	close refnum
 	
-	sc_NewFileAdded("config", configfile)
 end
 
-function sc_loadconfig(filelist)
-	string filelist
+function sc_loadconfig(configfile)
+	string configfile
 	variable refnum
 	string loadcontainer
 	nvar sc_PrintRaw
@@ -1515,18 +1420,8 @@ function sc_loadconfig(filelist)
 	variable i, confignum=0
 	string file_string, configunix
 	
-	make/o/d/n=(itemsinlist(filelist)) configmax=0
-	
-	for(i=0;i<itemsinlist(filelist);i=i+1)
-		file_string = stringfromlist(i,filelist)
-		splitstring/e=("sc([[:digit:]]+).config") file_string, configunix
-		confignum = str2num(configunix)
-		configmax[i] = confignum
-	endfor
-	confignum = wavemax(configmax)
-	
-	open /z/r/p=config refnum as "sc"+num2istr(confignum)+".config"
-	printf "Loading configuration from: %s\n", "sc"+num2istr(confignum)+".config"
+	open /z/r/p=config refnum as configfile
+	printf "Loading configuration from: %s\n", configfile
 	
 	// load raw wave configuration
 	freadline/t=(num2char(13)) refnum, loadcontainer
