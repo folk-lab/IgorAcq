@@ -1264,8 +1264,8 @@ function SaveWaves([msg, save_experiment])
 		ii+=1
 	while (ii < numpnts(sc_CalcWaveNames))
 	
-	variable t_elapsed = datetime-sc_scanstarttime
-	printf "Time elapsed: %.2f s \r", t_elapsed
+	variable /g sweep_t_elapsed = datetime-sc_scanstarttime
+	printf "Time elapsed: %.2f s \r", sweep_t_elapsed
 	
 	dowindow /k SweepControl
 	
@@ -1274,7 +1274,7 @@ function SaveWaves([msg, save_experiment])
 		
 		saveScanComments(msg=msg, logs=logs)
 		
-		if(sc_save_exp == 1 & t_elapsed>10.0)
+		if(sc_save_exp == 1 & sweep_t_elapsed>10.0)
 			saveExp()
 		endif
 		

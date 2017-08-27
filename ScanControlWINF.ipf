@@ -120,7 +120,7 @@ function /S calcWaveStrs()
 end
 
 function /s getExpStatus()
-	nvar filenum, sc_scanstarttime
+	nvar filenum, sweep_t_elapsed
 	
 	// create header with corresponding .ibw name and date
 	string output="", buffer="" 
@@ -131,7 +131,7 @@ function /s getExpStatus()
 	sprintf buffer, "data path:  %s \r", ReplaceString(":", getExpPath("data"), "/"); output+=buffer // path to data 
 	sprintf buffer, "system info: %s \r", ReplaceString(":",igorinfo(3),"="); output+=buffer // system information
 	sprintf buffer, "measurement completed:  %s %s \r", Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); output+=buffer // time of file save
-	sprintf buffer, "time elapsed:  %.2f s \r", datetime-sc_scanstarttime; output+=buffer
+	sprintf buffer, "time elapsed:  %.2f s \r", sweep_t_elapsed; output+=buffer
 	
 	// scan control info
 	sprintf buffer, "raw data waves:  %s \r", rawWaveStrs(); output+=buffer 
@@ -415,17 +415,16 @@ function getSlackNotice(username, [message, channel, botname, emoji, min_time])
 	//					defaults to 60 seconds
 	string username, channel, message, botname, emoji
 	variable min_time
-	nvar filenum, sc_scanstarttime, sc_abortsweep
+	nvar filenum, sweep_t_elapsed, sc_abortsweep
 	svar slack_url
 	string txt="", buffer="", payload=""
 	
 	//// check if I need a notification ////
-	variable t_elapsed = datetime-sc_scanstarttime;
 	if (paramisdefault(min_time))
 		min_time = 60.0 // seconds
 	endif
-	
-	if(t_elapsed < min_time)
+
+	if(sweep_t_elapsed < min_time)
 		return 0 // no notification if min_time is not exceeded
 	endif
 	
@@ -447,7 +446,7 @@ function getSlackNotice(username, [message, channel, botname, emoji, min_time])
 	endif
 		
 	sprintf buffer, "dat%d completed:  %s %s \r", filenum, Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); txt+=buffer 
-	sprintf buffer, "time elapsed:  %.2f s \r", datetime-sc_scanstarttime; txt+=buffer
+	sprintf buffer, "time elapsed:  %.2f s \r", sweep_t_elapsed; txt+=buffer
 	//// end build txt ////
 	
 	
