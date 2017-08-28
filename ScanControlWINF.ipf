@@ -18,20 +18,11 @@ function /s str2WINF(datname, s)
 	variable refnum
 	nvar filenum
 	
-	string extension, filename, datapath, winfpath
+	string extension, filename
 	extension = "." + num2istr(unixtime()) + ".winf"
 	filename =  "dat" + num2istr(filenum) + datname + extension
-	pathinfo data; datapath=S_path
-	winfpath = datapath+"winfs:"
+	open /A/P=winfs refnum as filename
 	
-	//	GetFileFolderInfo /Q /Z=1 winfpath // check if directory exists
-	//	if (V_flag!=0)
-	//		// create folder
-	//	endif
-
-	newpath /C/O/Q winfs winfpath // easier just to add/create a path
-	
-	open /A refnum as winfpath+filename
 	do
 		if(strlen(s)<500)
 			fprintf refnum, "%s", s
@@ -42,6 +33,7 @@ function /s str2WINF(datname, s)
 		endif
 	while(1)
 	close refnum
+	
 	return filename
 end
 
@@ -128,7 +120,7 @@ function /S calcWaveStrs()
 end
 
 function /s getExpStatus()
-	nvar filenum, sc_scanstarttime
+	nvar filenum, sweep_t_elapsed
 	
 	// create header with corresponding .ibw name and date
 	string output="", buffer="" 
@@ -136,15 +128,14 @@ function /s getExpStatus()
 	// date/time info
 	sprintf buffer, "dataset:  dat%d*.ibw \r", filenum; output+=buffer
 	sprintf buffer, "filenum: %d \r", filenum; output+=buffer
-	pathinfo data
-	sprintf buffer, "data path:  %s \r", ReplaceString(":", S_path, "/"); output+=buffer // path to data 
+	sprintf buffer, "data path:  %s \r", ReplaceString(":", getExpPath("data"), "/"); output+=buffer // path to data 
 	sprintf buffer, "system info: %s \r", ReplaceString(":",igorinfo(3),"="); output+=buffer // system information
 	sprintf buffer, "measurement completed:  %s %s \r", Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); output+=buffer // time of file save
-	sprintf buffer, "time elapsed:  %.2f s \r", datetime-sc_scanstarttime; output+=buffer
+	sprintf buffer, "time elapsed:  %.2f s \r", sweep_t_elapsed; output+=buffer
 	
 	// scan control info
-	sprintf buffer, "raw data waves:  %s \r", rawWaveStrs(); output+=buffer // path to data 
-	sprintf buffer, "calculated data waves:  %s \r", calcWaveStrs(); output+=buffer // path to data
+	sprintf buffer, "raw data waves:  %s \r", rawWaveStrs(); output+=buffer 
+	sprintf buffer, "calculated data waves:  %s \r", calcWaveStrs(); output+=buffer
 
 	return output
 end
@@ -159,8 +150,7 @@ function /s getWaveStatus(datname)
 	// date/time info
 	sprintf buffer, "wave name:  dat%d%s.ibw \r", filenum, datname; output+=buffer
 	sprintf buffer, "filenum: %d \r", filenum; output+=buffer
-	pathinfo data
-	sprintf buffer, "data path:  %sdat%d%s.ibw \r", ReplaceString(":", S_path, "/"), filenum,datname; output+=buffer
+	sprintf buffer, "data path:  %sdat%d%s.ibw \r", ReplaceString(":", getExpPath("data"), "/"), filenum, datname; output+=buffer
 	
 	// wave info
 	//check if wave is 1d or 2d
@@ -244,7 +234,6 @@ function /S saveScanComments([msg, logs])
 		comments = comments[0,strlen(comments)-2]
 	endif
 	str2WINF("", comments)
-	// return "\r" + comments
 end
 
 function /S SaveInitialWaveComments(datname, [title, x_label, y_label, z_label, x_multiplier, y_multiplier, z_multiplier, display_thumbnail])
@@ -303,7 +292,114 @@ function /S SaveInitialWaveComments(datname, [title, x_label, y_label, z_label, 
 	comments += "\r"+"comments:  \r"
 	
 	str2WINF(datname, comments)
-	//return "\r"+comments
+end
+
+function sc_findNewFiles(datnum)
+	// path -- loction of new file: "data", "winfs", "config"
+	// filename -- name of new file
+	variable datnum
+	variable refnum
+	nvar sc_save_exp
+	string winfpath = getExpPath("winfs", full=0)
+	string configpath = getExpPath("config", full=0)
+	string datapath = getExpPath("data", full=0)
+	
+	//// create/open qdot-server.notify ////
+	
+	getfilefolderinfo /Q/Z/P=data "qdot-server.notify"
+	if(V_isFile==0) // if the file does not exist, create it with hostname/n at the top
+		open /A/P=data refnum as "qdot-server.notify"
+		fprintf refnum, "%s\n", getHostName()
+	else // if the file does exist, open it for appending
+		open /A/P=data refnum as "qdot-server.notify"
+	endif
+	
+	string tmpname = ""
+	// add the most recent config file
+	string configlist = greplist(indexedfile(config,-1,".config"),"sc")
+	
+	if(itemsinlist(configlist)>0)
+		// read content into waves
+		configlist = SortList(configlist, ";", 1+16)
+		tmpname = configpath+StringFromList(0,configlist, ";")
+		grep /Q /E=tmpname /p=data "qdot-server.notify"
+		if(V_value==0)
+			fprintf refnum, "%s\n", tmpname
+		endif
+	endif
+	
+	// add experiment file?
+	if(sc_save_exp == 1)
+		tmpname = datapath+igorinfo(1)+".pxp"
+		grep /Q /E=tmpname /p=data "qdot-server.notify"
+		if(V_value==0)
+			fprintf refnum, "%s\n", tmpname
+		endif
+	endif
+	
+	// find new data files
+	string datstr = "dat"+num2str(datnum)+"*"
+	string datlist = IndexedFile(data, -1, ".ibw")
+	datlist = ListMatch(datlist, datstr, ";")
+	variable i=0
+	for(i = 0 ; i < itemsinlist(datlist, ";") ; i+=1)
+		tmpname = datapath+StringFromList(i,datlist, ";")
+		fprintf refnum, "%s\n", tmpname
+	endfor
+	
+	// find new data files
+	string winflist = IndexedFile(winfs, -1, ".winf")
+	winflist = ListMatch(winflist, datstr, ";")
+	for(i = 0 ; i < itemsinlist(winflist, ";") ; i+=1)
+		tmpname = winfpath+StringFromList(i,winflist, ";")
+		fprintf refnum, "%s\n", tmpname
+	endfor
+	
+	close refnum // close qdot-server.notify
+end
+
+function sc_NotifyServer()
+	// send notification to qdot server
+	string server = "10.5.254.1"
+	variable port = 7965
+	string url = ""
+	sprintf url, "http://%s:%d", server, port
+	
+	variable refnum
+	open /A/P=data refnum as "qdot-server.notify"
+	
+	if(refnum==0)
+		// if there is not qdot-server.notify file
+		// I don't need to do anything
+		print "No new files available."
+		return 0
+	else
+		fprintf refnum, "\n"
+		close refnum
+	endif
+
+	URLRequest /TIME=5.0 /P=data /DFIL="qdot-server.notify" url=url, method=post
+	if (V_flag == 0)    // No error
+        if (V_responseCode != 200)  // 200 is the HTTP OK code
+            print "New file notification failed!"
+            return 0
+        else
+            sc_DeleteNotificationFile()
+            return 1
+        endif
+    else
+        print "HTTP connection error. New file notification not attempted."
+        return 0
+    endif
+
+end
+
+function sc_DeleteNotificationFile()
+	// delete qdot-server.notify
+	deletefile /Z/P=data "qdot-server.notify"
+	if(V_flag!=0)
+		print "Failed to delete 'qdot-server.notify'"
+	endif
 end
 
 function getSlackNotice(username, [message, channel, botname, emoji, min_time])
@@ -319,17 +415,16 @@ function getSlackNotice(username, [message, channel, botname, emoji, min_time])
 	//					defaults to 60 seconds
 	string username, channel, message, botname, emoji
 	variable min_time
-	nvar filenum, sc_scanstarttime, sc_abortsweep
+	nvar filenum, sweep_t_elapsed, sc_abortsweep
 	svar slack_url
 	string txt="", buffer="", payload=""
 	
 	//// check if I need a notification ////
-	variable t_elapsed = datetime-sc_scanstarttime;
 	if (paramisdefault(min_time))
 		min_time = 60.0 // seconds
 	endif
-	
-	if(t_elapsed < min_time)
+
+	if(sweep_t_elapsed < min_time)
 		return 0 // no notification if min_time is not exceeded
 	endif
 	
@@ -351,7 +446,7 @@ function getSlackNotice(username, [message, channel, botname, emoji, min_time])
 	endif
 		
 	sprintf buffer, "dat%d completed:  %s %s \r", filenum, Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); txt+=buffer 
-	sprintf buffer, "time elapsed:  %.2f s \r", datetime-sc_scanstarttime; txt+=buffer
+	sprintf buffer, "time elapsed:  %.2f s \r", sweep_t_elapsed; txt+=buffer
 	//// end build txt ////
 	
 	

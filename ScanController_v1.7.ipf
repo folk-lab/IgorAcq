@@ -8,13 +8,13 @@ function sc_checksweepstate()
 	nvar sc_abortsweep, sc_pause
 	if (GetKeyState(0) & 32)
 			// If the ESC button is pressed during the scan, save existing data and stop the scan.
-			SaveWaves(msg="The scan was aborted during the execution.")
+			SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0)
 			abort
 		endif
 		
 		if(sc_abortsweep)
 			// If the Abort button is pressed during the scan, save existing data and stop the scan.
-			SaveWaves(msg="The scan was aborted during the execution.")
+			SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0)
 			dowindow /k SweepControl
 			sc_abortsweep=0
 			abort "Measurement aborted by user"
@@ -22,7 +22,7 @@ function sc_checksweepstate()
 			// Pause sweep if button is pressed
 			do
 				if(sc_abortsweep)
-					SaveWaves(msg="The scan was aborted during the execution.")
+					SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0)
 					dowindow /k SweepControl
 					sc_abortsweep=0
 					abort "Measurement aborted by user"
@@ -49,19 +49,134 @@ function sc_sleep(delay)
 	while(datetime-start_time < delay)
 end
 
+// system information //
+
+function/S executeWinCmd(command)
+	// http://www.igorexchange.com/node/938
+	string command
+	string IPUFpath = SpecialDirPath("Igor Pro User Files",0,1,0)	// guaranteed writeable path in IP6
+	string batchFileName = "ExecuteWinCmd.bat", outputFileName = "ExecuteWinCmd.out"
+	string outputLine, result = ""
+	variable refNum
+	 
+	NewPath/O/Q IgorProUserFiles, IPUFpath
+	Open/P=IgorProUserFiles refNum as batchFileName	// overwrites previous batchfile
+	fprintf refNum,"cmd/c \"%s > \"%s%s\"\"\r", command, IPUFpath, outputFileName
+	Close refNum
+	ExecuteScriptText/B "\"" + IPUFpath + "\\" + batchFileName + "\""
+	Open/P=IgorProUserFiles/R refNum as outputFileName
+	
+	do
+		FReadLine refNum, outputLine
+		if( strlen(outputLine) == 0 )
+			break
+		endif
+		result += outputLine
+	while( 1 )
+	Close refNum
+	return result
+end
+
+function/S executeMacCmd(command)
+	// http://www.igorexchange.com/node/938
+	string command
+
+	string cmd
+	sprintf cmd, "do shell script \"%s\"", command
+	ExecuteScriptText cmd
+
+	return S_value
+end
+
+
+function /S getHostName()
+	// find the name of the computer Igor is running on
+	string platform = igorinfo(2)
+	string result, hostname, location
+	
+	strswitch(platform)
+		case "Macintosh":
+			result = executeMacCmd("hostname")
+			splitstring /E="([a-zA-Z0-9\-]+).(.+)" result, hostname, location
+			return removeallwhitespace(LowerStr(hostname))
+		case "Windows":
+			hostname = executeWinCmd("hostname")
+			return removeallwhitespace(LowerStr(hostname))
+		default:
+			abort "What operating system are you running?! How?!"
+	endswitch
+	
+end
+
+function /S getExpPath(whichpath, [full])
+	// whichpath determines which path will be returned (data, winfs, config)
+	// root always gives the path to local_measurement_data
+	// if full==1, the full path on the local machine is returned in native style
+	// if full==0, the path relative to local_measurement_data is returned in Unix style
+	string whichpath
+	variable full
+	
+	if(paramisdefault(full))
+		full=0
+	endif
+	
+	pathinfo data // get path info
+	
+	if(V_flag == 0) // check if path is defined
+		abort "data path is not defined!\n"
+	endif
+	
+	// get relative path to data
+	string temp1, temp2, temp3
+	SplitString/E="([\w\s\-\:]+)(?i)(local[\s\_]measurement[\s\_]data)([\w\s\-\:]+)" S_path, temp1, temp2, temp3
+		
+	strswitch(whichpath)
+		case "root":
+			// returns path to local_measurement_data on local machine
+			return ParseFilePath(5, temp1+temp2, "*", 0, 0)
+		case "data":
+			// returns path to data relative to local_measurement_data
+			if(full==0)
+				return "/"+ReplaceString(":", temp3[1,inf], "/")
+			else
+				return ParseFilePath(5, temp1+temp2+temp3, "*", 0, 0)
+			endif
+		case "winfs":
+			if(full==0)
+				return "/"+ReplaceString(":", temp3[1,inf], "/")+"winfs/"
+			else
+				return ParseFilePath(5, temp1+temp2+temp3+"winfs:", "*", 0, 0)
+			endif
+		case "config":
+			if(full==0)
+				return "/"+ReplaceString(":", temp3[1,inf], "/")+"config/"
+			else
+				return ParseFilePath(5, temp1+temp2+temp3+"config:", "*", 0, 0)
+			endif
+	endswitch
+end
+
 function InitScanController()
 	string filelist = ""
-	string /g slack_url =  "https://hooks.slack.com/services/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"
-	
-	GetFileFolderInfo/z/q/p=config
-	
-	if(v_flag==0)
-		filelist = greplist(indexedfile(config,-1,".config"),"sc")
+	string /g slack_url =  "https://hooks.slack.com/services/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" // url for slack alert
+	string /g sc_hostname = getHostName() // machine name
+
+	// Check if data path is definded
+	GetFileFolderInfo/Z/Q/P=data
+	if(v_flag != 0 || v_isfolder != 1)
+		abort "Data path not defined!\n"
 	endif
+	
+	newpath /C/O/Q winfs getExpPath("winfs", full=1) // create/overwrite winf path
+	newpath /C/O/Q config getExpPath("config", full=1) // create/overwrite config path
+	
+	// look for config files
+	filelist = greplist(indexedfile(config,-1,".config"),"sc")
 	
 	if(itemsinlist(filelist)>0)
 		// read content into waves
-		sc_loadconfig(filelist)
+		filelist = SortList(filelist, ";", 1+16)
+		sc_loadconfig(StringFromList(0,filelist, ";"))
 	else
 		// These arrays should have the same size. Their indeces correspond to each other.
 		make/t/o sc_RawWaveNames = {"g1x", "g1y"} // Wave names to be created and saved
@@ -383,20 +498,6 @@ function sc_CheckboxClicked(ControlName, Value)
 	endif
 end
 
-Function/S RemoveEndingWhitespace(str)
-	// stolen from http://www.igorexchange.com/node/2957
-	String str
- 
-	do
-		String str2= RemoveEnding(str," ")
-		if( CmpStr(str2, str) == 0 )
-			break
-		endif
-		str= str2
-	while( 1 )
-	return str
-End
-
 function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_label])
 	variable start, fin, numpts, starty, finy, numptsy
 	string x_label, y_label
@@ -450,11 +551,11 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	variable ii=0
 	do
 		if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
-			script = RemoveEndingWhitespace(sc_RequestScripts[ii])
+			script = RemoveTrailingWhitespace(sc_RequestScripts[ii])
 			if(cmpstr(script, "")!=0) // it's ok if this one is empty
 				// check if there is more than one command
-				script0 = RemoveEndingWhitespace(stringfromlist(0, script)) // should be something here
-				script1 = RemoveEndingWhitespace(stringfromlist(1, script)) // should be nothing here
+				script0 = RemoveTrailingWhitespace(stringfromlist(0, script)) // should be something here
+				script1 = RemoveTrailingWhitespace(stringfromlist(1, script)) // should be nothing here
 				if(cmpstr(script1, "")!=0 ||  strsearch(script0, "()", 0)==-1) // check that script1 is empty and script0 contains ()
 					abort "Request scripts should be formatted as: setParam() with no arguments and only a single function call"
 				else
@@ -469,11 +570,11 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	ii=0
 	do
 		if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
-			script = RemoveEndingWhitespace(sc_GetResponseScripts[ii])
+			script = RemoveTrailingWhitespace(sc_GetResponseScripts[ii])
 			
 			// check if there is more than one command
-			script0 = RemoveEndingWhitespace(stringfromlist(0, script)) // should be something here
-			script1 = RemoveEndingWhitespace(stringfromlist(1, script)) // should be nothing here
+			script0 = RemoveTrailingWhitespace(stringfromlist(0, script)) // should be something here
+			script1 = RemoveTrailingWhitespace(stringfromlist(1, script)) // should be nothing here
 			if(cmpstr(script1, "")!=0 ||  strsearch(script0, "()", 0)==-1) // check that script1 is empty and script0 contains ()
 				abort "Response scripts should be formatted as: getParam() with no arguments and only a single function call"
 			else
@@ -482,12 +583,6 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		endif
 		ii+=1
 	while (ii < numpnts(sc_RawWaveNames))
-	
-	//Check if Data exsits as a path
-	GetFileFolderInfo/Z/Q/P=Data
-	if(V_Flag != 0 || V_isFolder != 1)
-		abort "The path Data is not defined correctly."
-	endif
 	
 	// The status of the upcoming scan will be set when waves are initialized.
 	if(!paramisdefault(starty) && !paramisdefault(finy) && !paramisdefault(numptsy))
@@ -1090,8 +1185,20 @@ function RecordTmpValues(index, innerindex, outerindex)
 	
 end
 
+function saveWaveAsIBW(filename)
+	// save ibw file
+	string filename
+	Save/C/P=data $filename;
+end
+
+function saveExp()
+	// save current experiment as .pxp
+	SaveExperiment /P=data
+end
+
 function SaveWaves([msg, save_experiment])
 	// the message will be printed in the history, and will be saved in the winf file corresponding to this scan
+	// save_experiment=1 to save the experiment file
 	string msg
 	variable save_experiment
 	nvar sc_is2d, sc_PrintRaw, sc_PrintCalc
@@ -1111,9 +1218,8 @@ function SaveWaves([msg, save_experiment])
 	
 	if (paramisdefault(save_experiment))
 		save_experiment = 1 // save the experiment by default
-	else
-		save_experiment = 0 // do not save the experiment 
 	endif
+	variable /g sc_save_exp = save_experiment
 	
 	if (strlen(sc_LogStr)!=0)
 		logs = sc_LogStr
@@ -1132,13 +1238,12 @@ function SaveWaves([msg, save_experiment])
 			if(sc_PrintRaw == 1)
 				print filename
 			endif
-			Save/C/P=data $filename;
+			saveWaveAsIBW(filename)
 			SaveInitialWaveComments(wn, x_label=sc_x_label, y_label=sc_y_label)
-			//Save/C/P=backup $filename;
-
 		endif
 		ii+=1
 	while (ii < numpnts(sc_RawWaveNames))
+	
 	// Calculated Data
 	ii=0
 	do
@@ -1153,28 +1258,32 @@ function SaveWaves([msg, save_experiment])
 			if(sc_PrintCalc == 1)
 				print filename
 			endif
-			Save/C/P=data $filename;
+			saveWaveAsIBW(filename)
 			SaveInitialWaveComments(wn, x_label=sc_x_label, y_label=sc_y_label)
 		endif
 		ii+=1
 	while (ii < numpnts(sc_CalcWaveNames))
 	
-	if(sc_PrintRaw == 0 && sc_PrintCalc == 0 && Rawadd+Calcadd > 0)
-		print "dat"+ num2str(filenum)
-	endif
+	variable /g sweep_t_elapsed = datetime-sc_scanstarttime
+	printf "Time elapsed: %.2f s \r", sweep_t_elapsed
+	
+	dowindow /k SweepControl
 	
 	if(Rawadd+Calcadd > 0)
-		// Save WINF for this sweep
+		printf "saving all dat%d files...\r", filenum
+		
 		saveScanComments(msg=msg, logs=logs)
+		
+		if(sc_save_exp == 1 & sweep_t_elapsed>10.0)
+			saveExp()
+		endif
+		
+		sc_findNewFiles(filenum)
+		sc_NotifyServer()
+		
 		filenum+=1
 	endif
 	
-	printf "Time elapsed: %.2f s \r", datetime-sc_scanstarttime
-	dowindow /k SweepControl
-	
-	if(save_experiment == 1)
-		SaveExperiment/p=data
-	endif
 end
 
 function SaveTmpWaves()
@@ -1211,6 +1320,9 @@ function SaveTmpWaves()
 	endif
 
 end
+	
+
+
 
 function sc_readvstime(i, j, delay, timeout)
 	variable i, j, delay, timeout
@@ -1261,19 +1373,7 @@ function sc_createconfig()
 	svar sc_ColorMap
 	nvar filenum
 	variable refnum
-	string configfile, datapath, configpath
-	
-	// Check if data path is definded
-	GetFileFolderInfo/Z/Q/P=data
-	
-	if(v_flag != 0 || v_isfolder != 1)
-		print "Data path no defined. No config file created!\n"
-		return 0
-	else
-		pathinfo data; datapath=S_path
-		configpath = datapath+"config:"
-		newpath /C/O/Q config configpath // easier just to add/create a path than to check
-	endif
+	string configfile
 	
 	configfile = "sc" + num2istr(unixtime()) + ".config"
 	
@@ -1305,10 +1405,11 @@ function sc_createconfig()
 	fprintf refnum, "%g\r", filenum
 	
 	close refnum
+	
 end
 
-function sc_loadconfig(filelist)
-	string filelist
+function sc_loadconfig(configfile)
+	string configfile
 	variable refnum
 	string loadcontainer
 	nvar sc_PrintRaw
@@ -1319,18 +1420,8 @@ function sc_loadconfig(filelist)
 	variable i, confignum=0
 	string file_string, configunix
 	
-	make/o/d/n=(itemsinlist(filelist)) configmax=0
-	
-	for(i=0;i<itemsinlist(filelist);i=i+1)
-		file_string = stringfromlist(i,filelist)
-		splitstring/e=("sc([[:digit:]]+).config") file_string, configunix
-		confignum = str2num(configunix)
-		configmax[i] = confignum
-	endfor
-	confignum = wavemax(configmax)
-	
-	open /z/r/p=config refnum as "sc"+num2istr(confignum)+".config"
-	printf "Loading configuration from: %s\n", "sc"+num2istr(confignum)+".config"
+	open /z/r/p=config refnum as configfile
+	printf "Loading configuration from: %s\n", configfile
 	
 	// load raw wave configuration
 	freadline/t=(num2char(13)) refnum, loadcontainer
