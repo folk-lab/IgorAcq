@@ -10,6 +10,111 @@ function unixtime()
 	return DateTime - date2secs(1970,1,1) - date2secs(-1,-1,-1)
 end
 
+function/S executeWinCmd(command)
+	// http://www.igorexchange.com/node/938
+	string command
+	string IPUFpath = SpecialDirPath("Igor Pro User Files",0,1,0)	// guaranteed writeable path in IP6
+	string batchFileName = "ExecuteWinCmd.bat", outputFileName = "ExecuteWinCmd.out"
+	string outputLine, result = ""
+	variable refNum
+	 
+	NewPath/O/Q IgorProUserFiles, IPUFpath
+	Open/P=IgorProUserFiles refNum as batchFileName	// overwrites previous batchfile
+	fprintf refNum,"cmd/c \"%s > \"%s%s\"\"\r", command, IPUFpath, outputFileName
+	Close refNum
+	ExecuteScriptText/B "\"" + IPUFpath + "\\" + batchFileName + "\""
+	Open/P=IgorProUserFiles/R refNum as outputFileName
+	
+	do
+		FReadLine refNum, outputLine
+		if( strlen(outputLine) == 0 )
+			break
+		endif
+		result += outputLine
+	while( 1 )
+	Close refNum
+	return result
+end
+
+function/S executeMacCmd(command)
+	// http://www.igorexchange.com/node/938
+	string command
+
+	string cmd
+	sprintf cmd, "do shell script \"%s\"", command
+	ExecuteScriptText cmd
+
+	return S_value
+end
+
+
+function /S getHostName()
+	// find the name of the computer Igor is running on
+	string platform = igorinfo(2)
+	string result, hostname, location
+	
+	strswitch(platform)
+		case "Macintosh":
+			result = executeMacCmd("hostname")
+			splitstring /E="([a-zA-Z0-9\-]+).(.+)" result, hostname, location
+			return removeallwhitespace(LowerStr(hostname))
+		case "Windows":
+			hostname = executeWinCmd("hostname")
+			return removeallwhitespace(LowerStr(hostname))
+		default:
+			abort "What operating system are you running?! How?!"
+	endswitch
+	
+end
+
+function /S getExpPath(whichpath, [full])
+	// whichpath determines which path will be returned (data, winfs, config)
+	// root always gives the path to local_measurement_data
+	// if full==1, the full path on the local machine is returned in native style
+	// if full==0, the path relative to local_measurement_data is returned in Unix style
+	string whichpath
+	variable full
+	
+	if(paramisdefault(full))
+		full=0
+	endif
+	
+	pathinfo data // get path info
+	
+	if(V_flag == 0) // check if path is defined
+		abort "data path is not defined!\n"
+	endif
+	
+	// get relative path to data
+	string temp1, temp2, temp3
+	SplitString/E="([\w\s\-\:]+)(?i)(local[\s\_]measurement[\s\_]data)([\w\s\-\:]+)" S_path, temp1, temp2, temp3
+		
+	strswitch(whichpath)
+		case "root":
+			// returns path to local_measurement_data on local machine
+			return ParseFilePath(5, temp1+temp2, "*", 0, 0)
+		case "data":
+			// returns path to data relative to local_measurement_data
+			if(full==0)
+				return "/"+ReplaceString(":", temp3[1,inf], "/")
+			else
+				return ParseFilePath(5, temp1+temp2+temp3, "*", 0, 0)
+			endif
+		case "winfs":
+			if(full==0)
+				return "/"+ReplaceString(":", temp3[1,inf], "/")+"winfs/"
+			else
+				return ParseFilePath(5, temp1+temp2+temp3+"winfs:", "*", 0, 0)
+			endif
+		case "config":
+			if(full==0)
+				return "/"+ReplaceString(":", temp3[1,inf], "/")+"config/"
+			else
+				return ParseFilePath(5, temp1+temp2+temp3+"config:", "*", 0, 0)
+			endif
+	endswitch
+end
+
 function /s str2WINF(datname, s)
 	// string s to winf file 
 	// this assumes you have a path called data for your experiment
