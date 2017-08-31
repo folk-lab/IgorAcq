@@ -1,5 +1,14 @@
 #pragma rtGlobals=3		// Use modern global access method and strict wave access.
 
+
+// these tests do exactly what I wanted
+// Async is a considerable speed improvement over Sync
+// the problem is that none of the existing instrument communication XOPs are threadsafe
+// Options:
+//     
+
+
+
 //// All the getFuncs (and any functions/XOPs they call) must be threadSafe ////
 
 ThreadSafe function getFunc()
