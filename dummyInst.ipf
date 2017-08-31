@@ -29,26 +29,26 @@ end
 
 ///// setParam EXAMPLE /////
 
-function /S setPlungerFine(idx, setpoint, ramprate, update)
-	// dummy instrument to set plunger gate
-	// this will
-	variable idx, setpoint, ramprate, update
-	wave /t dacvalsstr
-	
-	variable courseCh = 0, fineCh = 2
-	variable courseVal = str2num(dacvalsstr[0][1]), fineVal
-	
-	// output = courseVal + fineVal/40.0 + 125 <-- depends on BD setup
-	fineVal = (setpoint - courseVal -125)*40.0
-	RampOutputBD(fineCh, fineVal, ramprate=ramprate, update=update)
-	
-	if(idx==-1)
-		// setup some stuff if necessary
-		return "plunger (mV)"
-	else
-		return num2str(fineVal)
-	endif
-end
+//function /S setPlungerFine(idx, setpoint, ramprate, update)
+//	// dummy instrument to set plunger gate
+//	// this will
+//	variable idx, setpoint, ramprate, update
+//	wave /t dacvalsstr
+//	
+//	variable courseCh = 0, fineCh = 2
+//	variable courseVal = str2num(dacvalsstr[0][1]), fineVal
+//	
+//	// output = courseVal + fineVal/40.0 + 125 <-- depends on BD setup
+//	fineVal = (setpoint - courseVal -125)*40.0
+//	RampOutputBD(fineCh, fineVal, ramprate=ramprate, update=update)
+//	
+//	if(idx==-1)
+//		// setup some stuff if necessary
+//		return "plunger (mV)"
+//	else
+//		return num2str(fineVal)
+//	endif
+//end
 
 ////////////////////////////
 
@@ -90,7 +90,7 @@ function ScanDummy2D(setfuncx, setfuncy, startx, finx, numptsx, delayx, ramprate
 	string setfuncx, setfuncy, comments
 	string x_label, y_label
 	variable i=0, j=0, setpointx, setpointy
-	svar dummy_instx, dummy_insty
+	string /g dummy_instx, dummy_insty
 
 	if(paramisdefault(comments))
 		comments=""
