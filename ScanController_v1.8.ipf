@@ -11,11 +11,16 @@
 //     -- remove support for time averaging over any parameter. it is rarely useful and confusing 
 //     -- add option to push new file notifications to qdot-server 
 //     -- fill 2D arrays point by point not line by line 
+//     -- remove restriction on Request/Response scripts -- go back to using execute()
 
 // TODO: 
-//     -- remove restriction on Request/Response scripts -- go back to using execute()
 //     -- add a new type of value to record that can/will be read during sc_sleep
 //     -- start using JSON format for sc config files
+
+// FUTURE:
+//     -- Convert all WINF files to use JSON format
+//     -- Test a ScanControllerHDF5 package to put all sweep information in a single HDF5 file
+//     -- Write a RecordValuesAsync function that can parallelize instrument calls by opening multiple threads
 
 ///////////////////////////////
 ////// utility functions //////
@@ -385,11 +390,13 @@ function sc_rebuildwindow()
 	execute("ScanController()")
 end
 
-// In order to enable or disable a wave, call these two functions instead of messing with the waves sc_RawRecord and sc_CalcRecord directly
+// In order to enable or disable a wave
+// call these two functions instead of messing with the waves sc_RawRecord and sc_CalcRecord directly
 function EnableScanControllerItem(wn)
 	string wn
 	ChangeScanControllerItemStatus(wn, 1)
 end
+
 function DisableScanControllerItem(wn)
 	string wn
 	ChangeScanControllerItemStatus(wn, 0)
@@ -698,44 +705,6 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	while (i<numpnts(sc_CalcWaveNames))	
 	i=0
 	
-	// check that request and response scripts are defined correctly
-	// check request scripts first
-	variable ii=0
-	do
-		if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
-			script = RemoveTrailingWhitespace(sc_RequestScripts[ii])
-			if(cmpstr(script, "")!=0) // it's ok if this one is empty
-				// check if there is more than one command
-				script0 = RemoveTrailingWhitespace(stringfromlist(0, script)) // should be something here
-				script1 = RemoveTrailingWhitespace(stringfromlist(1, script)) // should be nothing here
-				if(cmpstr(script1, "")!=0 ||  strsearch(script0, "()", 0)==-1) // check that script1 is empty and script0 contains ()
-					abort "Request scripts should be formatted as: setParam() with no arguments and only a single function call"
-				else
-					sc_RequestScripts[ii] = script0
-				endif
-			endif
-		endif
-		ii+=1
-	while (ii < numpnts(sc_RawWaveNames))
-	
-	// check response scripts
-	ii=0
-	do
-		if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
-			script = RemoveTrailingWhitespace(sc_GetResponseScripts[ii])
-			
-			// check if there is more than one command
-			script0 = RemoveTrailingWhitespace(stringfromlist(0, script)) // should be something here
-			script1 = RemoveTrailingWhitespace(stringfromlist(1, script)) // should be nothing here
-			if(cmpstr(script1, "")!=0 ||  strsearch(script0, "()", 0)==-1) // check that script1 is empty and script0 contains ()
-				abort "Response scripts should be formatted as: getParam() with no arguments and only a single function call"
-			else
-				sc_GetResponseScripts[ii] = script0
-			endif
-		endif
-		ii+=1
-	while (ii < numpnts(sc_RawWaveNames))
-	
 	// The status of the upcoming scan will be set when waves are initialized.
 	if(!paramisdefault(starty) && !paramisdefault(finy) && !paramisdefault(numptsy))
 		sc_is2d = 1
@@ -1034,18 +1003,6 @@ end
 /////////////////////////////
 ////  read/record funcs  ////
 /////////////////////////////
-
-function protofunc()
-	/// this function will be used to format function calls from strings
-	/// in this revision, all functions in requestscripts and responsescripts must take no arguments
-	///
-	/// for example:
-	/// getTemp("mc")
-	/// should be replaced with a function like
-	/// function getMCTemp()
- 	/// 	return getTemp("mc")
- 	/// end
- end	
  	
 function RecordValues(i, j, [scandirection, readvstime, fillnan])
 	// In a 1d scan, i is the index of the loop. j will be ignored.
@@ -1066,6 +1023,7 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 	string script = "",cmd = "", wstr = ""
 	variable innerindex, outerindex
 	nvar sc_abortsweep, sc_pause,sc_scanstarttime
+	variable /g sc_tmpVal
 	
 	//// setup all sorts of logic so we can store values correctly ////
 	
@@ -1105,8 +1063,7 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 				jj=0;
 				script = sc_RequestScripts[ii];
 				if (cmpstr(script, ""))
-					FUNCREF protofunc fscript = $script[0,strlen(script)-3]
-					fscript()
+					execute(script)
 				endif
 			endif
 			ii+=1
@@ -1115,24 +1072,22 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 	
 	//// Read responses from machines ////
 	ii=0
-	variable /g sc_tmpval
+	cmd = ""
 	do
 		if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
-			if(fillnan == 0)
-				script = sc_GetResponseScripts[ii]; // assume i'm just getting one function back here like "readFunc()"
-			endif
+			wave wref1d = $sc_RawWaveNames[ii]
 			
 			// Redimension waves if readvstime is set to 1
 			if (readvstime == 1)
 				redimension /n=(innerindex+1) $sc_RawWaveNames[ii]
 				setscale/I x 0,  datetime - sc_scanstarttime, $sc_RawWaveNames[ii]
 			endif
-
-			// execute response script
-			wave wref1d = $sc_RawWaveNames[ii]
+			
 			if(fillnan == 0)
-				FUNCREF protofunc fscript = $script[0,strlen(script)-3]
-				sc_tmpval = fscript()
+				script = sc_GetResponseScripts[ii] // assume script will execute and return a 'variable'
+												           // let it fail hard otherwise
+				sprintf cmd, "%s = %s", "sc_tmpVal", script
+				execute(cmd)
 			elseif(fillnan == 1)
 				sc_tmpval = nan
 			endif
@@ -1149,22 +1104,31 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 	
 	//// Calculate interpreted numbers and store them in calculated waves ////
 	ii=0
+	cmd = ""
 	do
 		if (sc_CalcRecord[ii] == 1 || sc_CalcPlot[ii] == 1)
-			script = sc_CalcScripts[ii]; // assume i'm just getting one function back here like "readFunc()"
-			
+			wave wref1d = $sc_CalcWaveNames[ii] // this is the 1D wave I am filling
+												  
 			// Redimension waves if readvstimeis set to 1
 			if (readvstime == 1)
-				redimension /n=(innerindex+1) $sc_CalcWaveNames[ii]
+				redimension /n=(innerindex+1) wref1d
 				setscale/I x 0, datetime - sc_scanstarttime, $sc_CalcWaveNames[ii]
 			endif
 			
-			// Allow the use of the keyword '[i]' in calculated fields where i is the inner loop's current index
-			script = ReplaceString("[i]", script, "["+num2istr(innerindex)+"]")
-			execute(sc_CalcWaveNames[ii] + "[" + num2istr(innerindex) + "]=" + script)
+			if(fillnan == 0)
+				script = sc_CalcScripts[ii]; // assume script will execute and return a 'variable'
+												     // let it fail hard otherwise
+												     
+				// Allow the use of the keyword '[i]' in calculated fields where i is the inner loop's current index
+				script = ReplaceString("[i]", script, "["+num2istr(innerindex)+"]")
+				sprintf cmd, "%s = %s", "sc_tmpVal", script
+				execute(cmd)
+			elseif(fillnan == 1)
+				sc_tmpval = nan
+			endif
+			wref1d[innerindex] = sc_tmpval
 			
 			if (sc_is2d)				
-				wave wref1d = $sc_CalcWaveNames[ii]
 				wave wref2d = $sc_CalcWaveNames[ii] + "2d"
 				wref2d[innerindex][outerindex] = wref1d[innerindex]
 			endif
