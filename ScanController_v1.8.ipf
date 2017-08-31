@@ -2,7 +2,7 @@
 
 // Scan Controller routines for 1d and 2d scans
 // Version 1.7 August 8, 2016
-// Version 1.8 Sept 2017
+// Version 1.8 XXXX X, 2017
 // Authors: Mohammad Samani, Nik Hartman & Christian Olsen
 
 
@@ -15,6 +15,7 @@
 
 // TODO: 
 //     -- add a new type of value to record that can/will be read during sc_sleep
+//     -- initialize calc waves and deferred waves with just one element
 //     -- start using JSON format for sc config files
 
 // FUTURE:
@@ -215,6 +216,12 @@ function InitScanController([srv_push])
 	
 	string filelist = ""
 	string /g slack_url =  "https://hooks.slack.com/services/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" // url for slack alert
+
+	string server = "10.5.254.1" // address for qdot-server
+	variable port = 7965 // port number the server is listening on
+	string /g server_url = ""
+	sprintf server_url, "http://%s:%d", server, port
+	
 	string /g sc_hostname = getHostName() // machine name
 
 	// Check if data path is definded
@@ -986,18 +993,17 @@ function sc_sleep(delay)
 	// sleep for delay seconds while 
 	// checking for breaks and doing other tasks
 	variable delay
-	nvar sc_abortsweep, sc_pause
+	variable start_time = datetime // start the timer immediately
 	
-	variable i=0, start_time = datetime
+	nvar sc_abortsweep, sc_pause
+	variable i=0
+	
+	doupdate // do this just once during the sleep function
+	
 	do
-
-		if(i==0)
-			doupdate // update plots on first iteration only
-		endif
-		
 		sc_checksweepstate()
-		
 	while(datetime-start_time < delay)
+	
 end
 
 /////////////////////////////
@@ -1141,6 +1147,10 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 	
 end
 
+////////////////////////
+////  save all data ////
+////////////////////////
+
 function SaveWaves([msg, save_experiment])
 	// the message will be printed in the history, and will be saved in the winf file corresponding to this scan
 	// save_experiment=1 to save the experiment file
@@ -1234,6 +1244,198 @@ function SaveWaves([msg, save_experiment])
 		filenum+=1
 	endif
 	
+end
+
+////////////////////////
+////  notifications ////
+////////////////////////
+
+function sc_findNewFiles(datnum)
+	// path -- loction of new file: "data", "winfs", "config"
+	// filename -- name of new file
+	variable datnum
+	variable refnum
+	nvar sc_save_exp
+	string winfpath = getExpPath("winfs", full=0)
+	string configpath = getExpPath("config", full=0)
+	string datapath = getExpPath("data", full=0)
+	
+	//// create/open qdot-server.notify ////
+	
+	getfilefolderinfo /Q/Z/P=data "qdot-server.notify"
+	if(V_isFile==0) // if the file does not exist, create it with hostname/n at the top
+		open /A/P=data refnum as "qdot-server.notify"
+		fprintf refnum, "%s\n", getHostName()
+	else // if the file does exist, open it for appending
+		open /A/P=data refnum as "qdot-server.notify"
+	endif
+	
+	string tmpname = ""
+	// add the most recent config file
+	string configlist = greplist(indexedfile(config,-1,".config"),"sc")
+	
+	if(itemsinlist(configlist)>0)
+		// read content into waves
+		configlist = SortList(configlist, ";", 1+16)
+		tmpname = configpath+StringFromList(0,configlist, ";")
+		grep /Q /E=tmpname /p=data "qdot-server.notify"
+		if(V_value==0)
+			fprintf refnum, "%s\n", tmpname
+		endif
+	endif
+	
+	// add experiment file?
+	if(sc_save_exp == 1)
+		tmpname = datapath+igorinfo(1)+".pxp"
+		grep /Q /E=tmpname /p=data "qdot-server.notify"
+		if(V_value==0)
+			fprintf refnum, "%s\n", tmpname
+		endif
+	endif
+	
+	// find new data files
+	string datstr = "dat"+num2str(datnum)+"*"
+	string datlist = IndexedFile(data, -1, ".ibw")
+	datlist = ListMatch(datlist, datstr, ";")
+	variable i=0
+	for(i = 0 ; i < itemsinlist(datlist, ";") ; i+=1)
+		tmpname = datapath+StringFromList(i,datlist, ";")
+		fprintf refnum, "%s\n", tmpname
+	endfor
+	
+	// find new winf files
+	string winflist = IndexedFile(winfs, -1, ".winf")
+	winflist = ListMatch(winflist, datstr, ";")
+	for(i = 0 ; i < itemsinlist(winflist, ";") ; i+=1)
+		tmpname = winfpath+StringFromList(i,winflist, ";")
+		fprintf refnum, "%s\n", tmpname
+	endfor
+	
+	close refnum // close qdot-server.notify
+end
+
+function sc_NotifyServer()
+	svar server_url
+	
+	variable refnum
+	open /A/P=data refnum as "qdot-server.notify"
+	
+	if(refnum==0)
+		// if there is not qdot-server.notify file
+		// I don't need to do anything
+		print "No new files available."
+		return 0
+	else
+		fprintf refnum, "\n"
+		close refnum
+	endif
+
+	URLRequest /TIME=5.0 /P=data /DFIL="qdot-server.notify" url=server_url, method=post
+	if (V_flag == 0)    // No error
+        if (V_responseCode != 200)  // 200 is the HTTP OK code
+            print "New file notification failed!"
+            return 0
+        else
+            sc_DeleteNotificationFile()
+            return 1
+        endif
+    else
+        print "HTTP connection error. New file notification not attempted."
+        return 0
+    endif
+
+end
+
+function sc_DeleteNotificationFile()
+	// delete qdot-server.notify
+	deletefile /Z/P=data "qdot-server.notify"
+	if(V_flag!=0)
+		print "Failed to delete 'qdot-server.notify'"
+	endif
+end
+
+function getSlackNotice(username, [message, channel, botname, emoji, min_time])
+	// this function will send a notification to Slack
+	// username = your slack username
+	
+	// message = string to include in Slack message
+	// channel = slack channel to post the message in
+	//            if no channel is provided a DM will be sent to username
+	// botname = slack user that will post the message, defaults to @qdotbot
+	// emoji = emoji that will be used as the bots avatar, defaults to :the_horns:
+	// min_time = if time elapsed for this current scan is less than min_time no notification will be sent
+	//					defaults to 60 seconds
+	string username, channel, message, botname, emoji
+	variable min_time
+	nvar filenum, sweep_t_elapsed, sc_abortsweep
+	svar slack_url
+	string txt="", buffer="", payload=""
+	
+	//// check if I need a notification ////
+	if (paramisdefault(min_time))
+		min_time = 60.0 // seconds
+	endif
+
+	if(sweep_t_elapsed < min_time)
+		return 0 // no notification if min_time is not exceeded
+	endif
+	
+	if(sc_abortsweep)
+		return 0 // no notification if sweep was aborted by the user
+	endif
+	//// end notification checks //// 
+	
+	
+	//// build notification text ////
+	if (!paramisdefault(channel)) 
+		// message will be sent to public channel
+		// user who sent it will be mentioned at the beginning of the message
+		txt += "<@"+username+">\r" 
+	endif
+	
+	if (!paramisdefault(message) && strlen(message)>0)
+		txt += RemoveTrailingWhitespace(message) + "\r"
+	endif
+		
+	sprintf buffer, "dat%d completed:  %s %s \r", filenum, Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); txt+=buffer 
+	sprintf buffer, "time elapsed:  %.2f s \r", sweep_t_elapsed; txt+=buffer
+	//// end build txt ////
+	
+	
+	//// build payload ////
+	sprintf buffer, "{\"text\": \"%s\"", txt; payload+=buffer // 
+	
+	if (paramisdefault(botname))
+		botname = "qdotbot"
+	endif	
+	sprintf buffer, ", \"username\": \"%s\"", botname; payload+=buffer
+	
+	if (paramisdefault(channel))
+		sprintf buffer, ", \"channel\": \"@%s\"", username; payload+=buffer
+	else
+		sprintf buffer, ", \"channel\": \"#%s\"", channel; payload+=buffer
+	endif
+	
+	if (paramisdefault(emoji))
+		emoji = ":the_horns:"
+	endif	
+	sprintf buffer, ", \"icon_emoji\": \"%s\"", emoji; payload+=buffer // 
+	
+	payload += "}"
+	//// end payload ////
+	
+	URLRequest /DSTR=payload url=slack_url, method=post
+	if (V_flag == 0)    // No error
+        if (V_responseCode != 200)  // 200 is the HTTP OK code
+            print "Slack post failed!"
+            return 0
+        else
+            return 1
+        endif
+    else
+        print "HTTP connection error. Slack post not attempted."
+        return 0
+    endif
 end
 
 ////////////////////////
