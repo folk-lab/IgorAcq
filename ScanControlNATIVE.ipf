@@ -34,6 +34,49 @@ function /s str2WINF(datname, s)
 	return filename
 end
 
+////////////////////////////
+////  write out history ////
+////////////////////////////
+
+function getCmdHistory()
+	// save the command history from this experiment as a plain text file
+	
+	// this misses the first command and output from the experiment
+	// and it will probalby break if you look at it wrong
+	// but it's a start
+	
+	string expFile = igorinfo(1)+".pxp"
+	variable expRef
+	open /r/z/p=data expRef as expFile // open experiment file as read-only
+	
+	string histFile = igorinfo(1)+".history"
+	variable histRef
+	open /p=data histRef as histFile
+	
+	variable lines=0, histStart=0
+	string outputLine
+	do
+		fReadLine expRef, outputLine
+		
+		if( CmpStr(outputLine, "!")==0 )
+			// looks like this is where the history stops
+			break
+		endif
+	
+		if( char2num(outputLine[0])==-30 )
+			histStart=1
+		endif
+		
+		if(histStart==1)
+			fprintf histRef, "%s", outputLine
+		endif
+		lines+=1
+	while( 1 )
+	
+	close expRef
+	close histRef
+end
+
 ///////////////////////////////////
 //// save waves and experiment ////
 ///////////////////////////////////
@@ -47,6 +90,7 @@ end
 function saveExp()
 	// save current experiment as .pxp
 	SaveExperiment /P=data
+	getCmdHistory()
 end
 
 /////////////////////////////

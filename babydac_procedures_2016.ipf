@@ -536,21 +536,21 @@ function RampOutputBD(channel, output, [ramprate, update])
 	endif
 	
 	variable starttime, endtime
-
-	starttime = stopmstimer(-2)
 	do
 		if(update==1)
 			doupdate
 		endif
 		SetOutputBD(channel, voltage)
 
+		starttime = stopmstimer(-2)
 		endtime = starttime + 1e6*sleeptime
 		do
+			sc_checksweepstate()
 		while(stopmstimer(-2) < endtime)
-		starttime = stopmstimer(-2)
 
 		voltage+=sgn*step
 	while(sgn*voltage<sgn*output-step)
+	
 	SetOutputBD(channel, output)
 	
 	if(update==0)

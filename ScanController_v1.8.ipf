@@ -96,6 +96,19 @@ Function IsWhiteSpace(char)
     return GrepString(char, "\\s")
 End
 
+function list2textwave(stringlistwave,namewave)
+	string stringlistwave, namewave
+	variable n = ItemsInList(stringlistwave,",")
+	make/o/t/n=(n) $namewave=StringFromList(p,stringlistwave, ",")
+end
+
+function list2numwave(stringlistwave,namewave)
+	string stringlistwave, namewave
+	variable n = ItemsInList(stringlistwave,",")
+	make/o/t/n=(n) blawave=StringFromList(p,stringlistwave, ",")
+	make/o/n=(n) $namewave= str2num(blawave)
+end
+
 function/S executeWinCmd(command)
 	// http://www.igorexchange.com/node/938
 	string command
@@ -922,6 +935,19 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	execute(cmd1)
 end
 
+function sc_controlwindows(action)
+	string action
+	string openaboutwindows
+	variable ii
+	
+	openaboutwindows = winlist("SweepControl*",";","WIN:64")
+	if(itemsinlist(openaboutwindows)>0)
+		for(ii=0;ii<itemsinlist(openaboutwindows);ii+=1)
+			killwindow $stringfromlist(ii,openaboutwindows)	
+		endfor
+	endif
+end
+
 /////////////////////////////
 /////  sweep controls   /////
 /////////////////////////////
@@ -1293,6 +1319,15 @@ function sc_findNewFiles(datnum)
 		endif
 	endif
 	
+	// add history file?
+	if(sc_save_exp == 1)
+		tmpname = datapath+igorinfo(1)+".history"
+		grep /Q /E=tmpname /p=data "qdot-server.notify"
+		if(V_value==0)
+			fprintf refnum, "%s\n", tmpname
+		endif
+	endif
+	
 	// find new data files
 	string datstr = "dat"+num2str(datnum)+"*"
 	string datlist = IndexedFile(data, -1, ".ibw")
@@ -1456,30 +1491,4 @@ function sc_testreadtime(numpts, delay) //Units: s
 	printf "each sc_sleep(...) + RecordValues(...) call takes ~%.1fms \n", ttotal/numpts*1000
 	
 	sc_controlwindows("") // kill sweep control windows
-end
-
-function list2textwave(stringlistwave,namewave)
-	string stringlistwave, namewave
-	variable n = ItemsInList(stringlistwave,",")
-	make/o/t/n=(n) $namewave=StringFromList(p,stringlistwave, ",")
-end
-
-function list2numwave(stringlistwave,namewave)
-	string stringlistwave, namewave
-	variable n = ItemsInList(stringlistwave,",")
-	make/o/t/n=(n) blawave=StringFromList(p,stringlistwave, ",")
-	make/o/n=(n) $namewave= str2num(blawave)
-end
-
-function sc_controlwindows(action)
-	string action
-	string openaboutwindows
-	variable ii
-	
-	openaboutwindows = winlist("SweepControl*",";","WIN:64")
-	if(itemsinlist(openaboutwindows)>0)
-		for(ii=0;ii<itemsinlist(openaboutwindows);ii+=1)
-			killwindow $stringfromlist(ii,openaboutwindows)	
-		endfor
-	endif
 end
