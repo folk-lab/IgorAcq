@@ -15,7 +15,7 @@
 
 // TODO: 
 //     -- add a new type of value to record that can/will be read during sc_sleep
-//     -- initialize calc waves and deferred waves with just one element
+//     -- initialize calc waves and deferred waves with just one element (?)
 //     -- start using JSON format for sc config files
 
 // FUTURE:
@@ -1096,19 +1096,19 @@ function sc_checksweepstate()
 end
 
 function sc_sleep(delay)
-	// sleep for delay seconds while 
+	// sleep for delay seconds
 	// checking for breaks and doing other tasks
 	variable delay
-	variable start_time = datetime // start the timer immediately
+	delay = delay*1e6 // convert to microseconds
+	variable start_time = stopMStimer(-2) // start the timer immediately
 	
 	nvar sc_abortsweep, sc_pause
-	variable i=0
 	
 	doupdate // do this just once during the sleep function
 	
 	do
 		sc_checksweepstate()
-	while(datetime-start_time < delay)
+	while(stopMStimer(-2)-start_time < delay)
 	
 end
 

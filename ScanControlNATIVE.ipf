@@ -40,10 +40,11 @@ end
 
 function getCmdHistory()
 	// save the command history from this experiment as a plain text file
-	
+	//
 	// this misses the first command and output from the experiment
 	// and it will probalby break if you look at it wrong
 	// but it's a start
+	//
 	
 	string expFile = igorinfo(1)+".pxp"
 	variable expRef
@@ -55,23 +56,30 @@ function getCmdHistory()
 	
 	variable lines=0, histStart=0
 	string outputLine
+
+	variable i=0
 	do
 		fReadLine expRef, outputLine
+		print outputLine
 		
 		if( CmpStr(outputLine, "!")==0 )
 			// looks like this is where the history stops
 			break
 		endif
 	
-		if( char2num(outputLine[0])==-30 )
+		if( char2num(outputLine[0])==-30 ||  char2num(outputLine[0])==-107)
+			// finding the first 'bullet character' in the file identifies the
+			// start of the command history
+	
 			histStart=1
 		endif
 		
 		if(histStart==1)
 			fprintf histRef, "%s", outputLine
+			lines+=1
 		endif
-		lines+=1
-	while( 1 )
+		i+=1
+	while( i<1000 )
 	
 	close expRef
 	close histRef
@@ -90,7 +98,7 @@ end
 function saveExp()
 	// save current experiment as .pxp
 	SaveExperiment /P=data
-	getCmdHistory()
+//	getCmdHistory()
 end
 
 /////////////////////////////
