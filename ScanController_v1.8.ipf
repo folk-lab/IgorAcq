@@ -23,9 +23,89 @@
 //     -- Test a ScanControllerHDF5 package to put all sweep information in a single HDF5 file
 //     -- Write a RecordValuesAsync function that can parallelize instrument calls by opening multiple threads
 
+
 ///////////////////////////////
 ////// utility functions //////
 ///////////////////////////////
+
+
+function /S getJSONstr(jstr, key)
+	// get value of key from json string	
+	// works for string values
+	// matches anything in quotes like this.... 
+	//
+	// "key":"match_this"
+	//
+	// returns "match_this"
+
+	string jstr, key
+	string val=""
+	string regex = ""
+	sprintf regex, "\"(?i)%s\"\\s*:\\s*\"(.+?)\"", key
+	splitstring /E=regex jstr, val
+	return val
+end
+
+function /S getJSONarray(jstr, key)
+	// get value of key from json string	
+	// works for string values
+	// matches anything in (), {}, or [] like this.... 
+	//
+	// "key": [1,2,3,4]
+	//
+	// returns "[1,2,3,4]"
+
+	string jstr, key
+	string group1
+	string regex = ""
+	sprintf regex, "\"(?i)%s\"\\s*:\\s*((\[|\(|{)(.+?)(\]|\)|}))", key
+
+	splitstring /E=regex jstr, group1
+	return group1
+end
+
+function getJSONbool(jstr, key)
+	// get value of key from json string
+	// works on boolean values
+	// matches true|false
+	//
+	// "key":True
+	//
+	// returns 1
+	
+	string jstr, key
+	string val=""
+	string regex = ""
+	sprintf regex, "\"(?i)%s\"\\s*:\\s*(?i)(true|false)", key
+	splitstring /E=regex jstr, val
+
+	strswitch(LowerStr(val))
+		case "true":
+			return 1
+		case "false":
+			return 0
+	endswitch
+	
+end
+
+function getJSONnum(jstr, key)
+	// get value of key from json string
+	// works on numeric values in quotes or not in quotes
+	// 
+	// "key":9.99 and "key":"9.99"
+	//
+	// both return 9.99
+	
+	string jstr, key
+	string quote="", val=""
+	string regex = ""
+	sprintf regex, "\"(?i)%s\"\\s*:\\s*(\")?([-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?)(?(1)\\1|)", key
+	
+	splitstring /E=regex jstr, quote, val
+
+	return str2num(val)
+	
+end
 
 function unixtime()
 	// returns the current unix time in seconds
