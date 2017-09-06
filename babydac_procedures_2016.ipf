@@ -401,7 +401,7 @@ function ResetStartupVoltageBD(board_number, range)
 	
 		// read the response from the buffer
 		ReadBytesBD(7)
-		sleep /s 0.3
+		sc_sleep(0.3)
 	endfor
 
 	// backup settings to non-volatile memory
@@ -416,7 +416,7 @@ function ResetStartupVoltageBD(board_number, range)
 	// read the response from the buffer
 	print ReadBytesBD(4) 
 	
-	sleep /s 0.3
+	sc_sleep(0.3)
 end
 
 //// SET and RAMP outputs ////
@@ -543,10 +543,9 @@ function RampOutputBD(channel, output, [ramprate, update])
 		SetOutputBD(channel, voltage)
 
 		starttime = stopmstimer(-2)
-		endtime = starttime + 1e6*sleeptime
 		do
 			sc_checksweepstate()
-		while(stopmstimer(-2) < endtime)
+		while(stopmstimer(-2) - starttime < 1e6*sleeptime)
 
 		voltage+=sgn*step
 	while(sgn*voltage<sgn*output-step)

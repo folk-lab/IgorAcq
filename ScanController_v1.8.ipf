@@ -12,6 +12,7 @@
 //     -- add option to push new file notifications to qdot-server 
 //     -- fill 2D arrays point by point not line by line 
 //     -- remove restriction on Request/Response scripts -- go back to using execute()
+//     -- fix sc_sleep accuracy problem -- USE IT EVERYWHERE IN PLACE OF SLEEP
 
 // TODO: 
 //     -- add a new type of value to record that can/will be read during sc_sleep
@@ -1097,12 +1098,10 @@ end
 
 function sc_sleep(delay)
 	// sleep for delay seconds
-	// checking for breaks and doing other tasks
+	// checks for keyboard interrupts in mstimer loop
 	variable delay
 	delay = delay*1e6 // convert to microseconds
 	variable start_time = stopMStimer(-2) // start the timer immediately
-	
-	nvar sc_abortsweep, sc_pause
 	
 	doupdate // do this just once during the sleep function
 	
