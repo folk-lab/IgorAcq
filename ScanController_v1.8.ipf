@@ -8,20 +8,18 @@
 
 // Updates in 1.8....
 //     -- separate all save functions into ScanControllerNATIVE 
-//     -- remove support for time averaging over any parameter. it is rarely useful and confusing 
-//     -- add option to push new file notifications to qdot-server 
+//     -- remove support for time averaging over any parameter. it is rarely useful and confusing to read. 
+//     -- add option (which should be ON) to push 'new data' notifications to qdot-server 
 //     -- fill 2D arrays point by point not line by line 
 //     -- remove restriction on Request/Response scripts -- go back to using execute()
 //     -- fix sc_sleep accuracy problem -- USE IT EVERYWHERE IN PLACE OF SLEEP
+//     -- save command history as plain text in *.history
+//     -- add Slack notifications (somefolkneverlearn.slack.com)
 
-// TODO: 
-//     -- add a new type of value to record that can/will be read during sc_sleep
-//     -- initialize calc waves and deferred waves with just one element (?)
-//     -- start using JSON format for sc config files
-
-// FUTURE:
-//     -- Convert all WINF files to use JSON format
+// FUTURE: 
+//     -- start using JSON format for config files
 //     -- Test a ScanControllerHDF5 package to put all sweep information in a single HDF5 file
+//     -- add a new type of value to record that can/will be read during sc_sleep
 //     -- Write a RecordValuesAsync function that can parallelize instrument calls by opening multiple threads
 
 
