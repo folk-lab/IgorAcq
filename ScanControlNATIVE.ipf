@@ -1,7 +1,11 @@
 #pragma rtGlobals=1		// Use modern global access method.
 
-// Some useful functions for creating *.winf files that will add labels and proper scaling to 
-// the plots found at https://qdot-server.phas.ubc.ca/measurements
+// Save all experiment data in native IGOR formats
+//
+// Waves are saved as .ibw
+// Experiments are saved as .pxp
+// meta data is dumped into custom .winf files
+// 
 
 /////////////////////////
 ////  string utility ////
@@ -47,7 +51,7 @@ end
 function saveExp()
 	// save current experiment as .pxp
 	SaveExperiment /P=data
-//	getCmdHistory()
+	getCmdHistory()
 end
 
 /////////////////////////////

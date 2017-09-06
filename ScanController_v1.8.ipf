@@ -31,7 +31,7 @@
 
 
 function /S getJSONstr(jstr, key)
-	// get value of key from json string	
+	// get value of key from json string	s
 	// works for string values
 	// matches anything in quotes like this.... 
 	//
