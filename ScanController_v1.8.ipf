@@ -14,11 +14,12 @@
 //     -- remove restriction on Request/Response scripts -- go back to using execute()
 //     -- fix sc_sleep accuracy problem -- USE IT EVERYWHERE IN PLACE OF SLEEP
 //     -- save command history as plain text in *.history
+//     -- save main procedure window as *.ipf
 //     -- add Slack notifications (somefolkneverlearn.slack.com)
 
 // FUTURE: 
-//     -- start using JSON format for config files
 //     -- Test a ScanControllerHDF5 package to put all sweep information in a single HDF5 file
+//     -- start using JSON/XML/YAML format for config files
 //     -- add a new type of value to record that can/will be read during sc_sleep
 //     -- Write a RecordValuesAsync function that can parallelize instrument calls by opening multiple threads
 
@@ -1349,28 +1350,47 @@ function SaveWaves([msg, save_experiment])
 	
 end
 
-////////////////////////////
-////  write out history ////
-////////////////////////////
+//////////////////////////////////
+////  save history/procedures ////
+//////////////////////////////////
 
-function getCmdHistory()
-	// this is all based on 
+function SaveFromPXP([history, procedure])
+	// this is all based on Igor Pro Technical Note #3
+	// to save history as plain text: history=1
+	// to save main procedure window as .ipf, procedure=1
+	// if history=0 or procedure=0, they will not be saved
 	
+	variable history, procedure
+	
+	if(paramisdefault(history))
+		history=1
+	endif
+	
+	if(paramisdefault(procedure))
+		procedure=1
+	endif
+	
+	if(procedure!=1 && history!=1)
+		// why did you do this?
+		return 0
+	endif
+	
+	// open experiment file as read-only
+	// make sure it exists and get total size
 	string expFile = igorinfo(1)+".pxp"
 	variable expRef
-	open /r/z/p=data expRef as expFile // open experiment file as read-only
+	open /r/z/p=data expRef as expFile 
 	if(V_flag!=0)
 		print "Experiment file could not be opened to fetch command history: ", expFile
 		return 0
 	endif
 	FStatus expRef
 	variable totalBytes = V_logEOF
-	
-	string histFile = igorinfo(1)+".history"
-	variable histRef
-	open /p=data histRef as histFile
 
-	variable pos = 0, foundHistory=0
+	// find records from PackedFileRecordHeader
+	variable pos = 0
+	variable foundHistory=0, startHistory=0, numHistoryBytes=0
+	variable foundProcedure=0, startProcedure=0, numProcedureBytes=0
 	variable recordType, version, numDataBytes
 	do
 		FSetPos expRef, pos                // go to next header position
@@ -1379,38 +1399,113 @@ function getCmdHistory()
 		FBinRead /F=2 expRef, version      // signed, two-byte integer
 		FBinRead /F=3 expRef, numDataBytes // signed, four-byte integer
 		
+		FGetPos expRef // get current file position in V_filePos
+		
 		if(recordType==2)
+			print "found history: ", recordType, version, numDataBytes
 			foundHistory=1
+			startHistory=V_filePos
+			numHistoryBytes=numDataBytes
+		endif
+		
+		if(recordType==5)
+			print "found procedure: ", recordType, version, numDataBytes
+			foundProcedure=1
+			startProcedure=V_filePos
+			numProcedureBytes=numDataBytes
+		endif
+		
+		if(foundHistory==1 && foundProcedure==1)
 			break
 		endif
 		
-		FGetPos expRef
-		pos = V_filePos + numDataBytes
+		pos = V_filePos + numDataBytes // set new header position if I need to keep looking
 	while(pos<totalBytes)
 
-	if(foundHistory==0)
-		print "WARNING: no command history saved"
-		return 0
-	endif
-
+	variable warnings=0
+	
 	string buffer=""
-	variable bytes=0
-	do
-		FReadLine /N=(numDataBytes-bytes) expRef, buffer
-		bytes+=strlen(buffer)
-		fprintf histRef, "%s", buffer
-	while(bytes<numDataBytes)
+	variable bytes=0, t_start=0
+	if(history==1 && foundHistory==1)
+		// I want to save it + I can save it
+		
+		string histFile = igorinfo(1)+".history"
+		variable histRef
+		open /p=data histRef as histFile
 	
+		
+		FSetPos expRef, startHistory
+		
+		buffer=""
+		bytes=0
+		t_start=datetime
+		do
+			FReadLine /N=(numHistoryBytes-bytes) expRef, buffer
+			bytes+=strlen(buffer)
+			fprintf histRef, "%s", buffer
+			
+			if(datetime-t_start>2.0)
+				// timeout at 2 seconds
+				// something went wrong
+				warnings += 1
+				print "WARNING: timeout while trying to write out command history"
+				break
+			elseif(strlen(buffer)==0)
+				// this is probably fine
+				break
+			endif
+		while(bytes<numHistoryBytes)
+		close histRef
+		
+	elseif(history==1 && foundHistory==0)
+		// I want to save it but I cannot save it
+		
+		print "WARNING: no command history saved"
+		warnings += 1
+		
+	endif	
+
+	if(procedure==1 && foundProcedure==1)
+		// I want to save it + I can save it
+		
+		string procFile = igorinfo(1)+".ipf"
+		variable procRef
+		open /p=data procRef as procFile
+	
+		
+		FSetPos expRef, startProcedure
+		
+		buffer=""
+		bytes=0
+		t_start=datetime
+		do
+			FReadLine /N=(numProcedureBytes-bytes) expRef, buffer
+			bytes+=strlen(buffer)
+			fprintf procRef, "%s", buffer
+			
+			if(datetime-t_start>2.0)
+				// timeout at 2 seconds
+				// something went wrong
+				warnings += 1
+				print "WARNING: timeout while trying to write out procedure window"
+				break
+			elseif(strlen(buffer)==0)
+				// this is probably fine
+				break
+			endif
+			
+		while(bytes<numProcedureBytes)
+		close procRef
+		
+	elseif(procedure==1 && foundProcedure==0)
+		// I want to save it but I cannot save it
+		print "WARNING: no procedure window saved"
+		warnings += 1
+	endif	
+
 	close expRef
-	close histRef
-	
-	if(bytes!=numDataBytes)
-		 print "WARNING: Parts of history not written to file"
-		 return 0
-	else	
-		return 1
-	endif
 end
+
 
 ////////////////////////
 ////  notifications ////
