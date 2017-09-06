@@ -1351,6 +1351,69 @@ function SaveWaves([msg, save_experiment])
 	
 end
 
+////////////////////////////
+////  write out history ////
+////////////////////////////
+
+function getCmdHistory()
+	// this is all based on 
+	
+	string expFile = igorinfo(1)+".pxp"
+	variable expRef
+	open /r/z/p=data expRef as expFile // open experiment file as read-only
+	if(V_flag!=0)
+		print "Experiment file could not be opened to fetch command history: ", expFile
+		return 0
+	endif
+	FStatus expRef
+	variable totalBytes = V_logEOF
+	
+	string histFile = igorinfo(1)+".history"
+	variable histRef
+	open /p=data histRef as histFile
+
+	variable pos = 0, foundHistory=0
+	variable recordType, version, numDataBytes
+	do
+		FSetPos expRef, pos                // go to next header position
+		FBinRead /U/F=2 expRef, recordType // unsigned, two-byte integer
+		recordType = recordType&0x7FFF     // mask to get just the type value
+		FBinRead /F=2 expRef, version      // signed, two-byte integer
+		FBinRead /F=3 expRef, numDataBytes // signed, four-byte integer
+		
+		if(recordType==2)
+			foundHistory=1
+			break
+		endif
+		
+		FGetPos expRef
+		pos = V_filePos + numDataBytes
+	while(pos<totalBytes)
+
+	if(foundHistory==0)
+		print "WARNING: no command history saved"
+		return 0
+	endif
+
+	string buffer=""
+	variable bytes=0
+	do
+		FReadLine /N=(numDataBytes-bytes) expRef, buffer
+		bytes+=strlen(buffer)
+		fprintf histRef, "%s", buffer
+	while(bytes<numDataBytes)
+	
+	close expRef
+	close histRef
+	
+	if(bytes!=numDataBytes)
+		 print "WARNING: Parts of history not written to file"
+		 return 0
+	else	
+		return 1
+	endif
+end
+
 ////////////////////////
 ////  notifications ////
 ////////////////////////
