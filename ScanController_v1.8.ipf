@@ -17,6 +17,10 @@
 //     -- save main procedure window as *.ipf
 //     -- add Slack notifications (somefolkneverlearn.slack.com)
 
+//TODO:
+
+//     -- add smarter control over when experiments are saved
+
 // FUTURE: 
 //     -- Test a ScanControllerHDF5 package to put all sweep information in a single HDF5 file
 //     -- start using JSON/XML/YAML format for config files
@@ -1402,14 +1406,12 @@ function SaveFromPXP([history, procedure])
 		FGetPos expRef // get current file position in V_filePos
 		
 		if(recordType==2)
-			print "found history: ", recordType, version, numDataBytes
 			foundHistory=1
 			startHistory=V_filePos
 			numHistoryBytes=numDataBytes
 		endif
 		
 		if(recordType==5)
-			print "found procedure: ", recordType, version, numDataBytes
 			foundProcedure=1
 			startProcedure=V_filePos
 			numProcedureBytes=numDataBytes
