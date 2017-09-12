@@ -23,9 +23,13 @@
 //// save waves and experiment ////
 ///////////////////////////////////
 
-function initSaveFiles()
+function initSaveFiles([msg])
 	//// create/open any files needed to save data 
 	//// also save any global meta-data you want   
+	string msg
+	if(paramisdefault(msg)) // save meta data
+		msg=""
+	endif
 	
 	nvar filenum
 	string filenumstr = ""
@@ -76,12 +80,6 @@ function endSaveFiles()
 	endif
 	
 end
-
-function saveExp()
-	SaveExperiment /P=data // save current experiment as .pxp
-	SaveFromPXP(history=1, procedure=1) // grab some useful plain text docs from the pxp
-end
-
 
 // these should live in the procedures for the instrument
 // that way not all of the procedures need to be loaded for this WINF thing to compile correctly
