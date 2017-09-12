@@ -87,6 +87,7 @@ end
 
 function /s getExpStatus()
 	nvar filenum, sweep_t_elapsed
+	svar sc_current_config
 	
 	// create header with corresponding .ibw name and date
 	string output="", buffer="" 
@@ -102,6 +103,7 @@ function /s getExpStatus()
 	// scan control info
 	sprintf buffer, "raw data waves:  %s \r", rawWaveStrs(); output+=buffer 
 	sprintf buffer, "calculated data waves:  %s \r", calcWaveStrs(); output+=buffer
+	sprintf buffer, "current config file: %s\r", sc_current_config; output+=buffer
 
 	return output
 end

@@ -15,17 +15,21 @@
 //     -- fix sc_sleep accuracy problem -- USE IT EVERYWHERE IN PLACE OF SLEEP
 //     -- save command history as plain text in *.history
 //     -- save main procedure window as *.ipf
+//     -- save note about which config file was used for a given data set (ScanControlNATIVE)
 //     -- add Slack notifications (somefolkneverlearn.slack.com)
 
 //TODO:
 
-//     -- add smarter control over when experiments are saved
-
-// FUTURE: 
 //     -- Test a ScanControllerHDF5 package to put all sweep information in a single HDF5 file
-//     -- start using JSON/XML/YAML format for config files
+//     -- start using proper JSON format for config files
 //     -- add a new type of value to record that can/will be read during sc_sleep
 //     -- Write a RecordValuesAsync function that can parallelize instrument calls by opening multiple threads
+
+//FIX:
+
+//     -- Text encoding issues with .history files, not transferable between systems
+//             this might be igors problem, I'm not convinced it is simple to fix
+//             works ok with a decent text editor, outside of igor, regardless of system
 
 
 ///////////////////////////////
@@ -313,6 +317,8 @@ function InitScanController([srv_push])
 	
 	string filelist = ""
 	string /g slack_url =  "https://hooks.slack.com/services/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" // url for slack alert
+	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
+	string /g sc_current_config = ""
 
 	string server = "10.5.254.1" // address for qdot-server
 	variable port = 7965 // port number the server is listening on
@@ -392,6 +398,7 @@ function sc_createconfig()
 	nvar sc_PrintCalc
 	svar sc_LogStr
 	svar sc_ColorMap
+	svar sc_current_config
 	nvar filenum
 	variable refnum
 	string configfile
@@ -426,6 +433,7 @@ function sc_createconfig()
 	fprintf refnum, "%g\r", filenum
 	
 	close refnum
+	sc_current_config = configfile
 	
 end
 
@@ -437,12 +445,14 @@ function sc_loadconfig(configfile)
 	nvar sc_PrintCalc
 	svar sc_LogStr
 	svar sc_ColorMap
+	svar sc_current_config
 	nvar filenum
 	variable i, confignum=0
 	string file_string, configunix
 	
 	open /z/r/p=config refnum as configfile
 	printf "Loading configuration from: %s\n", configfile
+	sc_current_config = configfile
 	
 	// load raw wave configuration
 	freadline/t=(num2char(13)) refnum, loadcontainer
@@ -1273,7 +1283,6 @@ function SaveWaves([msg, save_experiment])
 	sprintf filenumstr, "%d", filenum
 	wave /t sc_RawWaveNames, sc_CalcWaveNames
 	wave sc_RawRecord, sc_CalcRecord
-	variable ii=0, Rawadd =0, Calcadd = 0
 
 	if (!paramisdefault(msg))
 		print msg
@@ -1291,65 +1300,86 @@ function SaveWaves([msg, save_experiment])
 		logs = sc_LogStr
 	endif
 
-	// Raw Data
-	do
-		Rawadd += sc_RawRecord[ii]
-		if (sc_RawRecord[ii] == 1)
-			wn = sc_RawWaveNames[ii]
-			if (sc_is2d)
-				wn += "2d"
-			endif
-			filename =  "dat" + filenumstr + wn
-			duplicate $wn $filename // filename is a new wavename and will become <filename.xxx>
-			if(sc_PrintRaw == 1)
-				print filename
-			endif
-			saveSingleWave(filename)
-			SaveInitialWaveComments(wn, x_label=sc_x_label, y_label=sc_y_label)
-		endif
-		ii+=1
-	while (ii < numpnts(sc_RawWaveNames))
-	
-	// Calculated Data
-	ii=0
-	do
-		Calcadd += sc_CalcRecord[ii]
-		if (sc_CalcRecord[ii] == 1)
-			wn = sc_CalcWaveNames[ii]
-			if (sc_is2d)
-				wn += "2d"
-			endif
-			filename =  "dat" + filenumstr + wn
-			duplicate $wn $filename
-			if(sc_PrintCalc == 1)
-				print filename
-			endif
-			saveSingleWave(filename)
-			SaveInitialWaveComments(wn, x_label=sc_x_label, y_label=sc_y_label)
-		endif
-		ii+=1
-	while (ii < numpnts(sc_CalcWaveNames))
-	
+	// save timing variables
 	variable /g sweep_t_elapsed = datetime-sc_scanstarttime
 	printf "Time elapsed: %.2f s \r", sweep_t_elapsed
 	
-	dowindow /k SweepControl
+	dowindow /k SweepControl // kill scan control window
+
+	// count up the number of data files to save
+	variable ii=0, Rawadd =0, Calcadd = 0
+	wavestats /Q/Z sc_RawRecord
+	Rawadd = V_Sum
+	wavestats /Q/Z sc_CalcRecord
+	Calcadd = V_Sum
 	
 	if(Rawadd+Calcadd > 0)
+		// there is data to save!
+		// save it and increment the filenumber
 		printf "saving all dat%d files...\r", filenum
 		
-		saveScanComments(msg=msg, logs=logs)
+		// Open up any files that may be needed
+	 	// Save scan controller meta data in this function as well
+	 	
+		initSaveFiles()
+//		SaveScanComments(msg=msg, logs=logs)
 		
-		if(sc_save_exp == 1 & sweep_t_elapsed>10.0)
-			saveExp()
-		endif
+		// save raw data waves
+		ii=0
+		do
+			if (sc_RawRecord[ii] == 1)
+				wn = sc_RawWaveNames[ii]
+				if (sc_is2d)
+					wn += "2d"
+				endif
+				filename =  "dat" + filenumstr + wn
+				duplicate $wn $filename // filename is a new wavename and will become <filename.xxx>
+				if(sc_PrintRaw == 1)
+					print filename
+				endif
+				saveSingleWave(wn)
+//				SaveInitialWaveComments(wn, x_label=sc_x_label, y_label=sc_y_label)
+			endif
+			ii+=1
+		while (ii < numpnts(sc_RawWaveNames))
+	
+		//save calculated data waves
+		ii=0
+		do
+			if (sc_CalcRecord[ii] == 1)
+				wn = sc_CalcWaveNames[ii]
+				if (sc_is2d)
+					wn += "2d"
+				endif
+				filename =  "dat" + filenumstr + wn
+				duplicate $wn $filename
+				if(sc_PrintCalc == 1)
+					print filename
+				endif
+				saveSingleWave(wn)
+//				SaveInitialWaveComments(wn, x_label=sc_x_label, y_label=sc_y_label)
+			endif
+			ii+=1
+		while (ii < numpnts(sc_CalcWaveNames))
+	endif
+	
+	if(sc_srv_push==1)
+		sc_findNewFiles(filenum)
+		sc_NotifyServer()
+	endif
 		
-		if(sc_srv_push==1)
-			sc_findNewFiles(filenum)
-			sc_NotifyServer()
-		endif
-		
-		filenum+=1
+	if(sc_save_exp==1)
+		// save if sc_save_exp=1
+		// if the sweep was aborted sc_save_exp=0 before you get here
+		nvar sc_save_time
+		saveExp()
+		sc_save_time = datetime
+	endif
+	
+	// the very last thing we want to do here is increment the file number
+	// only if we recorded some data	
+	if(Rawadd+Calcadd > 0)
+			filenum+=1
 	endif
 	
 end
@@ -1435,7 +1465,6 @@ function SaveFromPXP([history, procedure])
 		variable histRef
 		open /p=data histRef as histFile
 	
-		
 		FSetPos expRef, startHistory
 		
 		buffer=""
@@ -1474,7 +1503,6 @@ function SaveFromPXP([history, procedure])
 		variable procRef
 		open /p=data procRef as procFile
 	
-		
 		FSetPos expRef, startProcedure
 		
 		buffer=""
@@ -1514,73 +1542,145 @@ end
 ////////////////////////
 
 function sc_findNewFiles(datnum)
-	// path -- loction of new file: "data", "winfs", "config"
-	// filename -- name of new file
 	variable datnum
-	variable refnum
+	variable refNum
 	nvar sc_save_exp
 	string winfpath = getExpPath("winfs", full=0)
 	string configpath = getExpPath("config", full=0)
 	string datapath = getExpPath("data", full=0)
 	
 	//// create/open qdot-server.notify ////
-	
+	string notifyText = "", buffer
 	getfilefolderinfo /Q/Z/P=data "qdot-server.notify"
 	if(V_isFile==0) // if the file does not exist, create it with hostname/n at the top
-		open /A/P=data refnum as "qdot-server.notify"
+		open /A/P=data refNum as "qdot-server.notify"
 		fprintf refnum, "%s\n", getHostName()
 	else // if the file does exist, open it for appending
-		open /A/P=data refnum as "qdot-server.notify"
+		open /A/P=data refNum as "qdot-server.notify"
+		FSetPos refNum, 0
+		variable lines = 0
+		do 
+			FReadLine refNum, buffer
+			if(lines>0)
+				notifyText+=buffer
+			endif
+			lines +=1
+		while(strlen(buffer)>0)
 	endif
 	
+	variable notifyLen = strlen(notifyText)
+	variable result = 0
 	string tmpname = ""
-	// add the most recent config file
-	string configlist = greplist(indexedfile(config,-1,".config"),"sc")
 	
+	// add the most recent scan controller config file
+	string configlist = greplist(indexedfile(config,-1,".config"),"sc")
 	if(itemsinlist(configlist)>0)
-		// read content into waves
 		configlist = SortList(configlist, ";", 1+16)
 		tmpname = configpath+StringFromList(0,configlist, ";")
-		grep /Q /E=tmpname /p=data "qdot-server.notify"
-		if(V_value==0)
+		if(notifyLen==0)
+			// if there is no notification file
+			// add this immediately
 			fprintf refnum, "%s\n", tmpname
+		else
+			// search for tmpname in notifyText
+			result = strsearch(notifyText, tmpname, 0)
+			if(result==-1)
+				fprintf refnum, "%s\n", tmpname
+			endif
 		endif
 	endif
 	
-	// add experiment file?
+	// add experiment and history files
+	// only if I saved the experiment this run
 	if(sc_save_exp == 1)
+		// add experiment file
 		tmpname = datapath+igorinfo(1)+".pxp"
-		grep /Q /E=tmpname /p=data "qdot-server.notify"
-		if(V_value==0)
+		if(notifyLen==0)
+			// if there is no notification file
+			// add this immediately
 			fprintf refnum, "%s\n", tmpname
+		else
+			// search for tmpname in notifyText
+			result = strsearch(notifyText, tmpname, 0)
+			if(result==-1)
+				fprintf refnum, "%s\n", tmpname
+			endif
 		endif
-	endif
 	
-	// add history file?
-	if(sc_save_exp == 1)
+		// add history file
 		tmpname = datapath+igorinfo(1)+".history"
-		grep /Q /E=tmpname /p=data "qdot-server.notify"
-		if(V_value==0)
+		if(notifyLen==0)
+			// if there is no notification file
+			// add this immediately
 			fprintf refnum, "%s\n", tmpname
+		else
+			// search for tmpname in notifyText
+			result = strsearch(notifyText, tmpname, 0)
+			if(result==-1)
+				fprintf refnum, "%s\n", tmpname
+			endif
 		endif
 	endif
 	
 	// find new data files
-	string datstr = "dat"+num2str(datnum)+"*"
-	string datlist = IndexedFile(data, -1, ".ibw")
-	datlist = ListMatch(datlist, datstr, ";")
-	variable i=0
-	for(i = 0 ; i < itemsinlist(datlist, ";") ; i+=1)
-		tmpname = datapath+StringFromList(i,datlist, ";")
-		fprintf refnum, "%s\n", tmpname
+	string extensions = ".ibw;.h5;.txt;.itx"
+	string datstr = "", idxList, matchList
+	variable i, j
+	for(i=0;i<ItemsInList(extensions, ";");i+=1)
+		sprintf datstr, "dat%d*%s", datnum, StringFromList(i, extensions, ";") // grep string
+		idxList = IndexedFile(data, -1, StringFromList(i, extensions, ";"))
+		if(strlen(idxList)==0)
+			continue
+		endif
+		matchList = ListMatch(idxList, datstr, ";")
+		if(strlen(matchlist)==0)
+			continue
+		endif
+		
+		for(j=0;j<ItemsInList(matchList, ";");j+=1)
+			tmpname = datapath+StringFromList(j,matchList, ";")
+			if(notifyLen==0)
+				// if there is no notification file
+				// add this immediately
+				fprintf refnum, "%s\n", tmpname
+			else
+				// search for tmpname in notifyText
+				result = strsearch(notifyText, tmpname, 0)
+				if(result==-1)
+					fprintf refnum, "%s\n", tmpname
+				endif
+			endif
+		endfor
 	endfor
-	
+
 	// find new winf files
-	string winflist = IndexedFile(winfs, -1, ".winf")
-	winflist = ListMatch(winflist, datstr, ";")
-	for(i = 0 ; i < itemsinlist(winflist, ";") ; i+=1)
-		tmpname = winfpath+StringFromList(i,winflist, ";")
-		fprintf refnum, "%s\n", tmpname
+	extensions = ".winf;"
+	string winfstr = ""
+	for(i=0;i<ItemsInList(extensions, ";");i+=1)
+		sprintf winfstr, "dat%d*%s", datnum, StringFromList(i, extensions, ";") // grep string
+		idxList = IndexedFile(winfs, -1, StringFromList(i, extensions, ";"))
+		if(strlen(idxList)==0)
+			continue
+		endif
+		matchList = ListMatch(idxList, datstr, ";")
+		if(strlen(matchlist)==0)
+			continue
+		endif
+		
+		for(j=0;j<ItemsInList(matchList, ";");j+=1)
+			tmpname = datapath+StringFromList(j,matchList, ";")
+			if(notifyLen==0)
+				// if there is no notification file
+				// add this immediately
+				fprintf refnum, "%s\n", tmpname
+			else
+				// search for tmpname in notifyText
+				result = strsearch(notifyText, tmpname, 0)
+				if(result==-1)
+					fprintf refnum, "%s\n", tmpname
+				endif
+			endif
+		endfor
 	endfor
 	
 	close refnum // close qdot-server.notify
