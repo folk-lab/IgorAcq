@@ -1271,7 +1271,6 @@ end
 
 function saveExp()
 	SaveExperiment /P=data // save current experiment as .pxp
-	sc_sleep(0.1)
 	SaveFromPXP(history=1, procedure=1) // grab some useful plain text docs from the pxp
 end
 
@@ -1301,6 +1300,7 @@ function SaveWaves([msg, save_experiment])
 	endif
 	
 	variable /g sc_save_exp = save_experiment
+	nvar sc_save_time
 	
 	if (strlen(sc_LogStr)!=0)
 		logs = sc_LogStr
@@ -1365,19 +1365,19 @@ function SaveWaves([msg, save_experiment])
 			ii+=1
 		while (ii < numpnts(sc_CalcWaveNames))
 	endif
-	
-	sc_findNewFiles(filenum)
-	if(sc_srv_push==1)
-		sc_findNewFiles(filenum)
-		sc_NotifyServer()
-	endif
 		
-	if(sc_save_exp==1)
+	if(sc_save_exp==1 & (datetime-sc_save_time)>180.0)
 		// save if sc_save_exp=1
+		// and if more than 3 minutes has elapsed since previous saveExp
 		// if the sweep was aborted sc_save_exp=0 before you get here
-		nvar sc_save_time
 		saveExp()
 		sc_save_time = datetime
+	endif
+	
+	if(sc_srv_push==1)
+		sc_findNewFiles(filenum)
+		sc_NotifyServer() // this may leave the experiment file open for some time
+							  // make sure to run saveExp before this
 	endif
 	
 	// close save files and increment filenum
