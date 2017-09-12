@@ -107,14 +107,14 @@ End
 
 function list2textwave(stringlistwave,namewave)
 	string stringlistwave, namewave
-	variable n = ItemsInList(stringlistwave,",")
-	make/o/t/n=(n) $namewave=StringFromList(p,stringlistwave, ",")
+	variable n = ItemsInList(stringlistwave,";")
+	make/o/t/n=(n) $namewave=StringFromList(p,stringlistwave, ";")
 end
 
 function list2numwave(stringlistwave,namewave)
 	string stringlistwave, namewave
-	variable n = ItemsInList(stringlistwave,",")
-	make/o/t/n=(n) blawave=StringFromList(p,stringlistwave, ",")
+	variable n = ItemsInList(stringlistwave,";")
+	make/o/t/n=(n) blawave=StringFromList(p,stringlistwave, ";")
 	make/o/n=(n) $namewave= str2num(blawave)
 end
 
@@ -329,23 +329,23 @@ function sc_createconfig()
 	// Try to open config file or create it otherwise
 	open /z/p=config refnum as configfile
 	
-	wfprintf refnum, "%s,", sc_RawWaveNames
+	wfprintf refnum, "%s;", sc_RawWaveNames
 	fprintf refnum, "\r"
-	wfprintf refnum, "%g,", sc_RawRecord
+	wfprintf refnum, "%g;", sc_RawRecord
 	fprintf refnum, "\r"
-	wfprintf refnum, "%g,", sc_RawPlot
+	wfprintf refnum, "%g;", sc_RawPlot
 	fprintf refnum, "\r"
-	wfprintf refnum, "%s,", sc_RequestScripts
+	wfprintf refnum, "%s;", sc_RequestScripts
 	fprintf refnum, "\r"
-	wfprintf refnum, "%s,", sc_GetResponseScripts
+	wfprintf refnum, "%s;", sc_GetResponseScripts
 	fprintf refnum, "\r"
-	wfprintf refnum, "%s,", sc_CalcWaveNames
+	wfprintf refnum, "%s;", sc_CalcWaveNames
 	fprintf refnum, "\r"
-	wfprintf refnum, "%s,", sc_CalcScripts
+	wfprintf refnum, "%s;", sc_CalcScripts
 	fprintf refnum, "\r"
-	wfprintf refnum, "%g,", sc_CalcRecord
+	wfprintf refnum, "%g;", sc_CalcRecord
 	fprintf refnum, "\r"
-	wfprintf refnum, "%g,", sc_CalcPlot
+	wfprintf refnum, "%g;", sc_CalcPlot
 	fprintf refnum, "\r"
 	fprintf refnum, "%g\r", sc_PrintRaw
 	fprintf refnum, "%g\r", sc_PrintCalc
@@ -473,7 +473,7 @@ end
 Window ScanController() : Panel
 	variable sc_InnerBoxW = 660, sc_InnerBoxH = 32, sc_InnerBoxSpacing = 2
 
-	if (numpnts(sc_RawWaveNames) != numpnts(sc_RawRecord) ||  numpnts(sc_RawWaveNames) != numpnts(sc_RequestScripts) ||  numpnts(sc_RawWaveNames) != numpnts(sc_GetResponseScripts)) 
+	if (numpnts(sc_RawWaveNames) != numpnts(sc_RawRecord) ||  numpnts(sc_RawWaveNames) != numpnts(sc_RequestScripts) ||  numpnts(sc_RawWaveNames) != numpnts(sc_GetResponseScripts))
 		print "sc_RawWaveNames, sc_RawRecord, sc_RequestScripts, and sc_GetResponseScripts waves should have the number of elements.\nGo to the beginning of InitScanController() to fix this.\n"
 		abort
 	endif
@@ -1221,6 +1221,7 @@ function SaveWaves([msg, save_experiment])
 	endif
 	
 	variable /g sc_save_exp = save_experiment
+	nvar sc_save_time
 	
 	if (strlen(sc_LogStr)!=0)
 		logs = sc_LogStr
@@ -1285,19 +1286,19 @@ function SaveWaves([msg, save_experiment])
 			ii+=1
 		while (ii < numpnts(sc_CalcWaveNames))
 	endif
-	
-	sc_findNewFiles(filenum)
-	if(sc_srv_push==1)
-		sc_findNewFiles(filenum)
-		sc_NotifyServer()
-	endif
 		
-	if(sc_save_exp==1)
+	if(sc_save_exp==1 & (datetime-sc_save_time)>180.0)
 		// save if sc_save_exp=1
+		// and if more than 3 minutes has elapsed since previous saveExp
 		// if the sweep was aborted sc_save_exp=0 before you get here
-		nvar sc_save_time
 		saveExp()
 		sc_save_time = datetime
+	endif
+	
+	if(sc_srv_push==1)
+		sc_findNewFiles(filenum)
+		sc_NotifyServer() // this may leave the experiment file open for some time
+							  // make sure to run saveExp before this
 	endif
 	
 	// close save files and increment filenum
