@@ -110,7 +110,7 @@ end
 function /s getExpStatus()
 	nvar filenum, sweep_t_elapsed
 	svar sc_current_config
-	
+		
 	// create header with corresponding .ibw name and date
 	string output="", buffer="" 
 	
