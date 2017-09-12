@@ -1298,7 +1298,7 @@ function SaveWaves([msg, save_experiment])
 	if(sc_srv_push==1)
 		sc_findNewFiles(filenum)
 		sc_NotifyServer() // this may leave the experiment file open for some time
-							  // make sure to run saveExp before this
+							   // make sure to run saveExp before this
 	endif
 	
 	// close save files and increment filenum
