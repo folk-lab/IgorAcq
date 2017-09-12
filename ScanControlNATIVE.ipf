@@ -42,15 +42,37 @@ end
 //// save waves and experiment ////
 ///////////////////////////////////
 
-function saveSingleWave(filename)
-	// wave with name 'filename' as filename.ibw
-	string filename
-	Save/C/P=data $filename;
+function initSaveFiles([msg])
+	//// create/open any files needed to save data 
+	//// also save any global meta-data you want  
+	
+	string msg
+	if(paramisdefault(msg)) // save meta data
+		msg=""
+	endif
+	
+	SaveScanComments(msg=msg)
+	
 end
 
-function saveExp()
-	SaveExperiment /P=data // save current experiment as .pxp
-	SaveFromPXP(history=1, procedure=1) // grab some useful plain text docs from the pxp
+function saveSingleWave(wn)
+	// wave with name 'filename' as filename.ibw
+	string wn
+	
+	nvar filenum
+	string filenumstr = ""
+	sprintf filenumstr, "%d", filenum
+	string filename =  "dat" + filenumstr + wn
+	
+	Save/C/P=data $filename;
+	
+	svar sc_x_label, sc_y_label
+	SaveInitialWaveComments(wn, x_label=sc_x_label, y_label=sc_y_label)
+end
+
+function endSaveFiles()
+	//// close any files that were created for this dataset
+	
 end
 
 /////////////////////////////
@@ -146,14 +168,13 @@ function /s getWaveStatus(datname)
 	return output
 end
 
-function /S saveScanComments([msg, logs])
+function /S saveScanComments([msg])
 	// msg must be a string
 	// logs should be formatted like a series of commands
 	// logs = "function(param1, param2); second_function(param)"
 	// any params used in 
 	
-	string msg, logs
-	variable numlogs = 12
+	string msg
 	string buffer="", comments=""
 	comments += getExpStatus() + "\r" // record date, time, wave names, time elapsed...
 	
@@ -162,43 +183,20 @@ function /S saveScanComments([msg, logs])
 	endif
 	
 	comments += "logs: \r"
-	if (!paramisdefault(logs) && strlen(logs)!=0)
+	svar sc_LogStr
+	if (strlen(sc_LogStr)>0)
 		string command
-		string /G sc_loggable=""
-		variable N = strlen(logs)
-		variable i = 0, ind
-		do
-			ind = strsearch(logs, ";",0)
-			if(ind==0)
-				// strange case where the string starts with ;
-				// get rid of the ; and move on
-				logs = logs[1,inf]
-				N = strlen(logs)
-				continue
-			elseif(ind == N-1)
-				// string ends with ;
-				// this is the final command
-				command = logs[0,N-2]
-				N = 0 
-			elseif(ind==-1 && strlen(logs)!=0)
-				// no ; left
-				// if the string is not empty, it must be a command
-				command = logs
-				N = 0
-			else
-				// there must be a ; somewhere in the middle
-				command = logs[0,ind-1]
-				logs = logs[ind,inf]
-				N = strlen(logs)
-			endif
-			Execute/Q/Z "sc_loggable="+command
-			if(strlen(sc_loggable)!=0)
-				comments += removeAllWhitespace(sc_loggable)+"\r\r"
+		string /G sc_log_buffer=""
+		variable i = 0
+		for(i=0;i<ItemsInList(sc_logStr, ";");i+=1)
+			command = StringFromList(i, sc_logStr, ";")
+			Execute/Q/Z "sc_log_buffer="+command
+			if(strlen(sc_log_buffer)!=0)
+				comments += removeAllWhitespace(sc_log_buffer)+"\r\r"
 			else
 				comments += removeAllWhitespace("command failed to log anything: "+command)+"\r\r"
 			endif
-			sc_loggable=""
-		while(N>0)
+		endfor
 		comments = comments[0,strlen(comments)-2]
 	endif
 	str2WINF("", comments)

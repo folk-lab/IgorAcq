@@ -1269,6 +1269,11 @@ end
 ////  save all data ////
 ////////////////////////
 
+function saveExp()
+	SaveExperiment /P=data // save current experiment as .pxp
+	SaveFromPXP(history=1, procedure=1) // grab some useful plain text docs from the pxp
+end
+
 function SaveWaves([msg, save_experiment])
 	// the message will be printed in the history, and will be saved in the winf file corresponding to this scan
 	// save_experiment=1 to save the experiment file
@@ -1321,8 +1326,7 @@ function SaveWaves([msg, save_experiment])
 		// Open up any files that may be needed
 	 	// Save scan controller meta data in this function as well
 	 	
-		initSaveFiles()
-//		SaveScanComments(msg=msg, logs=logs)
+		initSaveFiles(msg=msg)
 		
 		// save raw data waves
 		ii=0
@@ -1338,7 +1342,6 @@ function SaveWaves([msg, save_experiment])
 					print filename
 				endif
 				saveSingleWave(wn)
-//				SaveInitialWaveComments(wn, x_label=sc_x_label, y_label=sc_y_label)
 			endif
 			ii+=1
 		while (ii < numpnts(sc_RawWaveNames))
@@ -1357,12 +1360,12 @@ function SaveWaves([msg, save_experiment])
 					print filename
 				endif
 				saveSingleWave(wn)
-//				SaveInitialWaveComments(wn, x_label=sc_x_label, y_label=sc_y_label)
 			endif
 			ii+=1
 		while (ii < numpnts(sc_CalcWaveNames))
 	endif
 	
+	sc_findNewFiles(filenum)
 	if(sc_srv_push==1)
 		sc_findNewFiles(filenum)
 		sc_NotifyServer()
@@ -1376,17 +1379,13 @@ function SaveWaves([msg, save_experiment])
 		sc_save_time = datetime
 	endif
 	
-	// the very last thing we want to do here is increment the file number
-	// only if we recorded some data	
+	// close save files and increment filenum
 	if(Rawadd+Calcadd > 0)
-			filenum+=1
+		endSaveFiles()
+		filenum+=1
 	endif
 	
 end
-
-//////////////////////////////////
-////  save history/procedures ////
-//////////////////////////////////
 
 function SaveFromPXP([history, procedure])
 	// this is all based on Igor Pro Technical Note #3
@@ -1662,7 +1661,7 @@ function sc_findNewFiles(datnum)
 		if(strlen(idxList)==0)
 			continue
 		endif
-		matchList = ListMatch(idxList, datstr, ";")
+		matchList = ListMatch(idxList, winfstr, ";")
 		if(strlen(matchlist)==0)
 			continue
 		endif
