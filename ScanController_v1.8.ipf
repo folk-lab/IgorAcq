@@ -20,10 +20,11 @@
 
 //TODO:
 
-//     -- Test a ScanControllerHDF5 package to put all sweep information in a single HDF5 file
 //     -- start using proper JSON format for config files
+//     -- Test a ScanControllerHDF5 package to put all sweep information in a single HDF5 file
 //     -- add a new type of value to record that can/will be read during sc_sleep
 //     -- Write a RecordValuesAsync function that can parallelize instrument calls by opening multiple threads
+//     -- Use FunctionPath(functionNameStr) to find which scancontroller data type is being used
 
 //FIX:
 
@@ -55,12 +56,8 @@ function AppendString(thewave, thestring)
 	thewave[numpnts(thewave)-1] = thestring
 end
 
-function /S removeAllWhitespace(str)
-	string str
-	str = RemoveLeadingWhitespace(str)
-	str = RemoveTrailingWhitespace(str)
-	return str
-end
+// removeAllWhitespace() has been removed
+// use TrimString() instead
 
 Function/S RemoveLeadingWhitespace(str)
     String str
@@ -164,10 +161,10 @@ function /S getHostName()
 		case "Macintosh":
 			result = executeMacCmd("hostname")
 			splitstring /E="([a-zA-Z0-9\-]+).(.+)" result, hostname, location
-			return removeallwhitespace(LowerStr(hostname))
+			return TrimString(LowerStr(hostname))
 		case "Windows":
 			hostname = executeWinCmd("hostname")
-			return removeallwhitespace(LowerStr(hostname))
+			return TrimString(LowerStr(hostname))
 		default:
 			abort "What operating system are you running?! How?!"
 	endswitch
