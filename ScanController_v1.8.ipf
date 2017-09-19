@@ -27,10 +27,9 @@
 //     -- Use FunctionPath(functionNameStr) to find which scancontroller data type is being used
 
 //FIX:
-
 //     -- Text encoding issues with .history files, not transferable between systems
-//             this might be igors problem, I'm not convinced it is simple to fix
-//             works ok with a decent text editor, outside of igor, regardless of system
+//             this might be igor's problem, I'm not convinced it is simple to fix
+//             works _ok_ with a decent text editor outside of igor, regardless of system
 
 
 ///////////////////////////////
