@@ -445,22 +445,21 @@ function /S JSONfromFile(path, filename)
 	return readJSONobject(jstr)
 end
 
-function getJSONValue(jstr, key) 
+function /S getJSONValue(jstr, key) 
 	
 	// keys can be nested:
 	//		"key1;keyA" will return the value of keyA which is a key within the key1 value
 	// if there are repeated keys at the same nesting level, you always get the first one
 	//
 	// RETURN TYPES:
-	// 1 -- object
-	// 2 -- array
-	// 3 -- number -- no float/int distinction in igor
-	// 4 -- string
-	// 5 -- bool
-	// 6 -- null
+	// 1 -- object -- return string
+	// 2 -- array -- return string
+	// 3 -- number -- return result of num2str()
+	// 4 -- string -- return string, no surrounding quotes
+	// 5 -- bool -- return "0" or "1"
+	// 6 -- null -- return "NaN" (will convert to str2num("NaN") is not a number, close enough)
 	//
-	// use the return values to grab data from a global variable
-	// J_obj, J_arr, J_num, J_str, J_bool, J_isnull
+	// always return strings
 	//
 	// example:
 	//     if(getJSONValue(jstr, "data")==3)
@@ -470,8 +469,6 @@ function getJSONValue(jstr, key)
 	//     endif
 	
 	string jstr, key
-	string /g J_obj = "", J_arr = "", J_str = ""
-	variable /g J_num = NaN, J_bool = NaN, J_isnull = NaN
 
 	variable j = 0, numKeys = ItemsInList(key)
 	string currentKey = "", regex = ""
@@ -488,10 +485,10 @@ function getJSONValue(jstr, key)
 		// check the validity of currentKey values/positions
 		if(strlen(group)==0)
 			print "[WARNING] Key not found: " + currentKey
-			return -1
+			return ""
 		elseif(countBrackets(group)!=0)
 			print "[WARNING] Not a valid key (nested key problem): " + currentKey
-			return -1
+			return ""
 		endif
 
 	endfor
@@ -501,51 +498,43 @@ function getJSONValue(jstr, key)
 		case 1:
 			strVal = readJSONObject(group)
 			if(strlen(strVal)>0)
-				J_obj = strVal
-				return 1
+				return strVal
 			else
-				return -1
+				return ""
 			endif
 		case 2: 
 			strVal = readJSONArray(group)
 			if(strlen(strVal)>0)
-				J_arr = strVal
-				return 2
+				return strVal
 			else
-				return -1
+				return ""
 			endif
-			return 2
 		case 3:
 			splitstring /E=numRegex group, strVal
 			if(strlen(strVal)>0)
-				J_num = str2num(strVal)
-				return 3
+				return strVal
 			else
-				return -1
+				return ""
 			endif
 		case 4:
 			strVal = readJSONString(group)
 			if(strlen(strVal)>0)
-				J_str = strVal
-				return 4
+				return strVal
 			else
-				return -1
+				return ""
 			endif
 		case 5:
 			if(stringmatch(LowerStr(group[0,3]),"true")==1)
-				J_bool = 1
-				return 5
+				return num2istr(1)
 			elseif(stringmatch(LowerStr(group[0,4]),"false")==1)
-				J_bool = 0
-				return 5
+				return num2istr(0)
 			else
-				return -1
+				return ""
 			endif
 		case 6:
-			J_isnull = 1
-			return 6
+			return "NaN" 
 		case -1:
 			print "[WARNING] Trying to fetch an invalid type or empty value from: " + group
-			return -1
+			return ""
 	endswitch
 end
