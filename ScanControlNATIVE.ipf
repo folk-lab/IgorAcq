@@ -179,7 +179,7 @@ function /S saveScanComments([msg])
 	comments += getExpStatus() + "\r" // record date, time, wave names, time elapsed...
 	
 	if (!paramisdefault(msg) && strlen(msg)!=0)
-		comments += "comments:  \r" + removeAllWhitespace(msg) + "\r\r" // record any comments
+		comments += "comments:  \r" + TrimString(msg) + "\r\r" // record any comments
 	endif
 	
 	comments += "logs: \r"
@@ -192,9 +192,9 @@ function /S saveScanComments([msg])
 			command = StringFromList(i, sc_logStr, ";")
 			Execute/Q/Z "sc_log_buffer="+command
 			if(strlen(sc_log_buffer)!=0)
-				comments += removeAllWhitespace(sc_log_buffer)+"\r\r"
+				comments += TrimString(sc_log_buffer)+"\r\r"
 			else
-				comments += removeAllWhitespace("command failed to log anything: "+command)+"\r\r"
+				comments += TrimString("command failed to log anything: "+command)+"\r\r"
 			endif
 		endfor
 		comments = comments[0,strlen(comments)-2]

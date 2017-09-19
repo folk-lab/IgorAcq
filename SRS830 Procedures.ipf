@@ -80,6 +80,13 @@ End
 
 function SetSRSAmplitude(srs,volts)
 	Variable srs,volts
+	
+	if(volts<0.0)
+		abort "are you trying to set the amplitude < 0?"
+	elseif(volts<0.004)
+		volts = 0.004
+	endif
+	
 	GPIB2 device = srs
 	GPIBWrite2 "SLVL "+num2str(volts)
 End
