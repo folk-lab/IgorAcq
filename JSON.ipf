@@ -233,6 +233,74 @@ function /S readJSONstring(jstr)
 	string str
 end
 
+function /S getJSONkeys(jstr)
+
+	// return all the keys in the JSON string
+	// do not pay attention to what level they are
+	//     see getKeyLevels(jstr)
+	// one nice feature is that keylist is in the same order as jstr
+	
+	string jstr
+	
+	variable i=0, j=0, escaped = 0, startkey=0
+	string char = "", keylist = "", testkey = "", realkey = ""
+	do
+		// check if the current character is escaped
+		if(i!=0)
+			if( StringMatch(jstr[i-1], "\\") == 1)
+				escaped = 1
+			else
+				escaped = 0
+			endif
+		endif
+	
+		char = jstr[i]
+		if(StringMatch(jstr[i], "\"" ) == 1 && escaped == 0)
+		
+			startkey = i // remember where we began this journey
+			testkey = readJSONstring(jstr[i,inf]) // get a string to test
+			i+=strlen(testkey) // jump to the end of that quoted string
+						
+			// look for the next non-whitespace character
+			do
+				char = jstr[i]
+				i+=1
+			while(isWhitespace(char)==1)
+			
+			// now I have some non-whitespace character as char
+			// check if it is what I want
+			if(stringmatch(char, ":")==1)
+				realkey = TrimString(jstr[startkey,i-2]) // drop the ":" and any whitespace
+				keylist += realkey[1,strlen(realkey)-2]+":"
+			else
+				// not what you wanted, back up one and put this character back in play
+			endif
+			i-=1 // back up one and put that character back in play
+		
+		endif
+		i+=1
+	while(i<strlen(jstr))
+	return keylist
+end
+
+function /S getJSONkeylevels(jstr, keylist)
+	// take a json string and a list of keys
+	// return a numerical list signifying at what level they are nested
+	string jstr, keylist
+	
+	variable i=0
+	string key = "", group = "", regex = "", keylevels = ""
+	for(i=0; i<ItemsInList(keylist, ":");i+=1)
+		
+		key = StringFromList(i, keylist, ":")
+	
+		sprintf regex, "\"%s\"\\s*:([\\s\\S]*)}$", key
+		splitstring /E=regex jstr, group
+	
+		keylevels += num2istr(countBrackets(group)+1)+":"
+	endfor
+	print keylist, keylevels
+end
 
 ///////////////////////////////
 //// JSON output functions ////
@@ -320,13 +388,26 @@ function /S addJSONKeyVal(jstr, key, [numVal, strVal, fmt])
 	
 end
 
-function writeJSONtoFile(jstr, filename)
-	string jstr, filename
+function writeJSONtoFile(jstr, filename, path)
+	string jstr, filename, path
+	string indent = "  "
 	
-	//
 	// write jstr to filename
 	// add whitespace to make it easier to read
-	//
+	// this is expected to be a valid json str
+	// it will be a disaster otherwise
+	
+	variable refNum=0
+	open /z/p=$path refNum as filename
+	
+	variable i=0
+	string char = ""
+
+	// get keys...
+	string keylist = getJSONkeys(jstr)
+	string keylevels = getJSONkeylevels(jstr, keylist)
+
+	close refNum
 	
 end
 	
