@@ -543,13 +543,13 @@ function /S getJSONValue(jstr, key)
 	
 	string jstr, key
 
-	variable j = 0, numKeys = ItemsInList(key)
+	variable j = 0, numKeys = ItemsInList(key, ":")
 	string currentKey = "", regex = ""
 	string group = jstr
 	for(j=0;j<numKeys;j+=1)
 	
 		jstr = readJSONObject(group)
-		currentKey = StringFromList(j, key, ";")
+		currentKey = StringFromList(j, key, ":")
 				
 		// use regex to match key and everything after it...
 		sprintf regex, "\"%s\"\\s*:([\\s\\S]*)}$", currentKey

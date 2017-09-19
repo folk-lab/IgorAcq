@@ -61,13 +61,14 @@ function getTemperature(plate, max_age)
         print "HTTP connection error. Temperature reading not attempted."
         return 0.0
    endif
-	
-	if(getJSONbool(response, "ok")==1)
-		// no error
-		string data = getJSONarray(response, "data")
-		return getJSONnum(data, "T")
+
+	variable ok = str2num(getJSONvalue(response, "ok")) // should be boolean
+	if(ok==1)
+		// no error, get temperature
+		return str2num(getJSONvalue(response, "data:T"))
+		
 	else
-		// not sure what comes back here
+		// strange resopnse
 		print "Problem reading temperature value: "+response
 		return 0.0
 	endif
@@ -117,16 +118,16 @@ function getHeaterPwr(heater, max_age)
 		    string response = S_serverResponse // response is a JSON string
 		endif
    else
-        print "HTTP connection error. Heater reading not attempted."
+        print "HTTP connection error. Temperature reading not attempted."
         return 0.0
    endif
-	
-	if(getJSONbool(response, "ok")==1)
-		// no error
-		string data = getJSONarray(response, "data")
-		return getJSONnum(data, "power_mw")
+
+	variable ok = str2num(getJSONvalue(response, "ok")) // should be boolean
+	if(ok==1)
+		// no error, get power
+		return str2num(getJSONvalue(response, "data:power_mw"))
 	else
-		// not sure what comes back here
+		// reading error
 		print "Problem reading heater value: "+response
 		return 0.0
 	endif
@@ -475,11 +476,13 @@ function /S lakeshorePost(cmd)
         abort "HTTP connection error. LakeShore command not attempted."
    endif
 
-	if(getJSONbool(response, "ok")==1)
-		// no error
-		return response // return JSON string. let the next function parse it.
+	variable ok = str2num(getJSONvalue(response, "ok")) 
+	if(ok==1)
+		// no error, get temperature
+		return response
+		
 	else
-		// not sure what comes back here
+		// strange resopnse
 		abort "LakeShore command execution error: "+response
 	endif
 
