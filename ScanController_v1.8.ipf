@@ -18,9 +18,10 @@
 //     -- save note about which config file was used for a given data set (ScanControlNATIVE)
 //     -- add Slack notifications (somefolkneverlearn.slack.com)
 
+//     -- start using proper JSON format for config files and general winf 
+
 //TODO:
 
-//     -- start using proper JSON format for config files
 //     -- Test a ScanControllerHDF5 package to put all sweep information in a single HDF5 file
 //     -- add a new type of value to record that can/will be read during sc_sleep
 //     -- Write a RecordValuesAsync function that can parallelize instrument calls by opening multiple threads
@@ -1296,6 +1297,11 @@ function SaveWaves([msg, save_experiment])
 		sc_findNewFiles(filenum)
 		sc_NotifyServer() // this may leave the experiment file open for some time
 							   // make sure to run saveExp before this
+	else
+		sc_DeleteNotificationFile() // delete the last file list
+		sc_findNewFiles(filenum)    // get list of new files
+		                            // I assume you're testing something
+		                            //     and may want to keep track of the files another way
 	endif
 	
 	// close save files and increment filenum
