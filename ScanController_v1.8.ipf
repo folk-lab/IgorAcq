@@ -1591,7 +1591,7 @@ function sc_findNewFiles(datnum)
 		endif
 		
 		for(j=0;j<ItemsInList(matchList, ";");j+=1)
-			tmpname = datapath+StringFromList(j,matchList, ";")
+			tmpname = winfpath+StringFromList(j,matchList, ";")
 			if(notifyLen==0)
 				// if there is no notification file
 				// add this immediately
