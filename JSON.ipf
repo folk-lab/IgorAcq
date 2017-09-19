@@ -299,7 +299,7 @@ function /S getJSONkeylevels(jstr, keylist)
 	
 		keylevels += num2istr(countBrackets(group)+1)+":"
 	endfor
-	print keylist, keylevels
+	return keylevels
 end
 
 ///////////////////////////////
@@ -388,6 +388,19 @@ function /S addJSONKeyVal(jstr, key, [numVal, strVal, fmt])
 	
 end
 
+function /S getJSONindent(level)
+	// returning whitespace for formatting JSON strings
+	variable level
+	
+	variable i=0
+	string output = ""
+	for(i=0;i<level;i+=1)
+		output += "  "
+	endfor
+	
+	return output
+end
+
 function writeJSONtoFile(jstr, filename, path)
 	string jstr, filename, path
 	string indent = "  "
@@ -399,13 +412,73 @@ function writeJSONtoFile(jstr, filename, path)
 	
 	variable refNum=0
 	open /z/p=$path refNum as filename
-	
-	variable i=0
-	string char = ""
+
+	fprintf refNum, "{\r"
 
 	// get keys...
 	string keylist = getJSONkeys(jstr)
 	string keylevels = getJSONkeylevels(jstr, keylist)
+
+	variable i=0, level = 0
+	string key = "", strVal = "", group = ""
+	string regex = "", numRegex = "([-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?)"
+	for(i=0;i<ItemsInList(keylevels,":");i+=1) // keylevels less likely to have a problem
+		
+		// check if the indent level has decreased
+		// if so, close out object with curly bracket
+		if(i!=0 && str2num(StringFromList(i, keylevels, ":"))<level)
+			level = str2num(StringFromList(i, keylevels, ":"))
+			fprintf refNum, "\r%s}\r", getJSONindent(level)
+		else
+			level = str2num(StringFromList(i, keylevels, ":"))
+		endif 
+		
+		key = StringFromList(i, keylist, ":")
+		
+		sprintf regex, "\"%s\"\\s*:([\\s\\S]*)}$", key
+		splitstring /E=regex jstr, group
+		switch(findJSONtype(group))
+			case 1:
+				// don't put the value in, it will contain keys and be handled another way
+				fprintf refNum, "%s\"%s\": {\r", getJSONindent(level), key
+				break
+			case 2: 
+				strVal = readJSONArray(group)
+				fprintf refNum, "%s\"%s\": %s\r", getJSONindent(level), key, strVal
+				break
+			case 3:
+				splitstring /E=numRegex group, strVal
+				fprintf refNum, "%s\"%s\": %s\r", getJSONindent(level), key, strVal
+				break
+			case 4:
+				strVal = readJSONString(group)
+				fprintf refNum, "%s\"%s\": %s\r", getJSONindent(level), key, strVal
+				break
+			case 5:
+				if(stringmatch(LowerStr(group[0,3]),"true")==1)
+					strVal = "true"
+				elseif(stringmatch(LowerStr(group[0,4]),"false")==1)
+					strVal = "false"
+				endif
+				fprintf refNum, "%s\"%s\": %s\r", getJSONindent(level), key, strVal
+				break
+			case 6:
+				strVal = "null" 
+				fprintf refNum, "%s\"%s\": %s\r", getJSONindent(level), key, strVal
+				break
+			case -1:
+				strVal = ""
+				fprintf refNum, "%s\"%s\": %s\r", getJSONindent(level), key, strVal
+				break
+		endswitch
+		
+	endfor
+	
+	// need to close out open objects
+	do
+		level-=1
+		fprintf refNum, "%s}\r", getJSONindent(level)
+	while(level>0)
 
 	close refNum
 	
