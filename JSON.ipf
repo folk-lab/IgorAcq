@@ -12,13 +12,119 @@
 //// utility functions ////
 ///////////////////////////
 
+function /S numToBool(val)
+	variable val
+	if(val==1)
+		return "true"
+	elseif(val==0)
+		return "false"
+	else
+		return ""
+	endif
+end
+
+Function/S NumericWaveToBoolArray(w)
+	Wave w	// numeric wave (if text, use /T here and %s below)
+	String list = "["
+	
+	variable i=0
+	for(i=0; i<numpnts(w); i+=1)
+		list += numToBool(w[i])+", "
+	endfor
+	
+	return list[0,strlen(list)-3] + "]"
+End
+
+Function/S NumericWaveToNumArray(w)
+	Wave w	// numeric wave (if text, use /T here and %s below)
+	String list
+	wfprintf list, "%g,", w	// semicolon-separated list
+	return "["+list[0,strlen(list)-2]+"]"
+End
+
+Function/S TextWaveToStrArray(w)
+	Wave w	// numeric wave (if text, use /T here and %s below)
+	String list
+	wfprintf list, "\"%s\",", w	// semicolon-separated list
+	return "["+list[0,strlen(list)-2]+"]"
+End
+
+function /s stripCharacters(str, charlist)
+	// always strip whitespace from beginning and end
+	// also remove any unescaped characters from charlist
+	//      charlist should be a comma separated list of characters
+	
+	string str, charlist
+	
+	if (strlen(str) == 0)
+		// just get this out of the way real quick
+		return ""
+	endif
+ 
+ 	// remove leading whitespace
+	do
+		string firstChar= str[0]
+		if (IsWhiteSpace(firstChar))
+			str= str[1,inf]
+		else
+		   break
+		endif   
+	while (strlen(str) > 0)
+	
+	// remove trailing whitespace
+	do
+	    string lastChar = str[strlen(str) - 1]
+	    if (IsWhiteSpace(lastChar))
+	    	str = str[0, strlen(str) - 2]
+	    else
+	    	break
+	    endif
+	while (strlen(str) > 0)
+	
+	// remove charlist characters that are not escaped
+	variable i=0, j=0, escaped = 0, nchars = ItemsInList(charlist, ",")
+	do
+		// check if the current character is escaped
+		if(i!=0)
+			if( CmpStr(str[i-1], "\\") == 0)
+				escaped = 1
+			else
+				escaped = 0
+			endif
+		endif
+		
+		string nextChar = str[i]
+		for(j=0;j<nchars+1;j+=1)
+			if(CmpStr(nextChar, StringFromList(j, charlist, ","))==0 && escaped==0)
+				str = str[0,i-1]+str[i+1,inf]
+				i-=1
+			endif
+		endfor
+		i+=1
+	while(i<strlen(str))
+	
+	return str
+end
+	
+end
+
+function StrArrayToTextWave(arraystr, namewave)
+	string arraystr, namewave
+	
+	arraystr = stripCharacters(arraystr, "[,],\"")
+	
+	variable n = ItemsInList(arraystr,",")	
+	make/o/t/n=(n) $namewave=StringFromList(p,arraystr, ",")
+end
+
 function findJSONtype(str)
-	//
+	
 	// this checks quickly to find what type something is intended to be
 	// it makes no effort to check if str is a valid version of that type
+	
 	// in fact, I take advantage of that later by sending this function big chunks of 
 	// characters that only _start_ with the thing I want
-	//
+	
 	// RETURN TYPES:
 	// 1 -- object
 	// 2 -- array
@@ -26,7 +132,7 @@ function findJSONtype(str)
 	// 4 -- string
 	// 5 -- bool
 	// 6 -- null
-	//
+	
 	
 	string str
 	str = TrimString(str) // trim leading/trailing whitespace
@@ -36,19 +142,19 @@ function findJSONtype(str)
 	endif
 	
 	string numRegex = "([-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?)"
-	if(stringmatch(str[0], "{")==1)
+	if(CmpStr(str[0], "{")==0)
 		// this is an object
 		return 1
-	elseif(stringmatch(str[0], "[")==1)
+	elseif(CmpStr(str[0], "[")==0)
 		// this is an array
 		return 2
-	elseif(stringmatch(str[0], "\"")==1)
+	elseif(CmpStr(str[0], "\"")==0)
 		// this is a string
 		return 4
-	elseif(stringmatch(str[0,3], "true")==1 || stringmatch(str[0,4], "false")==1)
+	elseif(CmpStr(str[0,3], "true")==0 || CmpStr(str[0,4], "false")==0)
 		// this is a boolean
 		return 5
-	elseif(stringmatch(str[0,3], "null")==1)
+	elseif(CmpStr(str[0,3], "null")==0)
 		// this is null
 		return 6
 	elseif(grepstring(str, "([-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?)")==1)
@@ -70,7 +176,7 @@ function countBrackets(str)
 	
 		// check if the current character is escaped
 		if(i!=0)
-			if( StringMatch(str[i-1], "\\") == 1)
+			if( CmpStr(str[i-1], "\\") == 0)
 				escaped = 1
 			else
 				escaped = 0
@@ -78,12 +184,12 @@ function countBrackets(str)
 		endif
 	
 		// count opening brackets
-		if( StringMatch(str[i], "{" ) == 1 && escaped == 0)
+		if( CmpStr(str[i], "{" ) == 0 && escaped == 0)
 			bracketCount -= 1
 		endif
 		
 		// count closing brackets
-		if( StringMatch(str[i], "}" ) == 1 && escaped == 0)
+		if( CmpStr(str[i], "}" ) == 0 && escaped == 0)
 			bracketCount += 1
 		endif
 		
@@ -104,7 +210,7 @@ function /S readJSONobject(jstr)
 	
 		// check if the current character is escaped
 		if(i!=0)
-			if( StringMatch(jstr[i-1], "\\") == 1)
+			if( CmpStr(jstr[i-1], "\\") == 0)
 				escaped = 1
 			else
 				escaped = 0
@@ -112,7 +218,7 @@ function /S readJSONobject(jstr)
 		endif
 	
 		// count opening brackets
-		if( StringMatch(jstr[i], "{" ) == 1 && escaped == 0)
+		if( CmpStr(jstr[i], "{" ) == 0 && escaped == 0)
 			openBrackets+=1
 			if(startPos==-1)
 				startPos = i
@@ -120,7 +226,7 @@ function /S readJSONobject(jstr)
 		endif
 		
 		// count closing brackets
-		if( StringMatch(jstr[i], "}" ) == 1 && escaped == 0)
+		if( CmpStr(jstr[i], "}" ) == 0 && escaped == 0)
 			openBrackets-=1
 			if(openBrackets==0)
 				// found the last closing bracket
@@ -152,7 +258,7 @@ function /S readJSONarray(jstr)
 	
 		// check if the current character is escaped
 		if(i!=0)
-			if( StringMatch(jstr[i-1], "\\") == 1)
+			if( CmpStr(jstr[i-1], "\\") == 0)
 				escaped = 1
 			else
 				escaped = 0
@@ -160,7 +266,7 @@ function /S readJSONarray(jstr)
 		endif
 	
 		// count opening brackets
-		if( StringMatch(jstr[i], "[" ) == 1 && escaped == 0)
+		if( CmpStr(jstr[i], "[" ) == 0 && escaped == 0)
 			openBrackets+=1
 			if(startPos==-1)
 				startPos = i
@@ -168,7 +274,7 @@ function /S readJSONarray(jstr)
 		endif
 		
 		// count closing brackets
-		if( StringMatch(jstr[i], "]" ) == 1 && escaped == 0)
+		if( CmpStr(jstr[i], "]" ) == 0 && escaped == 0)
 			openBrackets-=1
 			if(openBrackets==0)
 				// found the last closing bracket
@@ -201,7 +307,7 @@ function /S readJSONstring(jstr)
 	
 		// check if the current character is escaped
 		if(i!=0)
-			if( StringMatch(jstr[i-1], "\\") == 1)
+			if( CmpStr(jstr[i-1], "\\") == 0)
 				escaped = 1
 			else
 				escaped = 0
@@ -209,7 +315,7 @@ function /S readJSONstring(jstr)
 		endif
 	
 		// count quotes
-		if( StringMatch(jstr[i], "\"" ) == 1 && escaped == 0)
+		if( CmpStr(jstr[i], "\"" ) == 0 && escaped == 0)
 			// found one!
 			if(startPos==-1)
 				// this is the first one
@@ -236,18 +342,18 @@ end
 function /S getJSONkeys(jstr)
 
 	// return all the keys in the JSON string
-	// do not pay attention to what level they are
-	//     see getKeyLevels(jstr)
-	// one nice feature is that keylist is in the same order as jstr
+	// returns a comma separated list like
+	// 	key1,key2,key3:key3a,key4
 	
 	string jstr
 	
 	variable i=0, j=0, escaped = 0, startkey=0
-	string char = "", keylist = "", testkey = "", realkey = ""
+	string char = "", testkey = "", realkey = ""
+	string keylist = "", keylevel = ""
 	do
 		// check if the current character is escaped
 		if(i!=0)
-			if( StringMatch(jstr[i-1], "\\") == 1)
+			if( CmpStr(jstr[i-1], "\\") == 0)
 				escaped = 1
 			else
 				escaped = 0
@@ -255,7 +361,7 @@ function /S getJSONkeys(jstr)
 		endif
 	
 		char = jstr[i]
-		if(StringMatch(jstr[i], "\"" ) == 1 && escaped == 0)
+		if(CmpStr(jstr[i], "\"" ) == 0 && escaped == 0)
 		
 			startkey = i // remember where we began this journey
 			testkey = readJSONstring(jstr[i,inf]) // get a string to test
@@ -269,37 +375,46 @@ function /S getJSONkeys(jstr)
 			
 			// now I have some non-whitespace character as char
 			// check if it is what I want
-			if(stringmatch(char, ":")==1)
+			if(CmpStr(char, ":")==0)
 				realkey = TrimString(jstr[startkey,i-2]) // drop the ":" and any whitespace
-				keylist += realkey[1,strlen(realkey)-2]+":"
-			else
-				// not what you wanted, back up one and put this character back in play
+				keylist += realkey[1,strlen(realkey)-2]+","
+				keylevel += num2istr(countBrackets(jstr[i,inf])-1)+"," // for closing bracket
 			endif
 			i-=1 // back up one and put that character back in play
 		
 		endif
 		i+=1
 	while(i<strlen(jstr))
-	return keylist
-end
-
-function /S getJSONkeylevels(jstr, keylist)
-	// take a json string and a list of keys
-	// return a numerical list signifying at what level they are nested
-	string jstr, keylist
 	
-	variable i=0
-	string key = "", group = "", regex = "", keylevels = ""
-	for(i=0; i<ItemsInList(keylist, ":");i+=1)
-		
-		key = StringFromList(i, keylist, ":")
-	
-		sprintf regex, "\"%s\"\\s*:([\\s\\S]*)}$", key
-		splitstring /E=regex jstr, group
-	
-		keylevels += num2istr(countBrackets(group)+1)+":"
+	// ok... now I've got to go back through this key list and 
+	//   build up keys that start at level 0
+	//   this allows keys to be repeated at lower levels
+	//   repeated keys at level 0 are still a problem
+	variable level = -1, nextlevel = -1
+	string key = "", newlist = ""
+	for(i=0; i<ItemsInList(keylist, ","); i+=1)
+		key = StringFromList(i, keylist, ",")
+		level = str2num(StringFromList(i, keylevel, ","))
+		if(level!=0)
+			// go back and find all keys until you are at level 0
+			// so... replace key2 with key0:key1:key2
+			for(j=i-1;j>-1;j-=1)
+				nextlevel = str2num(StringFromList(j, keylevel, ","))
+				if(nextlevel==level-1)
+					// add next level to the key
+					key = StringFromList(j, keylist, ",")+":"+key
+					level=nextlevel
+				elseif(nextlevel>level)
+					// you got to the end of whatever was nested here
+					break
+				endif
+			endfor
+			newlist += key+","
+		else
+			newlist += key+","
+		endif
 	endfor
-	return keylevels
+	return newlist[0,strlen(newlist)-2]
 end
 
 ///////////////////////////////
@@ -323,7 +438,7 @@ function /S addJSONKeyVal(jstr, key, [numVal, strVal, fmt])
 	//// remove leading/trailing whitespace and quotes from key ////
 	do
 	    String firstChar= key[0]
-	    if (StringMatch(firstChar, "\"") == 1 || GrepString(firstChar, "\\s") == 1)
+	    if (CmpStr(firstChar, "\"") == 0 || GrepString(firstChar, "\\s") == 1)
 	        key = key[1,inf]
 	    else
 	        break
@@ -331,7 +446,7 @@ function /S addJSONKeyVal(jstr, key, [numVal, strVal, fmt])
 	while (strlen(key) > 0)
 	do
 	    String lastChar = key[strlen(key) - 1]
-	    if (StringMatch(lastChar, "\"") == 1 || GrepString(lastChar, "\\s") == 1)
+	    if (CmpStr(lastChar, "\"") == 0 || GrepString(lastChar, "\\s") == 1)
 	        key = key[0, strlen(key) - 2]
 	    else
 	        break
@@ -342,15 +457,14 @@ function /S addJSONKeyVal(jstr, key, [numVal, strVal, fmt])
 	if(strlen(jstr)==0)
 		// no starting string provided
 		// make a new one
-		jstr = "{}"
+		jstr = "{"
 	else
 		// get only what is inside the starting and ending brakets
 		jstr = readJSONObject(jstr) // returns '{....}'
+		jstr = jstr[0,strlen(jstr)-2]+", " // returns '{....., '
 	endif
 	
-	jstr = jstr[0,strlen(jstr)-2]
-	
-	variable err
+	variable err = 0
 	string output="", outputFmt = ""
 	if(!paramisdefault(strVal))
 
@@ -362,13 +476,13 @@ function /S addJSONKeyVal(jstr, key, [numVal, strVal, fmt])
 
 		// setup format string
 		if(paramisdefault(fmt))
-			outputFmt = "%s, \"%s\": %s}"
+			outputFmt = jstr+"\"%s\": %s}"
 		else
-			outputFmt = "%s, \"%s\": " + fmt + "}"
+			outputFmt = jstr+"\"%s\": " + fmt + "}"
 		endif
 		
 		// return output
-		sprintf output, outputFmt, jstr, key, strVal
+		sprintf output, outputFmt, key, strVal
 		return output
 	endif
 
@@ -376,13 +490,13 @@ function /S addJSONKeyVal(jstr, key, [numVal, strVal, fmt])
 	
 		// setup format string
 		if(paramisdefault(fmt))
-			outputFmt = "%s, \"%s\": %f}"
+			outputFmt = jstr+"\"%s\": %f}"
 		else
-			outputFmt = "%s, \"%s\": " + fmt + "}"
+			outputFmt = jstr+"\"%s\": " + fmt + "}"
 		endif
 		
 		// return output
-		sprintf output, outputFmt, jstr, key, numVal
+		sprintf output, outputFmt, key, numVal
 		return output
 	endif
 	
@@ -402,6 +516,9 @@ function /S getJSONindent(level)
 end
 
 function writeJSONtoFile(jstr, filename, path)
+
+	/////// this currently fails when I pass it a boolean value!!!! ///////
+
 	string jstr, filename, path
 	string indent = "  "
 	
@@ -417,58 +534,51 @@ function writeJSONtoFile(jstr, filename, path)
 
 	// get keys...
 	string keylist = getJSONkeys(jstr)
-	string keylevels = getJSONkeylevels(jstr, keylist)
+	
 
 	variable i=0, level = 0
-	string key = "", strVal = "", group = ""
-	string regex = "", numRegex = "([-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?)"
-	for(i=0;i<ItemsInList(keylevels,":");i+=1) // keylevels less likely to have a problem
+	string key = "", printkey = "", strVal = "", group = ""
+	for(i=0;i<ItemsInList(keylist,",");i+=1) // loop over keys
 		
 		// check if the indent level has decreased
 		// if so, close out object with curly bracket
-		if(i!=0 && str2num(StringFromList(i, keylevels, ":"))<level)
-			level = str2num(StringFromList(i, keylevels, ":"))
-			fprintf refNum, "\r%s}\r", getJSONindent(level)
+		
+		key = StringFromList(i, keylist, ",")
+		printkey = StringFromList(ItemsInList(key, ":")-1, key, ":")
+		
+		if(i!=0 && ItemsInList(key, ":")<level)
+			level = ItemsInList(key, ":")
+			fprintf refNum, "%s}\r", getJSONindent(level)
 		else
-			level = str2num(StringFromList(i, keylevels, ":"))
+			level = ItemsInList(key, ":")
 		endif 
 		
-		key = StringFromList(i, keylist, ":")
+		strVal = getJSONValue(jstr, key)
 		
-		sprintf regex, "\"%s\"\\s*:([\\s\\S]*)}$", key
-		splitstring /E=regex jstr, group
-		switch(findJSONtype(group))
+		switch(findJSONtype(strVal))
 			case 1:
 				// don't put the value in, it will contain keys and be handled another way
-				fprintf refNum, "%s\"%s\": {\r", getJSONindent(level), key
+				fprintf refNum, "%s\"%s\": {\r", getJSONindent(level), printkey
 				break
 			case 2: 
-				strVal = readJSONArray(group)
-				fprintf refNum, "%s\"%s\": %s\r", getJSONindent(level), key, strVal
+				fprintf refNum, "%s\"%s\": %s\r", getJSONindent(level), printkey, strVal
 				break
 			case 3:
-				splitstring /E=numRegex group, strVal
-				fprintf refNum, "%s\"%s\": %s\r", getJSONindent(level), key, strVal
+				fprintf refNum, "%s\"%s\": %s\r", getJSONindent(level), printkey, strVal
 				break
 			case 4:
-				strVal = readJSONString(group)
-				fprintf refNum, "%s\"%s\": %s\r", getJSONindent(level), key, strVal
+				fprintf refNum, "%s\"%s\": %s\r", getJSONindent(level), printkey, strVal
 				break
 			case 5:
-				if(stringmatch(LowerStr(group[0,3]),"true")==1)
-					strVal = "true"
-				elseif(stringmatch(LowerStr(group[0,4]),"false")==1)
-					strVal = "false"
-				endif
-				fprintf refNum, "%s\"%s\": %s\r", getJSONindent(level), key, strVal
+				fprintf refNum, "%s\"%s\": %s\r", getJSONindent(level), printkey, strVal
 				break
 			case 6:
 				strVal = "null" 
-				fprintf refNum, "%s\"%s\": %s\r", getJSONindent(level), key, strVal
+				fprintf refNum, "%s\"%s\": %s\r", getJSONindent(level), printkey, strVal
 				break
 			case -1:
 				strVal = ""
-				fprintf refNum, "%s\"%s\": %s\r", getJSONindent(level), key, strVal
+				fprintf refNum, "%s\"%s\": %s\r", getJSONindent(level), printkey, strVal
 				break
 		endswitch
 		
@@ -597,9 +707,9 @@ function /S getJSONValue(jstr, key)
 				return ""
 			endif
 		case 5:
-			if(stringmatch(LowerStr(group[0,3]),"true")==1)
+			if(CmpStr(LowerStr(group[0,3]),"true")==0)
 				return num2istr(1)
-			elseif(stringmatch(LowerStr(group[0,4]),"false")==1)
+			elseif(CmpStr(LowerStr(group[0,4]),"false")==0)
 				return num2istr(0)
 			else
 				return ""
