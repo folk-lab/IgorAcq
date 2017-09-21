@@ -102,15 +102,17 @@ Function IsWhiteSpace(char)
     return GrepString(char, "\\s")
 End
 
-function list2textwave(stringlistwave,namewave)
-	string stringlistwave, namewave
-	variable n = ItemsInList(stringlistwave,";")
-	make/o/t/n=(n) $namewave=StringFromList(p,stringlistwave, ";")
-end
+//function list2textwave(stringlistwave,namewave)
+//	string stringlistwave, namewave
+//	
+//	variable n = ItemsInList(stringlistwave,";")
+//	make/o/t/n=(n) $namewave=StringFromList(p,stringlistwave, ";")
+//end
 
 function list2numwave(stringlistwave,namewave)
 	string stringlistwave, namewave
 	variable n = ItemsInList(stringlistwave,";")
+	
 	make/o/t/n=(n) blawave=StringFromList(p,stringlistwave, ";")
 	make/o/n=(n) $namewave= str2num(blawave)
 end
@@ -302,7 +304,7 @@ end
 //// configuration files ////
 /////////////////////////////
 
-function sc_createconfig()
+function /S sc_createconfig()
 	wave/t sc_RawWaveNames
 	wave sc_RawRecord
 	wave sc_RawPlot
@@ -321,38 +323,47 @@ function sc_createconfig()
 	variable refnum
 	string configfile
 	
+	string configstr = "", tmpstr = ""
+	
+	// wave names
+	tmpstr = addJSONKeyVal(tmpstr, "raw", strVal=TextWaveToStrArray(sc_RawWaveNames))
+	tmpstr = addJSONKeyVal(tmpstr, "calc", strVal=TextWaveToStrArray(sc_CalcWaveNames))
+	configstr = addJSONKeyVal(configstr, "wave_names", strVal=tmpstr)
+	
+	// record?
+	tmpstr = ""
+	tmpstr = addJSONKeyVal(tmpstr, "raw", strVal=NumericWaveToBoolArray(sc_RawRecord)) 
+	tmpstr = addJSONKeyVal(tmpstr, "calc", strVal=NumericWaveToBoolArray(sc_CalcRecord))
+	configstr = addJSONKeyVal(configstr, "record_waves", strVal=tmpstr)
+	
+	// plot?
+	tmpstr = ""
+	tmpstr = addJSONKeyVal(tmpstr, "raw", strVal=NumericWaveToBoolArray(sc_RawPlot)) 
+	tmpstr = addJSONKeyVal(tmpstr, "calc", strVal=NumericWaveToBoolArray(sc_CalcPlot))
+	configstr = addJSONKeyVal(configstr, "plot_waves", strVal=tmpstr)
+
+	//scripts
+	tmpstr = ""
+	tmpstr = addJSONKeyVal(tmpstr, "request", strVal=TextWaveToStrArray(sc_RequestScripts)) 
+	tmpstr = addJSONKeyVal(tmpstr, "response", strVal=TextWaveToStrArray(sc_GetResponseScripts))
+	tmpstr = addJSONKeyVal(tmpstr, "calc", strVal=TextWaveToStrArray(sc_CalcScripts))
+	configstr = addJSONKeyVal(configstr, "scripts", strVal=tmpstr)
+	
+	// executable string to get logs
+	configstr = addJSONKeyVal(configstr, "log_string", strVal="\""+sc_LogStr+"\"")
+	
+	// print_to_history
+	tmpstr = ""
+	tmpstr = addJSONKeyVal(tmpstr, "raw", strVal=numToBool(sc_PrintRaw))
+	tmpstr = addJSONKeyVal(tmpstr, "calc", strVal=numToBool(sc_PrintCalc))
+	configstr = addJSONKeyVal(configstr, "print_to_history", strVal=tmpstr)
+
+	// igor stuff
+	configstr = addJSONKeyVal(configstr, "colormap", strVal="\""+sc_ColorMap+"\"")
+	configstr = addJSONKeyVal(configstr, "filenum", strVal=num2istr(filenum))
+	
 	configfile = "sc" + num2istr(unixtime()) + ".config"
-	
-	// Try to open config file or create it otherwise
-	open /z/p=config refnum as configfile
-	
-	wfprintf refnum, "%s;", sc_RawWaveNames
-	fprintf refnum, "\r"
-	wfprintf refnum, "%g;", sc_RawRecord
-	fprintf refnum, "\r"
-	wfprintf refnum, "%g;", sc_RawPlot
-	fprintf refnum, "\r"
-	wfprintf refnum, "%s;", sc_RequestScripts
-	fprintf refnum, "\r"
-	wfprintf refnum, "%s;", sc_GetResponseScripts
-	fprintf refnum, "\r"
-	wfprintf refnum, "%s;", sc_CalcWaveNames
-	fprintf refnum, "\r"
-	wfprintf refnum, "%s;", sc_CalcScripts
-	fprintf refnum, "\r"
-	wfprintf refnum, "%g;", sc_CalcRecord
-	fprintf refnum, "\r"
-	wfprintf refnum, "%g;", sc_CalcPlot
-	fprintf refnum, "\r"
-	fprintf refnum, "%g\r", sc_PrintRaw
-	fprintf refnum, "%g\r", sc_PrintCalc
-	fprintf refnum, "%s\r", sc_LogStr
-	fprintf refnum, "%s\r", sc_ColorMap
-	fprintf refnum, "%g\r", filenum
-	
-	close refnum
-	sc_current_config = configfile
-	
+	writeJSONtoFile(configstr, configfile, "config")
 end
 
 function sc_loadconfig(configfile)
@@ -368,47 +379,37 @@ function sc_loadconfig(configfile)
 	variable i, confignum=0
 	string file_string, configunix
 	
-	open /z/r/p=config refnum as configfile
 	printf "Loading configuration from: %s\n", configfile
 	sc_current_config = configfile
 	
+	string jstr = JSONfromFile("config", configfile)
+	
 	// load raw wave configuration
-	freadline/t=(num2char(13)) refnum, loadcontainer
-	list2textwave(removeending(loadcontainer,"\r"),"sc_RawWaveNames")
-	freadline/t=(num2char(13)) refnum, loadcontainer
-	list2numwave(removeending(loadcontainer,"\r"),"sc_RawRecord")
-	freadline/t=(num2char(13)) refnum, loadcontainer
-	list2numwave(removeending(loadcontainer,"\r"),"sc_RawPlot")
-	freadline/t=(num2char(13)) refnum, loadcontainer
-	list2textwave(removeending(loadcontainer,"\r"),"sc_RequestScripts")
-	freadline/t=(num2char(13)) refnum, loadcontainer
-	list2textwave(removeending(loadcontainer,"\r"),"sc_GetResponseScripts")
+
+	StrArrayToTextWave(getJSONvalue(jstr, "wave_names:raw"), "sc_RawWaveNames")
 	
-	// load calc wave configuration
-	freadline/t=(num2char(13)) refnum, loadcontainer
-	list2textwave(removeending(loadcontainer,"\r"),"sc_CalcWaveNames")
-	freadline/t=(num2char(13)) refnum, loadcontainer
-	list2textwave(removeending(loadcontainer,"\r"),"sc_CalcScripts")
-	freadline/t=(num2char(13)) refnum, loadcontainer
-	list2numwave(removeending(loadcontainer,"\r"),"sc_CalcRecord")
-	freadline/t=(num2char(13)) refnum, loadcontainer
-	list2numwave(removeending(loadcontainer,"\r"),"sc_CalcPlot")
 	
-	// load print checkbox settings
-	freadline/t=(num2char(13)) refnum, loadcontainer
-	sc_PrintRaw = str2num(removeending(loadcontainer,"\r"))
-	freadline/t=(num2char(13)) refnum, loadcontainer
-	sc_PrintCalc = str2num(removeending(loadcontainer,"\r"))
+//	list2numwave(removeending(loadcontainer,"\r"),"sc_RawRecord")
+//	list2numwave(removeending(loadcontainer,"\r"),"sc_RawPlot")
+//	list2textwave(removeending(loadcontainer,"\r"),"sc_RequestScripts")
+//	list2textwave(removeending(loadcontainer,"\r"),"sc_GetResponseScripts")
+//	
+//	// load calc wave configuration
+//	list2textwave(removeending(loadcontainer,"\r"),"sc_CalcWaveNames")
+//	list2textwave(removeending(loadcontainer,"\r"),"sc_CalcScripts")
+//	list2numwave(removeending(loadcontainer,"\r"),"sc_CalcRecord")
+//	list2numwave(removeending(loadcontainer,"\r"),"sc_CalcPlot")
+//	
+//	// load print checkbox settings
+//	sc_PrintRaw = str2num(removeending(loadcontainer,"\r"))
+//	sc_PrintCalc = str2num(removeending(loadcontainer,"\r"))
+//	
+//	// load log string
+//	sc_LogStr = removeending(loadcontainer,"\r")
+//	
+//	// load colormap
+//	sc_ColorMap = removeending(loadcontainer,"\r")
 	
-	// load log string
-	freadline/t=(num2char(13)) refnum, loadcontainer
-	sc_LogStr = removeending(loadcontainer,"\r")
-	
-	// load colormap
-	freadline/t=(num2char(13)) refnum, loadcontainer
-	sc_ColorMap = removeending(loadcontainer,"\r")
-	
-	close refnum
 end
 
 
