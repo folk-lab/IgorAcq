@@ -476,13 +476,13 @@ function /S lakeshorePost(cmd)
         abort "HTTP connection error. LakeShore command not attempted."
    endif
 
-	variable ok = str2num(getJSONvalue(response, "ok")) 
+	variable ok = str2num(getJSONvalue(response, "OK")) 
 	if(ok==1)
 		// no error, get temperature
 		return response
-		
 	else
 		// strange resopnse
+		print response
 		abort "LakeShore command execution error: "+response
 	endif
 
