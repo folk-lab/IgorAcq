@@ -23,6 +23,18 @@ function /S numToBool(val)
 	endif
 end
 
+function boolToNum(str)
+	string str
+	if(StringMatch(LowerStr(str), "true")==1)
+		// use string match to ignore whitespace
+		return 1
+	elseif(StringMatch(LowerStr(str), "false")==1)
+		return 0
+	else
+		return -1
+	endif
+end
+
 Function/S NumericWaveToBoolArray(w)
 	Wave w	// numeric wave (if text, use /T here and %s below)
 	String list = "["
@@ -53,6 +65,7 @@ function /s stripCharacters(str, charlist)
 	// always strip whitespace from beginning and end
 	// also remove any unescaped characters from charlist
 	//      charlist should be a comma separated list of characters
+	// ignores anything from charlist that seems to be escaped with \
 	
 	string str, charlist
 	
@@ -106,16 +119,260 @@ function /s stripCharacters(str, charlist)
 	return str
 end
 	
+//////////////////////////////////
+//// converting JSON to waves ////
+//////////////////////////////////
+	
+function ItemsInArray(arraystr)
+	// get item at index from arraystr
+	// requires arraystr to be a proper JSON array of JSON strings
+	//     ["like", "this"]
+	// can contain any sort of JSON element
+	
+	// needed a custom function because there were too
+	// many exceptions for StringFromList
+	string arraystr
+	
+	// remove leading whitespace and opening [
+	variable bracketGone = 0
+	do
+		string firstChar= arraystr[0]
+		if (IsWhiteSpace(firstChar))
+			// remove whitespace
+			arraystr = arraystr[1,inf]
+		elseif (CmpStr(firstChar, "[")==0 && bracketGone==0)
+			// this is the opening bracket
+			arraystr = arraystr[1,inf]
+			bracketGone=1
+		else
+		   break
+		endif   
+	while (strlen(arraystr) > 0)
+	
+	// remove trailing whitespace and closing ]
+	bracketGone = 0
+	do
+	    string lastChar = arraystr[strlen(arraystr) - 1]
+	    if (IsWhiteSpace(lastChar))
+	    	arraystr = arraystr[0, strlen(arraystr) - 2]
+	    elseif (CmpStr(lastChar, "]")==0 && bracketGone==0)
+			// this is the closing bracket
+			arraystr = arraystr[0, strlen(arraystr) - 2]
+			bracketGone=1
+	    else
+	    	break
+	    endif
+	while (strlen(arraystr) > 0)
+	
+	// look for commas that are not enclosed in curly brackets, square brackets or quotes
+	variable i=0, commaCount = 0
+	for(i=0;i<strlen(arraystr);i+=1)
+		if(CmpStr(arraystr[i], ",")==0)
+
+			// is it a good comma?
+			if(countBrackets(arraystr[i+1, inf])!=0)
+				// if this is not zero, the comma is inside a JSON object
+				commaCount += 0
+			elseif(countSqBrackets(arraystr[i+1, inf])!=0)
+				// if this is not zero, the comma is inside a JSON array
+				commaCount += 0
+			elseif(mod(countQuotes(arraystr[i+1, inf]),2)!=0)
+				// if this is an odd number, the comma is inside a JSON string
+				commaCount += 0
+			else
+				// this is a good one
+				commaCount +=1
+			endif
+						
+		endif
+	endfor
+	
+	return commaCount+1
+
+end
+	
+function /S StringFromArray(index, arraystr)
+	// get item at index from arraystr
+	// requires arraystr to be a proper JSON array of only JSON strings
+	//     ["like", "this"]
+	
+	// needed a custom function because there were too
+	// many exceptions for StringFromList
+	variable index
+	string arraystr
+	
+	// remove leading whitespace and opening [
+	variable bracketGone = 0
+	do
+		string firstChar= arraystr[0]
+		if (IsWhiteSpace(firstChar))
+			// remove whitespace
+			arraystr = arraystr[1,inf]
+		elseif (CmpStr(firstChar, "[")==0 && bracketGone==0)
+			// this is the opening bracket
+			arraystr = arraystr[1,inf]
+			bracketGone=1
+		else
+		   break
+		endif   
+	while (strlen(arraystr) > 0)
+	
+	// remove trailing whitespace and closing ]
+	bracketGone = 0
+	do
+	    string lastChar = arraystr[strlen(arraystr) - 1]
+	    if (IsWhiteSpace(lastChar))
+	    	arraystr = arraystr[0, strlen(arraystr) - 2]
+	    elseif (CmpStr(lastChar, "]")==0 && bracketGone==0)
+			// this is the closing bracket
+			arraystr = arraystr[0, strlen(arraystr) - 2]
+			bracketGone=1
+	    else
+	    	break
+	    endif
+	while (strlen(arraystr) > 0)
+		
+	// find the element by counting commas
+	variable i=0, elementCount = 0
+	
+	for(i=0;i<strlen(arraystr);i+=1)
+		
+		if(elementCount>=index)
+			break
+		endif
+	
+		if(CmpStr(arraystr[i], ",")==0)	
+				
+			// is it a good comma?
+			if(countBrackets(arraystr[i+1, inf])!=0)
+				// if this is not zero, the comma is inside a JSON object
+				elementCount += 0
+			elseif(countSqBrackets(arraystr[i+1, inf])!=0)
+				// if this is not zero, the comma is inside a JSON array
+				elementCount += 0
+			elseif(mod(countQuotes(arraystr[i+1, inf]),2)!=0)
+				// if this is an odd number, the comma is inside a JSON string
+				elementCount += 0
+			else
+				// this is a good one
+				elementCount +=1
+			endif
+			
+		endif
+	endfor
+	
+	// arraystr[i,inf] starts with the value I want to return
+	return getJSONitemFromGroup(arraystr[i,inf])
 end
 
-function StrArrayToTextWave(arraystr, namewave)
+function ArrayToTextWave(arraystr, namewave)
 	string arraystr, namewave
 	
-	arraystr = stripCharacters(arraystr, "[,],\"")
-	
-	variable n = ItemsInList(arraystr,",")	
-	make/o/t/n=(n) $namewave=StringFromList(p,arraystr, ",")
+	variable n = ItemsInArray(arraystr)
+	make/o/t/n=(n) $namewave=stripCharacters(StringFromArray(p,arraystr), "\"")
 end
+
+function ArrayToNumWave(arraystr, namewave)
+	// if you put nonsense in, you'll get nonsense back here
+	// it best be an array of numbers and/or bools
+	string arraystr, namewave
+
+	variable n = ItemsInArray(arraystr)
+	make/o/n=(n) $namewave=str2num(StringFromArray(p,arraystr))
+end
+
+function countBrackets(str)
+	// count how many brackets are in the string
+	// +1 for }
+	// -1 for {
+	string str
+	variable bracketCount = 0, i = 0, escaped = 0
+	for(i=0; i<strlen(str); i+=1)
+	
+		// check if the current character is escaped
+		if(i!=0)
+			if( CmpStr(str[i-1], "\\") == 0)
+				escaped = 1
+			else
+				escaped = 0
+			endif
+		endif
+	
+		// count opening brackets
+		if( CmpStr(str[i], "{" ) == 0 && escaped == 0)
+			bracketCount -= 1
+		endif
+		
+		// count closing brackets
+		if( CmpStr(str[i], "}" ) == 0 && escaped == 0)
+			bracketCount += 1
+		endif
+		
+	endfor
+	return bracketCount
+end
+
+function countSqBrackets(str)
+	// count how many brackets are in the string
+	// +1 for ]
+	// -1 for [
+	string str
+	variable bracketCount = 0, i = 0, escaped = 0
+	for(i=0; i<strlen(str); i+=1)
+	
+		// check if the current character is escaped
+		if(i!=0)
+			if( CmpStr(str[i-1], "\\") == 0)
+				escaped = 1
+			else
+				escaped = 0
+			endif
+		endif
+	
+		// count opening brackets
+		if( CmpStr(str[i], "[" ) == 0 && escaped == 0)
+			bracketCount -= 1
+		endif
+		
+		// count closing brackets
+		if( CmpStr(str[i], "]" ) == 0 && escaped == 0)
+			bracketCount += 1
+		endif
+		
+	endfor
+	return bracketCount
+end
+
+function countQuotes(str)
+	// count how many quotes are in the string
+	// +1 for "
+	// escaped quotes are ignored
+	string str
+	variable quoteCount = 0, i = 0, escaped = 0
+	for(i=0; i<strlen(str); i+=1)
+	
+		// check if the current character is escaped
+		if(i!=0)
+			if( CmpStr(str[i-1], "\\") == 0)
+				escaped = 1
+			else
+				escaped = 0
+			endif
+		endif
+	
+		// count opening brackets
+		if( CmpStr(str[i], "\"" ) == 0 && escaped == 0)
+			quoteCount += 1
+		endif
+		
+	endfor
+	return quoteCount
+end
+
+
+////////////////////////
+//// getting values ////
+////////////////////////
 
 function findJSONtype(str)
 	
@@ -164,37 +421,6 @@ function findJSONtype(str)
 		print "[WARNING] Value does not fit any JSON type:", str
 		return -1
 	endif
-end
-
-function countBrackets(str)
-	// count how many brackets are in the string
-	// +1 for }
-	// -1 for {
-	string str
-	variable bracketCount = 0, i = 0, escaped = 0
-	for(i=0; i<strlen(str); i+=1)
-	
-		// check if the current character is escaped
-		if(i!=0)
-			if( CmpStr(str[i-1], "\\") == 0)
-				escaped = 1
-			else
-				escaped = 0
-			endif
-		endif
-	
-		// count opening brackets
-		if( CmpStr(str[i], "{" ) == 0 && escaped == 0)
-			bracketCount -= 1
-		endif
-		
-		// count closing brackets
-		if( CmpStr(str[i], "}" ) == 0 && escaped == 0)
-			bracketCount += 1
-		endif
-		
-	endfor
-	return bracketCount
 end
 
 function /S readJSONobject(jstr)
@@ -594,9 +820,9 @@ function writeJSONtoFile(jstr, filename, path)
 	
 end
 	
-/////////////////////////////
-//// JSON read functions ////
-/////////////////////////////
+///////////////////////////////
+//// JSON import functions ////
+///////////////////////////////
 
 function /S JSONfromStr(rawstr)
 	// read JSON string from filename in path
@@ -626,6 +852,56 @@ function /S JSONfromFile(path, filename)
 	close refNum
 	
 	return readJSONobject(jstr)
+end
+
+function /S getJSONitemFromGroup(group)
+	// get the first valid JSON item from a long ass string
+	string group  // call it group because the long ass string is often a regex match
+	
+	string strVal, numRegex = "([-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?)"
+	switch(findJSONtype(group))
+		case 1:
+			strVal = readJSONObject(group)
+			if(strlen(strVal)>0)
+				return strVal
+			else
+				return ""
+			endif
+		case 2: 
+			strVal = readJSONArray(group)
+			if(strlen(strVal)>0)
+				return strVal
+			else
+				return ""
+			endif
+		case 3:
+			splitstring /E=numRegex group, strVal
+			if(strlen(strVal)>0)
+				return strVal
+			else
+				return ""
+			endif
+		case 4:
+			strVal = readJSONString(group)
+			if(strlen(strVal)>0)
+				return strVal
+			else
+				return ""
+			endif
+		case 5:
+			if(CmpStr(trimString(group)[0,3],"true")==0)
+				return num2istr(1)
+			elseif(CmpStr(trimString(group)[0,4],"false")==0)
+				return num2istr(0)
+			else
+				return ""
+			endif
+		case 6:
+			return "NaN" 
+		case -1:
+			print "[WARNING] Trying to fetch an invalid type or empty value from: " + group
+			return ""
+	endswitch
 end
 
 function /S getJSONValue(jstr, key) 
@@ -676,48 +952,6 @@ function /S getJSONValue(jstr, key)
 
 	endfor
 	
-	string strVal, numRegex = "([-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?)"
-	switch(findJSONtype(group))
-		case 1:
-			strVal = readJSONObject(group)
-			if(strlen(strVal)>0)
-				return strVal
-			else
-				return ""
-			endif
-		case 2: 
-			strVal = readJSONArray(group)
-			if(strlen(strVal)>0)
-				return strVal
-			else
-				return ""
-			endif
-		case 3:
-			splitstring /E=numRegex group, strVal
-			if(strlen(strVal)>0)
-				return strVal
-			else
-				return ""
-			endif
-		case 4:
-			strVal = readJSONString(group)
-			if(strlen(strVal)>0)
-				return strVal
-			else
-				return ""
-			endif
-		case 5:
-			if(CmpStr(LowerStr(group[0,3]),"true")==0)
-				return num2istr(1)
-			elseif(CmpStr(LowerStr(group[0,4]),"false")==0)
-				return num2istr(0)
-			else
-				return ""
-			endif
-		case 6:
-			return "NaN" 
-		case -1:
-			print "[WARNING] Trying to fetch an invalid type or empty value from: " + group
-			return ""
-	endswitch
+	return getJSONitemFromGroup(group)
+
 end

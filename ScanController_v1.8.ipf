@@ -17,11 +17,11 @@
 //     -- save main procedure window as *.ipf
 //     -- save note about which config file was used for a given data set (ScanControlNATIVE)
 //     -- add Slack notifications (somefolkneverlearn.slack.com)
-
-//     -- start using proper JSON format for config files and general winf 
+//     -- use JSON format for config files (adds dependency on JSON.ipf
 
 //TODO:
 
+//     -- restructure WINF file (just the main one) to use JSON
 //     -- Test a ScanControllerHDF5 package to put all sweep information in a single HDF5 file
 //     -- add a new type of value to record that can/will be read during sc_sleep
 //     -- Write a RecordValuesAsync function that can parallelize instrument calls by opening multiple threads
@@ -385,28 +385,27 @@ function sc_loadconfig(configfile)
 	string jstr = JSONfromFile("config", configfile)
 	
 	// load raw wave configuration
-	StrArrayToTextWave(getJSONvalue(jstr, "wave_names:raw"), "sc_RawWaveNames")
+	ArrayToTextWave(getJSONvalue(jstr, "wave_names:raw"), "sc_RawWaveNames")
+	ArrayToNumWave(getJSONvalue(jstr, "record_waves:raw"), "sc_RawRecord")
+	ArrayToNumWave(getJSONvalue(jstr, "plot_waves:raw"), "sc_RawPlot")
+	ArrayToTextWave(getJSONvalue(jstr, "scripts:request"), "sc_RequestScripts")
+	ArrayToTextWave(getJSONvalue(jstr, "scripts:response"), "sc_ResponseScripts")
+
+	// load calc wave configuration
+	ArrayToTextWave(getJSONvalue(jstr, "wave_names:calc"), "sc_CalcWaveNames")
+	ArrayToNumWave(getJSONvalue(jstr, "record_waves:calc"), "sc_CalcRecord")
+	ArrayToNumWave(getJSONvalue(jstr, "plot_waves:calc"), "sc_CalcPlot")
+	ArrayToTextWave(getJSONvalue(jstr, "scripts:calc"), "sc_CalcScripts")
+
+	// load print checkbox settings
+	sc_PrintRaw = str2num(getJSONvalue(jstr, "print_to_history:raw"))
+	sc_PrintCalc = str2num(getJSONvalue(jstr, "print_to_history:calc"))
 	
-//	list2numwave(removeending(loadcontainer,"\r"),"sc_RawRecord")
-//	list2numwave(removeending(loadcontainer,"\r"),"sc_RawPlot")
-//	list2textwave(removeending(loadcontainer,"\r"),"sc_RequestScripts")
-//	list2textwave(removeending(loadcontainer,"\r"),"sc_GetResponseScripts")
-//	
-//	// load calc wave configuration
-//	list2textwave(removeending(loadcontainer,"\r"),"sc_CalcWaveNames")
-//	list2textwave(removeending(loadcontainer,"\r"),"sc_CalcScripts")
-//	list2numwave(removeending(loadcontainer,"\r"),"sc_CalcRecord")
-//	list2numwave(removeending(loadcontainer,"\r"),"sc_CalcPlot")
-//	
-//	// load print checkbox settings
-//	sc_PrintRaw = str2num(removeending(loadcontainer,"\r"))
-//	sc_PrintCalc = str2num(removeending(loadcontainer,"\r"))
-//	
-//	// load log string
-//	sc_LogStr = removeending(loadcontainer,"\r")
-//	
-//	// load colormap
-//	sc_ColorMap = removeending(loadcontainer,"\r")
+	// load log string
+	sc_LogStr = getJSONvalue(jstr, "log_string")
+	
+	// load colormap
+	sc_ColorMap = getJSONvalue(jstr, "colormap")
 	
 end
 
