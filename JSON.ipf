@@ -49,17 +49,72 @@ Function/S TextWaveToStrArray(w)
 	return "["+list[0,strlen(list)-2]+"]"
 End
 
+function /s stripCharacters(str, charlist)
+	// always strip whitespace from beginning and end
+	// also remove any unescaped characters from charlist
+	//      charlist should be a comma separated list of characters
+	
+	string str, charlist
+	
+	if (strlen(str) == 0)
+		// just get this out of the way real quick
+		return ""
+	endif
+ 
+ 	// remove leading whitespace
+	do
+		string firstChar= str[0]
+		if (IsWhiteSpace(firstChar))
+			str= str[1,inf]
+		else
+		   break
+		endif   
+	while (strlen(str) > 0)
+	
+	// remove trailing whitespace
+	do
+	    string lastChar = str[strlen(str) - 1]
+	    if (IsWhiteSpace(lastChar))
+	    	str = str[0, strlen(str) - 2]
+	    else
+	    	break
+	    endif
+	while (strlen(str) > 0)
+	
+	// remove charlist characters that are not escaped
+	variable i=0, j=0, escaped = 0, nchars = ItemsInList(charlist, ",")
+	do
+		// check if the current character is escaped
+		if(i!=0)
+			if( CmpStr(str[i-1], "\\") == 0)
+				escaped = 1
+			else
+				escaped = 0
+			endif
+		endif
+		
+		string nextChar = str[i]
+		for(j=0;j<nchars+1;j+=1)
+			if(CmpStr(nextChar, StringFromList(j, charlist, ","))==0 && escaped==0)
+				str = str[0,i-1]+str[i+1,inf]
+				i-=1
+			endif
+		endfor
+		i+=1
+	while(i<strlen(str))
+	
+	return str
+end
+	
+end
 
 function StrArrayToTextWave(arraystr, namewave)
 	string arraystr, namewave
 	
-	arraystr = TrimString(arraystr)[1,strlen(arraystr)-2] // just in case there is whitespace
+	arraystr = stripCharacters(arraystr, "[,],\"")
 	
-	variable n = ItemsInList(arraystr,",")
-	print arraystr, n
-	
-//	variable n = ItemsInList(stringlistwave,";")
-//	make/o/t/n=(n) $namewave=StringFromList(p,stringlistwave, ";")
+	variable n = ItemsInList(arraystr,",")	
+	make/o/t/n=(n) $namewave=StringFromList(p,arraystr, ",")
 end
 
 function findJSONtype(str)
@@ -87,19 +142,19 @@ function findJSONtype(str)
 	endif
 	
 	string numRegex = "([-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?)"
-	if(stringmatch(str[0], "{")==1)
+	if(CmpStr(str[0], "{")==0)
 		// this is an object
 		return 1
-	elseif(stringmatch(str[0], "[")==1)
+	elseif(CmpStr(str[0], "[")==0)
 		// this is an array
 		return 2
-	elseif(stringmatch(str[0], "\"")==1)
+	elseif(CmpStr(str[0], "\"")==0)
 		// this is a string
 		return 4
-	elseif(stringmatch(str[0,3], "true")==1 || stringmatch(str[0,4], "false")==1)
+	elseif(CmpStr(str[0,3], "true")==0 || CmpStr(str[0,4], "false")==0)
 		// this is a boolean
 		return 5
-	elseif(stringmatch(str[0,3], "null")==1)
+	elseif(CmpStr(str[0,3], "null")==0)
 		// this is null
 		return 6
 	elseif(grepstring(str, "([-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?)")==1)
@@ -121,7 +176,7 @@ function countBrackets(str)
 	
 		// check if the current character is escaped
 		if(i!=0)
-			if( StringMatch(str[i-1], "\\") == 1)
+			if( CmpStr(str[i-1], "\\") == 0)
 				escaped = 1
 			else
 				escaped = 0
@@ -129,12 +184,12 @@ function countBrackets(str)
 		endif
 	
 		// count opening brackets
-		if( StringMatch(str[i], "{" ) == 1 && escaped == 0)
+		if( CmpStr(str[i], "{" ) == 0 && escaped == 0)
 			bracketCount -= 1
 		endif
 		
 		// count closing brackets
-		if( StringMatch(str[i], "}" ) == 1 && escaped == 0)
+		if( CmpStr(str[i], "}" ) == 0 && escaped == 0)
 			bracketCount += 1
 		endif
 		
@@ -155,7 +210,7 @@ function /S readJSONobject(jstr)
 	
 		// check if the current character is escaped
 		if(i!=0)
-			if( StringMatch(jstr[i-1], "\\") == 1)
+			if( CmpStr(jstr[i-1], "\\") == 0)
 				escaped = 1
 			else
 				escaped = 0
@@ -163,7 +218,7 @@ function /S readJSONobject(jstr)
 		endif
 	
 		// count opening brackets
-		if( StringMatch(jstr[i], "{" ) == 1 && escaped == 0)
+		if( CmpStr(jstr[i], "{" ) == 0 && escaped == 0)
 			openBrackets+=1
 			if(startPos==-1)
 				startPos = i
@@ -171,7 +226,7 @@ function /S readJSONobject(jstr)
 		endif
 		
 		// count closing brackets
-		if( StringMatch(jstr[i], "}" ) == 1 && escaped == 0)
+		if( CmpStr(jstr[i], "}" ) == 0 && escaped == 0)
 			openBrackets-=1
 			if(openBrackets==0)
 				// found the last closing bracket
@@ -203,7 +258,7 @@ function /S readJSONarray(jstr)
 	
 		// check if the current character is escaped
 		if(i!=0)
-			if( StringMatch(jstr[i-1], "\\") == 1)
+			if( CmpStr(jstr[i-1], "\\") == 0)
 				escaped = 1
 			else
 				escaped = 0
@@ -211,7 +266,7 @@ function /S readJSONarray(jstr)
 		endif
 	
 		// count opening brackets
-		if( StringMatch(jstr[i], "[" ) == 1 && escaped == 0)
+		if( CmpStr(jstr[i], "[" ) == 0 && escaped == 0)
 			openBrackets+=1
 			if(startPos==-1)
 				startPos = i
@@ -219,7 +274,7 @@ function /S readJSONarray(jstr)
 		endif
 		
 		// count closing brackets
-		if( StringMatch(jstr[i], "]" ) == 1 && escaped == 0)
+		if( CmpStr(jstr[i], "]" ) == 0 && escaped == 0)
 			openBrackets-=1
 			if(openBrackets==0)
 				// found the last closing bracket
@@ -252,7 +307,7 @@ function /S readJSONstring(jstr)
 	
 		// check if the current character is escaped
 		if(i!=0)
-			if( StringMatch(jstr[i-1], "\\") == 1)
+			if( CmpStr(jstr[i-1], "\\") == 0)
 				escaped = 1
 			else
 				escaped = 0
@@ -260,7 +315,7 @@ function /S readJSONstring(jstr)
 		endif
 	
 		// count quotes
-		if( StringMatch(jstr[i], "\"" ) == 1 && escaped == 0)
+		if( CmpStr(jstr[i], "\"" ) == 0 && escaped == 0)
 			// found one!
 			if(startPos==-1)
 				// this is the first one
@@ -298,7 +353,7 @@ function /S getJSONkeys(jstr)
 	do
 		// check if the current character is escaped
 		if(i!=0)
-			if( StringMatch(jstr[i-1], "\\") == 1)
+			if( CmpStr(jstr[i-1], "\\") == 0)
 				escaped = 1
 			else
 				escaped = 0
@@ -306,7 +361,7 @@ function /S getJSONkeys(jstr)
 		endif
 	
 		char = jstr[i]
-		if(StringMatch(jstr[i], "\"" ) == 1 && escaped == 0)
+		if(CmpStr(jstr[i], "\"" ) == 0 && escaped == 0)
 		
 			startkey = i // remember where we began this journey
 			testkey = readJSONstring(jstr[i,inf]) // get a string to test
@@ -320,7 +375,7 @@ function /S getJSONkeys(jstr)
 			
 			// now I have some non-whitespace character as char
 			// check if it is what I want
-			if(stringmatch(char, ":")==1)
+			if(CmpStr(char, ":")==0)
 				realkey = TrimString(jstr[startkey,i-2]) // drop the ":" and any whitespace
 				keylist += realkey[1,strlen(realkey)-2]+","
 				keylevel += num2istr(countBrackets(jstr[i,inf])-1)+"," // for closing bracket
@@ -383,7 +438,7 @@ function /S addJSONKeyVal(jstr, key, [numVal, strVal, fmt])
 	//// remove leading/trailing whitespace and quotes from key ////
 	do
 	    String firstChar= key[0]
-	    if (StringMatch(firstChar, "\"") == 1 || GrepString(firstChar, "\\s") == 1)
+	    if (CmpStr(firstChar, "\"") == 0 || GrepString(firstChar, "\\s") == 1)
 	        key = key[1,inf]
 	    else
 	        break
@@ -391,7 +446,7 @@ function /S addJSONKeyVal(jstr, key, [numVal, strVal, fmt])
 	while (strlen(key) > 0)
 	do
 	    String lastChar = key[strlen(key) - 1]
-	    if (StringMatch(lastChar, "\"") == 1 || GrepString(lastChar, "\\s") == 1)
+	    if (CmpStr(lastChar, "\"") == 0 || GrepString(lastChar, "\\s") == 1)
 	        key = key[0, strlen(key) - 2]
 	    else
 	        break
@@ -652,9 +707,9 @@ function /S getJSONValue(jstr, key)
 				return ""
 			endif
 		case 5:
-			if(stringmatch(LowerStr(group[0,3]),"true")==1)
+			if(CmpStr(LowerStr(group[0,3]),"true")==0)
 				return num2istr(1)
-			elseif(stringmatch(LowerStr(group[0,4]),"false")==1)
+			elseif(CmpStr(LowerStr(group[0,4]),"false")==0)
 				return num2istr(0)
 			else
 				return ""

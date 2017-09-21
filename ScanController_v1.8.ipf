@@ -385,9 +385,7 @@ function sc_loadconfig(configfile)
 	string jstr = JSONfromFile("config", configfile)
 	
 	// load raw wave configuration
-
 	StrArrayToTextWave(getJSONvalue(jstr, "wave_names:raw"), "sc_RawWaveNames")
-	
 	
 //	list2numwave(removeending(loadcontainer,"\r"),"sc_RawRecord")
 //	list2numwave(removeending(loadcontainer,"\r"),"sc_RawPlot")
