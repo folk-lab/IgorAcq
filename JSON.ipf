@@ -576,6 +576,7 @@ function /S getJSONkeys(jstr)
 	variable i=0, j=0, escaped = 0, startkey=0
 	string char = "", testkey = "", realkey = ""
 	string keylist = "", keylevel = ""
+	
 	do
 		// check if the current character is escaped
 		if(i!=0)
@@ -630,8 +631,8 @@ function /S getJSONkeys(jstr)
 					// add next level to the key
 					key = StringFromList(j, keylist, ",")+":"+key
 					level=nextlevel
-				elseif(nextlevel>level)
-					// you got to the end of whatever was nested here
+				endif
+				if(level==0)
 					break
 				endif
 			endfor
