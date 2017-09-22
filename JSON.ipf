@@ -694,16 +694,27 @@ function /S addJSONKeyVal(jstr, key, [numVal, strVal, fmt])
 	string output="", outputFmt = ""
 	if(!paramisdefault(strVal))
 
-		// check if it is a valid type
-		err = findJSONtype(strVal)
-		if(err==-1)
-			return ""
-		endif
-
 		// setup format string
 		if(paramisdefault(fmt))
+		
+			// if no format is provided
+			// check if strVal is a valid type
+			err = findJSONtype(strVal)
+			if(err==-1)
+				return ""
+			endif
+			
 			outputFmt = "\"%s\": %s}"
 		else
+			// build test string
+			// check if it is a valid type
+			string test = ""
+			sprintf test, fmt, strVal
+			err = findJSONtype(test)
+			if(err==-1)
+				return ""
+			endif
+			
 			outputFmt = "\"%s\": " + fmt + "}"
 		endif
 		
@@ -741,12 +752,82 @@ function /S getJSONindent(level)
 	return output
 end
 
+function /S prettyJSONfmt(jstr)
+	string jstr
+	
+	// write jstr to filename
+	// add whitespace to make it easier to read
+	// this is expected to be a valid json str
+	// it will be a disaster otherwise
+	
+	string outStr="", buffer=""
+
+	outStr += "{\r"
+
+	// get keys...
+	string keylist = getJSONkeys(jstr)
+	
+	variable i=0, level = 0
+	string key = "", printkey = "", strVal = "", group = ""
+	for(i=0;i<ItemsInList(keylist,",");i+=1) // loop over keys
+		
+		// check if the indent level has decreased
+		// if so, close out object with curly bracket
+		
+		key = StringFromList(i, keylist, ",")
+		printkey = StringFromList(ItemsInList(key, ":")-1, key, ":")
+		
+		if(i!=0 && ItemsInList(key, ":")<level)
+			level = ItemsInList(key, ":")
+			outStr+= getJSONindent(level)+"}\r"
+		else
+			level = ItemsInList(key, ":")
+		endif 
+		
+		strVal = getJSONValue(jstr, key)
+		
+		switch(findJSONtype(strVal))
+			case 1:
+				// don't put the value in, it will contain keys and be handled another way
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": {\r"
+				break
+			case 2: 
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+"\r"
+				break
+			case 3:
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+"\r"
+				break
+			case 4:
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+"\r"
+				break
+			case 5:
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+"\r"
+				break
+			case 6:
+				strVal = "null" 
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+"\r"
+				break
+			case -1:
+				strVal = ""
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+"\r"
+				break
+		endswitch
+		
+	endfor
+	
+	// need to close out open objects
+	do
+		level-=1
+		outStr+= getJSONindent(level)+"}\r"
+	while(level>0)
+	
+	return outStr
+		
+end
+
 function writeJSONtoFile(jstr, filename, path)
 
-	/////// this currently fails when I pass it a boolean value!!!! ///////
-
 	string jstr, filename, path
-	string indent = "  "
 	
 	// write jstr to filename
 	// add whitespace to make it easier to read

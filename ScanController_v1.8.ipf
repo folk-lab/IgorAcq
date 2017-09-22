@@ -363,7 +363,6 @@ function /S sc_createconfig()
 	configstr = addJSONKeyVal(configstr, "filenum", strVal=num2istr(filenum))
 	
 	configfile = "sc" + num2istr(unixtime()) + ".config"
-	print strlen(configstr)
 	writeJSONtoFile(configstr, configfile, "config")
 end
 
