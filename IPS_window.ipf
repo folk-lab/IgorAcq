@@ -446,11 +446,10 @@ end
 //// Status for logging ////
 
 function/s GetIPSStatus()
-	string winfcomments=""
-	string buffer
-	sprintf buffer, "Magnet:\r\tField = %.3f mT\r", GetField()
-	winfcomments += buffer
-	sprintf buffer, "\tSweep Rate = %.1f mT/min\r", GetSweepRate()
-	winfcomments += buffer	
-	return winfcomments
+	svar ips_comport
+	string buffer = ""
+	buffer = addJSONKeyVal(buffer, "field mT", numVal=GetField(), fmt="%.3f")
+	buffer = addJSONKeyVal(buffer, "rate mT/min", numVal=GetSweepRate(), fmt="%.1f")
+	buffer = addJSONKeyVal(buffer, "com_port", strVal=ips_comport, fmt="\"%s\"")
+	return addJSONKeyVal("", "IPS", strVal = buffer)
 end`

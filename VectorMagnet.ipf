@@ -530,7 +530,7 @@ function/s ReadVector(powersupply)
 		VDTRead2 /O=2/T="\r" response
 	elseif(cmpstr(powersupply,"l625x")==0 || cmpstr(powersupply,"l625y")==0)
 		VDTRead2 /O=2/T="\r" response
-		response = removeAllWhitespace(response)
+		response = TrimString(response)
 		//index = strsearch(response,"\n",0)
 		//response = response[0,index-1]
 	endif
@@ -540,9 +540,9 @@ function/s ReadVector(powersupply)
 	return response
 end
 
-/////////////////
+///////////////////
 //// Utilities ////
-////////////////
+///////////////////
 
 function SphericalToCartisianTest(r,theta,phi)
 	variable r, theta, phi
@@ -741,19 +741,27 @@ end
 ////////////////
 
 function/s GetVectorStatus()
-	string winfcomments=""
-	string buffer
-	sprintf buffer, "Vector Magnet:\r\tField x = %.3f mT\r\t", GetFieldx()
-	winfcomments += buffer
-	sprintf buffer, "Field y = %.3f mT\r\t", GetFieldy()
-	winfcomments += buffer
-	sprintf buffer, "Field z = %.3f mT\r\t", GetFieldz()
-	winfcomments += buffer
-	sprintf buffer, "Sweep Rate x = %.1f mT/min\r\t", GetSweepRatex()
-	winfcomments += buffer	
-	sprintf buffer, "Sweep Rate y = %.1f mT/min\r\t", GetSweepRatey()
-	winfcomments += buffer
-	sprintf buffer, "Sweep Rate z = %.1f mT/min\r", GetSweepRatez()
-	winfcomments += buffer
-	return winfcomments
+
+	string buffer = "", subbuffer = ""
+	
+	subbuffer = ""
+	subbuffer = addJSONKeyVal(subbuffer, "x", numVal=0.0, fmt="%.3f")
+	subbuffer = addJSONKeyVal(subbuffer, "y", numVal=10.0, fmt="%.3f")
+	subbuffer = addJSONKeyVal(subbuffer, "z", numVal=2000.0, fmt="%.3f")
+//	subbuffer = addJSONKeyVal(subbuffer, "x", numVal=GetFieldx(), fmt="%.3f")
+//	subbuffer = addJSONKeyVal(subbuffer, "y", numVal=GetFieldy(), fmt="%.3f")
+//	subbuffer = addJSONKeyVal(subbuffer, "z", numVal=GetFieldz(), fmt="%.3f")
+	buffer = addJSONKeyVal(buffer, "field mT", strVal=subbuffer)
+
+	subbuffer = ""
+	subbuffer = addJSONKeyVal(subbuffer, "x", numVal=80.0, fmt="%.1f")
+	subbuffer = addJSONKeyVal(subbuffer, "y", numVal=80.0, fmt="%.1f")
+	subbuffer = addJSONKeyVal(subbuffer, "z", numVal=120.0, fmt="%.1f")
+
+//	subbuffer = addJSONKeyVal(subbuffer, "x", numVal=GetSweepRatex(), fmt="%.1f")
+//	subbuffer = addJSONKeyVal(subbuffer, "y", numVal=GetSweepRatey(), fmt="%.1f")
+//	subbuffer = addJSONKeyVal(subbuffer, "z", numVal=GetSweepRatez(), fmt="%.1f")
+	buffer = addJSONKeyVal(buffer, "rate mT/min", strVal=subbuffer)
+	
+	return addJSONKeyVal("", "Vector Magnet", strVal=buffer)
 end

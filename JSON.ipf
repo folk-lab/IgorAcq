@@ -775,6 +775,7 @@ function /S prettyJSONfmt(jstr)
 		// if so, close out object with curly bracket
 		
 		key = StringFromList(i, keylist, ",")
+		print key
 		printkey = StringFromList(ItemsInList(key, ":")-1, key, ":")
 		
 		if(i!=0 && ItemsInList(key, ":")<level)
