@@ -113,7 +113,7 @@ function /s getWaveStatus(datname)
 	string jstr="", buffer="" 
 	
 	// date/time info
-	jstr = addJSONKeyVal(jstr, "wave_name", numVal=filenum, fmt = "%.0f")
+	jstr = addJSONKeyVal(jstr, "wave_name", strVal=datname, fmt = "\"%s\"")
 	jstr = addJSONKeyVal(jstr, "filenum", numVal=filenum, fmt = "%.0f")
 	jstr = addJSONKeyVal(jstr, "file_path", strVal=getExpPath("data")+"dat"+num2istr(filenum)+datname+".ibw", fmt = "\"%s\"")
 
@@ -282,10 +282,6 @@ function /S SaveInitialWaveComments(datname, [title, x_label, y_label, z_label, 
 	plotcmds+="$$ display_thumbnail = "+display_thumbnail+"\r"
 	
 	comments+=plotcmds
-	
-	// leave room for comments
-	comments += "\r"+"comments:  \r"
 
-	print comments	
-//	str2WINF(datname, comments)
+	str2WINF(datname, comments)
 end
