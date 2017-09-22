@@ -136,15 +136,20 @@ end
 ///// Status strings for logging /////
 
 function /S GetBFStatus()
-	string winfcomments=""
 	string  buffer=""
 
-	sprintf  winfcomments "BF250:\r\t"
-	sprintf buffer "MC = %.3f K\r\tStill = %.3f K\r\t4K = %.3f K\r\tMagnet = %.3f K\r\t50K = %.3f K\r\t", GetTemp("mc"), GetTemp("still"), GetTemp("4k"), GetTemp("magnet"), GetTemp("50k")
-	winfcomments += buffer
-	sprintf buffer "P1 = %.2e mbar\r\tP2 = %.3f mbar\r\tP3 = %.3f mbar\r\tP4 = %.3f mbar\r\tP5 = %.3f mbar\r\tP6 = %.3f mbar\r\t", GetBFSPressure(1), GetBFSPressure(2), GetBFSPressure(3), GetBFSPressure(4), GetBFSPressure(5), GetBFSPressure(6)
-	winfcomments += buffer
-	return winfcomments
+	buffer = addJSONKeyVal(buffer, "MC K", numVal = GetTemp("mc"), fmt="%.3f")
+	buffer = addJSONKeyVal(buffer, "Still K", numVal = GetTemp("still"), fmt="%.3f")
+	buffer = addJSONKeyVal(buffer, "4K Plate K", numVal = GetTemp("4k"), fmt="%.3f")
+	buffer = addJSONKeyVal(buffer, "Magnet K", numVal = GetTemp("magnet"), fmt="%.3f")
+	buffer = addJSONKeyVal(buffer, "50K Plate K", numVal = GetTemp("50k"), fmt="%.3f")
+	
+	variable i=0
+	for(i=1;i<7;i+=1)
+		buffer = addJSONKeyVal(buffer, "P"+num2istr(i), numVal = GetBFSPressure(i), fmt="%g")
+	endfor
+
+	return addJSONKeyVal("", "BF250", strval = buffer)
 end
 
 //// Change temperature recording sequence ////

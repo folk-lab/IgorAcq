@@ -830,24 +830,25 @@ end
 //// Status String for Logging ////
 
 function/s GetDACStatus()
-	string winfcomments="", buffer=""
 	wave /t dacvalsstr = dacvalsstr
 	wave bd_boardnumbers = bd_boardnumbers
+	svar bd_comport
 
-	winfcomments += "BabyDAC:\r\t"
 
+	string buffer=""
 	variable i=0, j=0
-	variable dacval
 	do
 		if(numtype(bd_boardnumbers[i])==0)
 			for(j=0;j<4;j+=1)
-				sprintf buffer, "CH%d = %s mV\r\t", (4*i+j), dacvalsstr[4*i+j][1]
-				winfcomments+=buffer
+				buffer = addJSONKeyVal(buffer, "CH"+num2istr(4*i+j), strVal=dacvalsstr[4*i+j][1])
 			endfor
 		endif
 		i+=1
 	while(i<numpnts(bd_boardnumbers))	
-	return winfcomments
+
+	buffer = addJSONKeyVal(buffer, "com_port", strVal=bd_comport, fmt="\"%s\"")
+	
+	return addJSONKeyVal("", "BabyDAC", strVal = buffer)
 end
 
 //// testing ////

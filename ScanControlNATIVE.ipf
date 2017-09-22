@@ -151,6 +151,10 @@ function /s getWaveStatus(datname)
 		jstr = addJSONKeyVal(jstr, "wave_stats", strVal="Wave dimensions > 2. How did you get this far?", fmt = "\"%s\"")
 	endif
 	
+	svar sc_x_label, sc_y_label
+	jstr = addJSONKeyVal(jstr, "x_label", strVal=sc_x_label, fmt = "\"%s\"")
+	jstr = addJSONKeyVal(jstr, "y_label", strVal=sc_y_label, fmt = "\"%s\"")
+	
 	return jstr	
 end
 
@@ -195,12 +199,6 @@ function /S saveScanComments([msg])
 
 end
 
-
-
-
-
-
-
 function /s str2WINF(datname, s)
 	// string s to winf file 
 	//filename = dat<filenum><datname>.<unixtime>.winf
@@ -229,7 +227,6 @@ function /s str2WINF(datname, s)
 end
 
 function /S SaveInitialWaveComments(datname, [title, x_label, y_label, z_label, x_multiplier, y_multiplier, z_multiplier, display_thumbnail])
-	// this has not been converted to JSON, because our measurement website relies on it, for now
 	variable  x_multiplier, y_multiplier, z_multiplier
 	string datname, title, x_label, y_label, z_label, display_thumbnail
 	string buffer="", comments=""
@@ -240,6 +237,8 @@ function /S SaveInitialWaveComments(datname, [title, x_label, y_label, z_label, 
 	comments += prettyJSONfmt(jstr) + "\r\r" // record date, time, wave names, time elapsed...
 	
 	// save plot commands
+	// these cannot be JSON strings because of the way ..../measurements looks for them
+	// i'm ignoring this in hopes that we can move to HDF5 instead of dealing with it
 	string plotcmds=""
 	if (paramisdefault(title))
 		title = ""

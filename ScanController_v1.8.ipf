@@ -6,7 +6,7 @@
 // Authors: Mohammad Samani, Nik Hartman & Christian Olsen
 
 
-// Updates in 1.8....
+// Updates in 1.8.... This is almost certainly _not_ back-compatible with your old experiments.
 //     -- separate all save functions into ScanControllerNATIVE 
 //     -- remove support for time averaging over any parameter. it is rarely useful and confusing to read. 
 //     -- add option (which should be ON) to push 'new data' notifications to qdot-server 
@@ -15,14 +15,15 @@
 //     -- fix sc_sleep accuracy problem -- USE IT EVERYWHERE IN PLACE OF SLEEP
 //     -- save command history as plain text in *.history
 //     -- save main procedure window as *.ipf
-//     -- save note about which config file was used for a given data set (ScanControlNATIVE)
+//     -- log which config file was used for a given data set
 //     -- add Slack notifications (somefolkneverlearn.slack.com)
-//     -- use JSON format for config files (adds dependency on JSON.ipf
+//     -- use JSON format for config files (adds dependency on JSON.ipf)
+//     -- restructure WINF files to use JSON wherever possible
+//     -- update all instrument logs to use JSON... this is going to break someone shit
 
 //TODO:
 
-//     -- restructure WINF file (just the main one) to use JSON
-//     -- Test a ScanControllerHDF5 package to put all sweep information in a single HDF5 file
+//     -- add logged info as attributes in ScanControlHDF5 (I think)
 //     -- add a new type of value to record that can/will be read during sc_sleep
 //     -- Write a RecordValuesAsync function that can parallelize instrument calls by opening multiple threads
 //     -- Use FunctionPath(functionNameStr) to find which scancontroller data type is being used
@@ -31,6 +32,7 @@
 //     -- Text encoding issues with .history files, not transferable between systems
 //             this might be igor's problem, I'm not convinced it is simple to fix
 //             works _ok_ with a decent text editor outside of igor, regardless of system
+//     			Ideas... replce "\r" with "\r\n", replace bullets with ">>>"
 
 
 ///////////////////////////////

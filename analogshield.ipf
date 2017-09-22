@@ -495,15 +495,15 @@ end
 ////// Status String for Logging ////
 
 function/s GetASStatus()
-	string winfcomments="", buffer=""
 	wave /t as_valsstr = as_valsstr
+	svar as_comport
 
-	winfcomments += "AnalogShield:\r\t"
-
+	string buffer=""
 	variable j=0
 	for(j=0;j<4;j+=1)
-		sprintf buffer, "CH%d = %s\r\t", (j), as_valsstr[j][1]
-		winfcomments+=buffer
+		buffer = addJSONKeyVal(buffer, "CH"+num2istr(j), strVal=as_valsstr[j][1])
 	endfor
-	return winfcomments
+	buffer = addJSONKeyVal(buffer, "com_port", strVal=as_comport, fmt="\"%s\"")
+	
+	return addJSONKeyVal("", "AnalogShield", strVal = buffer)
 end
