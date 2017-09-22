@@ -6,7 +6,7 @@
 // RULES: https://tools.ietf.org/html/rfc7159.html
 //        If something here doesn't make sense, go read the rules
 //
-// Written by Nik Hartman (September 2017) -- This whole thing is sloppy a.f. 
+// Written by Nik Hartman (September 2017)
 
 ///////////////////////////
 //// utility functions ////
@@ -702,28 +702,28 @@ function /S addJSONKeyVal(jstr, key, [numVal, strVal, fmt])
 
 		// setup format string
 		if(paramisdefault(fmt))
-			outputFmt = jstr+"\"%s\": %s}"
+			outputFmt = "\"%s\": %s}"
 		else
-			outputFmt = jstr+"\"%s\": " + fmt + "}"
+			outputFmt = "\"%s\": " + fmt + "}"
 		endif
 		
 		// return output
 		sprintf output, outputFmt, key, strVal
-		return output
+		return jstr+output
 	endif
 
 	if(!paramisdefault(numVal))
 	
 		// setup format string
 		if(paramisdefault(fmt))
-			outputFmt = jstr+"\"%s\": %f}"
+			outputFmt = "\"%s\": %f}"
 		else
-			outputFmt = jstr+"\"%s\": " + fmt + "}"
+			outputFmt = "\"%s\": " + fmt + "}"
 		endif
 		
 		// return output
 		sprintf output, outputFmt, key, numVal
-		return output
+		return jstr+output
 	endif
 	
 end

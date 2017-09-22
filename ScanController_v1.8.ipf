@@ -363,6 +363,7 @@ function /S sc_createconfig()
 	configstr = addJSONKeyVal(configstr, "filenum", strVal=num2istr(filenum))
 	
 	configfile = "sc" + num2istr(unixtime()) + ".config"
+	print strlen(configstr)
 	writeJSONtoFile(configstr, configfile, "config")
 end
 
@@ -402,10 +403,10 @@ function sc_loadconfig(configfile)
 	sc_PrintCalc = str2num(getJSONvalue(jstr, "print_to_history:calc"))
 	
 	// load log string
-	sc_LogStr = getJSONvalue(jstr, "log_string")
+	sc_LogStr = stripCharacters(getJSONvalue(jstr, "log_string"), "\"")
 	
 	// load colormap
-	sc_ColorMap = getJSONvalue(jstr, "colormap")
+	sc_ColorMap = stripCharacters(getJSONvalue(jstr, "colormap"), "\"")
 	
 end
 
