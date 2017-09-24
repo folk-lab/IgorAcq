@@ -8,6 +8,7 @@
 //
 // Written by Nik Hartman (September 2017)
 
+
 ///////////////////////////
 //// utility functions ////
 ///////////////////////////
@@ -650,10 +651,10 @@ end
 
 function /S addJSONKeyVal(jstr, key, [numVal, strVal, fmt])
 	// new Key:Val goes at the end of JSON object, jstr
-	//
+	
 	// it is up to the user to provide format strings that make sense
 	// defaults are %s and %f for strVal and numVal, respectively
-	//
+
 	
 	string jstr, key, strVal, fmt
 	variable numVal
@@ -776,12 +777,11 @@ function /S prettyJSONfmt(jstr)
 		// if so, close out object with curly bracket
 		
 		key = StringFromList(i, keylist, ",")
-		print key
 		printkey = StringFromList(ItemsInList(key, ":")-1, key, ":")
 		
 		if(i!=0 && ItemsInList(key, ":")<level)
 			level = ItemsInList(key, ":")
-			outStr+= getJSONindent(level)+"}\r"
+			outStr= outStr[0,strlen(outStr)-3] + "\r" + getJSONindent(level) + "},\r"
 		else
 			level = ItemsInList(key, ":")
 		endif 
@@ -794,28 +794,30 @@ function /S prettyJSONfmt(jstr)
 				outStr += getJSONindent(level)+"\""+printkey+"\""+": {\r"
 				break
 			case 2: 
-				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+"\r"
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+",\r"
 				break
 			case 3:
-				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+"\r"
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+",\r"
 				break
 			case 4:
-				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+"\r"
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+",\r"
 				break
 			case 5:
-				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+"\r"
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+",\r"
 				break
 			case 6:
 				strVal = "null" 
-				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+"\r"
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+",\r"
 				break
 			case -1:
 				strVal = ""
-				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+"\r"
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+",\r"
 				break
 		endswitch
 		
 	endfor
+	
+	outStr = outStr[0,strlen(outStr)-3]+"\r" // fix trailing comma trouble
 	
 	// need to close out open objects
 	do
@@ -837,67 +839,19 @@ function writeJSONtoFile(jstr, filename, path)
 	// it will be a disaster otherwise
 	
 	variable refNum=0
+	jstr = prettyJSONfmt(jstr)
+	
 	open /z/p=$path refNum as filename
 
-	fprintf refNum, "{\r"
-
-	// get keys...
-	string keylist = getJSONkeys(jstr)
-	
-
-	variable i=0, level = 0
-	string key = "", printkey = "", strVal = "", group = ""
-	for(i=0;i<ItemsInList(keylist,",");i+=1) // loop over keys
-		
-		// check if the indent level has decreased
-		// if so, close out object with curly bracket
-		
-		key = StringFromList(i, keylist, ",")
-		printkey = StringFromList(ItemsInList(key, ":")-1, key, ":")
-		
-		if(i!=0 && ItemsInList(key, ":")<level)
-			level = ItemsInList(key, ":")
-			fprintf refNum, "%s}\r", getJSONindent(level)
-		else
-			level = ItemsInList(key, ":")
-		endif 
-		
-		strVal = getJSONValue(jstr, key)
-		
-		switch(findJSONtype(strVal))
-			case 1:
-				// don't put the value in, it will contain keys and be handled another way
-				fprintf refNum, "%s\"%s\": {\r", getJSONindent(level), printkey
-				break
-			case 2: 
-				fprintf refNum, "%s\"%s\": %s\r", getJSONindent(level), printkey, strVal
-				break
-			case 3:
-				fprintf refNum, "%s\"%s\": %s\r", getJSONindent(level), printkey, strVal
-				break
-			case 4:
-				fprintf refNum, "%s\"%s\": %s\r", getJSONindent(level), printkey, strVal
-				break
-			case 5:
-				fprintf refNum, "%s\"%s\": %s\r", getJSONindent(level), printkey, strVal
-				break
-			case 6:
-				strVal = "null" 
-				fprintf refNum, "%s\"%s\": %s\r", getJSONindent(level), printkey, strVal
-				break
-			case -1:
-				strVal = ""
-				fprintf refNum, "%s\"%s\": %s\r", getJSONindent(level), printkey, strVal
-				break
-		endswitch
-		
-	endfor
-	
-	// need to close out open objects
 	do
-		level-=1
-		fprintf refNum, "%s}\r", getJSONindent(level)
-	while(level>0)
+		if(strlen(jstr)<500)
+			fprintf refnum, "%s", jstr
+			break
+		else
+			fprintf refnum, "%s", jstr[0,499]
+			jstr = jstr[500,inf]
+		endif
+	while(1)
 
 	close refNum
 	

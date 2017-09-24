@@ -19,7 +19,7 @@
 //     -- add Slack notifications (somefolkneverlearn.slack.com)
 //     -- use JSON format for config files (adds dependency on JSON.ipf)
 //     -- restructure WINF files to use JSON wherever possible
-//     -- update all instrument logs to use JSON... this is going to break someone shit
+//     -- update all instrument logs to use JSON -- STILL NEED TO FIX THIS IN ScanControlNative
 
 //TODO:
 

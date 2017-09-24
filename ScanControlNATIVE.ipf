@@ -88,7 +88,7 @@ function /s getExpStatus()
 	jstr = addJSONKeyVal(jstr, "system_info", strVal=buffer)
 
 	// information about the current experiment
-	jstr = addJSONKeyVal(jstr, "experiment", strVal=getExpPath("data")+igorinfo(1)+".pxp", fmt = "\"%s\"")
+	jstr = addJSONKeyVal(jstr, "experiment", strVal=getExpPath("data")+igorinfo(1)+".pxp", fmt="\"%s\"")
 	jstr = addJSONKeyVal(jstr, "current_config", strVal=sc_current_config, fmt = "\"%s\"")
 	buffer = ""
 	buffer = addJSONKeyVal(buffer, "data", strVal=getExpPath("data"), fmt = "\"%s\"")
@@ -174,21 +174,24 @@ function /S saveScanComments([msg])
 	buffer = ""	
 	svar sc_LogStr
 	if (strlen(sc_LogStr)>0)
-		string command
+		string command, keylist = "", key = "", sval = ""
 		string /G sc_log_buffer=""
 		variable i = 0
 		for(i=0;i<ItemsInList(sc_logStr, ";");i+=1)
 			command = StringFromList(i, sc_logStr, ";")
 			Execute/Q/Z "sc_log_buffer="+command
 			if(strlen(sc_log_buffer)!=0)
-				buffer += TrimString(sc_log_buffer)+"\r\r"
+				// need to get first key and value from sc_log_buffer
+				keylist = getJSONkeys(sc_log_buffer)
+				key = StringFromList(0,keylist, ",")
+				sval = getJSONValue(sc_log_buffer, key)
+				buffer = addJSONKeyVal(buffer, key, strVal=sval)
 			else
-				buffer += TrimString("command failed to log anything: "+command)+"\r\r"
+				print "[WARNING] command failed to log anything: "+command+"\r"
 			endif
 		endfor
-		buffer = buffer[0,strlen(buffer)-2]
 	endif	
-	jstr = addJSONKeyVal(jstr, "logs", strVal=buffer, fmt = "\"%s\"")
+	jstr = addJSONKeyVal(jstr, "logs", strVal=buffer)
 	
 	//// save file ////
 	nvar filenum
@@ -197,6 +200,7 @@ function /S saveScanComments([msg])
 	filename =  "dat" + num2istr(filenum) + extension
 	writeJSONtoFile(jstr, filename, "winfs")
 
+	return jstr
 end
 
 function /s str2WINF(datname, s)
