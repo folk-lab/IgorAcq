@@ -81,25 +81,25 @@ function /s getExpStatus()
 
 	// information about the machine your working on
 	buffer = ""
-	buffer = addJSONKeyVal(buffer, "hostname", strVal=getHostName(), fmt = "\"%s\"")
+	buffer = addJSONKeyVal(buffer, "hostname", strVal=getHostName(), addQuotes = 1)
 	string sysinfo = igorinfo(3)
-	buffer = addJSONKeyVal(buffer, "OS", strVal=StringByKey("OS", sysinfo), fmt = "\"%s\"")
-	buffer = addJSONKeyVal(buffer, "IGOR_VERSION", strVal=StringByKey("IGORFILEVERSION", sysinfo), fmt = "\"%s\"")
+	buffer = addJSONKeyVal(buffer, "OS", strVal=StringByKey("OS", sysinfo), addQuotes = 1)
+	buffer = addJSONKeyVal(buffer, "IGOR_VERSION", strVal=StringByKey("IGORFILEVERSION", sysinfo), addQuotes = 1)
 	jstr = addJSONKeyVal(jstr, "system_info", strVal=buffer)
 
 	// information about the current experiment
-	jstr = addJSONKeyVal(jstr, "experiment", strVal=getExpPath("data")+igorinfo(1)+".pxp", fmt="\"%s\"")
-	jstr = addJSONKeyVal(jstr, "current_config", strVal=sc_current_config, fmt = "\"%s\"")
+	jstr = addJSONKeyVal(jstr, "experiment", strVal=getExpPath("data")+igorinfo(1)+".pxp", addQuotes = 1)
+	jstr = addJSONKeyVal(jstr, "current_config", strVal=sc_current_config, addQuotes = 1)
 	buffer = ""
-	buffer = addJSONKeyVal(buffer, "data", strVal=getExpPath("data"), fmt = "\"%s\"")
-	buffer = addJSONKeyVal(buffer, "winfs", strVal=getExpPath("winfs"), fmt = "\"%s\"")
-	buffer = addJSONKeyVal(buffer, "config", strVal=getExpPath("config"), fmt = "\"%s\"")
+	buffer = addJSONKeyVal(buffer, "data", strVal=getExpPath("data"), addQuotes = 1)
+	buffer = addJSONKeyVal(buffer, "winfs", strVal=getExpPath("winfs"), addQuotes = 1)
+	buffer = addJSONKeyVal(buffer, "config", strVal=getExpPath("config"), addQuotes = 1)
 	jstr = addJSONKeyVal(jstr, "paths", strVal=buffer)
 	
 	// information about this specific run
-	jstr = addJSONKeyVal(jstr, "filenum", numVal=filenum, fmt = "%.0f")
-	jstr = addJSONKeyVal(jstr, "time_completed", strVal=Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), fmt = "\"%s\"")
-	jstr = addJSONKeyVal(jstr, "time_elapsed", numVal = sweep_t_elapsed, fmt = "%.3f")
+	jstr = addJSONKeyVal(jstr, "filenum", numVal=filenum, fmtNum = "%.0f")
+	jstr = addJSONKeyVal(jstr, "time_completed", strVal=Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
+	jstr = addJSONKeyVal(jstr, "time_elapsed", numVal = sweep_t_elapsed, fmtNum = "%.3f")
 	jstr = addJSONKeyVal(jstr, "saved_waves", strVal=recordedWaveArray())
 
 	return jstr
@@ -113,9 +113,9 @@ function /s getWaveStatus(datname)
 	string jstr="", buffer="" 
 	
 	// date/time info
-	jstr = addJSONKeyVal(jstr, "wave_name", strVal=datname, fmt = "\"%s\"")
-	jstr = addJSONKeyVal(jstr, "filenum", numVal=filenum, fmt = "%.0f")
-	jstr = addJSONKeyVal(jstr, "file_path", strVal=getExpPath("data")+"dat"+num2istr(filenum)+datname+".ibw", fmt = "\"%s\"")
+	jstr = addJSONKeyVal(jstr, "wave_name", strVal=datname, addQuotes = 1)
+	jstr = addJSONKeyVal(jstr, "filenum", numVal=filenum, fmtNum = "%.0f")
+	jstr = addJSONKeyVal(jstr, "file_path", strVal=getExpPath("data")+"dat"+num2istr(filenum)+datname+".ibw", addQuotes = 1)
 
 	// wave info
 	//check if wave is 1d or 2d
@@ -132,7 +132,7 @@ function /s getWaveStatus(datname)
 		// save some data
 		wavestats/Q $datname
 		buffer = ""
-		buffer = addJSONKeyVal(buffer, "length", numVal=dimsize($datname,0), fmt = "%d")
+		buffer = addJSONKeyVal(buffer, "length", numVal=dimsize($datname,0), fmtNum = "%d")
 		buffer = addJSONKeyVal(buffer, "dx", numVal=dimdelta($datname, 0))
 		buffer = addJSONKeyVal(buffer, "mean", numVal=V_avg)
 		buffer = addJSONKeyVal(buffer, "standard_dev", numVal=V_avg)
@@ -140,20 +140,20 @@ function /s getWaveStatus(datname)
 	elseif(dims==2)
 		wavestats/Q $datname
 		buffer = ""
-		buffer = addJSONKeyVal(buffer, "columns", numVal=dimsize($datname,0), fmt = "%d")
-		buffer = addJSONKeyVal(buffer, "rows", numVal=dimsize($datname,1), fmt = "%d")
+		buffer = addJSONKeyVal(buffer, "columns", numVal=dimsize($datname,0), fmtNum = "%d")
+		buffer = addJSONKeyVal(buffer, "rows", numVal=dimsize($datname,1), fmtNum = "%d")
 		buffer = addJSONKeyVal(buffer, "dx", numVal=dimdelta($datname, 0))
 		buffer = addJSONKeyVal(buffer, "dy", numVal=dimdelta($datname, 1))
 		buffer = addJSONKeyVal(buffer, "mean", numVal=V_avg)
 		buffer = addJSONKeyVal(buffer, "standard_dev", numVal=V_avg)
 		jstr = addJSONKeyVal(jstr, "wave_stats", strVal=buffer)
 	else
-		jstr = addJSONKeyVal(jstr, "wave_stats", strVal="Wave dimensions > 2. How did you get this far?", fmt = "\"%s\"")
+		jstr = addJSONKeyVal(jstr, "wave_stats", strVal="Wave dimensions > 2. How did you get this far?", addQuotes = 1)
 	endif
 	
 	svar sc_x_label, sc_y_label
-	jstr = addJSONKeyVal(jstr, "x_label", strVal=sc_x_label, fmt = "\"%s\"")
-	jstr = addJSONKeyVal(jstr, "y_label", strVal=sc_y_label, fmt = "\"%s\"")
+	jstr = addJSONKeyVal(jstr, "x_label", strVal=sc_x_label, addQuotes = 1)
+	jstr = addJSONKeyVal(jstr, "y_label", strVal=sc_y_label, addQuotes = 1)
 	
 	return jstr	
 end
@@ -166,7 +166,7 @@ function /S saveScanComments([msg])
 	jstr += getExpStatus() // record date, time, wave names, time elapsed...
 	
 	if (!paramisdefault(msg) && strlen(msg)!=0)
-		jstr = addJSONKeyVal(jstr, "comments", strVal=TrimString(msg), fmt = "\"%s\"")
+		jstr = addJSONKeyVal(jstr, "comments", strVal=TrimString(msg), addQuotes = 1)
 	endif
 	
 	//// this should be replaced ////

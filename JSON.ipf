@@ -649,15 +649,18 @@ end
 //// JSON output functions ////
 ///////////////////////////////
 
-function /S addJSONKeyVal(jstr, key, [numVal, strVal, fmt])
+function /S addJSONKeyVal(jstr, key, [numVal, strVal, fmtNum, addQuotes])
 	// new Key:Val goes at the end of JSON object, jstr
 	
 	// it is up to the user to provide format strings that make sense
 	// defaults are %s and %f for strVal and numVal, respectively
 
 	
-	string jstr, key, strVal, fmt
-	variable numVal
+	string jstr, key, strVal, fmtNum
+	variable numVal, addQuotes
+	if(paramisdefault(addQuotes))
+		addQuotes = 0
+	endif
 
 	if(paramisdefault(numVal) && paramisdefault(strVal))
 		print "[WARNING] A value has not been provided along with the key: ", key
@@ -693,50 +696,34 @@ function /S addJSONKeyVal(jstr, key, [numVal, strVal, fmt])
 	endif
 	
 	variable err = 0
-	string output="", outputFmt = ""
 	if(!paramisdefault(strVal))
 
 		// setup format string
-		if(paramisdefault(fmt))
-		
-			// if no format is provided
-			// check if strVal is a valid type
+		if(addQuotes!=0)
+			strVal = "\""+strVal+"\""
 			err = findJSONtype(strVal)
-			if(err==-1)
-				return ""
-			endif
-			
-			outputFmt = "\"%s\": %s}"
-		else
-			// build test string
-			// check if it is a valid type
-			string test = ""
-			sprintf test, fmt, strVal
-			err = findJSONtype(test)
-			if(err==-1)
-				return ""
-			endif
-			
-			outputFmt = "\"%s\": " + fmt + "}"
 		endif
 		
-		// return output
-		sprintf output, outputFmt, key, strVal
-		return jstr+output
+		// check if strVal is a valid type
+		err = findJSONtype(strVal)
+		if(err==-1)
+				return ""
+		endif 
+		return jstr+"\""+key+"\": "+strVal+"}"
 	endif
 
 	if(!paramisdefault(numVal))
 	
 		// setup format string
-		if(paramisdefault(fmt))
-			outputFmt = "\"%s\": %f}"
+		string numStr = ""
+		if(paramisdefault(fmtNum))
+			sprintf numStr, "%g", numVal
 		else
-			outputFmt = "\"%s\": " + fmt + "}"
+			sprintf numStr, fmtNum, numVal
 		endif
 		
 		// return output
-		sprintf output, outputFmt, key, numVal
-		return jstr+output
+		return jstr+"\""+key+"\": "+numStr+"}"
 	endif
 	
 end
