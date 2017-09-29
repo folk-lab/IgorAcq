@@ -503,7 +503,7 @@ function/s GetASStatus()
 	for(j=0;j<4;j+=1)
 		buffer = addJSONKeyVal(buffer, "CH"+num2istr(j), strVal=as_valsstr[j][1])
 	endfor
-	buffer = addJSONKeyVal(buffer, "com_port", strVal=as_comport, fmt="\"%s\"")
+	buffer = addJSONKeyVal(buffer, "com_port", strVal=as_comport, addQuotes=1)
 	
 	return addJSONKeyVal("", "AnalogShield", strVal = buffer)
 end

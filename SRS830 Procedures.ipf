@@ -320,12 +320,12 @@ function/s GetSRSStatus(srs)
 	string gpib = num2istr(returnGPIBaddress(srs))
 	buffer = addJSONKeyVal(buffer, "gpib_address", strVal=gpib)
 	
-	buffer = addJSONKeyVal(buffer, "amplitude V", numVal=GetSRSAmplitude(srs), fmt="%.3f")
-	buffer = addJSONKeyVal(buffer, "time_const ms", numVal= GetSRSTimeConst(srs,realtime=1)*1000, fmt="%.2f")
-	buffer = addJSONKeyVal(buffer, "frequency Hz", numVal= GetSRSFrequency(srs), fmt="%.3f")
-	buffer = addJSONKeyVal(buffer, "phase deg", numVal=GetSRSPhase(srs), fmt="%.2f")
-	buffer = addJSONKeyVal(buffer, "sensitivity V", numVal=GetSRSSensitivity(srs, realsens=1), fmt="%.4f")
-	buffer = addJSONKeyVal(buffer, "harmonic", numVal=GetSRSHarmonic(srs), fmt="%d")
+	buffer = addJSONKeyVal(buffer, "amplitude V", numVal=GetSRSAmplitude(srs), fmtNum="%.3f")
+	buffer = addJSONKeyVal(buffer, "time_const ms", numVal= GetSRSTimeConst(srs,realtime=1)*1000, fmtNum="%.2f")
+	buffer = addJSONKeyVal(buffer, "frequency Hz", numVal= GetSRSFrequency(srs), fmtNum="%.3f")
+	buffer = addJSONKeyVal(buffer, "phase deg", numVal=GetSRSPhase(srs), fmtNum="%.2f")
+	buffer = addJSONKeyVal(buffer, "sensitivity V", numVal=GetSRSSensitivity(srs, realsens=1), fmtNum="%.4f")
+	buffer = addJSONKeyVal(buffer, "harmonic", numVal=GetSRSHarmonic(srs), fmtNum="%d")
 
 	return addJSONKeyVal("", "SRS_"+gpib, strVal=buffer)
 end

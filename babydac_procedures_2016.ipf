@@ -846,7 +846,7 @@ function/s GetDACStatus()
 		i+=1
 	while(i<numpnts(bd_boardnumbers))	
 
-	buffer = addJSONKeyVal(buffer, "com_port", strVal=bd_comport, fmt="\"%s\"")
+	buffer = addJSONKeyVal(buffer, "com_port", strVal=bd_comport, addQuotes=1)
 	
 	return addJSONKeyVal("", "BabyDAC", strVal = buffer)
 end
