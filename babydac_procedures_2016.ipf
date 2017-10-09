@@ -8,8 +8,10 @@
 
 ///// Initiate DAC board(s) /////
 
-function InitBabyDACs(boards, ranges)
-	// boards and ranges should be a comma separated list
+function InitBabyDACs(boards, ranges, [custom])
+	// boards and ranges should be a comma separated list.
+	// custom should be set to 1 if you want to bring up the custom
+	// babydac window as well.
 	
 	// ranges: 
 	//     1010 = -10 to +10
@@ -22,59 +24,111 @@ function InitBabyDACs(boards, ranges)
 	// otherwise number of boards must equal number of ranges given
 	
 	string boards, ranges
+	variable custom
 	variable /g bd_ramprate = 200 // default ramprate
 	
-	//DACSetup() // setup DAC com port
-	SetBoardNumbers(boards) // handle board numbering
+	if(paramisdefault(custom))
+		custom = 0
+	endif
+	
+	DACSetup() // setup DAC com port
+	SetBoardNumbers(boards,custom) // handle board numbering
 	
 	SetChannelRange(ranges) // set DAC output ranges
 	
-	CheckForOldInit() // Will update the user window to the last known values.
+	CheckForOldInit(custom) // Will update the user window to the last known values.
 	
 	// open window
 	dowindow /k BabyDACWindow
 	execute("BabyDACWindow()")
+	
+	if(custom)
+		dowindow /k CustomDACWindow
+		execute("CustomDACWindow()")
+	endif
 end
 
-function CheckForOldInit()
+function CheckForOldInit(custom)
+	variable custom
 	variable response
+	nvar numCustom
+	
 	if(WaveExists(dacvalsstr) && WaveExists(oldvalue))
 		response = AskUser()
 		if(response == 1)
 			// Init at old values
 			print "Init to old values"
+			if(custom)
+				CreateCustomWaves(1)
+				CalcCustomValues()
+			endif
 		elseif(response == -1)
 			// Init to Zero
 			InitToZero()
+			if(custom)
+				CreateCustomWaves(0)
+				CalcCustomValues()
+			endif
 			print "Init all channels to 0V"
 		else
 			print "Something went wrong, will init to defualt"
 			InitToZero()
+			if(custom)
+				CreateCustomWaves(0)
+				CalcCustomValues()
+			endif
 		endif
 	else
 		// Init to Zero
 		InitToZero()
+		if(custom)
+			CreateCustomWaves(0)
+			CalcCustomValues()
+		endif
 		print "Init all channels to 0V"
 	endif
 end
 
+function CalcCustomValues()
+	nvar numCustom
+	wave/t dacvalsstr
+	wave/t customdacvalstr
+	wave bdtocustom_vec
+	wave customtobd_vec
+	wave offsets
+	variable i
+	
+	make/o/n=(numCustom) customoutput = nan
+	make/o/n=(numCustom) bdoutput = nan
+	make/o/n=(numCustom) scalefunc = nan
+	make/o/n=(numCustom) offset = nan
+	bdoutput = str2num(dacvalsstr[p][1])
+	for(i=0;i<numCustom;i=i+1)
+		scalefunc = bdtocustom_vec[p][i]
+		offset = offsets[p][i]
+		matrixop/o placeholder = (scalefunc.(bdoutput + offset))
+		customoutput[i] = placeholder[0]
+	endfor
+	customdacvalstr[][1] = num2str(customoutput[p])
+end
+
 function InitToZero()
 	wave bd_boardnumbers
-
+	nvar numCustom
+	
 	// Init all channels to 0V.
-	make/t/o dacvalsstr = {{"0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15"},{"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}, {"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"},{"CH0","CH1","CH2","CH3","CH4","CH5","CH6","CH7","CH8","CH9","CH10","CH11","CH12","CH13","CH14","CH15"}}
+	make/t/o dacvalsstr = {{"0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15"},{"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}, {"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}}
 	make/t/o oldvalue = {{"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}}
 
 	// setup software limit
 	variable i = 0, board_index = 0
 	wave bd_range_high, bd_range_low
-		for(i=0; i<16; i+=1)
-			board_index = floor(i/4)
-			if(numtype(bd_boardnumbers[board_index])==0)
-				dacvalsstr[i][2] = num2str(max(abs(bd_range_high[board_index]), abs(bd_range_low[board_index])))
-			endif
-		endfor
-
+	for(i=0; i<16; i+=1)
+		board_index = floor(i/4)
+		if(numtype(bd_boardnumbers[board_index])==0)
+			dacvalsstr[i][2] = num2str(max(abs(bd_range_high[board_index]), abs(bd_range_low[board_index])))
+		endif
+	endfor
 end
 
 function AskUser()
@@ -102,15 +156,17 @@ function DACSetup()
 	execute("VDT2 baud=57600, databits=8, stopbits=1, parity=0, killio") // Communication Settings
 end
 
-function SetBoardNumbers(boards)
+function SetBoardNumbers(boards,custom)
 	// Leave board numbers blank or NaN if not all 4 boards are used.
 	// First board will have channels 0-3, second baord will have channels 4-7,
 	// third board will have channels 8-11, fourth board will have channels 12-15
 	string boards
+	variable custom
 	variable numBoards = ItemsInList(boards, ",")
+	variable/g numCustom = 0
 	wave/t dacvalsstr=dacvalsstr
 	
-	make/o listboxattr = {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},{2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0}, {2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0},{2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0}}
+	make/o listboxattr = {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},{2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0}, {2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0}}
 	
 	switch(numBoards)
 		case 1:
@@ -122,7 +178,11 @@ function SetBoardNumbers(boards)
 		case 4:
 			make/o bd_boardnumbers = {{str2num(StringFromList(0, boards, ",")),str2num(StringFromList(1, boards, ",")),str2num(StringFromList(2, boards, ",")),str2num(StringFromList(3, boards, ","))}}
 	endswitch
-					
+	
+	if(custom)
+		numCustom += 4
+	endif
+	
 	if(numtype(bd_boardnumbers[1])==2)
 		dacvalsstr[4] = "0"
 		dacvalsstr[5] = "0"
@@ -139,10 +199,9 @@ function SetBoardNumbers(boards)
 		listboxattr[6][2] = 2
 		listboxattr[7][2] = 2
 		
-		listboxattr[4][3] = 2
-		listboxattr[5][3] = 2
-		listboxattr[6][3] = 2
-		listboxattr[7][3] = 2
+		if(custom)
+			numCustom += 4
+		endif
 	endif
 	
 	if(numtype(bd_boardnumbers[2])==2)
@@ -161,10 +220,9 @@ function SetBoardNumbers(boards)
 		listboxattr[10][2] = 2
 		listboxattr[11][2] = 2
 		
-		listboxattr[8][3] = 2
-		listboxattr[9][3] = 2
-		listboxattr[10][3] = 2
-		listboxattr[11][3] = 2
+		if(custom)
+			numCustom += 4
+		endif
 	endif
 	
 	if(numtype(bd_boardnumbers[3])==2)
@@ -183,12 +241,70 @@ function SetBoardNumbers(boards)
 		listboxattr[14][2] = 2
 		listboxattr[15][2] = 2
 		
-		listboxattr[12][3] = 2
-		listboxattr[13][3] = 2
-		listboxattr[14][3] = 2
-		listboxattr[15][3] = 2
+		if(custom)
+			numCustom += 4
+		endif
 	endif
+end
+
+function CreateCustomWaves(keepold)
+	variable keepold
+	string customname = "ABCDEFGHIJKLMNOP", default_vec ="", specific_vec = "", offset_vec = ""
+	variable i
+	nvar numCustom
 	
+	make/o/n=(numCustom,3) customlistboxattr = 2
+	
+	if(keepold && waveexists(customdacvalstr))
+		print("BabyDAC is initialized to old values.")
+		print("Remember to update the scale functions and channel names in the Custom window.")
+	endif
+	make/o/t/n=(numCustom,3) customdacvalstr
+	for(i=0;i<numCustom;i=i+1)
+		default_vec = addlistitem("0",default_vec,",")
+		offset_vec = addlistitem("0",offset_vec,",")
+	endfor
+	offset_vec = "("+offset_vec[0,strlen(offset_vec)-2]+")"
+	for(i=0;i<numCustom;i=i+1)
+		specific_vec = removelistitem(i,default_vec,",")
+		specific_vec = addlistitem("1",specific_vec,",",i)
+		specific_vec = "("+specific_vec[0,strlen(specific_vec)-2]+")"
+		customdacvalstr[i][0] = customname[i]
+		customdacvalstr[i][1] = ""
+		customdacvalstr[i][2] = specific_vec+";"+offset_vec+";"+"CH"+num2istr(i)
+	endfor
+	CreateVectors()
+end
+
+function CreateVectors()
+	wave/t customdacvalstr
+	nvar numCustom
+	string vector
+	variable i,j
+	
+	make/t/o/n=(numCustom) textplaceholder
+	make/o/n=(numCustom) numplaceholder
+	make/o/n=(numCustom,numCustom) bdtocustom_vec = nan
+	make/o/n=(numCustom,numCustom) customtobd_vec = nan
+	make/o/n=(numCustom,numCustom) offsets = nan
+	for(i=0;i<numCustom;i=i+1)
+		vector = stringfromlist(0,customdacvalstr[i][2])
+		vector = vector[1,strlen(vector)-2]
+		textplaceholder = StringFromList(p, vector, ",")
+		numplaceholder = str2num(textplaceholder)
+		bdtocustom_vec[][i] = numplaceholder[p]
+		
+		vector = stringfromlist(1,customdacvalstr[i][2])
+		vector = vector[1,strlen(vector)-2]
+		textplaceholder = StringFromList(p, vector, ",")
+		numplaceholder = str2num(textplaceholder)
+		offsets[][i] = numplaceholder[p]
+	endfor
+	for(i=0;i<numCustom;i=i+1)
+		for(j=0;j<numCustom;j=j+1)
+			customtobd_vec[i][j] = 1.0/bdtocustom_vec[i][j]
+		endfor
+	endfor
 end
 
 function SetChannelRange(ranges)
@@ -625,9 +741,68 @@ function RampMultipleBD(channels, setpoint, nChannels, [ramprate, update])
 	
 	for(i=0;i<nChannels;i+=1)
 		channel = str2num(StringFromList(i, channels, ","))
-		dacvalsstr[channel][1] = num2str(setpoint) // set new values with a strings
+		dacvalsstr[channel][1] = num2str(setpoint) // set new value with a string
 	endfor
 	UpdateMultipleBD(action="ramp", ramprate=ramprate, update = update)
+end
+
+function RampMultipleCustom(channels, setpoints, [ramprate, update]) //Units = mV and mV/s
+	// Ramps Custom Channels. Will only work if custom window is activated at Init!
+	// channels and setpoints are comma separeted string lists. Eg. channels = "channelx,channely", setpoints = "10,26"
+	// Channel names are case sensitive.
+	variable ramprate, update
+	string channels,setpoints
+	variable i,j, bd_channel, bd_setpoint, channel_scale, bd_output, nChannels, offset
+	string channel, moving_channel, scale_vec, offset_vec
+	wave/t dacvalsstr
+	wave/t customdacvalstr
+	
+	if(waveexists(customdacvalstr) == 0)
+		abort "Custom channels are not supported. Re-init the BabyDAC with custom=1"
+	endif
+
+	if(paramisdefault(ramprate))
+		nvar bd_ramprate
+		ramprate = bd_ramprate    // (mV/s)
+	endif
+	
+	if(paramisdefault(update))
+		update = 1
+	endif
+	
+	nChannels = itemsinlist(channels,",")
+	
+	for(i=0;i<nChannels;i+=1)
+		channel = StringFromList(i, channels, ",")
+		make/t/o testswave = customdacvalstr[p][0]
+		extract/indx testswave, indexwave, (cmpstr(customdacvalstr[p][0], channel) == 0)
+		if(numpnts(indexwave) > 1)
+			abort "More than two Custom channels have the same name"
+		elseif(numpnts(indexwave) == 0)
+			abort "No channel found with the name "+channel
+		endif
+		moving_channel = stringfromlist(2,customdacvalstr[indexwave[0]][2],";")
+		moving_channel = moving_channel[2]
+		scale_vec = stringfromlist(0,customdacvalstr[indexwave[0]][2],";")
+		scale_vec = scale_vec[1,strlen(scale_vec)-2]
+		offset_vec = stringfromlist(1,customdacvalstr[indexwave[0]][2],";")
+		offset_vec = offset_vec[1,strlen(offset_vec)-2]
+		bd_setpoint = str2num(stringfromlist(i,setpoints,","))
+		for(j=0;j<itemsinlist(scale_vec,",");j=j+1)
+			channel_scale = str2num(stringfromlist(j,scale_vec,","))
+			offset = str2num(stringfromlist(j,offset_vec,","))
+			bd_output = str2num(dacvalsstr[j][1])
+			if(str2num(moving_channel) == j)
+				bd_setpoint -= offset
+			else
+				bd_setpoint -= channel_scale*(bd_output+offset)
+			endif
+		endfor
+		bd_setpoint = bd_setpoint/str2num(stringfromlist(str2num(moving_channel),scale_vec,","))
+		dacvalsstr[str2num(moving_channel)][1] = num2str(bd_setpoint) // set new values with a string
+	endfor
+	UpdateMultipleBD(action="ramp", ramprate=ramprate, update = update)
+	CalcCustomValues()
 end
 
 ///// ACD readings /////
@@ -741,26 +916,67 @@ end
 
 ///// User interface /////
 
-Window BabyDACWindow() : Panel
+window CustomDACWindow() : Panel
+	variable channelhight = 23.5
+	
 	PauseUpdate; Silent 1 // building window
-	NewPanel /W=(0,0,420,530) // window size
+	NewPanel /W=(0,0,320,150+numCustom*channelhight) // window size
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv fsize= 25,fstyle= 1
-	DrawText 140, 45,"BabyDAC" // Headline
+	DrawText 50, 45,"BabyDAC Custom" // Headline
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 12,85,"NAME"
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 108,85,"OUTPUT"
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 208,85,"FUNC"
+	ListBox daccustomlist,pos={10,90},size={300,numCustom*channelhight},fsize=16,frame=2
+	ListBox daccustomlist,fStyle=1,listWave=root:customdacvalstr,selWave=root:customlistboxattr,mode= 1
+	Button ramp,pos={30,105+numCustom*channelhight},size={65,20},proc=update_BabyDAC_custom,title="Ramp"
+	Button calcvectors,pos={150,105+numCustom*channelhight},size={150,20},proc=calcvectors,title="Update scale functions"
+endmacro
+
+function update_BabyDAC_custom(action) : ButtonControl
+	string action
+	nvar numCustom
+	variable i, check
+	string output, channel
+	wave/t customdacvalstr
+	
+	for(i=0;i<numCustom;i=i+1)
+		output = customdacvalstr[i][1]
+		channel = customdacvalstr[i][0]
+		RampMultipleCustom(channel,output)
+	endfor
+end
+
+function calcvectors(action) : ButtonControl
+	string action
+	
+	CreateVectors()
+	CalcCustomValues()
+end
+
+
+window BabyDACWindow() : Panel
+	PauseUpdate; Silent 1 // building window
+	NewPanel /W=(0,0,320,530) // window size
+	ModifyPanel frameStyle=2
+	SetDrawLayer UserBack
+	SetDrawEnv fsize= 25,fstyle= 1
+	DrawText 90, 45,"BabyDAC" // Headline
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 12,85,"CHANNEL"
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 108,85,"VOLT (mV)"
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 208,85,"LIM (mV)"
-	SetDrawEnv fsize= 16,fstyle= 1
-	DrawText 308,85,"Scale Func"
-	ListBox daclist,pos={10,90},size={400,390},fsize=16,frame=2 // interactive list
+	ListBox daclist,pos={10,90},size={300,390},fsize=16,frame=2 // interactive list
 	ListBox daclist,fStyle=1,listWave=root:dacvalsstr,selWave=root:listboxattr,mode= 1
-	Button ramp,pos={90,495},size={65,20},proc=update_BabyDAC,title="RAMP"
-	Button rampallzero,pos={210,495},size={90,20},proc=update_BabyDAC,title="RAMP ALL 0"
-EndMacro
+	Button ramp,pos={50,495},size={65,20},proc=update_BabyDAC,title="RAMP"
+	Button rampallzero,pos={170,495},size={90,20},proc=update_BabyDAC,title="RAMP ALL 0"
+endMacro
 
 function update_BabyDAC(action) : ButtonControl
 	string action
@@ -768,7 +984,7 @@ function update_BabyDAC(action) : ButtonControl
 	wave/t oldvalue=oldvalue
 	variable output,i
 	variable check = nan
-	controlinfo /W=BabyDACWindow daclist
+	nvar numCustom
 	
 	strswitch(action)
 		case "ramp":
@@ -793,6 +1009,9 @@ function update_BabyDAC(action) : ButtonControl
 			endfor
 			break
 	endswitch
+	if(numCustom > 0)
+		CalcCustomValues()
+	endif
 end
 
 Window AskUserWindow() : Panel
