@@ -96,6 +96,7 @@ function CalcCustomValues()
 	wave bdtocustom_vec
 	wave customtobd_vec
 	wave offsets
+	wave oldcustom
 	variable i
 	
 	make/o/n=(numCustom) customoutput = nan
@@ -109,6 +110,7 @@ function CalcCustomValues()
 		matrixop/o placeholder = (scalefunc.(bdoutput + offset))
 		customoutput[i] = placeholder[0]
 	endfor
+	oldcustom = customoutput[p]
 	customdacvalstr[][1] = num2str(customoutput[p])
 end
 
@@ -258,6 +260,8 @@ function CreateCustomWaves(keepold)
 	if(keepold && waveexists(customdacvalstr))
 		print("BabyDAC is initialized to old values.")
 		print("Remember to update the scale functions and channel names in the Custom window.")
+	else
+		make/o/n=(numCustom) oldcustom = 0
 	endif
 	make/o/t/n=(numCustom,3) customdacvalstr
 	for(i=0;i<numCustom;i=i+1)
@@ -774,7 +778,7 @@ function RampMultipleCustom(channels, setpoints, [ramprate, update]) //Units = m
 	
 	for(i=0;i<nChannels;i+=1)
 		channel = StringFromList(i, channels, ",")
-		make/t/o testswave = customdacvalstr[p][0]
+		make/t/o/n=(dimsize(customdacvalstr,0)) testswave = customdacvalstr[p][0]
 		extract/indx testswave, indexwave, (cmpstr(customdacvalstr[p][0], channel) == 0)
 		if(numpnts(indexwave) > 1)
 			abort "More than two Custom channels have the same name"
@@ -941,14 +945,17 @@ function update_BabyDAC_custom(action) : ButtonControl
 	string action
 	nvar numCustom
 	variable i, check
-	string output, channel
+	string output="", channel=""
 	wave/t customdacvalstr
+	wave oldcustom
 	
 	for(i=0;i<numCustom;i=i+1)
-		output = customdacvalstr[i][1]
-		channel = customdacvalstr[i][0]
-		RampMultipleCustom(channel,output)
+		if(str2num(customdacvalstr[i][1]) != oldcustom[i])
+			output = AddListItem(customdacvalstr[i][1],output,",",Inf)
+			channel = AddListItem(customdacvalstr[i][0],channel,",",Inf)
+		endif
 	endfor
+	RampMultipleCustom(channel,output)
 end
 
 function calcvectors(action) : ButtonControl
