@@ -733,6 +733,7 @@ function RampMultipleBD(channels, setpoint, nChannels, [ramprate, update])
 	string channels
 	variable i, channel
 	wave /t dacvalsstr = dacvalsstr
+	nvar numCustom
 
 	if(paramisdefault(ramprate))
 		nvar bd_ramprate
@@ -748,6 +749,9 @@ function RampMultipleBD(channels, setpoint, nChannels, [ramprate, update])
 		dacvalsstr[channel][1] = num2str(setpoint) // set new value with a string
 	endfor
 	UpdateMultipleBD(action="ramp", ramprate=ramprate, update = update)
+	if(numCustom > 0)
+		CalcCustomValues()
+	endif
 end
 
 function RampMultipleCustom(channels, setpoints, [ramprate, update]) //Units = mV and mV/s
