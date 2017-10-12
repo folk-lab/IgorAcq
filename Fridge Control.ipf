@@ -138,15 +138,15 @@ end
 function /S GetBFStatus()
 	string  buffer=""
 
-	buffer = addJSONKeyVal(buffer, "MC K", numVal = GetTemp("mc"), fmt="%.3f")
-	buffer = addJSONKeyVal(buffer, "Still K", numVal = GetTemp("still"), fmt="%.3f")
-	buffer = addJSONKeyVal(buffer, "4K Plate K", numVal = GetTemp("4k"), fmt="%.3f")
-	buffer = addJSONKeyVal(buffer, "Magnet K", numVal = GetTemp("magnet"), fmt="%.3f")
-	buffer = addJSONKeyVal(buffer, "50K Plate K", numVal = GetTemp("50k"), fmt="%.3f")
+	buffer = addJSONKeyVal(buffer, "MC K", numVal = GetTemp("mc"), fmtNum="%.3f")
+	buffer = addJSONKeyVal(buffer, "Still K", numVal = GetTemp("still"), fmtNum="%.3f")
+	buffer = addJSONKeyVal(buffer, "4K Plate K", numVal = GetTemp("4k"), fmtNum="%.3f")
+	buffer = addJSONKeyVal(buffer, "Magnet K", numVal = GetTemp("magnet"), fmtNum="%.3f")
+	buffer = addJSONKeyVal(buffer, "50K Plate K", numVal = GetTemp("50k"), fmtNum="%.3f")
 	
 	variable i=0
 	for(i=1;i<7;i+=1)
-		buffer = addJSONKeyVal(buffer, "P"+num2istr(i), numVal = GetBFSPressure(i), fmt="%g")
+		buffer = addJSONKeyVal(buffer, "P"+num2istr(i), numVal = GetBFSPressure(i), fmtNum="%g")
 	endfor
 
 	return addJSONKeyVal("", "BF250", strval = buffer)
