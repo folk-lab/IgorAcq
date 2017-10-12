@@ -19,7 +19,7 @@
 //     -- add Slack notifications (somefolkneverlearn.slack.com)
 //     -- use JSON format for config files (adds dependency on JSON.ipf)
 //     -- restructure WINF files to use JSON wherever possible
-//     -- update all instrument logs to use JSON -- STILL NEED TO FIX THIS IN ScanControlNative
+//     -- update all instrument logs to use JSON
 
 //TODO:
 
@@ -30,10 +30,6 @@
 
 //FIX:
 //     -- NaN handling in JSON package
-//     -- Text encoding issues with .history files, not transferable between systems
-//             this might be igor's problem, I'm not convinced it is simple to fix
-//             works _ok_ with a decent text editor outside of igor, regardless of system
-//     		  Ideas... replce "\r" with "\r\n", replace bullets with ">>>"
 
 
 ///////////////////////////////
@@ -105,19 +101,11 @@ Function IsWhiteSpace(char)
     return GrepString(char, "\\s")
 End
 
-//function list2textwave(stringlistwave,namewave)
-//	string stringlistwave, namewave
-//	
-//	variable n = ItemsInList(stringlistwave,";")
-//	make/o/t/n=(n) $namewave=StringFromList(p,stringlistwave, ";")
-//end
-
-function list2numwave(stringlistwave,namewave)
-	string stringlistwave, namewave
-	variable n = ItemsInList(stringlistwave,";")
+function /S ReplaceBullets(str)
+	// replace bullet points with >>> in string
+	string str
 	
-	make/o/t/n=(n) blawave=StringFromList(p,stringlistwave, ";")
-	make/o/n=(n) $namewave= str2num(blawave)
+	return ReplaceString(U+2022, str, ">>> ")
 end
 
 function/S executeWinCmd(command)
@@ -1398,7 +1386,7 @@ function SaveFromPXP([history, procedure])
 		do
 			FReadLine /N=(numHistoryBytes-bytes) expRef, buffer
 			bytes+=strlen(buffer)
-			fprintf histRef, "%s", buffer
+			fprintf histRef, "%s", ReplaceBullets(buffer)
 			
 			if(datetime-t_start>2.0)
 				// timeout at 2 seconds

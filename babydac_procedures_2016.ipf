@@ -1061,7 +1061,6 @@ end
 
 function/s GetDACStatus()
 	wave /t dacvalsstr = dacvalsstr
-	wave/t customdacvalstr
 	wave bd_boardnumbers = bd_boardnumbers
 	svar bd_comport
 	nvar numCustom
@@ -1078,11 +1077,15 @@ function/s GetDACStatus()
 		i+=1
 	while(i<numpnts(bd_boardnumbers))
 	i=0
-	do
-		buffer = addJSONKeyVal(buffer, customdacvalstr[i][0], strVal=customdacvalstr[i][1])
-		i=i+1
-	while(i<numCustom)
-
+	
+	wave /z/t customdacvalstr = customdacvalstr
+	if(WaveExists(customdacvalstr))
+		do
+			buffer = addJSONKeyVal(buffer, customdacvalstr[i][0], strVal=customdacvalstr[i][1])
+			i=i+1
+		while(i<numCustom)
+	endif
+	
 	buffer = addJSONKeyVal(buffer, "com_port", strVal=bd_comport, addQuotes=1)
 	
 	return addJSONKeyVal("", "BabyDAC", strVal = buffer)
