@@ -29,10 +29,11 @@
 //     -- Use FunctionPath(functionNameStr) to find which scancontroller data type is being used
 
 //FIX:
+//     -- NaN handling in JSON package
 //     -- Text encoding issues with .history files, not transferable between systems
 //             this might be igor's problem, I'm not convinced it is simple to fix
 //             works _ok_ with a decent text editor outside of igor, regardless of system
-//     			Ideas... replce "\r" with "\r\n", replace bullets with ">>>"
+//     		  Ideas... replce "\r" with "\r\n", replace bullets with ">>>"
 
 
 ///////////////////////////////
@@ -365,6 +366,7 @@ function /S sc_createconfig()
 	configstr = addJSONKeyVal(configstr, "filenum", strVal=num2istr(filenum))
 	
 	configfile = "sc" + num2istr(unixtime()) + ".config"
+	sc_current_config = configfile
 	writeJSONtoFile(configstr, configfile, "config")
 end
 
@@ -1414,7 +1416,7 @@ function SaveFromPXP([history, procedure])
 	elseif(history==1 && foundHistory==0)
 		// I want to save it but I cannot save it
 		
-		print "WARNING: no command history saved"
+		print "[WARNING] No command history saved"
 		warnings += 1
 		
 	endif	
@@ -1440,7 +1442,7 @@ function SaveFromPXP([history, procedure])
 				// timeout at 2 seconds
 				// something went wrong
 				warnings += 1
-				print "WARNING: timeout while trying to write out procedure window"
+				print "[WARNING] Timeout while trying to write out procedure window"
 				break
 			elseif(strlen(buffer)==0)
 				// this is probably fine
@@ -1615,6 +1617,7 @@ function sc_NotifyServer()
 	variable refnum
 	open /A/P=data refnum as "qdot-server.notify"
 	
+	
 	if(refnum==0)
 		// if there is not qdot-server.notify file
 		// I don't need to do anything
@@ -1624,20 +1627,20 @@ function sc_NotifyServer()
 		fprintf refnum, "\n"
 		close refnum
 	endif
-
+	
 	URLRequest /TIME=5.0 /P=data /DFIL="qdot-server.notify" url=server_url, method=post
 	if (V_flag == 0)    // No error
-        if (V_responseCode != 200)  // 200 is the HTTP OK code
-            print "New file notification failed!"
-            return 0
-        else
-            sc_DeleteNotificationFile()
-            return 1
-        endif
-    else
-        print "HTTP connection error. New file notification not attempted."
-        return 0
-    endif
+		if (V_responseCode != 200)  // 200 is the HTTP OK code
+		    print "New file notification failed!"
+		    return 0
+		else
+			sc_DeleteNotificationFile()
+			return 1
+		endif
+	else
+		print "HTTP connection error. New file notification not attempted."
+		return 0
+	endif
 
 end
 
