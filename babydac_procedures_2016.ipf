@@ -731,8 +731,10 @@ end
 function RampMultipleBD(channels, setpoint, nChannels, [ramprate, update])
 	variable setpoint, nChannels, ramprate, update
 	string channels
-	variable i, channel
+	variable i, kind
+	string channel
 	wave /t dacvalsstr = dacvalsstr
+	wave /t customdacvalstr
 	nvar numCustom
 
 	if(paramisdefault(ramprate))
@@ -745,8 +747,13 @@ function RampMultipleBD(channels, setpoint, nChannels, [ramprate, update])
 	endif
 	
 	for(i=0;i<nChannels;i+=1)
-		channel = str2num(StringFromList(i, channels, ","))
-		dacvalsstr[channel][1] = num2str(setpoint) // set new value with a string
+		channel = StringFromList(i, channels, ",")
+		kind = ChannelLookUp(channel)
+		if(kind == 0) //Not a custom channel
+			dacvalsstr[str2num(channel)][1] = num2str(setpoint) // set new value with a string
+		elseif(kind == 1) // Custom channel
+			UpdateCustom(channel,setpoint)
+		endif
 	endfor
 	UpdateMultipleBD(action="ramp", ramprate=ramprate, update = update)
 	if(numCustom > 0)
@@ -754,64 +761,120 @@ function RampMultipleBD(channels, setpoint, nChannels, [ramprate, update])
 	endif
 end
 
-function RampMultipleCustom(channels, setpoints, [ramprate, update]) //Units = mV and mV/s
-	// Ramps Custom Channels. Will only work if custom window is activated at Init!
-	// channels and setpoints are comma separeted string lists. Eg. channels = "channelx,channely", setpoints = "10,26"
-	// Channel names are case sensitive.
-	variable ramprate, update
-	string channels,setpoints
-	variable i,j, bd_channel, bd_setpoint, channel_scale, bd_output, nChannels, offset
-	string channel, moving_channel, scale_vec, offset_vec
+function ChannelLookUp(channel)
+	string channel
 	wave/t dacvalsstr
 	wave/t customdacvalstr
 	
 	if(waveexists(customdacvalstr) == 0)
-		abort "Custom channels are not supported. Re-init the BabyDAC with custom=1"
-	endif
-
-	if(paramisdefault(ramprate))
-		nvar bd_ramprate
-		ramprate = bd_ramprate    // (mV/s)
+		return 0
 	endif
 	
-	if(paramisdefault(update))
-		update = 1
-	endif
+	make/t/o/n=(dimsize(customdacvalstr,0)) testswavecustom = customdacvalstr[p][0]
+	extract/indx testswavecustom, indexwavecustom, (cmpstr(customdacvalstr[p][0], channel) == 0)
+	make/t/o/n=(dimsize(dacvalsstr,0)) testswave = dacvalsstr[p][0]
+	extract/indx testswave, indexwave, (cmpstr(dacvalsstr[p][0], channel) == 0)
 	
-	nChannels = itemsinlist(channels,",")
-	
-	for(i=0;i<nChannels;i+=1)
-		channel = StringFromList(i, channels, ",")
-		make/t/o/n=(dimsize(customdacvalstr,0)) testswave = customdacvalstr[p][0]
-		extract/indx testswave, indexwave, (cmpstr(customdacvalstr[p][0], channel) == 0)
-		if(numpnts(indexwave) > 1)
+	if(numpnts(indexwave) == 0 && numpnts(indexwavecustom) == 0)
+		abort "No channel found with the name "+channel
+	elseif(numpnts(indexwavecustom) == 0)
+		return 0
+	elseif(numpnts(indexwave) == 0)
+		if(numpnts(indexwavecustom) > 1)
 			abort "More than two Custom channels have the same name"
-		elseif(numpnts(indexwave) == 0)
-			abort "No channel found with the name "+channel
+		else
+			return 1
 		endif
-		moving_channel = stringfromlist(2,customdacvalstr[indexwave[0]][2],";")
-		moving_channel = moving_channel[2]
-		scale_vec = stringfromlist(0,customdacvalstr[indexwave[0]][2],";")
-		scale_vec = scale_vec[1,strlen(scale_vec)-2]
-		offset_vec = stringfromlist(1,customdacvalstr[indexwave[0]][2],";")
-		offset_vec = offset_vec[1,strlen(offset_vec)-2]
-		bd_setpoint = str2num(stringfromlist(i,setpoints,","))
-		for(j=0;j<itemsinlist(scale_vec,",");j=j+1)
-			channel_scale = str2num(stringfromlist(j,scale_vec,","))
-			offset = str2num(stringfromlist(j,offset_vec,","))
-			bd_output = str2num(dacvalsstr[j][1])
-			if(str2num(moving_channel) == j)
-				bd_setpoint -= offset
-			else
-				bd_setpoint -= channel_scale*(bd_output+offset)
-			endif
-		endfor
-		bd_setpoint = bd_setpoint/str2num(stringfromlist(str2num(moving_channel),scale_vec,","))
-		dacvalsstr[str2num(moving_channel)][1] = num2str(bd_setpoint) // set new values with a string
-	endfor
-	UpdateMultipleBD(action="ramp", ramprate=ramprate, update = update)
-	CalcCustomValues()
+	endif
 end
+
+function UpdateCustom(channel,setpoint)
+	string channel
+	variable setpoint
+	string moving_channel, scale_vec, offset_vec
+	variable channel_scale, offset, bd_output, j=0
+	wave/t customdacvalstr
+	wave/t dacvalsstr
+	wave indexwavecustom // updated in ChannelLookUp()
+	
+	moving_channel = stringfromlist(2,customdacvalstr[indexwavecustom[0]][2],";")
+	moving_channel = moving_channel[2]
+	scale_vec = stringfromlist(0,customdacvalstr[indexwavecustom[0]][2],";")
+	scale_vec = scale_vec[1,strlen(scale_vec)-2]
+	offset_vec = stringfromlist(1,customdacvalstr[indexwavecustom[0]][2],";")
+	offset_vec = offset_vec[1,strlen(offset_vec)-2]
+	for(j=0;j<itemsinlist(scale_vec,",");j=j+1)
+		channel_scale = str2num(stringfromlist(j,scale_vec,","))
+		offset = str2num(stringfromlist(j,offset_vec,","))
+		bd_output = str2num(dacvalsstr[j][1])
+		if(str2num(moving_channel) == j)
+			setpoint -= offset
+		else
+			setpoint -= channel_scale*(bd_output+offset)
+		endif
+	endfor
+	setpoint = setpoint/str2num(stringfromlist(str2num(moving_channel),scale_vec,","))
+	dacvalsstr[str2num(moving_channel)][1] = num2str(setpoint) // set new values with a string
+end
+
+//function RampMultipleCustom(channels, setpoints, [ramprate, update]) //Units = mV and mV/s
+//	// Ramps Custom Channels. Will only work if custom window is activated at Init!
+//	// channels and setpoints are comma separeted string lists. Eg. channels = "channelx,channely", setpoints = "10,26"
+//	// Channel names are case sensitive.
+//	variable ramprate, update
+//	string channels,setpoints
+//	variable i,j, bd_channel, bd_setpoint, channel_scale, bd_output, nChannels, offset
+//	string channel, moving_channel, scale_vec, offset_vec
+//	wave/t dacvalsstr
+//	wave/t customdacvalstr
+//	
+//	if(waveexists(customdacvalstr) == 0)
+//		abort "Custom channels are not supported. Re-init the BabyDAC with custom=1"
+//	endif
+//
+//	if(paramisdefault(ramprate))
+//		nvar bd_ramprate
+//		ramprate = bd_ramprate    // (mV/s)
+//	endif
+//	
+//	if(paramisdefault(update))
+//		update = 1
+//	endif
+//	
+//	nChannels = itemsinlist(channels,",")
+//	
+//	for(i=0;i<nChannels;i+=1)
+//		channel = StringFromList(i, channels, ",")
+//		make/t/o/n=(dimsize(customdacvalstr,0)) testswave = customdacvalstr[p][0]
+//		extract/indx testswave, indexwave, (cmpstr(customdacvalstr[p][0], channel) == 0)
+//		if(numpnts(indexwave) > 1)
+//			abort "More than two Custom channels have the same name"
+//		elseif(numpnts(indexwave) == 0)
+//			abort "No channel found with the name "+channel
+//		endif
+//		moving_channel = stringfromlist(2,customdacvalstr[indexwave[0]][2],";")
+//		moving_channel = moving_channel[2]
+//		scale_vec = stringfromlist(0,customdacvalstr[indexwave[0]][2],";")
+//		scale_vec = scale_vec[1,strlen(scale_vec)-2]
+//		offset_vec = stringfromlist(1,customdacvalstr[indexwave[0]][2],";")
+//		offset_vec = offset_vec[1,strlen(offset_vec)-2]
+//		bd_setpoint = str2num(stringfromlist(i,setpoints,","))
+//		for(j=0;j<itemsinlist(scale_vec,",");j=j+1)
+//			channel_scale = str2num(stringfromlist(j,scale_vec,","))
+//			offset = str2num(stringfromlist(j,offset_vec,","))
+//			bd_output = str2num(dacvalsstr[j][1])
+//			if(str2num(moving_channel) == j)
+//				bd_setpoint -= offset
+//			else
+//				bd_setpoint -= channel_scale*(bd_output+offset)
+//			endif
+//		endfor
+//		bd_setpoint = bd_setpoint/str2num(stringfromlist(str2num(moving_channel),scale_vec,","))
+//		dacvalsstr[str2num(moving_channel)][1] = num2str(bd_setpoint) // set new values with a string
+//	endfor
+//	UpdateMultipleBD(action="ramp", ramprate=ramprate, update = update)
+//	CalcCustomValues()
+//end
 
 ///// ACD readings /////
 
@@ -948,18 +1011,19 @@ endmacro
 function update_BabyDAC_custom(action) : ButtonControl
 	string action
 	nvar numCustom
-	variable i, check
-	string output="", channel=""
+	variable i, check, output
+	string channel=""
 	wave/t customdacvalstr
 	wave oldcustom
 	
 	for(i=0;i<numCustom;i=i+1)
 		if(str2num(customdacvalstr[i][1]) != oldcustom[i])
-			output = AddListItem(customdacvalstr[i][1],output,",",Inf)
-			channel = AddListItem(customdacvalstr[i][0],channel,",",Inf)
+			output = str2num(customdacvalstr[i][1])
+			channel = customdacvalstr[i][0]
+			RampMultipleBD(channel,output,1)
+			oldcustom[i] = str2num(customdacvalstr[i][1])
 		endif
 	endfor
-	RampMultipleCustom(channel,output)
 end
 
 function calcvectors(action) : ButtonControl
