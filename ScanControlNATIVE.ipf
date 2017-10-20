@@ -13,13 +13,15 @@
 
 function initSaveFiles([msg])
 	//// create/open any files needed to save data 
-	//// also save any global meta-data you want  
+	//// also save any global meta-data you want  	
 	
 	string msg
 	if(paramisdefault(msg)) // save meta data
 		msg=""
 	endif
 	
+	// check winfs path
+	newpath /C/O/Q winfs getExpPath("winfs", full=1) // create/overwrite winf path
 	SaveScanComments(msg=msg)
 	
 end

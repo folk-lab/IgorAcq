@@ -20,10 +20,10 @@
 //     -- use JSON format for config files (adds dependency on JSON.ipf)
 //     -- restructure WINF files to use JSON wherever possible
 //     -- update all instrument logs to use JSON
+//     -- only create WINF folder/path if using 
 
 //TODO:
 
-//     -- only create WINF path if using 
 //     -- add a new type of value to record that can/will be read during sc_sleep
 //     -- Write a RecordValuesAsync function that can parallelize instrument calls by opening multiple threads
 //     -- Use FunctionPath(functionNameStr) to find which scancontroller data type is being used
@@ -244,7 +244,6 @@ function InitScanController([srv_push])
 		abort "Data path not defined!\n"
 	endif
 	
-	newpath /C/O/Q winfs getExpPath("winfs", full=1) // create/overwrite winf path
 	newpath /C/O/Q config getExpPath("config", full=1) // create/overwrite config path
 	
 	// look for config files
@@ -1608,7 +1607,12 @@ function sc_findNewFiles(datnum)
 	string tmpname = ""
 	
 	// add the most recent scan controller config file
-	string configlist = greplist(indexedfile(config,-1,".config"),"sc")
+	
+	string configlist=""
+	getfilefolderinfo /Q/Z/P=config // check if config folder exists before looking for files
+	if(V_flag==0 && V_isFolder==1)
+		configlist = greplist(indexedfile(config,-1,".config"),"sc")
+	endif
 	if(itemsinlist(configlist)>0)
 		configlist = SortList(configlist, ";", 1+16)
 		tmpname = configpath+StringFromList(0,configlist, ";")
@@ -1688,12 +1692,16 @@ function sc_findNewFiles(datnum)
 		endfor
 	endfor
 
-	// find new winf files
+	// find new metadata files in winfs folder (if it exists)
 	extensions = ".winf;"
 	string winfstr = ""
+	idxList = ""
 	for(i=0;i<ItemsInList(extensions, ";");i+=1)
 		sprintf winfstr, "dat%d*%s", datnum, StringFromList(i, extensions, ";") // grep string
-		idxList = IndexedFile(winfs, -1, StringFromList(i, extensions, ";"))
+		getfilefolderinfo /Q/Z/P=winfs
+		if(V_flag==0 && V_isFolder==1)
+			idxList = IndexedFile(winfs, -1, StringFromList(i, extensions, ";"))
+		endif
 		if(strlen(idxList)==0)
 			continue
 		endif

@@ -1,14 +1,12 @@
 #pragma rtGlobals=1		// Use modern global access method.
 
 // Save all experiment data in native IGOR formats
-//
+
 // Waves are saved in HDF5
 // Experiments are saved as .pxp
-// meta data is dumped into HDF5 as JSON formatted text
-// 
+// meta data is dumped into HDF5 as JSON-formatted attributes
 
-// structure of h5 file
-// 
+// structure of h5 file...
 // there is a root group "/"
 // can create other groups "/GroupA"....
 // each group can contain datasets or additional groups "/GroupA/Subgroup"
