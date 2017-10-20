@@ -589,7 +589,7 @@ function /S getJSONkeys(jstr)
 		endif
 	
 		char = jstr[i]
-		if(CmpStr(jstr[i], "\"" ) == 0 && escaped == 0)
+		if(CmpStr(jstr[i], "\"" ) == 0 && escaped == 0) // found an unescaped quotation mark
 		
 			startkey = i // remember where we began this journey
 			testkey = readJSONstring(jstr[i,inf]) // get a string to test

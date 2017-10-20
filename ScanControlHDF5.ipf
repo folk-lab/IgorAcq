@@ -42,91 +42,34 @@ function /S recordedWaveArray()
 	return "["+swave[0,strlen(swave)-3]+"]"
 end
 
-function /s getExpStatus()
-	// returns JSON object full of details about the system and this run
-	nvar filenum, sweep_t_elapsed
-	svar sc_current_config
-		
-	// create header with corresponding .ibw name and date
-	string jstr = "", buffer = ""
-
-	// information about the machine your working on
-	buffer = ""
-	buffer = addJSONKeyVal(buffer, "hostname", strVal=getHostName(), addQuotes = 1)
-	string sysinfo = igorinfo(3)
-	buffer = addJSONKeyVal(buffer, "OS", strVal=StringByKey("OS", sysinfo), addQuotes = 1)
-	buffer = addJSONKeyVal(buffer, "IGOR_VERSION", strVal=StringByKey("IGORFILEVERSION", sysinfo), addQuotes = 1)
-	jstr = addJSONKeyVal(jstr, "system_info", strVal=buffer)
-
-	// information about the current experiment
-	jstr = addJSONKeyVal(jstr, "experiment", strVal=getExpPath("data")+igorinfo(1)+".pxp", addQuotes = 1)
-	jstr = addJSONKeyVal(jstr, "current_config", strVal=sc_current_config, addQuotes = 1)
-	buffer = ""
-	buffer = addJSONKeyVal(buffer, "data", strVal=getExpPath("data"), addQuotes = 1)
-	buffer = addJSONKeyVal(buffer, "winfs", strVal=getExpPath("winfs"), addQuotes = 1)
-	buffer = addJSONKeyVal(buffer, "config", strVal=getExpPath("config"), addQuotes = 1)
-	jstr = addJSONKeyVal(jstr, "paths", strVal=buffer)
+function /s json2attributes(jstr, obj_name, h5id)
+	// writes key/value pairs from jstr as attributes of "obj_name" 
+	// in the hdf5 file or group identified by h5id
+	string jstr, obj_name
+	variable h5id
 	
-	// information about this specific run
-	jstr = addJSONKeyVal(jstr, "filenum", numVal=filenum, fmtNum = "%.0f")
-	jstr = addJSONKeyVal(jstr, "time_completed", strVal=Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
-	jstr = addJSONKeyVal(jstr, "time_elapsed", numVal = sweep_t_elapsed, fmtNum = "%.3f")
-	jstr = addJSONKeyVal(jstr, "saved_waves", strVal=recordedWaveArray())
-
-	return jstr
-end
-
-function /s getWaveStatus(datname)
-	string datname
-	nvar filenum
+	make /FREE /T /N=1 str_attr = ""
+	make /FREE /N=1 num_attr = 0
 	
-	// create header with corresponding .ibw name and date
-	string jstr="", buffer="" 
+	// loop over keys
+	string keys = getJSONkeys(jstr)
+	variable j = 0, numKeys = ItemsInList(keys, ",")
+	string currentKey = "", currentVal = ""
+	string group = ""
+	for(j=0;j<numKeys;j+=1)
+		currentKey = StringFromList(j, keys, ",")
+		if(strsearch(currentKey, ":", 0)==-1)
+			currentVal = getJSONValue(jstr, currentKey) 
+			if(findJSONtype(currentVal)==3)
+				num_attr[0] = str2num(currentVal)
+				HDF5SaveData /A=currentKey num_attr, h5id, obj_name
+			else
+				str_attr[0] = currentVal
+				HDF5SaveData /A=currentKey str_attr, h5id, obj_name
+			endif
+		endif
+	endfor
 	
-	// date/time info
-	jstr = addJSONKeyVal(jstr, "wave_name", strVal=datname, addQuotes = 1)
-	jstr = addJSONKeyVal(jstr, "filenum", numVal=filenum, fmtNum = "%.0f")
-	jstr = addJSONKeyVal(jstr, "file_path", strVal=getExpPath("data")+"dat"+num2istr(filenum)+datname+".ibw", addQuotes = 1)
-
-	// wave info
-	//check if wave is 1d or 2d
-	variable dims
-	if(dimsize($datname, 1)==0)
-		dims =1
-	elseif(dimsize($datname, 1)!=0 && dimsize($datname, 2)==0)
-		dims = 2
-	else
-		dims = 3
-	endif
-	
-	if (dims==1)
-		// save some data
-		wavestats/Q $datname
-		buffer = ""
-		buffer = addJSONKeyVal(buffer, "length", numVal=dimsize($datname,0), fmtNum = "%d")
-		buffer = addJSONKeyVal(buffer, "dx", numVal=dimdelta($datname, 0))
-		buffer = addJSONKeyVal(buffer, "mean", numVal=V_avg)
-		buffer = addJSONKeyVal(buffer, "standard_dev", numVal=V_avg)
-		jstr = addJSONKeyVal(jstr, "wave_stats", strVal=buffer)
-	elseif(dims==2)
-		wavestats/Q $datname
-		buffer = ""
-		buffer = addJSONKeyVal(buffer, "columns", numVal=dimsize($datname,0), fmtNum = "%d")
-		buffer = addJSONKeyVal(buffer, "rows", numVal=dimsize($datname,1), fmtNum = "%d")
-		buffer = addJSONKeyVal(buffer, "dx", numVal=dimdelta($datname, 0))
-		buffer = addJSONKeyVal(buffer, "dy", numVal=dimdelta($datname, 1))
-		buffer = addJSONKeyVal(buffer, "mean", numVal=V_avg)
-		buffer = addJSONKeyVal(buffer, "standard_dev", numVal=V_avg)
-		jstr = addJSONKeyVal(jstr, "wave_stats", strVal=buffer)
-	else
-		jstr = addJSONKeyVal(jstr, "wave_stats", strVal="Wave dimensions > 2. How did you get this far?", addQuotes = 1)
-	endif
-	
-	svar sc_x_label, sc_y_label
-	jstr = addJSONKeyVal(jstr, "x_label", strVal=sc_x_label, addQuotes = 1)
-	jstr = addJSONKeyVal(jstr, "y_label", strVal=sc_y_label, addQuotes = 1)
-	
-	return jstr	
 end
 
 ///////////////////////////////////
@@ -149,26 +92,47 @@ function initSaveFiles([msg])
 	// Open HDF5 file
 	variable /g hdf5_id
 	HDF5CreateFile /P=data hdf5_id as h5name
-
-	// Create data array group
-	variable /G data_group_ID
-	HDF5CreateGroup hdf5_id, "data_arrays", data_group_ID
 	
-	getExpStatus()
+	// save x and y arrays
+	nvar sc_is2d
+	HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_xdata" , hdf5_id, "x_array"
+	if(sc_is2d)
+		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_ydata" , hdf5_id, "y_array"
+	endif
+	
+	// Create metadata group
+	variable /G metadata_group_ID
+	HDF5CreateGroup hdf5_id, "metadata", metadata_group_ID
+	json2attributes(getExpStatus(), "metadata", hdf5_id) // add experiment metadata
+	
+	// Create config group
+	svar sc_current_config
+	variable /G config_group_ID
+	HDF5CreateGroup hdf5_id, "config", config_group_ID
+	json2attributes(JSONfromFile("config", sc_current_config), "config", hdf5_id) // add current scancontroller config
+	
+	// Create logs group
+	svar sc_current_config
+	variable /G logs_group_ID
+	HDF5CreateGroup hdf5_id, "logs", logs_group_ID
+	json2attributes(getEquipLogs(), "logs", hdf5_id) // add current scancontroller config
 	
 end
 
 function saveSingleWave(wn)
 	// wave with name 'filename' as filename.ibw
 	string wn
-	nvar data_group_id
+	nvar hdf5_id
 
-	getWaveStatus(wn)
-
-	HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 /Z $wn , data_group_id
+	HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 /Z $wn , hdf5_id
 	if (V_flag != 0)
 		Print "HDF5SaveData failed: ", wn
+		return 0
 	endif
+	
+	 // add wave status JSON string as attribute
+	 nvar hdf5_id
+	 json2attributes(getWaveStatus(wn), wn, hdf5_id)
 end
 
 function endSaveFiles()
@@ -179,11 +143,18 @@ function endSaveFiles()
 	sprintf filenumstr, "%d", filenum
 	string /g h5name = "dat"+filenumstr+".h5"
 	
-	// close data_array group
-	nvar data_group_id
-	HDF5CloseGroup /Z data_group_id
+	// close metadata group
+	nvar metadata_group_id
+	HDF5CloseGroup /Z metadata_group_id
 	if (V_flag != 0)
-		Print "HDF5CloseGroup Failed: ", "data_arrays"
+		Print "HDF5CloseGroup Failed: ", "metadata"
+	endif
+
+	// close config group
+	nvar config_group_id
+	HDF5CloseGroup /Z config_group_id
+	if (V_flag != 0)
+		Print "HDF5CloseGroup Failed: ", "config"
 	endif
 
 	// close HDF5 file
