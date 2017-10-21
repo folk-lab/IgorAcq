@@ -360,14 +360,34 @@ function SetFieldz(output) // Units: mT
 	endif
 end
 
+function SetFieldxWait(output)
+	variable output
+	
+	SetFieldx(output)
+	do
+		sleep/s 0.1
+		GetFieldAll()
+	while (CheckMagnetRamp("l625x"))
+end
+
+function SetFieldyWait(output)
+	variable output
+	
+	SetFieldy(output)
+	do
+		sleep/s 0.1
+		GetFieldAll()
+	while (CheckMagnetRamp("l625y"))
+end
+
 function SetFieldzWait(output)
 	variable output
-	variable err=0.1
 	
 	SetFieldz(output)
 	do
 		sleep/s 0.1
-	while (abs(GetFieldz() - output) > err)
+		GetFieldAll()
+	while (CheckMagnetRamp("ips"))
 end
 
 function SetSweepRatex(output) // Units: mT/min
@@ -470,11 +490,10 @@ function SetFieldAllWait(outputx,outputy,outputz) // Units: mT
 	wave fieldwave
 	
 	SetFieldAll(outputx,outputy,outputz)
-	do // Maybe better to just look at the axis that's moving longest
+	do
 		sleep/s 0.1
 		GetFieldAll()
-		delta_all = abs(fieldwave[0] - outputx) + abs(fieldwave[1] - outputy) + abs(fieldwave[2] - outputz)
-	while (delta_all > err)
+	while (CheckMagnetRamp("l625x") || CheckMagnetRamp("l625y") || CheckMagnetRamp("ips"))
 end
 
 function SetFieldAllSphericalWait(r,theta,phi) // Units: mt,rad,rad
@@ -612,6 +631,40 @@ function TestCoordinateTransform(x,y,z)
 	print carcoordinates[0],carcoordinates[1],carcoordinates[2]
 end
 
+function CheckMagnetRamp(powersupply)
+	string powersupply
+	string answerips
+	variable answerl625, ramping
+	
+	if(cmpstr(powersupply,"ips")==0)
+		WriteVector("X",powersupply)
+		answerips = ReadVector(powersupply)
+		if(str2num(answerips[11]) == 0) //XmnAnCnHnMmnPmn
+			ramping = 0
+		else
+			ramping = 1
+		endif
+	elseif(cmpstr(powersupply,"l625x")==0)
+		answerl625 = QueryVector("OPST?",powersupply)
+		if(answerl625 == 6)
+			ramping = 0
+		else
+			ramping = 1
+		endif
+	elseif(cmpstr(powersupply,"l625y")==0)
+		answerl625 = QueryVector("OPST?",powersupply)
+		if(answerl625 == 6)
+			ramping = 0
+		else
+			ramping = 1
+		endif
+	else
+		abort "input must be: \"ips\",\"l625x\" or \"l625y\""	
+	endif
+	
+	return ramping
+end
+
 //////////////////////
 //// Control Window ////
 /////////////////////
@@ -722,13 +775,19 @@ end
 
 function update_everything(action) : ButtonControl
 	string action
-	wave fieldwave,sweepratewave,sphericalcoordinates
-	wave/t outputvalstr,sweepratevalstr,sphericalvalstr
-	variable i=0
+	wave fieldwave
 	
 	GetFieldAll()
 	GetSweeprateAll()
 	CartisiantoSpherical(fieldwave[0],fieldwave[1],fieldwave[2])
+	update_output()
+end
+
+function update_output()
+	wave fieldwave,sweepratewave,sphericalcoordinates
+	wave/t outputvalstr,sweepratevalstr,sphericalvalstr
+	variable i=0
+	
 	for(i=0;i<3;i+=1)
 		outputvalstr[i][1] = num2str(fieldwave[i])
 		sphericalvalstr[i][1] = num2str(sphericalcoordinates[i])
