@@ -360,14 +360,34 @@ function SetFieldz(output) // Units: mT
 	endif
 end
 
+function SetFieldxWait(output)
+	variable output
+	
+	SetFieldx(output)
+	do
+		sleep/s 0.1
+		GetFieldAll()
+	while (CheckMagnetRamp("l625x"))
+end
+
+function SetFieldyWait(output)
+	variable output
+	
+	SetFieldy(output)
+	do
+		sleep/s 0.1
+		GetFieldAll()
+	while (CheckMagnetRamp("l625y"))
+end
+
 function SetFieldzWait(output)
 	variable output
-	variable err=0.1
 	
 	SetFieldz(output)
 	do
 		sleep/s 0.1
-	while (abs(GetFieldz() - output) > err)
+		GetFieldAll()
+	while (CheckMagnetRamp("ips"))
 end
 
 function SetSweepRatex(output) // Units: mT/min
@@ -470,11 +490,10 @@ function SetFieldAllWait(outputx,outputy,outputz) // Units: mT
 	wave fieldwave
 	
 	SetFieldAll(outputx,outputy,outputz)
-	do // Maybe better to just look at the axis that's moving longest
+	do
 		sleep/s 0.1
 		GetFieldAll()
-		delta_all = abs(fieldwave[0] - outputx) + abs(fieldwave[1] - outputy) + abs(fieldwave[2] - outputz)
-	while (delta_all > err)
+	while (CheckMagnetRamp("l625x") || CheckMagnetRamp("l625y") || CheckMagnetRamp("ips"))
 end
 
 function SetFieldAllSphericalWait(r,theta,phi) // Units: mt,rad,rad
@@ -530,7 +549,7 @@ function/s ReadVector(powersupply)
 		VDTRead2 /O=2/T="\r" response
 	elseif(cmpstr(powersupply,"l625x")==0 || cmpstr(powersupply,"l625y")==0)
 		VDTRead2 /O=2/T="\r" response
-		response = removeAllWhitespace(response)
+		response = TrimString(response)
 		//index = strsearch(response,"\n",0)
 		//response = response[0,index-1]
 	endif
@@ -540,9 +559,9 @@ function/s ReadVector(powersupply)
 	return response
 end
 
-/////////////////
+///////////////////
 //// Utilities ////
-////////////////
+///////////////////
 
 function SphericalToCartisianTest(r,theta,phi)
 	variable r, theta, phi
@@ -610,6 +629,40 @@ function TestCoordinateTransform(x,y,z)
 	CartisiantoSpherical(x,y,z)
 	SphericalToCartisian(sphericalcoordinates[0],sphericalcoordinates[1],sphericalcoordinates[2])
 	print carcoordinates[0],carcoordinates[1],carcoordinates[2]
+end
+
+function CheckMagnetRamp(powersupply)
+	string powersupply
+	string answerips
+	variable answerl625, ramping
+	
+	if(cmpstr(powersupply,"ips")==0)
+		WriteVector("X",powersupply)
+		answerips = ReadVector(powersupply)
+		if(str2num(answerips[11]) == 0) //XmnAnCnHnMmnPmn
+			ramping = 0
+		else
+			ramping = 1
+		endif
+	elseif(cmpstr(powersupply,"l625x")==0)
+		answerl625 = QueryVector("OPST?",powersupply)
+		if(answerl625 == 6)
+			ramping = 0
+		else
+			ramping = 1
+		endif
+	elseif(cmpstr(powersupply,"l625y")==0)
+		answerl625 = QueryVector("OPST?",powersupply)
+		if(answerl625 == 6)
+			ramping = 0
+		else
+			ramping = 1
+		endif
+	else
+		abort "input must be: \"ips\",\"l625x\" or \"l625y\""	
+	endif
+	
+	return ramping
 end
 
 //////////////////////
@@ -722,13 +775,19 @@ end
 
 function update_everything(action) : ButtonControl
 	string action
-	wave fieldwave,sweepratewave,sphericalcoordinates
-	wave/t outputvalstr,sweepratevalstr,sphericalvalstr
-	variable i=0
+	wave fieldwave
 	
 	GetFieldAll()
 	GetSweeprateAll()
 	CartisiantoSpherical(fieldwave[0],fieldwave[1],fieldwave[2])
+	update_output()
+end
+
+function update_output()
+	wave fieldwave,sweepratewave,sphericalcoordinates
+	wave/t outputvalstr,sweepratevalstr,sphericalvalstr
+	variable i=0
+	
 	for(i=0;i<3;i+=1)
 		outputvalstr[i][1] = num2str(fieldwave[i])
 		sphericalvalstr[i][1] = num2str(sphericalcoordinates[i])
@@ -741,19 +800,20 @@ end
 ////////////////
 
 function/s GetVectorStatus()
-	string winfcomments=""
-	string buffer
-	sprintf buffer, "Vector Magnet:\r\tField x = %.3f mT\r\t", GetFieldx()
-	winfcomments += buffer
-	sprintf buffer, "Field y = %.3f mT\r\t", GetFieldy()
-	winfcomments += buffer
-	sprintf buffer, "Field z = %.3f mT\r\t", GetFieldz()
-	winfcomments += buffer
-	sprintf buffer, "Sweep Rate x = %.1f mT/min\r\t", GetSweepRatex()
-	winfcomments += buffer	
-	sprintf buffer, "Sweep Rate y = %.1f mT/min\r\t", GetSweepRatey()
-	winfcomments += buffer
-	sprintf buffer, "Sweep Rate z = %.1f mT/min\r", GetSweepRatez()
-	winfcomments += buffer
-	return winfcomments
+
+	string buffer = "", subbuffer = ""
+	
+	subbuffer = ""
+	subbuffer = addJSONKeyVal(subbuffer, "x", numVal=GetFieldx(), fmtNum="%.3f")
+	subbuffer = addJSONKeyVal(subbuffer, "y", numVal=GetFieldy(), fmtNum="%.3f")
+	subbuffer = addJSONKeyVal(subbuffer, "z", numVal=GetFieldz(), fmtNum="%.3f")
+	buffer = addJSONKeyVal(buffer, "field mT", strVal=subbuffer)
+
+	subbuffer = ""
+	subbuffer = addJSONKeyVal(subbuffer, "x", numVal=GetSweepRatex(), fmtNum="%.1f")
+	subbuffer = addJSONKeyVal(subbuffer, "y", numVal=GetSweepRatey(), fmtNum="%.1f")
+	subbuffer = addJSONKeyVal(subbuffer, "z", numVal=GetSweepRatez(), fmtNum="%.1f")
+	buffer = addJSONKeyVal(buffer, "rate mT/min", strVal=subbuffer)
+	
+	return addJSONKeyVal("", "Vector Magnet", strVal=buffer)
 end

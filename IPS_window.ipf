@@ -92,7 +92,7 @@ function GetCurrent() // return in A
 	wave/t magnetvalsstr=magnetvalsstr
 	NVAR ampspertesla=ampspertesla
 	variable current
-	current = QueryMagnet("R0")
+	current = str2num(QueryMagnet("R0")[1,inf])
 	magnetvalsstr[1][1] = num2str(current)
 	magnetvalsstr[0][1] = num2str(round_num(current/ampspertesla*1000,2))
 	return current
@@ -102,7 +102,7 @@ function GetField() // return in mT
 	wave/t magnetvalsstr=magnetvalsstr
 	NVAR ampspertesla=ampspertesla
 	variable current,round_field
-	current = QueryMagnet("R0")
+	current = str2num(QueryMagnet("R0")[1,inf])
 	round_field = round_num(current/ampspertesla*1000,2)
 	magnetvalsstr[0][1] = num2str(round_field)
 	magnetvalsstr[1][1] = num2str(current)
@@ -166,7 +166,7 @@ function GetSweepRate() // returns in mT/min
 	variable ramprate_amps,round_field
 	wave/t magnetvalsstr=magnetvalsstr
 	NVAR ampspertesla=ampspertesla
-	ramprate_amps = QueryMagnet("R6")
+	ramprate_amps = str2num(QueryMagnet("R6")[1,inf])
 	round_field = round_num(ramprate_amps/ampspertesla*1000,0)
 	magnetvalsstr[4][1] = num2str(round_field)
 	magnetvalsstr[5][1] = num2str(ramprate_amps)
@@ -177,7 +177,7 @@ function GetSweepRateCurrent() // returns in A/min
 	variable ramprate_amps,round_field
 	wave/t magnetvalsstr=magnetvalsstr
 	NVAR ampspertesla=ampspertesla
-	ramprate_amps = QueryMagnet("R6")
+	ramprate_amps = str2num(QueryMagnet("R6")[1,inf])
 	round_field = round_num(ramprate_amps/ampspertesla*1000,0)
 	magnetvalsstr[4][1] = num2str(round_field)
 	magnetvalsstr[5][1] = num2str(ramprate_amps)
@@ -258,22 +258,19 @@ end
 function SetFieldWait(field) // in mT
 	// Setting new set point and waiting for magnet to reach new set point
 	variable field
-	variable err = 0.06 // this should really be 0.01, but I find it gets stuck in that case --Nik
-					  // even with 0.05 it gets stuck. I changed to it 0.06 -- Mohammad
-	variable currentfield
-	variable sweeprate
-	variable sweeptime
-	//currentfield = GetField()
-	//sweeprate = GetSweepRate()
-	//sweeptime = CalcSweepTime(currentfield,field,sweeprate)
+	variable status, count = 0
+
 	SetField(field)
 	do
-		
+
 		do
-			sc_sleep(0.05)
-			currentfield = GetField()
-		while(numtype(currentfield)==2)
-	while (abs(currentfield - field) > err)
+			sc_sleep(0.02)
+			GetField() // forces the window to update
+			status = str2num(QueryMagnet("X")[11])
+		while(numtype(status)==2)
+		
+	while(status!=0)
+	
 end
 
 function CalcSweepTime(currentfield,newfield,sweeprate)
@@ -325,7 +322,7 @@ function WriteMagnetCheckResponse(command)	// Checks response for error
 	endif
 end
 
-function QueryMagnet(qstring)
+function /S QueryMagnet(qstring)
 	string qstring
 	string response
 	
@@ -334,7 +331,7 @@ function QueryMagnet(qstring)
 	if (cmpstr(response[0],"?") == 0)
 		printf "Error detected, command not executed. Command was: %s", qstring
 	endif
-	return str2num(response[1,inf])
+	return response
 end
 
 ///// User interface /////
@@ -446,11 +443,10 @@ end
 //// Status for logging ////
 
 function/s GetIPSStatus()
-	string winfcomments=""
-	string buffer
-	sprintf buffer, "Magnet:\r\tField = %.3f mT\r", GetField()
-	winfcomments += buffer
-	sprintf buffer, "\tSweep Rate = %.1f mT/min\r", GetSweepRate()
-	winfcomments += buffer	
-	return winfcomments
+	svar ips_comport
+	string buffer = ""
+	buffer = addJSONKeyVal(buffer, "field mT", numVal=GetField(), fmtNum="%.3f")
+	buffer = addJSONKeyVal(buffer, "rate mT/min", numVal=GetSweepRate(), fmtNum="%.1f")
+	buffer = addJSONKeyVal(buffer, "com_port", strVal=ips_comport, addQuotes=1)
+	return addJSONKeyVal("", "IPS", strVal = buffer)
 end`

@@ -186,8 +186,8 @@ function SetOutputAS(channel, output) // HERE!
 	return 1
 end
 
-function RampOutputAS(channel, output, [ramprate, noupdate])
-	variable channel, output,ramprate, noupdate // output is in mV, ramprate in mV/s
+function RampOutputAS(channel, output, [ramprate, update])
+	variable channel, output,ramprate, update // output is in mV, ramprate in mV/s
 	wave/t as_valsstr=as_valsstr
 	wave /t as_oldvalue=as_oldvalue
 	variable voltage, sgn, step
@@ -198,7 +198,7 @@ function RampOutputAS(channel, output, [ramprate, noupdate])
 	voltage = str2num(as_oldvalue[channel][1])
 	sgn = sign(output-voltage)
 	
-	if(noupdate)
+	if(update==0)
 		pauseupdate
 		sleeptime = 0.002 // can ramp finely if there's no updating!
 	else
@@ -222,7 +222,7 @@ function RampOutputAS(channel, output, [ramprate, noupdate])
 
 	starttime = stopmstimer(-2)
 	do
-		if(!noupdate)
+		if(update==1)
 			doupdate
 		endif
 		SetOutputAS(channel, voltage)
@@ -495,15 +495,15 @@ end
 ////// Status String for Logging ////
 
 function/s GetASStatus()
-	string winfcomments="", buffer=""
 	wave /t as_valsstr = as_valsstr
+	svar as_comport
 
-	winfcomments += "AnalogShield:\r\t"
-
+	string buffer=""
 	variable j=0
 	for(j=0;j<4;j+=1)
-		sprintf buffer, "CH%d = %s\r\t", (j), as_valsstr[j][1]
-		winfcomments+=buffer
+		buffer = addJSONKeyVal(buffer, "CH"+num2istr(j), strVal=as_valsstr[j][1])
 	endfor
-	return winfcomments
+	buffer = addJSONKeyVal(buffer, "com_port", strVal=as_comport, addQuotes=1)
+	
+	return addJSONKeyVal("", "AnalogShield", strVal = buffer)
 end

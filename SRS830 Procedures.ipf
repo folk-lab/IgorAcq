@@ -80,6 +80,13 @@ End
 
 function SetSRSAmplitude(srs,volts)
 	Variable srs,volts
+	
+	if(volts<0.0)
+		abort "are you trying to set the amplitude < 0?"
+	elseif(volts<0.004)
+		volts = 0.004
+	endif
+	
 	GPIB2 device = srs
 	GPIBWrite2 "SLVL "+num2str(volts)
 End
@@ -308,13 +315,17 @@ End
 
 function/s GetSRSStatus(srs)
 	variable srs
-	string cmd
-	string winfcomments
-	string  buffer
+	string  buffer = ""
 	
-	sprintf  winfcomments "Lock-in GPIB%d:\r\t", returnGPIBaddress(srs)
-	sprintf buffer "Amplitude = %.3f V\r\tTime Constant = %.2f ms\r\tFrequency = %.2f Hz\r\tPhase = %.2f deg\r\tSensitivity = %.4f V\r\tHarmonic = %d\r", GetSRSAmplitude(srs), GetSRSTimeConst(srs,realtime=1)*1000, GetSRSFrequency(srs), GetSRSPhase(srs), GetSRSSensitivity(srs, realsens=1), GetSRSHarmonic(srs)
+	string gpib = num2istr(returnGPIBaddress(srs))
+	buffer = addJSONKeyVal(buffer, "gpib_address", strVal=gpib)
+	
+	buffer = addJSONKeyVal(buffer, "amplitude V", numVal=GetSRSAmplitude(srs), fmtNum="%.3f")
+	buffer = addJSONKeyVal(buffer, "time_const ms", numVal= GetSRSTimeConst(srs,realtime=1)*1000, fmtNum="%.2f")
+	buffer = addJSONKeyVal(buffer, "frequency Hz", numVal= GetSRSFrequency(srs), fmtNum="%.3f")
+	buffer = addJSONKeyVal(buffer, "phase deg", numVal=GetSRSPhase(srs), fmtNum="%.2f")
+	buffer = addJSONKeyVal(buffer, "sensitivity V", numVal=GetSRSSensitivity(srs, realsens=1), fmtNum="%.4f")
+	buffer = addJSONKeyVal(buffer, "harmonic", numVal=GetSRSHarmonic(srs), fmtNum="%d")
 
-	winfcomments += buffer
-	return winfcomments
+	return addJSONKeyVal("", "SRS_"+gpib, strVal=buffer)
 end

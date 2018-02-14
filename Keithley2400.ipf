@@ -205,11 +205,12 @@ end
 
 function/s GetK2400Status(id)
 	variable id
-	string winfcomments, buffer
+	string  buffer = ""
 	
-	NI4882 ibask={id,01}
-	sprintf  winfcomments "Keithley 2400 GPIB%d:\r\t", v_flag
-	return winfcomments
+	string gpib = num2istr(returnGPIBaddress(id))
+	buffer = addJSONKeyVal(buffer, "gpib_address", strVal=gpib)
+
+	return addJSONKeyVal("", "K2400_"+gpib, strVal=buffer)
 end
 
 

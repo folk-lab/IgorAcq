@@ -1,7 +1,9 @@
 #pragma rtGlobals=1		// Use modern global access method.
 
 // Functions and interface for power supply HP6038A
-// Please run initPS() first. Pay attention to initPS(), in order to set the current limit, I use the command "iset", because the command "imax" doesn't work. But in some case, this command can cause damage to the instrument.
+// Please run initPS() first. Pay attention to initPS(), 
+//     in order to set the current limit, I use the command "iset", because the command "imax" doesn't work. 
+//     But in some case, this command can cause damage to the instrument.
 
 // Functions:
 // SetPSVol(Voltage),     RampPSVol(Voltage),     ReadPSVol()
