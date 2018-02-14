@@ -626,6 +626,7 @@ function RampOutputBD(channel, output, [ramprate, update])
 	variable voltage, sgn, step
 	variable sleeptime // seconds per ramp cycle (must be at least 0.002)
 	
+	
 	// calculate step direction
 	voltage = str2num(oldvalue[channel][1])
 	sgn = sign(output-voltage)
@@ -644,6 +645,8 @@ function RampOutputBD(channel, output, [ramprate, update])
 	if(paramisdefault(ramprate))
 		nvar bd_ramprate
 		ramprate = bd_ramprate 
+	else
+		ramprate=abs(ramprate)
 	endif
 	
 	step = ramprate*sleeptime
