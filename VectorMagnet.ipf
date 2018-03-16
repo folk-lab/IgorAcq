@@ -365,7 +365,7 @@ function SetFieldxWait(output)
 	
 	SetFieldx(output)
 	do
-		sleep/s 0.1
+		sc_sleep(0.1)
 		GetFieldAll()
 	while (CheckMagnetRamp("l625x"))
 end
@@ -375,7 +375,7 @@ function SetFieldyWait(output)
 	
 	SetFieldy(output)
 	do
-		sleep/s 0.1
+		sc_sleep(0.1)
 		GetFieldAll()
 	while (CheckMagnetRamp("l625y"))
 end
@@ -385,7 +385,7 @@ function SetFieldzWait(output)
 	
 	SetFieldz(output)
 	do
-		sleep/s 0.1
+		sc_sleep(0.1)
 		GetFieldAll()
 	while (CheckMagnetRamp("ips"))
 end
@@ -491,7 +491,7 @@ function SetFieldAllWait(outputx,outputy,outputz) // Units: mT
 	
 	SetFieldAll(outputx,outputy,outputz)
 	do
-		sleep/s 0.1
+		sc_sleep(0.1)
 		GetFieldAll()
 	while (CheckMagnetRamp("l625x") || CheckMagnetRamp("l625y") || CheckMagnetRamp("ips"))
 end
