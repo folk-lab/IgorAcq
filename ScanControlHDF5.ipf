@@ -17,7 +17,8 @@
 //// get meta data ////
 ///////////////////////
 
-function /S recordedWaveArray()
+function/S recordedWaveArray()
+	// array of recorded waves 
 	wave /T sc_RawWaveNames, sc_CalcWaveNames
 	wave sc_RawRecord, sc_CalcRecord
 	string swave=""
@@ -118,7 +119,7 @@ function initSaveFiles([msg])
 end
 
 function saveSingleWave(wn)
-	// wave with name 'filename' as filename.ibw
+	// wave with name 'filename' as filename.hd5
 	string wn
 	nvar hdf5_id
 
@@ -163,22 +164,3 @@ function endSaveFiles()
 	endif
 	
 end
-
-// these should live in the procedures for the instrument
-// that way not all of the procedures need to be loaded for this WINF thing to compile correctly
-
-//function/S GetSRSStatus(srs)
-//	variable srs
-//	string winfcomments = "", buffer = "";
-//	sprintf buffer "SRS %s:\r\tLock-in  Amplitude = %.3f V\r\tTime Constant = %.2fms\r\tFrequency = %.2fHz\r\tSensitivity=%.2fV\r\tPhase = %.2f\r", GetSRSAmplitude(srs), GetSRSTimeConstInSeconds(srs)*1000, GetSRSFrequency(srs),getsrssensitivity(srs, realsens=1), GetSRSPhase(srs)
-//	winfcomments += buffer
-//	
-//	return winfcomments
-//end
-//
-//function /S GetIPSStatus()
-//	string winfcomments = "", buffer = "";
-//	sprintf buffer, "IPS:\r\tMagnetic Field = %.4f mT\r\tSweep Rate = %.4f mT/min\r", GetField(),   GetSweepRate(); winfcomments += buffer
-//	
-//	return winfcomments
-//end
