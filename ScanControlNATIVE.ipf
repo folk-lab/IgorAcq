@@ -50,7 +50,8 @@ end
 //// save comments files ////
 /////////////////////////////
 
-function /S recordedWaveArray()
+function/S recordedWaveArray()
+	// build list of record waves
 	wave /T sc_RawWaveNames, sc_CalcWaveNames
 	wave sc_RawRecord, sc_CalcRecord
 	string swave=""
@@ -73,7 +74,7 @@ function /S recordedWaveArray()
 	return "["+swave[0,strlen(swave)-3]+"]"
 end
 
-function /S saveScanComments([msg])
+function/S saveScanComments([msg])
 	// msg can be any normal string, it will be saved as a JSON string value
 	
 	string msg
@@ -123,7 +124,8 @@ function /s str2WINF(datname, s)
 	return filename
 end
 
-function /S SaveInitialWaveComments(datname, [title, x_label, y_label, z_label, x_multiplier, y_multiplier, z_multiplier, display_thumbnail])
+function/S SaveInitialWaveComments(datname, [title, x_label, y_label, z_label, x_multiplier, y_multiplier, z_multiplier, display_thumbnail])
+	// save winf file for a wave
 	variable  x_multiplier, y_multiplier, z_multiplier
 	string datname, title, x_label, y_label, z_label, display_thumbnail
 	string buffer="", comments=""

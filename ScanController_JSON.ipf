@@ -13,7 +13,8 @@
 //// utility functions ////
 ///////////////////////////
 
-function /S numToBool(val)
+function/S numToBool(val)
+	// return string boolean from value "0" or "1"
 	variable val
 	if(val==1)
 		return "true"
@@ -25,6 +26,7 @@ function /S numToBool(val)
 end
 
 function boolToNum(str)
+	// return numerical value from string boolean
 	string str
 	if(StringMatch(LowerStr(str), "true")==1)
 		// use string match to ignore whitespace
@@ -37,6 +39,7 @@ function boolToNum(str)
 end
 
 Function/S NumericWaveToBoolArray(w)
+	// transform a numerical wave to boolean string list
 	Wave w	// numeric wave (if text, use /T here and %s below)
 	String list = "["
 	

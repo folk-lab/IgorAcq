@@ -4,6 +4,7 @@
 // Version 1.7 August 8, 2016
 // Version 1.8 XXXX X, 2017
 // Authors: Mohammad Samani, Nik Hartman & Christian Olsen
+// Full "how-to" documentation can be found here: ADD URL
 
 
 // Updates in 1.8.... This is almost certainly _not_ back-compatible with your old experiments.
@@ -31,6 +32,87 @@
 //FIX:
 //     -- NaN handling in JSON package
 
+///////////////////////////////
+//// start scan controller ////
+///////////////////////////////
+
+function InitScanController([srv_push])
+	// initscancontroller sets up all the needed global variables needed
+	// for connections to the qdot-server and other services.
+	// function calls up the main scancontroller window.
+
+	// srv_push = 1 to alert qdot-server of new data
+	variable srv_push
+	variable /g sc_srv_push
+	if(paramisdefault(srv_push) || srv_push==1)
+		sc_srv_push = 1
+	else
+		sc_srv_push = 0
+	endif
+	
+	string filelist = ""
+	string /g slack_url =  "https://hooks.slack.com/services/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" // url for slack alert
+	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
+	string /g sc_current_config = ""
+
+	string server = "10.5.254.1" // address for qdot-server
+	variable port = 7965 // port number the server is listening on
+	string /g server_url = ""
+	sprintf server_url, "http://%s:%d", server, port
+	
+	string /g sc_hostname = getHostName() // machine name
+
+	// Check if data path is definded
+	GetFileFolderInfo/Z/Q/P=data
+	if(v_flag != 0 || v_isfolder != 1)
+		abort "Data path not defined!\n"
+	endif
+	
+	newpath /C/O/Q config getExpPath("config", full=1) // create/overwrite config path
+	
+	// look for config files
+	filelist = greplist(indexedfile(config,-1,".config"),"sc")
+	
+	if(itemsinlist(filelist)>0)
+		// read content into waves
+		filelist = SortList(filelist, ";", 1+16)
+		sc_loadconfig(StringFromList(0,filelist, ";"))
+	else
+		// These arrays should have the same size. Their indeces correspond to each other.
+		make/t/o sc_RawWaveNames = {"g1x", "g1y"} // Wave names to be created and saved
+		make/o sc_RawRecord = {0,0} // Whether you want to record and save the data for this wave
+		make/o sc_RawPlot = {0,0} // Whether you want to record and save the data for this wave
+		make/t/o sc_RequestScripts = {"", ""}
+		make/t/o sc_GetResponseScripts = {"getg1x()", "getg1y()"}
+		// End of same-size waves
+		
+		// And these waves should be the same size too
+		make/t/o sc_CalcWaveNames = {"", ""} // Calculated wave names
+		make/t/o sc_CalcScripts = {"",""} // Scripts to calculate stuff
+		make/o sc_CalcRecord = {0,0} // Include this calculated field or not
+		make/o sc_CalcPlot = {0,0} // Include this calculated field or not
+		// end of same-size waves
+		
+		// default colormap
+		string /g sc_ColorMap = "Grays"
+		
+		// Print variables
+		variable/g sc_PrintRaw = 1,sc_PrintCalc = 1
+		
+		// logging string
+		string /g sc_LogStr = "GetSRSStatus(srs1);"
+			
+		nvar filenum
+		if (numtype(filenum) == 2)
+			print "Initializing FileNum to 0 since it didn't exist before.\n"
+			variable /g filenum=0
+		else
+			printf "Current FileNum is %d\n", filenum
+		endif
+	endif
+	
+	sc_rebuildwindow()
+end
 
 ///////////////////////////////
 ////// utility functions //////
@@ -42,6 +124,7 @@ function unixtime()
 end
 
 function AppendValue(thewave, thevalue)
+	// append a value to an existing numerical wave
 	wave thewave
 	variable thevalue
 	Redimension /N=(numpnts(thewave)+1) thewave
@@ -49,6 +132,7 @@ function AppendValue(thewave, thevalue)
 end
 
 function AppendString(thewave, thestring)
+	// append a value to an existing string wave
 	wave/t thewave
 	string thestring
 	Redimension /N=(numpnts(thewave)+1) thewave
@@ -59,6 +143,7 @@ end
 // use TrimString() instead
 
 Function/S RemoveLeadingWhitespace(str)
+	// removes leading whitespaces
     String str
  
     if (strlen(str) == 0)
@@ -78,6 +163,7 @@ Function/S RemoveLeadingWhitespace(str)
 End
  
 Function/S RemoveTrailingWhitespace(str)
+	// remove trailing whitespaces
     String str
  
     if (strlen(str) == 0)
@@ -212,89 +298,14 @@ function /S getExpPath(whichpath, [full])
 	endswitch
 end
 
-///////////////////////////////
-//// start scan controller ////
-///////////////////////////////
-
-function InitScanController([srv_push])
-	// srv_push = 1 to alert qdot-server of new data
-	variable srv_push
-	variable /g sc_srv_push
-	if(paramisdefault(srv_push) || srv_push==1)
-		sc_srv_push = 1
-	else
-		sc_srv_push = 0
-	endif
-	
-	string filelist = ""
-	string /g slack_url =  "https://hooks.slack.com/services/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" // url for slack alert
-	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
-	string /g sc_current_config = ""
-
-	string server = "10.5.254.1" // address for qdot-server
-	variable port = 7965 // port number the server is listening on
-	string /g server_url = ""
-	sprintf server_url, "http://%s:%d", server, port
-	
-	string /g sc_hostname = getHostName() // machine name
-
-	// Check if data path is definded
-	GetFileFolderInfo/Z/Q/P=data
-	if(v_flag != 0 || v_isfolder != 1)
-		abort "Data path not defined!\n"
-	endif
-	
-	newpath /C/O/Q config getExpPath("config", full=1) // create/overwrite config path
-	
-	// look for config files
-	filelist = greplist(indexedfile(config,-1,".config"),"sc")
-	
-	if(itemsinlist(filelist)>0)
-		// read content into waves
-		filelist = SortList(filelist, ";", 1+16)
-		sc_loadconfig(StringFromList(0,filelist, ";"))
-	else
-		// These arrays should have the same size. Their indeces correspond to each other.
-		make/t/o sc_RawWaveNames = {"g1x", "g1y"} // Wave names to be created and saved
-		make/o sc_RawRecord = {0,0} // Whether you want to record and save the data for this wave
-		make/o sc_RawPlot = {0,0} // Whether you want to record and save the data for this wave
-		make/t/o sc_RequestScripts = {"", ""}
-		make/t/o sc_GetResponseScripts = {"getg1x()", "getg1y()"}
-		// End of same-size waves
-		
-		// And these waves should be the same size too
-		make/t/o sc_CalcWaveNames = {"", ""} // Calculated wave names
-		make/t/o sc_CalcScripts = {"",""} // Scripts to calculate stuff
-		make/o sc_CalcRecord = {0,0} // Include this calculated field or not
-		make/o sc_CalcPlot = {0,0} // Include this calculated field or not
-		// end of same-size waves
-		
-		// default colormap
-		string /g sc_ColorMap = "Grays"
-		
-		// Print variables
-		variable/g sc_PrintRaw = 1,sc_PrintCalc = 1
-		
-		// logging string
-		string /g sc_LogStr = "GetSRSStatus(srs1);"
-			
-		nvar filenum
-		if (numtype(filenum) == 2)
-			print "Initializing FileNum to 0 since it didn't exist before.\n"
-			variable /g filenum=0
-		else
-			printf "Current FileNum is %d\n", filenum
-		endif
-	endif
-	
-	sc_rebuildwindow()
-end
-
 /////////////////////////////
 //// configuration files ////
 /////////////////////////////
 
 function /S sc_createconfig()
+	// creates a new configuration file.
+	// config files holds the content of the scancontroller window.
+	// using config files lets you rebuild a scancontroller window after a restart.
 	wave/t sc_RawWaveNames
 	wave sc_RawRecord
 	wave sc_RawPlot
@@ -358,6 +369,7 @@ function /S sc_createconfig()
 end
 
 function sc_loadconfig(configfile)
+	// load an exsisting config file for rebuilding the scancontroller window
 	string configfile
 	variable refnum
 	string loadcontainer
@@ -405,58 +417,13 @@ end
 //// main window ////
 /////////////////////
 
-
 function sc_rebuildwindow()
 	dowindow /k ScanController
 	execute("ScanController()")
 end
 
-// In order to enable or disable a wave
-// call these two functions instead of messing with the waves sc_RawRecord and sc_CalcRecord directly
-function EnableScanControllerItem(wn)
-	string wn
-	ChangeScanControllerItemStatus(wn, 1)
-end
-
-function DisableScanControllerItem(wn)
-	string wn
-	ChangeScanControllerItemStatus(wn, 0)
-end
-
-function ChangeScanControllerItemStatus(wn, ison)
-	string wn
-	variable ison
-	string cmd
-	wave sc_RawRecord, sc_CalcRecord
-	wave /t sc_RawWaveNames, sc_CalcWaveNames
-	variable i=0, done=0
-	do
-		if (stringmatch(sc_RawWaveNames[i], wn))
-			sc_RawRecord[i]=ison
-			cmd = "CheckBox sc_RawRecordCheckBox" + num2istr(i) + " value=" + num2istr(ison)
-			execute(cmd)
-			done=1
-		endif
-		i+=1
-	while (i<numpnts( sc_RawWaveNames ) && !done)
-
-	i=0
-	do
-		if (stringmatch(sc_CalcWaveNames[i], wn))
-			sc_CalcRecord[i]=ison
-			cmd = "CheckBox sc_CalcRecordCheckBox" + num2istr(i) + " value=" + num2istr(ison)
-			execute(cmd)	
-		endif
-		i+=1
-	while (i<numpnts( sc_CalcWaveNames ) && !done)
-
-	if (!done) 
-		print "Error: Could not find the wave name specified."
-	endif
-	execute("doupdate")
-end
-
-Window ScanController() : Panel
+window ScanController() : Panel
+	// build the main scancontroller window
 	variable sc_InnerBoxW = 660, sc_InnerBoxH = 32, sc_InnerBoxSpacing = 2
 
 	if (numpnts(sc_RawWaveNames) != numpnts(sc_RawRecord) ||  numpnts(sc_RawWaveNames) != numpnts(sc_RequestScripts) ||  numpnts(sc_RawWaveNames) != numpnts(sc_GetResponseScripts))
@@ -552,9 +519,12 @@ Window ScanController() : Panel
 	
 	//Update button
 	button updatebutton, pos={550,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_updatewindow,title="Update"
-EndMacro
+endMacro
+
+//// scancontroller support functions ////
 
 function sc_killgraphs(action) : Buttoncontrol
+	// close all graphs and control windows
 	string action
 	string opengraphs
 	variable ii
@@ -565,12 +535,12 @@ function sc_killgraphs(action) : Buttoncontrol
 			killwindow $stringfromlist(ii,opengraphs)	
 		endfor
 	endif
-	sc_controlwindows("") // Kill all open control windows
+	sc_controlwindows("") // close all open control windows
 end
 
 function sc_updatewindow(action) : ButtonControl
+	// Write a new config file
 	string action
-	// Write (or overwrite) a config file
 	sc_createconfig()
 end
 
@@ -605,6 +575,7 @@ function sc_addrow(action) : ButtonControl
 end
 
 function sc_removerow(action) : Buttoncontrol
+	// remove a row in the scancontroller window
 	string action
 	wave/t sc_RawWaveNames=sc_RawWaveNames
 	wave sc_RawRecord=sc_RawRecord 
@@ -642,8 +613,8 @@ function sc_removerow(action) : Buttoncontrol
 	sc_rebuildwindow()
 end
 
-// Update after checkbox clicked
-function sc_CheckboxClicked(ControlName, Value)
+function sc_CheckboxClicked(ControlName, value)
+	// update control waves based on check boxes in the scancontroller window
 	string ControlName
 	variable value
 	string indexstring
@@ -679,6 +650,9 @@ function sc_CheckboxClicked(ControlName, Value)
 end
 
 function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_label])
+	// initializewaves are called at the begining of every measurement to set up
+	// the waves needed for data storage and for opening the plots requested.
+	// this function is one of the three main functions called in any measurement!
 	variable start, fin, numpts, starty, finy, numptsy
 	string x_label, y_label
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
@@ -964,7 +938,7 @@ end
 /////////////////////////////
 
 window abortmeasurementwindow() : Panel
-	//Silent 1 // building window
+	// build abort measurement window used to abort or puase a measurement
 	NewPanel /W=(500,700,870,750) /N=SweepControl// window size
 	ModifyPanel frameStyle=2
 	ModifyPanel fixedSize=1
@@ -1008,6 +982,7 @@ function resumesweep(action) : Buttoncontrol
 end
 
 function sc_checksweepstate()
+	// checks the state of the three buttons: "Abort", "Abort and Save" and "Pause"
 	nvar sc_abortsweep, sc_pause, sc_abortnosave
 	if (GetKeyState(0) & 32)
 			// If the ESC button is pressed during the scan, save existing data and stop the scan.
@@ -1053,7 +1028,7 @@ end
 
 function sc_sleep(delay)
 	// sleep for delay seconds
-	// checks for keyboard interrupts in mstimer loop
+	// checks for changes to the abort/pause window in mstimer loop
 	variable delay
 	delay = delay*1e6 // convert to microseconds
 	variable start_time = stopMStimer(-2) // start the timer immediately
@@ -1071,6 +1046,7 @@ end
 /////////////////////////////
  	
 function RecordValues(i, j, [scandirection, readvstime, fillnan])
+	// record values must be called every time data needs to be acquired.
 	// In a 1d scan, i is the index of the loop. j will be ignored.
 	// In a 2d scan, i is the index of the outer (slow) loop, and j is the index of the inner (fast) loop. 
 
@@ -1204,7 +1180,6 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 	
 	// check abort/pause status
 	sc_checksweepstate()
-	
 end
 
 ////////////////////////
@@ -1212,6 +1187,7 @@ end
 ////////////////////////
 
 function /s getEquipLogs()
+	// build the json string containing the returns from functions in "Logging functions".
 	string buffer = ""
 	svar sc_LogStr
 	
@@ -1273,6 +1249,7 @@ function /s getExpStatus()
 end
 
 function /s getWaveStatus(datname)
+	// build meta data file for a wave
 	string datname
 	nvar filenum
 	
@@ -1329,6 +1306,7 @@ function saveExp()
 end
 
 function SaveWaves([msg, save_experiment])
+	// savewaves are called at the end of each measurement in order to save all the collected data and meta data.
 	// the message will be printed in the history, and will be saved in the winf file corresponding to this scan
 	// save_experiment=1 to save the experiment file
 	// srv_push=1 to alert qdot-server of new data
@@ -1444,7 +1422,6 @@ function SaveWaves([msg, save_experiment])
 		endSaveFiles()
 		filenum+=1
 	endif
-	
 end
 
 function SaveFromPXP([history, procedure])
@@ -1601,6 +1578,7 @@ end
 ////////////////////////
 
 function sc_findNewFiles(datnum)
+	// build the notifier file used to notify the qdot-server when new files are avaliable
 	variable datnum
 	variable refNum
 	nvar sc_save_exp
@@ -1755,6 +1733,7 @@ function sc_findNewFiles(datnum)
 end
 
 function sc_NotifyServer()
+	// notify the qdot-server that there are new data files to fetch
 	svar server_url
 	
 	variable refnum
@@ -1884,6 +1863,8 @@ end
 ////////////////////////
 
 function sc_testreadtime(numpts, delay) //Units: s
+	// estimates the time it takes to read all the parameters currently set in the
+	// scancontroller window
 	variable numpts, delay
 
 	InitializeWaves(0, numpts, numpts, x_label="index")
@@ -1897,4 +1878,54 @@ function sc_testreadtime(numpts, delay) //Units: s
 	printf "each sc_sleep(...) + RecordValues(...) call takes ~%.1fms \n", ttotal/numpts*1000
 	
 	sc_controlwindows("") // kill sweep control windows
+end
+
+
+//////////////////////
+////// obsolete //////
+//////////////////////
+
+// In order to enable or disable a wave
+// call these two functions instead of messing with the waves sc_RawRecord and sc_CalcRecord directly
+function EnableScanControllerItem(wn)
+	string wn
+	ChangeScanControllerItemStatus(wn, 1)
+end
+
+function DisableScanControllerItem(wn)
+	string wn
+	ChangeScanControllerItemStatus(wn, 0)
+end
+
+function ChangeScanControllerItemStatus(wn, ison)
+	string wn
+	variable ison
+	string cmd
+	wave sc_RawRecord, sc_CalcRecord
+	wave /t sc_RawWaveNames, sc_CalcWaveNames
+	variable i=0, done=0
+	do
+		if (stringmatch(sc_RawWaveNames[i], wn))
+			sc_RawRecord[i]=ison
+			cmd = "CheckBox sc_RawRecordCheckBox" + num2istr(i) + " value=" + num2istr(ison)
+			execute(cmd)
+			done=1
+		endif
+		i+=1
+	while (i<numpnts( sc_RawWaveNames ) && !done)
+
+	i=0
+	do
+		if (stringmatch(sc_CalcWaveNames[i], wn))
+			sc_CalcRecord[i]=ison
+			cmd = "CheckBox sc_CalcRecordCheckBox" + num2istr(i) + " value=" + num2istr(ison)
+			execute(cmd)	
+		endif
+		i+=1
+	while (i<numpnts( sc_CalcWaveNames ) && !done)
+
+	if (!done) 
+		print "Error: Could not find the wave name specified."
+	endif
+	execute("doupdate")
 end
