@@ -688,7 +688,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	string /g sc_x_label, sc_y_label
 	variable /g sc_is2d, sc_scanstarttime = datetime
 	variable /g sc_startx, sc_finx, sc_numptsx, sc_starty, sc_finy, sc_numptsy
-	variable/g sc_abortsweep=0, sc_pause=0
+	variable/g sc_abortsweep=0, sc_pause=0, sc_abortnosave=0
 	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, activegraphs="", cmd1="",window_string=""
 	string cmd2=""
 	variable index, graphopen, graphopen2d
@@ -965,21 +965,29 @@ end
 
 window abortmeasurementwindow() : Panel
 	//Silent 1 // building window
-	NewPanel /W=(500,700,750,750) /N=SweepControl// window size
+	NewPanel /W=(500,700,870,750) /N=SweepControl// window size
 	ModifyPanel frameStyle=2
 	ModifyPanel fixedSize=1
 	SetDrawLayer UserBack
 	Button pausesweep, pos={10,15},size={110,20},proc=pausesweep,title="Pause"
-	Button stopsweep, pos={130,15},size={110,20},proc=stopsweep,title="Abort"
+	Button stopsweep, pos={130,15},size={110,20},proc=stopsweep,title="Abort and Save"
+	Button stopsweepnosave, pos={250,15},size={110,20},proc=stopsweep,title="Abort"
 	DoUpdate /W=SweepControl /E=1
 endmacro
 
 function stopsweep(action) : Buttoncontrol
 	string action
-	nvar sc_abortsweep
+	nvar sc_abortsweep,sc_abortnosave
 	
-	sc_abortsweep = 1
-end 
+	strswitch(action)
+		case "stopsweep":
+			sc_abortsweep = 1
+			break
+		case "stopsweepnosave":
+			sc_abortnosave = 1
+			break
+	endswitch
+end 	
 
 function pausesweep(action) : Buttoncontrol
 	string action
@@ -1000,7 +1008,7 @@ function resumesweep(action) : Buttoncontrol
 end
 
 function sc_checksweepstate()
-	nvar sc_abortsweep, sc_pause
+	nvar sc_abortsweep, sc_pause, sc_abortnosave
 	if (GetKeyState(0) & 32)
 			// If the ESC button is pressed during the scan, save existing data and stop the scan.
 			SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0)
@@ -1012,7 +1020,16 @@ function sc_checksweepstate()
 			SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0)
 			dowindow /k SweepControl
 			sc_abortsweep=0
+			sc_abortnosave=0
+			sc_pause=0
 			abort "Measurement aborted by user"
+		elseif(sc_abortnosave)
+			// Abort measurement without saving anything!
+			dowindow /k SweepControl
+			sc_abortnosave = 0
+			sc_abortsweep = 0
+			sc_pause=0
+			abort "Measurement aborted by user. Data NOT saved!"
 		elseif(sc_pause)
 			// Pause sweep if button is pressed
 			do
@@ -1020,7 +1037,15 @@ function sc_checksweepstate()
 					SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0)
 					dowindow /k SweepControl
 					sc_abortsweep=0
+					sc_abortnosave=0
+					sc_pause=0
 					abort "Measurement aborted by user"
+				elseif(sc_abortnosave)
+					dowindow /k SweepControl
+					sc_abortsweep=0
+					sc_abortnosave=0
+					sc_pause=0
+					abort "Measurement aborted by user. Data NOT saved!"
 				endif
 			while(sc_pause)
 	endif
