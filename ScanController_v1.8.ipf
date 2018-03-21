@@ -1186,6 +1186,8 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 												     // let it fail hard otherwise
 												     
 				// Allow the use of the keyword '[i]' in calculated fields where i is the inner loop's current index
+				// If script does not contains "[i]" add it
+				script = construct_calc_script(script)
 				script = ReplaceString("[i]", script, "["+num2istr(innerindex)+"]")
 				sprintf cmd, "%s = %s", "sc_tmpVal", script
 				execute(cmd)
@@ -1205,6 +1207,29 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 	// check abort/pause status
 	sc_checksweepstate()
 	
+end
+
+function/s construct_calc_script(script)
+	// adds "[i]" to calculation scripts
+	string script
+	string test_wave
+	variable i=0, j=0, strpos
+	wave/t sc_RawWaveNames
+	
+	for(i=0;i<numpnts(sc_RawWaveNames);i+=1)
+		j=0
+		test_wave = sc_RawWaveNames[i]
+		do
+			strpos = strsearch(script,test_wave,j)
+			if(strpos >= 0 && cmpstr(script[strpos+strlen(test_wave)],"[")==0)
+				//do nothing
+			elseif(strpos >= 0)
+				script[strpos+strlen(test_wave)] = "[i]"
+			endif
+			j=strpos+strlen(test_wave)
+		while(strpos >= 0)
+	endfor
+	return script
 end
 
 ////////////////////////
