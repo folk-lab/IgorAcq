@@ -682,7 +682,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	variable start, fin, numpts, starty, finy, numptsy
 	string x_label, y_label
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
-	wave /T sc_RawWaveNames, sc_CalcWaveNames, sc_RequestScripts, sc_GetResponseScripts
+	wave /T sc_RawWaveNames, sc_CalcWaveNames, sc_RequestScripts, sc_GetResponseScripts, sc_CalcScripts
 	variable i=0, j=0
 	string cmd = "", wn = "", wn2d="", s, script = "", script0 = "", script1 = ""
 	string /g sc_x_label, sc_y_label
@@ -799,8 +799,9 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 				cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn2d; execute(cmd)
 				cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
 			endif			
-			
 		endif
+		// Add "[i]" to calculation scripts if needed
+		sc_CalcScripts[i] = construct_calc_script(sc_CalcScripts[i])
 		i+=1
 	while (i<numpnts(sc_CalcWaveNames))
 	
@@ -1186,8 +1187,6 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 												     // let it fail hard otherwise
 												     
 				// Allow the use of the keyword '[i]' in calculated fields where i is the inner loop's current index
-				// If script does not contains "[i]" add it
-				script = construct_calc_script(script)
 				script = ReplaceString("[i]", script, "["+num2istr(innerindex)+"]")
 				sprintf cmd, "%s = %s", "sc_tmpVal", script
 				execute(cmd)
