@@ -23,7 +23,7 @@ function SetK2400Current(curr,id) //Units: nA
 	variable curr, id
 	string cmd
 	
-	sprintf cmd, ":sour:func \"curr\";:sour:curr:mode fix;:sour:curr:lev %.10f", curr*1e-9
+	sprintf cmd, ":sour:func curr;:sour:curr:mode fix;:sour:curr:lev %.10f", curr*1e-9
 	WriteK2400(cmd,id)
 end
 
@@ -31,7 +31,7 @@ function SetK2400Voltage(volt,id) // Units: mV
 	variable volt, id
 	string cmd
 	
-	sprintf cmd, ":sour:func \"volt\";:sour:volt:mode fix;:sour:volt:lev %.10f", volt*1e-3
+	sprintf cmd, ":sour:func volt;:sour:volt:mode fix;:sour:volt:lev %.10f", volt*1e-3
 	WriteK2400(cmd,id)
 end
 
