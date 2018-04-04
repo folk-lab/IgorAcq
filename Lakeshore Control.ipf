@@ -12,6 +12,7 @@
 // GetHeaterPowerDB()
 // GetPressureDB()
 // QueryDB()
+// Change LS timing loop for temperature control, add it to SetControlMode()
 // Add support for BF #2
 
 ////////////////////////////
