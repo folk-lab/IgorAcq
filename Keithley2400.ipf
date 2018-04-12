@@ -1,7 +1,7 @@
 #pragma rtGlobals=1		// Use modern global access method
 
 // Keithley 2400 driver
-// Initiate a Keithley 2400 by calling InitK2400, pass id and GPIB adresse.
+// Initiate using general gpib init function.
 // Voltages are in mV and Currents in nA
 // By Christian Olsen, 2016-10-19
 
@@ -163,6 +163,26 @@ function K2400Output(onoff,id) // "on" or "off"
 			break
 		default:
 			abort "Pass \"on\" or \"off\""
+			break
+	endswitch
+end
+
+function K2400AutoRange(onoff,voltcurr,id) // Turn autorange on/off
+	string onoff, voltcurr
+	variable id
+	string cmd
+	
+	strswitch(voltcurr)
+		case "volt":
+			sprintf cmd, "sour:volt:rang:auto %s", onoff
+			WriteK2400(cmd,id)
+			break
+		case "curr":
+			sprintf cmd, "sour:curr:rang:auto %s", onoff
+			WriteK2400(cmd,id)
+			break
+		default:
+			abort "Pass \"volt\" or \"curr\""
 			break
 	endswitch
 end
