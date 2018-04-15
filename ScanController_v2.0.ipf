@@ -3,7 +3,15 @@
 // Scan Controller routines for 1d and 2d scans
 // Version 1.7 August 8, 2016
 // Version 1.8 XXXX X, 2017
+// Version 2.0 May, 2018
 // Authors: Mohammad Samani, Nik Hartman & Christian Olsen
+
+// Updates in 2.0:
+// 	-- Async functionallity is now nativly supported by scancontroller.
+//		-- All drivers now uses the VISA xop, as it is the only one supporting multiple threads.
+//			Therefore VDT and GPIB xop's should not be used anymore.
+//		-- "Request scripts" are removed from the scancontroller window. Its only use was
+//			trying to do async communication (badly).
 
 
 // Updates in 1.8.... This is almost certainly _not_ back-compatible with your old experiments.
@@ -25,7 +33,6 @@
 //TODO:
 
 //     -- add a new type of value to record that can/will be read during sc_sleep
-//     -- Write a RecordValuesAsync function that can parallelize instrument calls by opening multiple threads
 //     -- Use FunctionPath(functionNameStr) to find which scancontroller data type is being used
 
 //FIX:
@@ -258,7 +265,7 @@ function InitScanController([srv_push])
 		make/t/o sc_RawWaveNames = {"g1x", "g1y"} // Wave names to be created and saved
 		make/o sc_RawRecord = {0,0} // Whether you want to record and save the data for this wave
 		make/o sc_RawPlot = {0,0} // Whether you want to record and save the data for this wave
-		make/t/o sc_RequestScripts = {"", ""}
+		//make/t/o sc_RequestScripts = {"", ""}
 		make/t/o sc_GetResponseScripts = {"getg1x()", "getg1y()"}
 		// End of same-size waves
 		
@@ -268,6 +275,8 @@ function InitScanController([srv_push])
 		make/o sc_CalcRecord = {0,0} // Include this calculated field or not
 		make/o sc_CalcPlot = {0,0} // Include this calculated field or not
 		// end of same-size waves
+		
+		make/t/o sc_AsyncRecord = {""}
 		
 		// default colormap
 		string /g sc_ColorMap = "Grays"
@@ -459,8 +468,8 @@ end
 Window ScanController() : Panel
 	variable sc_InnerBoxW = 660, sc_InnerBoxH = 32, sc_InnerBoxSpacing = 2
 
-	if (numpnts(sc_RawWaveNames) != numpnts(sc_RawRecord) ||  numpnts(sc_RawWaveNames) != numpnts(sc_RequestScripts) ||  numpnts(sc_RawWaveNames) != numpnts(sc_GetResponseScripts))
-		print "sc_RawWaveNames, sc_RawRecord, sc_RequestScripts, and sc_GetResponseScripts waves should have the number of elements.\nGo to the beginning of InitScanController() to fix this.\n"
+	if (numpnts(sc_RawWaveNames) != numpnts(sc_RawRecord) ||  numpnts(sc_RawWaveNames) != numpnts(sc_GetResponseScripts))
+		print "sc_RawWaveNames, sc_RawRecord, and sc_GetResponseScripts waves should have the number of elements.\nGo to the beginning of InitScanController() to fix this.\n"
 		abort
 	endif
 
@@ -483,24 +492,19 @@ Window ScanController() : Panel
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 200,29,"Plot"
 	SetDrawEnv fsize= 16,fstyle= 1
-	DrawText 250,29,"Request Script (Optional)"
-	SetDrawEnv fsize= 16,fstyle= 1
-	DrawText 460,29,"Get Response Script"
+	DrawText 250,29,"Get Response Script"
 
 	string cmd = ""
 	variable i=0
 	do
 		DrawRect 9,30+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing),5+sc_InnerBoxW,30+sc_InnerBoxH+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)
-		//DrawText 13,54+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing), sc_RawWaveNames[i]
 		cmd="SetVariable sc_RawWaveNameBox" + num2istr(i) + " pos={13, 37+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={110, 0}, fsize=14, title=\" \", value=sc_RawWaveNames[i]"
 		execute(cmd)
 		cmd="CheckBox sc_RawRecordCheckBox" + num2istr(i) + ", proc=sc_CheckBoxClicked, pos={150,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_RawRecord[i]) + " , title=\"\""
 		execute(cmd)
 		cmd="CheckBox sc_RawPlotCheckBox" + num2istr(i) + ", proc=sc_CheckBoxClicked, pos={210,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_RawPlot[i]) + " , title=\"\""
 		execute(cmd)
-		cmd="SetVariable sc_RequestScriptBox" + num2istr(i) + " pos={250, 37+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={200, 0}, fsize=14, title=\" \", value=sc_RequestScripts[i]"
-		execute(cmd)
-		cmd="SetVariable sc_GetResponseScriptBox" + num2istr(i) + " pos={460, 37+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={200, 0}, fsize=14, title=\" \", value=sc_GetResponseScripts[i]"
+		cmd="SetVariable sc_GetResponseScriptBox" + num2istr(i) + " pos={250, 37+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={410, 0}, fsize=14, title=\" \", value=sc_GetResponseScripts[i]"
 		execute(cmd)		
 		i+=1
 	while (i<numpnts( sc_RawWaveNames ))
@@ -1083,11 +1087,12 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 	
 	variable i, j, scandirection, readvstime, fillnan
 	nvar sc_is2d, sc_startx, sc_finx, sc_numptsx, sc_starty, sc_finy, sc_numptsy
-	variable ii = 0, jj=0
-	wave /t sc_RawWaveNames, sc_RequestScripts, sc_GetResponseScripts, sc_CalcWaveNames, sc_CalcScripts
+	variable ii = 0, jj=0, k=0
+	wave/t sc_RawWaveNames, sc_GetResponseScripts, sc_CalcWaveNames, sc_CalcScripts
+	wave/t sc_AsyncRecord
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
 	string script = "",cmd = "", wstr = ""
-	variable innerindex, outerindex
+	variable innerindex, outerindex, tgID
 	nvar sc_abortsweep, sc_pause,sc_scanstarttime
 	variable /g sc_tmpVal
 	
@@ -1122,31 +1127,46 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 		abort "NOT IMPLEMENTED: Read vs Time is currently only supported for 1D sweeps."
 	endif
 	
-	//// Send requests to machines ////
-	if(fillnan == 0)
-		do
-			if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
-				jj=0;
-				script = sc_RequestScripts[ii];
-				if (cmpstr(script, ""))
-					execute(script)
+	//// Setup and run async data collection ////
+	ii=0
+	k=0
+	do
+		if(strsearch(sc_GetResponseScripts[ii],"_async",0) > 0 && sc_RawRecord[ii] == 1 || strsearch(sc_GetResponseScripts[ii],"_async",0) > 0 && sc_RawPlot[ii] == 1)
+			if(fillnan == 0)
+				redimension /n=(numpnts(sc_AsyncRecord)+1) sc_AsyncRecord
+				sc_AsyncRecord[numpnts(sc_AsyncRecord)-1] = sc_GetResponseScripts[ii]
+				k+=1
+			elseif(fillnan == 1)
+				wave wref1d = $sc_RawWaveNames[ii]
+				wref1d[innerindex] = nan
+			
+				if (sc_is2d)
+					// 2D Wave
+					wave wref2d = $sc_RawWaveNames[ii] + "2d"
+					wref2d[innerindex][outerindex] = sc_tmpval
 				endif
 			endif
-			ii+=1
-		while (ii < numpnts(sc_RawWaveNames))
-	endif
+		endif
+		ii+=1
+	while(ii < numpnts(sc_RawWaveNames))
 	
-	//// Read responses from machines ////
+	if(k>0)
+		tgID = sc_StartThreads(k) //Startup and run function calls on mulitple threads, returns the thread group id.
+		sc_CollectDataFromThreads(tgID,k,readvstime,innerindex,outerindex) //Retrive data from threads when they are done.
+		sc_KillThreads(tgID) //Terminate threads.
+	endif
+
+	//// Read sync responses from machines if there are any ////
 	ii=0
 	cmd = ""
 	do
-		if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
+		if (strsearch(sc_GetResponseScripts[ii],"_async",0) == -1 && sc_RawRecord[ii] == 1 || strsearch(sc_GetResponseScripts[ii],"_async",0) == -1 && sc_RawPlot[ii] == 1)
 			wave wref1d = $sc_RawWaveNames[ii]
 			
 			// Redimension waves if readvstime is set to 1
 			if (readvstime == 1)
-				redimension /n=(innerindex+1) $sc_RawWaveNames[ii]
-				setscale/I x 0,  datetime - sc_scanstarttime, $sc_RawWaveNames[ii]
+				redimension /n=(innerindex+1) wref1d
+				setscale/I x 0,  datetime - sc_scanstarttime, wref1d
 			endif
 			
 			if(fillnan == 0)
@@ -1162,7 +1182,7 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 			if (sc_is2d)
 				// 2D Wave
 				wave wref2d = $sc_RawWaveNames[ii] + "2d"
-				wref2d[innerindex][outerindex] = sc_tmpval
+				wref2d[innerindex][outerindex] = wref1d[innerindex]
 			endif
 		endif
 		ii+=1
@@ -1178,7 +1198,7 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 			// Redimension waves if readvstimeis set to 1
 			if (readvstime == 1)
 				redimension /n=(innerindex+1) wref1d
-				setscale/I x 0, datetime - sc_scanstarttime, $sc_CalcWaveNames[ii]
+				setscale/I x 0, datetime - sc_scanstarttime, wref1d
 			endif
 			
 			if(fillnan == 0)
@@ -1204,6 +1224,81 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 	
 	// check abort/pause status
 	sc_checksweepstate()
+end
+
+function sc_StartThreads(numThreads)
+	variable numThreads
+	wave/t sc_AsyncRecord
+	variable tgID, i=0, instSessionID
+	string queryFunc, expr = "(.+)\((.+)\)"
+	
+	tgID = ThreadGroupCreate(numThreads)
+	
+	// duplicate the datafolder with the VISA handles
+	// and pass it to the thread group. 
+	
+	do
+		splitstring/e=(expr) sc_AsyncRecord[i], queryFunc, instSessionID
+		ThreadStart tgID, i, sc_Worker(queryFunc,instSessionID)
+		i+=1
+	while(i<numThreads)
+	
+	return tgID
+end
+
+function sc_CollectDataFromThreads(tgID,numThreads,readvstime,innerindex,outerindex)
+	variable tgID, numThreads, readvstime, innerindex, outerindex
+	variable processflag, i=0, threaddata
+	wave/t sc_RawWaveNames
+	nvar sc_is2d, sc_scanstarttime
+	
+	// wait for all threads to finish
+	do
+		processflag = ThreadGroupWait(tgID, 0)
+		sc_sleep(1.0e-3)
+	while(processflag>0)
+	
+	for(i=0;i<numThreads;i+=1)
+		wave wref1d = $sc_RawWaveNames[i]
+		threaddata = ThreadReturnValue(tgID, i)
+		
+		// Redimension waves if readvstime is set to 1
+		if (readvstime == 1)
+			redimension /n=(innerindex+1) wref1d
+			setscale/I x 0,  datetime - sc_scanstarttime, wref1d
+		endif
+		
+		wref1d[innerindex] = threaddata
+			
+		if (sc_is2d)				
+			wave wref2d = $sc_RawWaveNames[i] + "2d"
+			wref2d[innerindex][outerindex] = wref1d[innerindex]
+		endif
+	endfor
+end
+
+function sc_KillThreads(tgID)
+	variable tgID
+	variable releaseResult
+	
+	releaseResult = ThreadGroupRelease(tgID)
+	if (releaseResult == -2)
+		abort "ThreadGroupRelease failed, threads were force quit. Igor should be restarted!"
+	elseif(releaseResult == -1)
+		printf "ThreadGroupRelease failed. No fatal errors, will continue.\r"
+	endif
+end
+
+threadsafe function sc_Worker(queryFunc,instSessionID)
+	string queryFunc
+	variable instSessionID
+	
+	funcref func_async func = $queryFunc
+	return func(instSessionID)
+end
+
+threadsafe function func_async(instSessionID) // Reference functions for all *_async functions
+	variable instSessionID //VISA instrument handle
 	
 end
 
