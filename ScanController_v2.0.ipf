@@ -686,7 +686,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	variable start, fin, numpts, starty, finy, numptsy
 	string x_label, y_label
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
-	wave /T sc_RawWaveNames, sc_CalcWaveNames, sc_RequestScripts, sc_GetResponseScripts
+	wave /T sc_RawWaveNames, sc_CalcWaveNames, sc_RequestScripts, sc_GetResponseScripts, sc_CalcScripts
 	variable i=0, j=0
 	string cmd = "", wn = "", wn2d="", s, script = "", script0 = "", script1 = ""
 	string /g sc_x_label, sc_y_label
@@ -803,8 +803,9 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 				cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn2d; execute(cmd)
 				cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
 			endif			
-			
 		endif
+		// Add "[i]" to calculation scripts if needed
+		sc_CalcScripts[i] = construct_calc_script(sc_CalcScripts[i])
 		i+=1
 	while (i<numpnts(sc_CalcWaveNames))
 	
@@ -1300,6 +1301,29 @@ end
 threadsafe function func_async(instSessionID) // Reference functions for all *_async functions
 	variable instSessionID //VISA instrument handle
 	
+end
+
+function/s construct_calc_script(script)
+	// adds "[i]" to calculation scripts
+	string script
+	string test_wave
+	variable i=0, j=0, strpos
+	wave/t sc_RawWaveNames
+	
+	for(i=0;i<numpnts(sc_RawWaveNames);i+=1)
+		j=0
+		test_wave = sc_RawWaveNames[i]
+		do
+			strpos = strsearch(script,test_wave,j)
+			if(strpos >= 0 && cmpstr(script[strpos+strlen(test_wave)],"[")==0)
+				//do nothing
+			elseif(strpos >= 0)
+				script[strpos+strlen(test_wave)] = "[i]"
+			endif
+			j=strpos+strlen(test_wave)
+		while(strpos >= 0)
+	endfor
+	return script
 end
 
 ////////////////////////
