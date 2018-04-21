@@ -848,12 +848,14 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 			if(graphopen && graphopen2d)
 			elseif(graphopen2d)
 				display $wn
+				setwindow kwTopWin, enablehiresdraw=3
 				Label bottom, sc_x_label
 				activegraphs+= winname(0,1)+";"
 			elseif(graphopen)
 				if(sc_is2d)
 					wn2d = wn + "2d"
 					display
+					setwindow kwTopWin, enablehiresdraw=3
 					appendimage $wn2d
 					modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
 					colorscale /c/n=$sc_ColorMap /e/a=rc
@@ -864,10 +866,12 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 			else
 				wn2d = wn + "2d"
 				display $wn
+				setwindow kwTopWin, enablehiresdraw=3
 				Label bottom, sc_x_label
 				activegraphs+= winname(0,1)+";"
 				if(sc_is2d)
 					display
+					setwindow kwTopWin, enablehiresdraw=3
 					appendimage $wn2d
 					modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
 					colorscale /c/n=$sc_ColorMap /e/a=rc
@@ -905,12 +909,14 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 			if(graphopen && graphopen2d)
 			elseif(graphopen2d)
 				display $wn
+				setwindow kwTopWin, enablehiresdraw=3
 				Label bottom, sc_x_label
 				activegraphs+= winname(0,1)+";"
 			elseif(graphopen)
 				if(sc_is2d)
 					wn2d = wn + "2d"
 					display
+					setwindow kwTopWin, enablehiresdraw=3
 					appendimage $wn2d
 					modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
 					colorscale /c/n=$sc_ColorMap /e/a=rc
@@ -921,10 +927,12 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 			else
 				wn2d = wn + "2d"
 				display $wn
+				setwindow kwTopWin, enablehiresdraw=3
 				Label bottom, sc_x_label
 				activegraphs+= winname(0,1)+";"
 				if(sc_is2d)
 					display
+					setwindow kwTopWin, enablehiresdraw=3
 					appendimage $wn2d
 					modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
 					colorscale /c/n=$sc_ColorMap /e/a=rc
