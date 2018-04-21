@@ -1248,7 +1248,8 @@ function sc_StartThreads(numThreads)
 		nvar instID = $instSessionID
 		newdatafolder/o root:$(queryfunc)
 		movevariable root:instID, root:$(queryfunc):
-		ThreadStart tgID, i, sc_Worker(queryFunc)
+		threadgroupputdf tgID, root:$(queryfunc)
+		threadstart tgID, i, sc_Worker(queryFunc)
 		i+=1
 	while(i<numThreads)
 	

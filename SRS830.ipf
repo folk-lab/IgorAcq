@@ -7,11 +7,11 @@
 // Units: mV, nA or Hz
 // Written by Christian Olsen, 2018-05-01
 
-function InitSRS(id,gpibadresse,[gpibboard])
-	string id
+function InitSRS(instID,gpibadresse,[gpibboard])
+	string instID
 	variable gpibadresse, gpibboard
 	string resource, error
-	variable session=0, instID=0, status
+	variable session=0, inst=0, status
 	
 	if(paramisdefault(gpibboard))
 		gpibboard = 0
@@ -24,13 +24,13 @@ function InitSRS(id,gpibadresse,[gpibboard])
 		abort "OpenDefaultRM error: " + error
 	endif
 	
-	status = viOpen(session,resource,0,0,instID) //not sure what to do with openTimeout, setting it to 0!
+	status = viOpen(session,resource,0,0,inst) //not sure what to do with openTimeout, setting it to 0!
 	if (status < 0)
 		viStatusDesc(session, status, error)
 		abort "viOpen error: " + error
 	endif
 	
-	variable/g $id = instID
+	variable/g $instID = inst
 end
 
 /////////////////////////////
@@ -219,20 +219,20 @@ end
 //// Status function ////
 ////////////////////////
 
-function/s GetSRSStatus(id)
-	variable id
+function/s GetSRSStatus(instID)
+	variable instID
 	string  buffer = ""
 	
 	//string gpib = num2istr(returnGPIBaddress(srs)) FIX "GPIB procedure"
 	string gpib = ""
 	buffer = addJSONKeyVal(buffer, "gpib_address", strVal=gpib)
 	
-	buffer = addJSONKeyVal(buffer, "amplitude V", numVal=GetSRSAmplitude(id), fmtNum="%.3f")
-	buffer = addJSONKeyVal(buffer, "time_const ms", numVal= GetSRSTimeConst(id)*1000, fmtNum="%.2f")
-	buffer = addJSONKeyVal(buffer, "frequency Hz", numVal= GetSRSFrequency(id), fmtNum="%.3f")
-	buffer = addJSONKeyVal(buffer, "phase deg", numVal=GetSRSPhase(id), fmtNum="%.2f")
-	buffer = addJSONKeyVal(buffer, "sensitivity V", numVal=GetSRSSensitivity(id), fmtNum="%.4f")
-	buffer = addJSONKeyVal(buffer, "harmonic", numVal=GetSRSHarmonic(id), fmtNum="%d")
+	buffer = addJSONKeyVal(buffer, "amplitude V", numVal=GetSRSAmplitude(instID), fmtNum="%.3f")
+	buffer = addJSONKeyVal(buffer, "time_const ms", numVal= GetSRSTimeConst(instID)*1000, fmtNum="%.2f")
+	buffer = addJSONKeyVal(buffer, "frequency Hz", numVal= GetSRSFrequency(instID), fmtNum="%.3f")
+	buffer = addJSONKeyVal(buffer, "phase deg", numVal=GetSRSPhase(instID), fmtNum="%.2f")
+	buffer = addJSONKeyVal(buffer, "sensitivity V", numVal=GetSRSSensitivity(instID), fmtNum="%.4f")
+	buffer = addJSONKeyVal(buffer, "harmonic", numVal=GetSRSHarmonic(instID), fmtNum="%d")
 
 	return addJSONKeyVal("", "SRS_"+gpib, strVal=buffer)
 end
@@ -241,26 +241,26 @@ end
 //// Visa communication ////
 ////////////////////////////
 
-threadsafe function WriteSRS(cmd,id)
+threadsafe function WriteSRS(cmd,instID)
 	string cmd
-	variable id
+	variable instID
 	
 	cmd = cmd+"\n"
-	VisaWrite id, cmd
+	VisaWrite instID, cmd
 end
 
-threadsafe function/s ReadSRS(id)
-	variable id
+threadsafe function/s ReadSRS(instID)
+	variable instID
 	string response
 	
-	VisaRead/T="\n" id, response
+	VisaRead/T="\n" instID, response
 	return response
 end
 
-threadsafe function/s QuerySRS(cmd,id)
+threadsafe function/s QuerySRS(cmd,instID)
 	string cmd
-	variable id
+	variable instID
 	
-	WriteSRS(cmd,id)
-	return ReadSRS(id)
+	WriteSRS(cmd,instID)
+	return ReadSRS(instID)
 end
