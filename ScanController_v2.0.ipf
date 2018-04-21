@@ -1230,17 +1230,17 @@ end
 function sc_StartThreads(numThreads)
 	variable numThreads
 	wave/t sc_AsyncRecord
-	variable tgID, i=0, instSessionID
-	string queryFunc, expr = "(.+)\((.+)\)"
+	variable tgID, i=0
+	string queryFunc, instSessionID, expr = "(.+)\((.+)\)"
 	
 	tgID = ThreadGroupCreate(numThreads)
 	
-	// duplicate the datafolder with the VISA handles
-	// and pass it to the thread group. 
-	
 	do
 		splitstring/e=(expr) sc_AsyncRecord[i], queryFunc, instSessionID
-		ThreadStart tgID, i, sc_Worker(queryFunc,instSessionID)
+		nvar instID = $instSessionID
+		newdatafolder/o root:$(queryfunc)
+		movevariable root:instID, root:$(queryfunc):
+		ThreadStart tgID, i, sc_Worker(queryFunc)
 		i+=1
 	while(i<numThreads)
 	
@@ -1290,17 +1290,15 @@ function sc_KillThreads(tgID)
 	endif
 end
 
-threadsafe function sc_Worker(queryFunc,instSessionID)
-	string queryFunc
-	variable instSessionID
+threadsafe function sc_Worker(queryfunc)
+	string queryfunc
 	
-	funcref func_async func = $queryFunc
-	return func(instSessionID)
+	funcref func_async func = $queryfunc
+	return func(queryfunc)
 end
 
-threadsafe function func_async(instSessionID) // Reference functions for all *_async functions
-	variable instSessionID //VISA instrument handle
-	
+threadsafe function func_async(queryfunc) // Reference functions for all *_async functions
+	string queryfunc //function call name, used as datafolder name
 end
 
 function/s construct_calc_script(script)
