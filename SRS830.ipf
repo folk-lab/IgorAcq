@@ -69,7 +69,7 @@ function ReadSRSt(instID) //Units: rad
 	return str2num(response)
 end
 
-function GetSRSHarmonic(instID)
+function GetSRSHarmonic(instID) // Units: AU
 	variable instID
 	string response
 	
@@ -79,18 +79,18 @@ end
 
 function GetSRSTimeConst(instID) // Return units: s
 	variable instID
-	variable srsreturn
+	variable response
 	
-	srsreturn = str2num(QuerySRS("OFLT?",instID))
+	response = str2num(QuerySRS("OFLT?",instID))
 	
-	if(mod(srsreturn,2) == 0)
-		return 10^(srsreturn/2-5)
+	if(mod(response,2) == 0)
+		return 10^(response/2-5)
 	else
-		return 3*10^((srsreturn-1)/2-5)
+		return 3*10^((response-1)/2-5)
 	endif
 end
 
-function GetSRSPhase(instID)
+function GetSRSPhase(instID) // Units: AU
 	variable instID
 	string response
 	
@@ -98,15 +98,15 @@ function GetSRSPhase(instID)
 	return str2num(response)
 end
 
-function GetSRSAmplitude(instID)
+function GetSRSAmplitude(instID) // Units: mV
 	variable instID
 	string response
 	
 	response = QuerySRS("SLVL?",instID)
-	return str2num(response)
+	return str2num(response)*1000
 end
 
-function GetSRSFrequency(instID)
+function GetSRSFrequency(instID) // Units: Hz
 	variable instID
 	string response
 	
@@ -114,27 +114,46 @@ function GetSRSFrequency(instID)
 	return str2num(response)
 end
 
-function GetSRSSensitivity(instID) // Return units: V or A
-	variable instID
-	variable srsreturn, modulo, expo
+function GetSRSSensitivity(instID,[integer]) // Units: mV or nA
+	variable instID, integer
+	variable response, modulo, expo
 	
-	srsreturn = str2num(QuerySRS("SENS?",instID))
-	modulo = mod(srsreturn,3)
-	expo = (srsreturn-modulo)/3
+	if(paramisdefault(integer))
+		integer = 0
+	endif
 	
-	srsreturn = str2num(QuerySRS("ISRC?",instID))
-	if(srsreturn >= 2)
+	response = str2num(QuerySRS("SENS?",instID))
+	if(integer)
+		return response
+	endif
+	modulo = mod(response,3)
+	expo = (response-modulo)/3
+	
+	response = str2num(QuerySRS("ISRC?",instID))
+	if(response >= 2)
 		expo -= 15 //current mode
 	else
 		expo -= 9 // voltage mode
 	endif
 	
 	if(modulo == 0)
-		return 2*10^expo
+		if(response >= 2)
+			return (2*10^expo)*1e9
+		else
+			return (2*10^expo)*1e3
+		endif
 	elseif(modulo == 1)
-		return 5*10^expo
+		if(response >= 2)
+			return (5*10^expo)*1e9
+		else
+			return (5*10^expo)*1e3
+		endif
 	elseif(modulo == 2)
-		return 10*10^expo
+		if(response >= 2)
+			return (10*10^expo)*1e9
+		else
+			return (10*10^expo)*1e3
+		endif
 	endif
 end
 
@@ -214,6 +233,89 @@ end
 //// Set functions ////
 ///////////////////////
 
+function SetSRSHarmonic(instID,harm) // Units: AU
+	variable instID,harm
+	
+	WriteSRS("HARM "+num2str(harm),instID)
+end
+
+function SetSRSTimeConst(instID,timeConst) // Units: s
+	variable instID, timeConst
+	variable range
+	make/o lookuptable = {0.00001,0.00003,0.0001,0.0003,0.001,0.003,0.01,0.03,0.1,0.3,1,3,10,30,100,300,1000,3000,10000,30000}
+	
+	// check that time constant is within range
+	if(timeConst > 30000)
+		print "Time constant not within range, setting to nearest possible."
+		timeConst = 30000
+	elseif(timeConst < 0.01)
+		print "Time constant not within range, setting to nearest possible."
+		timeConst = 0.01
+	endif
+	
+	// transform to integer
+	make/o mintime = abs(lookuptable-timeConst)
+	findvalue/v=(wavemin(minstime)) mintime
+	
+	WriteSRS("OFLT "+num2istr(v_value),instID)
+end
+
+function SetSRSPhase(instID,phase) // Units: AU
+	variable instID, phase
+	
+	WriteSRS("PHAS "+num2str(phase),instID)
+end
+
+function SetSRSAmplitude(instID,amplitude) // Units: mV
+	variable instID, amplitude
+	
+	if(amplitude > 4)
+		print "max amplitude is 4mV."
+		amplitude = 4
+	endif
+	
+	WriteSRS("SLVL "+num2str(amplitude/1000),instID)
+end
+
+function SetSRSFrequency(instID,frequency)
+	variable instID, frequency
+	
+	WriteSRS("FREQ "+num2str(frequency),instID)
+end
+
+function SetSRSSensitivity(instID,sens) // Units: mV or nA
+	variable instID, sens
+	make/o lookuptable={0.000002,0.000005,0.00001,0.00002,0.00005,0.0001,0.0002,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.2,0.5,1,2,5,10,20,50,100,200,500,1000}
+	
+	make/o minsens = abs(lookuptable-sens)
+	findvalue/v=(wavemin(minsens)) minsens
+	
+	WriteSRS("SENS "+num2str(v_value),instID)
+end
+
+function SetSRSSensUp(instID)
+	variable instID
+	variable sens
+	
+	sens = GetSRSSensitivity(instID,integer=1)
+	if(sens < 26)
+		WriteSRS("SENS "+num2str(sens+1),instID)
+	else
+		print "Sensitivity is at max already!"
+	endif
+end
+
+function SetSRSSensDown(instID)
+	variable instID
+	variable sens
+	
+	sens = GetSRSSensitivity(instID,integer=1)
+	if(sens > 0)
+		WriteSRS("SENS "+num2str(sens+1),instID)
+	else
+		print "Sensitivity is at min already!"
+	endif
+end
 
 /////////////////////////
 //// Status function ////
@@ -223,8 +325,7 @@ function/s GetSRSStatus(instID)
 	variable instID
 	string  buffer = ""
 	
-	//string gpib = num2istr(returnGPIBaddress(srs)) FIX "GPIB procedure"
-	string gpib = ""
+	string gpib = num2istr(instGPIB(instID))
 	buffer = addJSONKeyVal(buffer, "gpib_address", strVal=gpib)
 	
 	buffer = addJSONKeyVal(buffer, "amplitude V", numVal=GetSRSAmplitude(instID), fmtNum="%.3f")

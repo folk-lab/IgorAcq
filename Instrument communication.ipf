@@ -185,3 +185,11 @@ function/s QueryInstr(instrID,cmd)
 	
 	return response
 end
+
+function instGPIB(instID)
+	variable instID
+	variable gpibadresse
+	
+	viGetAttribute(instID,VI_ATTR_GPIB_PRIMARY_ADDR,gpibadresse)
+	return gpibadresse
+end
