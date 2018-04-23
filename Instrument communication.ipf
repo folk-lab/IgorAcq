@@ -190,6 +190,6 @@ function instGPIB(instID)
 	variable instID
 	variable gpibadresse
 	
-	viGetAttribute(instID,VI_ATTR_GPIB_PRIMARY_ADDR,gpibadresse)
+	viGetAttribute(instID,0x3FFF0172,gpibadresse) // get primary adresse
 	return gpibadresse
 end
