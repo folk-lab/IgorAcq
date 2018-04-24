@@ -5,6 +5,7 @@ function Initeverything() //add serial support!
 	variable status, sessionID, findlist=0,instrcnt=0,instrcntserial=0,i=0
 	string instrDesc="", instrtype, instrname, error, summary
 	variable instrID
+	string/g serialinfo = "\rSerial instruments:\r\t"
 	
 	// check for old call to viOpenDefaultRM and close it
 	nvar/z sessionRM
@@ -28,7 +29,7 @@ function Initeverything() //add serial support!
 	status = viFindRsrc(sessionID,"GPIB?*INSTR",findlist,instrcnt,instrDesc)
 	if(status < 0)
 		viStatusDesc(sessionID, status, error)	
-		abort "FindRSrc error: " + error
+		printf "FindRSrc error (GPIB): %s\r", error
 	else
 		// init first instrument returned by viFindRsrc
 		instrID = openinstr(sessionID,instrDesc)
@@ -47,18 +48,28 @@ function Initeverything() //add serial support!
 	endfor
 	
 	// find all serial (instrument and ports)
-	viClose(findlist)
 	status = viFindRsrc(sessionID,"ASRL?*INSTR",findlist,instrcntserial,instrDesc)
 	if(status < 0)
 		viStatusDesc(sessionID, status, error)	
-		abort "FindRSrc error: " + error
+		printf "FindRSrc error (Serial): %s\r", error
 	else
-		// init first instrument returned by viFindRsrc
-		// try communicating ....
+		instrID = openinstr(sessionID,instrDesc)
+		GetSerialInstrInfo(instrDesc,sessionID,instrID,0)
 	endif
 	
-	summary = CreateSummary(instrcnt)
-	print summary
+	// find the remaining Serial instruments
+	for(i=1;i<instrcntserial;i+=1)
+		viFindNext(findlist,instrDesc)
+		instrID = openinstr(sessionID,instrDesc)
+		GetSerialInstrInfo(instrDesc,sessionID,instrID,i)
+	endfor
+	
+	if(instrcnt>0)
+		CreateGPIBSummary(instrcnt)
+	endif
+	if(instrcntserial>0)
+		print serialinfo
+	endif
 end
 
 function openinstr(sessionID,instrDesc)
@@ -76,10 +87,35 @@ function openinstr(sessionID,instrDesc)
 	return instrID
 end
 
-function/s DetermineSerialInstrType(instrDesc,sessionID,instrID)
+function/s GetSerialInstrInfo(instrDesc,sessionID,instrID,counter)
 	string instrDesc
-	variable sessionID, instrID
+	variable sessionID, instrID, counter
+	variable status, baudrate
+	string instrname, instrbaud, serialname, error,counterString
+	svar serialinfo
 	
+	sprintf counterString, "%d)\t", counter+1
+	serialinfo += counterString+instrDesc+"\r\t"
+	
+	// get full name
+	status = viGetAttributeString(instrID,0xBFFF00E9,serialname)
+	if (status < 0)
+		viStatusDesc(sessionID, status, error)
+		abort "viGetAttribute error: "+error
+	else
+		sprintf instrname, "\tSerial object connected is called: %s\r\t", serialname
+		serialinfo += instrname
+	endif
+	
+	// get baud rate
+	status = viGetAttribute(instrID,0x3FFF0021,baudrate)
+	if (status < 0)
+		viStatusDesc(sessionID, status, error)
+		abort "viGetAttribute error: "+error
+	else
+		sprintf instrbaud, "\tThe baudrate is currently set to: %g\r\t", baudrate
+		serialinfo += instrbaud
+	endif
 end
 
 function/s DetermineGPIBInstrType(instrDesc,sessionID,instrID)
@@ -134,7 +170,7 @@ function/s CreateGPIBInstrID(instrtype,instrDesc,instrID)
 	return instrname
 end
 
-function/s CreateSummary(instrcnt)
+function/s CreateGPIBSummary(instrcnt)
 	variable instrcnt
 	wave/t idwave
 	wave counter
@@ -164,14 +200,14 @@ function/s CreateSummary(instrcnt)
 			endswitch
 	endfor
 	
-	header = "Instruments connected to the setup:\r\t"
+	header = "\rGPIB instruments connected to the setup:\r\t"
 	sprintf srsline, "%d SR830's are connected. They are: %s\r\t", counter[0], srsid
 	sprintf k2400line, "%d Keithley's are connected. They are: %s\r\t", counter[1], k2400id
 	sprintf dmmline, "%d DMM's are connected. They are: %s\r\t", counter[2], dmmid
 	sprintf awgline, "%d AWG's are connected. They are: %s\r\t", counter[3], awgid
 	sprintf unknownline, "%d unknown instruments are connected. They are: %s", counter[4], unknownid
 	
-	return header+srsline+k2400line+dmmline+awgline+unknownline 
+	print header+srsline+k2400line+dmmline+awgline+unknownline 
 end
 
 function/s QueryInstr(instrID,cmd)
