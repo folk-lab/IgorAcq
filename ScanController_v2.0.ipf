@@ -13,23 +13,6 @@
 //		-- "Request scripts" are removed from the scancontroller window. Its only use was
 //			trying to do async communication (badly).
 
-
-// Updates in 1.8.... This is almost certainly _not_ back-compatible with your old experiments.
-//     -- separate all save functions into ScanControllerNATIVE 
-//     -- remove support for time averaging over any parameter. it is rarely useful and confusing to read. 
-//     -- add option (which should be ON) to push 'new data' notifications to qdot-server 
-//     -- fill 2D arrays point by point not line by line 
-//     -- remove restriction on Request/Response scripts -- go back to using execute()
-//     -- fix sc_sleep accuracy problem -- USE IT EVERYWHERE IN PLACE OF SLEEP
-//     -- save command history as plain text in *.history
-//     -- save main procedure window as *.ipf
-//     -- log which config file was used for a given data set
-//     -- add Slack notifications (somefolkneverlearn.slack.com)
-//     -- use JSON format for config files (adds dependency on JSON.ipf)
-//     -- restructure WINF files to use JSON wherever possible
-//     -- update all instrument logs to use JSON
-//     -- only create WINF folder/path if using 
-
 //TODO:
 
 //     -- add a new type of value to record that can/will be read during sc_sleep
@@ -61,9 +44,6 @@ function AppendString(thewave, thestring)
 	Redimension /N=(numpnts(thewave)+1) thewave
 	thewave[numpnts(thewave)-1] = thestring
 end
-
-// removeAllWhitespace() has been removed
-// use TrimString() instead
 
 Function/S RemoveLeadingWhitespace(str)
     String str
