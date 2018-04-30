@@ -1220,12 +1220,19 @@ function/s construct_calc_script(script)
 	// adds "[i]" to calculation scripts
 	string script
 	string test_wave
-	variable i=0, j=0, strpos
-	wave/t sc_RawWaveNames
+	variable i=0, j=0, strpos, numptsRaw, numptsCalc
+	wave/t sc_RawWaveNames, sc_CalcWaveNames
 	
-	for(i=0;i<numpnts(sc_RawWaveNames);i+=1)
+	numptsRaw = numpnts(sc_RawWaveNames)
+	numptsCalc = numpnts(sc_CalcWaveNames)
+	
+	for(i=0;i<numptsRaw+numptsCalc;i+=1)
 		j=0
-		test_wave = sc_RawWaveNames[i]
+		if(i<numptsRaw)
+			test_wave = sc_RawWaveNames[i]
+		else
+			test_wave = sc_CalcWaveNames[i-numptsRaw]
+		endif
 		do
 			strpos = strsearch(script,test_wave,j)
 			if(strpos >= 0 && cmpstr(script[strpos+strlen(test_wave)],"[")==0)
