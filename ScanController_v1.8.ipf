@@ -1835,7 +1835,7 @@ function sc_DeleteNotificationFile()
 	endif
 end
 
-function getSlackNotice(username, [message, channel, botname, emoji, min_time])
+function /S getSlackNotice(username, [message, channel, botname, emoji, min_time])
 	// this function will send a notification to Slack
 	// username = your slack username
 	
@@ -1850,7 +1850,7 @@ function getSlackNotice(username, [message, channel, botname, emoji, min_time])
 	variable min_time
 	nvar filenum, sweep_t_elapsed, sc_abortsweep
 	svar slack_url
-	string txt="", buffer="", payload=""
+	string txt="", buffer="", payload="", out=""
 	
 	//// check if I need a notification ////
 	if (paramisdefault(min_time))
@@ -1858,11 +1858,11 @@ function getSlackNotice(username, [message, channel, botname, emoji, min_time])
 	endif
 
 	if(sweep_t_elapsed < min_time)
-		return 0 // no notification if min_time is not exceeded
+		return addJSONKeyVal(out, "notified", strVal="false") // no notification if min_time is not exceeded
 	endif
 	
 	if(sc_abortsweep)
-		return 0 // no notification if sweep was aborted by the user
+		return addJSONKeyVal(out, "notified", strVal="false") // no notification if sweep was aborted by the user
 	endif
 	//// end notification checks //// 
 	
@@ -1909,13 +1909,13 @@ function getSlackNotice(username, [message, channel, botname, emoji, min_time])
 	if (V_flag == 0)    // No error
         if (V_responseCode != 200)  // 200 is the HTTP OK code
             print "Slack post failed!"
-            return 0
+            return addJSONKeyVal(out, "notified", strVal="false")
         else
-            return 1
+            return addJSONKeyVal(out, "notified", strVal="true")
         endif
     else
         print "HTTP connection error. Slack post not attempted."
-        return 0
+        return addJSONKeyVal(out, "notified", strVal="false")
     endif
 end
 
