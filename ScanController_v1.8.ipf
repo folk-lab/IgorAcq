@@ -1473,10 +1473,10 @@ function SaveWaves([msg, save_experiment])
 		sc_NotifyServer() // this may leave the experiment file open for some time
 							   // make sure to run saveExp before this
 	else
-		sc_DeleteNotificationFile() // delete the last file list
 		sc_findNewFiles(filenum)    // get list of new files
-		                            // I assume you're testing something
-		                            //     and may want to keep track of the files another way
+		                            // keeps appending files until 
+		                            // qdot-server.notify is deleted
+		                            // or srv_push is turned on
 	endif
 	
 	// close save files and increment filenum
