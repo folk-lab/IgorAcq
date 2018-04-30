@@ -1236,6 +1236,7 @@ function/s construct_calc_script(script)
 			j=strpos+strlen(test_wave)
 		while(strpos >= 0)
 	endfor
+
 	return script
 end
 
