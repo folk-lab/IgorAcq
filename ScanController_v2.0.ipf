@@ -237,7 +237,7 @@ function InitScanController(instrWave, [srv_push])
 	// set reference to instrument wave for scan controller
 	string /g sc_instr_wave=nameofwave(instrWave)
 	initVISAinstruments(instrWave, verbose=1)
-	
+
 	// set server push variable for scan controller
 	variable /g sc_srv_push
 	if(paramisdefault(srv_push) || srv_push==1)
@@ -748,7 +748,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	// i don't want to delete any old data
 	svar sc_instr_wave
 	wave /t instrWave = $sc_instr_wave
-	
+
 	initVISAinstruments(instrWave, verbose=0) // how to handle connInstr so SC knows about it???
 
 	// The status of the upcoming scan will be set when waves are initialized.

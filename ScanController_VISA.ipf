@@ -29,7 +29,7 @@ threadsafe function VISAerrormsg(descriptor, localRM, status)
 	String descriptor			// string to identify where this problem originated, e.g., viRead
 	Variable localRM			// Session ID obtained from viOpen
 	Variable status				// Status code from VISA library
-	
+
 	String desc
 
 	viStatusDesc(localRM, status, desc)
