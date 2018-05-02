@@ -58,13 +58,12 @@ function initIPS120(instrID)
 
 	setIPS120rate(instrID, 100)
 
-	string/g oldsweeprate = magnetvalsstr[4][1]
-	string/g oldsetpoint = "0"
+	string/g ips_oldsweeprate = magnetvalsstr[4][1]
+	string/g ips_oldsetpoint = "0"
 
 	execute("IPS_window()")
 	execute("Magnetsettings_window()")
 	PauseForUser Magnetsettings
-
 end
 
 ///// Talk to Magnet /////
@@ -158,7 +157,7 @@ function setIPS120field(instrID, field) // in mT
 		magnetvalsstr[3][1] = num2str(amps)
 		return 1
 	endif
-//end
+end
 
 function setIPS120rate(instrID, ramprate) // mT/min
 	variable instrID, ramprate
@@ -198,15 +197,16 @@ function getIPS120rate_current(instrID) // returns in A/min
     variable ramprate_amps,ramprate_field
 	wave/t magnetvalsstr=magnetvalsstr
 	NVAR ampspertesla=ampspertesla
-	ramprate_amps = str2num(queryInstr("R6", "\r", "\r")[1,inf])
+	ramprate_amps = str2num(queryInstr(instrID, "R6", "\r", "\r")[1,inf])
 	ramprate_field = roundNum(ramprate_amps/ampspertesla*1000,0)
 	magnetvalsstr[4][1] = num2str(ramprate_field)
 	magnetvalsstr[5][1] = num2str(ramprate_amps)
 	return ramprate_amps
 end
 
-function/s getIPS120status(instrID)
-	string instrID, status
+function /s getIPS120status(instrID)
+	variable instrID
+	string status
 	writeInstr(instrID, "X", "\r")
 	status = readInstr(instrID, "\r")
 	return status
@@ -215,17 +215,18 @@ end
 function getIPS120status_heater(instrID)
     variable instrID
 	string status
-	status = ExamineStatus(instrID)
+	status = getIPS120status(instrID)
 	return str2num(status[8])
 end
 
 function switchHeaterIPS120(instrID, newstate) // Call with "ON" or "OFF"
+	variable instrID
 	string newstate
 	string oldstate
 	variable heaterstate
 	wave/t magnetvalsstr=magnetvalsstr
 
-	heaterstate = GetHeaterStatus()
+	heaterstate = getIPS120status_heater(instrID)
 
 	if (heaterstate == 5)
 		print "Heater error"
@@ -313,15 +314,15 @@ EndMacro
 
 Window Magnetsettings_window() : Panel
 	PauseUpdate; Silent 1 // building window
-	NewPanel /W=(0,0, 250,120)/N=MagnetSettings // window size
+	NewPanel /W=(0,0, 290,120)/N=MagnetSettings // window size
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv fsize= 20,fstyle= 1
 	DrawText 50, 40,"Choose Magnet" // Headline
-	Button CMmagnet,pos={10,60},size={110,20},proc=magnet_button,title="Marcus 10T Magnet"
-    Button XLD3INmagnet, pos={130,60},size={110,20},proc=magnet_button,title="XLD 3\" 9T Magnet"
-	Button IGHmagnet,pos={60,90},size={110,20},proc=magnet_button,title="IGHN 12T Magnet"
-	Button AMmagnet,pos={130,90},size={110,20},proc=magnet_button,title="AM 6T z-axis"
+	Button CMmagnet,pos={10,60},size={130,20},proc=magnet_button,title="Marcus 10T Magnet"
+    Button XLD3INmagnet, pos={150,60},size={130,20},proc=magnet_button,title="XLD 3\" 9T Magnet"
+	Button IGHmagnet,pos={10,90},size={130,20},proc=magnet_button,title="IGHN 12T Magnet"
+	Button AMmagnet,pos={150,90},size={130,20},proc=magnet_button,title="AM 6T z-axis"
 end
 
 function magnet_button(action) : ButtonControl
@@ -335,9 +336,9 @@ function magnet_button(action) : ButtonControl
 			dowindow /k MagnetSettings
 			break
         case "XLD3INmagnet":
-			ampspertesla = 9.569 //A/T
-			maxfield = 9000//mT
-			maxramprate = 182 //mT/min
+			ampspertesla = 9.569 // A/T
+			maxfield = 9000.585//mT
+			maxramprate = 174 //mT/min
 			dowindow /k MagnetSettings
 			break
 		case "IGHmagnet":
@@ -357,6 +358,7 @@ end
 
 function update_magnet(action) : ButtonControl
 	string action
+	variable check=0
 	wave/t magnetvalsstr=magnetvalsstr
 	controlinfo /W=IPS_Window maglist
 
@@ -370,6 +372,7 @@ function update_magnet(action) : ButtonControl
         abort
     endif
     openInstr("ips_window_resource", ips_controller_addr, localRM=localRM, verbose=0)
+    nvar ips_window_resource
 
 	strswitch(action)
 		case "updatevals":
@@ -381,44 +384,44 @@ function update_magnet(action) : ButtonControl
 			variable ramprate = getIPS120rate_current(ips_window_resource)
 			variable heater = getIPS120status_heater(ips_window_resource)
 			if (heater == 0)
-				state = "OFF"
+				heater_state = "OFF"
 			elseif (heater == 1)
-				state = "ON"
+				heater_state = "ON"
 			else
-				state = "Heater fault"
+				heater_state = "Heater fault"
 			endif
 			magnetvalsstr[0][1] = num2str(field)
 			magnetvalsstr[1][1] = num2str(roundNum(field*ampspertesla/1000,4))
 			magnetvalsstr[4][1] = num2str(roundNum(ramprate/ampspertesla*1000,0))
 			magnetvalsstr[5][1] = num2str(ramprate)
-			magnetvalsstr[6][1] = state
+			magnetvalsstr[6][1] = heater_state
 			print "UPDATED: IPS120 window data"
 			break
 
 		case "setfield":
-            svar oldsetpoint
+            svar ips_oldsetpoint
 
 			// Update the field setpoint
 			variable setpoint = roundNum(str2num(magnetvalsstr[2][1]),2)
 			check = setIPS120field(ips_window_resource, setpoint)
 			if (check == 1)
-				printf "Setting IPS120 field: %.2fmT", magnetvalsstr[2][1]
-				oldsetpoint = magnetvalsstr[2][1]
+				printf "Setting IPS120 field: %.2fmT\r", setpoint
+				ips_oldsetpoint = magnetvalsstr[2][1]
 			else
-				magnetvalsstr[2][1] = oldsetpoint
+				magnetvalsstr[2][1] = ips_oldsetpoint
 			endif
 			break
 
 		case "setrate":
-            svar oldsweeprate
+            svar ips_oldsweeprate
 
 			// Update the sweep rate
 			check = setIPS120rate(ips_window_resource, str2num(magnetvalsstr[4][1]))
 			if (check == 1)
-				printf "Setting IPS120 ramprate: %.0f mT/min", magnetvalsstr[4][1]
-				oldsweeprate = magnetvalsstr[4][1]
+				printf "Setting IPS120 ramprate: %.0f mT/min\r", str2num(magnetvalsstr[4][1])
+				ips_oldsweeprate = magnetvalsstr[4][1]
 			else
-				magnetvalsstr[4][1] = oldsweeprate
+				magnetvalsstr[4][1] = ips_oldsweeprate
 			endif
 			break
 

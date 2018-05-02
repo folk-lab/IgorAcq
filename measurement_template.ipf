@@ -24,12 +24,9 @@ mmamacro initexp()
                                             // and prints their test function output
   sc_ColorMap = "VioletOrangeYellow" // change default colormap (default=Grays)
 
-  ///// configure instruments /////
-  // setup individual instruments here for particular readings
+  ///// configure instruments and GUI(s) /////
   setup3478Adcvolts(dmm18, 3, 0.1)
   initIPS120(ips2)
-
-  ///// open GUI windows /////
 
 end
 
