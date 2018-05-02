@@ -21,6 +21,85 @@
 //-Query functions
 
 ///////////////////////////////////////////////////////////////////////////////////////
+////////////////// Initializing and Closing GPIB Connections //////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////
+
+threadsafe function check_folder(data_folder)
+	string data_folder
+	if (DataFolderExists(data_folder) != 1)
+		newdatafolder/O $data_folder
+	endif
+end
+
+function open_comms(device_name, resourceName)
+	string device_name, resourceName
+	string data_folder = "root:connections"
+	check_folder(data_folder)
+	data_folder += ":" + device_name
+	check_folder(data_folder)
+	nvar/z session = $(data_folder + ":session")
+	nvar/z instr = $(data_folder + ":instr")
+	if (!nvar_exists(instr))
+		variable/g $(data_folder + ":instr") = -1
+	endif
+	if (!nvar_exists(session))
+		variable/g $(data_folder + ":session") = -1
+	endif
+	nvar session = $(data_folder + ":session")
+	nvar instr = $(data_folder + ":instr")
+
+	if (session != -1 || instr != -1)
+//		print device_name, ": comms already open:", session, instr
+	endif
+
+	variable status, instr_id = session, session_id = session
+	string error_message
+	status = viOpenDefaultRM(session_id)
+	if (status < 0)
+		viStatusDesc(instr_id, status, error_message)
+		abort "OpenDefaultRM error: " + error_message
+	endif
+	status = viOpen(session_id, resourceName, 0, 0, instr_id)
+	if (status < 0)
+		viStatusDesc(instr_id, status, error_message)
+		abort "Open error: " + error_message
+	endif
+   session = session_id
+   instr = instr_id
+	return status
+end
+
+function close_comms(device_name)
+	string device_name
+	string data_folder = "root:connections:" + device_name
+	nvar/z session = $(data_folder + ":session")
+	nvar/z instr = $(data_folder + ":instr")
+	if (!nvar_exists(instr))
+		variable/g $(data_folder + ":instr") = -1
+	endif
+	if (!nvar_exists(session))
+		variable/g $(data_folder + ":session") = -1
+	endif
+
+	// check if comms are already closed
+	if (session == -1 || instr == -1)
+		print device_name, ": comms already closed"
+		return 0
+	endif
+
+	variable session_id = session, instr_id = instr, status
+	string error_message
+	status = viClose(session_id)
+	if (status < 0)
+		viStatusDesc(instr_id, status, error_message)
+		abort "Close error: " + error_message
+	endif
+
+	session = -1; instr = -1
+	return status
+end
+
+///////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////// Read Functions /////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,7 +110,7 @@ Threadsafe Function ReadInstrumentAsync(threadGroupID, device_name, query)
 	variable threadGroupID
 	String device_name
 	String query
-	
+
 	//get duplicate connections data folder passed to thread group
 	//access instr for given device_name
 	DFREF dfr = ThreadGroupGetDFR(0,inf)
@@ -40,7 +119,7 @@ Threadsafe Function ReadInstrumentAsync(threadGroupID, device_name, query)
 	endif
 	SetDataFolder dfr
 	nvar/z instr = $(":"+device_name+":instr")
-	
+
 	//read from device
 	Variable cN
 	string readstr
@@ -88,7 +167,7 @@ Threadsafe function getFunc(threadGroupID, device_name)
 	string device_name
 	variable threadGroupID
 	/// this function will be used to format all getData() functions using FUNCREF
-end	
+end
 
 //initialize the devices
 //- number of devices
@@ -110,7 +189,7 @@ end
 
 //kill golbal variables from device init
 function killDevices()
-	NVAR numDevices = root:gNumDevices 
+	NVAR numDevices = root:gNumDevices
 	wave /T devices_name
 	variable i=0
 	do
@@ -131,7 +210,7 @@ ThreadSafe Function sc_ActionWorker(threadGroupID, device_name, query)
 	string device_name
 	String query
 	variable threadGroupID
-		
+
 	FUNCREF getFunc actionFunc = $query
 	return actionFunc(threadGroupID, device_name)
 end
@@ -141,7 +220,7 @@ end
 Function sc_StartActionThreads()
 	wave /T devices_name
 	wave /T devices_query
-	NVAR numDevices = root:gNumDevices 
+	NVAR numDevices = root:gNumDevices
 	//create group for threads
 	variable threadGroupID = ThreadGroupCreate(numDevices)
  	//create threads
@@ -162,7 +241,7 @@ End
 //complete thread group properly
 Function sc_StopActionThreads(threadGroupID)
 	variable threadGroupID
-	
+
 	if (threadGroupID != 0)
 		// We are done - kill the threads
 		Variable releaseResult = ThreadGroupRelease(threadGroupID)
@@ -171,7 +250,7 @@ Function sc_StopActionThreads(threadGroupID)
 		endif
 		threadGroupID = 0
 	endif
-	
+
 	return threadGroupID
 end
 
@@ -180,7 +259,7 @@ end
 function sc_GetDataAsync(data)
 	wave data
 	nvar numdevices = root:gNumDevices
-	
+
 	variable threadGroupID = sc_StartActionThreads() // start threads
 
 	// wait until threads complete
@@ -192,8 +271,8 @@ function sc_GetDataAsync(data)
 		else
 			sleep /S 5.0e-3
 		endif
-	while(1)	
-	
+	while(1)
+
 	// get results from threads using return value
 	variable result = 0, i = 0
 	for(i=0; i<numDevices; i+=1)
@@ -217,15 +296,15 @@ end
 //delays - seconds
 function testAsync(numpts, delay)
 	variable numpts, delay
-	
+
 	//initalize read functions
 	initDevices()
 	wave /t devices_name
 	nvar numDevices = root:gNumDevices
-		
+
 	//wave to store data
 	Make/O/N=(numpts, numDevices) data
-	
+
 	//perform read
 	variable i=0, ttotal = 0, tstart = datetime
 	do
@@ -233,90 +312,11 @@ function testAsync(numpts, delay)
 		sc_GetDataAsync(data)
 		i+=1
 	while (i<numpts)
-	
+
 	//calculate time
 	ttotal = datetime-tstart
 	printf "each sleep(...) + getDataAsync(...) call takes ~%.1fms \n", ttotal/numpts*1000
-	
+
 	//close comms
 	killDevices()
-end
-
-///////////////////////////////////////////////////////////////////////////////////////
-////////////////// Initializing and Closing GPIB Connections //////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////
-
-threadsafe function check_folder(data_folder)
-	string data_folder
-	if (DataFolderExists(data_folder) != 1)
-		newdatafolder/O $data_folder
-	endif
-end
-
-function open_comms(device_name, resourceName)
-	string device_name, resourceName
-	string data_folder = "root:connections"
-	check_folder(data_folder)
-	data_folder += ":" + device_name
-	check_folder(data_folder)
-	nvar/z session = $(data_folder + ":session")
-	nvar/z instr = $(data_folder + ":instr")
-	if (!nvar_exists(instr))
-		variable/g $(data_folder + ":instr") = -1
-	endif
-	if (!nvar_exists(session))
-		variable/g $(data_folder + ":session") = -1
-	endif
-	nvar session = $(data_folder + ":session")
-	nvar instr = $(data_folder + ":instr")
-	
-	if (session != -1 || instr != -1)
-//		print device_name, ": comms already open:", session, instr
-	endif
-	
-	variable status, instr_id = session, session_id = session
-	string error_message
-	status = viOpenDefaultRM(session_id)
-	if (status < 0)
-		viStatusDesc(instr_id, status, error_message)
-		abort "OpenDefaultRM error: " + error_message
-	endif
-	status = viOpen(session_id, resourceName, 0, 0, instr_id)
-	if (status < 0)
-		viStatusDesc(instr_id, status, error_message)
-		abort "Open error: " + error_message
-	endif
-   session = session_id
-   instr = instr_id
-	return status
-end
-
-function close_comms(device_name)
-	string device_name
-	string data_folder = "root:connections:" + device_name
-	nvar/z session = $(data_folder + ":session")
-	nvar/z instr = $(data_folder + ":instr")
-	if (!nvar_exists(instr))
-		variable/g $(data_folder + ":instr") = -1
-	endif
-	if (!nvar_exists(session))
-		variable/g $(data_folder + ":session") = -1
-	endif
-	
-	// check if comms are already closed
-	if (session == -1 || instr == -1)
-		print device_name, ": comms already closed"
-		return 0
-	endif
-	
-	variable session_id = session, instr_id = instr, status
-	string error_message
-	status = viClose(session_id)
-	if (status < 0)
-		viStatusDesc(instr_id, status, error_message)
-		abort "Close error: " + error_message
-	endif
-	
-	session = -1; instr = -1
-	return status
 end
