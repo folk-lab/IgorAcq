@@ -57,7 +57,7 @@ end
 Function/t removeStringListDuplicates(theListStr)
 	// credit: http://www.igorexchange.com/node/1071
 	String theListStr
- 
+
 	String retStr = ""
 	variable ii
 	for(ii = 0 ; ii < itemsinlist(theListStr) ; ii+=1)
@@ -73,30 +73,30 @@ End
 
 Function/S RemoveLeadingWhitespace(str)
     String str
- 
+
     if (strlen(str) == 0)
         return ""
     endif
- 
+
     do
         String firstChar= str[0]
         if (IsWhiteSpace(firstChar))
             str= str[1,inf]
         else
             break
-        endif   
+        endif
     while (strlen(str) > 0)
- 
+
     return str
 End
- 
+
 Function/S RemoveTrailingWhitespace(str)
     String str
- 
+
     if (strlen(str) == 0)
         return ""
     endif
- 
+
     do
         String lastChar = str[strlen(str) - 1]
         if (IsWhiteSpace(lastChar))
@@ -107,17 +107,17 @@ Function/S RemoveTrailingWhitespace(str)
     while (strlen(str) > 0)
     return str
 End
- 
+
 Function IsWhiteSpace(char)
     String char
- 
+
     return GrepString(char, "\\s")
 End
 
 function /S ReplaceBullets(str)
 	// replace bullet points with >>> in string
 	string str
-	
+
 	return ReplaceString(U+2022, str, ">>> ")
 end
 
@@ -128,14 +128,14 @@ function/S executeWinCmd(command)
 	string batchFileName = "ExecuteWinCmd.bat", outputFileName = "ExecuteWinCmd.out"
 	string outputLine, result = ""
 	variable refNum
-	 
+
 	NewPath/O/Q IgorProUserFiles, IPUFpath
 	Open/P=IgorProUserFiles refNum as batchFileName	// overwrites previous batchfile
 	fprintf refNum,"cmd/c \"%s > \"%s%s\"\"\r", command, IPUFpath, outputFileName
 	Close refNum
 	ExecuteScriptText/B "\"" + IPUFpath + "\\" + batchFileName + "\""
 	Open/P=IgorProUserFiles/R refNum as outputFileName
-	
+
 	do
 		FReadLine refNum, outputLine
 		if( strlen(outputLine) == 0 )
@@ -162,7 +162,7 @@ function /S getHostName()
 	// find the name of the computer Igor is running on
 	string platform = igorinfo(2)
 	string result, hostname, location
-	
+
 	strswitch(platform)
 		case "Macintosh":
 			result = executeMacCmd("hostname")
@@ -174,7 +174,7 @@ function /S getHostName()
 		default:
 			abort "What operating system are you running?! How?!"
 	endswitch
-	
+
 end
 
 function /S getExpPath(whichpath, [full])
@@ -184,21 +184,21 @@ function /S getExpPath(whichpath, [full])
 	// if full==0, the path relative to local_measurement_data is returned in Unix style
 	string whichpath
 	variable full
-	
+
 	if(paramisdefault(full))
 		full=0
 	endif
-	
+
 	pathinfo data // get path info
-	
+
 	if(V_flag == 0) // check if path is defined
 		abort "data path is not defined!\n"
 	endif
-	
+
 	// get relative path to data
 	string temp1, temp2, temp3
 	SplitString/E="([\w\s\-\:]+)(?i)(local[\s\_]measurement[\s\_]data)([\w\s\-\:]+)" S_path, temp1, temp2, temp3
-		
+
 	strswitch(whichpath)
 		case "root":
 			// returns path to local_measurement_data on local machine
@@ -233,10 +233,12 @@ function InitScanController(instrWave, [srv_push])
 	// srv_push = 1 to alert qdot-server of new data
 	wave /t instrWave
 	variable srv_push
-	
+
 	// set reference to instrument wave for scan controller
+    // connect instruments
 	wave /t sc_connected_instruments = instrWave
-	
+    initVISAinstruments(sc_connected_instruments, verbose=1)
+
 	// set server push variable for scan controller
 	variable /g sc_srv_push
 	if(paramisdefault(srv_push) || srv_push==1)
@@ -244,7 +246,7 @@ function InitScanController(instrWave, [srv_push])
 	else
 		sc_srv_push = 0
 	endif
-	
+
 	string filelist = ""
 	string /g slack_url =  "https://hooks.slack.com/services/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" // url for slack alert
 	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
@@ -254,7 +256,7 @@ function InitScanController(instrWave, [srv_push])
 	variable port = 7965 // port number the server is listening on
 	string /g server_url = ""
 	sprintf server_url, "http://%s:%d", server, port
-	
+
 	string /g sc_hostname = getHostName() // machine name
 
 	// Check if data path is definded
@@ -262,12 +264,12 @@ function InitScanController(instrWave, [srv_push])
 	if(v_flag != 0 || v_isfolder != 1)
 		abort "Data path not defined!\n"
 	endif
-	
+
 	newpath /C/O/Q config getExpPath("config", full=1) // create/overwrite config path
-	
+
 	// look for config files
 	filelist = greplist(indexedfile(config,-1,".config"),"sc")
-	
+
 	if(itemsinlist(filelist)>0)
 		// read content into waves
 		filelist = SortList(filelist, ";", 1+16)
@@ -280,25 +282,25 @@ function InitScanController(instrWave, [srv_push])
 		//make/t/o sc_RequestScripts = {"", ""}
 		make/t/o sc_GetResponseScripts = {"getg1x()", "getg1y()"}
 		// End of same-size waves
-		
+
 		// And these waves should be the same size too
 		make/t/o sc_CalcWaveNames = {"", ""} // Calculated wave names
 		make/t/o sc_CalcScripts = {"",""} // Scripts to calculate stuff
 		make/o sc_CalcRecord = {0,0} // Include this calculated field or not
 		make/o sc_CalcPlot = {0,0} // Include this calculated field or not
 		// end of same-size waves
-		
+
 		make/t/o sc_AsyncRecord = {""}
-		
+
 		// default colormap
 		string /g sc_ColorMap = "Grays"
-		
+
 		// Print variables
 		variable/g sc_PrintRaw = 1,sc_PrintCalc = 1
-		
+
 		// logging string
 		string /g sc_LogStr = "GetSRSStatus(srs1);"
-			
+
 		nvar filenum
 		if (numtype(filenum) == 2)
 			print "Initializing FileNum to 0 since it didn't exist before.\n"
@@ -307,7 +309,7 @@ function InitScanController(instrWave, [srv_push])
 			printf "Current FileNum is %d\n", filenum
 		endif
 	endif
-	
+
 	sc_rebuildwindow()
 end
 
@@ -333,36 +335,36 @@ function /S sc_createconfig()
 	nvar filenum
 	variable refnum
 	string configfile
-	
+
 	string configstr = "", tmpstr = ""
-	
+
 	// wave names
 	tmpstr = addJSONKeyVal(tmpstr, "raw", strVal=TextWaveToStrArray(sc_RawWaveNames))
 	tmpstr = addJSONKeyVal(tmpstr, "calc", strVal=TextWaveToStrArray(sc_CalcWaveNames))
 	configstr = addJSONKeyVal(configstr, "wave_names", strVal=tmpstr)
-	
+
 	// record?
 	tmpstr = ""
-	tmpstr = addJSONKeyVal(tmpstr, "raw", strVal=NumericWaveToBoolArray(sc_RawRecord)) 
+	tmpstr = addJSONKeyVal(tmpstr, "raw", strVal=NumericWaveToBoolArray(sc_RawRecord))
 	tmpstr = addJSONKeyVal(tmpstr, "calc", strVal=NumericWaveToBoolArray(sc_CalcRecord))
 	configstr = addJSONKeyVal(configstr, "record_waves", strVal=tmpstr)
-	
+
 	// plot?
 	tmpstr = ""
-	tmpstr = addJSONKeyVal(tmpstr, "raw", strVal=NumericWaveToBoolArray(sc_RawPlot)) 
+	tmpstr = addJSONKeyVal(tmpstr, "raw", strVal=NumericWaveToBoolArray(sc_RawPlot))
 	tmpstr = addJSONKeyVal(tmpstr, "calc", strVal=NumericWaveToBoolArray(sc_CalcPlot))
 	configstr = addJSONKeyVal(configstr, "plot_waves", strVal=tmpstr)
 
 	//scripts
 	tmpstr = ""
-	tmpstr = addJSONKeyVal(tmpstr, "request", strVal=TextWaveToStrArray(sc_RequestScripts)) 
+	tmpstr = addJSONKeyVal(tmpstr, "request", strVal=TextWaveToStrArray(sc_RequestScripts))
 	tmpstr = addJSONKeyVal(tmpstr, "response", strVal=TextWaveToStrArray(sc_GetResponseScripts))
 	tmpstr = addJSONKeyVal(tmpstr, "calc", strVal=TextWaveToStrArray(sc_CalcScripts))
 	configstr = addJSONKeyVal(configstr, "scripts", strVal=tmpstr)
-	
+
 	// executable string to get logs
 	configstr = addJSONKeyVal(configstr, "log_string", strVal="\""+sc_LogStr+"\"")
-	
+
 	// print_to_history
 	tmpstr = ""
 	tmpstr = addJSONKeyVal(tmpstr, "raw", strVal=numToBool(sc_PrintRaw))
@@ -372,7 +374,7 @@ function /S sc_createconfig()
 	// igor stuff
 	configstr = addJSONKeyVal(configstr, "colormap", strVal="\""+sc_ColorMap+"\"")
 	configstr = addJSONKeyVal(configstr, "filenum", strVal=num2istr(filenum))
-	
+
 	configfile = "sc" + num2istr(unixtime()) + ".config"
 	sc_current_config = configfile
 	writeJSONtoFile(configstr, configfile, "config")
@@ -390,12 +392,12 @@ function sc_loadconfig(configfile)
 	nvar filenum
 	variable i, confignum=0
 	string file_string, configunix
-	
+
 	printf "Loading configuration from: %s\n", configfile
 	sc_current_config = configfile
-	
+
 	string jstr = JSONfromFile("config", configfile)
-	
+
 	// load raw wave configuration
 	ArrayToTextWave(getJSONvalue(jstr, "wave_names:raw"), "sc_RawWaveNames")
 	ArrayToNumWave(getJSONvalue(jstr, "record_waves:raw"), "sc_RawRecord")
@@ -412,13 +414,13 @@ function sc_loadconfig(configfile)
 	// load print checkbox settings
 	sc_PrintRaw = str2num(getJSONvalue(jstr, "print_to_history:raw"))
 	sc_PrintCalc = str2num(getJSONvalue(jstr, "print_to_history:calc"))
-	
+
 	// load log string
 	sc_LogStr = stripCharacters(getJSONvalue(jstr, "log_string"), "\"")
-	
+
 	// load colormap
 	sc_ColorMap = stripCharacters(getJSONvalue(jstr, "colormap"), "\"")
-	
+
 end
 
 
@@ -466,12 +468,12 @@ function ChangeScanControllerItemStatus(wn, ison)
 		if (stringmatch(sc_CalcWaveNames[i], wn))
 			sc_CalcRecord[i]=ison
 			cmd = "CheckBox sc_CalcRecordCheckBox" + num2istr(i) + " value=" + num2istr(ison)
-			execute(cmd)	
+			execute(cmd)
 		endif
 		i+=1
 	while (i<numpnts( sc_CalcWaveNames ) && !done)
 
-	if (!done) 
+	if (!done)
 		print "Error: Could not find the wave name specified."
 	endif
 	execute("doupdate")
@@ -485,7 +487,7 @@ Window ScanController() : Panel
 		abort
 	endif
 
-	if (numpnts(sc_CalcWaveNames) != numpnts(sc_CalcRecord) ||  numpnts(sc_CalcWaveNames) != numpnts(sc_CalcScripts)) 
+	if (numpnts(sc_CalcWaveNames) != numpnts(sc_CalcRecord) ||  numpnts(sc_CalcWaveNames) != numpnts(sc_CalcScripts))
 		print "sc_CalcWaveNames, sc_CalcRecord, and sc_CalcScripts waves should have the number of elements.\n  Go to the beginning of InitScanController() to fix this.\n"
 		abort
 	endif
@@ -517,7 +519,7 @@ Window ScanController() : Panel
 		cmd="CheckBox sc_RawPlotCheckBox" + num2istr(i) + ", proc=sc_CheckBoxClicked, pos={210,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_RawPlot[i]) + " , title=\"\""
 		execute(cmd)
 		cmd="SetVariable sc_GetResponseScriptBox" + num2istr(i) + " pos={250, 37+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={410, 0}, fsize=14, title=\" \", value=sc_GetResponseScripts[i]"
-		execute(cmd)		
+		execute(cmd)
 		i+=1
 	while (i<numpnts( sc_RawWaveNames ))
 	i+=1
@@ -537,19 +539,19 @@ Window ScanController() : Panel
 	do
 		DrawRect 9,85+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing),5+sc_InnerBoxW,85+sc_InnerBoxH+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)
 		cmd="SetVariable sc_CalcWaveNameBox" + num2istr(i) + " pos={13, 92+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={110, 0}, fsize=14, title=\" \", value=sc_CalcWaveNames[i]"
-		execute(cmd)		
+		execute(cmd)
 		cmd="CheckBox sc_CalcRecordCheckBox" + num2istr(i) + ", proc=sc_CheckBoxClicked, pos={150,95+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_CalcRecord[i]) + " , title=\"\""
 		execute(cmd)
 		cmd="CheckBox sc_CalcPlotCheckBox" + num2istr(i) + ", proc=sc_CheckBoxClicked, pos={210,95+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_CalcPlot[i]) + " , title=\"\""
 		execute(cmd)
 		cmd="SetVariable sc_CalcScriptBox" + num2istr(i) + " pos={250, 92+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={410, 0}, fsize=14, title=\" \", value=sc_CalcScripts[i]"
-		execute(cmd)		
+		execute(cmd)
 		i+=1
-	while (i<numpnts( sc_CalcWaveNames ))	
+	while (i<numpnts( sc_CalcWaveNames ))
 	button addrowcalc,pos={550,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_addrow,title="Add Row"
 	button removerowcalc,pos={430,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_removerow,title="Remove Row"
 	checkbox sc_PrintCalcBox, pos={300,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)}, proc=sc_CheckBoxClicked, value=sc_PrintCalc,side=1,title="\Z14Print filenames"
-	
+
 	// box for logging functions
 	variable sc_Loggable
 	SetDrawEnv fsize= 16,fstyle= 1
@@ -557,15 +559,15 @@ Window ScanController() : Panel
 	DrawRect 9,120+5+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25,5+sc_InnerBoxW,120+5+sc_InnerBoxH+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25
 	cmd="SetVariable sc_LogStr pos={13, 127+5+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25}, size={sc_InnerBoxW-12, 0}, fsize=14, title=\" \", value=sc_LogStr"
 	execute(cmd)
-	
+
 	// helpful text
 	DrawText 13,170+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing),"Press Update to save changes."
 	DrawText 13,190+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing),"Press ESC to abort the scan and save data, while this window is active"
-	
+
 	// Close all open graphs
 	button killgraphs, pos={420,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={120,20},proc=sc_killgraphs,title="Close All Graphs"
 	button killabout, pos={220,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={190,20},proc=sc_controlwindows,title="Kill Sweep Control Windows"
-	
+
 	//Update button
 	button updatebutton, pos={550,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_updatewindow,title="Update"
 EndMacro
@@ -574,11 +576,11 @@ function sc_killgraphs(action) : Buttoncontrol
 	string action
 	string opengraphs
 	variable ii
-	
+
 	opengraphs = winlist("*",";","WIN:1")
 	if(itemsinlist(opengraphs)>0)
 		for(ii=0;ii<itemsinlist(opengraphs);ii+=1)
-			killwindow $stringfromlist(ii,opengraphs)	
+			killwindow $stringfromlist(ii,opengraphs)
 		endfor
 	endif
 	sc_controlwindows("") // Kill all open control windows
@@ -593,15 +595,15 @@ end
 function sc_addrow(action) : ButtonControl
 	string action
 	wave/t sc_RawWaveNames=sc_RawWaveNames
-	wave sc_RawRecord=sc_RawRecord 
+	wave sc_RawRecord=sc_RawRecord
 	wave sc_RawPlot=sc_RawPlot
 	wave/t sc_RequestScripts=sc_RequestScripts
 	wave/t sc_GetResponseScripts=sc_GetResponseScripts
 	wave/t sc_CalcWaveNames=sc_CalcWaveNames
-	wave sc_CalcRecord=sc_CalcRecord 
+	wave sc_CalcRecord=sc_CalcRecord
 	wave sc_CalcPlot=sc_CalcPlot
 	wave/t sc_CalcScripts=sc_CalcScripts
-	
+
 	strswitch(action)
 		case "addrowraw":
 			AppendString(sc_RawWaveNames, "")
@@ -623,15 +625,15 @@ end
 function sc_removerow(action) : Buttoncontrol
 	string action
 	wave/t sc_RawWaveNames=sc_RawWaveNames
-	wave sc_RawRecord=sc_RawRecord 
+	wave sc_RawRecord=sc_RawRecord
 	wave sc_RawPlot=sc_RawPlot
 	wave/t sc_RequestScripts=sc_RequestScripts
 	wave/t sc_GetResponseScripts=sc_GetResponseScripts
 	wave/t sc_CalcWaveNames=sc_CalcWaveNames
-	wave sc_CalcRecord=sc_CalcRecord 
+	wave sc_CalcRecord=sc_CalcRecord
 	wave sc_CalcPlot=sc_CalcPlot
 	wave/t sc_CalcScripts=sc_CalcScripts
-	
+
 	strswitch(action)
 		case "removerowraw":
 			if(numpnts(sc_RawWaveNames) > 1)
@@ -709,7 +711,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	string cmd2=""
 	variable index, graphopen, graphopen2d
 	svar sc_ColorMap
-	
+
 	//do some sanity checks on wave names: they should not start or end with numbers.
 	do
 		if (sc_RawRecord[i])
@@ -739,15 +741,15 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 			endif
 		endif
 		i+=1
-	while (i<numpnts(sc_CalcWaveNames))	
+	while (i<numpnts(sc_CalcWaveNames))
 	i=0
-	
+
 	// connect VISA instruments
 	// do this here, because if it fails
 	// i don't want to delete any old data
 	wave /t sc_connected_instruments
 	initVISAinstruments(sc_connected_instruments, verbose=0) // how to handle connInstr so SC knows about it???
-	
+
 	// The status of the upcoming scan will be set when waves are initialized.
 	if(!paramisdefault(starty) && !paramisdefault(finy) && !paramisdefault(numptsy))
 		sc_is2d = 1
@@ -761,21 +763,21 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		sc_is2d = 0
 		sc_startx = start
 		sc_finx = fin
-		sc_numptsx = numpts	
+		sc_numptsx = numpts
 	endif
-	
+
 	if(paramisdefault(x_label) || stringmatch(x_label,""))
 		sc_x_label=""
 	else
 		sc_x_label=x_label
 	endif
-	
+
 	if(paramisdefault(y_label) || stringmatch(y_label,""))
 		sc_y_label=""
 	else
 		sc_y_label=y_label
 	endif
-	
+
 	// create waves to hold x and y data (in case I want to save it)
 	cmd = "make /o/n=(" + num2istr(sc_numptsx) + ") " + "sc_xdata" + "=NaN"; execute(cmd)
 	cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + "sc_xdata"; execute(cmd)
@@ -785,7 +787,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		cmd = "setscale/I x " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", \"\", " + "sc_ydata"; execute(cmd)
 		cmd = "sc_ydata" +" = x"; execute(cmd)
 	endif
-	
+
 	// Initialize waves for raw data
 	do
 		if (sc_RawRecord[i] == 1 && cmpstr(sc_RawWaveNames[i], "") || sc_RawPlot[i] == 1 && cmpstr(sc_RawWaveNames[i], ""))
@@ -800,7 +802,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 				cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd)
 				cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn2d; execute(cmd)
 				cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
-			endif			
+			endif
 		endif
 		i+=1
 	while (i<numpnts(sc_RawWaveNames))
@@ -813,20 +815,20 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 			cmd = "make /o/n=(" + num2istr(sc_numptsx) + ") " + wn + "=NaN"
 			execute(cmd)
 			cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn
-			execute(cmd)		
+			execute(cmd)
 			if(sc_is2d)
 				// In case this is a 2D measurement
 				wn2d = wn + "2d"
 				cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd)
 				cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn2d; execute(cmd)
 				cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
-			endif			
+			endif
 		endif
 		// Add "[i]" to calculation scripts if needed
 		sc_CalcScripts[i] = construct_calc_script(sc_CalcScripts[i])
 		i+=1
 	while (i<numpnts(sc_CalcWaveNames))
-	
+
 	// Find all open plots
 	graphlist = winlist("*",";","WIN:1")
 	j=0
@@ -840,7 +842,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		graphnumlist+= graphnum+";"
 		j=index+1
 	endfor
-	
+
 	//Initialize plots for raw data waves
 	i=0
 	do
@@ -901,7 +903,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		endif
 		i+= 1
 	while(i<numpnts(sc_RawWaveNames))
-	
+
 	//Initialize plots for calculated data waves
 	i=0
 	do
@@ -962,9 +964,9 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		endif
 		i+= 1
 	while(i<numpnts(sc_CalcWaveNames))
-	
+
 	execute("abortmeasurementwindow()")
-	
+
 	cmd1 = "TileWindows/O=1/A=(3,4) "
 	// Tile graphs
 	for(i=0;i<itemsinlist(activegraphs);i=i+1)
@@ -981,11 +983,11 @@ function sc_controlwindows(action)
 	string action
 	string openaboutwindows
 	variable ii
-	
+
 	openaboutwindows = winlist("SweepControl*",";","WIN:64")
 	if(itemsinlist(openaboutwindows)>0)
 		for(ii=0;ii<itemsinlist(openaboutwindows);ii+=1)
-			killwindow $stringfromlist(ii,openaboutwindows)	
+			killwindow $stringfromlist(ii,openaboutwindows)
 		endfor
 	endif
 end
@@ -1009,7 +1011,7 @@ endmacro
 function stopsweep(action) : Buttoncontrol
 	string action
 	nvar sc_abortsweep,sc_abortnosave
-	
+
 	strswitch(action)
 		case "stopsweep":
 			sc_abortsweep = 1
@@ -1018,12 +1020,12 @@ function stopsweep(action) : Buttoncontrol
 			sc_abortnosave = 1
 			break
 	endswitch
-end 	
+end
 
 function pausesweep(action) : Buttoncontrol
 	string action
 	nvar sc_pause, sc_abortsweep
-	
+
 	Button pausesweep,proc=resumesweep,title="Resume"
 	sc_pause=1
 	print "Sweep paused by user"
@@ -1032,7 +1034,7 @@ end
 function resumesweep(action) : Buttoncontrol
 	string action
 	nvar sc_pause
-	
+
 	Button pausesweep,proc=pausesweep,title="Pause"
 	sc_pause = 0
 	print "Sweep resumed"
@@ -1045,7 +1047,7 @@ function sc_checksweepstate()
 			SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0)
 			abort
 		endif
-		
+
 		if(sc_abortsweep)
 			// If the Abort button is pressed during the scan, save existing data and stop the scan.
 			SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0)
@@ -1088,30 +1090,30 @@ function sc_sleep(delay)
 	variable delay
 	delay = delay*1e6 // convert to microseconds
 	variable start_time = stopMStimer(-2) // start the timer immediately
-	
+
 	doupdate // do this just once during the sleep function
-	
+
 	do
 		sc_checksweepstate()
 	while(stopMStimer(-2)-start_time < delay)
-	
+
 end
 
 /////////////////////////////
 ////  read/record funcs  ////
 /////////////////////////////
- 	
+
 function RecordValues(i, j, [scandirection, readvstime, fillnan])
 	// In a 1d scan, i is the index of the loop. j will be ignored.
-	// In a 2d scan, i is the index of the outer (slow) loop, and j is the index of the inner (fast) loop. 
+	// In a 2d scan, i is the index of the outer (slow) loop, and j is the index of the inner (fast) loop.
 
-	// In a 2D scan, if scandirection=1 (scan up), the 1d wave gets saved into the matrix when j=numptsy. 
+	// In a 2D scan, if scandirection=1 (scan up), the 1d wave gets saved into the matrix when j=numptsy.
 	// If scandirection=-1(scan down), the 1d matrix gets saved when j=0. Default is 1 (up)
-	
+
 	// readvstime works only in 1d and rescales (grows) the wave at each index
-		
+
 	// fillnan skips any read or calculation functions entirely and fills point [i,j] with nan
-	
+
 	variable i, j, scandirection, readvstime, fillnan
 	nvar sc_is2d, sc_startx, sc_finx, sc_numptsx, sc_starty, sc_finy, sc_numptsy
 	variable ii = 0, jj=0, k=0
@@ -1122,9 +1124,9 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 	variable innerindex, outerindex, tgID
 	nvar sc_abortsweep, sc_pause,sc_scanstarttime
 	variable /g sc_tmpVal
-	
+
 	//// setup all sorts of logic so we can store values correctly ////
-	
+
 	if (sc_is2d)
 		// 2d
 		innerindex = j
@@ -1134,26 +1136,26 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 		innerindex = i
 		outerindex = i // meaningless
 	endif
-	
+
 	// Default scan direction is up
 	if (paramisdefault(scandirection))
 		scandirection=1
 	endif
 	variable /g sc_scandirection = scandirection // create global variable for this
-	
+
 	// Set readvstime to 0 if it's not defined
 	if(paramisdefault(readvstime))
 		readvstime=0
 	endif
-	
+
 	if(paramisdefault(fillnan))
 		fillnan=0
 	endif
-	
+
 	if(readvstime==1 && sc_is2d)
 		abort "NOT IMPLEMENTED: Read vs Time is currently only supported for 1D sweeps."
 	endif
-	
+
 	//// Setup and run async data collection ////
 	ii=0
 	k=0
@@ -1166,7 +1168,7 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 			elseif(fillnan == 1)
 				wave wref1d = $sc_RawWaveNames[ii]
 				wref1d[innerindex] = nan
-			
+
 				if (sc_is2d)
 					// 2D Wave
 					wave wref2d = $sc_RawWaveNames[ii] + "2d"
@@ -1176,7 +1178,7 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 		endif
 		ii+=1
 	while(ii < numpnts(sc_RawWaveNames))
-	
+
 	if(k>0)
 		tgID = sc_StartThreads(k) //Startup and run function calls on mulitple threads, returns the thread group id.
 		sc_CollectDataFromThreads(tgID,k,readvstime,innerindex,outerindex) //Retrive data from threads when they are done.
@@ -1189,13 +1191,13 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 	do
 		if (strsearch(sc_GetResponseScripts[ii],"_async",0) == -1 && sc_RawRecord[ii] == 1 || strsearch(sc_GetResponseScripts[ii],"_async",0) == -1 && sc_RawPlot[ii] == 1)
 			wave wref1d = $sc_RawWaveNames[ii]
-			
+
 			// Redimension waves if readvstime is set to 1
 			if (readvstime == 1)
 				redimension /n=(innerindex+1) wref1d
 				setscale/I x 0,  datetime - sc_scanstarttime, wref1d
 			endif
-			
+
 			if(fillnan == 0)
 				script = sc_GetResponseScripts[ii] // assume script will execute and return a 'variable'
 												           // let it fail hard otherwise
@@ -1205,7 +1207,7 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 				sc_tmpval = nan
 			endif
 			wref1d[innerindex] = sc_tmpval
-			
+
 			if (sc_is2d)
 				// 2D Wave
 				wave wref2d = $sc_RawWaveNames[ii] + "2d"
@@ -1214,24 +1216,24 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 		endif
 		ii+=1
 	while (ii < numpnts(sc_RawWaveNames))
-	
+
 	//// Calculate interpreted numbers and store them in calculated waves ////
 	ii=0
 	cmd = ""
 	do
 		if (sc_CalcRecord[ii] == 1 || sc_CalcPlot[ii] == 1)
 			wave wref1d = $sc_CalcWaveNames[ii] // this is the 1D wave I am filling
-												  
+
 			// Redimension waves if readvstimeis set to 1
 			if (readvstime == 1)
 				redimension /n=(innerindex+1) wref1d
 				setscale/I x 0, datetime - sc_scanstarttime, wref1d
 			endif
-			
+
 			if(fillnan == 0)
 				script = sc_CalcScripts[ii]; // assume script will execute and return a 'variable'
 												     // let it fail hard otherwise
-												     
+
 				// Allow the use of the keyword '[i]' in calculated fields where i is the inner loop's current index
 				script = ReplaceString("[i]", script, "["+num2istr(innerindex)+"]")
 				sprintf cmd, "%s = %s", "sc_tmpVal", script
@@ -1240,15 +1242,15 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 				sc_tmpval = nan
 			endif
 			wref1d[innerindex] = sc_tmpval
-			
-			if (sc_is2d)				
+
+			if (sc_is2d)
 				wave wref2d = $sc_CalcWaveNames[ii] + "2d"
 				wref2d[innerindex][outerindex] = wref1d[innerindex]
 			endif
 		endif
 		ii+=1
 	while (ii < numpnts(sc_CalcWaveNames))
-	
+
 	// check abort/pause status
 	sc_checksweepstate()
 end
@@ -1258,9 +1260,9 @@ function sc_StartThreads(numThreads)
 	wave/t sc_AsyncRecord
 	variable tgID, i=0
 	string queryFunc, instSessionID, expr = "(.+)\((.+)\)"
-	
+
 	tgID = ThreadGroupCreate(numThreads)
-	
+
 	do
 		splitstring/e=(expr) sc_AsyncRecord[i], queryFunc, instSessionID
 		nvar instID = $instSessionID
@@ -1270,7 +1272,7 @@ function sc_StartThreads(numThreads)
 		threadstart tgID, i, sc_Worker(queryFunc)
 		i+=1
 	while(i<numThreads)
-	
+
 	return tgID
 end
 
@@ -1279,26 +1281,26 @@ function sc_CollectDataFromThreads(tgID,numThreads,readvstime,innerindex,outerin
 	variable processflag, i=0, threaddata
 	wave/t sc_RawWaveNames
 	nvar sc_is2d, sc_scanstarttime
-	
+
 	// wait for all threads to finish
 	do
 		processflag = ThreadGroupWait(tgID, 0)
 		sc_sleep(1.0e-3)
 	while(processflag>0)
-	
+
 	for(i=0;i<numThreads;i+=1)
 		wave wref1d = $sc_RawWaveNames[i]
 		threaddata = ThreadReturnValue(tgID, i)
-		
+
 		// Redimension waves if readvstime is set to 1
 		if (readvstime == 1)
 			redimension /n=(innerindex+1) wref1d
 			setscale/I x 0,  datetime - sc_scanstarttime, wref1d
 		endif
-		
+
 		wref1d[innerindex] = threaddata
-			
-		if (sc_is2d)				
+
+		if (sc_is2d)
 			wave wref2d = $sc_RawWaveNames[i] + "2d"
 			wref2d[innerindex][outerindex] = wref1d[innerindex]
 		endif
@@ -1308,7 +1310,7 @@ end
 function sc_KillThreads(tgID)
 	variable tgID
 	variable releaseResult
-	
+
 	releaseResult = ThreadGroupRelease(tgID)
 	if (releaseResult == -2)
 		abort "ThreadGroupRelease failed, threads were force quit. Igor should be restarted!"
@@ -1319,7 +1321,7 @@ end
 
 threadsafe function sc_Worker(queryfunc)
 	string queryfunc
-	
+
 	funcref func_async func = $queryfunc
 	return func(queryfunc)
 end
@@ -1334,7 +1336,7 @@ function/s construct_calc_script(script)
 	string test_wave
 	variable i=0, j=0, strpos
 	wave/t sc_RawWaveNames
-	
+
 	for(i=0;i<numpnts(sc_RawWaveNames);i+=1)
 		j=0
 		test_wave = sc_RawWaveNames[i]
@@ -1358,7 +1360,7 @@ end
 function /s getEquipLogs()
 	string buffer = ""
 	svar sc_LogStr
-	
+
 	//// all log strings should be valid JSON objects ////
 	if (strlen(sc_LogStr)>0)
 		string command, keylist = "", key = "", sval = ""
@@ -1377,7 +1379,7 @@ function /s getEquipLogs()
 				print "[WARNING] command failed to log anything: "+command+"\r"
 			endif
 		endfor
-	endif	
+	endif
 
 	return buffer
 end
@@ -1386,7 +1388,7 @@ function /s getExpStatus()
 	// returns JSON object full of details about the system and this run
 	nvar filenum, sweep_t_elapsed
 	svar sc_current_config
-		
+
 	// create header with corresponding .ibw name and date
 	string jstr = "", buffer = ""
 
@@ -1406,7 +1408,7 @@ function /s getExpStatus()
 	buffer = addJSONKeyVal(buffer, "winfs", strVal=getExpPath("winfs"), addQuotes = 1)
 	buffer = addJSONKeyVal(buffer, "config", strVal=getExpPath("config"), addQuotes = 1)
 	jstr = addJSONKeyVal(jstr, "paths", strVal=buffer)
-	
+
 	// information about this specific run
 	jstr = addJSONKeyVal(jstr, "filenum", numVal=filenum, fmtNum = "%.0f")
 	jstr = addJSONKeyVal(jstr, "time_completed", strVal=Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
@@ -1419,10 +1421,10 @@ end
 function /s getWaveStatus(datname)
 	string datname
 	nvar filenum
-	
+
 	// create header with corresponding .ibw name and date
-	string jstr="", buffer="" 
-	
+	string jstr="", buffer=""
+
 	// date/time info
 	jstr = addJSONKeyVal(jstr, "wave_name", strVal=datname, addQuotes = 1)
 	jstr = addJSONKeyVal(jstr, "filenum", numVal=filenum, fmtNum = "%.0f")
@@ -1437,7 +1439,7 @@ function /s getWaveStatus(datname)
 	else
 		dims = 3
 	endif
-	
+
 	if (dims==1)
 		wavestats/Q $datname
 		buffer = ""
@@ -1459,12 +1461,12 @@ function /s getWaveStatus(datname)
 	else
 		jstr = addJSONKeyVal(jstr, "wave_stats", strVal="Wave dimensions > 2. How did you get this far?", addQuotes = 1)
 	endif
-	
+
 	svar sc_x_label, sc_y_label
 	jstr = addJSONKeyVal(jstr, "x_label", strVal=sc_x_label, addQuotes = 1)
 	jstr = addJSONKeyVal(jstr, "y_label", strVal=sc_y_label, addQuotes = 1)
-	
-	return jstr	
+
+	return jstr
 end
 
 function saveExp()
@@ -1492,14 +1494,14 @@ function SaveWaves([msg, save_experiment])
 	else
 		msg=""
 	endif
-	
+
 	if (paramisdefault(save_experiment))
 		save_experiment = 1 // save the experiment by default
 	endif
-	
+
 	variable /g sc_save_exp = save_experiment
 	nvar sc_save_time
-	
+
 	if (strlen(sc_LogStr)!=0)
 		logs = sc_LogStr
 	endif
@@ -1507,7 +1509,7 @@ function SaveWaves([msg, save_experiment])
 	// save timing variables
 	variable /g sweep_t_elapsed = datetime-sc_scanstarttime
 	printf "Time elapsed: %.2f s \r", sweep_t_elapsed
-	
+
 	dowindow /k SweepControl // kill scan control window
 
 	// count up the number of data files to save
@@ -1516,17 +1518,17 @@ function SaveWaves([msg, save_experiment])
 	Rawadd = V_Sum
 	wavestats /Q/Z sc_CalcRecord
 	Calcadd = V_Sum
-	
+
 	if(Rawadd+Calcadd > 0)
 		// there is data to save!
 		// save it and increment the filenumber
 		printf "saving all dat%d files...\r", filenum
-		
+
 		// Open up any files that may be needed
 	 	// Save scan controller meta data in this function as well
-	 	
+
 		initSaveFiles(msg=msg)
-		
+
 		// save raw data waves
 		ii=0
 		do
@@ -1544,7 +1546,7 @@ function SaveWaves([msg, save_experiment])
 			endif
 			ii+=1
 		while (ii < numpnts(sc_RawWaveNames))
-	
+
 		//save calculated data waves
 		ii=0
 		do
@@ -1563,7 +1565,7 @@ function SaveWaves([msg, save_experiment])
 			ii+=1
 		while (ii < numpnts(sc_CalcWaveNames))
 	endif
-		
+
 	if(sc_save_exp==1 & (datetime-sc_save_time)>180.0)
 		// save if sc_save_exp=1
 		// and if more than 3 minutes has elapsed since previous saveExp
@@ -1571,7 +1573,7 @@ function SaveWaves([msg, save_experiment])
 		saveExp()
 		sc_save_time = datetime
 	endif
-	
+
 	if(sc_srv_push==1)
 		sc_findNewFiles(filenum)
 		sc_NotifyServer() // this may leave the experiment file open for some time
@@ -1582,13 +1584,13 @@ function SaveWaves([msg, save_experiment])
 		                            // I assume you're testing something
 		                            //     and may want to keep track of the files another way
 	endif
-	
+
 	// close save files and increment filenum
 	if(Rawadd+Calcadd > 0)
 		endSaveFiles()
 		filenum+=1
 	endif
-	
+
 end
 
 function SaveFromPXP([history, procedure])
@@ -1596,27 +1598,27 @@ function SaveFromPXP([history, procedure])
 	// to save history as plain text: history=1
 	// to save main procedure window as .ipf, procedure=1
 	// if history=0 or procedure=0, they will not be saved
-	
+
 	variable history, procedure
-	
+
 	if(paramisdefault(history))
 		history=1
 	endif
-	
+
 	if(paramisdefault(procedure))
 		procedure=1
 	endif
-	
+
 	if(procedure!=1 && history!=1)
 		// why did you do this?
 		return 0
 	endif
-	
+
 	// open experiment file as read-only
 	// make sure it exists and get total size
 	string expFile = igorinfo(1)+".pxp"
 	variable expRef
-	open /r/z/p=data expRef as expFile 
+	open /r/z/p=data expRef as expFile
 	if(V_flag!=0)
 		print "Experiment file could not be opened to fetch command history: ", expFile
 		return 0
@@ -1635,41 +1637,41 @@ function SaveFromPXP([history, procedure])
 		recordType = recordType&0x7FFF     // mask to get just the type value
 		FBinRead /F=2 expRef, version      // signed, two-byte integer
 		FBinRead /F=3 expRef, numDataBytes // signed, four-byte integer
-		
+
 		FGetPos expRef // get current file position in V_filePos
-		
+
 		if(recordType==2)
 			foundHistory=1
 			startHistory=V_filePos
 			numHistoryBytes=numDataBytes
 		endif
-		
+
 		if(recordType==5)
 			foundProcedure=1
 			startProcedure=V_filePos
 			numProcedureBytes=numDataBytes
 		endif
-		
+
 		if(foundHistory==1 && foundProcedure==1)
 			break
 		endif
-		
+
 		pos = V_filePos + numDataBytes // set new header position if I need to keep looking
 	while(pos<totalBytes)
 
 	variable warnings=0
-	
+
 	string buffer=""
 	variable bytes=0, t_start=0
 	if(history==1 && foundHistory==1)
 		// I want to save it + I can save it
-		
+
 		string histFile = igorinfo(1)+".history"
 		variable histRef
 		open /p=data histRef as histFile
-	
+
 		FSetPos expRef, startHistory
-		
+
 		buffer=""
 		bytes=0
 		t_start=datetime
@@ -1677,7 +1679,7 @@ function SaveFromPXP([history, procedure])
 			FReadLine /N=(numHistoryBytes-bytes) expRef, buffer
 			bytes+=strlen(buffer)
 			fprintf histRef, "%s", ReplaceBullets(buffer)
-			
+
 			if(datetime-t_start>2.0)
 				// timeout at 2 seconds
 				// something went wrong
@@ -1690,24 +1692,24 @@ function SaveFromPXP([history, procedure])
 			endif
 		while(bytes<numHistoryBytes)
 		close histRef
-		
+
 	elseif(history==1 && foundHistory==0)
 		// I want to save it but I cannot save it
-		
+
 		print "[WARNING] No command history saved"
 		warnings += 1
-		
-	endif	
+
+	endif
 
 	if(procedure==1 && foundProcedure==1)
 		// I want to save it + I can save it
-		
+
 		string procFile = igorinfo(1)+".ipf"
 		variable procRef
 		open /p=data procRef as procFile
-	
+
 		FSetPos expRef, startProcedure
-		
+
 		buffer=""
 		bytes=0
 		t_start=datetime
@@ -1715,7 +1717,7 @@ function SaveFromPXP([history, procedure])
 			FReadLine /N=(numProcedureBytes-bytes) expRef, buffer
 			bytes+=strlen(buffer)
 			fprintf procRef, "%s", buffer
-			
+
 			if(datetime-t_start>2.0)
 				// timeout at 2 seconds
 				// something went wrong
@@ -1726,15 +1728,15 @@ function SaveFromPXP([history, procedure])
 				// this is probably fine
 				break
 			endif
-			
+
 		while(bytes<numProcedureBytes)
 		close procRef
-		
+
 	elseif(procedure==1 && foundProcedure==0)
 		// I want to save it but I cannot save it
 		print "WARNING: no procedure window saved"
 		warnings += 1
-	endif	
+	endif
 
 	close expRef
 end
@@ -1751,7 +1753,7 @@ function sc_findNewFiles(datnum)
 	string winfpath = getExpPath("winfs", full=0)
 	string configpath = getExpPath("config", full=0)
 	string datapath = getExpPath("data", full=0)
-	
+
 	//// create/open qdot-server.notify ////
 	string notifyText = "", buffer
 	getfilefolderinfo /Q/Z/P=data "qdot-server.notify"
@@ -1762,7 +1764,7 @@ function sc_findNewFiles(datnum)
 		open /A/P=data refNum as "qdot-server.notify"
 		FSetPos refNum, 0
 		variable lines = 0
-		do 
+		do
 			FReadLine refNum, buffer
 			if(lines>0)
 				notifyText+=buffer
@@ -1770,13 +1772,13 @@ function sc_findNewFiles(datnum)
 			lines +=1
 		while(strlen(buffer)>0)
 	endif
-	
+
 	variable notifyLen = strlen(notifyText)
 	variable result = 0
 	string tmpname = ""
-	
+
 	// add the most recent scan controller config file
-	
+
 	string configlist=""
 	getfilefolderinfo /Q/Z/P=config // check if config folder exists before looking for files
 	if(V_flag==0 && V_isFolder==1)
@@ -1797,7 +1799,7 @@ function sc_findNewFiles(datnum)
 			endif
 		endif
 	endif
-	
+
 	// add experiment and history files
 	// only if I saved the experiment this run
 	if(sc_save_exp == 1)
@@ -1814,7 +1816,7 @@ function sc_findNewFiles(datnum)
 				fprintf refnum, "%s\n", tmpname
 			endif
 		endif
-	
+
 		// add history file
 		tmpname = datapath+igorinfo(1)+".history"
 		if(notifyLen==0)
@@ -1829,7 +1831,7 @@ function sc_findNewFiles(datnum)
 			endif
 		endif
 	endif
-	
+
 	// find new data files
 	string extensions = ".ibw;.h5;.txt;.itx"
 	string datstr = "", idxList, matchList
@@ -1844,7 +1846,7 @@ function sc_findNewFiles(datnum)
 		if(strlen(matchlist)==0)
 			continue
 		endif
-		
+
 		for(j=0;j<ItemsInList(matchList, ";");j+=1)
 			tmpname = datapath+StringFromList(j,matchList, ";")
 			if(notifyLen==0)
@@ -1878,7 +1880,7 @@ function sc_findNewFiles(datnum)
 		if(strlen(matchlist)==0)
 			continue
 		endif
-		
+
 		for(j=0;j<ItemsInList(matchList, ";");j+=1)
 			tmpname = winfpath+StringFromList(j,matchList, ";")
 			if(notifyLen==0)
@@ -1894,17 +1896,17 @@ function sc_findNewFiles(datnum)
 			endif
 		endfor
 	endfor
-	
+
 	close refnum // close qdot-server.notify
 end
 
 function sc_NotifyServer()
 	svar server_url
-	
+
 	variable refnum
 	open /A/P=data refnum as "qdot-server.notify"
-	
-	
+
+
 	if(refnum==0)
 		// if there is not qdot-server.notify file
 		// I don't need to do anything
@@ -1914,7 +1916,7 @@ function sc_NotifyServer()
 		fprintf refnum, "\n"
 		close refnum
 	endif
-	
+
 	URLRequest /TIME=5.0 /P=data /DFIL="qdot-server.notify" url=server_url, method=post
 	if (V_flag == 0)    // No error
 		if (V_responseCode != 200)  // 200 is the HTTP OK code
@@ -1942,7 +1944,7 @@ end
 function /S getSlackNotice(username, [message, channel, botname, emoji, min_time])
 	// this function will send a notification to Slack
 	// username = your slack username
-	
+
 	// message = string to include in Slack message
 	// channel = slack channel to post the message in
 	//            if no channel is provided a DM will be sent to username
@@ -1955,7 +1957,7 @@ function /S getSlackNotice(username, [message, channel, botname, emoji, min_time
 	nvar filenum, sweep_t_elapsed, sc_abortsweep
 	svar slack_url
 	string txt="", buffer="", payload="", out=""
-	
+
 	//// check if I need a notification ////
 	if (paramisdefault(min_time))
 		min_time = 60.0 // seconds
@@ -1964,51 +1966,51 @@ function /S getSlackNotice(username, [message, channel, botname, emoji, min_time
 	if(sweep_t_elapsed < min_time)
 		return addJSONKeyVal(out, "notified", strVal="false") // no notification if min_time is not exceeded
 	endif
-	
+
 	if(sc_abortsweep)
 		return addJSONKeyVal(out, "notified", strVal="false") // no notification if sweep was aborted by the user
 	endif
-	//// end notification checks //// 
-	
-	
+	//// end notification checks ////
+
+
 	//// build notification text ////
-	if (!paramisdefault(channel)) 
+	if (!paramisdefault(channel))
 		// message will be sent to public channel
 		// user who sent it will be mentioned at the beginning of the message
-		txt += "<@"+username+">\r" 
+		txt += "<@"+username+">\r"
 	endif
-	
+
 	if (!paramisdefault(message) && strlen(message)>0)
 		txt += RemoveTrailingWhitespace(message) + "\r"
 	endif
-		
-	sprintf buffer, "dat%d completed:  %s %s \r", filenum, Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); txt+=buffer 
+
+	sprintf buffer, "dat%d completed:  %s %s \r", filenum, Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); txt+=buffer
 	sprintf buffer, "time elapsed:  %.2f s \r", sweep_t_elapsed; txt+=buffer
 	//// end build txt ////
-	
-	
+
+
 	//// build payload ////
-	sprintf buffer, "{\"text\": \"%s\"", txt; payload+=buffer // 
-	
+	sprintf buffer, "{\"text\": \"%s\"", txt; payload+=buffer //
+
 	if (paramisdefault(botname))
 		botname = "qdotbot"
-	endif	
+	endif
 	sprintf buffer, ", \"username\": \"%s\"", botname; payload+=buffer
-	
+
 	if (paramisdefault(channel))
 		sprintf buffer, ", \"channel\": \"@%s\"", username; payload+=buffer
 	else
 		sprintf buffer, ", \"channel\": \"#%s\"", channel; payload+=buffer
 	endif
-	
+
 	if (paramisdefault(emoji))
 		emoji = ":the_horns:"
-	endif	
-	sprintf buffer, ", \"icon_emoji\": \"%s\"", emoji; payload+=buffer // 
-	
+	endif
+	sprintf buffer, ", \"icon_emoji\": \"%s\"", emoji; payload+=buffer //
+
 	payload += "}"
 	//// end payload ////
-	
+
 	URLRequest /DSTR=payload url=slack_url, method=post
 	if (V_flag == 0)    // No error
         if (V_responseCode != 200)  // 200 is the HTTP OK code
@@ -2034,11 +2036,11 @@ function sc_testreadtime(numpts, delay) //Units: s
 	variable i=0, ttotal = 0, tstart = datetime
 	do
 		sc_sleep(delay)
-		RecordValues(i, 0, fillnan=0) 
+		RecordValues(i, 0, fillnan=0)
 		i+=1
 	while (i<numpts)
 	ttotal = datetime-tstart
 	printf "each RecordValues(...) call takes ~%.1fms \n", ttotal/numpts*1000 - delay*1000
-	
+
 	sc_controlwindows("") // kill sweep control windows
 end

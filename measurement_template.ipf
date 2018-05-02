@@ -20,6 +20,8 @@ mmamacro initexp()
                           "dmm18", "GPIB::18::INSTR", ""     }, {\
                           "ips2",  "ASRL2::INSTR",    "R1"   }}
   InitScanController(connInstr, srv_push=0) // pass instrument list wave to scan controller
+                                            // this connects to all Instruments
+                                            // and prints their test function output
   sc_ColorMap = "VioletOrangeYellow" // change default colormap (default=Grays)
 
   ///// configure instruments /////
