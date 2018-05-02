@@ -7,16 +7,16 @@
 // Authors: Mohammad Samani, Nik Hartman & Christian Olsen
 
 // Updates in 2.0:
-// 	-- Async functionallity is now nativly supported by scancontroller.
+
 //		-- All drivers now uses the VISA xop, as it is the only one supporting multiple threads.
 //			Therefore VDT and GPIB xop's should not be used anymore.
 //		-- "Request scripts" are removed from the scancontroller window. Its only use was
-//			trying to do async communication (badly).
+//			 trying to do async communication (badly).
 
 //TODO:
+// 	 -- add async functionallity support
+//     -- add a new type of value to record that can/will be read during sc_sleep?
 
-//     -- add a new type of value to record that can/will be read during sc_sleep
-//     -- Use FunctionPath(functionNameStr) to find which scancontroller data type is being used
 
 //FIX:
 //     -- NaN handling in JSON package
@@ -229,9 +229,15 @@ end
 //// start scan controller ////
 ///////////////////////////////
 
-function InitScanController([srv_push])
+function InitScanController(instrWave, [srv_push])
 	// srv_push = 1 to alert qdot-server of new data
+	wave /t instrWave
 	variable srv_push
+	
+	// set reference to instrument wave for scan controller
+	wave /t sc_connected_instruments = instrWave
+	
+	// set server push variable for scan controller
 	variable /g sc_srv_push
 	if(paramisdefault(srv_push) || srv_push==1)
 		sc_srv_push = 1
@@ -735,6 +741,12 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		i+=1
 	while (i<numpnts(sc_CalcWaveNames))	
 	i=0
+	
+	// connect VISA instruments
+	// do this here, because if it fails
+	// i don't want to delete any old data
+	wave /t sc_connected_instruments
+	initVISAinstruments(sc_connected_instruments, verbose=0) // how to handle connInstr so SC knows about it???
 	
 	// The status of the upcoming scan will be set when waves are initialized.
 	if(!paramisdefault(starty) && !paramisdefault(finy) && !paramisdefault(numptsy))

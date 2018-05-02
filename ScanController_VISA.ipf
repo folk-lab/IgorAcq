@@ -13,7 +13,7 @@
 //////////////////////////////
 
 function killVISA()
-	VISAControl killIO	  //Terminate all VISA sessions, put in nice state
+	VISAControl killIO	  //Terminate all VISA sessions
 end
 
 function gpibRENassert()
@@ -84,7 +84,7 @@ function openInstr(var_name, instrDesc, [localRM, verbose])
 	
 end
 
-function initInstrFromWave(instrWave, [verbose])
+function initVISAinstruments(instrWave, [verbose])
 	// each column (d=1) in instrWave represents an instrument
 	// there should be 3 rows (d=0) for each column 
 	//    with 'variable name', 'VISA address', and 'test function'
@@ -105,8 +105,16 @@ function initInstrFromWave(instrWave, [verbose])
 	// open resource manager
 	nvar /z globalRM
 	if(!nvar_exists(globalRM))
+		// if globalRM does not exist
+		// open RM and create the global variable
 		openResourceManager()
 		nvar globalRM
+	else
+		// if globalRM does exist
+		// close all connection
+		// reopen everything
+		closeAllInstr()
+		openResourceManager()
 	endif
 	
 	variable numInstr = dimsize(instrWave,1), i=0
@@ -114,18 +122,18 @@ function initInstrFromWave(instrWave, [verbose])
 	for(i=0;i<numInstr;i++)
 	
 		// open VISA connection to instrument
-		openInstr(instrWave[0][i], instrWave[1][i], localRM = globalRM)
+		openInstr(instrWave[0][i], instrWave[1][i], localRM = globalRM, verbose = verbose)
 
 		// test block
 		if(strlen(instrWave[2][i])==0)
 			if(verbose)
-				print "No test\r" + instrWave[2][i]
+				print "\t-- No test\r" + instrWave[2][i]
 			endif
 		else
 			nvar inst = $instrWave[0][i]
-			response = queryInstr(inst, instrWave[2][i], "\r\n", "\r\n")
+			response = queryInstr(inst, instrWave[2][i], "\r\n", "\r\n") // all the term characters!
 			if(verbose)
-				printf "\t%s responded to %s with: %s\r", instrWave[0][i], instrWave[2][i], response
+				printf "\t-- %s responded to %s with: %s\r", instrWave[0][i], instrWave[2][i], response
 			endif
 		endif
 	endfor
