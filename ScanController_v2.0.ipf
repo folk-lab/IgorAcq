@@ -20,6 +20,8 @@
 
 //FIX:
 //     -- NaN handling in JSON package
+//     -- load config has a problem with strings in the logging function list, for example
+//            getSlackNotice("nik.hartman", min_time=120.0); reloads as getSlackNotice(
 
 
 ///////////////////////////////
@@ -29,6 +31,13 @@
 function unixtime()
 	// returns the current unix time in seconds
 	return DateTime - date2secs(1970,1,1) - date2secs(-1,-1,-1)
+end
+
+function roundNum(number,decimalplace) // to return integers, decimalplace=0
+	variable number, decimalplace
+	variable multiplier
+	multiplier = 10^decimalplace
+	return round(number*multiplier)/multiplier
 end
 
 function AppendValue(thewave, thevalue)
@@ -44,6 +53,23 @@ function AppendString(thewave, thestring)
 	Redimension /N=(numpnts(thewave)+1) thewave
 	thewave[numpnts(thewave)-1] = thestring
 end
+
+Function/t removeStringListDuplicates(theListStr)
+	// credit: http://www.igorexchange.com/node/1071
+	String theListStr
+ 
+	String retStr = ""
+	variable ii
+	for(ii = 0 ; ii < itemsinlist(theListStr) ; ii+=1)
+		if(whichlistitem(stringfromlist(ii , theListStr), retStr) == -1)
+			retStr = addlistitem(stringfromlist(ii, theListStr), retStr, ";", inf)
+		endif
+	endfor
+	return retStr
+End
+
+// removeAllWhitespace() has been removed
+// use TrimString() instead
 
 Function/S RemoveLeadingWhitespace(str)
     String str
@@ -1901,7 +1927,7 @@ function sc_DeleteNotificationFile()
 	endif
 end
 
-function getSlackNotice(username, [message, channel, botname, emoji, min_time])
+function /S getSlackNotice(username, [message, channel, botname, emoji, min_time])
 	// this function will send a notification to Slack
 	// username = your slack username
 	
@@ -1916,7 +1942,7 @@ function getSlackNotice(username, [message, channel, botname, emoji, min_time])
 	variable min_time
 	nvar filenum, sweep_t_elapsed, sc_abortsweep
 	svar slack_url
-	string txt="", buffer="", payload=""
+	string txt="", buffer="", payload="", out=""
 	
 	//// check if I need a notification ////
 	if (paramisdefault(min_time))
@@ -1924,11 +1950,11 @@ function getSlackNotice(username, [message, channel, botname, emoji, min_time])
 	endif
 
 	if(sweep_t_elapsed < min_time)
-		return 0 // no notification if min_time is not exceeded
+		return addJSONKeyVal(out, "notified", strVal="false") // no notification if min_time is not exceeded
 	endif
 	
 	if(sc_abortsweep)
-		return 0 // no notification if sweep was aborted by the user
+		return addJSONKeyVal(out, "notified", strVal="false") // no notification if sweep was aborted by the user
 	endif
 	//// end notification checks //// 
 	
@@ -1975,13 +2001,13 @@ function getSlackNotice(username, [message, channel, botname, emoji, min_time])
 	if (V_flag == 0)    // No error
         if (V_responseCode != 200)  // 200 is the HTTP OK code
             print "Slack post failed!"
-            return 0
+            return addJSONKeyVal(out, "notified", strVal="false")
         else
-            return 1
+            return addJSONKeyVal(out, "notified", strVal="true")
         endif
     else
         print "HTTP connection error. Slack post not attempted."
-        return 0
+        return addJSONKeyVal(out, "notified", strVal="false")
     endif
 end
 
