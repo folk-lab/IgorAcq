@@ -79,6 +79,20 @@ function getIPS120volts(instrID) // return in A
 	return volts
 end
 
+threadsafe function getIPS120volts_Async(datafolderID) // Units: mV
+	string datafolderID
+	
+	// get instrument ID from datafolder
+	DFREF dfr = ThreadGroupGetDFR(0,inf)
+	setdatafolder dfr
+	nvar instrID = $(":"+datafolderID+":instrID")
+	killdatafolder dfr // We don't need the datafolder anymore!
+	
+	variable volts
+	volts = str2num(queryInstr(instrID, "R1", "\r", "\r")[1,inf]) // get value
+	return volts
+end
+
 function getIPS120current(instrID) // return in A
 	variable instrID
 	wave/t magnetvalsstr=magnetvalsstr
