@@ -37,7 +37,7 @@ end
 
 function initIPS120(instrID)
 	variable instrID
-	variable /g ips_window_ctrl=instrID // copy of instrID to be used for the window
+	string /g ips_controller_addr = getResourceAddress(instrID)
 	
 	// currently hard coded for BFXLD 3" magnet
 	variable/g ampspertesla=9.569 // A/T
@@ -52,18 +52,18 @@ function initIPS120(instrID)
 	writeInstr(instrID, "Q4", "\r")    // Use extented resolusion (0.0001 amp/0.01 mT), no response from magnet
 	writeIPScheck(instrID, "A0") // Set to Hold
 	
-//	dowindow/k IPS_Window
+	dowindow/k IPS_Window
 	make /t/o magnetvalsstr = {{"Current field [mT]","Current amp [A]","Set point [mT]","Set point [A]","Sweep rate [mT/min]","Sweep rate [A/min]","Switch heater"},{"0","0","0","0","0","0","OFF"}}
-//	make /o listboxattr_mag={{0,0,0,0,0,0,0},{0,0,2,0,2,0,0}} // Setting list attributes. 0 = non-interactive, 2 = interactive
+	make /o listboxattr_mag={{0,0,0,0,0,0,0},{0,0,2,0,2,0,0}} // Setting list attributes. 0 = non-interactive, 2 = interactive
 	
 	setIPS120rate(instrID, 100)
 	
 	string/g oldsweeprate = magnetvalsstr[4][1]
 	string/g oldsetpoint = "0"
 	
-//	execute("IPS_window()")
-//	execute("Magnetsettings_window()")
-//	PauseForUser Magnetsettings
+	execute("IPS_window()")
+	execute("Magnetsettings_window()")
+	PauseForUser Magnetsettings
 
 end
 

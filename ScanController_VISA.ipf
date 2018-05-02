@@ -16,18 +16,22 @@ function killVISA()
 	VISAControl killIO	  //Terminate all VISA sessions
 end
 
-function gpibRENassert()
-	nvar globalRM
-	viGpibControlREN(globalRM, 1)  // assert remote control enable
+function /s getResourceAddress(instrID)
+	variable instrID
+	string address
+
+	viGetAttributeString(instrID, VI_ATTR_RSRC_NAME , address  )
+
+	return address
 end
 
 threadsafe function VISAerrormsg(descriptor, localRM, status)
-	String descriptor			// string to identify where this problem originated, e.g., viRead 
+	String descriptor			// string to identify where this problem originated, e.g., viRead
 	Variable localRM			// Session ID obtained from viOpen
 	Variable status				// Status code from VISA library
 	
 	String desc
-	
+
 	viStatusDesc(localRM, status, desc)
 	Printf "%s error (%x): %s\r", descriptor, status, desc
 
@@ -36,13 +40,13 @@ End
 function openResourceManager()
 	variable status, localRM
 	string error
-	
+
 	// check for old call to viOpenDefaultRM and close it
 	nvar /z globalRM
 	if(nvar_exists(globalRM))
 		viClose(globalRM)
 	endif
-	
+
 	// open VISA session and store ID in localRM
 	status = viOpenDefaultRM(localRM)
 	if(status < 0)
@@ -81,27 +85,27 @@ function openInstr(var_name, instrDesc, [localRM, verbose])
 			printf "%s connected as %s\r", instrDesc, var_name
 		endif
 	endif
-	
+
 end
 
 function initVISAinstruments(instrWave, [verbose])
 	// each column (d=1) in instrWave represents an instrument
-	// there should be 3 rows (d=0) for each column 
+	// there should be 3 rows (d=0) for each column
 	//    with 'variable name', 'VISA address', and 'test function'
-	
+
 	wave /t &instrWave
 	variable verbose
-	
+
 	if(dimsize(instrWave,0)!=3)
 		abort "instrWave must have 3 rows for each column -- {'variable name', 'VISA address', 'test function'}"
 	endif
-	
+
 	if(paramisdefault(verbose))
 		verbose=1
 	elseif(verbose!=1)
 		verbose=0
 	endif
-	
+
 	// open resource manager
 	nvar /z globalRM
 	if(!nvar_exists(globalRM))
@@ -116,11 +120,11 @@ function initVISAinstruments(instrWave, [verbose])
 		closeAllInstr()
 		openResourceManager()
 	endif
-	
+
 	variable numInstr = dimsize(instrWave,1), i=0
 	string response
 	for(i=0;i<numInstr;i++)
-	
+
 		// open VISA connection to instrument
 		openInstr(instrWave[0][i], instrWave[1][i], localRM = globalRM, verbose = verbose)
 
@@ -132,6 +136,9 @@ function initVISAinstruments(instrWave, [verbose])
 		else
 			nvar inst = $instrWave[0][i]
 			response = queryInstr(inst, instrWave[2][i], "\r\n", "\r\n") // all the term characters!
+			if(cmpstr(TrimString(response), "NaN")==0)
+				abort
+			endif
 			if(verbose)
 				printf "\t-- %s responded to %s with: %s\r", instrWave[0][i], instrWave[2][i], response
 			endif
@@ -150,7 +157,7 @@ function closeInstr(instrID)
 	else
 		printf "%s", instrID
 	endif
-	
+
 end
 
 function closeAllInstr()
@@ -163,14 +170,14 @@ function closeAllInstr()
 		viClose(globalRM)
 	endif
 end
-	
+
 
 threadsafe function writeInstr(instrID, cmd, write_term)
 	// generic error checking write function
 	variable instrID
 	string cmd, write_term
 	variable status
-	
+
 	VISAwrite instrID, cmd+write_term
 	if (V_flag==0)
 		VISAerrormsg("writeInstr() -- viWrite", instrID, V_status)
@@ -183,13 +190,13 @@ threadsafe function/s readInstr(instrID, read_term)
 	variable instrID
 	string read_term
 	string response
-	
+
 	VISAread/T=read_term instrID, response
 	if (V_flag==0)
 		VISAerrormsg("readInstr() -- viWrite", instrID, V_status)
 		return "NaN" // abort not supported in threads (v7)
 	endif
-	
+
 	return response
 end
 
@@ -198,13 +205,13 @@ threadsafe function/s queryInstr(instrID, cmd, write_term, read_term, [delay])
 	variable instrID, delay
 	string cmd, write_term, read_term
 	string response
-	
+
 	writeInstr(instrID, cmd, write_term)
 	if(!paramisdefault(delay))
 		sleep /S delay
 	endif
 	response = readInstr(instrID, read_term)
-	
+
 	return response
 end
 
@@ -212,19 +219,24 @@ end
 /// GPIB ///
 ////////////
 
+function gpibRENassert()
+	nvar globalRM
+	viGpibControlREN(globalRM, 1)  // assert remote control enable
+end
+
 function listGPIBinstr()
 	// find all gpib address with an active device
 	variable status, findlist=0, instrcnt=0, i=0
 	string instrDesc="", instrtype, instrname, error, summary
 	variable instrID
-	
+
 	// open resource manager
 	nvar /z globalRM
 	if(!nvar_exists(globalRM))
 		openResourceManager()
 		nvar globalRM
 	endif
-	
+
 	// print list of serial ports/instruments
 	status = viFindRsrc(globalRM,"GPIB?*INSTR",findlist,instrcnt,instrDesc)
 	if(status < 0)
@@ -236,37 +248,37 @@ function listGPIBinstr()
 	endif
 
 	for(i=0;i<instrcnt;i+=1)
-	
+
 		if(i!=0)
 			viFindNext(findlist,instrDesc) // get the next instrument descriptor
 		endif
-		
+
 		printf "%d) \t%s\r", i, instrDesc
 	endfor
-	
+
 end
-		
+
 //function autoInitGPIB()
 //	variable status, findlist=0, instrcnt=0, i=0
 //	string instrDesc="", instrtype, instrname, error, summary
 //	variable instrID
 //	string/g serialinfo = "\rSerial instruments:\r\t"
-//	
+//
 //	// check for resource manager
 //	nvar /z globalRM
 //	if(!nvar_exists(globalRM))
 //		openResourceManager()
 //		nvar globalRM
 //	endif
-//	
+//
 //	make/o/t/n=30 idwave=""
 //	make/o/n=5 gpibCount=0  // n=5 refers to how many known instrument
 //									// types there are. see DetermineGPIBInstrType()
-//	
+//
 //	// create list of GPIB instruments
 //	status = viFindRsrc(globalRM,"GPIB?*INSTR",findlist,instrcnt,instrDesc)
 //	if(status < 0)
-//		viStatusDesc(globalRM, status, error)	
+//		viStatusDesc(globalRM, status, error)
 //		printf "viFindRsrc error (GPIB): %s\r", error
 //		return 0
 //	elseif(instrcnt==0)
@@ -276,18 +288,18 @@ end
 //
 //	// connect GPIB instruments
 //	for(i=0;i<instrcnt;i+=1)
-//	
+//
 //		if(i!=0)
 //			viFindNext(findlist,instrDesc) // get the next instrument descriptor
 //		endif
-//		
+//
 //		instrID = openinstr(globalRM,instrDesc)
 //		instrtype = DetermineGPIBInstrType(instrDesc,globalRM,instrID)
 //		instrname = CreateGPIBInstrID(instrtype,instrDesc,instrID)
 //		idwave[i] = instrname
 //	endfor
 //	CreateGPIBSummary(instrcnt)
-//	
+//
 //	return instrcnt
 //end
 
@@ -296,9 +308,9 @@ end
 //	variable localRM,instrID
 //	string answer_long, answer, instrtype
 //	wave gpibCount
-//	
+//
 //	answer_long = QueryInstr(instrID,"*IDN?")
-//	
+//
 //	answer = stringfromlist(1,answer_long,",")
 //	strswitch(answer)
 //		case "SR830": // SR830 lockin
@@ -326,7 +338,7 @@ end
 //			gpibCount[4] += 1
 //			break
 //	endswitch
-//	
+//
 //	return instrtype
 //end
 
@@ -334,12 +346,12 @@ end
 //	string instrtype, instrDesc
 //	variable instrID
 //	string instrname, expr, gpib_address, gpib_board
-//	
+//
 //	expr = "GPIB([[:digit:]])::([[:digit:]]+)::INSTR"
 //	splitstring/e=(expr) instrDesc, gpib_board, gpib_address
 //	instrname = instrtype+gpib_address
 //	variable/g $instrname = instrID
-//	
+//
 //	return instrname
 //end
 
@@ -349,10 +361,10 @@ end
 //	string srsline, k2400line, dmmline, awgline, unknownline
 //	string srsid = "", k2400id = "", dmmid = "", awgid = "", unknownid = ""
 //	variable i
-//	
+//
 //	wave /t idwave
 //	wave gpibCount
-//	
+//
 //	expr = "([[:alpha:]]+)([[:digit:]]+)"
 //	for(i=0;i<instrcnt;i+=1)
 //			splitstring/E=(expr) idwave[i], type, gpib_address
@@ -374,21 +386,21 @@ end
 //					break
 //			endswitch
 //	endfor
-//	
+//
 //	header = "\rGPIB instruments connected to the setup:\r\t"
 //	sprintf srsline, "%d SR830's are connected. They are: %s\r\t", gpibCount[0], srsid
 //	sprintf k2400line, "%d Keithley's are connected. They are: %s\r\t", gpibCount[1], k2400id
 //	sprintf dmmline, "%d DMM's are connected. They are: %s\r\t", gpibCount[2], dmmid
 //	sprintf awgline, "%d AWG's are connected. They are: %s\r\t", gpibCount[3], awgid
 //	sprintf unknownline, "%d unknown instruments are connected. They are: %s", gpibCount[4], unknownid
-//	
-//	print header+srsline+k2400line+dmmline+awgline+unknownline 
+//
+//	print header+srsline+k2400line+dmmline+awgline+unknownline
 //end
 
 function getAddressGPIB(instrID)
 	variable instrID
 	variable gpib_address
-	
+
 	viGetAttribute(instrID,VI_ATTR_GPIB_PRIMARY_ADDR,gpib_address) // get primary adresse
 	return gpib_address
 end
@@ -402,14 +414,14 @@ function /s getSerialInstrInfo(instrDesc, instrID)
 	variable instrID
 	variable status, baudrate
 	string instrname, instrbaud, serialname, error, serialinfo=""
-	
+
 	// open resource manager
 	nvar /z globalRM
 	if(!nvar_exists(globalRM))
 		openResourceManager()
 		nvar globalRM
 	endif
-	
+
 	// get full name
 	status = viGetAttributeString(instrID, VI_ATTR_INTF_INST_NAME, serialname)
 	if (status < 0)
@@ -419,7 +431,7 @@ function /s getSerialInstrInfo(instrDesc, instrID)
 		printf instrname, "serial object connected at %s is called: %s\r", instrDesc, serialname
 		serialinfo += instrname
 	endif
-	
+
 	// get baud rate
 	status = viGetAttribute(instrID,VI_ATTR_ASRL_BAUD,baudrate)
 	if (status < 0)
@@ -436,18 +448,18 @@ function listSerialports()
 	variable status, findlist=0, instrcnt=0, i=0
 	string instrDesc="", instrtype, instrname, error, summary
 	variable instrID
-	
+
 	// open resource manager
 	nvar /z globalRM
 	if(!nvar_exists(globalRM))
 		openResourceManager()
 		nvar globalRM
 	endif
-	
+
 	// print list of serial ports/instruments
 	status = viFindRsrc(globalRM,"ASRL?*INSTR",findlist,instrcnt,instrDesc)
 	if(status < 0)
-		viStatusDesc(globalRM, status, error)	
+		viStatusDesc(globalRM, status, error)
 		printf "viFindRsrc error (serial): %s\r", error
 		return 0
 	elseif(instrcnt==0)
@@ -456,14 +468,14 @@ function listSerialports()
 	endif
 
 	for(i=0;i<instrcnt;i+=1)
-	
+
 		if(i!=0)
 			viFindNext(findlist,instrDesc) // get the next instrument descriptor
 		endif
-		
+
 		printf "%d) \t%s\r", i, instrDesc
 	endfor
-	
+
 end
 
 function visaSetBaudRate(instrID, baud)
@@ -974,4 +986,3 @@ Constant VI_USB_PIPE_STALLED         = 1
 Constant VI_USB_END_NONE             = 0
 Constant VI_USB_END_SHORT            = 4
 Constant VI_USB_END_SHORT_OR_COUNT   = 5
-
