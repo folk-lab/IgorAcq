@@ -39,7 +39,6 @@ End
 
 function openResourceManager()
 	variable status, localRM
-	string error
 
 	// check for old call to viOpenDefaultRM and close it
 	nvar /z globalRM
