@@ -10,13 +10,24 @@
 /// IPS specific COMM ///
 /////////////////////////
 
+function ipsCommSetup(instrID)
+	// baud=9600, stopbits=2
+	// write_term = "\r"
+	// read_term = "\r"
+	variable instrID
+
+	visaSetBaudRate(instrID, 9600)
+	visaSetStopBits(instrID, 20)
+	
+end
+
 function writeIPScheck(instrID, cmd)	// Checks response for error
 	variable instrID
 	string cmd
 
 	string response = queryInstr(instrID, cmd, "\r", "\r")
 	if (cmpstr(response[0],"?") == 0)
-		printf "[WARNING] IPS command not executed: %s", cmd
+		printf "[WARNING] IPS command did not execute correctly: %s\r", cmd
 	endif
 end
 
@@ -36,6 +47,7 @@ function initIPS120(instrID)
 	ipsCommSetup(instrID) // Setting up serial communication
 	
 	writeIPScheck(instrID, "C3") // Remote and unlocked
+	sc_sleep(0.02)
 	writeIPScheck(instrID, "M9") // Set display to Tesla
 	writeInstr(instrID, "Q4", "\r")    // Use extented resolusion (0.0001 amp/0.01 mT), no response from magnet
 	writeIPScheck(instrID, "A0") // Set to Hold
@@ -53,17 +65,6 @@ function initIPS120(instrID)
 //	execute("Magnetsettings_window()")
 //	PauseForUser Magnetsettings
 
-end
-
-function ipsCommSetup(instrID)
-	// baud=9600, stopbits=2
-	// write_term = "\r"
-	// read_term = "\r"
-	variable instrID
-
-	visaSetBaudRate(instrID, 9600)
-	visaSetStopBits(instrID, 20)
-	
 end
 
 ///// Talk to Magnet /////

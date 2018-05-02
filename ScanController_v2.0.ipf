@@ -2026,7 +2026,7 @@ function sc_testreadtime(numpts, delay) //Units: s
 		i+=1
 	while (i<numpts)
 	ttotal = datetime-tstart
-	printf "each sc_sleep(...) + RecordValues(...) call takes ~%.1fms \n", ttotal/numpts*1000
+	printf "each RecordValues(...) call takes ~%.1fms \n", ttotal/numpts*1000 - delay*1000
 	
 	sc_controlwindows("") // kill sweep control windows
 end

@@ -17,60 +17,145 @@ function killVISA()
 end
 
 function gpibRENassert()
-	nvar sessionRM
-	viGpibControlREN(sessionRM, 1)  // assert remote control enable
+	nvar globalRM
+	viGpibControlREN(globalRM, 1)  // assert remote control enable
 end
 
-threadsafe function VISAerrormsg(descriptor, sessionID, status)
+threadsafe function VISAerrormsg(descriptor, localRM, status)
 	String descriptor			// string to identify where this problem originated, e.g., viRead 
-	Variable sessionID			// Session ID obtained from viOpen
+	Variable localRM			// Session ID obtained from viOpen
 	Variable status				// Status code from VISA library
 	
 	String desc
 	
-	viStatusDesc(sessionID, status, desc)
+	viStatusDesc(localRM, status, desc)
 	Printf "%s error (%x): %s\r", descriptor, status, desc
 
 End
 
 function openResourceManager()
-	variable status, sessionID
+	variable status, localRM
 	string error
 	
 	// check for old call to viOpenDefaultRM and close it
-	nvar /z sessionRM
-	if(nvar_exists(sessionRM))
-		viClose(sessionRM)
+	nvar /z globalRM
+	if(nvar_exists(globalRM))
+		viClose(globalRM)
 	endif
 	
-	// open VISA session and store ID in sessionID
-	status = viOpenDefaultRM(sessionID)
+	// open VISA session and store ID in localRM
+	status = viOpenDefaultRM(localRM)
 	if(status < 0)
-		viStatusDesc(sessionID, status, error)
-		abort "OpenDefaultRM error: " + error
-	else
-		variable /g sessionRM = sessionID
-	endif
-
-end
-
-function openInstr(var_name, sessionID, instrDesc)
-	variable sessionID        // value returned from viOpenDefaultRM
-	string var_name, instrDesc          // VISA resource name i.e. GPIB0::5::INSTR
-	variable instrID, status
-	string error
-	
-	status = viOpen(sessionID,instrDesc,0,0,instrID)
-	if (status < 0)
-		VISAerrormsg("openInstr() -- viOpen", sessionID, status)
+		VISAerrormsg("OpenDefaultRM:", localRM, status)
 		abort
 	else
-		printf "%s connected as %s\r", instrDesc, var_name
+		variable /g globalRM = localRM
+	endif
+
+end
+
+function openInstr(var_name, instrDesc, [localRM, verbose])
+	string var_name, instrDesc  // name for global variable, VISA resource name (GPIB0::5::INSTR)
+	variable localRM, verbose
+	variable instrID, status
+	string error
+
+	if(paramisdefault(verbose))
+		verbose=1
+	elseif(verbose!=1)
+		verbose=0
+	endif
+
+	if(paramisdefault(localRM))
+		nvar globalRM
+		localRM = globalRM
+	endif
+
+	status = viOpen(localRM,instrDesc,0,0,instrID)
+	if (status < 0)
+		VISAerrormsg("openInstr() -- viOpen", localRM, status)
+		abort
+	else
+		variable /g $var_name = instrID
+		if(verbose)
+			printf "%s connected as %s\r", instrDesc, var_name
+		endif
 	endif
 	
-	variable /g $var_name = instrID
+end
+
+function initInstrFromWave(instrWave, [verbose])
+	// each column (d=1) in instrWave represents an instrument
+	// there should be 3 rows (d=0) for each column 
+	//    with 'variable name', 'VISA address', and 'test function'
+	
+	wave /t &instrWave
+	variable verbose
+	
+	if(dimsize(instrWave,0)!=3)
+		abort "instrWave must have 3 rows for each column -- {'variable name', 'VISA address', 'test function'}"
+	endif
+	
+	if(paramisdefault(verbose))
+		verbose=1
+	elseif(verbose!=1)
+		verbose=0
+	endif
+	
+	// open resource manager
+	nvar /z globalRM
+	if(!nvar_exists(globalRM))
+		openResourceManager()
+		nvar globalRM
+	endif
+	
+	variable numInstr = dimsize(instrWave,1), i=0
+	string response
+	for(i=0;i<numInstr;i++)
+	
+		// open VISA connection to instrument
+		openInstr(instrWave[0][i], instrWave[1][i], localRM = globalRM)
+
+		// test block
+		if(strlen(instrWave[2][i])==0)
+			if(verbose)
+				print "No test\r" + instrWave[2][i]
+			endif
+		else
+			nvar inst = $instrWave[0][i]
+			response = queryInstr(inst, instrWave[2][i], "\r\n", "\r\n")
+			if(verbose)
+				printf "\t%s responded to %s with: %s\r", instrWave[0][i], instrWave[2][i], response
+			endif
+		endif
+	endfor
+end
+
+function closeInstr(instrID)
+	variable instrID
+	string error
+
+	variable status = viClose(instrID)
+	if (status < 0)
+		VISAerrormsg("closeInstr() -- viClose", instrID, status)
+		abort
+	else
+		printf "%s", instrID
+	endif
 	
 end
+
+function closeAllInstr()
+	// closing the current VISA session will close all instruments
+	nvar /z globalRM
+	if(!nvar_exists(globalRM))
+		print "[WARNING]: no global VISA session available to close"
+		return 0
+	else
+		viClose(globalRM)
+	endif
+end
+	
 
 threadsafe function writeInstr(instrID, cmd, write_term)
 	// generic error checking write function
@@ -119,24 +204,23 @@ end
 /// GPIB ///
 ////////////
 
-function listGPIBAddress()
+function listGPIBinstr()
 	// find all gpib address with an active device
 	variable status, findlist=0, instrcnt=0, i=0
 	string instrDesc="", instrtype, instrname, error, summary
 	variable instrID
 	
-	// check for resource manager
-	nvar /z sessionRM
-	if(!nvar_exists(sessionRM))
+	// open resource manager
+	nvar /z globalRM
+	if(!nvar_exists(globalRM))
 		openResourceManager()
-		nvar sessionRM
+		nvar globalRM
 	endif
 	
 	// print list of serial ports/instruments
-	status = viFindRsrc(sessionRM,"GPIB?*INSTR",findlist,instrcnt,instrDesc)
+	status = viFindRsrc(globalRM,"GPIB?*INSTR",findlist,instrcnt,instrDesc)
 	if(status < 0)
-		viStatusDesc(sessionRM, status, error)	
-		printf "viFindRsrc error (GPIB): %s\r", error
+		VISAerrormsg("listGPIBAddress -- OpenDefaultRM:", instrID, status)
 		return 0
 	elseif(instrcnt==0)
 		printf "viFindRsrc found no available GPIB devices"
@@ -153,55 +237,6 @@ function listGPIBAddress()
 	endfor
 	
 end
-
-function manualInitGPIB(var_names, gpib_address, gpib_board)
-	// var_names, gpib_address are all comma separated lists
-	// gpib_board is a comma separated list, or a single board number (as string)
-	
-	string var_names, gpib_address, gpib_board
-	variable numInst = ItemsInList(var_names, ",")
-	variable numAddress = ItemsInList(gpib_address, ",")
-	variable numBoards = ItemsInList(gpib_board, ",")
-	variable i=0, board=0
-	string brd = ""
-	
-	// make there are as many addresses and boards as there are names
-	if(numAddress != numInst)
-		abort "Length of address list must equal length of variable name list"
-	endif
-	
-	if(numBoards != numInst)
-		if(numBoards == 1)
-			// create new range list with correct number of elements
-			brd = StringFromList(0, gpib_board, ",")
-			gpib_board = ""
-			for(i=0; i<numInst; i+=1)
-				gpib_board += brd+","
-			endfor
-			gpib_board = gpib_board[0,strlen(gpib_board)-2] // drop last comma
-			numBoards = numInst
-		else
-			abort "Length of gpib_board list must equal 1 or length of variable name list"
-		endif
-	endif
-
-	nvar /z sessionRM
-	if(!nvar_exists(sessionRM))
-		openResourceManager()
-		nvar sessionRM
-	endif
-	
-	i=0
-	variable instrAdd=0, instrBrd=0
-	string instrName = "", instrDesc = ""
-	for(i=0;i<numInst;i++)
-		instrName = TrimString(StringFromList(i, var_names, ","))
-		instrAdd = str2num(StringFromList(i, gpib_address, ","))
-		instrBrd = str2num(StringFromList(i, gpib_board, ","))
-		sprintf instrDesc, "GPIB%d::%d::INSTR", instrBrd, instrAdd
-		openInstr(instrName, sessionRM, instrDesc)
-	endfor
-end
 		
 //function autoInitGPIB()
 //	variable status, findlist=0, instrcnt=0, i=0
@@ -210,10 +245,10 @@ end
 //	string/g serialinfo = "\rSerial instruments:\r\t"
 //	
 //	// check for resource manager
-//	nvar /z sessionRM
-//	if(!nvar_exists(sessionRM))
+//	nvar /z globalRM
+//	if(!nvar_exists(globalRM))
 //		openResourceManager()
-//		nvar sessionRM
+//		nvar globalRM
 //	endif
 //	
 //	make/o/t/n=30 idwave=""
@@ -221,9 +256,9 @@ end
 //									// types there are. see DetermineGPIBInstrType()
 //	
 //	// create list of GPIB instruments
-//	status = viFindRsrc(sessionRM,"GPIB?*INSTR",findlist,instrcnt,instrDesc)
+//	status = viFindRsrc(globalRM,"GPIB?*INSTR",findlist,instrcnt,instrDesc)
 //	if(status < 0)
-//		viStatusDesc(sessionRM, status, error)	
+//		viStatusDesc(globalRM, status, error)	
 //		printf "viFindRsrc error (GPIB): %s\r", error
 //		return 0
 //	elseif(instrcnt==0)
@@ -238,8 +273,8 @@ end
 //			viFindNext(findlist,instrDesc) // get the next instrument descriptor
 //		endif
 //		
-//		instrID = openinstr(sessionRM,instrDesc)
-//		instrtype = DetermineGPIBInstrType(instrDesc,sessionRM,instrID)
+//		instrID = openinstr(globalRM,instrDesc)
+//		instrtype = DetermineGPIBInstrType(instrDesc,globalRM,instrID)
 //		instrname = CreateGPIBInstrID(instrtype,instrDesc,instrID)
 //		idwave[i] = instrname
 //	endfor
@@ -248,9 +283,9 @@ end
 //	return instrcnt
 //end
 
-//function/s DetermineGPIBInstrType(instrDesc,sessionID,instrID)
+//function/s DetermineGPIBInstrType(instrDesc,localRM,instrID)
 //	string instrDesc
-//	variable sessionID,instrID
+//	variable localRM,instrID
 //	string answer_long, answer, instrtype
 //	wave gpibCount
 //	
@@ -346,7 +381,7 @@ function getAddressGPIB(instrID)
 	variable instrID
 	variable gpib_address
 	
-	viGetAttribute(instrID,0x3FFF0172,gpib_address) // get primary adresse
+	viGetAttribute(instrID,VI_ATTR_GPIB_PRIMARY_ADDR,gpib_address) // get primary adresse
 	return gpib_address
 end
 
@@ -354,54 +389,57 @@ end
 /// serial ///
 //////////////
 
-function/s getSerialInstrInfo(instrDesc,sessionID,instrID,counter)
+function /s getSerialInstrInfo(instrDesc, instrID)
 	string instrDesc
-	variable sessionID, instrID, counter
+	variable instrID
 	variable status, baudrate
-	string instrname, instrbaud, serialname, error,counterString
-	svar serialinfo
+	string instrname, instrbaud, serialname, error, serialinfo=""
 	
-	sprintf counterString, "%d)\t", counter+1
-	serialinfo += counterString+instrDesc+"\r\t"
+	// open resource manager
+	nvar /z globalRM
+	if(!nvar_exists(globalRM))
+		openResourceManager()
+		nvar globalRM
+	endif
 	
 	// get full name
-	status = viGetAttributeString(instrID,0xBFFF00E9,serialname)
+	status = viGetAttributeString(instrID, VI_ATTR_INTF_INST_NAME, serialname)
 	if (status < 0)
-		viStatusDesc(sessionID, status, error)
-		abort "viGetAttribute error: "+error
+		VISAerrormsg("getSerialInstrInfo -- viGetAttributeString:", instrID, status)
+		abort
 	else
-		sprintf instrname, "\tSerial object connected is called: %s\r\t", serialname
+		printf instrname, "serial object connected at %s is called: %s\r", instrDesc, serialname
 		serialinfo += instrname
 	endif
 	
 	// get baud rate
-	status = viGetAttribute(instrID,0x3FFF0021,baudrate)
+	status = viGetAttribute(instrID,VI_ATTR_ASRL_BAUD,baudrate)
 	if (status < 0)
-		viStatusDesc(sessionID, status, error)
-		abort "viGetAttribute error: "+error
+		VISAerrormsg("getSerialInstrInfo -- viGetAttribute:", instrID, status)
+		abort
 	else
-		sprintf instrbaud, "\tThe baudrate is currently set to: %g\r\t", baudrate
+		sprintf instrbaud, "baudrate set to: %g\r", baudrate
 		serialinfo += instrbaud
 	endif
 end
 
-function listSerialPorts()
+function listSerialports()
 	// find all serial (ports)
 	variable status, findlist=0, instrcnt=0, i=0
 	string instrDesc="", instrtype, instrname, error, summary
 	variable instrID
 	
-	// check for resource manager
-	nvar /z sessionRM
-	if(!nvar_exists(sessionRM))
+	// open resource manager
+	nvar /z globalRM
+	if(!nvar_exists(globalRM))
 		openResourceManager()
-		nvar sessionRM
+		nvar globalRM
 	endif
 	
 	// print list of serial ports/instruments
-	status = viFindRsrc(sessionRM,"ASRL?*INSTR",findlist,instrcnt,instrDesc)
+	status = viFindRsrc(globalRM,"ASRL?*INSTR",findlist,instrcnt,instrDesc)
 	if(status < 0)
-		viStatusDesc(sessionRM, status, error)	
+		viStatusDesc(globalRM, status, error)	
 		printf "viFindRsrc error (serial): %s\r", error
 		return 0
 	elseif(instrcnt==0)
@@ -418,34 +456,6 @@ function listSerialPorts()
 		printf "%d) \t%s\r", i, instrDesc
 	endfor
 	
-end
-
-function manualInitSerial(var_names, port_num)
-	// var_names, port_num are comma separated lists
-
-	string var_names, port_num
-	variable numInst = ItemsInList(var_names, ",")
-	variable numPorts = ItemsInList(port_num, ",")
-	
-	// make there are as many addresses and boards as there are names
-	if(numPorts != numInst)
-		abort "Length of address list must equal length of variable name list"
-	endif
-
-	nvar /z sessionRM
-	if(!nvar_exists(sessionRM))
-		openResourceManager()
-		nvar sessionRM
-	endif
-	
-	variable i=0, instrPort=0
-	string instrName = "", instrDesc = ""
-	for(i=0;i<numInst;i++)
-		instrName = TrimString(StringFromList(i, var_names, ","))
-		instrPort = str2num(StringFromList(i, port_num, ","))
-		sprintf instrDesc, "ASRL%d::INSTR", instrPort
-		openInstr(instrName, sessionRM, instrDesc)
-	endfor
 end
 
 function visaSetBaudRate(instrID, baud)
