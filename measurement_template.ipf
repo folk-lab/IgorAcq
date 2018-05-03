@@ -4,29 +4,29 @@
 /////    SETUP    /////
 ///////////////////////
 
-mmamacro initexp()
+macro initexp()
     // customize this setup to each individual experiment
     // try write all functions such that initexp() can be run
     //     at any time without losing any setup/configuration info
 
     ///// setup ScanController /////
 
-    // define instruments* --
-    //      this wave should have columns with {instrument name, VISA address, test function}
+    // define instruments --
+    //      this wave should have columns with {instrument name, VISA address, test function, setup function}
     //      use test = "" to skip query tests when connecting instruments
-    // *the goofy formatting is thanks to Igor's strange line continuation rules
-  make /o/t connInstr = {{"srs1",  "GPIB::1::INSTR",  "*IDN?" },{\
-                          "srs2",  "GPIB::2::INSTR",  "*IDN?"}, {\
-                          "dmm18", "GPIB::18::INSTR", ""     }, {\
-                          "ips2",  "ASRL2::INSTR",    "R1"   }}
-  InitScanController(connInstr, srv_push=0) // pass instrument list wave to scan controller
-                                            // this connects to all Instruments
-                                            // and prints their test function output
-  sc_ColorMap = "VioletOrangeYellow" // change default colormap (default=Grays)
+	make /o/t connInstr = {{"srs1",  "GPIB::1::INSTR",  "*IDN?", ""                  },{\
+				                  "srs2",  "GPIB::2::INSTR",  "*IDN?", ""                  },{\
+				                  "dmm18", "GPIB::18::INSTR", "S"    , ""                  },{\
+					                "ips2",   "ASRL2::INSTR",   "R1"   , "ipsCommSetup(ips2)"},{\
+					                "bd1",    "ASRL1::INSTR",   ""     , "bdCommSetup(bd1)"  }}
+	InitScanController(connInstr, srv_push=0) // pass instrument list wave to scan controller
+	sc_ColorMap = "VioletOrangeYellow" // change default colormap (default=Grays)
 
-  ///// configure instruments and GUI(s) /////
-  setup3478Adcvolts(dmm18, 3, 0.1)
-  initIPS120(ips2)
+	///// configure instruments /////
+	// setup individual instruments here for particular readings
+	setup3478Adcvolts(dmm18, 3, 0.1)
+	initIPS120(ips2)
+	InitBabyDACs(bd1, "5", "55", custom = 0)
 
 end
 
