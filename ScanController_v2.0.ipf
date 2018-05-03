@@ -246,10 +246,11 @@ end
 //// start scan controller ////
 ///////////////////////////////
 
-function InitScanController(instrWave, [srv_push])
+function InitScanController(instrWave, [srv_push, config])
 	// srv_push = 1 to alert qdot-server of new data
 	wave /t instrWave
 	variable srv_push
+	string config // use this to specify which config file to load
 
 	// set reference to instrument wave for scan controller
 	string /g sc_instr_wave=nameofwave(instrWave)
@@ -286,47 +287,51 @@ function InitScanController(instrWave, [srv_push])
 	// look for config files
 	filelist = greplist(indexedfile(config,-1,".config"),"sc")
 
-	if(itemsinlist(filelist)>0)
-		// read content into waves
-		filelist = SortList(filelist, ";", 1+16)
-		sc_loadconfig(StringFromList(0,filelist, ";"))
-	else
-		// These arrays should have the same size. Their indeces correspond to each other.
-		make/t/o sc_RawWaveNames = {"g1x", "g1y"} // Wave names to be created and saved
-		make/o sc_RawRecord = {0,0} // Whether you want to record and save the data for this wave
-		make/o sc_RawPlot = {0,0} // Whether you want to record and save the data for this wave
-		//make/t/o sc_RequestScripts = {"", ""}
-		make/t/o sc_GetResponseScripts = {"getg1x()", "getg1y()"}
-		// End of same-size waves
-
-		// And these waves should be the same size too
-		make/t/o sc_CalcWaveNames = {"", ""} // Calculated wave names
-		make/t/o sc_CalcScripts = {"",""} // Scripts to calculate stuff
-		make/o sc_CalcRecord = {0,0} // Include this calculated field or not
-		make/o sc_CalcPlot = {0,0} // Include this calculated field or not
-		// end of same-size waves
-
-		make/t/o sc_AsyncRecord = {""}
-
-		// default colormap
-		string /g sc_ColorMap = "Grays"
-
-		// Print variables
-		variable/g sc_PrintRaw = 1,sc_PrintCalc = 1
-
-		// logging string
-		string /g sc_LogStr = "GetSRSStatus(srs1);"
-
-		nvar filenum
-		if (numtype(filenum) == 2)
-			print "Initializing FileNum to 0 since it didn't exist before.\n"
-			variable /g filenum=0
+	if(paramisdefault(config))
+		if(itemsinlist(filelist)>0)
+			// read content into waves
+			filelist = SortList(filelist, ";", 1+16)
+			sc_loadconfig(StringFromList(0,filelist, ";"))
 		else
-			printf "Current FileNum is %d\n", filenum
+			// These arrays should have the same size. Their indeces correspond to each other.
+			make/t/o sc_RawWaveNames = {"g1x", "g1y"} // Wave names to be created and saved
+			make/o sc_RawRecord = {0,0} // Whether you want to record and save the data for this wave
+			make/o sc_RawPlot = {0,0} // Whether you want to record and save the data for this wave
+			make/t/o sc_RawScripts = {"getg1x()", "getg1y()"}
+			// End of same-size waves
+	
+			// And these waves should be the same size too
+			make/t/o sc_CalcWaveNames = {"", ""} // Calculated wave names
+			make/t/o sc_CalcScripts = {"",""} // Scripts to calculate stuff
+			make/o sc_CalcRecord = {0,0} // Include this calculated field or not
+			make/o sc_CalcPlot = {0,0} // Include this calculated field or not
+			// end of same-size waves
+	
+			make/t/o sc_AsyncRecord = {""}
+	
+			// default colormap
+			string /g sc_ColorMap = "Grays"
+	
+			// Print variables
+			variable/g sc_PrintRaw = 1,sc_PrintCalc = 1
+	
+			// logging string
+			string /g sc_LogStr = "GetSRSStatus(srs1);"
+	
+			nvar filenum
+			if (numtype(filenum) == 2)
+				print "Initializing FileNum to 0 since it didn't exist before.\n"
+				variable /g filenum=0
+			else
+				printf "Current FileNum is %d\n", filenum
+			endif
 		endif
+	else
+		sc_loadconfig(config)
 	endif
-
+	
 	sc_rebuildwindow()
+	
 end
 
 /////////////////////////////
@@ -337,8 +342,7 @@ function /S sc_createconfig()
 	wave/t sc_RawWaveNames
 	wave sc_RawRecord
 	wave sc_RawPlot
-	wave/t sc_RequestScripts
-	wave/t sc_GetResponseScripts
+	wave/t sc_RawScripts
 	wave/t sc_CalcWaveNames
 	wave/t sc_CalcScripts
 	wave sc_CalcRecord
@@ -373,8 +377,7 @@ function /S sc_createconfig()
 
 	//scripts
 	tmpstr = ""
-	tmpstr = addJSONKeyVal(tmpstr, "request", strVal=TextWaveToStrArray(sc_RequestScripts))
-	tmpstr = addJSONKeyVal(tmpstr, "response", strVal=TextWaveToStrArray(sc_GetResponseScripts))
+	tmpstr = addJSONKeyVal(tmpstr, "raw", strVal=TextWaveToStrArray(sc_RawScripts))
 	tmpstr = addJSONKeyVal(tmpstr, "calc", strVal=TextWaveToStrArray(sc_CalcScripts))
 	configstr = addJSONKeyVal(configstr, "scripts", strVal=tmpstr)
 
@@ -418,8 +421,7 @@ function sc_loadconfig(configfile)
 	ArrayToTextWave(getJSONvalue(jstr, "wave_names:raw"), "sc_RawWaveNames")
 	ArrayToNumWave(getJSONvalue(jstr, "record_waves:raw"), "sc_RawRecord")
 	ArrayToNumWave(getJSONvalue(jstr, "plot_waves:raw"), "sc_RawPlot")
-	ArrayToTextWave(getJSONvalue(jstr, "scripts:request"), "sc_RequestScripts")
-	ArrayToTextWave(getJSONvalue(jstr, "scripts:response"), "sc_ResponseScripts")
+	ArrayToTextWave(getJSONvalue(jstr, "scripts:raw"), "sc_RawScripts")
 
 	// load calc wave configuration
 	ArrayToTextWave(getJSONvalue(jstr, "wave_names:calc"), "sc_CalcWaveNames")
@@ -498,8 +500,8 @@ end
 Window ScanController() : Panel
 	variable sc_InnerBoxW = 660, sc_InnerBoxH = 32, sc_InnerBoxSpacing = 2
 
-	if (numpnts(sc_RawWaveNames) != numpnts(sc_RawRecord) ||  numpnts(sc_RawWaveNames) != numpnts(sc_GetResponseScripts))
-		print "sc_RawWaveNames, sc_RawRecord, and sc_GetResponseScripts waves should have the number of elements.\nGo to the beginning of InitScanController() to fix this.\n"
+	if (numpnts(sc_RawWaveNames) != numpnts(sc_RawRecord) ||  numpnts(sc_RawWaveNames) != numpnts(sc_RawScripts))
+		print "sc_RawWaveNames, sc_RawRecord, and sc_RawScripts waves should have the number of elements.\nGo to the beginning of InitScanController() to fix this.\n"
 		abort
 	endif
 
@@ -522,7 +524,7 @@ Window ScanController() : Panel
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 200,29,"Plot"
 	SetDrawEnv fsize= 16,fstyle= 1
-	DrawText 250,29,"Get Response Script"
+	DrawText 250,29,"Raw Script (ex: ReadSRSx(srs1)"
 
 	string cmd = ""
 	variable i=0
@@ -534,7 +536,7 @@ Window ScanController() : Panel
 		execute(cmd)
 		cmd="CheckBox sc_RawPlotCheckBox" + num2istr(i) + ", proc=sc_CheckBoxClicked, pos={210,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_RawPlot[i]) + " , title=\"\""
 		execute(cmd)
-		cmd="SetVariable sc_GetResponseScriptBox" + num2istr(i) + " pos={250, 37+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={410, 0}, fsize=14, title=\" \", value=sc_GetResponseScripts[i]"
+		cmd="SetVariable sc_rawScriptBox" + num2istr(i) + " pos={250, 37+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={410, 0}, fsize=14, title=\" \", value=sc_rawScripts[i]"
 		execute(cmd)
 		i+=1
 	while (i<numpnts( sc_RawWaveNames ))
@@ -549,7 +551,7 @@ Window ScanController() : Panel
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 200,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Plot"
 	SetDrawEnv fsize= 16,fstyle= 1
-	DrawText 250,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Calculation Script ( example: dmm[i]*12.5)"
+	DrawText 250,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Calculation Script (ex: dmm[i]*12.5)"
 
 	i=0
 	do
@@ -613,8 +615,7 @@ function sc_addrow(action) : ButtonControl
 	wave/t sc_RawWaveNames=sc_RawWaveNames
 	wave sc_RawRecord=sc_RawRecord
 	wave sc_RawPlot=sc_RawPlot
-	wave/t sc_RequestScripts=sc_RequestScripts
-	wave/t sc_GetResponseScripts=sc_GetResponseScripts
+	wave/t sc_RawScripts=sc_RawScripts
 	wave/t sc_CalcWaveNames=sc_CalcWaveNames
 	wave sc_CalcRecord=sc_CalcRecord
 	wave sc_CalcPlot=sc_CalcPlot
@@ -625,8 +626,7 @@ function sc_addrow(action) : ButtonControl
 			AppendString(sc_RawWaveNames, "")
 			AppendValue(sc_RawRecord, 0)
 			AppendValue(sc_RawPlot, 0)
-			AppendString(sc_RequestScripts, "")
-			AppendString(sc_GetResponseScripts, "")
+			AppendString(sc_RawScripts, "")
 		break
 		case "addrowcalc":
 			AppendString(sc_CalcWaveNames, "")
@@ -643,8 +643,7 @@ function sc_removerow(action) : Buttoncontrol
 	wave/t sc_RawWaveNames=sc_RawWaveNames
 	wave sc_RawRecord=sc_RawRecord
 	wave sc_RawPlot=sc_RawPlot
-	wave/t sc_RequestScripts=sc_RequestScripts
-	wave/t sc_GetResponseScripts=sc_GetResponseScripts
+	wave/t sc_RawScripts=sc_RawScripts
 	wave/t sc_CalcWaveNames=sc_CalcWaveNames
 	wave sc_CalcRecord=sc_CalcRecord
 	wave sc_CalcPlot=sc_CalcPlot
@@ -656,8 +655,7 @@ function sc_removerow(action) : Buttoncontrol
 				Redimension /N=(numpnts(sc_RawWaveNames)-1) sc_RawWaveNames
 				Redimension /N=(numpnts(sc_RawRecord)-1) sc_RawRecord
 				Redimension /N=(numpnts(sc_RawPlot)-1) sc_RawPlot
-				Redimension /N=(numpnts(sc_RequestScripts)-1) sc_RequestScripts
-				Redimension /N=(numpnts(sc_GetResponseScripts)-1) sc_GetResponseScripts
+				Redimension /N=(numpnts(sc_RawScripts)-1) sc_RawScripts
 			else
 				abort "Can't remove the last row!"
 			endif
@@ -716,7 +714,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	variable start, fin, numpts, starty, finy, numptsy
 	string x_label, y_label
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
-	wave /T sc_RawWaveNames, sc_CalcWaveNames, sc_RequestScripts, sc_GetResponseScripts, sc_CalcScripts
+	wave /T sc_RawWaveNames, sc_CalcWaveNames, sc_RawScripts, sc_CalcScripts
 	variable i=0, j=0
 	string cmd = "", wn = "", wn2d="", s, script = "", script0 = "", script1 = ""
 	string /g sc_x_label, sc_y_label
@@ -760,13 +758,12 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	while (i<numpnts(sc_CalcWaveNames))
 	i=0
 
-	// connect VISA instruments
-	// do this here, because if it fails
-	// i don't want to delete any old data
-	svar sc_instr_wave
-	wave /t instrWave = $sc_instr_wave
-
-	initVISAinstruments(instrWave, verbose=0) // how to handle connInstr so SC knows about it???
+//	// connect VISA instruments
+//	// do this here, because if it fails
+//	// i don't want to delete any old data
+//	svar sc_instr_wave
+//	wave /t instrWave = $sc_instr_wave
+//	initVISAinstruments(instrWave, verbose=0) // how to handle connInstr so SC knows about it???
 
 	// The status of the upcoming scan will be set when waves are initialized.
 	if(!paramisdefault(starty) && !paramisdefault(finy) && !paramisdefault(numptsy))
@@ -1135,7 +1132,7 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 	variable i, j, scandirection, readvstime, fillnan
 	nvar sc_is2d, sc_startx, sc_finx, sc_numptsx, sc_starty, sc_finy, sc_numptsy
 	variable ii = 0, jj=0, k=0
-	wave/t sc_RawWaveNames, sc_GetResponseScripts, sc_CalcWaveNames, sc_CalcScripts
+	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts
 	wave/t sc_AsyncRecord
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
 	string script = "",cmd = "", wstr = ""
@@ -1178,10 +1175,10 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 	ii=0
 	k=0
 	do
-		if(strsearch(sc_GetResponseScripts[ii],"_async",0) > 0 && sc_RawRecord[ii] == 1 || strsearch(sc_GetResponseScripts[ii],"_async",0) > 0 && sc_RawPlot[ii] == 1)
+		if(strsearch(sc_RawScripts[ii],"_async",0) > 0 && sc_RawRecord[ii] == 1 || strsearch(sc_RawScripts[ii],"_async",0) > 0 && sc_RawPlot[ii] == 1)
 			if(fillnan == 0)
 				redimension /n=(numpnts(sc_AsyncRecord)+1) sc_AsyncRecord
-				sc_AsyncRecord[numpnts(sc_AsyncRecord)-1] = sc_GetResponseScripts[ii]
+				sc_AsyncRecord[numpnts(sc_AsyncRecord)-1] = sc_RawScripts[ii]
 				k+=1
 			elseif(fillnan == 1)
 				wave wref1d = $sc_RawWaveNames[ii]
@@ -1207,7 +1204,7 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 	ii=0
 	cmd = ""
 	do
-		if (strsearch(sc_GetResponseScripts[ii],"_async",0) == -1 && sc_RawRecord[ii] == 1 || strsearch(sc_GetResponseScripts[ii],"_async",0) == -1 && sc_RawPlot[ii] == 1)
+		if (strsearch(sc_RawScripts[ii],"_async",0) == -1 && sc_RawRecord[ii] == 1 || strsearch(sc_RawScripts[ii],"_async",0) == -1 && sc_RawPlot[ii] == 1)
 			wave wref1d = $sc_RawWaveNames[ii]
 
 			// Redimension waves if readvstime is set to 1
@@ -1217,7 +1214,7 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 			endif
 
 			if(fillnan == 0)
-				script = sc_GetResponseScripts[ii] // assume script will execute and return a 'variable'
+				script = sc_RawScripts[ii] // assume script will execute and return a 'variable'
 												           // let it fail hard otherwise
 				sprintf cmd, "%s = %s", "sc_tmpVal", script
 				execute(cmd)

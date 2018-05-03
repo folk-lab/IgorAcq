@@ -57,9 +57,9 @@ function openResourceManager()
 
 end
 
-function openInstr(var_name, instrDesc, [localRM, verbose])
+function openInstr(var_name, instrDesc, [localRM, verbose, timeout])
 	string var_name, instrDesc  // name for global variable, VISA resource name (GPIB0::5::INSTR)
-	variable localRM, verbose
+	variable localRM, verbose, timeout
 	variable instrID, status
 	string error
 
@@ -73,12 +73,17 @@ function openInstr(var_name, instrDesc, [localRM, verbose])
 		nvar globalRM
 		localRM = globalRM
 	endif
+	
+	if(paramisdefault(timeout))
+		timeout = 25
+	endif
 
 	status = viOpen(localRM,instrDesc,0,0,instrID)
 	if (status < 0)
 		VISAerrormsg("openInstr() -- viOpen", localRM, status)
 		abort
 	else
+		visaSetTimeout(instrID, timeout)
 		variable /g $var_name = instrID
 		if(verbose)
 			printf "%s connected as %s\r", instrDesc, var_name
@@ -95,8 +100,8 @@ function initVISAinstruments(instrWave, [verbose])
 	wave /t instrWave
 	variable verbose
 
-	if(dimsize(instrWave,0)!=3)
-		abort "instrWave must have 3 rows for each column -- {'variable name', 'VISA address', 'test function'}"
+	if(dimsize(instrWave,0)!=4)
+		abort "instrWave must have 4 rows for each column -- {'variable name', 'VISA address', 'test function', 'setup function'}"
 	endif
 
 	if(paramisdefault(verbose))
@@ -126,14 +131,17 @@ function initVISAinstruments(instrWave, [verbose])
 
 		// open VISA connection to instrument
 		openInstr(instrWave[0][i], instrWave[1][i], localRM = globalRM, verbose = verbose)
-
+		nvar inst = $instrWave[0][i]
+		if(strlen(instrWave[3][i])!=0)
+			execute(instrWave[3][i]) // execute 
+		endif
+		
 		// test block
 		if(strlen(instrWave[2][i])==0)
 			if(verbose)
 				print "\t-- No test\r" + instrWave[2][i]
 			endif
 		else
-			nvar inst = $instrWave[0][i]
 			response = queryInstr(inst, instrWave[2][i], "\r\n", "\r\n") // all the term characters!
 			if(cmpstr(TrimString(response), "NaN")==0)
 				abort
@@ -142,6 +150,7 @@ function initVISAinstruments(instrWave, [verbose])
 				printf "\t-- %s responded to %s with: %s\r", instrWave[0][i], instrWave[2][i], response
 			endif
 		endif
+		sleep /T 1
 	endfor
 end
 
@@ -475,6 +484,13 @@ function listSerialports()
 		printf "%d) \t%s\r", i, instrDesc
 	endfor
 
+end
+
+function visaSetTimeout(instrID, timeout) // timeout value in ms
+	variable instrID, timeout
+	variable status
+	status = viSetAttribute(instrID, VI_ATTR_TMO_VALUE, timeout)
+	return status
 end
 
 function visaSetBaudRate(instrID, baud)
