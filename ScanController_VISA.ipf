@@ -486,8 +486,20 @@ function visaSetBaudRate(instrID, baud)
 	return status
 end
 
+function visaSetDataBits(instrID, bits)
+	// acceptable values for data bits
+    //   5, 6, 7, 8 (default)
+	variable instrID	// An instrument referenced obtained from viOpen
+	variable bits
+
+	variable status
+	status = viSetAttribute(instrID, VI_ATTR_ASRL_DATA_BITS, bits)
+	return status
+end
+
 function visaSetStopBits(instrID, bits)
-	// acceptable values for bits are 10 (1 bit), 15 (1.5 bits), and 20 (2 bits)
+	// acceptable values for stop bits:
+    //    10 (1 bit), 15 (1.5 bits), and 20 (2 bits)
 	variable instrID	// An instrument referenced obtained from viOpen
 	variable bits
 
@@ -496,7 +508,20 @@ function visaSetStopBits(instrID, bits)
 	return status
 end
 
-//VI_ATTR_ASRL_PARITY
+function visaSetParity(instrID, parity)
+	// acceptable values for parity are:
+    //    NONE = 0
+    //    ODD = 1
+    //    EVEN = 2
+    //    MARK = 3
+    //    SPACE = 4
+	variable instrID	// An instrument referenced obtained from viOpen
+	variable parity
+
+	variable status
+	status = viSetAttribute(instrID, VI_ATTR_ASRL_PARITY, parity)
+	return status
+end
 
 //////////////////////
 /// VISA CONSTANTS ///

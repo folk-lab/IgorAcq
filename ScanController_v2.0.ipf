@@ -68,6 +68,23 @@ Function/t removeStringListDuplicates(theListStr)
 	return retStr
 End
 
+function/s searchFullString(string_to_search,substring)
+    // returns
+	string string_to_search, substring
+	string index_list=""
+	variable test, startpoint=0
+
+	do
+		test = strsearch(string_to_search, substring, startpoint)
+		if(test != -1)
+			index_list = index_list+num2istr(test)+","
+			startpoint = test+1
+		endif
+	while(test > -1)
+
+	return index_list
+end
+
 // removeAllWhitespace() has been removed
 // use TrimString() instead
 

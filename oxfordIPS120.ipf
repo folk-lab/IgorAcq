@@ -18,7 +18,6 @@ function ipsCommSetup(instrID)
 
 	visaSetBaudRate(instrID, 9600)
 	visaSetStopBits(instrID, 20)
-
 end
 
 function writeIPScheck(instrID, cmd)	// Checks response for error
