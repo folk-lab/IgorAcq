@@ -75,7 +75,7 @@ function GetTemp(plate, [max_age]) // Units: K
 	endswitch
 	sprintf payload, "{\"ch\":%d, \"max_age\":%d}", channel, max_age
 	headers = "Content-Type: application/json"
-	command = "get_channel_data"
+	command = "get-channel-data"
 	url = GenerateURL(command)
 	return QueryLakeshore(url,payload,headers,"data:T")
 end
@@ -124,13 +124,13 @@ function GetHeaterPower(heater, [max_age]) // Units: mW
 	headers = "Content-Type: application/json"
 	if(channel > 0)
 		sprintf payload, "{\"ch\":%d, \"max_age\":%d}", channel, max_age
-		command = "get_analog_data"
+		command = "get-analog-data"
 	else
 		sprintf payload, "{\"max_age\":%d}", max_age
-		command = "get_heater_data"
+		command = "get-heater-data"
 	endif
 	url = GenerateURL(command)
-	return QueryLakeshore(url,payload,headers,"data:power")
+	return QueryLakeshore(url,payload,headers,"data:power_mw")
 end
 
 function GetPIDTemp() // Units: mK
@@ -237,28 +237,68 @@ function SetTempControlMode(mode) // Units: No units
 	variable mode
 	nvar pid_mode, pid_led, mcheater_led, mcheater_set
 	string command, payload, headers, url
+	svar system, bfchannellookup, ighchannellookup
+	variable channel, interval
+	
+	strswitch(system)
+		case "bfsmall":
+			channel = whichlistitem("mc",bfchannellookup,";")
+			break
+		case "igh":
+			channel = whichlistitem("mc",ighchannellookup,";")
+			break
+		case "bfbig":
+			break
+	endswitch
 	
 	if(mode == 1)
 		pid_led = 1
 		mcheater_led = 1
 		PopupMenu mcheater, mode=1
 		SetVariable mcheaterset, disable=2
+		interval = 10
+		SetExclusiveReader(channel,interval)
 		SetPIDTemp(mcheater_set)
 	elseif(mode == 3)
 		pid_led = 0
 		mcheater_led = 1
 		PopupMenu mcheater, mode=1
 		SetVariable mcheaterset, disable=0
+		ResetExclusiveReader()
 	elseif(mode == 4)
 		pid_led = 0
 		mcheater_led = 0
 		PopupMenu mcheater, mode=2
 		SetVariable mcheaterset, disable=0
+		ResetExclusiveReader()
 		TurnOffMCHeater()
 	else
 		abort "Choose between: PID (1), Open loop (3) and off (4)"
 	endif
 	pid_mode = mode
+end
+
+function SetExclusiveReader(channel,interval) // interval units: ms
+	variable channel,interval
+	string command, payload, headers, url
+	
+	command = "set-exclusive-reader"
+	sprintf payload, "{\"channel_label\": \"%s\", \"interval_ms\": \"%s\"}", num2str(channel), num2str(interval)
+	headers = "Content-Type: application/json"
+	
+	url = GenerateURL(command)
+	WriteLakeshore(url,payload,headers)
+end
+	
+function ResetExclusiveReader()
+	string command, payload, headers, url
+	
+	command = "reset-exclusive-reader"
+	payload = "{}"
+	headers = "Content-Type: application/json"
+	
+	url = GenerateURL(command)
+	WriteLakeshore(url,payload,headers)
 end
 
 function SetPIDTemp(temp,[maxcurrent]) // Units: mK, mA
@@ -358,10 +398,10 @@ function TurnOffMCHeater()
 	// and therefore it is a good practise to always use it.
 	string command, payload, headers, url
 	
-	command = "set_htr_off"
+	command = "turn-heater-off"
 	headers = "Content-Type: application/json"
-	sprintf payload, "{\"cmd\": \"%s\"}", command
-	url = GenerateURL("cmd")
+	payload = "{}"
+	url = GenerateURL(command)
 	WriteLakeshore(url,payload,headers)
 end
 
@@ -868,6 +908,7 @@ function selectsystem_control(action,popnum,popstr) : PopupMenuControl
 			break
 		case "Blue Fors #2":
 			system = "bfbig"
+			print "No support for BF#2 yet!"
 			dowindow/k AskUserSystem
 			execute("AskUserSystem()")
 			break
