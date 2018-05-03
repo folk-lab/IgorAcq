@@ -130,17 +130,21 @@ function GetSRSSensitivity(instrID,[integer]) // Units: mV or nA
 	endif
 end
 
-//function GetSRSJunk(instrID)
-//	variable instrID
-//	variable i=0
-//	string response
-//	
-//	do
-//		VisaRead/Q/T="\n" instrID, response
-//		i+=1
-//	while(v_flag > 0)
-//	printf "Buffer had %d items of junk!\r", i
-//end
+function readSRSjunk(instrID)
+	variable instrID
+	variable i=0
+	string response
+	
+	do
+		VisaRead/Q/N=1 instrID, response
+		if(strlen(response) == 0)
+			break
+		endif
+		sleep /T 1
+		i+=1
+	while(1)
+	printf "Read %d chars of junk from buffer.\r", i
+end
 
 /////////////////////////////
 //// async get functions ////

@@ -92,7 +92,7 @@ function initVISAinstruments(instrWave, [verbose])
 	// there should be 3 rows (d=0) for each column
 	//    with 'variable name', 'VISA address', and 'test function'
 
-	wave /t &instrWave
+	wave /t instrWave
 	variable verbose
 
 	if(dimsize(instrWave,0)!=3)

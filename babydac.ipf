@@ -1,10 +1,11 @@
 #pragma rtGlobals=1		// Use modern global access method
 
-//	Driver communicates over serial, remember to set the DAC board number in InitBabyDAC() and the serial port in SetSerialPort()
-//	Has interactive window like BabyDAC Procedures, but the driver is much more flexible.
+//	Driver communicates over serial
+//	Has interactive window
 //	Supports up to four DAC boards
 //	Procedure written by Christian, 2016-0X-XX
 //    Updated by Nik for binary control, ADC reading, and software limits
+//    Updated again to use VISA and async read 05-XX-2018
 
 /////////////////////////////////
 ///// Initiate DAC board(s) /////
@@ -387,25 +388,14 @@ function bdInitAskUser()
 	return bd_answer
 end
 
+/////////////////////////////////////////////
 //// Keep track of channel/board numbers ////
-
-// function bdCheckForBoard(board_number)
-//     // check if board_number is listed
-// 	variable board_number
-// 	variable i=0, found_board = 0
-// 	wave bd_boardnumbers = bd_boardnumbers
-// 	do
-// 		if(bd_boardnumbers[i]==board_number)
-// 			return 1
-// 		endif
-// 		i+=1
-// 	while(i<numpnts(bd_boardnumbers))
-// 	return 0
-// end
+/////////////////////////////////////////////
 
 function bdGetBoard(channel)
     // given a channel number
     //    return a board number
+    //    throws an error if the board is not defined/connected
 	variable channel
 	wave bd_boardnumbers=bd_boardnumbers
 	variable index
@@ -426,11 +416,13 @@ function bdGetBoardChannel(channel)
 	return index
 end
 
+/////////////////
 //// UTILITY ////
+/////////////////
 
-function setAllZeroBD()
-	// ramp all gates to +/-10mV
-
+function setAllZeroBD(instrID)
+	// ramp all gates to +/-10mV and back to zero
+	variable instrID
 	wave bd_boardnumbers, bd_range_high
 	variable numCh = 0, i=0, idxBrd
 
@@ -446,9 +438,9 @@ function setAllZeroBD()
 	for(i=0;i<numCh;i+=1)
 		idxBrd =floor(i/4)
 		if(bd_range_high[idxBrd] > 0)
-			RampOutputBD(i, 10.0)
+			rampOutputBD(instrID, i, 10.0)
 		else
-			RampOutputBD(i, -10.0)
+			rampOutputBD(instrID, i, -10.0)
 		endif
 	endfor
 
@@ -456,7 +448,7 @@ function setAllZeroBD()
 	print "Set all channels back to 0mV."
 
 	for(i=0;i<numCh;i+=1)
-		RampOutputBD(i, 0.0)
+		RampOutputBD(instrID, i, 0.0)
 	endfor
 
 end
@@ -521,7 +513,6 @@ function resetStartupVoltageBD(board_number, range)
 		make/o bd_cmd_wave={id_byte, command_byte, data_byte_1, data_byte_2, data_byte_3, parity_byte, 0}
 
 		// send command to DAC
-		SetSerialPort()
 		execute "VDTWriteBinaryWave2 /O=10 bd_cmd_wave"
 
 		// read the response from the buffer
@@ -535,7 +526,6 @@ function resetStartupVoltageBD(board_number, range)
 	make/o bd_cmd_wave={id_byte, command_byte, parity_byte, 0}
 
 	// send command to DAC
-	SetSerialPort()
 	execute "VDTWriteBinaryWave2 /O=10 bd_cmd_wave"
 
 	// read the response from the buffer
@@ -546,7 +536,7 @@ end
 
 //// SET and RAMP outputs ////
 
-function GetSetpointBD(channel, output)
+function getSetpointBD(channel, output)
 	variable channel, output
 	wave bd_range_low, bd_range_high, bd_range_span
 	variable frac = 0, board_index = floor(channel/4)
@@ -557,9 +547,8 @@ function GetSetpointBD(channel, output)
 	return round((2^20-1)*frac)
 end
 
-function SetOutputBD(channel, output)
-	variable output // in mV
-	variable channel // 0 to 15
+function setOutputBD(instrID, channel, output) // in mV
+	variable instrID, channel, output
 	wave bd_boardnumbers=bd_boardnumbers
 	wave/t dacvalstr=dacvalstr
 	wave/t oldvalue=oldvalue
@@ -567,7 +556,7 @@ function SetOutputBD(channel, output)
 	variable board_index, board, board_channel, setpoint, sw_limit
 
 	// Check that the DAC board is initialized
-	CheckDACBoard(channel)
+	bdGetBoard(channel)
 	board_index = floor(channel/4)
 
 	// Check that the voltage is valid
@@ -589,10 +578,10 @@ function SetOutputBD(channel, output)
 		endif
 	endif
 
-	board = GetBoard(channel) // which DAC that channel number is on
-	board_channel = GetBoardChannel(channel) // which channel of that board
+	board = bdGetBoard(channel) // which DAC that channel number is on
+	board_channel = bdGetBoardChannel(channel) // which channel of that board
 
-	setpoint = GetSetpointBD(channel, output) // DAC setpoint as an integer
+	setpoint = getSetpointBD(channel, output) // DAC setpoint as an integer
 
 	// build output command
 	variable id_byte, alt_id_byte, command_byte, parity_byte
@@ -611,8 +600,7 @@ function SetOutputBD(channel, output)
 	make/o bd_cmd_wave={id_byte, command_byte, data_byte_1, data_byte_2, data_byte_3, parity_byte, 0}
 
 	// send command to DAC
-	SetSerialPort()
-	execute "VDTWriteBinaryWave2 /O=10 bd_cmd_wave"
+	VISAWriteBinaryWave /TYPE=0x8 instrID, bd_cmd_wave
 
 	// read the response from the buffer
 	ReadBytesBD(7) // does not seem to slow things down significantly
@@ -624,8 +612,8 @@ function SetOutputBD(channel, output)
 	return 1
 end
 
-function RampOutputBD(channel, output, [ramprate, update])
-	variable channel, output,ramprate, update // output is in mV, ramprate in mV/s
+function RampOutputBD(instrID, channel, output, [ramprate, update])
+	variable instrID, channel, output,ramprate, update // output is in mV, ramprate in mV/s
 	wave/t dacvalstr=dacvalstr
 	wave /t oldvalue=oldvalue
 	variable voltage, sgn, step
@@ -659,7 +647,7 @@ function RampOutputBD(channel, output, [ramprate, update])
 	voltage+=sgn*step
 	if(sgn*voltage >= sgn*output)
 		//// we started less than one step away from the target. set voltage and leave
-		SetOutputBD(channel, output)
+		setOutputBD(instrID, channel, output)
 		return 1
 	endif
 
@@ -667,14 +655,14 @@ function RampOutputBD(channel, output, [ramprate, update])
 		if(update==1)
 			doupdate
 		endif
-		SetOutputBD(channel, voltage)
+		setOutputBD(instrID, channel, voltage)
 
 		sc_sleep(sleeptime)
 
 		voltage+=sgn*step
 	while(sgn*voltage<sgn*output-step)
 
-	SetOutputBD(channel, output)
+	setOutputBD(instrID, channel, output)
 
 	if(update==0)
 		resumeupdate
@@ -683,7 +671,7 @@ function RampOutputBD(channel, output, [ramprate, update])
 	return 1
 end
 
-function UpdateMultipleBD([action, ramprate, update])
+function UpdateMultipleBD(instrID, [action, ramprate, update])
 
 	// usage:
 	// function Experiment(....)
@@ -693,6 +681,7 @@ function UpdateMultipleBD([action, ramprate, update])
 	//         dacvalstr[channelB][1] = num2str(-500)
 	//         UpdateMultipleBD(action="ramp") // ramps all channels to updated values
 
+	variable instrID
 	string action // "set" or "ramp"
 	variable ramprate, update
 	wave/t dacvalstr=dacvalstr
@@ -718,9 +707,9 @@ function UpdateMultipleBD([action, ramprate, update])
 			output = str2num(dacvalstr[i][1])
 			strswitch(action)
 				case "set":
-					check = SetOutputBD(i,output)
+					check = setOutputBD(instrID, i,output)
 				case "ramp":
-					check = RampOutputBD(i,output,ramprate=ramprate, update=update)
+					check = rampOutputBD(instrID, i,output,ramprate=ramprate, update=update)
 			endswitch
 			if(check == 1)
 				oldvalue[i][1] = dacvalstr[i][1]
@@ -732,10 +721,10 @@ function UpdateMultipleBD([action, ramprate, update])
 	return 1
 end
 
-function RampMultipleBD(channels, setpoint, nChannels, [ramprate, update])
-	variable setpoint, nChannels, ramprate, update
+function rampMultipleBD(instrID, channels, setpoint, [ramprate, update])
+	variable instrID, setpoint, ramprate, update
 	string channels
-	variable i, kind
+	variable i, kind, nChannels = ItemsInList(channels, ",")
 	string channel
 	wave /t dacvalstr = dacvalstr
 	wave /t customdacvalstr
@@ -759,7 +748,7 @@ function RampMultipleBD(channels, setpoint, nChannels, [ramprate, update])
 			UpdateCustom(channel,setpoint)
 		endif
 	endfor
-	UpdateMultipleBD(action="ramp", ramprate=ramprate, update = update)
+	UpdateMultipleBD(instrID, action="ramp", ramprate=ramprate, update = update)
 	if(bd_num_custom > 0)
 		bdCalcCustomValues()
 	endif
@@ -849,7 +838,6 @@ function readBytesBD(bytes)
 
 	// read serial port here
 	make /O/B/U/N=(bytes) bd_response_wave
-	SetSerialPort()
 	cmd="VDTReadBinaryWave2 /O=1.0 /Q bd_response_wave"
 	execute (cmd)
 
@@ -865,7 +853,6 @@ Function clearBufferBD()
 	string cmd
 	string /g bd_response
 	NVAR V_VDT
-	SetSerialPort()
 	do
 		cmd="VDTReadBinary2 /O=1.0 /S=1/Q bd_response"
 		execute (cmd)
@@ -915,7 +902,6 @@ function readBDadc(channel, board_number)
 	make/o bd_cmd_wave={id_byte, command_byte, data_byte_1, data_byte_2, data_byte_3, parity_byte, 0}
 
 	// send command to babydac
-	SetSerialPort()
 	execute "VDTWriteBinaryWave2 /O=10 bd_cmd_wave"
 
 	// read response
@@ -963,11 +949,14 @@ function update_BabyDAC_custom(action) : ButtonControl
 	wave/t customdacvalstr
 	wave oldcustom
 
+	// setup babdac control here
+	variable instrID 
+
 	for(i=0;i<bd_num_custom;i=i+1)
 		if(str2num(customdacvalstr[i][1]) != oldcustom[i])
 			output = str2num(customdacvalstr[i][1])
 			channel = customdacvalstr[i][0]
-			RampMultipleBD(channel,output,1)
+			rampMultipleBD(instrID,channel,output)
 			oldcustom[i] = str2num(customdacvalstr[i][1])
 		endif
 	endfor
@@ -1008,12 +997,15 @@ function update_BabyDAC(action) : ButtonControl
 	variable check = nan
 	nvar bd_num_custom
 
+	// setup babydac control here
+	variable instrID
+
 	strswitch(action)
 		case "ramp":
 			for(i=0;i<16;i+=1)
 				if(str2num(dacvalstr[i][1]) != str2num(oldvalue[i][1]))
 					output = str2num(dacvalstr[i][1])
-					check = RampOutputBD(i,output)
+					check = rampOutputBD(instrID, i,output)
 					if(check == 1)
 						oldvalue[i][1] = dacvalstr[i][1]
 					else
@@ -1024,7 +1016,7 @@ function update_BabyDAC(action) : ButtonControl
 			break
 		case "rampallzero":
 			for(i=0;i<16;i+=1)
-				check = RampOutputBD(i, 0)
+				check = RampOutputBD(instrID, i, 0)
 				if(check==1)
 					oldvalue[i][1] = dacvalstr[i][1]
 				endif
@@ -1075,6 +1067,7 @@ end
 function/s GetBDDACStatus(instrID)
     // this doesn't actually require CreateGPIBInstrID
     //     it is only there to be consistent with the other devices
+	variable instrID
 	wave /t dacvalstr = dacvalstr
 	wave bd_boardnumbers = bd_boardnumbers
 	svar bd_controller_addr
