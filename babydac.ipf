@@ -54,6 +54,8 @@ function InitBabyDACs(instrID, boards, ranges, [custom])
 
     // setup serial port attributes
 	bdCommSetup(instrID) // setup DAC com port
+						  // possibly redundant if setup done with ScanController_VISA
+						  // but it doesn't hurt (or take any time) to do it again
 
     // functions to handle a bunch of ugly waves
     //     these keep track of the current state of the outputs
@@ -855,7 +857,7 @@ function setAllZeroBD(instrID)
 		endif
 	endfor
 
-	sc_sleep(2.0)
+	sc_sleep(0.2)
 	print "Set all channels back to 0mV."
 
 	for(i=0;i<numCh;i+=1)
@@ -1122,7 +1124,7 @@ end
 ///////////////////////////////////
 
 function/s GetBDDACStatus(instrID)
-    // this doesn't actually require CreateGPIBInstrID
+    // this doesn't actually require instrID
     //     it is only there to be consistent with the other devices
 	variable instrID
 	wave /t dacvalstr = dacvalstr

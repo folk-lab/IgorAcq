@@ -606,8 +606,9 @@ end
 
 function sc_updatewindow(action) : ButtonControl
 	string action
-	// Write (or overwrite) a config file
-	sc_createconfig()
+	
+	sc_findAsyncScripts() // check if sc_isAsyncScript needs to be changed
+	sc_createconfig()     // write (or overwrite) a config file
 end
 
 function sc_addrow(action) : ButtonControl
@@ -710,6 +711,22 @@ function sc_CheckboxClicked(ControlName, Value)
 	endif
 end
 
+function sc_findAsyncScripts()
+
+	wave /t sc_RawScripts
+	make /o/n=(numpnts(sc_RawScripts)) sc_isAsyncScript = 0
+	
+	variable i =0
+	for(i=0;i<numpnts(sc_RawScripts);i+=1)
+	
+		if(strsearch(sc_RawScripts[i],"_async",0,2) > 0)
+			sc_isAsyncScript[i]=1
+		endif
+
+	endfor
+	
+end
+
 function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_label])
 	variable start, fin, numpts, starty, finy, numptsy
 	string x_label, y_label
@@ -758,12 +775,14 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	while (i<numpnts(sc_CalcWaveNames))
 	i=0
 
+	sc_findAsyncScripts() // update sc_isAsyncScript
+
 //	// connect VISA instruments
 //	// do this here, because if it fails
 //	// i don't want to delete any old data
-//	svar sc_instr_wave
-//	wave /t instrWave = $sc_instr_wave
-//	initVISAinstruments(instrWave, verbose=0) // how to handle connInstr so SC knows about it???
+	svar sc_instr_wave
+	wave /t instrWave = $sc_instr_wave
+	initVISAinstruments(instrWave, verbose=0)
 
 	// The status of the upcoming scan will be set when waves are initialized.
 	if(!paramisdefault(starty) && !paramisdefault(finy) && !paramisdefault(numptsy))
@@ -1118,30 +1137,24 @@ end
 ////  read/record funcs  ////
 /////////////////////////////
 
-function RecordValues(i, j, [scandirection, readvstime, fillnan])
+function RecordValues(i, j, [readvstime, fillnan])
 	// In a 1d scan, i is the index of the loop. j will be ignored.
 	// In a 2d scan, i is the index of the outer (slow) loop, and j is the index of the inner (fast) loop.
 
-	// In a 2D scan, if scandirection=1 (scan up), the 1d wave gets saved into the matrix when j=numptsy.
-	// If scandirection=-1(scan down), the 1d matrix gets saved when j=0. Default is 1 (up)
-
 	// readvstime works only in 1d and rescales (grows) the wave at each index
 
-	// fillnan skips any read or calculation functions entirely and fills point [i,j] with nan
+	// fillnan=1 skips any read or calculation functions entirely and fills point [i,j] with nan
 
-	variable i, j, scandirection, readvstime, fillnan
+	variable i, j, readvstime, fillnan
 	nvar sc_is2d, sc_startx, sc_finx, sc_numptsx, sc_starty, sc_finy, sc_numptsy
-	variable ii = 0, jj=0, k=0
 	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts
-	wave/t sc_AsyncRecord
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
-	string script = "",cmd = "", wstr = ""
-	variable innerindex, outerindex, tgID
-	nvar sc_abortsweep, sc_pause,sc_scanstarttime
-	variable /g sc_tmpVal
-
+	nvar sc_abortsweep, sc_pause, sc_scanstarttime
+	variable ii = 0
+	
 	//// setup all sorts of logic so we can store values correctly ////
-
+	
+	variable innerindex, outerindex
 	if (sc_is2d)
 		// 2d
 		innerindex = j
@@ -1152,59 +1165,42 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 		outerindex = i // meaningless
 	endif
 
-	// Default scan direction is up
-	if (paramisdefault(scandirection))
-		scandirection=1
-	endif
-	variable /g sc_scandirection = scandirection // create global variable for this
-
 	// Set readvstime to 0 if it's not defined
 	if(paramisdefault(readvstime))
 		readvstime=0
-	endif
-
-	if(paramisdefault(fillnan))
-		fillnan=0
 	endif
 
 	if(readvstime==1 && sc_is2d)
 		abort "NOT IMPLEMENTED: Read vs Time is currently only supported for 1D sweeps."
 	endif
 
-	//// Setup and run async data collection ////
-	ii=0
-	k=0
-	do
-		if(strsearch(sc_RawScripts[ii],"_async",0) > 0 && sc_RawRecord[ii] == 1 || strsearch(sc_RawScripts[ii],"_async",0) > 0 && sc_RawPlot[ii] == 1)
-			if(fillnan == 0)
-				redimension /n=(numpnts(sc_AsyncRecord)+1) sc_AsyncRecord
-				sc_AsyncRecord[numpnts(sc_AsyncRecord)-1] = sc_RawScripts[ii]
-				k+=1
-			elseif(fillnan == 1)
-				wave wref1d = $sc_RawWaveNames[ii]
-				wref1d[innerindex] = nan
-
-				if (sc_is2d)
-					// 2D Wave
-					wave wref2d = $sc_RawWaveNames[ii] + "2d"
-					wref2d[innerindex][outerindex] = sc_tmpval
-				endif
-			endif
-		endif
-		ii+=1
-	while(ii < numpnts(sc_RawWaveNames))
-
-	if(k>0)
-		tgID = sc_StartThreads(k) //Startup and run function calls on mulitple threads, returns the thread group id.
-		sc_CollectDataFromThreads(tgID,k,readvstime,innerindex,outerindex) //Retrive data from threads when they are done.
-		sc_KillThreads(tgID) //Terminate threads.
+	//// fill NaNs? ////
+	
+	if(paramisdefault(fillnan))
+		fillnan = 0 // defaults to 0
+	elseif(fillnan==1)
+		fillnan = 1 // again, obvious
+	else
+		fillnan=0   // if something other than 1
+					//     assume default
 	endif
 
-	//// Read sync responses from machines if there are any ////
+	//// Setup and run async data collection ////
+	wave sc_isAsyncScript
+	variable nAsync = sum(sc_isAsyncScript)
+	
+	if( (nAsync>0) && (fillnan==0) )
+		variable tgID = sc_StartThreads(nAsync) // start threas and run 1 function call per thread, returns the thread group id.
+		sc_CollectDataFromThreads(tgID,nAsync,readvstime,innerindex,outerindex) // Retrive data from threads when they are done.
+		sc_KillThreads(tgID) // Terminate threads.
+	endif
+
+	//// Read sync data ( or fill NaN) ////
+	variable /g sc_tmpVal
+	string script = "", cmd = ""
 	ii=0
-	cmd = ""
 	do
-		if (strsearch(sc_RawScripts[ii],"_async",0) == -1 && sc_RawRecord[ii] == 1 || strsearch(sc_RawScripts[ii],"_async",0) == -1 && sc_RawPlot[ii] == 1)
+		if ((sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1) && sc_isAsyncScript[ii]==0)
 			wave wref1d = $sc_RawWaveNames[ii]
 
 			// Redimension waves if readvstime is set to 1
@@ -1214,12 +1210,11 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 			endif
 
 			if(fillnan == 0)
-				script = sc_RawScripts[ii] // assume script will execute and return a 'variable'
-												           // let it fail hard otherwise
+				script = TrimString(sc_RawScripts[ii])
 				sprintf cmd, "%s = %s", "sc_tmpVal", script
 				execute(cmd)
-			elseif(fillnan == 1)
-				sc_tmpval = nan
+			else
+				sc_tmpval = NaN
 			endif
 			wref1d[innerindex] = sc_tmpval
 
@@ -1236,7 +1231,7 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 	ii=0
 	cmd = ""
 	do
-		if (sc_CalcRecord[ii] == 1 || sc_CalcPlot[ii] == 1)
+		if ( (sc_CalcRecord[ii] == 1) || (sc_CalcPlot[ii] == 1) )
 			wave wref1d = $sc_CalcWaveNames[ii] // this is the 1D wave I am filling
 
 			// Redimension waves if readvstimeis set to 1
@@ -1246,9 +1241,7 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 			endif
 
 			if(fillnan == 0)
-				script = sc_CalcScripts[ii]; // assume script will execute and return a 'variable'
-												     // let it fail hard otherwise
-
+				script = TrimString(sc_CalcScripts[ii])
 				// Allow the use of the keyword '[i]' in calculated fields where i is the inner loop's current index
 				script = ReplaceString("[i]", script, "["+num2istr(innerindex)+"]")
 				sprintf cmd, "%s = %s", "sc_tmpVal", script
@@ -1268,6 +1261,17 @@ function RecordValues(i, j, [scandirection, readvstime, fillnan])
 
 	// check abort/pause status
 	sc_checksweepstate()
+end
+
+threadsafe function sc_Worker(queryfunc)
+	string queryfunc
+
+	funcref func_async func = $queryfunc
+	return func(queryfunc)
+end
+
+threadsafe function func_async(queryfunc) // Reference functions for all *_async functions
+	string queryfunc                      //function call name, used as datafolder name
 end
 
 function sc_StartThreads(numThreads)
@@ -1300,7 +1304,7 @@ function sc_CollectDataFromThreads(tgID,numThreads,readvstime,innerindex,outerin
 	// wait for all threads to finish
 	do
 		processflag = ThreadGroupWait(tgID, 0)
-		sc_sleep(1.0e-3)
+		sleep /s 0.001
 	while(processflag>0)
 
 	for(i=0;i<numThreads;i+=1)
@@ -1332,17 +1336,6 @@ function sc_KillThreads(tgID)
 	elseif(releaseResult == -1)
 		printf "ThreadGroupRelease failed. No fatal errors, will continue.\r"
 	endif
-end
-
-threadsafe function sc_Worker(queryfunc)
-	string queryfunc
-
-	funcref func_async func = $queryfunc
-	return func(queryfunc)
-end
-
-threadsafe function func_async(queryfunc) // Reference functions for all *_async functions
-	string queryfunc //function call name, used as datafolder name
 end
 
 function/s construct_calc_script(script)

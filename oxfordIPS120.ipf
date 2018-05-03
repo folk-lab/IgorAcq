@@ -44,6 +44,9 @@ function initIPS120(instrID)
 	variable/g maxramprate=182    // mT/min, depends on max field
 
 	ipsCommSetup(instrID) // Setting up serial communication
+							// possibly redundant if setup done with ScanController_VISA
+						  	// but it doesn't hurt (or take any time) to do it again
+
 
 	writeIPScheck(instrID, "C3") // Remote and unlocked
 	sc_sleep(0.02)
@@ -434,7 +437,7 @@ end
 //// Status for logging ////
 ////////////////////////////
 
-function/s GetIPSStatus()
+function/s GetIPSStatus(instrID)
     variable instrID
 	string buffer = ""
 	buffer = addJSONKeyVal(buffer, "field mT", numVal=getIPS120field(instrID), fmtNum="%.3f")

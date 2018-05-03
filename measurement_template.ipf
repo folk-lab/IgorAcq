@@ -473,7 +473,7 @@ function ScanBabyDACRepeat(startx, finx, channelsx, numptsx, delayx, rampratex, 
   y_label = "Sweep Num"
 
   // intialize waves
-  variable starty = 0, finy = numptsy, scandirection=0
+  variable starty = 0, finy = numptsy
   InitializeWaves(startx, finx, numptsx, starty=starty, finy=finy, numptsy=numptsy, x_label=x_label, y_label=y_label)
 
   // set starting values
@@ -484,10 +484,8 @@ function ScanBabyDACRepeat(startx, finx, channelsx, numptsx, delayx, rampratex, 
   do
     if(mod(i,2)==0)
       j=0
-      scandirection=1
     else
       j=numptsx-1
-      scandirection=-1
     endif
 
     setpointx = startx - offsetx + (j*(finx-startx)/(numptsx-1)) // reset start point
@@ -497,8 +495,7 @@ function ScanBabyDACRepeat(startx, finx, channelsx, numptsx, delayx, rampratex, 
       setpointx = startx - offsetx + (j*(finx-startx)/(numptsx-1))
       RampMultipleBD(channelsx, setpointx, nChannelsx, ramprate=rampratex)
       sc_sleep(delayx)
-      RecordValues(i, j, scandirection=scandirection)
-      j+=scandirection
+      RecordValues(i, j)
     while (j>-1 && j<numptsx)
     i+=1
   while (i<numptsy)
@@ -536,7 +533,7 @@ function ScanBabyDACRepeatOneWay(startx, finx, channelsx, numptsx, delayx, rampr
   sc_sleep(2.0)
 
   // intialize waves
-  variable starty = 0, finy = numptsy, scandirection=0
+  variable starty = 0, finy = numptsy
 
   InitializeWaves(startx, finx, numptsx, starty=starty, finy=finy, numptsy=numptsy, x_label=x_label, y_label=y_label)
 
@@ -813,7 +810,7 @@ function ScanIPSRepeat(startx, finx, numptsx, delayx, rampratex, numptsy, delayy
   y_label = "Sweep Num"
 
   // intialize waves
-  variable starty = 0, finy = numptsy-1, scandirection=0
+  variable starty = 0, finy = numptsy-1
   InitializeWaves(startx, finx, numptsx, starty=starty, finy=finy, numptsy=numptsy, x_label=x_label, y_label=y_label)
 
   // set starting values
@@ -824,10 +821,8 @@ function ScanIPSRepeat(startx, finx, numptsx, delayx, rampratex, numptsy, delayy
   do
     if(mod(i,2)==0)
       j=0
-      scandirection=1
     else
       j=numptsx-1
-      scandirection=-1
     endif
 
     setpointx = startx + (j*(finx-startx)/(numptsx-1)) // reset start point
@@ -838,8 +833,7 @@ function ScanIPSRepeat(startx, finx, numptsx, delayx, rampratex, numptsy, delayy
       setpointx = startx + (j*(finx-startx)/(numptsx-1))
       SetFieldWait(setpointx)
       sc_sleep(delayx)
-      RecordValues(i, j, scandirection=scandirection)
-      j+=scandirection
+      RecordValues(i, j)
     while (j>-1 && j<numptsx)
     i+=1
   while (i<numptsy)
@@ -916,7 +910,7 @@ function ScanSmMagnetRepeat(startx, finx, numptsx, delayx, rampratex, numptsy, d
   y_label = "Sweep Num"
 
   // intialize waves
-  variable starty = 0, finy = numptsy-1, scandirection=0
+  variable starty = 0, finy = numptsy-1
   InitializeWaves(startx, finx, numptsx, starty=starty, finy=finy, numptsy=numptsy, x_label=x_label, y_label=y_label)
 
   // set starting values
@@ -926,10 +920,8 @@ function ScanSmMagnetRepeat(startx, finx, numptsx, delayx, rampratex, numptsy, d
   do
     if(mod(i,2)==0)
       j=0
-      scandirection=1
     else
       j=numptsx-1
-      scandirection=-1
     endif
 
     setpointx = startx + (j*(finx-startx)/(numptsx-1)) // reset start point
@@ -940,8 +932,7 @@ function ScanSmMagnetRepeat(startx, finx, numptsx, delayx, rampratex, numptsy, d
       setpointx = startx + (j*(finx-startx)/(numptsx-1))
       RampSmallMagnet(setpointx, rampratex, noupdate=1)
       sc_sleep(delayx)
-      RecordValues(i, j, scandirection=scandirection)
-      j+=scandirection
+      RecordValues(i, j)
     while (j>-1 && j<numptsx)
     i+=1
   while (i<numptsy)
