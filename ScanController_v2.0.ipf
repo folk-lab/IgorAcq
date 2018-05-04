@@ -1354,12 +1354,12 @@ function sc_StartThreads()
 			threadFolder = "thread"+num2str(iThread)
 			newdatafolder/o root:$(threadFolder)  // creates root:instr1
 			variable /g root:$(threadFolder):instrID = instrID   // creates variable instrID in root:thread0
-																   //     that has the same value as $strID
+																      //     that has the same value as $strID
 			string /g root:$(threadFolder):queryFunc = queryFunc // creates string variable queryFunc in root:thread0
-															       //      that has a value queryFunc="readInstr"
+															         //      that has a value queryFunc="readInstr"
 			
 			threadgroupputdf tgID, root:$(threadFolder) // move root:thread0 to where threadGroup can access it
-												         //     effectively kills root:thread0 folder in main thread
+												           //     effectively kills root:thread0 folder in main thread
 												   
 			threadstart tgID, iThread, sc_Worker(threadFolder)  // start this thread
 			iThread+=1

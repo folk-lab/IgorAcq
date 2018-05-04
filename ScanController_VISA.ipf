@@ -3,9 +3,8 @@
 
 
 // TODO:
-//    auto gpib thing should use more waves to keep track of things
-//       less repeating the same lines over and over
-//    create manual serial init function
+// change all VISARead calls to viRead(...)
+// change all VISAWrite calls to viWrite(...)
 
 
 //////////////////////////////
