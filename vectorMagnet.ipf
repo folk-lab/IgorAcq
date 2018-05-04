@@ -92,7 +92,7 @@ function getLS625current(instrID) // Units: A
 	
 	string l625 = getResourceAddress(instrID)
 	
-	current = str2num(queryInstr(instrID,"RDGI?","\r\n","\r\n"))
+	current = str2num(queryInstr(instrID,"RDGI?\r\n", read_term = "\r\n"))
 	
 	// Update control window
 	strswitch(l625)
@@ -175,7 +175,7 @@ function getLS625rate(instrID) // Units: mT/min
 	
 	string l625 = getResourceAddress(instrID)
 	
-	currentramprate = str2num(queryInstr(instrID,"RATE?","\r\n","\r\n")) // A/s
+	currentramprate = str2num(queryInstr(instrID,"RATE?\r\n", read_term = "\r\n")) // A/s
 	// Update control window
 	strswitch(l625)
 		case strX:
@@ -243,7 +243,7 @@ function setLS625current(instrID,output) // Units: A
 		print "Max current is "+num2str(maxfield*ampspertesla/1000)+" A"
 	else	
 		cmd = "SETI "+num2str(output)
-		writeInstr(instrID, cmd, "\r\n")
+		writeInstr(instrID, cmd+"\r\n")
 		setpointvalstr[i][1] = num2str(Round_Number(output/ampspertesla*1000,5))
 	endif
 end
@@ -336,7 +336,7 @@ function setLS625rate(instrID,output) // Units: mT/min
 	else
 		ramprate_amps = Round_Number(output*(ampspertesla/(1000*60)),5) // A/s
 		cmd = "RATE "+num2str(ramprate_amps)
-		writeInstr(instrID,cmd,"\r\n")
+		writeInstr(instrID,cmd+"\r\n")
 		sweepratevalstr[j][1] = num2str(output)
 		return i
 	endif
@@ -475,7 +475,7 @@ function checkLS625ramp(instrID)
 	string response
 	variable ramping
 	
-	response = queryInstr(instrID,"OPST?","\r\n","\r\n")
+	response = queryInstr(instrID,"OPST?\r\n",read_term = "\r\n")
 	if(str2num(response) == 6)
 		ramping = 0
 	else
