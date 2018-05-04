@@ -15,7 +15,7 @@ function ReadSRSx(instrID) //Units: mV
 	variable instrID
 	string response
 	
-	response = queryInstr(instrID, "OUTP? 1\n", read_term = "\n")
+	response = queryInstr(instrID, "OUTP? 1\n")
 	return str2num(response)
 end
 
@@ -23,7 +23,7 @@ function ReadSRSy(instrID) //Units: mV
 	variable instrID
 	string response
 	
-	response = queryInstr(instrID, "OUTP? 2\n", read_term = "\n")
+	response = queryInstr(instrID, "OUTP? 2\n")
 	return str2num(response)
 end
 
@@ -31,7 +31,7 @@ function ReadSRSr(instrID) //Units: mV
 	variable instrID
 	string response
 	
-	response = queryInstr(instrID, "OUTP? 3\n", read_term = "\n")
+	response = queryInstr(instrID, "OUTP? 3\n")
 	return str2num(response)
 end
 
@@ -39,7 +39,7 @@ function ReadSRSt(instrID) //Units: rad
 	variable instrID
 	string response
 	
-	response = queryInstr(instrID, "OUTP? 4\n", read_term = "\n")
+	response = queryInstr(instrID, "OUTP? 4\n")
 	return str2num(response)
 end
 
@@ -47,7 +47,7 @@ function GetSRSHarmonic(instrID) // Units: AU
 	variable instrID
 	string response
 	
-	response = queryInstr(instrID, "HARM?\n", read_term = "\n")
+	response = queryInstr(instrID, "HARM?\n")
 	return str2num(response)
 end
 
@@ -55,7 +55,7 @@ function GetSRSTimeConst(instrID) // Return units: s
 	variable instrID
 	variable response
 	
-	response = str2num(queryInstr(instrID, "OFLT?\n", read_term = "\n"))
+	response = str2num(queryInstr(instrID, "OFLT?\n"))
 	if(mod(response,2) == 0)
 		return 10^(response/2-5)
 	else
@@ -67,7 +67,7 @@ function GetSRSPhase(instrID) // Units: AU
 	variable instrID
 	string response
 	
-	response = queryInstr(instrID, "PHAS?\n", read_term = "\n")
+	response = queryInstr(instrID, "PHAS?\n")
 	return str2num(response)
 end
 
@@ -75,7 +75,7 @@ function GetSRSAmplitude(instrID) // Units: mV
 	variable instrID
 	string response
 	
-	response = queryInstr(instrID, "SLVL?\n", read_term = "\n")
+	response = queryInstr(instrID, "SLVL?\n")
 	return str2num(response)*1000
 end
 
@@ -83,7 +83,7 @@ function GetSRSFrequency(instrID) // Units: Hz
 	variable instrID
 	string response
 	
-	response = queryInstr(instrID, "FREQ?\n", read_term = "\n")
+	response = queryInstr(instrID, "FREQ?\n")
 	return str2num(response)
 end
 
@@ -95,14 +95,14 @@ function GetSRSSensitivity(instrID,[integer]) // Units: mV or nA
 		integer = 0
 	endif
 
-	response = str2num(queryInstr(instrID, "SENS?\n", read_term = "\n"))
+	response = str2num(queryInstr(instrID, "SENS?\n"))
 	if(integer)
 		return response
 	endif
 	modulo = mod(response,3)
 	expo = (response-modulo)/3
 
-	response = str2num(queryInstr(instrID, "ISRC?\n", read_term = "\n"))
+	response = str2num(queryInstr(instrID, "ISRC?\n"))
 	if(response >= 2)
 		expo -= 15 //current mode
 	else
@@ -154,12 +154,7 @@ threadsafe function ReadSRSx_async(instrID) // Units: mV
 	variable instrID
 	
 	string cmd = "OUTP? 1"+"\n"
-	variable retCnt
-	viWrite(instrID, cmd , strlen(cmd) , retCnt)
-	
-	string buffer = ""
-	retCnt=0
-	viRead(instrID , buffer , 1024 , retCnt  )
+	string buffer = queryInstr(instrID, cmd)
 	
 	return str2num(buffer)
 end

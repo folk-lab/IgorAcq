@@ -51,7 +51,7 @@ function initIPS120(instrID)
 	writeIPScheck(instrID, "C3") // Remote and unlocked
 	sc_sleep(0.02)
 	writeIPScheck(instrID, "M9") // Set display to Tesla
-	writeInstr(instrID, "Q4\r")    // Use extented resolusion (0.0001 amp/0.01 mT), no response from magnet
+	writeInstr(instrID, "Q4")    // Use extented resolusion (0.0001 amp/0.01 mT), no response from magnet
 	writeIPScheck(instrID, "A0") // Set to Hold
 
 	dowindow/k IPS_Window
@@ -72,20 +72,16 @@ end
 
 function getIPS120volts(instrID) // return in A
 	variable instrID
-	variable volts
+	string buffer = queryInstr(instrID, "R1", read_term = "\r")[1,inf] // get value
 
-	volts = str2num(queryInstr(instrID, "R1\r", read_term = "\r")[1,inf]) // get value
-
-	return volts
+	return str2num(buffer)
 end
 
 threadsafe function getIPS120volts_async(instrID) // Units: mV
 	variable instrID
-	variable volts
+	string buffer = queryInstr(instrID, "R1", read_term = "\r")[1,inf] // get value
 
-	volts = str2num(queryInstr(instrID, "R1\r", read_term = "\r")[1,inf]) // get value
-
-	return volts
+	return str2num(buffer)
 end
 
 function getIPS120current(instrID) // return in A
@@ -94,7 +90,7 @@ function getIPS120current(instrID) // return in A
 	NVAR ampspertesla=ampspertesla
 	variable current
 
-	current = str2num(queryInstr(instrID, "R0\r", read_term = "\r")[1,inf]) // get value
+	current = str2num(queryInstr(instrID, "R0", read_term = "\r")[1,inf]) // get value
 
 	// save to waves for window
 	magnetvalsstr[1][1] = num2str(current)
