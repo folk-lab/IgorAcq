@@ -72,7 +72,7 @@ function openInstr(var_name, instrDesc, [localRM, verbose, timeout])
 		nvar globalRM
 		localRM = globalRM
 	endif
-	
+
 	if(paramisdefault(timeout))
 		timeout = 25
 	endif
@@ -132,9 +132,9 @@ function initVISAinstruments(instrWave, [verbose])
 		openInstr(instrWave[0][i], instrWave[1][i], localRM = globalRM, verbose = verbose)
 		nvar inst = $instrWave[0][i]
 		if(strlen(instrWave[3][i])!=0)
-			execute(instrWave[3][i]) // execute 
+			execute(instrWave[3][i]) // execute
 		endif
-		
+
 		// test block
 		if(strlen(instrWave[2][i])==0)
 			if(verbose)
@@ -178,30 +178,47 @@ function closeAllInstr()
 	endif
 end
 
+////////////////////////
+/// READ/WRITE/QUERY ///
+////////////////////////
 
-threadsafe function writeInstr(instrID, cmd, write_term)
+threadsafe function writeInstr(instrID, cmd)
 	// generic error checking write function
 	variable instrID
-	string cmd, write_term
-	variable status
+	string cmd
 
-	VISAwrite instrID, cmd+write_term
-	if (V_flag==0)
-		VISAerrormsg("writeInstr() -- viWrite", instrID, V_status)
-		return NaN // abort not supported in threads (v7)
+    status = viWrite(instrID, cmd)
+    if (status)
+		VISAerrormsg("writeInstr() -- viWrite", instrID, status)
+    	return NaN // abort not supported in threads (v7)
 	endif
+
 end
 
-threadsafe function/s readInstr(instrID, read_term)
+threadsafe function/s readInstr(instrID, [read_term, read_bytes])
 	// generic error checking read function
-	variable instrID
+	variable instrID, read_bytes
 	string read_term
-	string response
 
-	VISAread/T=read_term instrID, response
-	if (V_flag==0)
-		VISAerrormsg("readInstr() -- viWrite", instrID, V_status)
-		return "NaN" // abort not supported in threads (v7)
+    if(!paramisdefault(read_term)
+        visaSetReadTerm(instrID, read_term)
+        visaSetReadTermEnable(instrID, 1)
+    else
+        visaSetReadTermEnable(instrID, 0)
+    endif
+
+    if(paramisdefault(bytes))
+        read_bytes = 1024
+    endif
+
+    string buffer
+    variable return_count
+    variable status = viRead(instrID , buffer, read_bytes,  return_count)
+
+
+    if (status)
+        VISAerrormsg("readInstr() -- viRead", instrID, status)
+    	return "NaN" // abort not supported in threads (v7)
 	endif
 
 	return response
@@ -485,6 +502,30 @@ function listSerialports()
 
 end
 
+/////////////////////////
+/// VISA ATTR Set/Get ///
+/////////////////////////
+
+function visaSetReadTerm(instrID, termChar)
+
+	variable instrID	// An instrument referenced obtained from viOpen
+	string termChar     // set read termination character
+
+	variable status
+	status = viSetAttributeString(instrID, VI_ATTR_TERMCHAR, termChar)
+	return status
+end
+
+function visaSetReadTermEnable(instrID, enable)
+
+	variable instrID	// An instrument referenced obtained from viOpen
+	variable enable     // 1 = yes, 0 = no
+
+	variable status
+	status = viSetAttribute(instrID, VI_ATTR_TERMCHAR_EN, enable)
+	return status
+end
+
 function visaSetTimeout(instrID, timeout) // timeout value in ms
 	variable instrID, timeout
 	variable status
@@ -523,20 +564,6 @@ function visaSetStopBits(instrID, bits)
 	return status
 end
 
-function visaSetParity(instrID, parity)
-	// acceptable values for parity are:
-    //    NONE = 0
-    //    ODD = 1
-    //    EVEN = 2
-    //    MARK = 3
-    //    SPACE = 4
-	variable instrID	// An instrument referenced obtained from viOpen
-	variable parity
-
-	variable status
-	status = viSetAttribute(instrID, VI_ATTR_ASRL_PARITY, parity)
-	return status
-end
 
 //////////////////////
 /// VISA CONSTANTS ///
