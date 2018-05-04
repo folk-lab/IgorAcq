@@ -6,6 +6,10 @@
 //	Procedure written by Christian Olsen 2016-01-26
 //  Updated to use VISA/async Nik/Christian 05-XX-2018
 
+
+// notes...
+//    definitely want the write term character
+
 /////////////////////////
 /// IPS specific COMM ///
 /////////////////////////
@@ -17,6 +21,8 @@ function ipsCommSetup(instrID)
 	variable instrID
 
 	visaSetBaudRate(instrID, 9600)
+	visaSetSerialEndOut(instrID, 0)
+	visaSetDataBits(instrID, 8)
 	visaSetStopBits(instrID, 20)
 end
 
@@ -24,7 +30,7 @@ function writeIPScheck(instrID, cmd)	// Checks response for error
 	variable instrID
 	string cmd
 
-	string response = queryInstr(instrID, cmd+"\r", read_term = "\r")
+	string response = queryInstr(instrID, cmd, read_term = "\r")
 	if (cmpstr(response[0],"?") == 0)
 		printf "[WARNING] IPS command did not execute correctly: %s\r", cmd
 	endif
@@ -48,11 +54,11 @@ function initIPS120(instrID)
 						  	// but it doesn't hurt (or take any time) to do it again
 
 
-	writeIPScheck(instrID, "C3") // Remote and unlocked
+	writeIPScheck(instrID, "C3\r") // Remote and unlocked
 	sc_sleep(0.02)
-	writeIPScheck(instrID, "M9") // Set display to Tesla
-	writeInstr(instrID, "Q4")    // Use extented resolusion (0.0001 amp/0.01 mT), no response from magnet
-	writeIPScheck(instrID, "A0") // Set to Hold
+	writeIPScheck(instrID, "M9\r") // Set display to Tesla
+	writeInstr(instrID, "Q4\r")    // Use extented resolusion (0.0001 amp/0.01 mT), no response from magnet
+	writeIPScheck(instrID, "A0\r") // Set to Hold
 
 	dowindow/k IPS_Window
 	make /t/o magnetvalsstr = {{"Current field [mT]","Current amp [A]","Set point [mT]","Set point [A]","Sweep rate [mT/min]","Sweep rate [A/min]","Switch heater"},{"0","0","0","0","0","0","OFF"}}
@@ -72,14 +78,14 @@ end
 
 function getIPS120volts(instrID) // return in A
 	variable instrID
-	string buffer = queryInstr(instrID, "R1", read_term = "\r")[1,inf] // get value
+	string buffer = queryInstr(instrID, "R1\r", read_term = "\r")[1,inf] // get value
 
 	return str2num(buffer)
 end
 
 threadsafe function getIPS120volts_async(instrID) // Units: mV
 	variable instrID
-	string buffer = queryInstr(instrID, "R1", read_term = "\r")[1,inf] // get value
+	string buffer = queryInstr(instrID, "R1\r", read_term = "\r")[1,inf] // get value
 
 	return str2num(buffer)
 end
@@ -90,7 +96,7 @@ function getIPS120current(instrID) // return in A
 	NVAR ampspertesla=ampspertesla
 	variable current
 
-	current = str2num(queryInstr(instrID, "R0", read_term = "\r")[1,inf]) // get value
+	current = str2num(queryInstr(instrID, "R0\r", read_term = "\r")[1,inf]) // get value
 
 	// save to waves for window
 	magnetvalsstr[1][1] = num2str(current)
@@ -124,7 +130,7 @@ function setIPS120current(instrID, amps) // in A
 		print "Magnet current not set, exceeds limit: "+num2str(maxfield*ampspertesla/1000)+" A"
 		return -1
 	else
-		writeIPScheck(instrID, "I"+num2str(amps))
+		writeIPScheck(instrID, "I"+num2str(amps)+"\r")
 		writeInstr(instrID, "$A1\r")
 		magnetvalsstr[3][1] = num2str(amps)
 		magnetvalsstr[2][1] = num2str(roundNum(amps/ampspertesla*1000,2))
@@ -142,7 +148,7 @@ function setIPS120field(instrID, field) // in mT
 		return -1
 	else
 		amps = roundNum(field*ampspertesla/1000,4)
-		writeIPScheck(instrID, "I"+num2str(amps))
+		writeIPScheck(instrID, "I"+num2str(amps)+"\r")
 		writeInstr(instrID, "$A1\r")
 		magnetvalsstr[2][1] = num2str(field)
 		magnetvalsstr[3][1] = num2str(amps)
@@ -162,7 +168,7 @@ function setIPS120rate(instrID, ramprate) // mT/min
 		return -1
 	else
 		ramprate_amps = roundNum(ramprate*ampspertesla/1000,3)
-		writeIPScheck(instrID, "S"+num2str(ramprate_amps))
+		writeIPScheck(instrID, "S"+num2str(ramprate_amps)+"\r")
 		magnetvalsstr[4][1] = num2str(ramprate)
 		magnetvalsstr[5][1] = num2str(ramprate_amps)
 		return 1
@@ -228,7 +234,7 @@ function switchHeaterIPS120(instrID, newstate) // Call with "ON" or "OFF"
 	strswitch(newstate)
 		case "ON":
 			if (heaterstate == 0)
-				writeIPScheck(instrID, "H1")
+				writeIPScheck(instrID, "H1"+"\r")
 				print "waiting 20 sec for heater to respond"
 				magnetvalsstr[6][1] = newstate
 				do
@@ -244,7 +250,7 @@ function switchHeaterIPS120(instrID, newstate) // Call with "ON" or "OFF"
 			if (heaterstate == 0)
 				print "Heater already off"
 			elseif (heaterstate == 1)
-				writeIPScheck(instrID, "H0")
+				writeIPScheck(instrID, "H0\r")
 				print "waiting 20 sec for heater to respond"
 				magnetvalsstr[6][1] = newstate
 				do

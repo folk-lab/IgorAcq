@@ -74,7 +74,7 @@ function openInstr(var_name, instrDesc, [localRM, verbose, timeout])
 	endif
 
 	if(paramisdefault(timeout))
-		timeout = 25
+		timeout = 100
 	endif
 
 	status = viOpen(localRM,instrDesc,0,0,instrID)
@@ -189,10 +189,10 @@ threadsafe function writeInstr(instrID, cmd)
 
     variable count = strlen(cmd) // strlen is a problem
                                  // with non-ascii characters
-                                 // it does not equal numBytes
+                                 // it does not equal numBytes                               
                                  
     variable return_count = 0    // how many bytes were written
-    variable status = viWrite(instrID, cmd, strlen(cmd), return_count) 
+    variable status = viWrite(instrID, cmd, count, return_count) 
     if (status)
 		VISAerrormsg("writeInstr() -- viWrite", instrID, status)
     	return NaN // abort not supported in threads (v7)
@@ -210,6 +210,7 @@ threadsafe function /s readInstr(instrID, [read_term, read_bytes])
         // read termination character read_term
         visaSetReadTerm(instrID, read_term)
         visaSetReadTermEnable(instrID, 1)
+       
     else
         // in this case it will read until some END signal
         // specified by the interface being used
@@ -570,8 +571,18 @@ function visaSetStopBits(instrID, bits)
 	variable instrID	// An instrument referenced obtained from viOpen
 	variable bits
 
-	variable status
-	status = viSetAttribute(instrID, VI_ATTR_ASRL_STOP_BITS, bits)
+	variable status = viSetAttribute(instrID, VI_ATTR_ASRL_STOP_BITS, bits)
+	return status
+end
+
+function visaSetSerialEndOut(instrID, out)
+//	VI_ASRL_END_NONE (0)
+//	VI_ASRL_END_LAST_BIT (1)
+//	VI_ASRL_END_TERMCHAR (2)
+//	VI_ASRL_END_BREAK (3)
+	variable instrID, out
+
+	variable status = viSetAttribute(instrID, VI_ATTR_ASRL_END_OUT, out)
 	return status
 end
 

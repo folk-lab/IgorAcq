@@ -108,23 +108,19 @@ function read3478A(instrID)
 	// new points into the buffer
 	// viRead until \n gets the most recent buffered reading
 	Variable instrID
-	string response
 	
-	response = readInstr(instrID, read_term = "\n")
+	string response = readInstr(instrID, read_term = "\n")
 	return str2num(response)
 end
 
-threadsafe function read3478A_ASYNC(datafolderID)
-	string datafolderID
-	string response
+threadsafe function read3478A_async(instrID)
+	// once everything is setup in the 
+	// proper mode, the device just keeps putting
+	// new points into the buffer
+	// viRead until \n gets the most recent buffered reading
+	Variable instrID
 	
-	// get instrument ID from datafolder
-	DFREF dfr = ThreadGroupGetDFR(0,inf)
-	setdatafolder dfr
-	nvar instrID = $(":"+datafolderID+":instID")
-	killdatafolder dfr // We don't need the datafolder anymore!
-	
-	response = readInstr(instrID, read_term = "\n")
+	string response = readInstr(instrID, read_term = "\n")
 	return str2num(response)
 end
 

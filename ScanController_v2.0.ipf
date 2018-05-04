@@ -15,6 +15,7 @@
 
 //TODO:
 // 	 -- add async functionallity support
+//   -- make async checkbox in scancontroller window
 //   -- add a new type of value to record that can/will be read during sc_sleep?
 
 
