@@ -187,7 +187,12 @@ threadsafe function writeInstr(instrID, cmd)
 	variable instrID
 	string cmd
 
-    status = viWrite(instrID, cmd)
+    variable count = strlen(cmd) // strlen is a problem
+                                 // with non-ascii characters
+                                 // it does not equal numBytes
+                                 
+    variable return_count = 0    // how many bytes were written
+    status = viWrite(instrID, cmd, strlen(cmd), return_count) 
     if (status)
 		VISAerrormsg("writeInstr() -- viWrite", instrID, status)
     	return NaN // abort not supported in threads (v7)
@@ -201,9 +206,13 @@ threadsafe function/s readInstr(instrID, [read_term, read_bytes])
 	string read_term
 
     if(!paramisdefault(read_term)
+        // here we are going to make sure to use a
+        // read termination character read_term
         visaSetReadTerm(instrID, read_term)
         visaSetReadTermEnable(instrID, 1)
     else
+        // in this case it will read until some END signal
+        // specified by the interface being used
         visaSetReadTermEnable(instrID, 0)
     endif
 
@@ -213,9 +222,7 @@ threadsafe function/s readInstr(instrID, [read_term, read_bytes])
 
     string buffer
     variable return_count
-    variable status = viRead(instrID , buffer, read_bytes,  return_count)
-
-
+    variable status = viRead(instrID, buffer, read_bytes, return_count)
     if (status)
         VISAerrormsg("readInstr() -- viRead", instrID, status)
     	return "NaN" // abort not supported in threads (v7)
@@ -224,17 +231,20 @@ threadsafe function/s readInstr(instrID, [read_term, read_bytes])
 	return response
 end
 
-threadsafe function/s queryInstr(instrID, cmd, write_term, read_term, [delay])
+threadsafe function/s queryInstr(instrID, cmd, [read_term, delay])
 	// generic error checking query function
 	variable instrID, delay
-	string cmd, write_term, read_term
+	string cmd, read_term
 	string response
 
 	writeInstr(instrID, cmd, write_term)
 	if(!paramisdefault(delay))
 		sleep /S delay
 	endif
-	response = readInstr(instrID, read_term)
+    if(paramisdefault(read_term)
+        response = readInstr(instrID)
+    else
+        response = readInstr(instrID, read_term = read_term)
 
 	return response
 end

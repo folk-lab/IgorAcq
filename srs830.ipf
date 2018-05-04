@@ -15,7 +15,7 @@ function ReadSRSx(instrID) //Units: mV
 	variable instrID
 	string response
 	
-	response = queryInstr(instrID, "OUTP? 1", "\n", "\n")
+	response = queryInstr(instrID, "OUTP? 1\n", read_term = "\n")
 	return str2num(response)
 end
 
@@ -23,7 +23,7 @@ function ReadSRSy(instrID) //Units: mV
 	variable instrID
 	string response
 	
-	response = queryInstr(instrID, "OUTP? 2", "\n", "\n")
+	response = queryInstr(instrID, "OUTP? 2\n", raed_term = "\n")
 	return str2num(response)
 end
 
@@ -31,7 +31,7 @@ function ReadSRSr(instrID) //Units: mV
 	variable instrID
 	string response
 	
-	response = queryInstr(instrID, "OUTP? 3", "\n", "\n")
+	response = queryInstr(instrID, "OUTP? 3\n", read_term = "\n")
 	return str2num(response)
 end
 
@@ -39,7 +39,7 @@ function ReadSRSt(instrID) //Units: rad
 	variable instrID
 	string response
 	
-	response = queryInstr(instrID, "OUTP? 4", "\n", "\n")
+	response = queryInstr(instrID, "OUTP? 4\n", read_term = "\n")
 	return str2num(response)
 end
 
@@ -47,7 +47,7 @@ function GetSRSHarmonic(instrID) // Units: AU
 	variable instrID
 	string response
 	
-	response = queryInstr(instrID, "HARM?", "\n", "\n")
+	response = queryInstr(instrID, "HARM?\n", read_term = "\n")
 	return str2num(response)
 end
 
@@ -55,7 +55,7 @@ function GetSRSTimeConst(instrID) // Return units: s
 	variable instrID
 	variable response
 	
-	response = str2num(queryInstr(instrID, "OFLT?", "\n", "\n"))
+	response = str2num(queryInstr(instrID, "OFLT?\n", read_term = "\n"))
 	if(mod(response,2) == 0)
 		return 10^(response/2-5)
 	else
@@ -67,7 +67,7 @@ function GetSRSPhase(instrID) // Units: AU
 	variable instrID
 	string response
 	
-	response = queryInstr(instrID, "PHAS?", "\n", "\n")
+	response = queryInstr(instrID, "PHAS?\n", read_term = "\n")
 	return str2num(response)
 end
 
@@ -75,7 +75,7 @@ function GetSRSAmplitude(instrID) // Units: mV
 	variable instrID
 	string response
 	
-	response = queryInstr(instrID, "SLVL?", "\n", "\n")
+	response = queryInstr(instrID, "SLVL?\n", read_term = "\n")
 	return str2num(response)*1000
 end
 
@@ -83,7 +83,7 @@ function GetSRSFrequency(instrID) // Units: Hz
 	variable instrID
 	string response
 	
-	response = queryInstr(instrID, "FREQ?", "\n", "\n")
+	response = queryInstr(instrID, "FREQ?\n", read_term = "\n")
 	return str2num(response)
 end
 
@@ -95,14 +95,14 @@ function GetSRSSensitivity(instrID,[integer]) // Units: mV or nA
 		integer = 0
 	endif
 
-	response = str2num(queryInstr(instrID, "SENS?", "\n", "\n"))
+	response = str2num(queryInstr(instrID, "SENS?\n", read_term = "\n"))
 	if(integer)
 		return response
 	endif
 	modulo = mod(response,3)
 	expo = (response-modulo)/3
 
-	response = str2num(queryInstr(instrID, "ISRC?", "\n", "\n"))
+	response = str2num(queryInstr(instrID, "ISRC?\n", read_term = "\n"))
 	if(response >= 2)
 		expo -= 15 //current mode
 	else
@@ -171,7 +171,7 @@ end
 function SetSRSHarmonic(instrID,harm) // Units: AU
 	variable instrID,harm
 	
-	writeInstr(instrID, "HARM "+num2str(harm), "\n")
+	writeInstr(instrID, "HARM "+num2str(harm)+"\n")
 end
 
 function SetSRSTimeConst(instrID,timeConst) // Units: s
@@ -192,13 +192,13 @@ function SetSRSTimeConst(instrID,timeConst) // Units: s
 	make/o mintime = abs(srs_tc_lookup-timeConst)
 	findvalue/v=(wavemin(minstime)) mintime
 	
-	writeInstr(instrID, "OFLT "+num2istr(v_value), "\n")
+	writeInstr(instrID, "OFLT "+num2istr(v_value)+"\n")
 end
 
 function SetSRSPhase(instrID,phase) // Units: AU
 	variable instrID, phase
 	
-	writeInstr(instrID, "PHAS "+num2str(phase), "\n")
+	writeInstr(instrID, "PHAS "+num2str(phase)+"\n")
 end
 
 function SetSRSAmplitude(instrID,amplitude) // Units: mV
@@ -209,13 +209,13 @@ function SetSRSAmplitude(instrID,amplitude) // Units: mV
 		amplitude = 4
 	endif
 	
-	writeInstr(instrID, "SLVL "+num2str(amplitude/1000), "\n")
+	writeInstr(instrID, "SLVL "+num2str(amplitude/1000)+"\n")
 end
 
 function SetSRSFrequency(instrID,frequency)
 	variable instrID, frequency
 	
-	writeInstr(instrID, "FREQ "+num2str(frequency), "\n")
+	writeInstr(instrID, "FREQ "+num2str(frequency)+"\n")
 end
 
 function SetSRSSensitivity(instrID,sens) // Units: mV or nA
@@ -225,7 +225,7 @@ function SetSRSSensitivity(instrID,sens) // Units: mV or nA
 	make/o minsens = abs(lookuptable-sens)
 	findvalue/v=(wavemin(minsens)) minsens
 	
-	writeInstr(instrID, "SENS "+num2str(v_value), "\n")
+	writeInstr(instrID, "SENS "+num2str(v_value)+"\n")
 end
 
 function SetSRSSensUp(instrID)
@@ -234,7 +234,7 @@ function SetSRSSensUp(instrID)
 	
 	sens = GetSRSSensitivity(instrID,integer=1)
 	if(sens < 26)
-		writeInstr(instrID, "SENS "+num2str(sens+1), "\n")
+		writeInstr(instrID, "SENS "+num2str(sens+1)+"\n")
 	else
 		print "SRS sensitivity already at maximum!"
 	endif
@@ -246,7 +246,7 @@ function SetSRSSensDown(instrID)
 	
 	sens = GetSRSSensitivity(instrID,integer=1)
 	if(sens > 0)
-		writeInstr(instrID, "SENS "+num2str(sens+1), "\n")
+		writeInstr(instrID, "SENS "+num2str(sens+1)+"\n")
 	else
 		print "Sensitivity is at min already!"
 	endif

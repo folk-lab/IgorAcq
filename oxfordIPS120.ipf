@@ -24,7 +24,7 @@ function writeIPScheck(instrID, cmd)	// Checks response for error
 	variable instrID
 	string cmd
 
-	string response = queryInstr(instrID, cmd, "\r", "\r")
+	string response = queryInstr(instrID, cmd+"\r", read_term = "\r")
 	if (cmpstr(response[0],"?") == 0)
 		printf "[WARNING] IPS command did not execute correctly: %s\r", cmd
 	endif
@@ -51,7 +51,7 @@ function initIPS120(instrID)
 	writeIPScheck(instrID, "C3") // Remote and unlocked
 	sc_sleep(0.02)
 	writeIPScheck(instrID, "M9") // Set display to Tesla
-	writeInstr(instrID, "Q4", "\r")    // Use extented resolusion (0.0001 amp/0.01 mT), no response from magnet
+	writeInstr(instrID, "Q4\r")    // Use extented resolusion (0.0001 amp/0.01 mT), no response from magnet
 	writeIPScheck(instrID, "A0") // Set to Hold
 
 	dowindow/k IPS_Window
@@ -74,7 +74,7 @@ function getIPS120volts(instrID) // return in A
 	variable instrID
 	variable volts
 
-	volts = str2num(queryInstr(instrID, "R1", "\r", "\r")[1,inf]) // get value
+	volts = str2num(queryInstr(instrID, "R1\r", read_term = "\r")[1,inf]) // get value
 
 	return volts
 end
@@ -83,7 +83,7 @@ threadsafe function getIPS120volts_async(instrID) // Units: mV
 	variable instrID
 	variable volts
 
-	volts = str2num(queryInstr(instrID, "R1", "\r", "\r")[1,inf]) // get value
+	volts = str2num(queryInstr(instrID, "R1\r", read_term = "\r")[1,inf]) // get value
 
 	return volts
 end
@@ -94,7 +94,7 @@ function getIPS120current(instrID) // return in A
 	NVAR ampspertesla=ampspertesla
 	variable current
 
-	current = str2num(queryInstr(instrID, "R0", "\r", "\r")[1,inf]) // get value
+	current = str2num(queryInstr(instrID, "R0\r", read_term = "\r")[1,inf]) // get value
 
 	// save to waves for window
 	magnetvalsstr[1][1] = num2str(current)
@@ -109,7 +109,7 @@ function getIPS120field(instrID) // return in mT
 	NVAR ampspertesla=ampspertesla
 	variable current,field
 
-	current = str2num(queryInstr(instrID, "R0", "\r", "\r")[1,inf]) // get current
+	current = str2num(queryInstr(instrID, "R0\r", read_term = "\r")[1,inf]) // get current
 	field = roundNum(current/ampspertesla*1000,2) // calculate field
 
 	// save to waves for window
@@ -129,7 +129,7 @@ function setIPS120current(instrID, amps) // in A
 		return -1
 	else
 		writeIPScheck(instrID, "I"+num2str(amps))
-		writeInstr(instrID, "$A1", "\r")
+		writeInstr(instrID, "$A1\r")
 		magnetvalsstr[3][1] = num2str(amps)
 		magnetvalsstr[2][1] = num2str(roundNum(amps/ampspertesla*1000,2))
 	endif
@@ -147,7 +147,7 @@ function setIPS120field(instrID, field) // in mT
 	else
 		amps = roundNum(field*ampspertesla/1000,4)
 		writeIPScheck(instrID, "I"+num2str(amps))
-		writeInstr(instrID, "$A1", "\r")
+		writeInstr(instrID, "$A1\r")
 		magnetvalsstr[2][1] = num2str(field)
 		magnetvalsstr[3][1] = num2str(amps)
 		return 1
@@ -180,7 +180,7 @@ function getIPS120rate(instrID) // returns in mT/min
 	wave/t magnetvalsstr=magnetvalsstr
 	NVAR ampspertesla=ampspertesla
 
-	ramprate_amps = str2num(queryInstr(instrID, "R6", "\r", "\r")[1,inf])
+	ramprate_amps = str2num(queryInstr(instrID, "R6\r", read_term = "\r")[1,inf])
 	ramprate_field = roundNum(ramprate_amps/ampspertesla*1000,0)
 	magnetvalsstr[4][1] = num2str(ramprate_field)
 	magnetvalsstr[5][1] = num2str(ramprate_amps)
@@ -192,7 +192,7 @@ function getIPS120rate_current(instrID) // returns in A/min
     variable ramprate_amps,ramprate_field
 	wave/t magnetvalsstr=magnetvalsstr
 	NVAR ampspertesla=ampspertesla
-	ramprate_amps = str2num(queryInstr(instrID, "R6", "\r", "\r")[1,inf])
+	ramprate_amps = str2num(queryInstr(instrID, "R6\r", read_term = "\r")[1,inf])
 	ramprate_field = roundNum(ramprate_amps/ampspertesla*1000,0)
 	magnetvalsstr[4][1] = num2str(ramprate_field)
 	magnetvalsstr[5][1] = num2str(ramprate_amps)
@@ -202,8 +202,8 @@ end
 function /s getIPS120status(instrID)
 	variable instrID
 	string status
-	writeInstr(instrID, "X", "\r")
-	status = readInstr(instrID, "\r")
+	writeInstr(instrID, "X\r")
+	status = readInstr(instrID, read_term = "\r")
 	return status
 end
 
@@ -277,7 +277,7 @@ function waitIPS120field(instrID, field) // in mT
 		do
 			sc_sleep(0.02)
 			getIPS120field(instrID) // forces the window to update
-			status = str2num(queryInstr(instrID, "X", "\r", "\r")[11])
+			status = str2num(queryInstr(instrID, "X\r", read_term = "\r")[11])
 		while(numtype(status)==2)
 
 	while(status!=0)
