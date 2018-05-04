@@ -770,10 +770,24 @@ function sc_findAsyncMeasurements()
 		
 	endfor
 	
-	// no point in doing anyting async is only one instrument is capable of it
-	if(sum(sc_measAsync)==1)
+	if(sum(sc_measAsync)<2)
+		// no point in doing anyting async is only one instrument is capable of it
 		make /o/n=(numpnts(sc_RawScripts)) sc_measAsync = 0
+		print "[WARNING] Not using async for only one measurement. It is pointless."
+		return 0
 	endif
+	
+//	// if there are some async measurements to be made
+//	// move the instrID variables to some cleverly named data folder structure
+//	variable iThread = 0
+//	for(i=0;i<numpnts(sc_RawScripts);i+=1)
+//	
+//		if ( sc_measAsync[i]==1 )
+//			// move the global instrID variable into a folder
+//			
+//		
+//	endfor
+		
 
 	return sum(sc_measAsync)
 end
@@ -1241,8 +1255,8 @@ function RecordValues(i, j, [readvstime, fillnan])
 	wave sc_measAsync
 	if( (sum(sc_measAsync) > 1) && (fillnan==0) )
 		variable tgID = sc_StartThreads() // start threads and run 1 function call per thread, returns the thread group id.
-//		sc_CollectDataFromThreads(tgID,nAsync,readvstime,innerindex,outerindex) // Retrive data from threads when they are done.
-//		sc_KillThreads(tgID) // Terminate threads.
+		sc_CollectDataFromThreads(tgID,readvstime,innerindex,outerindex) // Retrive data from threads when they are done.
+		sc_KillThreads(tgID) // Terminate threads.
 	endif
 
 	//// Read sync data ( or fill NaN) ////
@@ -1318,10 +1332,11 @@ function sc_StartThreads()
 	wave /t sc_RawScripts
 	
 	variable numThreads = sum(sc_measAsync)
-//	tgID = ThreadGroupCreate(numThreads) // open threads
+	variable tgID = ThreadGroupCreate(numThreads) // open threads
 
-	variable tgID, i=0, idx=0
-	string script, queryFunc, strID
+	variable i=0, idx=0
+	string script, queryFunc, strID, threadFolder
+	variable iThread = 0
 	for(i=0; i<numpnts(sc_RawScripts); i+=1)
 	
 		if(sc_measAsync[i]==1)
@@ -1330,36 +1345,54 @@ function sc_StartThreads()
 			idx = sc_checkAsyncScript(script)
 			queryFunc = script[0,idx-1]
 			strID = script[idx+1,strlen(script)-2]
-			nvar instID = $strID
-			newdatafolder/o root:$(queryfunc)
-//			movevariable root:strID, root:$(queryfunc):$(strID)
 			
-//			threadgroupputdf tgID, data:$(queryfunc)
-//			threadstart tgID, i, sc_Worker(queryFunc)
-
+			nvar instrID = $strID
+			
+			// going to use a new data folder structure
+			//     to keep track of function names and instrument ids
+			// comments below show an example
+			threadFolder = "thread"+num2str(iThread)
+			newdatafolder/o root:$(threadFolder)  // creates root:instr1
+			variable /g root:$(threadFolder):instrID = instrID   // creates variable instrID in root:thread0
+																   //     that has the same value as $strID
+			string /g root:$(threadFolder):queryFunc = queryFunc // creates string variable queryFunc in root:thread0
+															       //      that has a value queryFunc="readInstr"
+			
+			threadgroupputdf tgID, root:$(threadFolder) // move root:thread0 to where threadGroup can access it
+												         //     effectively kills root:thread0 folder in main thread
+												   
+			threadstart tgID, iThread, sc_Worker(threadFolder)  // start this thread
+			iThread+=1
+			
 		endif
 		
 	endfor
 
-//	return tgID
-	return 0
+	return tgID
 end
 
-threadsafe function sc_Worker(queryfunc)
-	string queryfunc
+threadsafe function sc_Worker(threadFolder)
+	string threadFolder
+	
+	DFREF dfr = ThreadGroupGetDFR(0,1000)
+	setdatafolder dfr
+	
+	nvar instrID = instrID
+	svar queryFunc = queryFunc
 
-	funcref func_async func = $queryfunc
-	return func(queryfunc)
+	funcref funcAsync func = $queryFunc
+	return func(instrID)
 end
 
-threadsafe function func_async(queryfunc) // Reference functions for all *_async functions
-	string queryfunc                      //function call name, used as datafolder name
+threadsafe function funcAsync(instrID)  // Reference functions for all *_async functions
+	variable instrID                    // instrID used as only input to async functions
 end
 
-function sc_CollectDataFromThreads(tgID,numThreads,readvstime,innerindex,outerindex)
-	variable tgID, numThreads, readvstime, innerindex, outerindex
+function sc_CollectDataFromThreads(tgID,readvstime,innerindex,outerindex)
+	variable tgID, readvstime, innerindex, outerindex
 	variable processflag, i=0, threaddata
 	wave/t sc_RawWaveNames
+	wave sc_measAsync
 	nvar sc_is2d, sc_scanstarttime
 
 	// wait for all threads to finish
@@ -1367,23 +1400,31 @@ function sc_CollectDataFromThreads(tgID,numThreads,readvstime,innerindex,outerin
 		processflag = ThreadGroupWait(tgID, 0)
 		sleep /s 0.001
 	while(processflag>0)
-
-	for(i=0;i<numThreads;i+=1)
-		wave wref1d = $sc_RawWaveNames[i]
-		threaddata = ThreadReturnValue(tgID, i)
-
-		// Redimension waves if readvstime is set to 1
-		if (readvstime == 1)
-			redimension /n=(innerindex+1) wref1d
-			setscale/I x 0,  datetime - sc_scanstarttime, wref1d
+	
+	variable iThread = 0
+	for(i=0; i<numpnts(sc_RawWaveNames); i+=1)
+	
+		if(sc_measAsync[i]==1)	
+	
+			wave wref1d = $sc_RawWaveNames[i]
+			threaddata = ThreadReturnValue(tgID, iThread)
+	
+			// Redimension waves if readvstime is set to 1
+			if (readvstime == 1)
+				redimension /n=(innerindex+1) wref1d
+				setscale/I x 0,  datetime - sc_scanstarttime, wref1d
+			endif
+	
+			wref1d[innerindex] = threaddata
+	
+			if (sc_is2d)
+				wave wref2d = $sc_RawWaveNames[i] + "2d"
+				wref2d[innerindex][outerindex] = wref1d[innerindex]
+			endif
+			iThread+=1
+			
 		endif
-
-		wref1d[innerindex] = threaddata
-
-		if (sc_is2d)
-			wave wref2d = $sc_RawWaveNames[i] + "2d"
-			wref2d[innerindex][outerindex] = wref1d[innerindex]
-		endif
+		
 	endfor
 end
 
@@ -1398,6 +1439,10 @@ function sc_KillThreads(tgID)
 		printf "ThreadGroupRelease failed. No fatal errors, will continue.\r"
 	endif
 end
+
+
+
+
 
 function/s construct_calc_script(script)
 	// adds "[i]" to calculation scripts

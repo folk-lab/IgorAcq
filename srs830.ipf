@@ -150,60 +150,18 @@ end
 //// async get functions ////
 ////////////////////////////
 
-threadsafe function ReadSRSx_Async(datafolderID) // Units: mV
-	string datafolderID
-	string response
+threadsafe function ReadSRSx_async(instrID) // Units: mV
+	variable instrID
 	
-	// get instrument ID from datafolder
-	DFREF dfr = ThreadGroupGetDFR(0,inf)
-	setdatafolder dfr
-	nvar instrID = $(":"+datafolderID+":instrID")
-	killdatafolder dfr // We don't need the datafolder anymore!
+	string cmd = "OUTP? 1"+"\n"
+	variable retCnt
+	viWrite(instrID, cmd , strlen(cmd) , retCnt)
 	
-	response = queryInstr(instrID, "OUTP? 1", "\n", "\n")
-	return str2num(response)
-end
-
-threadsafe function ReadSRSy_Async(datafolderID) // Units: mV
-	string datafolderID
-	string response
+	string buffer = ""
+	retCnt=0
+	viRead(instrID , buffer , 1024 , retCnt  )
 	
-	// get instrument ID from datafolder
-	DFREF dfr = ThreadGroupGetDFR(0,inf)
-	setdatafolder dfr
-	nvar instrID = $(":"+datafolderID+":instrID")
-	killdatafolder dfr // We don't need the datafolder anymore!
-	
-	response = queryInstr(instrID, "OUTP? 2", "\n", "\n")
-	return str2num(response)
-end
-
-threadsafe function ReadSRSr_Async(datafolderID) // Units: mV
-	string datafolderID
-	string response
-	
-	// get instrument ID from datafolder
-	DFREF dfr = ThreadGroupGetDFR(0,inf)
-	setdatafolder dfr
-	nvar instrID = $(":"+datafolderID+":instrID")
-	killdatafolder dfr // We don't need the datafolder anymore!
-	
-	response = queryInstr(instrID, "OUTP? 3", "\n", "\n")
-	return str2num(response)
-end
-
-threadsafe function ReadSRSt_Async(datafolderID) // Units: rad
-	string datafolderID
-	string response
-	
-	// get instrument ID from datafolder
-	DFREF dfr = ThreadGroupGetDFR(0,inf)
-	setdatafolder dfr
-	nvar instrID = $(":"+datafolderID+":instrID")
-	killdatafolder dfr // We don't need the datafolder anymore!
-	
-	response = queryInstr(instrID, "OUTP? 4", "\n", "\n")
-	return str2num(response)
+	return str2num(buffer)
 end
 
 ////////////////////////
