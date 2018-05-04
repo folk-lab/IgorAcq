@@ -15,7 +15,7 @@
 
 //TODO:
 // 	 -- add async functionallity support
-//     -- add a new type of value to record that can/will be read during sc_sleep?
+//   -- add a new type of value to record that can/will be read during sc_sleep?
 
 
 //FIX:

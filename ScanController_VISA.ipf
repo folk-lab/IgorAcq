@@ -523,7 +523,7 @@ threadsafe function visaSetReadTerm(instrID, termChar)
 	string termChar     // set read termination character
 
 	variable status
-	status = viSetAttributeString(instrID, VI_ATTR_TERMCHAR, termChar)
+	status = viSetAttribute(instrID, VI_ATTR_TERMCHAR, char2num(termChar))
 	return status
 end
 
