@@ -12,7 +12,6 @@
 // GetHeaterPowerDB()
 // GetPressureDB()
 // QueryDB()
-// Change LS timing loop for temperature control, add it to SetControlMode()
 // Add support for BF #2
 
 ////////////////////////////
@@ -48,7 +47,8 @@ function GetTemp(plate, [max_age]) // Units: K
 	string channel, payload, headers, command, url
 	
 	if(paramisdefault(max_age))
-		return GetTempDB(plate) // Maybe it is better to set max_age = 120
+		//return GetTempDB(plate) // Maybe it is better to set max_age = 120
+		max_age = 120
 	endif
 	
 	strswitch(system)
@@ -73,11 +73,11 @@ function GetTemp(plate, [max_age]) // Units: K
 		case "bfbig":
 			break
 	endswitch
-	sprintf payload, "{\"ch\":%d, \"max_age\":%d}", channel, max_age
+	sprintf payload, "{\"ch\":%d, \"max_age\":%d\", \"?_at_\":%s}", channel, max_age, "vMqyDIcB"
 	headers = "Content-Type: application/json"
 	command = "get-channel-data"
 	url = GenerateURL(command)
-	return QueryLakeshore(url,payload,headers,"data:T")
+	return QueryLakeshore(url,payload,headers,"data:t")
 end
 
 function GetHeaterPower(heater, [max_age]) // Units: mW
@@ -95,7 +95,8 @@ function GetHeaterPower(heater, [max_age]) // Units: mW
    string headers, payload, command, url
    
    if(paramisdefault(max_age))
-		return GetHeaterPowerDB(heater)
+		//return GetHeaterPowerDB(heater)
+		max_age = 120
 	endif
 	
 	strswitch(system)
@@ -201,6 +202,8 @@ function GetControlMode() // Units: No units
 end
 
 //// Get Functions - Directly from data base ////
+
+// NOT implimented yet!
 
 function GetTempDB(plate) // Units: mK
 	// returns the temperature of the selected "plate".
@@ -476,9 +479,13 @@ function UpdateLakeshoreWindow()
 	GetControlMode()
 	GetPIDTemp()
 	GetPIDParameters()
-	GetHeaterPowerDB("mc")
-	GetHeaterPowerDB("still")
+	GetHeaterPower("mc")
+	GetHeaterPower("still")
+	//GetHeaterPowerDB("mc")
+	//GetHeaterPowerDB("still")
 end
+
+// FIX pressure readings
 
 function/s GetSystemStatus()
 	// returns loggable parameters to meta-data file
@@ -488,26 +495,26 @@ function/s GetSystemStatus()
 	
 	strswitch(system)
 		case "bfsmall":
-			buffer = addJSONKeyVal(buffer,"MC K",numVal = GetTempDB("mc"),fmtNum="%.3f")
-			buffer = addJSONKeyVal(buffer,"Still K",numVal = GetTempDB("still"),fmtNum="%.3f")
-			buffer = addJSONKeyVal(buffer,"4K Plate K",numVal = GetTempDB("4K"),fmtNum="%.3f")
-			buffer = addJSONKeyVal(buffer,"Magnet K",numVal = GetTempDB("magnet"),fmtNum="%.3f")
-			buffer = addJSONKeyVal(buffer,"50K Plate K",numVal = GetTempDB("50K"),fmtNum="%.3f")
-			for(i=1;i<7;i+=1)
-				gauge = "P"+num2istr(i)
-				buffer = addJSONKeyVal(buffer,gauge,numVal = GetPressureDB(gauge),fmtNum="%g")
-			endfor
+			buffer = addJSONKeyVal(buffer,"MC K",numVal = GetTemp("mc"),fmtNum="%.3f")
+			buffer = addJSONKeyVal(buffer,"Still K",numVal = GetTemp("still"),fmtNum="%.3f")
+			buffer = addJSONKeyVal(buffer,"4K Plate K",numVal = GetTemp("4K"),fmtNum="%.3f")
+			buffer = addJSONKeyVal(buffer,"Magnet K",numVal = GetTemp("magnet"),fmtNum="%.3f")
+			buffer = addJSONKeyVal(buffer,"50K Plate K",numVal = GetTemp("50K"),fmtNum="%.3f")
+//			for(i=1;i<7;i+=1)
+//				gauge = "P"+num2istr(i)
+//				buffer = addJSONKeyVal(buffer,gauge,numVal = GetPressureDB(gauge),fmtNum="%g")
+//			endfor
 			return addJSONKeyVal("","BF Small",strval = buffer)
 		case "igh":
-			buffer = addJSONKeyVal(buffer,"MC K",numVal = GetTempDB("mc"),fmtNum="%.3f")
-			buffer = addJSONKeyVal(buffer,"Cold Plate K",numVal = GetTempDB("cold plate"),fmtNum="%.3f")
-			buffer = addJSONKeyVal(buffer,"Still K",numVal = GetTempDB("still"),fmtNum="%.3f")
-			buffer = addJSONKeyVal(buffer,"1K Pot K",numVal = GetTempDB("1Kt"),fmtNum="%.3f")
-			buffer = addJSONKeyVal(buffer,"Sorb K",numVal = GetTempDB("sorb"),fmtNum="%.3f")
-			for(i=1;i<6;i+=1)
-				gauge = stringfromlist(i,ighgaugelookup)
-				buffer = addJSONKeyVal(buffer,"P"+num2istr(i),numVal = GetPressureDB(gauge),fmtNum="%g")
-			endfor
+			buffer = addJSONKeyVal(buffer,"MC K",numVal = GetTemp("mc"),fmtNum="%.3f")
+			buffer = addJSONKeyVal(buffer,"Cold Plate K",numVal = GetTemp("cold plate"),fmtNum="%.3f")
+			buffer = addJSONKeyVal(buffer,"Still K",numVal = GetTemp("still"),fmtNum="%.3f")
+			buffer = addJSONKeyVal(buffer,"1K Pot K",numVal = GetTemp("1Kt"),fmtNum="%.3f")
+			buffer = addJSONKeyVal(buffer,"Sorb K",numVal = GetTemp("sorb"),fmtNum="%.3f")
+//			for(i=1;i<6;i+=1)
+//				gauge = stringfromlist(i,ighgaugelookup)
+//				buffer = addJSONKeyVal(buffer,"P"+num2istr(i),numVal = GetPressureDB(gauge),fmtNum="%g")
+//			endfor
 			return addJSONKeyVal("","IGH",strval = buffer)
 	endswitch
 end
@@ -628,7 +635,7 @@ function QueryLakeshore(url,payload,headers,responseformat)
         return -1.0
    endif
 
-	ok = str2num(getJSONvalue(response, "ok")) // should be boolean
+	ok = str2num(getJSONvalue(response, "OK")) // should be boolean
 	if(ok==1)
 		// no error, get response
 		return str2num(getJSONvalue(response, responseformat))
@@ -662,7 +669,7 @@ function/s QueryLakeshoreRaw(url,payload,headers,responseformat)
         return ""
    endif
 
-	ok = str2num(getJSONvalue(response, "ok")) // should be boolean
+	ok = str2num(getJSONvalue(response, "OK")) // should be boolean
 	if(ok==1)
 		// no error, get response
 		return getJSONvalue(response, responseformat)
