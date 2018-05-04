@@ -1,9 +1,9 @@
 #pragma rtGlobals=3		// Use modern global access method and strict wave access.
 
 //Datafolder structure:   -- move this structure from root to some connections path
-//data:
+//root:
 //		connections:
-//              -- put session here (only need one for the whole set) --
+//              -- put session here? --
 //				device_name:
 //						session -- remove this
 //						instr
@@ -96,8 +96,8 @@ function sc_StartActionThreads()
 	variable i=0
  	for(i=0;i<numpts(devices_name);i+=1)
 
-	 	duplicatedatafolder data:connections, data:copy //duplicate connections folder
- 		ThreadGroupPutDF threadGroupID, data:copy       //each thread gets a copy of entire device init
+	 	duplicatedatafolder root:connections, root:copy //duplicate connections folder
+ 		ThreadGroupPutDF threadGroupID, root:copy       //each thread gets a copy of entire device init
                                                         // and will only access the init under its name
  		ThreadStart threadGroupID, i, sc_ActionWorker(threadGroupID, devices_name[i], devices_query[i]) // start thread
     endfor
@@ -123,9 +123,9 @@ end
 
 function sc_GetDataAsync(data)
     //perform async data acquisition
-    //data: wave in which to store data
+    //root: wave in which to store data
 	wave async_data
-	nvar numdevices = data:gNumDevices // is there another way to get this number?
+	nvar numdevices = root:gNumDevices // is there another way to get this number?
 
 	variable threadGroupID = sc_StartActionThreads() // start threads
 
@@ -174,7 +174,7 @@ function open_comms(device_name, resourceName)
     string device_name, resourceName
 
     // setup folder structure
-	string data_folder = "data:connections"
+	string data_folder = "root:connections"
 	check_folder(data_folder)
 
 	data_folder += ":" + device_name

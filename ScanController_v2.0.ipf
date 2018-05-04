@@ -607,7 +607,6 @@ end
 function sc_updatewindow(action) : ButtonControl
 	string action
 	
-	sc_findAsyncScripts() // check if sc_isAsyncScript needs to be changed
 	sc_createconfig()     // write (or overwrite) a config file
 end
 
@@ -711,20 +710,72 @@ function sc_CheckboxClicked(ControlName, Value)
 	endif
 end
 
-function sc_findAsyncScripts()
+function sc_checkAsyncScript(str)
+	// returns -1 if formatting is bad
+	// could be better
+	// returns position of first ( character if it is good
+	string str
+	
+	variable i = 0, firstOP = 0, countOP = 0, countCP = 0
+	for(i=0; i<strlen(str); i+=1)
+		
+		if( CmpStr(str[i], "(") == 0 )
+			countOP+=1 // count opening parentheses 
+			if( firstOP==0 )
+				firstOP = i // record position of first (
+				continue
+			endif
+		endif
+		
+		if( CmpStr(str[i], ")") == 0 )
+			countCP -=1 // count closing parentheses 
+			continue
+		endif
+		
+		if( CmpStr(str[i], ",") == 0 )
+			return -1 // stop on comma 
+		endif
+			
+	endfor
+	
+	if( (countOP==1) && (countCP==-1) )
+		return firstOP
+	else
+		return -1
+	endif
+end
+						
+function sc_findAsyncMeasurements()
 
 	wave /t sc_RawScripts
-	make /o/n=(numpnts(sc_RawScripts)) sc_isAsyncScript = 0
+	wave sc_RawRecord, sc_RawPlot
+	make /o/n=(numpnts(sc_RawScripts)) sc_measAsync = 0
 	
 	variable i =0
 	for(i=0;i<numpnts(sc_RawScripts);i+=1)
 	
-		if(strsearch(sc_RawScripts[i],"_async",0,2) > 0)
-			sc_isAsyncScript[i]=1
+		if ( (sc_RawRecord[i] == 1) || (sc_RawPlot[i] == 1) )
+			// this is something that will be measured
+			
+			if (strsearch(sc_RawScripts[i],"_async",0,2) > 0)
+				// this is something that should be asyn
+				// check that function is formatted correctly
+				if(sc_checkAsyncScript(sc_RawScripts[i])!=-1)
+					sc_measAsync[i]=1 // this will be recorded asynchronously
+				else
+					printf "[WARNING] Async scripts must be formatted: \"readFunc(instrID)\"\r\t%s is no good and will be read synchronously,\r", sc_RawScripts[i]
+				endif
+			endif
 		endif
-
+		
 	endfor
 	
+	// no point in doing anyting async is only one instrument is capable of it
+	if(sum(sc_measAsync)==1)
+		make /o/n=(numpnts(sc_RawScripts)) sc_measAsync = 0
+	endif
+
+	return sum(sc_measAsync)
 end
 
 function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_label])
@@ -745,6 +796,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 
 	//do some sanity checks on wave names: they should not start or end with numbers.
 	do
+		
 		if (sc_RawRecord[i])
 			s = sc_RawWaveNames[i]
 			if (!((char2num(s[0]) >= 97 && char2num(s[0]) <= 122) || (char2num(s[0]) >= 65 && char2num(s[0]) <= 90)))
@@ -775,7 +827,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	while (i<numpnts(sc_CalcWaveNames))
 	i=0
 
-	sc_findAsyncScripts() // update sc_isAsyncScript
+	sc_findAsyncMeasurements() // update sc_isAsyncScript
 
 //	// connect VISA instruments
 //	// do this here, because if it fails
@@ -1186,13 +1238,11 @@ function RecordValues(i, j, [readvstime, fillnan])
 	endif
 
 	//// Setup and run async data collection ////
-	wave sc_isAsyncScript
-	variable nAsync = sum(sc_isAsyncScript)
-	
-	if( (nAsync>0) && (fillnan==0) )
-		variable tgID = sc_StartThreads(nAsync) // start threas and run 1 function call per thread, returns the thread group id.
-		sc_CollectDataFromThreads(tgID,nAsync,readvstime,innerindex,outerindex) // Retrive data from threads when they are done.
-		sc_KillThreads(tgID) // Terminate threads.
+	wave sc_measAsync
+	if( (sum(sc_measAsync) > 1) && (fillnan==0) )
+		variable tgID = sc_StartThreads() // start threads and run 1 function call per thread, returns the thread group id.
+//		sc_CollectDataFromThreads(tgID,nAsync,readvstime,innerindex,outerindex) // Retrive data from threads when they are done.
+//		sc_KillThreads(tgID) // Terminate threads.
 	endif
 
 	//// Read sync data ( or fill NaN) ////
@@ -1200,7 +1250,7 @@ function RecordValues(i, j, [readvstime, fillnan])
 	string script = "", cmd = ""
 	ii=0
 	do
-		if ((sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1) && sc_isAsyncScript[ii]==0)
+		if ((sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1) && sc_measAsync[ii]==0)
 			wave wref1d = $sc_RawWaveNames[ii]
 
 			// Redimension waves if readvstime is set to 1
@@ -1263,6 +1313,38 @@ function RecordValues(i, j, [readvstime, fillnan])
 	sc_checksweepstate()
 end
 
+function sc_StartThreads()
+	wave sc_measAsync
+	wave /t sc_RawScripts
+	
+	variable numThreads = sum(sc_measAsync)
+//	tgID = ThreadGroupCreate(numThreads) // open threads
+
+	variable tgID, i=0, idx=0
+	string script, queryFunc, strID
+	for(i=0; i<numpnts(sc_RawScripts); i+=1)
+	
+		if(sc_measAsync[i]==1)
+
+			script = sc_RawScripts[i]
+			idx = sc_checkAsyncScript(script)
+			queryFunc = script[0,idx-1]
+			strID = script[idx+1,strlen(script)-2]
+			nvar instID = $strID
+			newdatafolder/o root:$(queryfunc)
+//			movevariable root:strID, root:$(queryfunc):$(strID)
+			
+//			threadgroupputdf tgID, data:$(queryfunc)
+//			threadstart tgID, i, sc_Worker(queryFunc)
+
+		endif
+		
+	endfor
+
+//	return tgID
+	return 0
+end
+
 threadsafe function sc_Worker(queryfunc)
 	string queryfunc
 
@@ -1272,27 +1354,6 @@ end
 
 threadsafe function func_async(queryfunc) // Reference functions for all *_async functions
 	string queryfunc                      //function call name, used as datafolder name
-end
-
-function sc_StartThreads(numThreads)
-	variable numThreads
-	wave/t sc_AsyncRecord
-	variable tgID, i=0
-	string queryFunc, instSessionID, expr = "(.+)\((.+)\)"
-
-	tgID = ThreadGroupCreate(numThreads)
-
-	do
-		splitstring/e=(expr) sc_AsyncRecord[i], queryFunc, instSessionID
-		nvar instID = $instSessionID
-		newdatafolder/o root:$(queryfunc)
-		movevariable root:instID, root:$(queryfunc):
-		threadgroupputdf tgID, root:$(queryfunc)
-		threadstart tgID, i, sc_Worker(queryFunc)
-		i+=1
-	while(i<numThreads)
-
-	return tgID
 end
 
 function sc_CollectDataFromThreads(tgID,numThreads,readvstime,innerindex,outerindex)
