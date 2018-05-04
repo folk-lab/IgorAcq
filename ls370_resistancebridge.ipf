@@ -18,21 +18,23 @@
 //// Initiate Lakeshore ////
 ///////////////////////////
 
-function InitLakeshore()
-	SetSystem() // Set the correct system!
-	CreateGlobalLakeshore() // Create the needed global variables for the GUI
+// What is instrID for the lakeshore 370????
+
+function initLS370()
+	setLS370system() // Set the correct system!
+	createLS370globals() // Create the needed global variables for the GUI
 	// Build main control window
 	dowindow/k Lakeshore
 	execute("lakeshore_window()")
 	// Update current values
-	//UpdateLakeshoreWindow()
+	updateLS370GUI()
 end
 
 ///////////////////////
 //// Get Functions ////
 //////////////////////
 
-function GetTemp(plate, [max_age]) // Units: K
+function getLS370temp(plate, [max_age]) // Units: K
 	// returns the temperature of the selected "plate".
 	// avaliable plates on BF systems: mc (mixing chamber), still, magnet, 4K, 50K
 	// avaliable plates on IGH systems: mc (mixing chamber), cold plate, still, 1K, sorb
@@ -77,10 +79,10 @@ function GetTemp(plate, [max_age]) // Units: K
 	headers = "Content-Type: application/json"
 	command = "get-channel-data"
 	url = GenerateURL(command)
-	return QueryLakeshore(url,payload,headers,"data:t")
+	return str2num(queryLS370(url,payload,headers,"data:t"))
 end
 
-function GetHeaterPower(heater, [max_age]) // Units: mW
+function getLS370heaterpower(heater, [max_age]) // Units: mW
 	// returns the power of the selected heater.
 	// avaliable heaters on BF systems: still (analog 2), mc
 	// avaliable heaters on IGH systems: sorb (analog 1), still (analog 2), mc
@@ -131,10 +133,10 @@ function GetHeaterPower(heater, [max_age]) // Units: mW
 		command = "get-heater-data"
 	endif
 	url = GenerateURL(command)
-	return QueryLakeshore(url,payload,headers,"data:power_mw")
+	return str2num(queryLS370(url,payload,headers,"data:power_mw"))
 end
 
-function GetPIDTemp() // Units: mK
+function getLS370PIDtemp() // Units: mK
 	// returns the setpoint of the PID loop.
 	// the setpoint is set regardless of the actual state of the PID loop
 	// and one can therefore always read the current setpoint (active or not)
@@ -145,13 +147,13 @@ function GetPIDTemp() // Units: mK
 	headers = "Content-Type: application/json"
 	payload = "{\"cmd\": \"SETP?\"}"
 	url = GenerateURL("cmd")
-	temp = QueryLakeshore(url,payload,headers,"Response")*1000
+	temp = str2num(queryLS370(url,payload,headers,"Response"))*1000
 	temp_set = temp
 	
 	return temp
 end
 
-function/s GetPIDParameters() // Units: No units
+function/s getLS370PIDparameters() // Units: No units
 	// returns the PID parameters used. 
 	// the retruned values are comma seperated values.
 	// P = {0.001 1000}, I = {0 10000}, D = {0 2500}
@@ -161,7 +163,7 @@ function/s GetPIDParameters() // Units: No units
 	headers = "Content-Type: application/json"
 	payload = "{\"cmd\": \"PID?\"}"
 	url = GenerateURL("cmd")
-	pid = QueryLakeshoreRaw(url,payload,headers,"Response")
+	pid = queryLS370(url,payload,headers,"Response")
 	p_value = str2num(stringfromlist(0,pid,","))
 	i_value = str2num(stringfromlist(1,pid,","))
 	d_value = str2num(stringfromlist(2,pid,","))
@@ -169,7 +171,7 @@ function/s GetPIDParameters() // Units: No units
 	return pid
 end
 
-function GetControlMode() // Units: No units
+function getLS370controlmode() // Units: No units
 	// returns the temperature control mode.
 	// 1: PID, 3: Open loop, 4: Off
 	nvar pid_mode, pid_led, mcheater_led
@@ -178,7 +180,7 @@ function GetControlMode() // Units: No units
 	headers = "Content-Type: application/json"
 	payload = "{\"cmd\": \"CMODE?\"}"
 	url = GenerateURL("cmd")
-	pid_mode = QueryLakeshore(url,payload,headers,"Response")
+	pid_mode = str2num(queryLS370(url,payload,headers,"Response"))
 	
 	if(pid_mode == 1)
 		pid_led = 1
@@ -197,7 +199,7 @@ function GetControlMode() // Units: No units
 		SetVariable mcheaterset, disable=0
 	else
 		print "Control mode not in supported modes, turning off heater!"
-		SetTempControlMode(4)
+		setLS370tempcontrolmode(4)
 	endif
 end
 
@@ -205,7 +207,7 @@ end
 
 // NOT implimented yet!
 
-function GetTempDB(plate) // Units: mK
+function getLS370tempDB(plate) // Units: mK
 	// returns the temperature of the selected "plate".
 	// avaliable plates on BF systems: mc (mixing chamber), still, magnet, 4K, 50K
 	// avaliable plates on IGH systems: mc (mixing chamber), cold plate, still, 1K, sorb
@@ -214,7 +216,7 @@ function GetTempDB(plate) // Units: mK
 	
 end
 
-function GetHeaterPowerDB(heater) // Units: mW
+function getLS370heaterpowerDB(heater) // Units: mW
 	// returns the power of the selected heater.
 	// avaliable heaters on BF systems: still (analog 2), mc
 	// avaliable heaters on IGH systems: sorb (analog 1), still (analog 2), mc
@@ -222,7 +224,7 @@ function GetHeaterPowerDB(heater) // Units: mW
 	string heater
 end
 
-function GetPressureDB(gauge) // Units: mbar
+function getLS370pressureDB(gauge) // Units: mbar
 	// returns the pressure from the selected pressure gauge
 	// avaliable gauges on BF systems: P1,P2,P3,P4,P5,P6
 	// avaliable gauges on IGH systems: P1,P2,G1,G2,G3
@@ -234,7 +236,7 @@ end
 //// Set Functions ////
 //////////////////////
 
-function SetTempControlMode(mode) // Units: No units
+function setLS370tempcontrolmode(mode) // Units: No units
 	// sets the temperature control mode
 	// avaliable options are: off (4), PID (1) and Open loop (3)
 	variable mode
@@ -260,28 +262,28 @@ function SetTempControlMode(mode) // Units: No units
 		PopupMenu mcheater, mode=1
 		SetVariable mcheaterset, disable=2
 		interval = 10
-		SetExclusiveReader(channel,interval)
-		SetPIDTemp(mcheater_set)
+		setLS370exclusivereader(channel,interval)
+		setLS370PIDtemp(mcheater_set)
 	elseif(mode == 3)
 		pid_led = 0
 		mcheater_led = 1
 		PopupMenu mcheater, mode=1
 		SetVariable mcheaterset, disable=0
-		ResetExclusiveReader()
+		resetLS370exclusivereader()
 	elseif(mode == 4)
 		pid_led = 0
 		mcheater_led = 0
 		PopupMenu mcheater, mode=2
 		SetVariable mcheaterset, disable=0
-		ResetExclusiveReader()
-		TurnOffMCHeater()
+		resetLS370exclusivereader()
+		turnoffLS370MCheater()
 	else
 		abort "Choose between: PID (1), Open loop (3) and off (4)"
 	endif
 	pid_mode = mode
 end
 
-function SetExclusiveReader(channel,interval) // interval units: ms
+function setLS370exclusivereader(channel,interval) // interval units: ms
 	variable channel,interval
 	string command, payload, headers, url
 	
@@ -290,10 +292,10 @@ function SetExclusiveReader(channel,interval) // interval units: ms
 	headers = "Content-Type: application/json"
 	
 	url = GenerateURL(command)
-	WriteLakeshore(url,payload,headers)
+	writeLS370(url,payload,headers)
 end
 	
-function ResetExclusiveReader()
+function resetLS370exclusivereader()
 	string command, payload, headers, url
 	
 	command = "reset-exclusive-reader"
@@ -301,10 +303,10 @@ function ResetExclusiveReader()
 	headers = "Content-Type: application/json"
 	
 	url = GenerateURL(command)
-	WriteLakeshore(url,payload,headers)
+	writeLS370(url,payload,headers)
 end
 
-function SetPIDTemp(temp,[maxcurrent]) // Units: mK, mA
+function setLS370PIDtemp(temp,[maxcurrent]) // Units: mK, mA
 	// sets the temperature for PID control and turns ON PID control!
 	variable temp,maxcurrent
 	string command,payload,headers,url
@@ -318,11 +320,11 @@ function SetPIDTemp(temp,[maxcurrent]) // Units: mK, mA
 	headers = "Content-Type: application/json"
 	sprintf payload, "{\"ch\": \"6\", \"setpoint\": \"%g\", \"maxcurrent\": \"%g\"}", temp/1000, maxcurrent
 	url = GenerateURL(command)
-	WriteLakeshore(url,payload,headers)
+	writeLS370(url,payload,headers)
 	temp_set = temp
 end
 
-function SetPIDParameters(p,i,d) // Units: No units
+function setLS370PIDparameters(p,i,d) // Units: No units
 	// set the PID parameters for the PID control loop
 	// P = {0.001 1000}, I = {0 10000}, D = {0 2500}
 	variable p,i,d
@@ -334,7 +336,7 @@ function SetPIDParameters(p,i,d) // Units: No units
 		headers = "Content-Type: application/json"
 		sprintf payload, "{\"cmd\": \"%s\"}", command
 		url = GenerateURL("cmd")
-		WriteLakeshore(url,payload,headers)
+		writeLS370(url,payload,headers)
 		p_value = p
 		i_value = i
 		d_value = d
@@ -343,7 +345,7 @@ function SetPIDParameters(p,i,d) // Units: No units
 	endif
 end
 
-function SetHeater(heater,output) //Units: mW
+function setLS370heaterpower(heater,output) //Units: mW
 	// sets the manual heater output
 	// avaliable heaters on BF systems: mc,still
 	// avaliable heaters on IGH: mc,still,sorb
@@ -392,10 +394,10 @@ function SetHeater(heater,output) //Units: mW
 		mcheater_set = output
 	endif
 	url = GenerateURL(command)
-	WriteLakeshore(url,payload,headers)
+	writeLS370(url,payload,headers)
 end
 
-function TurnOffMCHeater()
+function turnoffLS370MCheater()
 	// turns off MC heater.
 	// this function can seem unnecessary, but is in some cases need
 	// and therefore it is a good practise to always use it.
@@ -405,10 +407,10 @@ function TurnOffMCHeater()
 	headers = "Content-Type: application/json"
 	payload = "{}"
 	url = GenerateURL(command)
-	WriteLakeshore(url,payload,headers)
+	writeLS370(url,payload,headers)
 end
 
-function ToggleMagnetHeater(onoff)
+function toggleLS370magnetheater(onoff)
 	// toggles the state of the magnet heater on BF #1.
 	// it sets ANALOG 1 to -50% (-5V) in the "on" state
 	// and 0% (0V) in the off state.
@@ -441,14 +443,14 @@ function ToggleMagnetHeater(onoff)
 	sprintf command, "ANALOG 1,1,2,1,1,100.0,0.0,%g", output
 	sprintf payload, "{\"cmd\":%s}", command
 	url = GenerateURL("cmd")
-	WriteLakeshore(url,payload,headers)
+	writeLS370(url,payload,headers)
 end
 
 ////////////////////
 //// Utillities ////
 ///////////////////
 
-function EstimateMaxCurrent(temp) // Units: mK
+function estimatemaxcurrent(temp) // Units: mK
 	// sets the heater range based on the wanted output
 	// uses the range lookup table
 	// avaliable ranges: 1,2,3,4,5,6,7,8 --> 0,10,30,95,500,1200,5000,10000 mK
@@ -474,20 +476,20 @@ function EstimateMaxCurrent(temp) // Units: mK
 	return maxcurrent
 end
 
-function UpdateLakeshoreWindow()
+function updateLS370GUI()
 	// updates all control variables for the main control window
-	GetControlMode()
-	GetPIDTemp()
-	GetPIDParameters()
-	GetHeaterPower("mc")
-	GetHeaterPower("still")
+	getLS370controlmode()
+	getLS370PIDtemp()
+	getLS370PIDparameters()
+	getLS370heaterpower("mc")
+	getLS370heaterpower("still")
 	//GetHeaterPowerDB("mc")
 	//GetHeaterPowerDB("still")
 end
 
 // FIX pressure readings
 
-function/s GetSystemStatus()
+function/s getLS370status()
 	// returns loggable parameters to meta-data file
 	svar system, ighgaugelookup
 	string  buffer="", gauge=""
@@ -495,22 +497,22 @@ function/s GetSystemStatus()
 	
 	strswitch(system)
 		case "bfsmall":
-			buffer = addJSONKeyVal(buffer,"MC K",numVal = GetTemp("mc"),fmtNum="%.3f")
-			buffer = addJSONKeyVal(buffer,"Still K",numVal = GetTemp("still"),fmtNum="%.3f")
-			buffer = addJSONKeyVal(buffer,"4K Plate K",numVal = GetTemp("4K"),fmtNum="%.3f")
-			buffer = addJSONKeyVal(buffer,"Magnet K",numVal = GetTemp("magnet"),fmtNum="%.3f")
-			buffer = addJSONKeyVal(buffer,"50K Plate K",numVal = GetTemp("50K"),fmtNum="%.3f")
+			buffer = addJSONKeyVal(buffer,"MC K",numVal = getLS370temp("mc"),fmtNum="%.3f")
+			buffer = addJSONKeyVal(buffer,"Still K",numVal = getLS370temp("still"),fmtNum="%.3f")
+			buffer = addJSONKeyVal(buffer,"4K Plate K",numVal = getLS370temp("4K"),fmtNum="%.3f")
+			buffer = addJSONKeyVal(buffer,"Magnet K",numVal = getLS370temp("magnet"),fmtNum="%.3f")
+			buffer = addJSONKeyVal(buffer,"50K Plate K",numVal = getLS370temp("50K"),fmtNum="%.3f")
 //			for(i=1;i<7;i+=1)
 //				gauge = "P"+num2istr(i)
 //				buffer = addJSONKeyVal(buffer,gauge,numVal = GetPressureDB(gauge),fmtNum="%g")
 //			endfor
 			return addJSONKeyVal("","BF Small",strval = buffer)
 		case "igh":
-			buffer = addJSONKeyVal(buffer,"MC K",numVal = GetTemp("mc"),fmtNum="%.3f")
-			buffer = addJSONKeyVal(buffer,"Cold Plate K",numVal = GetTemp("cold plate"),fmtNum="%.3f")
-			buffer = addJSONKeyVal(buffer,"Still K",numVal = GetTemp("still"),fmtNum="%.3f")
-			buffer = addJSONKeyVal(buffer,"1K Pot K",numVal = GetTemp("1Kt"),fmtNum="%.3f")
-			buffer = addJSONKeyVal(buffer,"Sorb K",numVal = GetTemp("sorb"),fmtNum="%.3f")
+			buffer = addJSONKeyVal(buffer,"MC K",numVal = getLS370temp("mc"),fmtNum="%.3f")
+			buffer = addJSONKeyVal(buffer,"Cold Plate K",numVal = getLS370temp("cold plate"),fmtNum="%.3f")
+			buffer = addJSONKeyVal(buffer,"Still K",numVal = getLS370temp("still"),fmtNum="%.3f")
+			buffer = addJSONKeyVal(buffer,"1K Pot K",numVal = getLS370temp("1Kt"),fmtNum="%.3f")
+			buffer = addJSONKeyVal(buffer,"Sorb K",numVal = getLS370temp("sorb"),fmtNum="%.3f")
 //			for(i=1;i<6;i+=1)
 //				gauge = stringfromlist(i,ighgaugelookup)
 //				buffer = addJSONKeyVal(buffer,"P"+num2istr(i),numVal = GetPressureDB(gauge),fmtNum="%g")
@@ -519,7 +521,7 @@ function/s GetSystemStatus()
 	endswitch
 end
 
-function SetSystem()
+function setLS370system()
 	// opens a control window and ask user to pick the correct system.
 	// this is important, because it sets the correct url for the selected RPi.
 	// if the wrong url is selected, you risk fucking up others experiment!!!
@@ -529,7 +531,7 @@ function SetSystem()
 	PauseForUser AskUserSystem
 end
 
-function CreateGlobalLakeshore()
+function createLS370globals()
 	// Create the needed global variables for driver
 	
 	// Create lookup tables
@@ -587,7 +589,7 @@ end
 //// Communication ////
 //////////////////////
 
-function/s WriteLakeshore(url,payload,headers)
+function/s writeLS370(url,payload,headers)
 	string url,payload,headers
 	variable ok
 	string response
@@ -613,40 +615,7 @@ function/s WriteLakeshore(url,payload,headers)
 	endif
 end
 
-function QueryLakeshore(url,payload,headers,responseformat)
-	// function takes four strings: url,payload,headers,responseformat
-	// url most be generated by GenerateURL(), paylod is a json string containing "key:value" pairs
-	// headers is always "Content-Type: application/json" and responseformat is the "key" of the returned data.
-	string url,payload,headers,responseformat
-	variable ok
-	string response
-	
-	URLRequest /TIME=5.0 /DSTR=payload url=url, method=post, headers=headers
-	
-	if (V_flag == 0)    // No error
-		if (V_responseCode != 200)  // 200 is the HTTP OK code
-		    print "Reading failed! HTTP response code: "+num2str(V_responseCode)
-		    return -1.0
-		else
-		    response = S_serverResponse // response is a JSON string
-		endif
-   else
-        print "HTTP connection error."
-        return -1.0
-   endif
-
-	ok = str2num(getJSONvalue(response, "OK")) // should be boolean
-	if(ok==1)
-		// no error, get response
-		return str2num(getJSONvalue(response, responseformat))
-	else
-		// strange resopnse
-		print "Problem reading value: "+response
-		return -1.0
-	endif
-end
-
-function/s QueryLakeshoreRaw(url,payload,headers,responseformat)
+function/s queryLS370(url,payload,headers,responseformat)
 	// function takes four strings: url,payload,headers,responseformat
 	// url most be generated by GenerateURL(), paylod is a json string containing "key:value" pairs
 	// headers is always "Content-Type: application/json" and responseformat is the "key" of the returned data.
@@ -680,7 +649,7 @@ function/s QueryLakeshoreRaw(url,payload,headers,responseformat)
 	endif
 end
 
-function QueryDB(query_url)
+function/s queryLS370DB(query_url)
 	string query_url
 	string headers,url,response
 	
@@ -693,14 +662,14 @@ function QueryDB(query_url)
 	if (V_flag == 0)    // No error
 		if (V_responseCode != 200)  // 200 is the HTTP OK code
 		    print "Reading failed!"
-		    return -1.0
+		    return num2str(-1.0)
 		else
 		    response = S_serverResponse
 		    print response
 		endif
    else
         print "HTTP connection error."
-        return -1.0
+        return num2str(-1.0)
    endif
 end
 
@@ -778,7 +747,7 @@ function tempcontrol_control(action,popnum,popstr) : PopupMenuControl
 			SetVariable mcheaterset, disable=0
 			break
 	endswitch
-	SetTempControlMode(popnum)
+	setLS370tempcontrolmode(popnum)
 	pid_mode = popnum
 end
 
@@ -787,14 +756,14 @@ function tempset_control(action,varnum,varstr,varname) : SetVariableControl
 	variable varnum
 	string varstr, varname
 	
-	SetPIDTemp(varnum) // mK
+	setLS370PIDtemp(varnum) // mK
 end
 
 function pid_control(action) : ButtonControl
 	string action
 	nvar p_value,i_value,d_value
 	
-	SetPIDParameters(p_value,i_value,d_value)
+	setLS370PIDparameters(p_value,i_value,d_value)
 end
 
 function mcheater_control(action,popnum,popstr) : PopupMenuControl
@@ -806,11 +775,11 @@ function mcheater_control(action,popnum,popstr) : PopupMenuControl
 	strswitch(popstr)
 		case "On":
 			mcheater_led = 1
-			SetTempControlMode(3) // set to "open loop"
-			SetHeater("mc",mcheater_set) //mW
+			setLS370tempcontrolmode(3) // set to "open loop"
+			setLS370heaterpower("mc",mcheater_set) //mW
 		case "Off":
 			mcheater_led = 0
-			TurnOffMCHeater()
+			turnoffLS370MCheater()
 	endswitch
 end
 
@@ -819,7 +788,7 @@ function mcheaterset_control(action,varnum,varstr,varname) : SetVariableControl
 	variable varnum
 	string varstr, varname
 	
-	SetHeater("mc",varnum) //mW
+	setLS370heaterpower("mc",varnum) //mW
 end
 
 function stillheater_control(action,popnum,popstr) : PopupMenuControl
@@ -831,10 +800,10 @@ function stillheater_control(action,popnum,popstr) : PopupMenuControl
 	strswitch(popstr)
 		case "On":
 			stillheater_led = 1
-			SetHeater("still",stillheater_set) //mW
+			setLS370heaterpower("still",stillheater_set) //mW
 		case "Off":
 			stillheater_led = 0
-			SetHeater("still",0) //mW
+			setLS370heaterpower("still",0) //mW
 	endswitch
 end
 
@@ -843,7 +812,7 @@ function stillheaterset_control(action,varnum,varstr,varname) : SetVariableContr
 	variable varnum
 	string varstr, varname
 	
-	SetHeater("still",varnum) //mW
+	setLS370heaterpower("still",varnum) //mW
 end
 
 function magnetheater_control(action,popnum,popstr) : PopupMenuControl
@@ -855,10 +824,10 @@ function magnetheater_control(action,popnum,popstr) : PopupMenuControl
 	strswitch(popstr)
 		case "On":
 			magnetheater_led = 1
-			ToggleMagnetHeater("on")
+			toggleLS370magnetheater("on")
 		case "Off":
 			magnetheater_led = 0
-			ToggleMagnetHeater("off")
+			toggleLS370magnetheater("off")
 	endswitch
 end
 
@@ -871,10 +840,10 @@ function sorbheater_control(action,popnum,popstr) : PopupMenuControl
 	strswitch(popstr)
 		case "On":
 			sorbheater_led = 1
-			SetHeater("sorb",sorbheater_set) //mW
+			setLS370heaterpower("sorb",sorbheater_set) //mW
 		case "Off":
 			sorbheater_led = 0
-			SetHeater("sorb",0) //mW
+			setLS370heaterpower("sorb",0) //mW
 	endswitch
 end
 
@@ -883,7 +852,7 @@ function sorbheaterset_control(action,varnum,varstr,varname) : SetVariableContro
 	variable varnum
 	string varstr, varname
 	
-	SetHeater("sorb",varnum) //mW
+	setLS370heaterpower("sorb",varnum) //mW
 end
 
 //// System set control wondow ////
