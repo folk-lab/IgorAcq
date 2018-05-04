@@ -1,12 +1,11 @@
 ﻿#pragma TextEncoding = "UTF-8"
 #pragma rtGlobals=1	// Use modern global access method
 
-// Driver communicates over serial, remember to set the correct serial ports in three global strings called IPSz_serial, L625x_serial & L625y_serial.
+// Driver communicates over serial.
 // Procedure written by Christian Olsen 2017-03-15
 // Updated to VISA by Christian Olsen, 2018-05-xx
-// Main axis is powered by an IPS120 and the in-plane fields are powered by two Lakeshore 625 power supplies.
+// All axes are powered by Lakeshore 625 power supplies.
 
-// FIX window and logging!
 
 ////////////////////////////
 //// Lakeshore 625 COMM ////
@@ -29,6 +28,11 @@ end
 function initLS625Vector(instrIDx,instrIDy,instrIDz)
 	// wrapper function for initLS625(instrID)
 	variable instrIDx, instrIDy, instrIDz
+	
+	// local copies of the serial port address'
+	string/g instrIDxCopy = getResourceAddress(instrIDx)
+	string/g instrIDyCopy = getResourceAddress(instrIDy)
+	string/g instrIDzCopy = getResourceAddress(instrIDz)
 	
 	variable/g ampsperteslax=55.49, ampsperteslay=55.22, ampsperteslaz=9.950// A/T
 	variable/g maxfieldx=1000, maxfieldy=1000, maxfieldz=6000 // mT
@@ -563,8 +567,6 @@ end
 //// Control Window ////
 ///////////////////////
 
-//// FIX from here ////
-
 window Vector_Window() : Panel
 	PauseUpdate; Silent 1 // building window
 	NewPanel /W=(0,0,500,500) // window size
@@ -589,9 +591,15 @@ function update_setpoint(action) : ButtonControl
 	string action
 	variable check
 	wave/t setpointvalstr
-	svar oldsetpointx,oldsetpointy,oldsetpointz
+	svar oldsetpointx,oldsetpointy,oldsetpointz,instrDescX,instrDescY,instrDescZ
+	variable localInstrIDx,localInstrIDy,localInstrIDz
 	
-	check = SetFieldAll(str2num(setpointvalstr[0][1]),str2num(setpointvalstr[1][1]),str2num(setpointvalstr[2][1]))
+	// open local instr connections
+	localInstrIDx = openTempcommLS625(instrDescX)
+	localInstrIDy = openTempcommLS625(instrDescY)
+	localInstrIDz = openTempcommLS625(instrDescZ)
+	
+	check = setLS625allfield(localInstrIDx,localInstrIDy,localInstrIDz,str2num(setpointvalstr[0][1]),str2num(setpointvalstr[1][1]),str2num(setpointvalstr[2][1]))
 	if (check == 9)
 		oldsetpointx = setpointvalstr[0][1]
 		oldsetpointy = setpointvalstr[1][1]
@@ -625,15 +633,25 @@ function update_setpoint(action) : ButtonControl
 		setpointvalstr[1][1] = oldsetpointy
 		setpointvalstr[2][1] = oldsetpointz
 	endif
+	
+	viClose(localInstrIDx)
+	viClose(localInstrIDy)
+	viClose(localInstrIDz)
 end
 
 function update_sweeprate(action) : ButtonControl
 	string action
 	variable check
 	wave/t sweepratevalstr
-	svar oldsweepratex,oldsweepratey,oldsweepratez
+	svar oldsweepratex,oldsweepratey,oldsweepratez,instrDescX,instrDescY,instrDescZ
+	variable localInstrIDx,localInstrIDy,localInstrIDz
 	
-	check = SetSweepRateAll(str2num(sweepratevalstr[0][1]),str2num(sweepratevalstr[1][1]),str2num(sweepratevalstr[2][1]))
+	// open local instr connections
+	localInstrIDx = openTempcommLS625(instrDescX)
+	localInstrIDy = openTempcommLS625(instrDescY)
+	localInstrIDz = openTempcommLS625(instrDescZ)
+	
+	check = setLS625allrate(localInstrIDx,localInstrIDy,localInstrIDz,str2num(sweepratevalstr[0][1]),str2num(sweepratevalstr[1][1]),str2num(sweepratevalstr[2][1]))
 	if (check == 9)
 		oldsweepratex = sweepratevalstr[0][1]
 		oldsweepratey = sweepratevalstr[1][1]
@@ -667,16 +685,31 @@ function update_sweeprate(action) : ButtonControl
 		sweepratevalstr[1][1] = oldsweepratey
 		sweepratevalstr[2][1] = oldsweepratez
 	endif
+	
+	viClose(localInstrIDx)
+	viClose(localInstrIDy)
+	viClose(localInstrIDz)
 end
 
 function update_everything(action) : ButtonControl
 	string action
 	wave fieldwave
+	variable localInstrIDx,localInstrIDy,localInstrIDz
+	svar instrDescX,instrDescY,instrDescZ
 	
-	GetFieldAll()
-	GetSweeprateAll()
+	// open local instr connections
+	localInstrIDx = openTempcommLS625(instrDescX)
+	localInstrIDy = openTempcommLS625(instrDescY)
+	localInstrIDz = openTempcommLS625(instrDescZ)
+	
+	getL625allfield(localInstrIDx,localInstrIDy,localInstrIDz)
+	getLS625allrate(localInstrIDx,localInstrIDy,localInstrIDz)
 	CartisiantoSpherical(fieldwave[0],fieldwave[1],fieldwave[2])
 	update_output()
+	
+	viClose(localInstrIDx)
+	viClose(localInstrIDy)
+	viClose(localInstrIDz)
 end
 
 function update_output()
@@ -691,24 +724,39 @@ function update_output()
 	endfor
 end
 
+function openTempcommLS625(instrDesc)
+	string instrDesc
+	variable status, localRM
+	string var_name="localhandle"
+	
+	status = viOpenDefaultRM(localRM) // open local copy of resource manager
+    if(status < 0)
+        VISAerrormsg("open LS625 connection:", localRM, status)
+        abort
+    endif
+    openInstr(var_name, instrDesc, localRM=localRM, verbose=0)
+    nvar localhandle = $var_name
+    return localhandle
+end
+
 //////////////////
 //// Logging ////
 ////////////////
 
-function/s GetVectorStatus()
-
+function/s GetVectorStatus(instrIDx,instrIDy,instrIDz)
+	variable instrIDx,instrIDy,instrIDz
 	string buffer = "", subbuffer = ""
 	
 	subbuffer = ""
-	subbuffer = addJSONKeyVal(subbuffer, "x", numVal=GetFieldx(), fmtNum="%.3f")
-	subbuffer = addJSONKeyVal(subbuffer, "y", numVal=GetFieldy(), fmtNum="%.3f")
-	subbuffer = addJSONKeyVal(subbuffer, "z", numVal=GetFieldz(), fmtNum="%.3f")
+	subbuffer = addJSONKeyVal(subbuffer, "x", numVal=getLS625fieldX(instrIDx), fmtNum="%.3f")
+	subbuffer = addJSONKeyVal(subbuffer, "y", numVal=getLS625fieldY(instrIDy), fmtNum="%.3f")
+	subbuffer = addJSONKeyVal(subbuffer, "z", numVal=getLS625fieldZ(instrIDz), fmtNum="%.3f")
 	buffer = addJSONKeyVal(buffer, "field mT", strVal=subbuffer)
 
 	subbuffer = ""
-	subbuffer = addJSONKeyVal(subbuffer, "x", numVal=GetSweepRatex(), fmtNum="%.1f")
-	subbuffer = addJSONKeyVal(subbuffer, "y", numVal=GetSweepRatey(), fmtNum="%.1f")
-	subbuffer = addJSONKeyVal(subbuffer, "z", numVal=GetSweepRatez(), fmtNum="%.1f")
+	subbuffer = addJSONKeyVal(subbuffer, "x", numVal=getLS625rateX(instrIDx), fmtNum="%.1f")
+	subbuffer = addJSONKeyVal(subbuffer, "y", numVal=getLS625rateY(instrIDy), fmtNum="%.1f")
+	subbuffer = addJSONKeyVal(subbuffer, "z", numVal=getLS625rateZ(instrIDz), fmtNum="%.1f")
 	buffer = addJSONKeyVal(buffer, "rate mT/min", strVal=subbuffer)
 	
 	return addJSONKeyVal("", "Vector Magnet", strVal=buffer)
