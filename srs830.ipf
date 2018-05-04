@@ -23,7 +23,7 @@ function ReadSRSy(instrID) //Units: mV
 	variable instrID
 	string response
 	
-	response = queryInstr(instrID, "OUTP? 2\n", raed_term = "\n")
+	response = queryInstr(instrID, "OUTP? 2\n", read_term = "\n")
 	return str2num(response)
 end
 

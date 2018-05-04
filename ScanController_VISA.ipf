@@ -141,7 +141,7 @@ function initVISAinstruments(instrWave, [verbose])
 				print "\t-- No test\r" + instrWave[2][i]
 			endif
 		else
-			response = queryInstr(inst, instrWave[2][i], "\r\n", "\r\n") // all the term characters!
+			response = queryInstr(inst, instrWave[2][i]+"\r\n", read_term = "\r\n") // all the term characters!
 			if(cmpstr(TrimString(response), "NaN")==0)
 				abort
 			endif
@@ -192,7 +192,7 @@ threadsafe function writeInstr(instrID, cmd)
                                  // it does not equal numBytes
                                  
     variable return_count = 0    // how many bytes were written
-    status = viWrite(instrID, cmd, strlen(cmd), return_count) 
+    variable status = viWrite(instrID, cmd, strlen(cmd), return_count) 
     if (status)
 		VISAerrormsg("writeInstr() -- viWrite", instrID, status)
     	return NaN // abort not supported in threads (v7)
@@ -200,12 +200,12 @@ threadsafe function writeInstr(instrID, cmd)
 
 end
 
-threadsafe function/s readInstr(instrID, [read_term, read_bytes])
+threadsafe function /s readInstr(instrID, [read_term, read_bytes])
 	// generic error checking read function
 	variable instrID, read_bytes
 	string read_term
 
-    if(!paramisdefault(read_term)
+    if(!paramisdefault(read_term))
         // here we are going to make sure to use a
         // read termination character read_term
         visaSetReadTerm(instrID, read_term)
@@ -216,7 +216,7 @@ threadsafe function/s readInstr(instrID, [read_term, read_bytes])
         visaSetReadTermEnable(instrID, 0)
     endif
 
-    if(paramisdefault(bytes))
+    if(paramisdefault(read_bytes))
         read_bytes = 1024
     endif
 
@@ -228,7 +228,7 @@ threadsafe function/s readInstr(instrID, [read_term, read_bytes])
     	return "NaN" // abort not supported in threads (v7)
 	endif
 
-	return response
+	return buffer
 end
 
 threadsafe function/s queryInstr(instrID, cmd, [read_term, delay])
@@ -237,14 +237,15 @@ threadsafe function/s queryInstr(instrID, cmd, [read_term, delay])
 	string cmd, read_term
 	string response
 
-	writeInstr(instrID, cmd, write_term)
+	writeInstr(instrID, cmd)
 	if(!paramisdefault(delay))
 		sleep /S delay
 	endif
-    if(paramisdefault(read_term)
+    if(paramisdefault(read_term))
         response = readInstr(instrID)
     else
         response = readInstr(instrID, read_term = read_term)
+    endif
 
 	return response
 end
@@ -516,7 +517,7 @@ end
 /// VISA ATTR Set/Get ///
 /////////////////////////
 
-function visaSetReadTerm(instrID, termChar)
+threadsafe function visaSetReadTerm(instrID, termChar)
 
 	variable instrID	// An instrument referenced obtained from viOpen
 	string termChar     // set read termination character
@@ -526,7 +527,7 @@ function visaSetReadTerm(instrID, termChar)
 	return status
 end
 
-function visaSetReadTermEnable(instrID, enable)
+threadsafe function visaSetReadTermEnable(instrID, enable)
 
 	variable instrID	// An instrument referenced obtained from viOpen
 	variable enable     // 1 = yes, 0 = no
@@ -571,6 +572,22 @@ function visaSetStopBits(instrID, bits)
 
 	variable status
 	status = viSetAttribute(instrID, VI_ATTR_ASRL_STOP_BITS, bits)
+	return status
+end
+
+function visaSetParity(instrID, parity)
+	// acceptable values for parity:
+   	// VI_ASRL_PAR_NONE (0)
+	// VI_ASRL_PAR_ODD (1)
+	// VI_ASRL_PAR_EVEN (2)
+	// VI_ASRL_PAR_MARK (3)
+	// VI_ASRL_PAR_SPACE (4)
+	
+	variable instrID	// An instrument referenced obtained from viOpen
+	variable parity
+
+	variable status
+	status = viSetAttribute(instrID, VI_ATTR_ASRL_PARITY, parity)
 	return status
 end
 
