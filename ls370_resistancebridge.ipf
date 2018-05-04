@@ -18,8 +18,6 @@
 //// Initiate Lakeshore ////
 ///////////////////////////
 
-// What is instrID for the lakeshore 370????
-
 function initLS370()
 	setLS370system() // Set the correct system!
 	createLS370globals() // Create the needed global variables for the GUI
@@ -78,7 +76,7 @@ function getLS370temp(plate, [max_age]) // Units: K
 	sprintf payload, "{\"ch\":%d, \"max_age\":%d\", \"?_at_\":%s}", channel, max_age, "vMqyDIcB"
 	headers = "Content-Type: application/json"
 	command = "get-channel-data"
-	url = GenerateURL(command)
+	url = generateLS370URL(command)
 	return str2num(queryLS370(url,payload,headers,"data:t"))
 end
 
@@ -132,7 +130,7 @@ function getLS370heaterpower(heater, [max_age]) // Units: mW
 		sprintf payload, "{\"max_age\":%d}", max_age
 		command = "get-heater-data"
 	endif
-	url = GenerateURL(command)
+	url = generateLS370URL(command)
 	return str2num(queryLS370(url,payload,headers,"data:power_mw"))
 end
 
@@ -146,7 +144,7 @@ function getLS370PIDtemp() // Units: mK
 	
 	headers = "Content-Type: application/json"
 	payload = "{\"cmd\": \"SETP?\"}"
-	url = GenerateURL("cmd")
+	url = generateLS370URL("cmd")
 	temp = str2num(queryLS370(url,payload,headers,"Response"))*1000
 	temp_set = temp
 	
@@ -162,7 +160,7 @@ function/s getLS370PIDparameters() // Units: No units
 	
 	headers = "Content-Type: application/json"
 	payload = "{\"cmd\": \"PID?\"}"
-	url = GenerateURL("cmd")
+	url = generateLS370URL("cmd")
 	pid = queryLS370(url,payload,headers,"Response")
 	p_value = str2num(stringfromlist(0,pid,","))
 	i_value = str2num(stringfromlist(1,pid,","))
@@ -179,7 +177,7 @@ function getLS370controlmode() // Units: No units
 	
 	headers = "Content-Type: application/json"
 	payload = "{\"cmd\": \"CMODE?\"}"
-	url = GenerateURL("cmd")
+	url = generateLS370URL("cmd")
 	pid_mode = str2num(queryLS370(url,payload,headers,"Response"))
 	
 	if(pid_mode == 1)
@@ -291,7 +289,7 @@ function setLS370exclusivereader(channel,interval) // interval units: ms
 	sprintf payload, "{\"channel_label\": \"%s\", \"interval_ms\": \"%s\"}", num2str(channel), num2str(interval)
 	headers = "Content-Type: application/json"
 	
-	url = GenerateURL(command)
+	url = generateLS370URL(command)
 	writeLS370(url,payload,headers)
 end
 	
@@ -302,7 +300,7 @@ function resetLS370exclusivereader()
 	payload = "{}"
 	headers = "Content-Type: application/json"
 	
-	url = GenerateURL(command)
+	url = generateLS370URL(command)
 	writeLS370(url,payload,headers)
 end
 
@@ -319,7 +317,7 @@ function setLS370PIDtemp(temp,[maxcurrent]) // Units: mK, mA
 	command = "set_htr_pid"
 	headers = "Content-Type: application/json"
 	sprintf payload, "{\"ch\": \"6\", \"setpoint\": \"%g\", \"maxcurrent\": \"%g\"}", temp/1000, maxcurrent
-	url = GenerateURL(command)
+	url = generateLS370URL(command)
 	writeLS370(url,payload,headers)
 	temp_set = temp
 end
@@ -335,7 +333,7 @@ function setLS370PIDparameters(p,i,d) // Units: No units
 		sprintf command,"PID %s,%s,%s", num2str(p), num2str(i), num2str(d)
 		headers = "Content-Type: application/json"
 		sprintf payload, "{\"cmd\": \"%s\"}", command
-		url = GenerateURL("cmd")
+		url = generateLS370URL("cmd")
 		writeLS370(url,payload,headers)
 		p_value = p
 		i_value = i
@@ -393,7 +391,7 @@ function setLS370heaterpower(heater,output) //Units: mW
 		command = "set_htr_manual"
 		mcheater_set = output
 	endif
-	url = GenerateURL(command)
+	url = generateLS370URL(command)
 	writeLS370(url,payload,headers)
 end
 
@@ -406,7 +404,7 @@ function turnoffLS370MCheater()
 	command = "turn-heater-off"
 	headers = "Content-Type: application/json"
 	payload = "{}"
-	url = GenerateURL(command)
+	url = generateLS370URL(command)
 	writeLS370(url,payload,headers)
 end
 
@@ -442,7 +440,7 @@ function toggleLS370magnetheater(onoff)
 	headers = "Content-Type: application/json"
 	sprintf command, "ANALOG 1,1,2,1,1,100.0,0.0,%g", output
 	sprintf payload, "{\"cmd\":%s}", command
-	url = GenerateURL("cmd")
+	url = generateLS370URL("cmd")
 	writeLS370(url,payload,headers)
 end
 
@@ -558,7 +556,7 @@ function createLS370globals()
 	variable/g pid_mode = 4
 end
 
-function/s GenerateURL(command)
+function/s generateLS370URL(command)
 	// Generate the command URL
 	string command
 	svar system
