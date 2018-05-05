@@ -98,22 +98,11 @@ function /S get3478Ainput(instrID)
 	endswitch
 end
 
-////////////////////////////
-//// sync/async readings ///
-////////////////////////////
+/////////////////
+//// readings ///
+/////////////////
 
-function read3478A(instrID)
-	// once everything is setup in the 
-	// proper mode, the device just keeps putting
-	// new points into the buffer
-	// viRead until \n gets the most recent buffered reading
-	Variable instrID
-	
-	string response = readInstr(instrID, read_term = "\n")
-	return str2num(response)
-end
-
-threadsafe function read3478A_async(instrID)
+threadsafe function read3478A(instrID)
 	// once everything is setup in the 
 	// proper mode, the device just keeps putting
 	// new points into the buffer
@@ -147,22 +136,11 @@ function /s GetDMMStatus(instrID)
 	buffer = addJSONKeyVal(buffer, "gpib_address", strVal=gpib)
 	
 	// get configuration
-	string config
 	writeInstr(instrID, "B\n")
-	VISAReadBinary /Q /S=5 /T="\n" instrID, config 
-	printf "%s\r", config
+	string config = readInstr(instrID, read_bytes=5)
 	
-//	variable i=0
-//	do
-//		if(CmpStr(config[i], "+")==0 || CmpStr(config[i], "-")==0)
-//			break
-//		endif
-//		i+=1
-//	while(i<strlen(config))
-//	buffer = addJSONKeyVal(buffer, "units", strVal=TrimString(config[1,i-1]), addQuotes=1)
-//	buffer = addJSONKeyVal(buffer, "range", numVal=str2num(StringFromList(0, config[i,strlen(config)-2],",")), fmtNum="%.3f")
-//	buffer = addJSONKeyVal(buffer, "resolution", numVal=str2num(StringFromList(1, config[i,strlen(config)-2],",")), fmtNum="%.3e")
-//	
-//	return addJSONKeyVal("", "HP-DMM_"+gpib, strVal=buffer)
+	buffer = addJSONKeyVal(buffer, "config_bytes", strVal=TrimString(config), addQuotes=1)
+	
+	return addJSONKeyVal("", "HP3478A"+gpib, strVal=buffer)
 end
 
