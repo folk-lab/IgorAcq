@@ -2,126 +2,103 @@
 
 #pragma rtGlobals=3		// Use modern global access method and strict wave access
 
-function getDummyx()
-	svar dummy_instx
-	return str2num(dummy_instx)
+threadsafe function getDummy1x(instrID)
+	variable instrID
+	
+	sc_sleep_noupdate(0.05)
+	return datetime
 end
 
-function getDummyy()
-	svar dummy_insty
-	return str2num(dummy_insty)
+threadsafe function getDummy2x(instrID)
+	variable instrID
+	
+	sc_sleep_noupdate(0.05)
+	return enoise(1)
 end
 
-function /S setProto(idx, setpoint, ramprate, update)
-	// idx -- sweep index
-	// start -- starting value for the parameter
-	// fin -- ending value for the parameter
-	// numpts -- number of points in sweep
-	// ramprate -- ramprate for the parameter (pass 0 if you don't need it)
-	// update -- update windows during sweep (pass 0 if you don't need it)
+function getDummy3y(instrID, num_input)
+	variable instrID, num_input
 	
-	// use idx=-1 to do any setup before the sweep
-	// return axis label when idx=-1 is passed
-	
-	variable idx, setpoint, ramprate, update
-	
+	sc_sleep_noupdate(0.05)
+	return mod(datetime, 2)
 end
 
-///// setParam EXAMPLE /////
+function setDummy(setpoint, [delay])
+	// put it where you would set a parameter
+	// add a delay if you like
+	variable setpoint, delay
+	if(paramisdefault(delay))
+		return setpoint
+	else
+		sc_sleep(delay)
+		return setpoint
+	endif
+end
 
-//function /S setPlungerFine(idx, setpoint, ramprate, update)
-//	// dummy instrument to set plunger gate
-//	// this will
-//	variable idx, setpoint, ramprate, update
-//	wave /t dacvalsstr
-//	
-//	variable courseCh = 0, fineCh = 2
-//	variable courseVal = str2num(dacvalsstr[0][1]), fineVal
-//	
-//	// output = courseVal + fineVal/40.0 + 125 <-- depends on BD setup
-//	fineVal = (setpoint - courseVal -125)*40.0
-//	RampOutputBD(fineCh, fineVal, ramprate=ramprate, update=update)
-//	
-//	if(idx==-1)
-//		// setup some stuff if necessary
-//		return "plunger (mV)"
-//	else
-//		return num2str(fineVal)
-//	endif
-//end
-
-////////////////////////////
-
-
-function ScanDummy(setfunc, start, fin, numpts, delay, ramprate, [comments])
+function ScanDummy(start, fin, numpts, delay, [comments])
 	// sweep dummy instrument
-	variable start, fin, numpts, delay, ramprate
-	string setfunc, comments
+	variable start, fin, numpts, delay
+	string comments
 	string x_label
 	variable i=0, j=0, setpoint
-	string /g dummy_instx
 
 	if(paramisdefault(comments))
 		comments=""
 	endif
 	
-	FUNCREF setProto setParam = $setfunc
-	
 	// set starting values
 	setpoint = start
-	x_label = setParam(-1, start, ramprate, 1)	
+	x_label = "x_var"
 		
 	sc_sleep(5*delay)
 	InitializeWaves(start, fin, numpts, x_label=x_label)
+	variable tstart = stopmstimer(-2)
 	do
 		setpoint = start + (i*(fin-start)/(numpts-1))
-		dummy_instx = setParam(i, setpoint, ramprate, 0)	
+		setDummy(setpoint)
 		sc_sleep(delay)
 		RecordValues(i, 0) 
 		i+=1
 	while (i<numpts)
+	variable telapsed = stopmstimer(-2) - tstart
+	printf "each RecordValues(...) call takes ~%.1fms \n", telapsed/numpts/1000 - delay*1000
 	SaveWaves(msg=comments)
 end
 
-function ScanDummy2D(setfuncx, setfuncy, startx, finx, numptsx, delayx, rampratex, starty, finy, numptsy, delayy, rampratey, [comments])
-	// sweep TWO dummy instruments
-	variable startx, finx, numptsx, delayx, rampratex
-	variable starty, finy, numptsy, delayy, rampratey
-	string setfuncx, setfuncy, comments
-	string x_label, y_label
-	variable i=0, j=0, setpointx, setpointy
-	string /g dummy_instx, dummy_insty
+function setDummyInstrID(instrID)
+	variable instrID
+	nvar dum1, dum2, dum3
+	dum1 = 1
+	dum2 = 2
+	dum3 = 3
+end
 
-	if(paramisdefault(comments))
-		comments=""
-	endif
+macro initDummyExp()
+	// customize this setup to each individual experiment
+	// try write all functions such that initexp() can be run
+	//     at any time without losing any setup/configuration info
 	
-	FUNCREF setProto setParamx = $setfuncx
-	FUNCREF setProto setParamy = $setfuncy
+	///// setup ScanController /////
+	
+	// define instruments --
+	//      this wave should have columns with {instrument name, VISA address, test function, setup function}
+	//      use test = "" to skip query tests when connecting instruments
 
-	// set starting values
-	x_label = setParamx(-1, startx, rampratex, 1)
-	y_label = setParamy(-1, starty, rampratey, 1)	
-	sc_sleep(delayy)
+	make /o/t connInstr = {{"dum1",  "",  "", "setDummyInstrID(dum1)"  },{\
+				               "dum2",  "",  "", "setDummyInstrID(dum2)"  },{\
+				               "dum3",  "",  "", "setDummyInstrID(dum3)"  }}
+	InitScanController(connInstr, srv_push=0) // pass instrument list wave to scan controller
+	sc_ColorMap = "VioletOrangeYellow" // change default colormap (default=Grays)
 
-	InitializeWaves(startx, finx, numptsx, starty=starty, finy=finy, numptsy=numptsy, x_label=x_label, y_label=y_label)
-do
-		
-		setpointx = startx
-		setpointy = starty + (i*(finy-starty)/(numptsy-1))
-		dummy_instx = setParamx(j, setpointx, rampratex, 1)
-		dummy_insty = setParamy(i, setpointy, rampratey, 1)	
-		sc_sleep(delayy)
-		
-		j=0
-		do
-			setpointx = startx + (j*(finx-startx)/(numptsx-1))
-			dummy_instx = setParamx(j, setpointx, rampratex, 1)
-			sc_sleep(delayx)
-			RecordValues(i, j)
-			j+=1
-		while (j<numptsx)
-		i+=1
-	while (i<numptsy)
-	SaveWaves(msg=comments)
+end
+
+function /s GetDummyStatus(instrID)
+	variable instrID
+	string  buffer = ""
+	
+	string id = num2istr(instrID)
+	buffer = addJSONKeyVal(buffer, "id", strVal=id)	
+	buffer = addJSONKeyVal(buffer, "time", numVal=datetime, fmtNum = "%d")
+	
+	return addJSONKeyVal("", "dum"+id, strVal=buffer)
 end

@@ -308,7 +308,7 @@ function InitScanController(instrWave, [srv_push, config])
 			make/o sc_CalcPlot = {0,0} // Include this calculated field or not
 			// end of same-size waves
 	
-			make/t/o sc_AsyncRecord = {""}
+			make /o sc_measAsync = {0,0}
 	
 			// default colormap
 			string /g sc_ColorMap = "Grays"
@@ -343,6 +343,7 @@ function /S sc_createconfig()
 	wave/t sc_RawWaveNames
 	wave sc_RawRecord
 	wave sc_RawPlot
+	wave sc_measAsync
 	wave/t sc_RawScripts
 	wave/t sc_CalcWaveNames
 	wave/t sc_CalcScripts
@@ -375,6 +376,11 @@ function /S sc_createconfig()
 	tmpstr = addJSONKeyVal(tmpstr, "raw", strVal=NumericWaveToBoolArray(sc_RawPlot))
 	tmpstr = addJSONKeyVal(tmpstr, "calc", strVal=NumericWaveToBoolArray(sc_CalcPlot))
 	configstr = addJSONKeyVal(configstr, "plot_waves", strVal=tmpstr)
+
+	// plot?
+	tmpstr = ""
+	tmpstr = addJSONKeyVal(tmpstr, "raw", strVal=NumericWaveToBoolArray(sc_measAsync))
+	configstr = addJSONKeyVal(configstr, "meas_async", strVal=tmpstr)
 
 	//scripts
 	tmpstr = ""
@@ -422,6 +428,7 @@ function sc_loadconfig(configfile)
 	ArrayToTextWave(getJSONvalue(jstr, "wave_names:raw"), "sc_RawWaveNames")
 	ArrayToNumWave(getJSONvalue(jstr, "record_waves:raw"), "sc_RawRecord")
 	ArrayToNumWave(getJSONvalue(jstr, "plot_waves:raw"), "sc_RawPlot")
+	ArrayToNumWave(getJSONvalue(jstr, "meas_async:raw"), "sc_measAsync")
 	ArrayToTextWave(getJSONvalue(jstr, "scripts:raw"), "sc_RawScripts")
 
 	// load calc wave configuration
@@ -525,7 +532,9 @@ Window ScanController() : Panel
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 200,29,"Plot"
 	SetDrawEnv fsize= 16,fstyle= 1
-	DrawText 250,29,"Raw Script (ex: ReadSRSx(srs1)"
+	DrawText 250,29,"Async"
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 320,29,"Raw Script (ex: ReadSRSx(srs1)"
 
 	string cmd = ""
 	variable i=0
@@ -537,7 +546,9 @@ Window ScanController() : Panel
 		execute(cmd)
 		cmd="CheckBox sc_RawPlotCheckBox" + num2istr(i) + ", proc=sc_CheckBoxClicked, pos={210,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_RawPlot[i]) + " , title=\"\""
 		execute(cmd)
-		cmd="SetVariable sc_rawScriptBox" + num2istr(i) + " pos={250, 37+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={410, 0}, fsize=14, title=\" \", value=sc_rawScripts[i]"
+		cmd="CheckBox sc_AsyncCheckBox" + num2istr(i) + ", proc=sc_CheckBoxClicked, pos={270,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_measAsync[i]) + " , title=\"\""
+		execute(cmd)
+		cmd="SetVariable sc_rawScriptBox" + num2istr(i) + " pos={320, 37+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={340, 0}, fsize=14, title=\" \", value=sc_rawScripts[i]"
 		execute(cmd)
 		i+=1
 	while (i<numpnts( sc_RawWaveNames ))
@@ -552,7 +563,7 @@ Window ScanController() : Panel
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 200,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Plot"
 	SetDrawEnv fsize= 16,fstyle= 1
-	DrawText 250,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Calculation Script (ex: dmm[i]*12.5)"
+	DrawText 320,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Calc Script (ex: dmm[i]*1.5)"
 
 	i=0
 	do
@@ -563,7 +574,7 @@ Window ScanController() : Panel
 		execute(cmd)
 		cmd="CheckBox sc_CalcPlotCheckBox" + num2istr(i) + ", proc=sc_CheckBoxClicked, pos={210,95+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_CalcPlot[i]) + " , title=\"\""
 		execute(cmd)
-		cmd="SetVariable sc_CalcScriptBox" + num2istr(i) + " pos={250, 92+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={410, 0}, fsize=14, title=\" \", value=sc_CalcScripts[i]"
+		cmd="SetVariable sc_CalcScriptBox" + num2istr(i) + " pos={320, 92+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={340, 0}, fsize=14, title=\" \", value=sc_CalcScripts[i]"
 		execute(cmd)
 		i+=1
 	while (i<numpnts( sc_CalcWaveNames ))
@@ -616,6 +627,7 @@ function sc_addrow(action) : ButtonControl
 	wave/t sc_RawWaveNames=sc_RawWaveNames
 	wave sc_RawRecord=sc_RawRecord
 	wave sc_RawPlot=sc_RawPlot
+	wave sc_measAsync=sc_measAsync
 	wave/t sc_RawScripts=sc_RawScripts
 	wave/t sc_CalcWaveNames=sc_CalcWaveNames
 	wave sc_CalcRecord=sc_CalcRecord
@@ -627,6 +639,7 @@ function sc_addrow(action) : ButtonControl
 			AppendString(sc_RawWaveNames, "")
 			AppendValue(sc_RawRecord, 0)
 			AppendValue(sc_RawPlot, 0)
+			AppendValue(sc_measAsync, 0)
 			AppendString(sc_RawScripts, "")
 		break
 		case "addrowcalc":
@@ -644,6 +657,7 @@ function sc_removerow(action) : Buttoncontrol
 	wave/t sc_RawWaveNames=sc_RawWaveNames
 	wave sc_RawRecord=sc_RawRecord
 	wave sc_RawPlot=sc_RawPlot
+	wave sc_measAsync=sc_measAsync
 	wave/t sc_RawScripts=sc_RawScripts
 	wave/t sc_CalcWaveNames=sc_CalcWaveNames
 	wave sc_CalcRecord=sc_CalcRecord
@@ -656,6 +670,7 @@ function sc_removerow(action) : Buttoncontrol
 				Redimension /N=(numpnts(sc_RawWaveNames)-1) sc_RawWaveNames
 				Redimension /N=(numpnts(sc_RawRecord)-1) sc_RawRecord
 				Redimension /N=(numpnts(sc_RawPlot)-1) sc_RawPlot
+				Redimension /N=(numpnts(sc_measAsync)-1) sc_measAsync
 				Redimension /N=(numpnts(sc_RawScripts)-1) sc_RawScripts
 			else
 				abort "Can't remove the last row!"
@@ -680,7 +695,7 @@ function sc_CheckboxClicked(ControlName, Value)
 	string ControlName
 	variable value
 	string indexstring
-	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
+	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot, sc_measAsync
 	nvar sc_PrintRaw, sc_PrintCalc
 	variable index
 	string expr
@@ -704,6 +719,11 @@ function sc_CheckboxClicked(ControlName, Value)
 		SplitString/E=(expr) controlname, indexstring
 		index = str2num(indexstring)
 		sc_CalcPlot[index] = value
+	elseif (stringmatch(ControlName,"sc_AsyncCheckBox*"))
+		expr="sc_AsyncCheckBox([[:digit:]]+)"
+		SplitString/E=(expr) controlname, indexstring
+		index = str2num(indexstring)
+		sc_measAsync[index] = value
 	elseif(stringmatch(ControlName,"sc_PrintRawBox"))
 		sc_PrintRaw = value
 	elseif(stringmatch(ControlName,"sc_PrintCalcBox"))
@@ -749,8 +769,7 @@ end
 function sc_findAsyncMeasurements()
 
 	wave /t sc_RawScripts
-	wave sc_RawRecord, sc_RawPlot
-	make /o/n=(numpnts(sc_RawScripts)) sc_measAsync = 0
+	wave sc_RawRecord, sc_RawPlot, sc_measAsync
 	
 	variable i =0
 	for(i=0;i<numpnts(sc_RawScripts);i+=1)
@@ -758,12 +777,12 @@ function sc_findAsyncMeasurements()
 		if ( (sc_RawRecord[i] == 1) || (sc_RawPlot[i] == 1) )
 			// this is something that will be measured
 			
-			if (strsearch(sc_RawScripts[i],"_async",0,2) > 0)
+			if (sc_measAsync[i] == 1)
 				// this is something that should be asyn
-				// check that function is formatted correctly
 				if(sc_checkAsyncScript(sc_RawScripts[i])!=-1)
 					sc_measAsync[i]=1 // this will be recorded asynchronously
 				else
+					sc_measAsync[i]=0
 					printf "[WARNING] Async scripts must be formatted: \"readFunc(instrID)\"\r\t%s is no good and will be read synchronously,\r", sc_RawScripts[i]
 				endif
 			endif
@@ -773,23 +792,19 @@ function sc_findAsyncMeasurements()
 	
 	if(sum(sc_measAsync)<2)
 		// no point in doing anyting async is only one instrument is capable of it
+		if(sum(sc_measAsync)==1)
+			print "[WARNING] Not using async for only one measurement. It is pointless."
+		endif
 		make /o/n=(numpnts(sc_RawScripts)) sc_measAsync = 0
-		print "[WARNING] Not using async for only one measurement. It is pointless."
-		return 0
 	endif
-	
-//	// if there are some async measurements to be made
-//	// move the instrID variables to some cleverly named data folder structure
-//	variable iThread = 0
-//	for(i=0;i<numpnts(sc_RawScripts);i+=1)
-//	
-//		if ( sc_measAsync[i]==1 )
-//			// move the global instrID variable into a folder
-//			
-//		
-//	endfor
 		
-
+	// change state of check boxes based on what just happened here!
+	string cmd = ""
+	for(i=0;i<numpnts(sc_measAsync);i+=1)
+		cmd = "CheckBox sc_AsyncCheckBox" + num2istr(i) + " value=" + num2istr(sc_measAsync[i])
+		execute(cmd)
+	endfor
+	
 	return sum(sc_measAsync)
 end
 
@@ -1196,6 +1211,18 @@ function sc_sleep(delay)
 
 	do
 		sc_checksweepstate()
+	while(stopMStimer(-2)-start_time < delay)
+
+end
+
+threadsafe function sc_sleep_noupdate(delay)
+	// sleep for delay seconds
+	variable delay
+	delay = delay*1e6 // convert to microseconds
+	variable start_time = stopMStimer(-2) // start the timer immediately
+
+	do
+		sleep /s 0.002
 	while(stopMStimer(-2)-start_time < delay)
 
 end

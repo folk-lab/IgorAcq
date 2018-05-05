@@ -128,15 +128,31 @@ function initVISAinstruments(instrWave, [verbose])
 	string response
 	for(i=0;i<numInstr;i++)
 
-		// open VISA connection to instrument
-		openInstr(instrWave[0][i], instrWave[1][i], localRM = globalRM, verbose = verbose)
-		nvar inst = $instrWave[0][i]
+		if(strlen(instrWave[1][i])>0)
+			// open VISA connection to instrument
+			openInstr(instrWave[0][i], instrWave[1][i], localRM = globalRM, verbose = verbose)
+			nvar inst = $instrWave[0][i]
+		else
+			// if the address was not provided, just assume 
+			// a global variable should be created and move on
+			variable /g $instrWave[0][i] = 0
+			if(verbose)
+				printf "created global variable %s\r", instrWave[0][i]
+			endif
+		endif
+		
 		if(strlen(instrWave[3][i])!=0)
 			execute(instrWave[3][i]) // execute
 		endif
-
+		
+		if(strlen(instrWave[1][i])==0)
+			// get out of here with that
+			// get variable
+			continue
+		endif 
+		
 		// test block
-		if(strlen(instrWave[2][i])==0)
+		if( (strlen(instrWave[2][i])==0) && (strlen(instrWave[1][i])>0) )
 			if(verbose)
 				print "\t-- No test\r" + instrWave[2][i]
 			endif
