@@ -6,22 +6,21 @@
 // should work for HP3478A and ????
 // Nik and Elyjah 8/17
 // Async support added by Christian Olsen, May 2018
-// I may have fucked this up -- Nik -- 5/1/2018
 
-////////////////////
+/////////////////////
 ///// Init mode /////
 ////////////////////
 
 function  init34401Adcvolts(instrID, range, linecycles)
 	// setup dmm to take dc voltage readings
 	Variable instrID, range, linecycles
-	// Ranges: 0.1, 1, 10, 100, 1000V 
+	// Ranges: 0.1, 1, 10, 100, 1000V
 	// Linecycles: 0.02, 0.2, 1, 10, 100 (60Hz cycles)
-	
-	// autozero off (set in this function) with 1NPLC gives 5.5 digits of resolution 
+
+	// autozero off (set in this function) with 1NPLC gives 5.5 digits of resolution
 	// according to the manual
 	// this is a pretty good default and makes the read time comparable to an srs830
-	
+
 	writeInstr(instrID,"*RST\r\n")
 	sc_sleep(0.05)
 	writeInstr(instrID,"*CLS\r\n")
@@ -39,7 +38,7 @@ end
 
 function/s get34401AIDN(instrID)
 	variable instrID
-	
+
 	return queryInstr(instrID,"*IDN?\r\n",read_term="\r\n")
 end
 
@@ -49,7 +48,7 @@ function get34401Ajunk(instrID)
 	variable instrID
 	string response
 	variable i=0
-	
+
 	do
 		VisaRead /N=1/Q/T="\r\n" instrID, response
 		print i, V_flag, response
@@ -62,7 +61,7 @@ function geterrors34401A(instrID)
 	variable instrID
 	string response
 	variable i=1
-	
+
 	do
 		response = queryInstr(instrID,"SYST:ERR?\r\n",read_term="\r\n")
 		print num2str(i) + ":  " + response
@@ -76,7 +75,7 @@ end
 function setspeed34401A(instrID, speed)
 	variable instrID, speed
 	string linecycles="1"
-	
+
 	if (speed == -2)
 		linecycles = ".02"
 	elseif (speed == -1)
@@ -88,13 +87,13 @@ function setspeed34401A(instrID, speed)
 	elseif (speed == 2)
 		linecycles = "100"
 	endif
-	
+
 	writeInstr(instrID,"volt:dc:nplc "+linecycles+"\r\n")
 end
 
 function/s check34401Aconfig(instrID)
 	variable instrID
-	
+
 	return queryInstr(instrID,"CONF?\r\n",read_term="\r\n")
 end
 
@@ -102,40 +101,22 @@ end
 function settext34401A(instrID, text)
 	variable instrID
 	string text
-	
+
 	sprintf text, ":DISP:TEXT '%s'\r\n", text
 	writeInstr(instrID,text)
 end
 
-/////////////////////////////
-//// Sync get functions ////
-////////////////////////////
+////////////////////////
+//// get functions ////
+///////////////////////
 
-function read34401A(instrID)
+threadsafe function read34401A(instrID)
 	Variable instrID
 	string response
-	
+
 	response = queryInstr(instrID,"READ?\r\n",read_term="\r\n")
 	return str2num(response)
 end
-
-/////////////////////////////
-//// Async get functions ////
-////////////////////////////
-
-//threadsafe function ReadDMM_Async(datafolderID)
-//	string datafolderID
-//	string response
-//	
-//	// get instrument ID from datafolder
-//	DFREF dfr = ThreadGroupGetDFR(0,inf)
-//	setdatafolder dfr
-//	nvar instID = $(":"+datafolderID+":instID")
-//	killdatafolder dfr // We don't need the datafolder anymore!
-//	
-//	response = QueryHP("READ?",InstID)
-//	return str2num(response)
-//end
 
 /////////////////////////
 //// Status function ////
@@ -144,7 +125,7 @@ end
 function/s get34401Astatus(instrID)
 	variable instrID
 	string  buffer = ""
-	
+
 	string gpib = num2istr(getAddressGPIB(instrID))
 	buffer = addJSONKeyVal(buffer, "gpib_address", strVal=gpib)
 
@@ -160,6 +141,6 @@ function/s get34401Astatus(instrID)
 	buffer = addJSONKeyVal(buffer, "units", strVal=TrimString(config[1,i-1]), addQuotes=1)
 	buffer = addJSONKeyVal(buffer, "range", numVal=str2num(StringFromList(0, config[i,strlen(config)-2],",")), fmtNum="%.3f")
 	buffer = addJSONKeyVal(buffer, "resolution", numVal=str2num(StringFromList(1, config[i,strlen(config)-2],",")), fmtNum="%.3e")
-	
+
 	return addJSONKeyVal("", "HP34401A_"+gpib, strVal=buffer)
 end
