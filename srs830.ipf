@@ -11,7 +11,7 @@
 //// Sync get functions ////
 ////////////////////////////
 
-function ReadSRSx(instrID) //Units: mV
+threadsafe function ReadSRSx(instrID) //Units: mV
 	variable instrID
 	string response
 	
@@ -19,7 +19,7 @@ function ReadSRSx(instrID) //Units: mV
 	return str2num(response)
 end
 
-function ReadSRSy(instrID) //Units: mV
+threadsafe function ReadSRSy(instrID) //Units: mV
 	variable instrID
 	string response
 	
@@ -27,7 +27,7 @@ function ReadSRSy(instrID) //Units: mV
 	return str2num(response)
 end
 
-function ReadSRSr(instrID) //Units: mV
+threadsafe function ReadSRSr(instrID) //Units: mV
 	variable instrID
 	string response
 	
@@ -35,7 +35,7 @@ function ReadSRSr(instrID) //Units: mV
 	return str2num(response)
 end
 
-function ReadSRSt(instrID) //Units: rad
+threadsafe function ReadSRSt(instrID) //Units: rad
 	variable instrID
 	string response
 	
@@ -43,7 +43,7 @@ function ReadSRSt(instrID) //Units: rad
 	return str2num(response)
 end
 
-function GetSRSHarmonic(instrID) // Units: AU
+threadsafe function GetSRSHarmonic(instrID) // Units: AU
 	variable instrID
 	string response
 	
@@ -51,7 +51,7 @@ function GetSRSHarmonic(instrID) // Units: AU
 	return str2num(response)
 end
 
-function GetSRSTimeConst(instrID) // Return units: s
+threadsafe function GetSRSTimeConst(instrID) // Return units: s
 	variable instrID
 	variable response
 	
@@ -63,7 +63,7 @@ function GetSRSTimeConst(instrID) // Return units: s
 	endif
 end
 
-function GetSRSPhase(instrID) // Units: AU
+threadsafe function GetSRSPhase(instrID) // Units: AU
 	variable instrID
 	string response
 	
@@ -71,7 +71,7 @@ function GetSRSPhase(instrID) // Units: AU
 	return str2num(response)
 end
 
-function GetSRSAmplitude(instrID) // Units: mV
+threadsafe function GetSRSAmplitude(instrID) // Units: mV
 	variable instrID
 	string response
 	
@@ -79,7 +79,7 @@ function GetSRSAmplitude(instrID) // Units: mV
 	return str2num(response)*1000
 end
 
-function GetSRSFrequency(instrID) // Units: Hz
+threadsafe function GetSRSFrequency(instrID) // Units: Hz
 	variable instrID
 	string response
 	
@@ -146,24 +146,11 @@ function readSRSjunk(instrID)
 	printf "Read %d chars of junk from buffer.\r", i
 end
 
-/////////////////////////////
-//// async get functions ////
-////////////////////////////
-
-threadsafe function ReadSRSx_async(instrID) // Units: mV
-	variable instrID
-	
-	string cmd = "OUTP? 1"+"\n"
-	string buffer = queryInstr(instrID, cmd)
-	
-	return str2num(buffer)
-end
-
 ////////////////////////
 //// Set functions ////
 ///////////////////////
 
-function SetSRSHarmonic(instrID,harm) // Units: AU
+threadsafe function SetSRSHarmonic(instrID,harm) // Units: AU
 	variable instrID,harm
 	
 	writeInstr(instrID, "HARM "+num2str(harm)+"\n")

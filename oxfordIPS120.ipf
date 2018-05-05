@@ -76,14 +76,7 @@ end
 
 ///// Talk to Magnet /////
 
-function getIPS120volts(instrID) // return in A
-	variable instrID
-	string buffer = queryInstr(instrID, "R1\r", read_term = "\r")[1,inf] // get value
-
-	return str2num(buffer)
-end
-
-threadsafe function getIPS120volts_async(instrID) // Units: mV
+threadsafe function getIPS120volts(instrID) // return in A
 	variable instrID
 	string buffer = queryInstr(instrID, "R1\r", read_term = "\r")[1,inf] // get value
 
@@ -286,7 +279,7 @@ function waitIPS120field(instrID, field) // in mT
 
 end
 
-function CalcSweepTime(currentfield,newfield,sweeprate)
+threadsafe function CalcSweepTime(currentfield,newfield,sweeprate)
 	variable currentfield // in mT
 	variable newfield // in mT
 	variable sweeprate // in mT/min
