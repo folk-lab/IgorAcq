@@ -771,27 +771,38 @@ function sc_findAsyncMeasurements()
 
 	wave /t sc_RawScripts
 	wave sc_RawRecord, sc_RawPlot, sc_measAsync
-	make /t/o/n=(numpnts(sc_measAsync)) sc_asyncQueries=""
-	make /t/o/n=(numpnts(sc_measAsync)) sc_asyncIDs=""
+	
+	// setup async folder
+	killdatafolder /z root:async // kill it if it exists
+	newdatafolder root:async // create an empty version
 	
 	variable i = 0, idx = 0
-	string script
+	string script, strID, threadFolder
 	for(i=0;i<numpnts(sc_RawScripts);i+=1)
 	
 		if ( (sc_RawRecord[i] == 1) || (sc_RawPlot[i] == 1) )
 			// this is something that will be measured
 			
-			if (sc_measAsync[i] == 1)
-				// this is something that should be asyn
+			if (sc_measAsync[i] == 1) // this is something that should be asyn
 				
-				idx = sc_checkAsyncScript(sc_RawScripts[i])
-				if(idx!=-1)
-					sc_measAsync[i]=1 // this will be recorded asynchronously
+				script = sc_RawScripts[i]
+				idx = sc_checkAsyncScript(script) // check function format
+				
+				if(idx!=-1) // fucntion is good, this will be recorded asynchronously
+					sc_measAsync[i]=1 
 
-					// keep track of function names and instrIDs
-					script = sc_RawScripts[i]
-					sc_asyncQueries[i] = script[0,idx-1]
-					sc_asyncIDs[i] = script[idx+1,strlen(script)-2]
+					// keep track of function names and instrIDs in folder structure
+					strID = script[idx+1,strlen(script)-2]
+					nvar instrID = $strID
+					
+					// creates root:async:instr1
+					threadFolder = "thread"+num2str(i)
+					newdatafolder/o root:async:$(threadFolder) 
+					
+					variable /g root:async:$(threadFolder):instrID = instrID   // creates variable instrID in root:thread
+																              // that has the same value as $strID
+					string /g root:async:$(threadFolder):queryFunc = script[0,idx-1] // creates string variable queryFunc in root:async:thread
+															                                   // that has a value queryFunc="readInstr"
 				else
 					sc_measAsync[i]=0
 					printf "[WARNING] Async scripts must be formatted: \"readFunc(instrID)\"\r\t%s is no good and will be read synchronously,\r", sc_RawScripts[i]
@@ -816,7 +827,13 @@ function sc_findAsyncMeasurements()
 		execute(cmd)
 	endfor
 	
-	return sum(sc_measAsync)
+	if(sum(sc_measAsync)==0)
+		KillDataFolder /Z root:async // don't need this
+		return 0
+	else
+		return sum(sc_measAsync)
+	endif
+	
 end
 
 function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_label])
@@ -868,11 +885,11 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	while (i<numpnts(sc_CalcWaveNames))
 	i=0
 
-	sc_findAsyncMeasurements() // update sc_isAsyncScript
+	printf "Measuring %d values asynchronously\r", sc_findAsyncMeasurements() // update sc_isAsyncScript
 
-//	// connect VISA instruments
-//	// do this here, because if it fails
-//	// i don't want to delete any old data
+	// connect VISA instruments
+	// do this here, because if it fails
+	// i don't want to delete any old data
 	svar sc_instr_wave
 	wave /t instrWave = $sc_instr_wave
 	initVISAinstruments(instrWave, verbose=0)
@@ -1391,30 +1408,18 @@ function sc_ManageThreads(innerIndex, outerIndex, readvstime)
 				threadIndex = ThreadGroupWait(tgID, -2) // relying on this to keep track of index
 			while(threadIndex<1)
 			
-			// going to use a new data folder structure
-			//     to keep track of function names and instrument ids
-			// comments below show an example
-			
-			nvar instrID = $sc_asyncIDs[i]
-			threadFolder = "thread"+num2str(i)
-			newdatafolder/o root:$(threadFolder)  // creates root:instr1
-			variable /g root:$(threadFolder):instrID = instrID   // creates variable instrID in root:thread0
-																              // that has the same value as $strID
-			string /g root:$(threadFolder):queryFunc = sc_asyncQueries[i] // creates string variable queryFunc in root:thread0
-															                          // that has a value queryFunc="readInstr"
-			
-			threadgroupputdf tgID, root:$(threadFolder) // move root:thread0 to where threadGroup can access it
-												                 // effectively kills root:thread0 folder in main thread
+			duplicatedatafolder root:async, root:asyncCopy //duplicate async folder
+ 			ThreadGroupPutDF tgID, root:asyncCopy // move root:asyncCopy to where threadGroup can access it
+												           // effectively kills root:asyncCopy in main thread			     
 												                 
-			// load 1d wave for data
-			wave wref1d = $sc_RawWaveNames[i]
+			wave wref1d = $sc_RawWaveNames[i] // load 1d wave for data
 			
 			// Redimension waves if readvstime is set to 1
 			if (readvstime == 1)
 				redimension /n=(innerindex+1) wref1d
 				setscale/I x 0,  datetime - sc_scanstarttime, wref1d
 			endif
-			threadstart tgID, threadIndex-1, sc_Worker(wref1d, innerindex)  // start this thread
+			threadstart tgID, threadIndex-1, sc_Worker(wref1d, innerindex, i)  // start this thread
 			
 		endif
 		
@@ -1443,9 +1448,9 @@ function sc_ManageThreads(innerIndex, outerIndex, readvstime)
 	return tgID
 end
 
-threadsafe function sc_Worker(dataWave, innerindex)
+threadsafe function sc_Worker(dataWave, innerindex, folderIndex)
 	wave dataWave
-	variable innerindex
+	variable innerindex, folderIndex
 	
 	do
 		DFREF dfr = ThreadGroupGetDFR(0,1000)	// Get free data folder from input queue
@@ -1455,7 +1460,7 @@ threadsafe function sc_Worker(dataWave, innerindex)
 			break
 		endif
 	while(1)
-	setdatafolder dfr
+	setdatafolder dfr:$("thread"+num2istr(folderIndex))
 	
 	nvar instrID = instrID
 	svar queryFunc = queryFunc
@@ -1481,11 +1486,8 @@ function sc_KillThreads(tgID)
 	elseif(releaseResult == -1)
 		printf "ThreadGroupRelease failed. No fatal errors, will continue.\r"
 	endif
+	
 end
-
-
-
-
 
 function/s construct_calc_script(script)
 	// adds "[i]" to calculation scripts
@@ -1662,6 +1664,8 @@ function SaveWaves([msg, save_experiment])
 	if (strlen(sc_LogStr)!=0)
 		logs = sc_LogStr
 	endif
+
+	KillDataFolder /Z root:async // clean this up for next time
 
 	// save timing variables
 	variable /g sweep_t_elapsed = datetime-sc_scanstarttime
