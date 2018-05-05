@@ -12,11 +12,12 @@
 //			Therefore VDT and GPIB xop's should not be used anymore.
 //		-- "Request scripts" are removed from the scancontroller window. Its only use was
 //			 trying to do async communication (badly).
+//    -- Added Async checkbox in scancontroller window
 
 //TODO:
-// 	 -- add async functionallity support
-//   -- make async checkbox in scancontroller window
-//   -- add a new type of value to record that can/will be read during sc_sleep?
+//   -- figure out how to keep track of data coming back in from threads
+// 
+//   -- if requesting data from the same resource more than once, make them use the same thread
 
 
 //FIX:
@@ -770,8 +771,11 @@ function sc_findAsyncMeasurements()
 
 	wave /t sc_RawScripts
 	wave sc_RawRecord, sc_RawPlot, sc_measAsync
+	make /t/o/n=(numpnts(sc_measAsync)) sc_asyncQueries=""
+	make /t/o/n=(numpnts(sc_measAsync)) sc_asyncIDs=""
 	
-	variable i =0
+	variable i = 0, idx = 0
+	string script
 	for(i=0;i<numpnts(sc_RawScripts);i+=1)
 	
 		if ( (sc_RawRecord[i] == 1) || (sc_RawPlot[i] == 1) )
@@ -779,8 +783,15 @@ function sc_findAsyncMeasurements()
 			
 			if (sc_measAsync[i] == 1)
 				// this is something that should be asyn
-				if(sc_checkAsyncScript(sc_RawScripts[i])!=-1)
+				
+				idx = sc_checkAsyncScript(sc_RawScripts[i])
+				if(idx!=-1)
 					sc_measAsync[i]=1 // this will be recorded asynchronously
+
+					// keep track of function names and instrIDs
+					script = sc_RawScripts[i]
+					sc_asyncQueries[i] = script[0,idx-1]
+					sc_asyncIDs[i] = script[idx+1,strlen(script)-2]
 				else
 					sc_measAsync[i]=0
 					printf "[WARNING] Async scripts must be formatted: \"readFunc(instrID)\"\r\t%s is no good and will be read synchronously,\r", sc_RawScripts[i]
@@ -1282,9 +1293,8 @@ function RecordValues(i, j, [readvstime, fillnan])
 	//// Setup and run async data collection ////
 	wave sc_measAsync
 	if( (sum(sc_measAsync) > 1) && (fillnan==0) )
-		variable tgID = sc_StartThreads() // start threads and run 1 function call per thread, returns the thread group id.
-		sc_CollectDataFromThreads(tgID,readvstime,innerindex,outerindex) // Retrive data from threads when they are done.
-		sc_KillThreads(tgID) // Terminate threads.
+		variable tgID = sc_ManageThreads(innerindex, outerindex, readvstime) // start threads, wait, collect data
+		sc_KillThreads(tgID) // Terminate threads
 	endif
 
 	//// Read sync data ( or fill NaN) ////
@@ -1355,105 +1365,110 @@ function RecordValues(i, j, [readvstime, fillnan])
 	sc_checksweepstate()
 end
 
-function sc_StartThreads()
-	wave sc_measAsync
-	wave /t sc_RawScripts
-	
-	variable numThreads = sum(sc_measAsync)
-	variable tgID = ThreadGroupCreate(numThreads) // open threads
+///////////////////////
+/// ASYNC handling ///
+//////////////////////
 
-	variable i=0, idx=0
+function sc_ManageThreads(innerIndex, outerIndex, readvstime)
+	variable innerIndex, outerIndex, readvstime
+	wave sc_measAsync
+	wave /t sc_RawScripts, sc_RawWaveNames, sc_asyncQueries, sc_asyncIDs
+	nvar sc_is2d, sc_scanstarttime
+	
+	variable numRequests = sum(sc_measAsync)
+	variable totalThreads = threadProcessorCount
+	
+	variable tgID = ThreadGroupCreate(min(numRequests, totalThreads)) // open threads
+
+	variable i=0, idx=0, measIndex=0, threadIndex = 0
 	string script, queryFunc, strID, threadFolder
-	variable iThread = 0
+
 	for(i=0; i<numpnts(sc_RawScripts); i+=1)
 	
-		if(sc_measAsync[i]==1)
-
-			script = sc_RawScripts[i]
-			idx = sc_checkAsyncScript(script)
-			queryFunc = script[0,idx-1]
-			strID = script[idx+1,strlen(script)-2]
-			
-			nvar instrID = $strID
+		if( (sc_measAsync[i]==1) )
+		
+			do
+				threadIndex = ThreadGroupWait(tgID, -2) // relying on this to keep track of index
+			while(threadIndex<1)
 			
 			// going to use a new data folder structure
 			//     to keep track of function names and instrument ids
 			// comments below show an example
-			threadFolder = "thread"+num2str(iThread)
+			
+			nvar instrID = $sc_asyncIDs[i]
+			threadFolder = "thread"+num2str(i)
 			newdatafolder/o root:$(threadFolder)  // creates root:instr1
 			variable /g root:$(threadFolder):instrID = instrID   // creates variable instrID in root:thread0
-																      //     that has the same value as $strID
-			string /g root:$(threadFolder):queryFunc = queryFunc // creates string variable queryFunc in root:thread0
-															         //      that has a value queryFunc="readInstr"
+																              // that has the same value as $strID
+			string /g root:$(threadFolder):queryFunc = sc_asyncQueries[i] // creates string variable queryFunc in root:thread0
+															                          // that has a value queryFunc="readInstr"
 			
 			threadgroupputdf tgID, root:$(threadFolder) // move root:thread0 to where threadGroup can access it
-												           //     effectively kills root:thread0 folder in main thread
-												   
-			threadstart tgID, iThread, sc_Worker(threadFolder)  // start this thread
-			iThread+=1
+												                 // effectively kills root:thread0 folder in main thread
+												                 
+			// load 1d wave for data
+			wave wref1d = $sc_RawWaveNames[i]
+			
+			// Redimension waves if readvstime is set to 1
+			if (readvstime == 1)
+				redimension /n=(innerindex+1) wref1d
+				setscale/I x 0,  datetime - sc_scanstarttime, wref1d
+			endif
+			threadstart tgID, threadIndex-1, sc_Worker(wref1d, innerindex)  // start this thread
 			
 		endif
 		
 	endfor
-
+	
+	// wait for all threads to finish and get the rest of the data
+	do
+		threadIndex = ThreadGroupWait(tgID, 0)
+		sleep /s 0.001
+	while(threadIndex!=0)
+	
+	// if sc_is2d -- put results into 2d waves
+	if(sc_is2d)
+	
+		for(i=0; i<numpnts(sc_RawWaveNames); i+=1)
+		
+			wave wref1d = $sc_RawWaveNames[i]
+			
+			wave wref2d = $sc_RawWaveNames[i] + "2d"
+			wref2d[innerindex][outerindex] = wref1d[innerindex]
+			
+		endfor
+		
+	endif
+	
 	return tgID
 end
 
-threadsafe function sc_Worker(threadFolder)
-	string threadFolder
+threadsafe function sc_Worker(dataWave, innerindex)
+	wave dataWave
+	variable innerindex
 	
-	DFREF dfr = ThreadGroupGetDFR(0,1000)
+	do
+		DFREF dfr = ThreadGroupGetDFR(0,1000)	// Get free data folder from input queue
+		if (DataFolderRefStatus(dfr) == 0)
+			continue
+		else
+			break
+		endif
+	while(1)
 	setdatafolder dfr
 	
 	nvar instrID = instrID
 	svar queryFunc = queryFunc
 
 	funcref funcAsync func = $queryFunc
-	return func(instrID)
+	variable response = func(instrID)
+
+	dataWave[innerindex] = response
+	
 end
 
 threadsafe function funcAsync(instrID)  // Reference functions for all *_async functions
 	variable instrID                    // instrID used as only input to async functions
-end
-
-function sc_CollectDataFromThreads(tgID,readvstime,innerindex,outerindex)
-	variable tgID, readvstime, innerindex, outerindex
-	variable processflag, i=0, threaddata
-	wave/t sc_RawWaveNames
-	wave sc_measAsync
-	nvar sc_is2d, sc_scanstarttime
-
-	// wait for all threads to finish
-	do
-		processflag = ThreadGroupWait(tgID, 0)
-		sleep /s 0.001
-	while(processflag>0)
-	
-	variable iThread = 0
-	for(i=0; i<numpnts(sc_RawWaveNames); i+=1)
-	
-		if(sc_measAsync[i]==1)	
-	
-			wave wref1d = $sc_RawWaveNames[i]
-			threaddata = ThreadReturnValue(tgID, iThread)
-	
-			// Redimension waves if readvstime is set to 1
-			if (readvstime == 1)
-				redimension /n=(innerindex+1) wref1d
-				setscale/I x 0,  datetime - sc_scanstarttime, wref1d
-			endif
-	
-			wref1d[innerindex] = threaddata
-	
-			if (sc_is2d)
-				wave wref2d = $sc_RawWaveNames[i] + "2d"
-				wref2d[innerindex][outerindex] = wref1d[innerindex]
-			endif
-			iThread+=1
-			
-		endif
-		
-	endfor
 end
 
 function sc_KillThreads(tgID)

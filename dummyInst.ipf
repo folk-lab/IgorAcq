@@ -5,23 +5,30 @@
 threadsafe function getDummy1x(instrID)
 	variable instrID
 	
-	sc_sleep_noupdate(0.05)
-	return datetime
+	sc_sleep_noupdate(0.025)
+	return enoise(1)+instrID
 end
 
 threadsafe function getDummy2x(instrID)
 	variable instrID
 	
-	sc_sleep_noupdate(0.05)
-	return enoise(1)
+	sc_sleep_noupdate(0.025)
+	return enoise(1)+instrID*10
 end
 
-function getDummy3y(instrID, num_input)
-	variable instrID, num_input
+threadsafe function getDummy3x(instrID)
+	variable instrID
 	
-	sc_sleep_noupdate(0.05)
-	return mod(datetime, 2)
+	sc_sleep_noupdate(0.025)
+	return instrID
 end
+
+//function getDummy3y(instrID, num_input)
+//	variable instrID, num_input
+//	
+//	sc_sleep_noupdate(0.025)
+//	return mod(datetime, 2)
+//end
 
 function setDummy(setpoint, [delay])
 	// put it where you would set a parameter
