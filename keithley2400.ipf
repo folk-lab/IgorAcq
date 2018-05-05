@@ -6,106 +6,43 @@
 // By Christian Olsen, 2016-10-19
 // Async supprt added by Christian Olsen, May 2018
 
-///////////////
-//// Init ////
-/////////////
-
-// Only for debugging use! Init GPIB devices using Initeverything()
-function InitK2400(instID,gpibadresse,[gpibboard])
-	string instID
-	variable gpibadresse, gpibboard
-	string resource, error
-	variable session=0, inst=0, status
-	
-	if(paramisdefault(gpibboard))
-		gpibboard = 0
-	endif
-	
-	sprintf resource, "GPIB%d::%d::INSTR",gpibboard,gpibadresse
-	status = viOpenDefaultRM(session)
-	if (status < 0)
-		viStatusDesc(session, status, error)
-		abort "OpenDefaultRM error: " + error
-	endif
-	
-	status = viOpen(session,resource,0,0,inst) //not sure what to do with openTimeout, setting it to 0!
-	if (status < 0)
-		viStatusDesc(session, status, error)
-		abort "viOpen error: " + error
-	endif
-	
-	variable/g $instID = inst
-end
-
 ///////////////////////
 //// Set functions ////
 //////////////////////
 
-function SetK2400Current(curr,instID) //Units: nA
-	variable curr, instID
+function setK2400Current(instrID,curr) //Units: nA
+	variable instrID,curr
 	string cmd
-	
-	sprintf cmd, ":sour:func curr;:sour:curr:mode fix;:sour:curr:lev %.10f", curr*1e-9
-	WriteK2400(cmd,instID)
+
+	sprintf cmd, ":sour:func curr;:sour:curr:mode fix;:sour:curr:lev %.10f\n", curr*1e-9
+	writeInstr(instrID,cmd)
 end
 
-function SetK2400Voltage(volt,instID) // Units: mV
-	variable volt, instID
+function setK2400Voltage(instrID,volt) // Units: mV
+	variable instrID,volt
 	string cmd
-	
-	sprintf cmd, ":sour:func volt;:sour:volt:mode fix;:sour:volt:lev %.10f", volt*1e-3
-	WriteK2400(cmd,instID)
+
+	sprintf cmd, ":sour:func volt;:sour:volt:mode fix;:sour:volt:lev %.10f\n", volt*1e-3
+	writeInstr(instrID,cmd)
 end
 
-////////////////////////////
-//// Sync Get functions ////
-///////////////////////////
+////////////////////////
+//// Get functions ////
+///////////////////////
 
-function GetK2400Current(instID) // Units: nA
-	variable instID
+threadsafe function getK2400current(instrID) // Units: nA
+	variable instrID
 	string response
-	
-	response = QueryK2400(":sens:func \"curr\";:form:elem curr",instID)
+
+	response = queryInstr(instrID,":sens:func \"curr\";:form:elem curr\n",read_term="\n")
 	return str2num(response)*1e9
 end
 
-function GetK2400Voltage(instID) // Units: mV
-	variable instID
+threadsafe function GetK2400voltage(instrID) // Units: mV
+	variable instrID
 	string response
-	
-	response = QueryK2400(":sens:func \"volt\";:form:elem volt",instID)
-	return str2num(response)*1e3
-end
 
-//////////////////////////////
-//// Async Get functions ////
-////////////////////////////
-
-threadsafe GetK2400Current_Async(datafolderID) // Units: nA
-	string datafolderID
-	string response
-	
-	// get instrument ID from datafolder
-	DFREF dfr = ThreadGroupGetDFR(0,inf)
-	setdatafolder dfr
-	nvar instID = $(":"+datafolderID+":instID")
-	killdatafolder dfr // We don't need the datafolder anymore!
-	
-	response = QueryK2400(":sens:func \"curr\";:form:elem curr",InstID)
-	return str2num(response)*1e9
-end
-
-threadsafe GetK2400Voltage(datafolderID) // Units: mV
-	string datafolderID
-	string response
-	
-	// get instrument ID from datafolder
-	DFREF dfr = ThreadGroupGetDFR(0,inf)
-	setdatafolder dfr
-	nvar instID = $(":"+datafolderID+":instID")
-	killdatafolder dfr // We don't need the datafolder anymore!
-	
-	response = QueryK2400(":sens:func \"volt\";:form:elem volt",InstID)
+	response = queryInstr(instrID,":sens:func \"volt\";:form:elem volt\n",read_term="\n")
 	return str2num(response)*1e3
 end
 
@@ -113,48 +50,48 @@ end
 //// Ramp functions ////
 ///////////////////////
 
-function RampK2400Voltage(output,instID,[ramprate]) // Units: mV, mV/s
-	variable output, instID, ramprate
+function rampK2400Voltage(instrID,output,[ramprate]) // Units: mV, mV/s
+	variable instrID,output,ramprate
 	variable startpoint, sgn, step, new_output
 	variable sleeptime = 0.01 //s
-	
+
 	if(paramisdefault(ramprate))
-		ramprate = 500  // mV/s 
+		ramprate = 500  // mV/s
 	endif
-	
-	startpoint = GetK2400Voltage(instID)
+
+	startpoint = getK2400Voltage(instrID)
 	sgn = sign(output-startpoint)
-	
+
 	step = ramprate*sleeptime
-	
+
 	if(abs(output-startpoint) <= step)
 		// We are within one step of the final output
-		SetK2400Voltage(output,instID)
+		SetK2400Voltage(instrID,output)
 		return 1
 	endif
 	new_output = startpoint
 	do
 		new_output += step*sgn
-		SetK2400Voltage(new_output,instID)
+		setK2400Voltage(instrID,new_output)
 		sc_sleep(sleeptime)
 	while(sgn*new_output < sgn*output-step)
-	SetK2400Voltage(output,instID) // Set final value
+	setK2400Voltage(instrID,output) // Set final value
 end
 
 function RampK2400Current(output, instID, [ramprate]) // Units: nA
 	variable output, instID, ramprate
 	variable startpoint, sgn, step, new_output
 	variable sleeptime = 0.01 //s
-	
+
 	if(paramisdefault(ramprate))
-		ramprate = 1  // nA/s 
+		ramprate = 1  // nA/s
 	endif
-	
+
 	startpoint = GetK2400Current(instID)
 	sgn = sign(output-startpoint)
-	
+
 	step = ramprate*sleeptime
-	
+
 	if(abs(output-startpoint) <= step)
 		// We are within one step of the final output
 		SetK2400Current(output,instID)
@@ -177,7 +114,7 @@ function SetK2400Compl(voltcurr,compl,instID) // Pass "volt" or "curr", the valu
 	string voltcurr
 	variable compl, instID
 	string cmd
-	
+
 	strswitch(voltcurr)
 		case "volt":
 			sprintf cmd, ":sens:vol:prot %g", compl*1e-3 //Units: mV
@@ -197,7 +134,7 @@ function SetK2400Range(voltcurr,range,instID)
 	string voltcurr
 	variable range, instID
 	string cmd
-	
+
 	strswitch(voltcurr)
 		case "volt":
 			sprintf cmd, ":sens:vol:rang %g", range*1e-3 //Units: mV
@@ -233,7 +170,7 @@ function K2400AutoRange(onoff,voltcurr,instID) // Turn autorange on/off
 	string onoff, voltcurr
 	variable instID
 	string cmd
-	
+
 	strswitch(voltcurr)
 		case "volt":
 			sprintf cmd, "sour:volt:rang:auto %s", onoff
@@ -256,7 +193,7 @@ end
 threadsafe function WriteK2400(cmd,instID)
 	string cmd
 	variable instID
-	
+
 	cmd = cmd+"\r"
 	VisaWrite instID, cmd
 end
@@ -264,7 +201,7 @@ end
 threadsafe function/s ReadK2400(instID)
 	variable instID
 	string response
-	
+
 	WriteK2400(":read?",instID)
 	VisaRead/T="\r" instID, response
 	return response
@@ -273,18 +210,18 @@ end
 threadsafe function/s QueryK2400(cmd,instID)
 	string cmd
 	variable instID
-	
+
 	WriteK2400(cmd,instID)
 	return ReadK2400(instID)
 end
 
 //// Logging functions ////
 
-function/s GetK2400Status(instID)
-	variable instID
+function/s GetK2400Status(instrID)
+	variable instrID
 	string  buffer = ""
-	
-	string gpib = num2istr(instGPIB(instID))
+
+	string gpib = num2istr(getAddressGPIB(instrID))
 	buffer = addJSONKeyVal(buffer, "gpib_address", strVal=gpib)
 
 	return addJSONKeyVal("", "K2400_"+gpib, strVal=buffer)
