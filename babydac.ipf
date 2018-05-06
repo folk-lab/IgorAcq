@@ -425,23 +425,38 @@ end
 //// UTILITY ////
 /////////////////
 
-threadsafe function /s readBytesBD(instrID, bytes)
+threadsafe function writeBytesBD(instrID, cmd_wave)
+	variable instrID
+	wave cmd_wave
+	
+	variable return_count, status = 0, i=0
+	for(i=0;i<numpnts(cmd_wave);i+=1)
+		viWrite( instrID, num2char(cmd_wave[i], 1), 1, return_count) 
+		if (status)
+			VISAerrormsg("writeBytesBD -- viWrite:", instrID, status)
+			return NaN // abort not supported in threads (v7)
+		endif
+	endfor
+
+end
+
+threadsafe function readBytesBD(instrID, nBytes)
 	// creates a wave of 8 bit integers with a given number of bytes 
 	//    access this wave as bd_response_wave
 	//    returns number of waves read, if successful
-	//    returns "NaN" on read error (prints message as well)"
-	variable instrID, bytes // number of bytes to read
+	//    returns NaN on read error (prints message as well)"
+	variable instrID, nBytes // number of bytes to read
 
 	// read serial port here
-	make /O/B/U/N=(bytes) bd_response_wave
-	VISAReadBinaryWave /Q /TYPE=0x8 instrID, bd_response_wave
-
-	if (V_flag==0)
-		VISAerrormsg("readBytesBD --", instrID, V_status)
-		return "NaN" // abort not supported in threads (v7)
-	endif
-
-	return num2str(V_flag)
+	make /O/B/U/N=(nBytes) bd_response_wave
+	variable i=0
+	for(i=0;i<nBytes;i+=1)
+		bd_response_wave[i] = readSingleByteBD(instrID)
+		if(numtype(bd_response_wave[i])==2)
+			return NaN
+		endif
+	endfor
+	
 end
 
 threadsafe function readSingleByteBD(instrID)
@@ -450,17 +465,20 @@ threadsafe function readSingleByteBD(instrID)
 	//    returns number of waves read, if successful
 	//    returns "NaN" on read error (prints message as well)"
 	variable instrID
-	variable byte
 
 	// read serial port here
-	VISAReadBinary /Q /TYPE=0x8 instrID, byte
+	variable return_count = 0
+	string buffer = ""
+	variable status = viRead(instrID , buffer , 1 , return_count )
 
-	if (V_flag==0)
-		VISAerrormsg("readSingleByteBD --", instrID, V_status)
+	if (status==1073676294)
+		// do nothing
+	elseif(status>0)
+		VISAerrormsg("readSingleByteBD --", instrID, status)
 		return NaN // abort not supported in threads (v7)
 	endif
 
-	return byte
+	return char2num(buffer)
 end
 
 function clearBufferBD(instrID)
@@ -538,7 +556,7 @@ function resetStartupVoltageBD(instrID, board_number, range)
 		make/o bd_cmd_wave={id_byte, command_byte, data_byte_1, data_byte_2, data_byte_3, parity_byte, 0}
 
 		// send command to DAC
-		execute "VDTWriteBinaryWave2 /O=10 bd_cmd_wave"
+		writeBytesBD(instrID, bd_cmd_wave)
 
 		// read the response from the buffer
 		ReadBytesBD(instrID, 7)
@@ -625,9 +643,7 @@ function setOutputBD(instrID, channel, output) // in mV
 	parity_byte=alt_id_byte%^command_byte%^data_byte_1%^data_byte_2%^data_byte_3 // XOR all previous bytes
 
 	make/o bd_cmd_wave={id_byte, command_byte, data_byte_1, data_byte_2, data_byte_3, parity_byte, 0}
-
-	// send command to DAC
-	VISAWriteBinaryWave /TYPE=0x8 instrID, bd_cmd_wave
+	writeBytesBD(instrID, bd_cmd_wave)
 
 	// Update stored values
 	dacvalstr[channel][1] = num2str(output)
@@ -870,10 +886,10 @@ end
 ///// ACD readings /////
 ////////////////////////
 
-function bdReading2Voltage(byte1, byte2, byte3)
+threadsafe function bdReading2Voltage(byte1, byte2, byte3)
 	variable byte1, byte2, byte3
 	variable int_reading, frac, volts 
-	variable /g bd_adc_low=-2500, bd_adc_high=2500
+	variable bd_adc_low=-2500, bd_adc_high=2500
 	
 	int_reading = byte1 * 2^14 + byte2 * 2^7 + byte3
 
@@ -882,7 +898,7 @@ function bdReading2Voltage(byte1, byte2, byte3)
     return volts
 end
 
-function ReadBDadc(instrID, channel, board_number)
+threadsafe function ReadBDadc(instrID, channel, board_number)
 	// you can only get a new reading here once every ~300ms 
 	// adc channels are indexed starting at 1 (unlike dac channels)
 	// this function will return data anytime it is called
@@ -891,21 +907,13 @@ function ReadBDadc(instrID, channel, board_number)
 	variable channel_bit
 	variable reading
 
-	// check if board is initialized
-	wave bd_boardnumbers
-	FindValue /V=(board_number) bd_boardnumbers
-	if(V_value==-1)
-		string err
-		sprintf err, "BabyDAC %d is not connected", board_number
-		abort err
-	endif
-
 	if(channel==1)
 		channel_bit = 0
 	elseif(channel==2)
 		channel_bit = 2
 	else
-		abort "pick a valid input channel, 1 or 2"
+		print "[WARNING] Not a valid BD ADC input channel, 1 or 2"
+		return NaN
 	endif
 
 	// build  command
@@ -913,27 +921,23 @@ function ReadBDadc(instrID, channel, board_number)
 	variable data_byte_1, data_byte_2, data_byte_3
 	wave bd_response_wave=bd_response_wave
 
-	id_byte = 0xc0+board_number // 11{gggggg}, g = board number
-	alt_id_byte = 0x40+board_number // id_byte with MSB = 0
+//	alt_id_byte = 0x40+board_number // alt_id_byte = id_byte with MSB = 0
 
-	command_byte = 0x60+(channel_bit) // 011000{h}0, h=0 for channel 1, 1 for channel 2
-
-	data_byte_1 = 0 // 00{aaaaaa}, a = most significant 6 bits
-	data_byte_2 = 0 // 0{bbbbbbb}, b = middle 7 bits
-	data_byte_3 = 0 // 0{ccccccc}, c = least significant 7 bits
-
+	id_byte = 0xc0+board_number // id_byte 11{gggggg}, g = board number
+	command_byte = 0x60+(channel_bit) // command byte 011000{h}0, h=0 for channel 1, 1 for channel 2
+	data_byte_1 = 0 // first data_byte 00{aaaaaa}, a = most significant 6 bits
+	data_byte_2 = 0 // second data_byte 0{bbbbbbb}, b = middle 7 bits
+	data_byte_3 = 0 // third data_byte 0{ccccccc}, c = least significant 7 bits
 	parity_byte=alt_id_byte%^command_byte%^data_byte_1%^data_byte_2%^data_byte_3 // XOR all previous bytes
 
 	make/o bd_cmd_wave={id_byte, command_byte, data_byte_1, data_byte_2, data_byte_3, parity_byte, 0}
-
-	// send command to babydac
-	VISAWriteBinaryWave /TYPE=0x8 instrID, bd_cmd_wave
+	writeBytesBD(instrID, bd_cmd_wave)
 	
 	// read response
 	variable response
 	do
 		response = ReadSingleByteBD(instrID) // reads into bd_response_wave
-		if(response==bd_cmd_wave[1])
+		if(response==command_byte)
 			// this is the command byte
 			// the next three bytes represent the adc reading
 			break
@@ -943,8 +947,9 @@ function ReadBDadc(instrID, channel, board_number)
 		endif
 	while(1)
 
-	variable byte1, byte2, byte3
-	VISAReadBinary /Q /TYPE=0x8 instrID, byte1, byte2, byte3
+	variable byte1 = ReadSingleByteBD(instrID) 
+	variable byte2 = ReadSingleByteBD(instrID)
+	variable byte3 = ReadSingleByteBD(instrID)
 	
 	reading = bdReading2Voltage(byte1, byte2, byte3)
 

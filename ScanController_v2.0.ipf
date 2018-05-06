@@ -826,6 +826,7 @@ function sc_findAsyncMeasurements()
 		cmd = "CheckBox sc_AsyncCheckBox" + num2istr(i) + " value=" + num2istr(sc_measAsync[i])
 		execute(cmd)
 	endfor
+	doupdate /W=ScanController
 	
 	if(sum(sc_measAsync)==0)
 		KillDataFolder /Z root:async // don't need this
@@ -885,7 +886,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	while (i<numpnts(sc_CalcWaveNames))
 	i=0
 
-	printf "Measuring %d values asynchronously\r", sc_findAsyncMeasurements() // update sc_isAsyncScript
+//	printf "Measuring %d values asynchronously\r", sc_findAsyncMeasurements() // update sc_isAsyncScript
 
 	// connect VISA instruments
 	// do this here, because if it fails
@@ -1388,7 +1389,7 @@ end
 
 function sc_ManageThreads(innerIndex, outerIndex, readvstime)
 	variable innerIndex, outerIndex, readvstime
-	wave sc_measAsync
+	wave sc_measAsync, sc_RawRecord, sc_RawPlot
 	wave /t sc_RawScripts, sc_RawWaveNames, sc_asyncQueries, sc_asyncIDs
 	nvar sc_is2d, sc_scanstarttime
 	
@@ -1402,7 +1403,7 @@ function sc_ManageThreads(innerIndex, outerIndex, readvstime)
 
 	for(i=0; i<numpnts(sc_RawScripts); i+=1)
 	
-		if( (sc_measAsync[i]==1) )
+		if( ( (sc_RawRecord[i] == 1) || (sc_RawPlot[i] == 1) ) && (sc_measAsync[i]==1) )
 		
 			do
 				threadIndex = ThreadGroupWait(tgID, -2) // relying on this to keep track of index
