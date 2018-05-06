@@ -261,7 +261,7 @@ end
 
 //// Advanced functions ////
 
-function waitIPS120field(instrID, field) // in mT
+function setIPS120fieldWait(instrID, field) // in mT
 	// Setting new set point and waiting for magnet to reach new set point
 	variable instrID, field
 	variable status, count = 0
