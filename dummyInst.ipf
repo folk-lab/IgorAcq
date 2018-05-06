@@ -4,28 +4,28 @@
 
 threadsafe function getDummy1x(instrID)
 	variable instrID
-	
+
 	sc_sleep_noupdate(0.025)
 	return enoise(1)+instrID
 end
 
 threadsafe function getDummy2x(instrID)
 	variable instrID
-	
+
 	sc_sleep_noupdate(0.025)
 	return enoise(1)+instrID*10
 end
 
 threadsafe function getDummy3x(instrID)
 	variable instrID
-	
+
 	sc_sleep_noupdate(0.025)
 	return instrID
 end
 
 //function getDummy3y(instrID, num_input)
 //	variable instrID, num_input
-//	
+//
 //	sc_sleep_noupdate(0.025)
 //	return mod(datetime, 2)
 //end
@@ -52,11 +52,11 @@ function ScanDummy(start, fin, numpts, delay, [comments])
 	if(paramisdefault(comments))
 		comments=""
 	endif
-	
+
 	// set starting values
 	setpoint = start
 	x_label = "x_var"
-		
+
 	sc_sleep(5*delay)
 	InitializeWaves(start, fin, numpts, x_label=x_label)
 	variable tstart = stopmstimer(-2)
@@ -64,7 +64,7 @@ function ScanDummy(start, fin, numpts, delay, [comments])
 		setpoint = start + (i*(fin-start)/(numpts-1))
 		setDummy(setpoint)
 		sc_sleep(delay)
-		RecordValues(i, 0) 
+		RecordValues(i, 0)
 		i+=1
 	while (i<numpts)
 	variable telapsed = stopmstimer(-2) - tstart
@@ -84,9 +84,9 @@ macro initDummyExp()
 	// customize this setup to each individual experiment
 	// try write all functions such that initexp() can be run
 	//     at any time without losing any setup/configuration info
-	
+
 	///// setup ScanController /////
-	
+
 	// define instruments --
 	//      this wave should have columns with {instrument name, VISA address, test function, setup function}
 	//      use test = "" to skip query tests when connecting instruments
@@ -102,10 +102,10 @@ end
 function /s GetDummyStatus(instrID)
 	variable instrID
 	string  buffer = ""
-	
+
 	string id = num2istr(instrID)
-	buffer = addJSONKeyVal(buffer, "id", strVal=id)	
+	buffer = addJSONKeyVal(buffer, "id", strVal=id)
 	buffer = addJSONKeyVal(buffer, "time", numVal=datetime, fmtNum = "%d")
-	
+
 	return addJSONKeyVal("", "dum"+id, strVal=buffer)
 end

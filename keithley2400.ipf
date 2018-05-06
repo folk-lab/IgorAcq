@@ -111,7 +111,7 @@ end
 ////////////////
 
 function setK2400compl(instrID,voltcurr,compl) // Pass "volt" or "curr", the value and the device instID
-	variable instrID 
+	variable instrID
 	string voltcurr
 	variable compl
 	string cmd
@@ -132,7 +132,7 @@ function setK2400compl(instrID,voltcurr,compl) // Pass "volt" or "curr", the val
 end
 
 function setK2400range(instrID,voltcurr,range)
-	variable instrID 
+	variable instrID
 	string voltcurr
 	variable range
 	string cmd

@@ -13,10 +13,10 @@
 //		-- "Request scripts" are removed from the scancontroller window. Its only use was
 //			 trying to do async communication (badly).
 //    -- Added Async checkbox in scancontroller window
+//    -- updated scancontroller and most intstruments for threadsafe/async reads
 
 //TODO:
-//   -- figure out how to keep track of data coming back in from threads
-// 
+//   -- config files for common instrument COMM setup and available magnets/fridges
 //   -- if requesting data from the same resource more than once, make them use the same thread
 
 
@@ -301,25 +301,25 @@ function InitScanController(instrWave, [srv_push, config])
 			make/o sc_RawPlot = {0,0} // Whether you want to record and save the data for this wave
 			make/t/o sc_RawScripts = {"getg1x()", "getg1y()"}
 			// End of same-size waves
-	
+
 			// And these waves should be the same size too
 			make/t/o sc_CalcWaveNames = {"", ""} // Calculated wave names
 			make/t/o sc_CalcScripts = {"",""} // Scripts to calculate stuff
 			make/o sc_CalcRecord = {0,0} // Include this calculated field or not
 			make/o sc_CalcPlot = {0,0} // Include this calculated field or not
 			// end of same-size waves
-	
+
 			make /o sc_measAsync = {0,0}
-	
+
 			// default colormap
 			string /g sc_ColorMap = "Grays"
-	
+
 			// Print variables
 			variable/g sc_PrintRaw = 1,sc_PrintCalc = 1
-	
+
 			// logging string
 			string /g sc_LogStr = "GetSRSStatus(srs1);"
-	
+
 			nvar filenum
 			if (numtype(filenum) == 2)
 				print "Initializing FileNum to 0 since it didn't exist before.\n"
@@ -331,9 +331,9 @@ function InitScanController(instrWave, [srv_push, config])
 	else
 		sc_loadconfig(config)
 	endif
-	
+
 	sc_rebuildwindow()
-	
+
 end
 
 /////////////////////////////
@@ -619,7 +619,7 @@ end
 
 function sc_updatewindow(action) : ButtonControl
 	string action
-	
+
 	sc_createconfig()     // write (or overwrite) a config file
 end
 
@@ -737,68 +737,68 @@ function sc_checkAsyncScript(str)
 	// could be better
 	// returns position of first ( character if it is good
 	string str
-	
+
 	variable i = 0, firstOP = 0, countOP = 0, countCP = 0
 	for(i=0; i<strlen(str); i+=1)
-		
+
 		if( CmpStr(str[i], "(") == 0 )
-			countOP+=1 // count opening parentheses 
+			countOP+=1 // count opening parentheses
 			if( firstOP==0 )
 				firstOP = i // record position of first (
 				continue
 			endif
 		endif
-		
+
 		if( CmpStr(str[i], ")") == 0 )
-			countCP -=1 // count closing parentheses 
+			countCP -=1 // count closing parentheses
 			continue
 		endif
-		
+
 		if( CmpStr(str[i], ",") == 0 )
-			return -1 // stop on comma 
+			return -1 // stop on comma
 		endif
-			
+
 	endfor
-	
+
 	if( (countOP==1) && (countCP==-1) )
 		return firstOP
 	else
 		return -1
 	endif
 end
-						
+
 function sc_findAsyncMeasurements()
 
 	wave /t sc_RawScripts
 	wave sc_RawRecord, sc_RawPlot, sc_measAsync
-	
+
 	// setup async folder
 	killdatafolder /z root:async // kill it if it exists
 	newdatafolder root:async // create an empty version
-	
+
 	variable i = 0, idx = 0
 	string script, strID, threadFolder
 	for(i=0;i<numpnts(sc_RawScripts);i+=1)
-	
+
 		if ( (sc_RawRecord[i] == 1) || (sc_RawPlot[i] == 1) )
 			// this is something that will be measured
-			
+
 			if (sc_measAsync[i] == 1) // this is something that should be asyn
-				
+
 				script = sc_RawScripts[i]
 				idx = sc_checkAsyncScript(script) // check function format
-				
+
 				if(idx!=-1) // fucntion is good, this will be recorded asynchronously
-					sc_measAsync[i]=1 
+					sc_measAsync[i]=1
 
 					// keep track of function names and instrIDs in folder structure
 					strID = script[idx+1,strlen(script)-2]
 					nvar instrID = $strID
-					
+
 					// creates root:async:instr1
 					threadFolder = "thread"+num2str(i)
-					newdatafolder/o root:async:$(threadFolder) 
-					
+					newdatafolder/o root:async:$(threadFolder)
+
 					variable /g root:async:$(threadFolder):instrID = instrID   // creates variable instrID in root:thread
 																              // that has the same value as $strID
 					string /g root:async:$(threadFolder):queryFunc = script[0,idx-1] // creates string variable queryFunc in root:async:thread
@@ -809,9 +809,9 @@ function sc_findAsyncMeasurements()
 				endif
 			endif
 		endif
-		
+
 	endfor
-	
+
 	if(sum(sc_measAsync)<2)
 		// no point in doing anyting async is only one instrument is capable of it
 		if(sum(sc_measAsync)==1)
@@ -819,7 +819,7 @@ function sc_findAsyncMeasurements()
 		endif
 		make /o/n=(numpnts(sc_RawScripts)) sc_measAsync = 0
 	endif
-		
+
 	// change state of check boxes based on what just happened here!
 	string cmd = ""
 	for(i=0;i<numpnts(sc_measAsync);i+=1)
@@ -827,14 +827,14 @@ function sc_findAsyncMeasurements()
 		execute(cmd)
 	endfor
 	doupdate /W=ScanController
-	
+
 	if(sum(sc_measAsync)==0)
 		KillDataFolder /Z root:async // don't need this
 		return 0
 	else
 		return sum(sc_measAsync)
 	endif
-	
+
 end
 
 function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_label])
@@ -855,7 +855,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 
 	//do some sanity checks on wave names: they should not start or end with numbers.
 	do
-		
+
 		if (sc_RawRecord[i])
 			s = sc_RawWaveNames[i]
 			if (!((char2num(s[0]) >= 97 && char2num(s[0]) <= 122) || (char2num(s[0]) >= 65 && char2num(s[0]) <= 90)))
@@ -1274,9 +1274,9 @@ function RecordValues(i, j, [readvstime, fillnan])
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
 	nvar sc_abortsweep, sc_pause, sc_scanstarttime
 	variable ii = 0
-	
+
 	//// setup all sorts of logic so we can store values correctly ////
-	
+
 	variable innerindex, outerindex
 	if (sc_is2d)
 		// 2d
@@ -1298,7 +1298,7 @@ function RecordValues(i, j, [readvstime, fillnan])
 	endif
 
 	//// fill NaNs? ////
-	
+
 	if(paramisdefault(fillnan))
 		fillnan = 0 // defaults to 0
 	elseif(fillnan==1)
@@ -1392,67 +1392,67 @@ function sc_ManageThreads(innerIndex, outerIndex, readvstime)
 	wave sc_measAsync, sc_RawRecord, sc_RawPlot
 	wave /t sc_RawScripts, sc_RawWaveNames, sc_asyncQueries, sc_asyncIDs
 	nvar sc_is2d, sc_scanstarttime
-	
+
 	variable numRequests = sum(sc_measAsync)
 	variable totalThreads = threadProcessorCount
-	
+
 	variable tgID = ThreadGroupCreate(min(numRequests, totalThreads)) // open threads
 
 	variable i=0, idx=0, measIndex=0, threadIndex = 0
 	string script, queryFunc, strID, threadFolder
 
 	for(i=0; i<numpnts(sc_RawScripts); i+=1)
-	
+
 		if( ( (sc_RawRecord[i] == 1) || (sc_RawPlot[i] == 1) ) && (sc_measAsync[i]==1) )
-		
+
 			do
 				threadIndex = ThreadGroupWait(tgID, -2) // relying on this to keep track of index
 			while(threadIndex<1)
-			
+
 			duplicatedatafolder root:async, root:asyncCopy //duplicate async folder
  			ThreadGroupPutDF tgID, root:asyncCopy // move root:asyncCopy to where threadGroup can access it
-												           // effectively kills root:asyncCopy in main thread			     
-												                 
+												           // effectively kills root:asyncCopy in main thread
+
 			wave wref1d = $sc_RawWaveNames[i] // load 1d wave for data
-			
+
 			// Redimension waves if readvstime is set to 1
 			if (readvstime == 1)
 				redimension /n=(innerindex+1) wref1d
 				setscale/I x 0,  datetime - sc_scanstarttime, wref1d
 			endif
 			threadstart tgID, threadIndex-1, sc_Worker(wref1d, innerindex, i)  // start this thread
-			
+
 		endif
-		
+
 	endfor
-	
+
 	// wait for all threads to finish and get the rest of the data
 	do
 		threadIndex = ThreadGroupWait(tgID, 0)
 		sleep /s 0.001
 	while(threadIndex!=0)
-	
+
 	// if sc_is2d -- put results into 2d waves
 	if(sc_is2d)
-	
+
 		for(i=0; i<numpnts(sc_RawWaveNames); i+=1)
-		
+
 			wave wref1d = $sc_RawWaveNames[i]
-			
+
 			wave wref2d = $sc_RawWaveNames[i] + "2d"
 			wref2d[innerindex][outerindex] = wref1d[innerindex]
-			
+
 		endfor
-		
+
 	endif
-	
+
 	return tgID
 end
 
 threadsafe function sc_Worker(dataWave, innerindex, folderIndex)
 	wave dataWave
 	variable innerindex, folderIndex
-	
+
 	do
 		DFREF dfr = ThreadGroupGetDFR(0,1000)	// Get free data folder from input queue
 		if (DataFolderRefStatus(dfr) == 0)
@@ -1462,7 +1462,7 @@ threadsafe function sc_Worker(dataWave, innerindex, folderIndex)
 		endif
 	while(1)
 	setdatafolder dfr:$("thread"+num2istr(folderIndex))
-	
+
 	nvar instrID = instrID
 	svar queryFunc = queryFunc
 
@@ -1470,7 +1470,7 @@ threadsafe function sc_Worker(dataWave, innerindex, folderIndex)
 	variable response = func(instrID)
 
 	dataWave[innerindex] = response
-	
+
 end
 
 threadsafe function funcAsync(instrID)  // Reference functions for all *_async functions
@@ -1487,7 +1487,7 @@ function sc_KillThreads(tgID)
 	elseif(releaseResult == -1)
 		printf "ThreadGroupRelease failed. No fatal errors, will continue.\r"
 	endif
-	
+
 end
 
 function/s construct_calc_script(script)
@@ -1499,7 +1499,11 @@ function/s construct_calc_script(script)
 
 	for(i=0;i<numpnts(sc_RawWaveNames);i+=1)
 		j=0
-		test_wave = sc_RawWaveNames[i]
+		if(i<numptsRaw)
+			test_wave = sc_RawWaveNames[i]
+		else
+			test_wave = sc_CalcWaveNames[i-numptsRaw]
+		endif
 		do
 			strpos = strsearch(script,test_wave,j)
 			if(strpos >= 0 && cmpstr(script[strpos+strlen(test_wave)],"[")==0)
@@ -1510,6 +1514,7 @@ function/s construct_calc_script(script)
 			j=strpos+strlen(test_wave)
 		while(strpos >= 0)
 	endfor
+
 	return script
 end
 
@@ -1741,10 +1746,10 @@ function SaveWaves([msg, save_experiment])
 		sc_NotifyServer() // this may leave the experiment file open for some time
 							   // make sure to run saveExp before this
 	else
-		sc_DeleteNotificationFile() // delete the last file list
 		sc_findNewFiles(filenum)    // get list of new files
-		                            // I assume you're testing something
-		                            //     and may want to keep track of the files another way
+		                            // keeps appending files until
+		                            // qdot-server.notify is deleted
+		                            // or srv_push is turned on
 	endif
 
 	// close save files and increment filenum
