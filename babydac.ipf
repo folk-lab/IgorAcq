@@ -17,9 +17,9 @@ function bdCommSetup(instrID)
 	variable instrID
 
 	visaSetBaudRate(instrID, 57600)
-    visaSetDataBits(instrID, 8)
-    visaSetStopBits(instrID, 10)
-    visaSetParity(instrID, 0)
+  visaSetDataBits(instrID, 8)
+  visaSetStopBits(instrID, 10)
+  visaSetParity(instrID, 0)
 
 end
 
@@ -42,11 +42,10 @@ function InitBabyDACs(instrID, boards, ranges, [custom])
 	// if all boards have the same range, you can pass just one number
 	// otherwise number of boards must equal number of ranges given
 
-    variable instrID, custom
+  variable instrID, custom
 	string boards, ranges
 	string /g bd_controller_addr = getResourceAddress(instrID) // for use by window functions
 	variable /g bd_ramprate = 200 // default ramprate
-    string /g bd_controller_addr = getResourceAddress(instrID) // for use by window functions
 
 	if(paramisdefault(custom))
 		custom = 0
@@ -428,10 +427,10 @@ end
 threadsafe function writeBytesBD(instrID, cmd_wave)
 	variable instrID
 	wave cmd_wave
-	
+
 	variable return_count, status = 0, i=0
 	for(i=0;i<numpnts(cmd_wave);i+=1)
-		viWrite( instrID, num2char(cmd_wave[i], 1), 1, return_count) 
+		viWrite( instrID, num2char(cmd_wave[i], 1), 1, return_count)
 		if (status)
 			VISAerrormsg("writeBytesBD -- viWrite:", instrID, status)
 			return NaN // abort not supported in threads (v7)
@@ -440,30 +439,9 @@ threadsafe function writeBytesBD(instrID, cmd_wave)
 
 end
 
-threadsafe function readBytesBD(instrID, nBytes)
-	// creates a wave of 8 bit integers with a given number of bytes 
-	//    access this wave as bd_response_wave
-	//    returns number of waves read, if successful
-	//    returns NaN on read error (prints message as well)"
-	variable instrID, nBytes // number of bytes to read
-
-	// read serial port here
-	make /O/B/U/N=(nBytes) bd_response_wave
-	variable i=0
-	for(i=0;i<nBytes;i+=1)
-		bd_response_wave[i] = readSingleByteBD(instrID)
-		if(numtype(bd_response_wave[i])==2)
-			return NaN
-		endif
-	endfor
-	
-end
-
 threadsafe function readSingleByteBD(instrID)
 	// reads a single byte from the BD buffer
-	//    access this wave as bd_response_wave
-	//    returns number of waves read, if successful
-	//    returns "NaN" on read error (prints message as well)"
+	// returns an 8 bit integer
 	variable instrID
 
 	// read serial port here
@@ -481,10 +459,28 @@ threadsafe function readSingleByteBD(instrID)
 	return char2num(buffer)
 end
 
+threadsafe function /WAVE readBytesBD(instrID, nBytes)
+	// creates a wave of 8 bit integers with a given number of bytes
+	//    access this wave as bd_response_wave
+	//    returns number of waves read, if successful
+	//    returns NaN on read error (prints message as well)"
+	variable instrID, nBytes // number of bytes to read
+
+	// read serial port here
+	make /O/B/U/N=(nBytes) /FREE response_wave
+	variable i=0
+	for(i=0;i<nBytes;i+=1)
+		response_wave[i] = readSingleByteBD(instrID)
+	endfor
+	
+	return response_wave
+
+end
+
 function clearBufferBD(instrID)
 	// read the full output buffer
-	// ends on timeout 
-	//    so it will have a delay equal to VI_ATTR_TMO_VALUE 
+	// ends on timeout
+	//    so it will have a delay equal to VI_ATTR_TMO_VALUE
 	variable instrID
 	variable byte // not sure why this needs to be global
 
@@ -559,7 +555,7 @@ function resetStartupVoltageBD(instrID, board_number, range)
 		writeBytesBD(instrID, bd_cmd_wave)
 
 		// read the response from the buffer
-		ReadBytesBD(instrID, 7)
+		wave response_wave_1 = ReadBytesBD(instrID, 7)
 		sc_sleep(0.3)
 	endfor
 
@@ -572,7 +568,7 @@ function resetStartupVoltageBD(instrID, board_number, range)
 	execute "VDTWriteBinaryWave2 /O=10 bd_cmd_wave"
 
 	// read the response from the buffer
-	print ReadBytesBD(instrID, 4)
+	wave response_wave_2 = ReadBytesBD(instrID, 4)
 
 	sc_sleep(0.3)
 end
@@ -888,9 +884,9 @@ end
 
 threadsafe function bdReading2Voltage(byte1, byte2, byte3)
 	variable byte1, byte2, byte3
-	variable int_reading, frac, volts 
+	variable int_reading, frac, volts
 	variable bd_adc_low=-2500, bd_adc_high=2500
-	
+
 	int_reading = byte1 * 2^14 + byte2 * 2^7 + byte3
 
     frac = int_reading/(2^21-1)
@@ -899,7 +895,7 @@ threadsafe function bdReading2Voltage(byte1, byte2, byte3)
 end
 
 threadsafe function ReadBDadc(instrID, channel, board_number)
-	// you can only get a new reading here once every ~300ms 
+	// you can only get a new reading here once every ~300ms
 	// adc channels are indexed starting at 1 (unlike dac channels)
 	// this function will return data anytime it is called
 	//     it will return NEW data once every 300ms
@@ -932,7 +928,7 @@ threadsafe function ReadBDadc(instrID, channel, board_number)
 
 	make/o bd_cmd_wave={id_byte, command_byte, data_byte_1, data_byte_2, data_byte_3, parity_byte, 0}
 	writeBytesBD(instrID, bd_cmd_wave)
-	
+
 	// read response
 	variable response
 	do
@@ -946,12 +942,9 @@ threadsafe function ReadBDadc(instrID, channel, board_number)
 			return NaN
 		endif
 	while(1)
-
-	variable byte1 = ReadSingleByteBD(instrID) 
-	variable byte2 = ReadSingleByteBD(instrID)
-	variable byte3 = ReadSingleByteBD(instrID)
 	
-	reading = bdReading2Voltage(byte1, byte2, byte3)
+	wave response_wave = ReadBytesBD(instrID, 5)
+	reading = bdReading2Voltage(response_wave[0], response_wave[1], response_wave[2])
 
 	return reading
 end
@@ -1054,13 +1047,13 @@ function update_BabyDAC(action) : ButtonControl
 			endfor
 			break
 	endswitch
-	
+
 	viClose(bd_window_resource) // close VISA resource
-	
+
 	if(bd_num_custom > 0)
 		bdCalcCustomValues()
 	endif
-	
+
 end
 
 window CustomDACWindow() : Panel
@@ -1103,6 +1096,7 @@ function update_BabyDAC_custom(action) : ButtonControl
     endif
     openInstr("bd_window_resource", bd_controller_addr, localRM=localRM, verbose=0)
     nvar bd_window_resource
+    bdCommSetup(bd_window_resource)
 
 	for(i=0;i<bd_num_custom;i=i+1)
 		if(str2num(customdacvalstr[i][1]) != oldcustom[i])
@@ -1112,9 +1106,9 @@ function update_BabyDAC_custom(action) : ButtonControl
 			oldcustom[i] = str2num(customdacvalstr[i][1])
 		endif
 	endfor
-	
+
 	viClose(bd_window_resource) // close VISA resource
-	
+
 end
 
 function calcvectors(action) : ButtonControl

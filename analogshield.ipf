@@ -2,6 +2,22 @@
 
 //	Supports a single AnalogShield/Arduino
 //	Procedure written by Nik Sept 2016 (borrows heavily from babyDAC procedures)
+//  update for VISA by Nik May XX 2018 (needs to be tested!)
+
+////////////////////////
+/// AnalogShield COM ///
+////////////////////////
+
+function AS_CommSetup(instrID)
+	// baud=115200, databits=8, stopbits=1, parity=0
+	variable instrID
+
+	visaSetBaudRate(instrID, 115200)
+    visaSetDataBits(instrID, 8)
+    visaSetStopBits(instrID, 10)
+    visaSetParity(instrID, 0)
+
+end
 
 ///// CALIBRATION CONSTANTS /////
 
@@ -14,26 +30,25 @@ end
 
 ///// Initiate board /////
 
-function InitAnalogShield()
+function InitAnalogShield(instrID)
+	variable instrID
 	variable /g as_range_low, as_range_high, as_range_span
+	string /g as_controller_addr = getResourceAddress(instrID) // for use by window functions
 	variable /g as_ramprate = 50 // default ramprate
 
 	as_range_low = -5000
 	as_range_high = 5000
 	as_range_span = abs(as_range_low-as_range_high)
 	
+	AS_CommSetup(instrID)
 	AS_setADCcalibration()
-	
 	AS_CheckForOldInit()
-	
-	AS_SetSerialPort() // setup COM port
-	execute("VDT2 baud=115200, databits=8, stopbits=1, parity=0, killio") // Communication Settings
 	
 	// open window
 	dowindow /k AnalogShieldWindow
 	execute("AnalogShieldWindow()")
 	
-	ClearBufferAS()
+//	ClearBufferAS(instrID)
 end
 
 function AS_CheckForOldInit()
@@ -85,55 +100,57 @@ function AS_AskUser()
 	return as_answer
 end
 
-function AS_SetSerialPort()
-	svar as_comport
-	execute("VDTOperationsPort2 $as_comport")
-end
+//// READ Functions ////
 
-//// WRITE/READ Functions ////
+threadsafe function readSingleByteAS(instrID)
+	// reads a single byte from the AS buffer
+	// returns an 8 bit integer
+	variable instrID
 
-function WriteAS(command, [timeout])	// Writes command without expecting a response
-	string command
-	variable timeout
-	SVAR comport=comport
-	string cmd
-	NVAR V_VDT
-	
-	if(paramisdefault(timeout))
-		timeout = 1.0 // seconds
-	endif
-
-	// Insert serial communication commands
-	AS_SetSerialPort()
-	sprintf cmd, "VDTWrite2 /O=%.2f /Q \"%s\\n\"", timeout, command
-	execute(cmd)
-	if (V_VDT == 0)
-		abort "Write failed on command "+cmd
-	endif
-end
-
-function ReadBytesAS(bytes, [timeout])
-	// creates a wave of 8 bit integers with a given number of bytes //
-	variable bytes, timeout // number of bytes to read
-	string response // response string
-	string cmd
-	NVAR V_VDT
-	
-	if(paramisdefault(timeout))
-		timeout = 1.0 // seconds
-	endif
-	
 	// read serial port here
-	make /O/B/U/N=(bytes) as_response_wave
-	AS_SetSerialPort()
-	sprintf cmd, "VDTReadBinaryWave2 /O=%.2f /Q as_response_wave", timeout
-	execute (cmd)
-	
-	if(V_VDT == 0)
-		abort "Failed to read"
+	variable return_count = 0
+	string buffer = ""
+	variable status = viRead(instrID , buffer , 1 , return_count )
+
+	if (status==1073676294)
+		// do nothing
+	elseif(status>0)
+		VISAerrormsg("readSingleByteBD --", instrID, status)
+		return NaN // abort not supported in threads (v7)
 	endif
+
+	return char2num(buffer)
+end
+
+threadsafe function /WAVE readBytesAS(instrID, nBytes)
+	// creates a wave of 8 bit integers with a given number of bytes
+	//    access this wave as bd_response_wave
+	//    returns number of waves read, if successful
+	//    returns NaN on read error (prints message as well)"
+	variable instrID, nBytes // number of bytes to read
+
+	// read serial port here
+	make /O/B/U/N=(nBytes) /FREE response_wave
+	variable i=0
+	for(i=0;i<nBytes;i+=1)
+		response_wave[i] = readSingleByteBD(instrID)
+	endfor
 	
-	return 1
+	return response_wave
+
+end
+
+function ClearBufferAS(instrID)
+	variable instrID
+	variable i=0
+
+//	do
+//
+//		i+=1
+//	while()
+	if(i>1)
+		print "Cleared " + num2istr(4*(i-1)) + " bytes of junk"
+	endif
 end
 
 //// SET and RAMP outputs ////
@@ -142,15 +159,14 @@ function GetSetpointAS(output)
 	variable output
 	NVAR as_range_low,as_range_high,as_range_span
 	variable frac
-	// calculate fraction of full output
+
 	frac = (output-as_range_low)/as_range_span
-	// convert to 16 bit number
+
 	return round((2^16-1)*frac)
 end	
 	
-function SetOutputAS(channel, output) // HERE!
-	variable output // in mV
-	variable channel // 0 to 3
+function SetOutputAS(instrID, channel, output) // mV
+	variable instrID, output, channel
 	wave/t as_valsstr=as_valsstr
 	wave/t as_oldvalue=as_oldvalue
 	NVAR as_range_span, as_range_high, as_range_low
@@ -177,8 +193,8 @@ function SetOutputAS(channel, output) // HERE!
 	endif
 	
 	// send command
-	sprintf cmd, "DAC %d,%.2f", channel, output
-	WriteAS(cmd)
+	sprintf cmd, "DAC %d,%.2f\n", channel, output
+	writeInstr(instrID, cmd)
 	
 	// Update stored values
 	as_valsstr[channel][1] = num2str(output)
@@ -186,8 +202,8 @@ function SetOutputAS(channel, output) // HERE!
 	return 1
 end
 
-function RampOutputAS(channel, output, [ramprate, update])
-	variable channel, output,ramprate, update // output is in mV, ramprate in mV/s
+function RampOutputAS(instrID, channel, output, [ramprate, update])
+	variable instrID, channel, output,ramprate, update // output is in mV, ramprate in mV/s
 	wave/t as_valsstr=as_valsstr
 	wave /t as_oldvalue=as_oldvalue
 	variable voltage, sgn, step
@@ -214,7 +230,7 @@ function RampOutputAS(channel, output, [ramprate, update])
 	voltage+=sgn*step
 	if(sgn*voltage >= sgn*output)
 		//// we started less than one step away from the target. set voltage and leave
-		SetOutputAS(channel, output)
+		SetOutputAS(instrID, channel, output)
 		return 1
 	endif
 	
@@ -225,7 +241,7 @@ function RampOutputAS(channel, output, [ramprate, update])
 		if(update==1)
 			doupdate
 		endif
-		SetOutputAS(channel, voltage)
+		SetOutputAS(instrID, channel, voltage)
 
 		endtime = starttime + 1e6*sleeptime
 		do
@@ -234,11 +250,11 @@ function RampOutputAS(channel, output, [ramprate, update])
 
 		voltage+=sgn*step
 	while(sgn*voltage<sgn*output-step)
-	SetOutputAS(channel, output)
+	SetOutputAS(instrID, channel, output)
 	return 1
 end
 
-function UpdateMultipleAS([action, ramprate])
+function UpdateMultipleAS(instrID, [action, ramprate])
 
 	// usage:
 	// function Experiment(....)
@@ -249,7 +265,7 @@ function UpdateMultipleAS([action, ramprate])
 	//         UpdateMultipleAS(action="ramp") // ramps all channels to updated values
 	
 	string action // "set" or "ramp"
-	variable ramprate
+	variable instrID, ramprate
 	wave/t as_valsstr=as_valsstr
 	wave/t as_oldvalue=as_oldvalue
 	variable output,i
@@ -269,9 +285,9 @@ function UpdateMultipleAS([action, ramprate])
 			output = str2num(as_valsstr[i][1])
 			strswitch(action)
 				case "set":
-					check = SetOutputAS(i,output)
+					check = SetOutputAS(instrID, i,output)
 				case "ramp":
-					check = RampOutputAS(i,output, ramprate=ramprate)
+					check = RampOutputAS(instrID, i,output, ramprate=ramprate)
 			endswitch
 			if(check == 1)
 				as_oldvalue[i][1] = as_valsstr[i][1]
@@ -283,10 +299,10 @@ function UpdateMultipleAS([action, ramprate])
 	return 1
 end
 
-function RampMultipleAS(channels, setpoint, nChannels, [ramprate])
+function RampMultipleAS(instrID, channels, setpoint, nChannels, [ramprate])
 	// this can be used to replace the single channel ramp function 
 	// it is slightly more trouble to use and a tiny bit slower, but offers a huge amount of flexibility
-	variable setpoint, ramprate, nChannels
+	variable instrID, setpoint, ramprate, nChannels
 	string channels
 	variable i, channel
 	nvar as_ramprate
@@ -300,16 +316,58 @@ function RampMultipleAS(channels, setpoint, nChannels, [ramprate])
 		channel = str2num(StringFromList(i, channels, ","))
 		as_valsstr[channel][1] = num2str(setpoint) // set new values with a strings
 	endfor
-	UpdateMultipleAS(action="ramp", ramprate=ramprate)
+	UpdateMultipleAS(instrID, action="ramp", ramprate=ramprate)
 end
 
 ///// ACD readings /////
 
-function AS_Reading2mV(int_reading)
+threadsafe function AS_Reading2mV(int_reading)
 	variable int_reading
-	variable /g as_adc_low=-5000, as_adc_high=5000
+	variable as_adc_low=-5000, as_adc_high=5000
 
-       return((int_reading/(2^16-1))*(as_adc_high-as_adc_low)+as_adc_low)
+    return((int_reading/(2^16-1))*(as_adc_high-as_adc_low)+as_adc_low)
+end
+
+function correctReadingAS(readingmV, channel)
+	// use this to correct for calibration in ADC readings
+	variable readingmV, channel
+	nvar as_adc0_mult,  as_adc0_offset,  as_adc2_mult, as_adc2_offset
+	if(channel == 0)
+		return (readingmV - as_adc0_offset)/as_adc0_mult
+	else
+		return (readingmV - as_adc2_offset)/as_adc2_mult
+	endif
+end
+
+threadsafe function ReadADCsingleAS(instrID, channel, numavg)
+	// will read up to 100 points of data at ~64kHz
+	variable instrID, channel // 0 or 2
+	variable numavg // number of points to average over (< 100 )
+	variable reading, readingmV
+	string cmd
+	wave as_response_wave=as_response_wave
+	
+
+	// check channel number	
+	if(channel!=0 && channel!=2)
+		print "[WARNING] readADCsingleAS -- pick a valid input channel, 0 or 2"
+		return NaN
+	endif
+	
+	// adc command
+//	sprintf cmd, "ADCF %d,%d\n", channel, numavg
+//	writeInstr(instrID, cmd)
+//	
+//	// read response
+//	ReadBytesAS(2*numavg + 4, timeout = 0.001*numavg) // reads into as_response_wave
+//	
+//	variable i=0
+//	for(i=0;i<numavg;i+=1)
+//		reading += as_response_wave[2*i] + as_response_wave[2*i+1]*256
+//	endfor
+	
+	return AS_Reading2mV(reading/numavg)
+
 end
 
 function AS_get_time()
@@ -319,62 +377,11 @@ function AS_get_time()
 	return as_response_wave[n-4] + as_response_wave[n-3]*2^8 + as_response_wave[n-2]*2^16 + as_response_wave[n-1]*2^32
 end	
 
-Function ClearBufferAS()
-	// probably smart to put this at the beginning of any script that reads the ADC //
-	string cmd
-	string /g as_response
-	variable i=0
-	NVAR V_VDT
-	AS_SetSerialPort()
-	do
-		cmd="VDTReadBinary2 /O=1.0 /S=1/Q as_response"
-		execute (cmd)
-		i+=1
-	while(V_VDT)
-	if(i>1)
-		print "Cleared " + num2istr(4*(i-1)) + " bytes of junk"
-	endif
-end
-
-function ReadADCsingleAS(channel, numavg)
-	// will read up to 100 points of data at ~64kHz
-	variable channel // 0 or 2
-	variable numavg // number of points to average over (< 100 )
-	variable reading, readingmV
-	string cmd
-	wave as_response_wave=as_response_wave
-	nvar as_adc0_mult,  as_adc0_offset,  as_adc2_mult, as_adc2_offset
-
-	// check channel number	
-	if(channel!=0 && channel!=2)
-		abort "pick a valid input channel, 0 or 2"
-	endif
-	
-	// adc command
-	sprintf cmd, "ADCF %d,%d", channel, numavg
-	WriteAS(cmd, timeout=0.5)
-	
-	// read response
-	ReadBytesAS(2*numavg + 4, timeout = 0.001*numavg) // reads into as_response_wave
-	
-	variable i=0
-	for(i=0;i<numavg;i+=1)
-		reading += as_response_wave[2*i] + as_response_wave[2*i+1]*256
-	endfor
-	
-	readingmV = AS_Reading2mV(reading/numavg)
-	if(channel == 0)
-		return (readingmV - as_adc0_offset)/as_adc0_mult
-	else
-		return (readingmV - as_adc2_offset)/as_adc2_mult
-	endif
-end
-
-function ReadADCtimeAS(channel, numpts)
+function ReadADCtimeAS(instrID, channel, numpts)
 	// will read unlimited data as fast as the serial port will allow
 	// this is  significantly faster on a UNIX system (~40kHz)
 	// compared to a Windows system (11 kHz)
-	variable channel // 0 or 2
+	variable instrID, channel // 0 or 2
 	variable numpts 
 	string cmd
 	wave as_response_wave=as_response_wave
@@ -386,11 +393,11 @@ function ReadADCtimeAS(channel, numpts)
 	endif
 	
 	// adc command
-	sprintf cmd, "ADC %d,%d", channel, numpts
-	WriteAS(cmd, timeout=0.5)
+	sprintf cmd, "ADC %d,%d\n", channel, numpts
+	writeInstr(instrID, cmd)
 	
 	// read response
-	ReadBytesAS(2*numpts + 4, timeout=0.001*numpts) // reads into as_response_wave
+	ReadBytesAS(instrID, 2*numpts + 4) // reads into as_response_wave
 	
 	// create wave to hold results
 	make /o/n=(numpts) as_adc_readings
@@ -404,6 +411,7 @@ function ReadADCtimeAS(channel, numpts)
 			 as_adc_readings[i] = (as_adc_readings[i] - as_adc2_offset)/as_adc2_mult
 		endif
 	endfor
+	
 end
 
 ///// User interface /////
@@ -435,12 +443,25 @@ function update_AnalogShield(action) : ButtonControl
 	variable check = nan
 	controlinfo /W=AnalogShieldWindow daclist
 	
+	// setup temporary control for Analog Shield
+    svar as_controller_addr
+    variable status, localRM
+    
+    status = viOpenDefaultRM(localRM) // open local copy of resource manager
+    if(status < 0)
+        VISAerrormsg("open BD connection:", localRM, status)
+        abort
+    endif
+    openInstr("as_window_resource", as_controller_addr, localRM=localRM, verbose=0)
+    nvar as_window_resource
+    AS_CommSetup(as_window_resource)
+    
 	strswitch(action)
 		case "ramp":
 			for(i=0;i<16;i+=1)
 				if(str2num(as_valsstr[i][1]) != str2num(as_oldvalue[i][1]))
 					output = str2num(as_valsstr[i][1])
-					check = RampOutputAS(i,output)
+					check = RampOutputAS(as_window_resource, i,output)
 					if(check == 1)
 						as_oldvalue[i][1] = as_valsstr[i][1]
 					else
@@ -451,13 +472,16 @@ function update_AnalogShield(action) : ButtonControl
 			break
 		case "rampallzero":
 			for(i=0;i<16;i+=1)
-				check = RampOutputAS(i, 0)
+				check = RampOutputAS(as_window_resource, i, 0)
 				if(check==1)
 					as_oldvalue[i][1] = as_valsstr[i][1]
 				endif
 			endfor
 			break
 	endswitch
+	
+	viClose(as_window_resource) // close VISA resource
+	
 end
 
 Window AskUserWindowAS() : Panel
@@ -496,14 +520,14 @@ end
 
 function/s GetASStatus()
 	wave /t as_valsstr = as_valsstr
-	svar as_comport
+	svar as_controller_addr
 
 	string buffer=""
 	variable j=0
 	for(j=0;j<4;j+=1)
 		buffer = addJSONKeyVal(buffer, "CH"+num2istr(j), strVal=as_valsstr[j][1])
 	endfor
-	buffer = addJSONKeyVal(buffer, "com_port", strVal=as_comport, addQuotes=1)
+	buffer = addJSONKeyVal(buffer, "com_port", strVal=as_controller_addr, addQuotes=1)
 	
 	return addJSONKeyVal("", "AnalogShield", strVal = buffer)
 end

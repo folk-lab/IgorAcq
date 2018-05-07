@@ -535,7 +535,7 @@ end
 /////////////////////////
 
 threadsafe function visaSetReadTerm(instrID, termChar)
-
+	// set the read termination character for this instrument
 	variable instrID	// An instrument referenced obtained from viOpen
 	string termChar     // set read termination character
 
@@ -545,7 +545,7 @@ threadsafe function visaSetReadTerm(instrID, termChar)
 end
 
 threadsafe function visaSetReadTermEnable(instrID, enable)
-
+	// enable use of read termination character
 	variable instrID	// An instrument referenced obtained from viOpen
 	variable enable     // 1 = yes, 0 = no
 
