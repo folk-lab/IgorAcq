@@ -3,7 +3,7 @@
 
 
 // DMM Procedures
-// should work for HP3478A and ????
+// works for HP34401A and HP????
 // Nik and Elyjah 8/17
 // Async support added by Christian Olsen, May 2018
 

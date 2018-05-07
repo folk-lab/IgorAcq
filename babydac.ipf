@@ -16,7 +16,7 @@ function bdCommSetup(instrID)
 
 	variable instrID
 
-	visaSetBaudRate(instrID, 57600)
+  visaSetBaudRate(instrID, 57600)
   visaSetDataBits(instrID, 8)
   visaSetStopBits(instrID, 10)
   visaSetParity(instrID, 0)
@@ -234,7 +234,7 @@ function bdCheckForOldInit(custom)
 	variable response
 	nvar bd_num_custom
 
-	if(waveexists(dacvalstr) && waveexists(oldvalue))
+	if(waveexists(dacvalstr) && waveexists(old_dacvalstr))
 		response = bdInitAskUser()
 		if(response == 1)
 			// Init at old values
@@ -364,7 +364,7 @@ function bdInitZeros()
 
 	// Init all channels to 0V.
 	make/t/o dacvalstr = {{"0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15"},{"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}, {"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}}
-	make/t/o oldvalue = {{"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}}
+	make/t/o old_dacvalstr = {{"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}}
 
 	// setup software limit
 	variable i = 0, board_index = 0
@@ -381,12 +381,12 @@ function bdInitAskUser()
 	wave/t dacvalstr=dacvalstr
 	variable/g bd_answer
 	make /o attinitlist = {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}}
-	make /o/t/n=16 oldinit
-	make /o/t/n=16 defaultinit = {"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}
+	make /o/t/n=16 old_dacinit
+	make /o/t/n=16 default_dacinit = {"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}
 	make /o/t/n=(16,2) initwave
-	oldinit = dacvalstr[p][1]
-	initwave[0,15][1] = defaultinit[p]
-	initwave[0,15][0] = oldinit[p]
+	old_dacinit = dacvalstr[p][1]
+	initwave[0,15][1] = default_dacinit[p]
+	initwave[0,15][0] = old_dacinit[p]
 	execute("bdInitWindow()")
 	PauseForUser bdInitWindow
 	return bd_answer
@@ -592,7 +592,7 @@ function setOutputBD(instrID, channel, output) // in mV
 	variable instrID, channel, output
 	wave bd_boardnumbers=bd_boardnumbers
 	wave/t dacvalstr=dacvalstr
-	wave/t oldvalue=oldvalue
+	wave/t old_dacvalstr=old_dacvalstr
 	wave bd_range_span, bd_range_high, bd_range_low
 	variable board_index, board, board_channel, setpoint, sw_limit
 
@@ -641,22 +641,24 @@ function setOutputBD(instrID, channel, output) // in mV
 	make/o bd_cmd_wave={id_byte, command_byte, data_byte_1, data_byte_2, data_byte_3, parity_byte, 0}
 	writeBytesBD(instrID, bd_cmd_wave)
 
+	wave response_wave = readBytesBD(instrID, 7)
+
 	// Update stored values
 	dacvalstr[channel][1] = num2str(output)
-	oldvalue[channel][1] = num2str(output)
+	old_dacvalstr[channel][1] = num2str(output)
 	return 1
 end
 
 function RampOutputBD(instrID, channel, output, [ramprate, update])
 	variable instrID, channel, output,ramprate, update // output is in mV, ramprate in mV/s
 	wave/t dacvalstr=dacvalstr
-	wave /t oldvalue=oldvalue
+	wave /t old_dacvalstr=old_dacvalstr
 	variable voltage, sgn, step
 	variable sleeptime // seconds per ramp cycle (must be at least 0.002)
 
 
 	// calculate step direction
-	voltage = str2num(oldvalue[channel][1])
+	voltage = str2num(old_dacvalstr[channel][1])
 	sgn = sign(output-voltage)
 
 	if(paramisdefault(update))
@@ -720,7 +722,7 @@ function UpdateMultipleBD(instrID, [action, ramprate, update])
 	string action // "set" or "ramp"
 	variable ramprate, update
 	wave/t dacvalstr=dacvalstr
-	wave/t oldvalue=oldvalue
+	wave/t old_dacvalstr=old_dacvalstr
 	variable output,i
 	variable check = nan
 
@@ -738,7 +740,7 @@ function UpdateMultipleBD(instrID, [action, ramprate, update])
 	endif
 
 	for(i=0;i<16;i+=1)
-		if(str2num(dacvalstr[i][1]) != str2num(oldvalue[i][1]))
+		if(str2num(dacvalstr[i][1]) != str2num(old_dacvalstr[i][1]))
 			output = str2num(dacvalstr[i][1])
 			strswitch(action)
 				case "set":
@@ -747,9 +749,9 @@ function UpdateMultipleBD(instrID, [action, ramprate, update])
 					check = rampOutputBD(instrID, i,output,ramprate=ramprate, update=update)
 			endswitch
 			if(check == 1)
-				oldvalue[i][1] = dacvalstr[i][1]
+				old_dacvalstr[i][1] = dacvalstr[i][1]
 			else
-				dacvalstr[i][1] = oldvalue[i][1]
+				dacvalstr[i][1] = old_dacvalstr[i][1]
 			endif
 		endif
 	endfor
@@ -966,19 +968,19 @@ Window bdInitWindow() : Panel
 	DrawText 170,80,"Default"
 	ListBox initlist,pos={10,90},size={280,390},fsize=16,frame=2
 	ListBox initlist,fStyle=1,listWave=root:initwave,selWave=root:attinitlist,mode= 0
-	Button oldinit,pos={40,490},size={70,20},proc=bdAskUserUpdate,title="OLD INIT"
-	Button defaultinit,pos={170,490},size={70,20},proc=bdAskUserUpdate,title="DEFAULT"
+	Button old_dacinit,pos={40,490},size={70,20},proc=bdAskUserUpdate,title="OLD INIT"
+	Button default_dacinit,pos={170,490},size={70,20},proc=bdAskUserUpdate,title="DEFAULT"
 EndMacro
 
 function bdAskUserUpdate(action) : ButtonControl
 	string action
 	variable/g bd_answer
 	strswitch(action)
-		case "oldinit":
+		case "old_dacinit":
 			bd_answer = 1
 			dowindow/k bdInitWindow
 			break
-		case "defaultinit":
+		case "default_dacinit":
 			bd_answer = -1
 			dowindow/k bdInitWindow
 			break
@@ -1007,7 +1009,7 @@ endMacro
 function update_BabyDAC(action) : ButtonControl
 	string action
 	wave/t dacvalstr=dacvalstr
-	wave/t oldvalue=oldvalue
+	wave/t old_dacvalstr=old_dacvalstr
 	variable output,i
 	variable check = nan
 	nvar bd_num_custom
@@ -1027,13 +1029,13 @@ function update_BabyDAC(action) : ButtonControl
 	strswitch(action)
 		case "ramp":
 			for(i=0;i<16;i+=1)
-				if(str2num(dacvalstr[i][1]) != str2num(oldvalue[i][1]))
+				if(str2num(dacvalstr[i][1]) != str2num(old_dacvalstr[i][1]))
 					output = str2num(dacvalstr[i][1])
 					check = rampOutputBD(bd_window_resource, i,output)
 					if(check == 1)
-						oldvalue[i][1] = dacvalstr[i][1]
+						old_dacvalstr[i][1] = dacvalstr[i][1]
 					else
-						dacvalstr[i][1] = oldvalue[i][1]
+						dacvalstr[i][1] = old_dacvalstr[i][1]
 					endif
 				endif
 			endfor
@@ -1042,7 +1044,7 @@ function update_BabyDAC(action) : ButtonControl
 			for(i=0;i<16;i+=1)
 				check = RampOutputBD(bd_window_resource, i, 0)
 				if(check==1)
-					oldvalue[i][1] = dacvalstr[i][1]
+					old_dacvalstr[i][1] = dacvalstr[i][1]
 				endif
 			endfor
 			break
