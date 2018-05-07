@@ -30,7 +30,7 @@ end
 //// Get functions ////
 ///////////////////////
 
-threadsafe function getK2400current_async(instrID) // Units: nA
+threadsafe function getK2400current(instrID) // Units: nA
 	variable instrID
 	string response
 
@@ -38,7 +38,7 @@ threadsafe function getK2400current_async(instrID) // Units: nA
 	return str2num(response)*1e9
 end
 
-threadsafe function getK2400voltage_async(instrID) // Units: mV
+threadsafe function getK2400voltage(instrID) // Units: mV
 	variable instrID
 	string response
 
@@ -59,7 +59,7 @@ function rampK2400Voltage(instrID,output,[ramprate]) // Units: mV, mV/s
 		ramprate = 500  // mV/s
 	endif
 
-	startpoint = getK2400voltage_async(instrID)
+	startpoint = getK2400voltage(instrID)
 	sgn = sign(output-startpoint)
 
 	step = ramprate*sleeptime
@@ -78,7 +78,7 @@ function rampK2400Voltage(instrID,output,[ramprate]) // Units: mV, mV/s
 	setK2400voltage(instrID,output) // Set final value
 end
 
-function rampK2400current(instrID,output,[ramprate]) // Units: nA
+function rampK2400current(instrID, output,[ramprate]) // Units: nA
 	variable output, instrID, ramprate
 	variable startpoint, sgn, step, new_output
 	variable sleeptime = 0.01 //s
@@ -87,7 +87,7 @@ function rampK2400current(instrID,output,[ramprate]) // Units: nA
 		ramprate = 1  // nA/s
 	endif
 
-	startpoint = getK2400current_async(instrID)
+	startpoint = getK2400current(instrID)
 	sgn = sign(output-startpoint)
 
 	step = ramprate*sleeptime
@@ -110,8 +110,8 @@ end
 //// Utility ////
 ////////////////
 
-function setK2400compl(instrID,voltcurr,compl) // Pass "volt" or "curr", the value and the device instID
-	variable instrID 
+function setK2400compl(instrID, voltcurr, compl) // Pass "volt" or "curr", the value and the device instID
+	variable instrID
 	string voltcurr
 	variable compl
 	string cmd
@@ -132,7 +132,7 @@ function setK2400compl(instrID,voltcurr,compl) // Pass "volt" or "curr", the val
 end
 
 function setK2400range(instrID,voltcurr,range)
-	variable instrID 
+	variable instrID
 	string voltcurr
 	variable range
 	string cmd

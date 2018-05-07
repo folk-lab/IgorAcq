@@ -16,10 +16,10 @@ function bdCommSetup(instrID)
 
 	variable instrID
 
-	visaSetBaudRate(instrID, 57600)
-    visaSetDataBits(instrID, 8)
-    visaSetStopBits(instrID, 10)
-    visaSetParity(instrID, 0)
+  visaSetBaudRate(instrID, 57600)
+  visaSetDataBits(instrID, 8)
+  visaSetStopBits(instrID, 10)
+  visaSetParity(instrID, 0)
 
 end
 
@@ -42,11 +42,10 @@ function InitBabyDACs(instrID, boards, ranges, [custom])
 	// if all boards have the same range, you can pass just one number
 	// otherwise number of boards must equal number of ranges given
 
-    variable instrID, custom
+  variable instrID, custom
 	string boards, ranges
 	string /g bd_controller_addr = getResourceAddress(instrID) // for use by window functions
 	variable /g bd_ramprate = 200 // default ramprate
-    string /g bd_controller_addr = getResourceAddress(instrID) // for use by window functions
 
 	if(paramisdefault(custom))
 		custom = 0
@@ -235,7 +234,7 @@ function bdCheckForOldInit(custom)
 	variable response
 	nvar bd_num_custom
 
-	if(waveexists(dacvalstr) && waveexists(oldvalue))
+	if(waveexists(dacvalstr) && waveexists(old_dacvalstr))
 		response = bdInitAskUser()
 		if(response == 1)
 			// Init at old values
@@ -365,7 +364,7 @@ function bdInitZeros()
 
 	// Init all channels to 0V.
 	make/t/o dacvalstr = {{"0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15"},{"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}, {"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}}
-	make/t/o oldvalue = {{"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}}
+	make/t/o old_dacvalstr = {{"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}}
 
 	// setup software limit
 	variable i = 0, board_index = 0
@@ -382,12 +381,12 @@ function bdInitAskUser()
 	wave/t dacvalstr=dacvalstr
 	variable/g bd_answer
 	make /o attinitlist = {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}}
-	make /o/t/n=16 oldinit
-	make /o/t/n=16 defaultinit = {"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}
+	make /o/t/n=16 old_dacinit
+	make /o/t/n=16 default_dacinit = {"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}
 	make /o/t/n=(16,2) initwave
-	oldinit = dacvalstr[p][1]
-	initwave[0,15][1] = defaultinit[p]
-	initwave[0,15][0] = oldinit[p]
+	old_dacinit = dacvalstr[p][1]
+	initwave[0,15][1] = default_dacinit[p]
+	initwave[0,15][0] = old_dacinit[p]
 	execute("bdInitWindow()")
 	PauseForUser bdInitWindow
 	return bd_answer
@@ -425,48 +424,63 @@ end
 //// UTILITY ////
 /////////////////
 
-threadsafe function /s readBytesBD(instrID, bytes)
-	// creates a wave of 8 bit integers with a given number of bytes 
-	//    access this wave as bd_response_wave
-	//    returns number of waves read, if successful
-	//    returns "NaN" on read error (prints message as well)"
-	variable instrID, bytes // number of bytes to read
+threadsafe function writeBytesBD(instrID, cmd_wave)
+	variable instrID
+	wave cmd_wave
 
-	// read serial port here
-	make /O/B/U/N=(bytes) bd_response_wave
-	VISAReadBinaryWave /Q /TYPE=0x8 instrID, bd_response_wave
+	variable return_count, status = 0, i=0
+	for(i=0;i<numpnts(cmd_wave);i+=1)
+		viWrite( instrID, num2char(cmd_wave[i], 1), 1, return_count)
+		if (status)
+			VISAerrormsg("writeBytesBD -- viWrite:", instrID, status)
+			return NaN // abort not supported in threads (v7)
+		endif
+	endfor
 
-	if (V_flag==0)
-		VISAerrormsg("readBytesBD --", instrID, V_status)
-		return "NaN" // abort not supported in threads (v7)
-	endif
-
-	return num2str(V_flag)
 end
 
 threadsafe function readSingleByteBD(instrID)
 	// reads a single byte from the BD buffer
-	//    access this wave as bd_response_wave
-	//    returns number of waves read, if successful
-	//    returns "NaN" on read error (prints message as well)"
+	// returns an 8 bit integer
 	variable instrID
-	variable byte
 
 	// read serial port here
-	VISAReadBinary /Q /TYPE=0x8 instrID, byte
+	variable return_count = 0
+	string buffer = ""
+	variable status = viRead(instrID , buffer , 1 , return_count )
 
-	if (V_flag==0)
-		VISAerrormsg("readSingleByteBD --", instrID, V_status)
+	if (status==1073676294)
+		// do nothing
+	elseif(status>0)
+		VISAerrormsg("readSingleByteBD --", instrID, status)
 		return NaN // abort not supported in threads (v7)
 	endif
 
-	return byte
+	return char2num(buffer)
+end
+
+threadsafe function /WAVE readBytesBD(instrID, nBytes)
+	// creates a wave of 8 bit integers with a given number of bytes
+	//    access this wave as bd_response_wave
+	//    returns number of waves read, if successful
+	//    returns NaN on read error (prints message as well)"
+	variable instrID, nBytes // number of bytes to read
+
+	// read serial port here
+	make /O/B/U/N=(nBytes) /FREE response_wave
+	variable i=0
+	for(i=0;i<nBytes;i+=1)
+		response_wave[i] = readSingleByteBD(instrID)
+	endfor
+	
+	return response_wave
+
 end
 
 function clearBufferBD(instrID)
 	// read the full output buffer
-	// ends on timeout 
-	//    so it will have a delay equal to VI_ATTR_TMO_VALUE 
+	// ends on timeout
+	//    so it will have a delay equal to VI_ATTR_TMO_VALUE
 	variable instrID
 	variable byte // not sure why this needs to be global
 
@@ -538,10 +552,10 @@ function resetStartupVoltageBD(instrID, board_number, range)
 		make/o bd_cmd_wave={id_byte, command_byte, data_byte_1, data_byte_2, data_byte_3, parity_byte, 0}
 
 		// send command to DAC
-		execute "VDTWriteBinaryWave2 /O=10 bd_cmd_wave"
+		writeBytesBD(instrID, bd_cmd_wave)
 
 		// read the response from the buffer
-		ReadBytesBD(instrID, 7)
+		wave response_wave_1 = ReadBytesBD(instrID, 7)
 		sc_sleep(0.3)
 	endfor
 
@@ -554,7 +568,7 @@ function resetStartupVoltageBD(instrID, board_number, range)
 	execute "VDTWriteBinaryWave2 /O=10 bd_cmd_wave"
 
 	// read the response from the buffer
-	print ReadBytesBD(instrID, 4)
+	wave response_wave_2 = ReadBytesBD(instrID, 4)
 
 	sc_sleep(0.3)
 end
@@ -578,7 +592,7 @@ function setOutputBD(instrID, channel, output) // in mV
 	variable instrID, channel, output
 	wave bd_boardnumbers=bd_boardnumbers
 	wave/t dacvalstr=dacvalstr
-	wave/t oldvalue=oldvalue
+	wave/t old_dacvalstr=old_dacvalstr
 	wave bd_range_span, bd_range_high, bd_range_low
 	variable board_index, board, board_channel, setpoint, sw_limit
 
@@ -625,26 +639,26 @@ function setOutputBD(instrID, channel, output) // in mV
 	parity_byte=alt_id_byte%^command_byte%^data_byte_1%^data_byte_2%^data_byte_3 // XOR all previous bytes
 
 	make/o bd_cmd_wave={id_byte, command_byte, data_byte_1, data_byte_2, data_byte_3, parity_byte, 0}
+	writeBytesBD(instrID, bd_cmd_wave)
 
-	// send command to DAC
-	VISAWriteBinaryWave /TYPE=0x8 instrID, bd_cmd_wave
+	wave response_wave = readBytesBD(instrID, 7)
 
 	// Update stored values
 	dacvalstr[channel][1] = num2str(output)
-	oldvalue[channel][1] = num2str(output)
+	old_dacvalstr[channel][1] = num2str(output)
 	return 1
 end
 
 function RampOutputBD(instrID, channel, output, [ramprate, update])
 	variable instrID, channel, output,ramprate, update // output is in mV, ramprate in mV/s
 	wave/t dacvalstr=dacvalstr
-	wave /t oldvalue=oldvalue
+	wave /t old_dacvalstr=old_dacvalstr
 	variable voltage, sgn, step
 	variable sleeptime // seconds per ramp cycle (must be at least 0.002)
 
 
 	// calculate step direction
-	voltage = str2num(oldvalue[channel][1])
+	voltage = str2num(old_dacvalstr[channel][1])
 	sgn = sign(output-voltage)
 
 	if(paramisdefault(update))
@@ -708,7 +722,7 @@ function UpdateMultipleBD(instrID, [action, ramprate, update])
 	string action // "set" or "ramp"
 	variable ramprate, update
 	wave/t dacvalstr=dacvalstr
-	wave/t oldvalue=oldvalue
+	wave/t old_dacvalstr=old_dacvalstr
 	variable output,i
 	variable check = nan
 
@@ -726,7 +740,7 @@ function UpdateMultipleBD(instrID, [action, ramprate, update])
 	endif
 
 	for(i=0;i<16;i+=1)
-		if(str2num(dacvalstr[i][1]) != str2num(oldvalue[i][1]))
+		if(str2num(dacvalstr[i][1]) != str2num(old_dacvalstr[i][1]))
 			output = str2num(dacvalstr[i][1])
 			strswitch(action)
 				case "set":
@@ -735,9 +749,9 @@ function UpdateMultipleBD(instrID, [action, ramprate, update])
 					check = rampOutputBD(instrID, i,output,ramprate=ramprate, update=update)
 			endswitch
 			if(check == 1)
-				oldvalue[i][1] = dacvalstr[i][1]
+				old_dacvalstr[i][1] = dacvalstr[i][1]
 			else
-				dacvalstr[i][1] = oldvalue[i][1]
+				dacvalstr[i][1] = old_dacvalstr[i][1]
 			endif
 		endif
 	endfor
@@ -870,11 +884,11 @@ end
 ///// ACD readings /////
 ////////////////////////
 
-function bdReading2Voltage(byte1, byte2, byte3)
+threadsafe function bdReading2Voltage(byte1, byte2, byte3)
 	variable byte1, byte2, byte3
-	variable int_reading, frac, volts 
-	variable /g bd_adc_low=-2500, bd_adc_high=2500
-	
+	variable int_reading, frac, volts
+	variable bd_adc_low=-2500, bd_adc_high=2500
+
 	int_reading = byte1 * 2^14 + byte2 * 2^7 + byte3
 
     frac = int_reading/(2^21-1)
@@ -882,8 +896,8 @@ function bdReading2Voltage(byte1, byte2, byte3)
     return volts
 end
 
-function ReadBDadc(instrID, channel, board_number)
-	// you can only get a new reading here once every ~300ms 
+threadsafe function ReadBDadc(instrID, channel, board_number)
+	// you can only get a new reading here once every ~300ms
 	// adc channels are indexed starting at 1 (unlike dac channels)
 	// this function will return data anytime it is called
 	//     it will return NEW data once every 300ms
@@ -891,21 +905,13 @@ function ReadBDadc(instrID, channel, board_number)
 	variable channel_bit
 	variable reading
 
-	// check if board is initialized
-	wave bd_boardnumbers
-	FindValue /V=(board_number) bd_boardnumbers
-	if(V_value==-1)
-		string err
-		sprintf err, "BabyDAC %d is not connected", board_number
-		abort err
-	endif
-
 	if(channel==1)
 		channel_bit = 0
 	elseif(channel==2)
 		channel_bit = 2
 	else
-		abort "pick a valid input channel, 1 or 2"
+		print "[WARNING] Not a valid BD ADC input channel, 1 or 2"
+		return NaN
 	endif
 
 	// build  command
@@ -913,27 +919,23 @@ function ReadBDadc(instrID, channel, board_number)
 	variable data_byte_1, data_byte_2, data_byte_3
 	wave bd_response_wave=bd_response_wave
 
-	id_byte = 0xc0+board_number // 11{gggggg}, g = board number
-	alt_id_byte = 0x40+board_number // id_byte with MSB = 0
+//	alt_id_byte = 0x40+board_number // alt_id_byte = id_byte with MSB = 0
 
-	command_byte = 0x60+(channel_bit) // 011000{h}0, h=0 for channel 1, 1 for channel 2
-
-	data_byte_1 = 0 // 00{aaaaaa}, a = most significant 6 bits
-	data_byte_2 = 0 // 0{bbbbbbb}, b = middle 7 bits
-	data_byte_3 = 0 // 0{ccccccc}, c = least significant 7 bits
-
+	id_byte = 0xc0+board_number // id_byte 11{gggggg}, g = board number
+	command_byte = 0x60+(channel_bit) // command byte 011000{h}0, h=0 for channel 1, 1 for channel 2
+	data_byte_1 = 0 // first data_byte 00{aaaaaa}, a = most significant 6 bits
+	data_byte_2 = 0 // second data_byte 0{bbbbbbb}, b = middle 7 bits
+	data_byte_3 = 0 // third data_byte 0{ccccccc}, c = least significant 7 bits
 	parity_byte=alt_id_byte%^command_byte%^data_byte_1%^data_byte_2%^data_byte_3 // XOR all previous bytes
 
 	make/o bd_cmd_wave={id_byte, command_byte, data_byte_1, data_byte_2, data_byte_3, parity_byte, 0}
+	writeBytesBD(instrID, bd_cmd_wave)
 
-	// send command to babydac
-	VISAWriteBinaryWave /TYPE=0x8 instrID, bd_cmd_wave
-	
 	// read response
 	variable response
 	do
 		response = ReadSingleByteBD(instrID) // reads into bd_response_wave
-		if(response==bd_cmd_wave[1])
+		if(response==command_byte)
 			// this is the command byte
 			// the next three bytes represent the adc reading
 			break
@@ -942,11 +944,9 @@ function ReadBDadc(instrID, channel, board_number)
 			return NaN
 		endif
 	while(1)
-
-	variable byte1, byte2, byte3
-	VISAReadBinary /Q /TYPE=0x8 instrID, byte1, byte2, byte3
 	
-	reading = bdReading2Voltage(byte1, byte2, byte3)
+	wave response_wave = ReadBytesBD(instrID, 5)
+	reading = bdReading2Voltage(response_wave[0], response_wave[1], response_wave[2])
 
 	return reading
 end
@@ -968,19 +968,19 @@ Window bdInitWindow() : Panel
 	DrawText 170,80,"Default"
 	ListBox initlist,pos={10,90},size={280,390},fsize=16,frame=2
 	ListBox initlist,fStyle=1,listWave=root:initwave,selWave=root:attinitlist,mode= 0
-	Button oldinit,pos={40,490},size={70,20},proc=bdAskUserUpdate,title="OLD INIT"
-	Button defaultinit,pos={170,490},size={70,20},proc=bdAskUserUpdate,title="DEFAULT"
+	Button old_dacinit,pos={40,490},size={70,20},proc=bdAskUserUpdate,title="OLD INIT"
+	Button default_dacinit,pos={170,490},size={70,20},proc=bdAskUserUpdate,title="DEFAULT"
 EndMacro
 
 function bdAskUserUpdate(action) : ButtonControl
 	string action
 	variable/g bd_answer
 	strswitch(action)
-		case "oldinit":
+		case "old_dacinit":
 			bd_answer = 1
 			dowindow/k bdInitWindow
 			break
-		case "defaultinit":
+		case "default_dacinit":
 			bd_answer = -1
 			dowindow/k bdInitWindow
 			break
@@ -1009,7 +1009,7 @@ endMacro
 function update_BabyDAC(action) : ButtonControl
 	string action
 	wave/t dacvalstr=dacvalstr
-	wave/t oldvalue=oldvalue
+	wave/t old_dacvalstr=old_dacvalstr
 	variable output,i
 	variable check = nan
 	nvar bd_num_custom
@@ -1029,13 +1029,13 @@ function update_BabyDAC(action) : ButtonControl
 	strswitch(action)
 		case "ramp":
 			for(i=0;i<16;i+=1)
-				if(str2num(dacvalstr[i][1]) != str2num(oldvalue[i][1]))
+				if(str2num(dacvalstr[i][1]) != str2num(old_dacvalstr[i][1]))
 					output = str2num(dacvalstr[i][1])
 					check = rampOutputBD(bd_window_resource, i,output)
 					if(check == 1)
-						oldvalue[i][1] = dacvalstr[i][1]
+						old_dacvalstr[i][1] = dacvalstr[i][1]
 					else
-						dacvalstr[i][1] = oldvalue[i][1]
+						dacvalstr[i][1] = old_dacvalstr[i][1]
 					endif
 				endif
 			endfor
@@ -1044,18 +1044,18 @@ function update_BabyDAC(action) : ButtonControl
 			for(i=0;i<16;i+=1)
 				check = RampOutputBD(bd_window_resource, i, 0)
 				if(check==1)
-					oldvalue[i][1] = dacvalstr[i][1]
+					old_dacvalstr[i][1] = dacvalstr[i][1]
 				endif
 			endfor
 			break
 	endswitch
-	
+
 	viClose(bd_window_resource) // close VISA resource
-	
+
 	if(bd_num_custom > 0)
 		bdCalcCustomValues()
 	endif
-	
+
 end
 
 window CustomDACWindow() : Panel
@@ -1098,6 +1098,7 @@ function update_BabyDAC_custom(action) : ButtonControl
     endif
     openInstr("bd_window_resource", bd_controller_addr, localRM=localRM, verbose=0)
     nvar bd_window_resource
+    bdCommSetup(bd_window_resource)
 
 	for(i=0;i<bd_num_custom;i=i+1)
 		if(str2num(customdacvalstr[i][1]) != oldcustom[i])
@@ -1107,9 +1108,9 @@ function update_BabyDAC_custom(action) : ButtonControl
 			oldcustom[i] = str2num(customdacvalstr[i][1])
 		endif
 	endfor
-	
+
 	viClose(bd_window_resource) // close VISA resource
-	
+
 end
 
 function calcvectors(action) : ButtonControl

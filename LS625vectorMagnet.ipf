@@ -13,7 +13,7 @@
 
 function ls625CommSetup(instrID)
 	variable instrID
-	
+
 	// setup communication attr
 	visaSetBaudRate(instrID, 57600) // baud rate
 	visaSetStopBits(instrID, 10) // 1 stop bit
@@ -28,19 +28,19 @@ end
 function initLS625Vector(instrIDx,instrIDy,instrIDz)
 	// wrapper function for initLS625(instrID)
 	variable instrIDx, instrIDy, instrIDz
-	
+
 	// local copies of the serial port addresses
 	string/g instrDescX = getResourceAddress(instrIDx)
 	string/g instrDescY = getResourceAddress(instrIDy)
 	string/g instrDescZ = getResourceAddress(instrIDz)
-	
+
 	// create string constants for use in get/set functions
 	execute("L625StrConst()")
-	
+
 	variable/g ampsperteslax=55.49, ampsperteslay=55.22, ampsperteslaz=9.950// A/T
 	variable/g maxfieldx=1000, maxfieldy=1000, maxfieldz=6000 // mT
 	variable/g maxrampratex=300, maxrampratey=300, maxrampratez=300 // mT/min
-	
+
 	// Setup variables and waves needed for the control window.
 	// Add control window stuff here.
 	make/t/o outputvalstr={{"X [mT]:","Y [mT]:","Z [mT]:"},{"0","0","0"}}
@@ -53,17 +53,17 @@ function initLS625Vector(instrIDx,instrIDy,instrIDz)
 	make/o listboxattr_sphericallist={{0,0,0},{0,0,0}}
 	string/g oldsweepratex,oldsweepratey,oldsweepratez
 	string/g oldsetpointx="0",oldsetpointy="0",oldsetpointz="0"
-	
+
 	// Setting up serial communication
 	ls625CommSetup(instrIDx)
 	ls625CommSetup(instrIDy)
 	ls625CommSetup(instrIDz)
-	
+
 	// Set sweep rates, unit: mT/s
 	setLS625rate(instrIDx,100)
 	setLS625rate(instrIDy,100)
 	setLS625rate(instrIDz,100)
-	
+
 	// Start GUI
 	dowindow/k Vector_Window
 	execute("Vector_Window()")
@@ -71,7 +71,7 @@ end
 
 macro L625StrConst()
 	svar instrDescX,instrDescY,instrDescZ
-	
+
 	// create string constants for use in get/set functions
 	StrConstant strX=instrDescX
 	StrConstant strY=instrDescX
@@ -89,11 +89,11 @@ function getLS625current(instrID) // Units: A
 	wave sphericalcoordinates
 	variable current,field, ampspertesla
 	svar instrDescX,instrDescY,instrDescZ
-	
+
 	string l625 = getResourceAddress(instrID)
-	
+
 	current = str2num(queryInstr(instrID,"RDGI?\r\n", read_term = "\r\n"))
-	
+
 	// Update control window
 	strswitch(l625)
 		case strX:
@@ -113,7 +113,7 @@ function getLS625current(instrID) // Units: A
 	sphericalvalstr[0][1] = num2str(sphericalcoordinates[0])
 	sphericalvalstr[1][1] = num2str(sphericalcoordinates[1])
 	sphericalvalstr[2][1] = num2str(sphericalcoordinates[2])
-	
+
 	return current
 end
 
@@ -121,7 +121,7 @@ function getL625allcurrent(instrIDx,instrIDy,instrIDz) // Units: A
 	variable instrIDx,instrIDy,instrIDz
 	nvar ampsperteslax, ampsperteslay, ampsperteslaz
 	make/o/n=3 currentwave
-	
+
 	currentwave[0] = getLS625current(instrIDx)
 	currentwave[1] = getLS625current(instrIDy)
 	currentwave[2] = getLS625current(instrIDz)
@@ -133,9 +133,9 @@ function getLS625field(instrID) // Units: mT
 	variable field, current
 	wave/t outputvalstr
 	svar instrDescX,instrDescY,instrDescZ
-	
+
 	string l625 = getResourceAddress(instrID)
-	
+
 	current = getLS625current(instrID)
 	// Update control window
 	strswitch(l625)
@@ -154,14 +154,14 @@ function getLS625field(instrID) // Units: mT
 		default:
 			abort "Couldn't determine which axis to address"
 	endswitch
-	
+
 	return field
 end
 
 function getL625allfield(instrIDx,instrIDy,instrIDz) // Units: mT
 	variable instrIDx,instrIDy,instrIDz
 	make/n=3/o fieldwave
-	
+
 	fieldwave[0] = getLS625field(instrIDx)
 	fieldwave[1] = getLS625field(instrIDy)
 	fieldwave[2] = getLS625field(instrIDz)
@@ -172,9 +172,9 @@ function getLS625rate(instrID) // Units: mT/min
 	nvar ampsperteslax,ampsperteslay,ampsperteslaz
 	wave/t sweepratevalstr
 	variable rampratefield, currentramprate
-	
+
 	string l625 = getResourceAddress(instrID)
-	
+
 	currentramprate = str2num(queryInstr(instrID,"RATE?\r\n", read_term = "\r\n")) // A/s
 	// Update control window
 	strswitch(l625)
@@ -193,14 +193,14 @@ function getLS625rate(instrID) // Units: mT/min
 		default:
 			abort "Couldn't determine which axis to address"
 	endswitch
-	
+
 	return rampratefield
 end
 
 function getLS625allrate(instrIDx,instrIDy,instrIDz)
 	variable instrIDx,instrIDy,instrIDz
 	make/o/n=3 sweepratewave
-	
+
 	sweepratewave[0] = getLS625rate(instrIDx)
 	sweepratewave[1] = getLS625rate(instrIDy)
 	sweepratewave[2] = getLS625rate(instrIDz)
@@ -216,9 +216,9 @@ function setLS625current(instrID,output) // Units: A
 	wave/t setpointvalstr
 	nvar maxfieldx,maxfieldy,maxfieldz,ampsperteslax,ampsperteslay,ampsperteslaz
 	variable maxfield,ampspertesla,i=-1
-	
+
 	string l625 = getResourceAddress(instrID)
-	
+
 	strswitch(l625)
 		case strX:
 			maxfield = maxfieldx
@@ -238,10 +238,10 @@ function setLS625current(instrID,output) // Units: A
 		default:
 			abort "Couldn't determine which axis to address"
 	endswitch
-	
+
 	if (abs(output) > maxfield*ampspertesla/1000)
 		print "Max current is "+num2str(maxfield*ampspertesla/1000)+" A"
-	else	
+	else
 		cmd = "SETI "+num2str(output)
 		writeInstr(instrID, cmd+"\r\n")
 		setpointvalstr[i][1] = num2str(Round_Number(output/ampspertesla*1000,5))
@@ -254,9 +254,9 @@ function setLS625field(instrID,output) // Units: mT
 	variable round_amps
 	string cmd
 	variable maxfield,ampspertesla,i=0
-	
+
 	string l625 = getResourceAddress(instrID)
-	
+
 	strswitch(l625)
 		case strX:
 			maxfield = maxfieldx
@@ -276,7 +276,7 @@ function setLS625field(instrID,output) // Units: mT
 		default:
 			abort "Couldn't determine which axis to address"
 	endswitch
-	
+
 	if (abs(output) > maxfield)
 		print "Max field is "+num2str(maxfield)+" mT"
 		return -i
@@ -289,7 +289,7 @@ end
 
 function setLS625fieldwait(instrID,output)
 	variable instrID, output
-	
+
 	setLS625field(instrID,output)
 	do
 		sc_sleep(0.1)
@@ -304,9 +304,9 @@ function setLS625rate(instrID,output) // Units: mT/min
 	variable ramprate_amps
 	string cmd
 	variable maxramprate,ampspertesla,i=0,j=-1
-	
+
 	string l625 = getResourceAddress(instrID)
-	
+
 	strswitch(l625)
 		case strX:
 			maxramprate = maxrampratex
@@ -329,7 +329,7 @@ function setLS625rate(instrID,output) // Units: mT/min
 		default:
 			abort "Couldn't determine which axis to address"
 	endswitch
-	
+
 	if (output < 0 || output > maxramprate)
 		print "Max sweep rate is "+num2str(maxramprate)+" mT/min"
 		return -i
@@ -345,7 +345,7 @@ end
 function setLS625allrate(instrIDx,instrIDy,instrIDz,outputx,outputy,outputz) // Units: mT/min
 	variable instrIDx,instrIDy,instrIDz,outputx,outputy,outputz
 	variable checkx, checky, checkz
-	
+
 	checkx = setLS625rate(instrIDx,outputx)
 	checky = setLS625rate(instrIDy,outputy)
 	checkz = setLS625rate(instrIDz,outputz)
@@ -354,7 +354,7 @@ end
 
 function setLS625allcurrent(instrIDx,instrIDy,instrIDz,outputx,outputy,outputz) // Units: A
 	variable instrIDx,instrIDy,instrIDz,outputx,outputy,outputz
-	
+
 	setLS625current(instrIDx,outputx)
 	setLS625current(instrIDy,outputy)
 	setLS625current(instrIDz,outputz)
@@ -363,18 +363,18 @@ end
 function setLS625allfield(instrIDx,instrIDy,instrIDz,outputx,outputy,outputz) // Units: mT
 	variable instrIDx,instrIDy,instrIDz,outputx,outputy,outputz
 	variable checkx,checky,checkz
-	
+
 	checkx = setLS625field(instrIDx,outputx)
 	checky = setLS625field(instrIDy,outputy)
 	checkz = setLS625field(instrIDz,outputz)
-	
+
 	return checkx+checky+checkz
 end
 
 function setLS625allfieldSpherical(instrIDx,instrIDy,instrIDz,r,theta,phi) // Units: mT,rad,rad
 	variable instrIDx,instrIDy,instrIDz,r,theta,phi
 	wave carcoordinates
-	
+
 	SphericalToCartisian(r,theta,phi)
 	setLS625allfield(instrIDx,instrIDy,instrIDz,carcoordinates[0],carcoordinates[1],carcoordinates[2])
 end
@@ -382,7 +382,7 @@ end
 function setLS625allfieldwait(instrIDx,instrIDy,instrIDz,outputx,outputy,outputz) // Units: mT
 	variable instrIDx,instrIDy,instrIDz,outputx,outputy,outputz
 	wave fieldwave
-	
+
 	setLS625allfield(instrIDx,instrIDy,instrIDz,outputx,outputy,outputz)
 	do
 		sc_sleep(0.1)
@@ -393,7 +393,7 @@ end
 function setLS625fieldAllsphericalWait(instrIDx,instrIDy,instrIDz,r,theta,phi) // Units: mT,rad,rad
 	variable instrIDx,instrIDy,instrIDz,r,theta,phi
 	wave carcoordinates
-	
+
 	SphericalToCartisian(r,theta,phi)
 	setLS625allfieldwait(instrIDx,instrIDy,instrIDz,carcoordinates[0],carcoordinates[1],carcoordinates[2])
 end
@@ -404,7 +404,7 @@ end
 
 function SphericalToCartisianTest(r,theta,phi)
 	variable r, theta, phi
-	
+
 	print("x= "+num2str(RoundtoZero(r*sin(theta)*cos(phi))))
 	print("y= "+num2str(RoundtoZero(r*sin(theta)*sin(phi))))
 	print("z= "+num2str(RoundtoZero(r*cos(theta))))
@@ -413,7 +413,7 @@ end
 function SphericalToCartisian(r,theta,phi)
 	variable r, theta, phi
 	make/n=3/o carcoordinates //wave holding x,y,z coordinates
-	
+
 	carcoordinates[0] = RoundtoZero(r*sin(theta)*cos(phi))
 	carcoordinates[1] = RoundtoZero(r*sin(theta)*sin(phi))
 	carcoordinates[2] = RoundtoZero(r*cos(theta))
@@ -438,7 +438,7 @@ end
 function CylindricalToCartisian(r,phi,z)
 	variable r, phi, z
 	make/n=3/o carcoordinates //wave holding x,y,z coordinates
-	
+
 	carcoordinates[0] = r*cos(phi)
 	carcoordinates[1] = r*sin(phi)
 	carcoordinates[2] = z
@@ -453,18 +453,18 @@ end
 
 function RoundtoZero(input)
 	variable input
-	
+
 	if(abs(input) < 1e-03)
 		input=0
 	endif
-	
+
 	return input
 end
 
 function TestCoordinateTransform(x,y,z)
 	variable x,y,z
 	wave carcoordinates,sphericalcoordinates
-	
+
 	CartisiantoSpherical(x,y,z)
 	SphericalToCartisian(sphericalcoordinates[0],sphericalcoordinates[1],sphericalcoordinates[2])
 	print carcoordinates[0],carcoordinates[1],carcoordinates[2]
@@ -474,14 +474,14 @@ function checkLS625ramp(instrID)
 	variable instrID
 	string response
 	variable ramping
-	
+
 	response = queryInstr(instrID,"OPST?\r\n",read_term = "\r\n")
 	if(str2num(response) == 6)
 		ramping = 0
 	else
 		ramping = 1
 	endif
-	
+
 	return ramping
 end
 
@@ -494,7 +494,7 @@ window Vector_Window() : Panel
 	NewPanel /W=(0,0,500,500) // window size
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
-	SetDrawEnv fsize= 25,fstyle= 1 
+	SetDrawEnv fsize= 25,fstyle= 1
 	DrawText 150, 45,"Vector Magnet" // Headline
 	DrawText 65,80,"\Z18Current Output"
 	DrawText 300,80,"\Z18Sweeprate"
@@ -515,12 +515,12 @@ function update_setpoint(action) : ButtonControl
 	wave/t setpointvalstr
 	svar oldsetpointx,oldsetpointy,oldsetpointz,instrDescX,instrDescY,instrDescZ
 	variable localInstrIDx,localInstrIDy,localInstrIDz
-	
+
 	// open local instr connections
 	localInstrIDx = openTempcommLS625(instrDescX)
 	localInstrIDy = openTempcommLS625(instrDescY)
 	localInstrIDz = openTempcommLS625(instrDescZ)
-	
+
 	check = setLS625allfield(localInstrIDx,localInstrIDy,localInstrIDz,str2num(setpointvalstr[0][1]),str2num(setpointvalstr[1][1]),str2num(setpointvalstr[2][1]))
 	if (check == 9)
 		oldsetpointx = setpointvalstr[0][1]
@@ -555,7 +555,7 @@ function update_setpoint(action) : ButtonControl
 		setpointvalstr[1][1] = oldsetpointy
 		setpointvalstr[2][1] = oldsetpointz
 	endif
-	
+
 	viClose(localInstrIDx)
 	viClose(localInstrIDy)
 	viClose(localInstrIDz)
@@ -567,12 +567,12 @@ function update_sweeprate(action) : ButtonControl
 	wave/t sweepratevalstr
 	svar oldsweepratex,oldsweepratey,oldsweepratez,instrDescX,instrDescY,instrDescZ
 	variable localInstrIDx,localInstrIDy,localInstrIDz
-	
+
 	// open local instr connections
 	localInstrIDx = openTempcommLS625(instrDescX)
 	localInstrIDy = openTempcommLS625(instrDescY)
 	localInstrIDz = openTempcommLS625(instrDescZ)
-	
+
 	check = setLS625allrate(localInstrIDx,localInstrIDy,localInstrIDz,str2num(sweepratevalstr[0][1]),str2num(sweepratevalstr[1][1]),str2num(sweepratevalstr[2][1]))
 	if (check == 9)
 		oldsweepratex = sweepratevalstr[0][1]
@@ -607,7 +607,7 @@ function update_sweeprate(action) : ButtonControl
 		sweepratevalstr[1][1] = oldsweepratey
 		sweepratevalstr[2][1] = oldsweepratez
 	endif
-	
+
 	viClose(localInstrIDx)
 	viClose(localInstrIDy)
 	viClose(localInstrIDz)
@@ -618,17 +618,17 @@ function update_everything(action) : ButtonControl
 	wave fieldwave
 	variable localInstrIDx,localInstrIDy,localInstrIDz
 	svar instrDescX,instrDescY,instrDescZ
-	
+
 	// open local instr connections
 	localInstrIDx = openTempcommLS625(instrDescX)
 	localInstrIDy = openTempcommLS625(instrDescY)
 	localInstrIDz = openTempcommLS625(instrDescZ)
-	
+
 	getL625allfield(localInstrIDx,localInstrIDy,localInstrIDz)
 	getLS625allrate(localInstrIDx,localInstrIDy,localInstrIDz)
 	CartisiantoSpherical(fieldwave[0],fieldwave[1],fieldwave[2])
 	update_output()
-	
+
 	viClose(localInstrIDx)
 	viClose(localInstrIDy)
 	viClose(localInstrIDz)
@@ -638,7 +638,7 @@ function update_output()
 	wave fieldwave,sweepratewave,sphericalcoordinates
 	wave/t outputvalstr,sweepratevalstr,sphericalvalstr
 	variable i=0
-	
+
 	for(i=0;i<3;i+=1)
 		outputvalstr[i][1] = num2str(fieldwave[i])
 		sphericalvalstr[i][1] = num2str(sphericalcoordinates[i])
@@ -650,7 +650,7 @@ function openTempcommLS625(instrDesc)
 	string instrDesc
 	variable status, localRM
 	string var_name="localhandle"
-	
+
 	status = viOpenDefaultRM(localRM) // open local copy of resource manager
     if(status < 0)
         VISAerrormsg("open LS625 connection:", localRM, status)
@@ -668,7 +668,7 @@ end
 function/s GetVectorStatus(instrIDx,instrIDy,instrIDz)
 	variable instrIDx,instrIDy,instrIDz
 	string buffer = "", subbuffer = ""
-	
+
 	subbuffer = ""
 	subbuffer = addJSONKeyVal(subbuffer, "x", numVal=getLS625field(instrIDx), fmtNum="%.3f")
 	subbuffer = addJSONKeyVal(subbuffer, "y", numVal=getLS625field(instrIDy), fmtNum="%.3f")
@@ -680,6 +680,6 @@ function/s GetVectorStatus(instrIDx,instrIDy,instrIDz)
 	subbuffer = addJSONKeyVal(subbuffer, "y", numVal=getLS625rate(instrIDy), fmtNum="%.1f")
 	subbuffer = addJSONKeyVal(subbuffer, "z", numVal=getLS625rate(instrIDz), fmtNum="%.1f")
 	buffer = addJSONKeyVal(buffer, "rate mT/min", strVal=subbuffer)
-	
+
 	return addJSONKeyVal("", "Vector Magnet", strVal=buffer)
 end

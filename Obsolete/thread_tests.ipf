@@ -98,7 +98,7 @@ function sc_StartActionThreads()
 
 	 	duplicatedatafolder root:connections, root:copy //duplicate connections folder
  		ThreadGroupPutDF threadGroupID, root:copy       //each thread gets a copy of entire device init
-                                                        // and will only access the init under its name
+                                                    // and will only access the init under its name
  		ThreadStart threadGroupID, i, sc_ActionWorker(threadGroupID, devices_name[i], devices_query[i]) // start thread
     endfor
 

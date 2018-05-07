@@ -12,11 +12,12 @@
 //			Therefore VDT and GPIB xop's should not be used anymore.
 //		-- "Request scripts" are removed from the scancontroller window. Its only use was
 //			 trying to do async communication (badly).
+//    -- Added Async checkbox in scancontroller window
 
 //TODO:
-// 	 -- add async functionallity support
-//   -- make async checkbox in scancontroller window
-//   -- add a new type of value to record that can/will be read during sc_sleep?
+//   -- figure out how to keep track of data coming back in from threads
+// 
+//   -- if requesting data from the same resource more than once, make them use the same thread
 
 
 //FIX:
@@ -771,16 +772,37 @@ function sc_findAsyncMeasurements()
 	wave /t sc_RawScripts
 	wave sc_RawRecord, sc_RawPlot, sc_measAsync
 	
-	variable i =0
+	// setup async folder
+	killdatafolder /z root:async // kill it if it exists
+	newdatafolder root:async // create an empty version
+	
+	variable i = 0, idx = 0
+	string script, strID, threadFolder
 	for(i=0;i<numpnts(sc_RawScripts);i+=1)
 	
 		if ( (sc_RawRecord[i] == 1) || (sc_RawPlot[i] == 1) )
 			// this is something that will be measured
 			
-			if (sc_measAsync[i] == 1)
-				// this is something that should be asyn
-				if(sc_checkAsyncScript(sc_RawScripts[i])!=-1)
-					sc_measAsync[i]=1 // this will be recorded asynchronously
+			if (sc_measAsync[i] == 1) // this is something that should be asyn
+				
+				script = sc_RawScripts[i]
+				idx = sc_checkAsyncScript(script) // check function format
+				
+				if(idx!=-1) // fucntion is good, this will be recorded asynchronously
+					sc_measAsync[i]=1 
+
+					// keep track of function names and instrIDs in folder structure
+					strID = script[idx+1,strlen(script)-2]
+					nvar instrID = $strID
+					
+					// creates root:async:instr1
+					threadFolder = "thread"+num2istr(i)
+					newdatafolder/o root:async:$(threadFolder) 
+					
+					variable /g root:async:$(threadFolder):instrID = instrID   // creates variable instrID in root:thread
+																              // that has the same value as $strID
+					string /g root:async:$(threadFolder):queryFunc = script[0,idx-1] // creates string variable queryFunc in root:async:thread
+															                                   // that has a value queryFunc="readInstr"
 				else
 					sc_measAsync[i]=0
 					printf "[WARNING] Async scripts must be formatted: \"readFunc(instrID)\"\r\t%s is no good and will be read synchronously,\r", sc_RawScripts[i]
@@ -799,13 +821,21 @@ function sc_findAsyncMeasurements()
 	endif
 		
 	// change state of check boxes based on what just happened here!
+	doupdate /W=ScanController
 	string cmd = ""
 	for(i=0;i<numpnts(sc_measAsync);i+=1)
 		cmd = "CheckBox sc_AsyncCheckBox" + num2istr(i) + " value=" + num2istr(sc_measAsync[i])
 		execute(cmd)
 	endfor
+	doupdate /W=ScanController
 	
-	return sum(sc_measAsync)
+	if(sum(sc_measAsync)==0)
+		KillDataFolder /Z root:async // don't need this
+		return 0
+	else
+		return sum(sc_measAsync)
+	endif
+	
 end
 
 function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_label])
@@ -857,11 +887,12 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	while (i<numpnts(sc_CalcWaveNames))
 	i=0
 
-	sc_findAsyncMeasurements() // update sc_isAsyncScript
+	sc_findAsyncMeasurements() 
+//	printf "Measuring %d values asynchronously\r", sc_findAsyncMeasurements() // update sc_isAsyncScript
 
-//	// connect VISA instruments
-//	// do this here, because if it fails
-//	// i don't want to delete any old data
+	// connect VISA instruments
+	// do this here, because if it fails
+	// i don't want to delete any old data
 	svar sc_instr_wave
 	wave /t instrWave = $sc_instr_wave
 	initVISAinstruments(instrWave, verbose=0)
@@ -1282,9 +1313,8 @@ function RecordValues(i, j, [readvstime, fillnan])
 	//// Setup and run async data collection ////
 	wave sc_measAsync
 	if( (sum(sc_measAsync) > 1) && (fillnan==0) )
-		variable tgID = sc_StartThreads() // start threads and run 1 function call per thread, returns the thread group id.
-		sc_CollectDataFromThreads(tgID,readvstime,innerindex,outerindex) // Retrive data from threads when they are done.
-		sc_KillThreads(tgID) // Terminate threads.
+		variable tgID = sc_ManageThreads(innerindex, outerindex, readvstime) // start threads, wait, collect data
+		sc_KillThreads(tgID) // Terminate threads
 	endif
 
 	//// Read sync data ( or fill NaN) ////
@@ -1355,105 +1385,101 @@ function RecordValues(i, j, [readvstime, fillnan])
 	sc_checksweepstate()
 end
 
-function sc_StartThreads()
-	wave sc_measAsync
-	wave /t sc_RawScripts
-	
-	variable numThreads = sum(sc_measAsync)
-	variable tgID = ThreadGroupCreate(numThreads) // open threads
+///////////////////////
+/// ASYNC handling ///
+//////////////////////
 
-	variable i=0, idx=0
+function sc_ManageThreads(innerIndex, outerIndex, readvstime)
+	variable innerIndex, outerIndex, readvstime
+	wave sc_measAsync, sc_RawRecord, sc_RawPlot
+	wave /t sc_RawScripts, sc_RawWaveNames, sc_asyncQueries, sc_asyncIDs
+	nvar sc_is2d, sc_scanstarttime
+	
+	variable numRequests = sum(sc_measAsync)
+	variable totalThreads = threadProcessorCount
+	
+	variable tgID = ThreadGroupCreate(min(numRequests, totalThreads)) // open threads
+
+	variable i=0, idx=0, measIndex=0, threadIndex = 0
 	string script, queryFunc, strID, threadFolder
-	variable iThread = 0
+
 	for(i=0; i<numpnts(sc_RawScripts); i+=1)
 	
-		if(sc_measAsync[i]==1)
-
-			script = sc_RawScripts[i]
-			idx = sc_checkAsyncScript(script)
-			queryFunc = script[0,idx-1]
-			strID = script[idx+1,strlen(script)-2]
-			
-			nvar instrID = $strID
-			
-			// going to use a new data folder structure
-			//     to keep track of function names and instrument ids
-			// comments below show an example
-			threadFolder = "thread"+num2str(iThread)
-			newdatafolder/o root:$(threadFolder)  // creates root:instr1
-			variable /g root:$(threadFolder):instrID = instrID   // creates variable instrID in root:thread0
-																      //     that has the same value as $strID
-			string /g root:$(threadFolder):queryFunc = queryFunc // creates string variable queryFunc in root:thread0
-															         //      that has a value queryFunc="readInstr"
-			
-			threadgroupputdf tgID, root:$(threadFolder) // move root:thread0 to where threadGroup can access it
-												           //     effectively kills root:thread0 folder in main thread
-												   
-			threadstart tgID, iThread, sc_Worker(threadFolder)  // start this thread
-			iThread+=1
-			
-		endif
+		if( ( (sc_RawRecord[i] == 1) || (sc_RawPlot[i] == 1) ) && (sc_measAsync[i]==1) )
 		
-	endfor
-
-	return tgID
-end
-
-threadsafe function sc_Worker(threadFolder)
-	string threadFolder
-	
-	DFREF dfr = ThreadGroupGetDFR(0,1000)
-	setdatafolder dfr
-	
-	nvar instrID = instrID
-	svar queryFunc = queryFunc
-
-	funcref funcAsync func = $queryFunc
-	return func(instrID)
-end
-
-threadsafe function funcAsync(instrID)  // Reference functions for all *_async functions
-	variable instrID                    // instrID used as only input to async functions
-end
-
-function sc_CollectDataFromThreads(tgID,readvstime,innerindex,outerindex)
-	variable tgID, readvstime, innerindex, outerindex
-	variable processflag, i=0, threaddata
-	wave/t sc_RawWaveNames
-	wave sc_measAsync
-	nvar sc_is2d, sc_scanstarttime
-
-	// wait for all threads to finish
-	do
-		processflag = ThreadGroupWait(tgID, 0)
-		sleep /s 0.001
-	while(processflag>0)
-	
-	variable iThread = 0
-	for(i=0; i<numpnts(sc_RawWaveNames); i+=1)
-	
-		if(sc_measAsync[i]==1)	
-	
-			wave wref1d = $sc_RawWaveNames[i]
-			threaddata = ThreadReturnValue(tgID, iThread)
-	
+			do
+				threadIndex = ThreadGroupWait(tgID, -2) // relying on this to keep track of index
+			while(threadIndex<1)
+			
+			duplicatedatafolder root:async, root:asyncCopy //duplicate async folder
+ 			ThreadGroupPutDF tgID, root:asyncCopy // move root:asyncCopy to where threadGroup can access it
+												     // effectively kills root:asyncCopy in main thread			     
+												                 
+			wave wref1d = $sc_RawWaveNames[i] // load 1d wave for data
+			
 			// Redimension waves if readvstime is set to 1
 			if (readvstime == 1)
 				redimension /n=(innerindex+1) wref1d
 				setscale/I x 0,  datetime - sc_scanstarttime, wref1d
 			endif
-	
-			wref1d[innerindex] = threaddata
-	
-			if (sc_is2d)
-				wave wref2d = $sc_RawWaveNames[i] + "2d"
-				wref2d[innerindex][outerindex] = wref1d[innerindex]
-			endif
-			iThread+=1
+			threadstart tgID, threadIndex-1, sc_Worker(wref1d, innerindex, i)  // start this thread
 			
 		endif
 		
 	endfor
+	
+	// wait for all threads to finish and get the rest of the data
+	do
+		threadIndex = ThreadGroupWait(tgID, 0)
+		sleep /s 0.001
+	while(threadIndex!=0)
+	
+	// if sc_is2d -- put results into 2d waves
+	if(sc_is2d)
+	
+		for(i=0; i<numpnts(sc_RawWaveNames); i+=1)
+		
+			wave wref1d = $sc_RawWaveNames[i]
+			
+			wave wref2d = $sc_RawWaveNames[i] + "2d"
+			wref2d[innerindex][outerindex] = wref1d[innerindex]
+			
+		endfor
+		
+	endif
+	
+	return tgID
+end
+
+threadsafe function sc_Worker(dataWave, innerindex, folderIndex)
+	wave dataWave
+	variable innerindex, folderIndex
+	
+	
+	do
+		DFREF dfr = ThreadGroupGetDFR(0,0)	// Get free data folder from input queue
+		if (DataFolderRefStatus(dfr) == 0)
+			continue
+		else
+			break
+		endif
+	while(1)
+	
+	setdatafolder dfr:$("thread"+num2istr(folderIndex))
+
+	nvar /z instrID = instrID
+	svar /z queryFunc = queryFunc
+	if(nvar_exists(instrID) && svar_exists(queryFunc))
+		funcref funcAsync func = $queryFunc
+		dataWave[innerindex] = func(instrID)
+	else
+		dataWave[innerindex] = NaN
+	endif
+	
+end
+
+threadsafe function funcAsync(instrID)  // Reference functions for all *_async functions
+	variable instrID                    // instrID used as only input to async functions
 end
 
 function sc_KillThreads(tgID)
@@ -1466,22 +1492,26 @@ function sc_KillThreads(tgID)
 	elseif(releaseResult == -1)
 		printf "ThreadGroupRelease failed. No fatal errors, will continue.\r"
 	endif
+	
 end
-
-
-
-
 
 function/s construct_calc_script(script)
 	// adds "[i]" to calculation scripts
 	string script
 	string test_wave
-	variable i=0, j=0, strpos
-	wave/t sc_RawWaveNames
-
-	for(i=0;i<numpnts(sc_RawWaveNames);i+=1)
+	variable i=0, j=0, strpos, numptsRaw, numptsCalc
+	wave/t sc_RawWaveNames, sc_CalcWaveNames
+	
+	numptsRaw = numpnts(sc_RawWaveNames)
+	numptsCalc = numpnts(sc_CalcWaveNames)
+	
+	for(i=0;i<numptsRaw+numptsCalc;i+=1)
 		j=0
-		test_wave = sc_RawWaveNames[i]
+		if(i<numptsRaw)
+			test_wave = sc_RawWaveNames[i]
+		else
+			test_wave = sc_CalcWaveNames[i-numptsRaw]
+		endif
 		do
 			strpos = strsearch(script,test_wave,j)
 			if(strpos >= 0 && cmpstr(script[strpos+strlen(test_wave)],"[")==0)
@@ -1492,6 +1522,7 @@ function/s construct_calc_script(script)
 			j=strpos+strlen(test_wave)
 		while(strpos >= 0)
 	endfor
+
 	return script
 end
 
@@ -1648,6 +1679,8 @@ function SaveWaves([msg, save_experiment])
 		logs = sc_LogStr
 	endif
 
+	KillDataFolder /Z root:async // clean this up for next time
+
 	// save timing variables
 	variable /g sweep_t_elapsed = datetime-sc_scanstarttime
 	printf "Time elapsed: %.2f s \r", sweep_t_elapsed
@@ -1721,10 +1754,10 @@ function SaveWaves([msg, save_experiment])
 		sc_NotifyServer() // this may leave the experiment file open for some time
 							   // make sure to run saveExp before this
 	else
-		sc_DeleteNotificationFile() // delete the last file list
 		sc_findNewFiles(filenum)    // get list of new files
-		                            // I assume you're testing something
-		                            //     and may want to keep track of the files another way
+		                            // keeps appending files until 
+		                            // qdot-server.notify is deleted
+		                            // or srv_push is turned on
 	endif
 
 	// close save files and increment filenum
@@ -2086,7 +2119,7 @@ end
 function /S getSlackNotice(username, [message, channel, botname, emoji, min_time])
 	// this function will send a notification to Slack
 	// username = your slack username
-
+	
 	// message = string to include in Slack message
 	// channel = slack channel to post the message in
 	//            if no channel is provided a DM will be sent to username
@@ -2099,7 +2132,7 @@ function /S getSlackNotice(username, [message, channel, botname, emoji, min_time
 	nvar filenum, sweep_t_elapsed, sc_abortsweep
 	svar slack_url
 	string txt="", buffer="", payload="", out=""
-
+	
 	//// check if I need a notification ////
 	if (paramisdefault(min_time))
 		min_time = 60.0 // seconds
@@ -2108,51 +2141,51 @@ function /S getSlackNotice(username, [message, channel, botname, emoji, min_time
 	if(sweep_t_elapsed < min_time)
 		return addJSONKeyVal(out, "notified", strVal="false") // no notification if min_time is not exceeded
 	endif
-
+	
 	if(sc_abortsweep)
 		return addJSONKeyVal(out, "notified", strVal="false") // no notification if sweep was aborted by the user
 	endif
-	//// end notification checks ////
-
-
+	//// end notification checks //// 
+	
+	
 	//// build notification text ////
-	if (!paramisdefault(channel))
+	if (!paramisdefault(channel)) 
 		// message will be sent to public channel
 		// user who sent it will be mentioned at the beginning of the message
-		txt += "<@"+username+">\r"
+		txt += "<@"+username+">\r" 
 	endif
-
+	
 	if (!paramisdefault(message) && strlen(message)>0)
 		txt += RemoveTrailingWhitespace(message) + "\r"
 	endif
-
-	sprintf buffer, "dat%d completed:  %s %s \r", filenum, Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); txt+=buffer
+		
+	sprintf buffer, "dat%d completed:  %s %s \r", filenum, Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); txt+=buffer 
 	sprintf buffer, "time elapsed:  %.2f s \r", sweep_t_elapsed; txt+=buffer
 	//// end build txt ////
-
-
+	
+	
 	//// build payload ////
-	sprintf buffer, "{\"text\": \"%s\"", txt; payload+=buffer //
-
+	sprintf buffer, "{\"text\": \"%s\"", txt; payload+=buffer // 
+	
 	if (paramisdefault(botname))
 		botname = "qdotbot"
-	endif
+	endif	
 	sprintf buffer, ", \"username\": \"%s\"", botname; payload+=buffer
-
+	
 	if (paramisdefault(channel))
 		sprintf buffer, ", \"channel\": \"@%s\"", username; payload+=buffer
 	else
 		sprintf buffer, ", \"channel\": \"#%s\"", channel; payload+=buffer
 	endif
-
+	
 	if (paramisdefault(emoji))
 		emoji = ":the_horns:"
-	endif
-	sprintf buffer, ", \"icon_emoji\": \"%s\"", emoji; payload+=buffer //
-
+	endif	
+	sprintf buffer, ", \"icon_emoji\": \"%s\"", emoji; payload+=buffer // 
+	
 	payload += "}"
 	//// end payload ////
-
+	
 	URLRequest /DSTR=payload url=slack_url, method=post
 	if (V_flag == 0)    // No error
         if (V_responseCode != 200)  // 200 is the HTTP OK code
