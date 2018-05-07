@@ -1,7 +1,7 @@
 #pragma rtGlobals=1		// Use modern global access method
 
 // Keithley 2400 driver
-// Initiate using Initeverything(). Use local init function for debugging!
+// Most be in 488.1 mode to function correctly!
 // Voltages are in mV and Currents in nA
 // By Christian Olsen, 2016-10-19
 // Async supprt added by Christian Olsen, May 2018

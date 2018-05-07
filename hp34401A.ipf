@@ -11,7 +11,7 @@
 ///// Init mode /////
 ////////////////////
 
-function  init34401Adcvolts(instrID, range, linecycles)
+function  setup34401Adcvolts(instrID, range, linecycles)
 	// setup dmm to take dc voltage readings
 	Variable instrID, range, linecycles
 	// Ranges: 0.1, 1, 10, 100, 1000V
@@ -110,7 +110,7 @@ end
 //// get functions ////
 ///////////////////////
 
-threadsafe function read34401A(instrID)
+threadsafe function read34401A_async(instrID)
 	Variable instrID
 	string response
 
