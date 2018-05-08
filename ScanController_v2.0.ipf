@@ -769,15 +769,15 @@ end
 						
 function sc_findAsyncMeasurements()
 
-	wave /t sc_RawScripts
+	wave /t sc_RawScripts, sc_RawWaveNames
 	wave sc_RawRecord, sc_RawPlot, sc_measAsync
 	
 	// setup async folder
 	killdatafolder /z root:async // kill it if it exists
 	newdatafolder root:async // create an empty version
 	
-	variable i = 0, idx = 0
-	string script, strID, threadFolder
+	variable i = 0, idx = 0, threadNum=0
+	string script, strID, queryFunc, threadFolder
 	for(i=0;i<numpnts(sc_RawScripts);i+=1)
 	
 		if ( (sc_RawRecord[i] == 1) || (sc_RawPlot[i] == 1) )
@@ -793,20 +793,34 @@ function sc_findAsyncMeasurements()
 
 					// keep track of function names and instrIDs in folder structure
 					strID = script[idx+1,strlen(script)-2]
-					nvar instrID = $strID
-					
+					queryFunc = script[0,idx-1] 
 					// creates root:async:instr1
-					threadFolder = "thread"+num2istr(i)
-					newdatafolder/o root:async:$(threadFolder) 
+					sprintf threadFolder, "thread_%s", strID
 					
-					variable /g root:async:$(threadFolder):instrID = instrID   // creates variable instrID in root:thread
-																              // that has the same value as $strID
-					string /g root:async:$(threadFolder):queryFunc = script[0,idx-1] // creates string variable queryFunc in root:async:thread
-															                                   // that has a value queryFunc="readInstr"
+					if(DataFolderExists("root:async:"+threadFolder))
+						// add measurements to the thread directory for this instrument
+						svar qF = root:async:$(threadFolder):queryFunc
+						qF += ";"+queryFunc
+						svar dW = root:async:$(threadFolder):dataWav
+						dW += ";"+sc_RawWaveNames[i]
+						
+					else
+						// create a new thread directory for this instrument
+						newdatafolder root:async:$(threadFolder)
+						nvar instrID = $strID
+						variable /g root:async:$(threadFolder):instrID = instrID   // creates variable instrID in root:thread
+																	                          // that has the same value as $strID
+						string /g root:async:$(threadFolder):dataWav = sc_RawWaveNames[i]
+						string /g root:async:$(threadFolder):queryFunc = queryFunc // creates string variable queryFunc in root:async:thread
+																                             // that has a value queryFunc="readInstr"
+						threadNum+=1
+					endif
 				else
+					// measurement script is formatted wrong
 					sc_measAsync[i]=0
 					printf "[WARNING] Async scripts must be formatted: \"readFunc(instrID)\"\r\t%s is no good and will be read synchronously,\r", sc_RawScripts[i]
 				endif
+				
 			endif
 		endif
 		
