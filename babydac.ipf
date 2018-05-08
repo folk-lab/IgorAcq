@@ -828,7 +828,7 @@ function UpdateCustom(channel,setpoint)
 	wave indexwavecustom // updated in ChannelLookUp()
 
 	moving_channel = stringfromlist(2,customdacvalstr[indexwavecustom[0]][2],";")
-	moving_channel = moving_channel[2]
+	moving_channel = moving_channel[2,inf]
 	scale_vec = stringfromlist(0,customdacvalstr[indexwavecustom[0]][2],";")
 	scale_vec = scale_vec[1,strlen(scale_vec)-2]
 	offset_vec = stringfromlist(1,customdacvalstr[indexwavecustom[0]][2],";")
