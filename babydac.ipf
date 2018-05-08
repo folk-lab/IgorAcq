@@ -549,26 +549,26 @@ function resetStartupVoltageBD(instrID, board_number, range)
 	for(i=0;i<4;i+=1)
 		command_byte = 0x40+i // 010000{hh}, h = channel number
 		parity_byte=alt_id_byte%^command_byte%^data_byte_1%^data_byte_2%^data_byte_3 // XOR all previous bytes
-		make/o bd_cmd_wave={id_byte, command_byte, data_byte_1, data_byte_2, data_byte_3, parity_byte, 0}
+		make/o /FREE w_cmd={id_byte, command_byte, data_byte_1, data_byte_2, data_byte_3, parity_byte, 0}
 
 		// send command to DAC
-		writeBytesBD(instrID, bd_cmd_wave)
+		writeBytesBD(instrID, w_cmd)
 
 		// read the response from the buffer
-		wave response_wave_1 = ReadBytesBD(instrID, 7)
+		wave response_wave_0 = ReadBytesBD(instrID, 7)
 		sc_sleep(0.3)
 	endfor
 
 	// backup settings to non-volatile memory
 	command_byte = 0x8 // 00001000
 	parity_byte=alt_id_byte%^command_byte // XOR all previous bytes
-	make/o bd_cmd_wave={id_byte, command_byte, parity_byte, 0}
+	make/o /FREE w_cmd={id_byte, command_byte, parity_byte, 0}
 
 	// send command to DAC
-	execute "VDTWriteBinaryWave2 /O=10 bd_cmd_wave"
+	writeBytesBD(instrID, w_cmd)
 
 	// read the response from the buffer
-	wave response_wave_2 = ReadBytesBD(instrID, 4)
+	wave response_wave_1 = ReadBytesBD(instrID, 4)
 
 	sc_sleep(0.3)
 end

@@ -815,7 +815,7 @@ function sc_findAsyncMeasurements()
 	if(sum(sc_measAsync)<2)
 		// no point in doing anyting async is only one instrument is capable of it
 		if(sum(sc_measAsync)==1)
-			print "[WARNING] Not using async for only one measurement. It is pointless."
+			print "[WARNING] Not using async for only one measurement. It will slow the measurement down."
 		endif
 		make /o/n=(numpnts(sc_RawScripts)) sc_measAsync = 0
 	endif
@@ -824,7 +824,7 @@ function sc_findAsyncMeasurements()
 	doupdate /W=ScanController
 	string cmd = ""
 	for(i=0;i<numpnts(sc_measAsync);i+=1)
-		cmd = "CheckBox sc_AsyncCheckBox" + num2istr(i) + " value=" + num2istr(sc_measAsync[i])
+		sprintf cmd, "CheckBox sc_AsyncCheckBox%d,win=ScanController,value=%d", i, sc_measAsync[i]
 		execute(cmd)
 	endfor
 	doupdate /W=ScanController
