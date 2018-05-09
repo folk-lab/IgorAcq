@@ -778,6 +778,8 @@ function sc_findAsyncMeasurements()
 	
 	variable i = 0, idx = 0, threadNum=0
 	string script, strID, queryFunc, threadFolder
+	string /g sc_asyncFolders = ""
+	
 	for(i=0;i<numpnts(sc_RawScripts);i+=1)
 	
 		if ( (sc_RawRecord[i] == 1) || (sc_RawPlot[i] == 1) )
@@ -807,12 +809,14 @@ function sc_findAsyncMeasurements()
 					else
 						// create a new thread directory for this instrument
 						newdatafolder root:async:$(threadFolder)
+						
 						nvar instrID = $strID
 						variable /g root:async:$(threadFolder):instrID = instrID   // creates variable instrID in root:thread
 																	                          // that has the same value as $strID
 						string /g root:async:$(threadFolder):dataWav = sc_RawWaveNames[i]
 						string /g root:async:$(threadFolder):queryFunc = queryFunc // creates string variable queryFunc in root:async:thread
 																                             // that has a value queryFunc="readInstr"
+						sc_asyncFolders += threadFolder + ";"
 						threadNum+=1
 					endif
 				else
@@ -844,10 +848,14 @@ function sc_findAsyncMeasurements()
 	doupdate /W=ScanController
 	
 	if(sum(sc_measAsync)==0)
+		sc_asyncFolders = ""
 		KillDataFolder /Z root:async // don't need this
 		return 0
 	else
-		return sum(sc_measAsync)
+		variable /g sc_numInstrThreads = ItemsInList(sc_asyncFolders, ";")
+		variable /g sc_numAvailThreads = threadProcessorCount
+		make /o/n=(2*sum(sc_measAsync)) /WAVE sc_asyncRefs
+		return sc_numInstrThreads
 	endif
 	
 end
@@ -1405,41 +1413,42 @@ end
 
 function sc_ManageThreads(innerIndex, outerIndex, readvstime)
 	variable innerIndex, outerIndex, readvstime
-	wave sc_measAsync, sc_RawRecord, sc_RawPlot
-	wave /t sc_RawScripts, sc_RawWaveNames, sc_asyncQueries, sc_asyncIDs
-	nvar sc_is2d, sc_scanstarttime
+	svar sc_asyncFolders
+	nvar sc_is2d, sc_scanstarttime, sc_numAvailThreads, sc_numInstrThreads
 	
-	variable numRequests = sum(sc_measAsync)
-	variable totalThreads = threadProcessorCount
-	
-	variable tgID = ThreadGroupCreate(min(numRequests, totalThreads)) // open threads
+	variable tgID = ThreadGroupCreate(min(sc_numInstrThreads, sc_numAvailThreads)) // open threads
 
 	variable i=0, idx=0, measIndex=0, threadIndex = 0
 	string script, queryFunc, strID, threadFolder
 
-	for(i=0; i<numpnts(sc_RawScripts); i+=1)
+	// start new thread for each thread_* folder in data folder structure
+	for(i=0;i<sc_numInstrThreads;i+=1)
 	
-		if( ( (sc_RawRecord[i] == 1) || (sc_RawPlot[i] == 1) ) && (sc_measAsync[i]==1) )
+		do
+			threadIndex = ThreadGroupWait(tgID, -2) // relying on this to keep track of index
+		while(threadIndex<1)
 		
-			do
-				threadIndex = ThreadGroupWait(tgID, -2) // relying on this to keep track of index
-			while(threadIndex<1)
+		duplicatedatafolder root:async, root:asyncCopy //duplicate async folder
+		ThreadGroupPutDF tgID, root:asyncCopy // move root:asyncCopy to where threadGroup can access it
+											           // effectively kills root:asyncCopy in main thread			     
+											                 
+		// fill wave with wave references needed for this instrument
+		if(sc_is2d)
+			// send both 1 and 2d waves
 			
-			duplicatedatafolder root:async, root:asyncCopy //duplicate async folder
- 			ThreadGroupPutDF tgID, root:asyncCopy // move root:asyncCopy to where threadGroup can access it
-												     // effectively kills root:asyncCopy in main thread			     
-												                 
-			wave wref1d = $sc_RawWaveNames[i] // load 1d wave for data
+		else
+			// send only 1d waves
 			
-			// Redimension waves if readvstime is set to 1
-			if (readvstime == 1)
-				redimension /n=(innerindex+1) wref1d
-				setscale/I x 0,  datetime - sc_scanstarttime, wref1d
-			endif
-			threadstart tgID, threadIndex-1, sc_Worker(wref1d, innerindex, i)  // start this thread
+//			if (readvstime == 1)
+//				redimension /n=(innerindex+1) wref1d
+//				setscale/I x 0, datetime - sc_scanstarttime, wref1d
+//			endif
 			
 		endif
 		
+		// start thread
+//		threadstart tgID, threadIndex-1, sc_Worker(wavRefs, innerindex, outerindex, StringFromList(i, sc_asyncFolders, ";"), sc_is2d)
+
 	endfor
 	
 	// wait for all threads to finish and get the rest of the data
@@ -1448,27 +1457,13 @@ function sc_ManageThreads(innerIndex, outerIndex, readvstime)
 		sleep /s 0.001
 	while(threadIndex!=0)
 	
-	// if sc_is2d -- put results into 2d waves
-	if(sc_is2d)
-	
-		for(i=0; i<numpnts(sc_RawWaveNames); i+=1)
-		
-			wave wref1d = $sc_RawWaveNames[i]
-			
-			wave wref2d = $sc_RawWaveNames[i] + "2d"
-			wref2d[innerindex][outerindex] = wref1d[innerindex]
-			
-		endfor
-		
-	endif
-	
 	return tgID
 end
 
-threadsafe function sc_Worker(dataWave, innerindex, folderIndex)
-	wave dataWave
-	variable innerindex, folderIndex
-	
+threadsafe function sc_Worker(dataWave, innerindex, outerindex, folderIndex, is2d, readvstime)
+	wave /WAVE dataWave
+	variable innerindex, outerindex, is2d, readvstime
+	string folderIndex
 	
 	do
 		DFREF dfr = ThreadGroupGetDFR(0,0)	// Get free data folder from input queue
@@ -1479,15 +1474,35 @@ threadsafe function sc_Worker(dataWave, innerindex, folderIndex)
 		endif
 	while(1)
 	
-	setdatafolder dfr:$("thread"+num2istr(folderIndex))
-
+	setdatafolder dfr:$("thread_"+folderIndex)
+	
 	nvar /z instrID = instrID
 	svar /z queryFunc = queryFunc
+	
 	if(nvar_exists(instrID) && svar_exists(queryFunc))
-		funcref funcAsync func = $queryFunc
-		dataWave[innerindex] = func(instrID)
+			
+		variable i, val
+		for(i=0;i<ItemsInList(queryFunc, ";");i+=1)
+			
+			// do the measurements
+			funcref funcAsync func = $queryFunc
+			val = func(instrID)
+			
+			if(numtype(val)==2)
+				return NaN
+			endif
+			
+//			wref1d[innerindex] = val
+			
+			//	if(is2d)
+			//		wref2d[innerindex][outerindex] = val
+			//	endif
+			
+		endfor
+		
+		return i	
 	else
-		dataWave[innerindex] = NaN
+		return NaN
 	endif
 	
 end
