@@ -34,7 +34,7 @@ function initLS625TwoAxis(instrIDx,instrIDz)
 	string/g instrDescZ = getResourceAddress(instrIDz)
 
 	// create string constants for use in get/set functions
-	execute("L625StrConst()")
+	execute("L625StrConst(instrDescX,instrDescZ)")
 
 	variable/g ampsperteslax=55.49, ampsperteslaz=9.950// A/T
 	variable/g maxfieldx=1000, maxfieldz=6000 // mT
@@ -60,12 +60,11 @@ function initLS625TwoAxis(instrIDx,instrIDz)
 	execute("TwoAxis_Window()")
 end
 
-macro L625StrConst()
-	svar instrDescX,instrDescZ
-
+macro L625StrConst(instrDescX,instrDescZ)
+	string instrDescX,instrDescZ
 	// create string constants for use in get/set functions
 	StrConstant strX=instrDescX
-	StrConstant strZ=instrDescX
+	StrConstant strZ=instrDescZ
 endmacro
 
 ////////////////////////
@@ -85,16 +84,13 @@ function getLS625current(instrID) // Units: A
 	current = str2num(queryInstr(instrID,"RDGI?\r\n", read_term = "\r\n"))
 
 	// Update control window
-	strswitch(l625)
-		case strX:
-			outputvalstr[0][1] = num2str(Round_Number(current/ampsperteslax*1000,5))
-			break
-		case strZ:
-			outputvalstr[1][1] = num2str(Round_Number(current/ampsperteslaz*1000,5))
-			break
-		default:
-			abort "Couldn't determine which axis to address"
-	endswitch
+	if(cmpstr(l625,instrDescX)==0)
+		outputvalstr[0][1] = num2str(Round_Number(current/ampsperteslax*1000,5))
+	elseif(cmpstr(l625,instrDescZ)==0)
+		outputvalstr[1][1] = num2str(Round_Number(current/ampsperteslaz*1000,5))
+	else
+		abort "Couldn't determine which axis to address"
+	endif
 
 //	CartisiantoSpherical(str2num(outputvalstr[0][1]),str2num(outputvalstr[1][1]),str2num(outputvalstr[2][1]))
 	sphericalvalstr[0][1] = num2str(sphericalcoordinates[0])
@@ -123,18 +119,15 @@ function getLS625field(instrID) // Units: mT
 
 	current = getLS625current(instrID)
 	// Update control window
-	strswitch(l625)
-		case strX:
-			field = Round_Number(current/ampsperteslax*1000,5)
-			outputvalstr[0][1] = num2str(field)
-			break
-		case strZ:
-			field = Round_Number(current/ampsperteslaz*1000,5)
-			outputvalstr[1][1] = num2str(field)
-			break
-		default:
-			abort "Couldn't determine which axis to address"
-	endswitch
+	if(cmpstr(l625,instrDescX)==0)
+		field = Round_Number(current/ampsperteslax*1000,5)
+		outputvalstr[0][1] = num2str(field)
+	elseif(cmpstr(l625,instrDescZ)==0)
+		field = Round_Number(current/ampsperteslaz*1000,5)
+		outputvalstr[1][1] = num2str(field)
+	else
+		abort "Couldn't determine which axis to address"
+	endif
 
 	return field
 end
@@ -152,23 +145,21 @@ function getLS625rate(instrID) // Units: mT/min
 	nvar ampsperteslax,ampsperteslaz
 	wave/t sweepratevalstr
 	variable rampratefield, currentramprate
+	svar instrDescX,instrDescZ
 
 	string l625 = getResourceAddress(instrID)
 
 	currentramprate = str2num(queryInstr(instrID,"RATE?\r\n", read_term = "\r\n")) // A/s
 	// Update control window
-	strswitch(l625)
-		case strX:
-			rampratefield = Round_Number(currentramprate/ampsperteslax*60*1000,5)
-			sweepratevalstr[0][1] = num2str(rampratefield)
-			break
-		case strZ:
-			rampratefield = Round_Number(currentramprate/ampsperteslaz*60*1000,5)
-			sweepratevalstr[1][1] = num2str(rampratefield)
-			break
-		default:
-			abort "Couldn't determine which axis to address"
-	endswitch
+	if(cmpstr(l625,instrDescX)==0)
+		rampratefield = Round_Number(currentramprate/ampsperteslax*60*1000,5)
+		sweepratevalstr[0][1] = num2str(rampratefield)
+	elseif(cmpstr(l625,instrDescZ)==0)
+		rampratefield = Round_Number(currentramprate/ampsperteslaz*60*1000,5)
+		sweepratevalstr[1][1] = num2str(rampratefield)
+	else
+		abort "Couldn't determine which axis to address"
+	endif
 
 	return rampratefield
 end
@@ -191,23 +182,21 @@ function setLS625current(instrID,output) // Units: A
 	wave/t setpointvalstr
 	nvar maxfieldx,maxfieldz,ampsperteslax,ampsperteslaz
 	variable maxfield,ampspertesla,i=-1
+	svar instrDescX,instrDescZ
 
 	string l625 = getResourceAddress(instrID)
 
-	strswitch(l625)
-		case strX:
-			maxfield = maxfieldx
-			ampspertesla = ampsperteslax
-			i=0
-			break
-		case strZ:
-			maxfield = maxfieldz
-			ampspertesla = ampsperteslaz
-			i=1
-			break
-		default:
-			abort "Couldn't determine which axis to address"
-	endswitch
+	if(cmpstr(l625,instrDescX)==0)
+		maxfield = maxfieldx
+		ampspertesla = ampsperteslax
+		i=0
+	elseif(cmpstr(l625,instrDescZ)==0)
+		maxfield = maxfieldz
+		ampspertesla = ampsperteslaz
+		i=1
+	else
+		abort "Couldn't determine which axis to address"
+	endif
 
 	if (abs(output) > maxfield*ampspertesla/1000)
 		print "Max current is "+num2str(maxfield*ampspertesla/1000)+" A"
@@ -224,23 +213,21 @@ function setLS625field(instrID,output) // Units: mT
 	variable round_amps
 	string cmd
 	variable maxfield,ampspertesla,i=0
+	svar instrDescX,instrDescZ
 
 	string l625 = getResourceAddress(instrID)
 
-	strswitch(l625)
-		case strX:
-			maxfield = maxfieldx
-			ampspertesla = ampsperteslax
-			i=2
-			break
-		case strZ:
-			maxfield = maxfieldz
-			ampspertesla = ampsperteslaz
-			i=3
-			break
-		default:
-			abort "Couldn't determine which axis to address"
-	endswitch
+	if(cmpstr(l625,instrDescX)==0)
+		maxfield = maxfieldx
+		ampspertesla = ampsperteslax
+		i=2
+	elseif(cmpstr(l625,instrDescZ)==0)
+		maxfield = maxfieldz
+		ampspertesla = ampsperteslaz
+		i=3
+	else
+		abort "Couldn't determine which axis to address"
+	endif
 
 	if (abs(output) > maxfield)
 		print "Max field is "+num2str(maxfield)+" mT"
@@ -269,25 +256,23 @@ function setLS625rate(instrID,output) // Units: mT/min
 	variable ramprate_amps
 	string cmd
 	variable maxramprate,ampspertesla,i=0,j=-1
+	svar instrDescX,instrDescZ
 
 	string l625 = getResourceAddress(instrID)
 
-	strswitch(l625)
-		case strX:
-			maxramprate = maxrampratex
-			ampspertesla = ampsperteslax
-			i=2
-			j=0
-			break
-		case strZ:
-			maxramprate = maxrampratez
-			ampspertesla = ampsperteslaz
-			i=3
-			j=1
-			break
-		default:
-			abort "Couldn't determine which axis to address"
-	endswitch
+	if(cmpstr(l625,instrDescX)==0)
+		maxramprate = maxrampratex
+		ampspertesla = ampsperteslax
+		i=2
+		j=0
+	elseif(cmpstr(l625,instrDescZ)==0)
+		maxramprate = maxrampratez
+		ampspertesla = ampsperteslaz
+		i=3
+		j=1
+	else
+		abort "Couldn't determine which axis to address"
+	endif
 
 	if (output < 0 || output > maxramprate)
 		print "Max sweep rate is "+num2str(maxramprate)+" mT/min"
@@ -447,7 +432,7 @@ end
 
 window TwoAxis_Window() : Panel
 	PauseUpdate; Silent 1 // building window
-	NewPanel /W=(0,0,500,500) // window size
+	NewPanel /W=(0,0,500,300) // window size
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv fsize= 25,fstyle= 1
@@ -573,8 +558,8 @@ end
 //// Logging ////
 ////////////////
 
-function/s GetTwoAxisStatus(instrIDx,instrIDy,instrIDz)
-	variable instrIDx,instrIDy,instrIDz
+function/s GetTwoAxisStatus(instrIDx,instrIDz)
+	variable instrIDx,instrIDz
 	string buffer = "", subbuffer = ""
 
 	subbuffer = ""
