@@ -631,7 +631,7 @@ function/s generateLS370URL(command)
 
 	strswitch(system)
 		case "bfsmall":
-			sprintf url, "http://bfsmall-wifi:9898/%s", command
+			sprintf url, "http://bfsmall-wifi:7777/api/v1/%s", command
 			break
 		case "igh":
 			sprintf url, "http://qdash.qdot.lab:7777/api/v1/%s", command
