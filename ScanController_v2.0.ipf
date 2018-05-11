@@ -768,7 +768,7 @@ function sc_checkAsyncScript(str)
 end
 						
 function sc_findAsyncMeasurements()
-
+	nvar sc_is2d
 	wave /t sc_RawScripts, sc_RawWaveNames
 	wave sc_RawRecord, sc_RawPlot, sc_measAsync
 	
@@ -776,9 +776,10 @@ function sc_findAsyncMeasurements()
 	killdatafolder /z root:async // kill it if it exists
 	newdatafolder root:async // create an empty version
 	
-	variable i = 0, idx = 0, threadNum=0
+	variable i = 0, idx = 0, measIdx=0
 	string script, strID, queryFunc, threadFolder
 	string /g sc_asyncFolders = ""
+	make /o/n=1 /WAVE sc_asyncRefs
 	
 	for(i=0;i<numpnts(sc_RawScripts);i+=1)
 	
@@ -803,9 +804,8 @@ function sc_findAsyncMeasurements()
 						// add measurements to the thread directory for this instrument
 						svar qF = root:async:$(threadFolder):queryFunc
 						qF += ";"+queryFunc
-						svar dW = root:async:$(threadFolder):dataWav
-						dW += ";"+sc_RawWaveNames[i]
-						
+						svar wI = root:async:$(threadFolder):wavIdx
+						wI += ";" + num2str(measIdx)
 					else
 						// create a new thread directory for this instrument
 						newdatafolder root:async:$(threadFolder)
@@ -813,12 +813,22 @@ function sc_findAsyncMeasurements()
 						nvar instrID = $strID
 						variable /g root:async:$(threadFolder):instrID = instrID   // creates variable instrID in root:thread
 																	                          // that has the same value as $strID
-						string /g root:async:$(threadFolder):dataWav = sc_RawWaveNames[i]
+						string /g root:async:$(threadFolder):wavIdx = num2str(measIdx)
 						string /g root:async:$(threadFolder):queryFunc = queryFunc // creates string variable queryFunc in root:async:thread
 																                             // that has a value queryFunc="readInstr"
 						sc_asyncFolders += threadFolder + ";"
-						threadNum+=1
 					endif
+					
+					// fill wave reference(s)
+					redimension /n=(2*measIdx+2) sc_asyncRefs
+					wave w=$sc_rawWaveNames[i] // 1d wave
+					sc_asyncRefs[2*measIdx] = w
+					if(sc_is2d)
+						wave w2d=$(sc_rawWaveNames[i]+"2d") // 2d wave
+						sc_asyncRefs[2*measIdx+1] = w2d
+					endif
+					measIdx+=1
+					
 				else
 					// measurement script is formatted wrong
 					sc_measAsync[i]=0
@@ -854,7 +864,6 @@ function sc_findAsyncMeasurements()
 	else
 		variable /g sc_numInstrThreads = ItemsInList(sc_asyncFolders, ";")
 		variable /g sc_numAvailThreads = threadProcessorCount
-		make /o/n=(2*sum(sc_measAsync)) /WAVE sc_asyncRefs
 		return sc_numInstrThreads
 	endif
 	
@@ -948,6 +957,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	endif
 
 	// create waves to hold x and y data (in case I want to save it)
+	// this is pretty useless if using readvstime
 	cmd = "make /o/n=(" + num2istr(sc_numptsx) + ") " + "sc_xdata" + "=NaN"; execute(cmd)
 	cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + "sc_xdata"; execute(cmd)
 	cmd = "sc_xdata" +" = x"; execute(cmd)
@@ -1415,6 +1425,7 @@ function sc_ManageThreads(innerIndex, outerIndex, readvstime)
 	variable innerIndex, outerIndex, readvstime
 	svar sc_asyncFolders
 	nvar sc_is2d, sc_scanstarttime, sc_numAvailThreads, sc_numInstrThreads
+	wave /WAVE sc_asyncRefs
 	
 	variable tgID = ThreadGroupCreate(min(sc_numInstrThreads, sc_numAvailThreads)) // open threads
 
@@ -1430,24 +1441,12 @@ function sc_ManageThreads(innerIndex, outerIndex, readvstime)
 		
 		duplicatedatafolder root:async, root:asyncCopy //duplicate async folder
 		ThreadGroupPutDF tgID, root:asyncCopy // move root:asyncCopy to where threadGroup can access it
-											           // effectively kills root:asyncCopy in main thread			     
-											                 
-		// fill wave with wave references needed for this instrument
-		if(sc_is2d)
-			// send both 1 and 2d waves
-			
-		else
-			// send only 1d waves
-			
-//			if (readvstime == 1)
-//				redimension /n=(innerindex+1) wref1d
-//				setscale/I x 0, datetime - sc_scanstarttime, wref1d
-//			endif
-			
-		endif
+											           // effectively kills root:asyncCopy in main thread
 		
 		// start thread
-//		threadstart tgID, threadIndex-1, sc_Worker(wavRefs, innerindex, outerindex, StringFromList(i, sc_asyncFolders, ";"), sc_is2d)
+		threadstart tgID, threadIndex-1, sc_Worker(sc_asyncRefs, innerindex, outerindex, \
+																 StringFromList(i, sc_asyncFolders, ";"), sc_is2d, \
+																 readvstime, sc_scanstarttime)
 
 	endfor
 	
@@ -1460,9 +1459,9 @@ function sc_ManageThreads(innerIndex, outerIndex, readvstime)
 	return tgID
 end
 
-threadsafe function sc_Worker(dataWave, innerindex, outerindex, folderIndex, is2d, readvstime)
-	wave /WAVE dataWave
-	variable innerindex, outerindex, is2d, readvstime
+threadsafe function sc_Worker(refWave, innerindex, outerindex, folderIndex, is2d, rvt, starttime)
+	wave /WAVE refWave
+	variable innerindex, outerindex, is2d, rvt, starttime
 	string folderIndex
 	
 	do
@@ -1474,34 +1473,45 @@ threadsafe function sc_Worker(dataWave, innerindex, outerindex, folderIndex, is2
 		endif
 	while(1)
 	
-	setdatafolder dfr:$("thread_"+folderIndex)
+	setdatafolder dfr:$(folderIndex)
 	
 	nvar /z instrID = instrID
 	svar /z queryFunc = queryFunc
+	svar /z wavIdx = wavIdx
 	
-	if(nvar_exists(instrID) && svar_exists(queryFunc))
+	if(nvar_exists(instrID) && svar_exists(queryFunc) && svar_exists(wavIdx))
 			
 		variable i, val
 		for(i=0;i<ItemsInList(queryFunc, ";");i+=1)
 			
 			// do the measurements
-			funcref funcAsync func = $queryFunc
+			funcref funcAsync func = $(StringFromList(i, queryFunc, ";"))
 			val = func(instrID)
 			
 			if(numtype(val)==2)
-				return NaN
+				// if NaN was returned, try the next function
+				continue
 			endif
 			
-//			wref1d[innerindex] = val
+			wave wref1d = refWave[2*str2num(StringFromList(i, wavIdx, ";"))]
 			
-			//	if(is2d)
-			//		wref2d[innerindex][outerindex] = val
-			//	endif
+			if(rvt == 1)
+				redimension /n=(innerindex+1) wref1d
+				setscale/I x 0, datetime - starttime, wref1d
+			endif
+			
+			wref1d[innerindex] = val
+			
+			if(is2d)
+				wave wref2d = refWave[2*str2num(StringFromList(i, wavIdx, ";"))+1]
+				wref2d[innerindex][outerindex] = val
+			endif
 			
 		endfor
 		
 		return i	
 	else
+		// if no instrID/queryFunc/wavIdx exists, get out
 		return NaN
 	endif
 	
