@@ -310,7 +310,7 @@ function setLS370PIDcontrol(channel,setpoint,maxcurrent) //Units: mK, mA
 	variable channel, setpoint, maxcurrent
 	string payload, command, headers, url, token = "vMqyDIcB"
 	
-	sprintf payload, "{ \"channel\": %d, \"set_point\": %g, \"max_current_ma\": %g}", channel, setpoint/1000, maxcurrent
+	sprintf payload, "{ \"channel\": %d, \"set_point\": %g, \"max_current_ma\": %g, \"max_heater_level\": %s}", channel, setpoint/1000, maxcurrent, "8"
 	headers = "Content-Type: application/json"
 	sprintf command, "set-temperature-control-parameters?_at_=%s", token
 	url = generateLS370URL(command)
@@ -460,12 +460,19 @@ function turnoffLS370MCheater()
 	// this function can seem unnecessary, but is in some cases need
 	// and therefore it is a good practise to always use it.
 	string command, payload, headers, url, token = "vMqyDIcB"
+	nvar pid_led, mcheater_led, pid_mode
 
 	sprintf command, "turn-heater-off?_at_=%s", token
 	headers = "Content-Type: application/json"
 	payload = "{}"
 	url = generateLS370URL(command)
 	writeLS370(url,payload,headers)
+	pid_led = 0
+	mcheater_led = 0
+	pid_mode = 4
+	PopupMenu mcheater, mode=2
+	SetVariable mcheaterset, disable=0
+	PopupMenu tempcontrol, value="Off"
 end
 
 function toggleLS370magnetheater(onoff)
