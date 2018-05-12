@@ -15,9 +15,7 @@
 //    -- Added Async checkbox in scancontroller window
 
 //TODO:
-//   -- figure out how to keep track of data coming back in from threads
-// 
-//   -- if requesting data from the same resource more than once, make them use the same thread
+//   -- FTP file upload
 
 
 //FIX:
@@ -271,10 +269,7 @@ function InitScanController(instrWave, [srv_push, config])
 	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
 	string /g sc_current_config = ""
 
-	string server = "10.5.254.1" // address for qdot-server
-	variable port = 7965 // port number the server is listening on
-	string /g server_url = ""
-	sprintf server_url, "http://%s:%d", server, port
+	string /g server_url = "qdash-server.phas.ubc.ca" // address for qdot-server
 
 	string /g sc_hostname = getHostName() // machine name
 
@@ -1599,14 +1594,14 @@ end
 function /s getExpStatus()
 	// returns JSON object full of details about the system and this run
 	nvar filenum, sweep_t_elapsed
-	svar sc_current_config
+	svar sc_current_config, sc_hostname
 
 	// create header with corresponding .ibw name and date
 	string jstr = "", buffer = ""
 
 	// information about the machine your working on
 	buffer = ""
-	buffer = addJSONKeyVal(buffer, "hostname", strVal=getHostName(), addQuotes = 1)
+	buffer = addJSONKeyVal(buffer, "hostname", strVal=sc_hostname, addQuotes = 1)
 	string sysinfo = igorinfo(3)
 	buffer = addJSONKeyVal(buffer, "OS", strVal=StringByKey("OS", sysinfo), addQuotes = 1)
 	buffer = addJSONKeyVal(buffer, "IGOR_VERSION", strVal=StringByKey("IGORFILEVERSION", sysinfo), addQuotes = 1)
@@ -1789,9 +1784,10 @@ function SaveWaves([msg, save_experiment])
 	endif
 
 	if(sc_srv_push==1)
+		svar server_url, sc_hostname
 		sc_findNewFiles(filenum)
-		sc_NotifyServer() // this may leave the experiment file open for some time
-							   // make sure to run saveExp before this
+		sc_TransferData(sc_hostname, server_url, filename) // this may leave the experiment file open for some time
+							                                    // make sure to run saveExp before this
 	else
 		sc_findNewFiles(filenum)    // get list of new files
 		                            // keeps appending files until 
@@ -1973,7 +1969,6 @@ function sc_findNewFiles(datnum)
 	getfilefolderinfo /Q/Z/P=data "qdot-server.notify"
 	if(V_isFile==0) // if the file does not exist, create it with hostname/n at the top
 		open /A/P=data refNum as "qdot-server.notify"
-		fprintf refnum, "%s\n", getHostName()
 	else // if the file does exist, open it for appending
 		open /A/P=data refNum as "qdot-server.notify"
 		FSetPos refNum, 0
@@ -2114,12 +2109,11 @@ function sc_findNewFiles(datnum)
 	close refnum // close qdot-server.notify
 end
 
-function sc_NotifyServer()
-	svar server_url
+function sc_TransferData(hostname, svr_url, filename)
+	string, hostname, svr_url, filename
 
 	variable refnum
 	open /A/P=data refnum as "qdot-server.notify"
-
 
 	if(refnum==0)
 		// if there is not qdot-server.notify file
@@ -2127,22 +2121,16 @@ function sc_NotifyServer()
 		print "No new files available."
 		return 0
 	else
-		fprintf refnum, "\n"
+		// walk through file and send data
+		string username = "igor-"+hostname
+		string password = "folklab101@gmail.com"
+//		string ftpURL = "ftp://"+srv_url+"/"+hostname
+//		FTPUpload /N=21 /O=2 /P=data /T=0 /U=username /W=password /Z ftpURL, filename
+		
+		
+		
+		
 		close refnum
-	endif
-
-	URLRequest /TIME=5.0 /P=data /DFIL="qdot-server.notify" url=server_url, method=post
-	if (V_flag == 0)    // No error
-		if (V_responseCode != 200)  // 200 is the HTTP OK code
-		    print "New file notification failed!"
-		    return 0
-		else
-			sc_DeleteNotificationFile()
-			return 1
-		endif
-	else
-		print "HTTP connection error. New file notification not attempted."
-		return 0
 	endif
 
 end
