@@ -1786,8 +1786,8 @@ function SaveWaves([msg, save_experiment])
 	if(sc_srv_push==1)
 		svar server_url, sc_hostname
 		sc_findNewFiles(filenum)
-		sc_TransferData(sc_hostname, server_url, filename) // this may leave the experiment file open for some time
-							                                    // make sure to run saveExp before this
+		sc_TransferData(sc_hostname, server_url) // this may leave the experiment file open for some time
+							                       // make sure to run saveExp before this
 	else
 		sc_findNewFiles(filenum)    // get list of new files
 		                            // keeps appending files until 
@@ -2109,11 +2109,11 @@ function sc_findNewFiles(datnum)
 	close refnum // close qdot-server.notify
 end
 
-function sc_TransferData(hostname, svr_url, filename)
-	string, hostname, svr_url, filename
+function sc_TransferData(hostname, svr_url)
+	string, hostname, svr_url
 
 	variable refnum
-	open /A/P=data refnum as "qdot-server.notify"
+	open /R/P=data refnum as "qdot-server.notify"
 
 	if(refnum==0)
 		// if there is not qdot-server.notify file
@@ -2124,13 +2124,30 @@ function sc_TransferData(hostname, svr_url, filename)
 		// walk through file and send data
 		string username = "igor-"+hostname
 		string password = "folklab101@gmail.com"
-//		string ftpURL = "ftp://"+srv_url+"/"+hostname
-//		FTPUpload /N=21 /O=2 /P=data /T=0 /U=username /W=password /Z ftpURL, filename
+		string datapath = getExpPath("data", full=0)
+		variable idx = strlen(datapath)
 		
-		
-		
-		
+		string ftpURL = "", lineContent = "", filePath = ""
+		variable i
+		for (i = 0; i < 1; i += 1)
+			FReadLine refNum, lineContent
+			lineContent = TrimString(lineContent)
+			filePath = ReplaceString("/", lineContent[idx,inf], ":")
+			print filePath
+			
+//			if (strlen(lineContent) == 0)
+//				// no more data to be read
+//				return 0
+//			endif
+	
+			sprintf ftpURL, "ftp://%s/%s%s", svr_url, hostname, lineContent
+			FTPUpload /N=21 /O=2 /P=data /T=0 /U=username /W=password /Z ftpURL, filePath 
+			print V_Flag, S_Filename
+			
+		endfor
+
 		close refnum
+		
 	endif
 
 end
