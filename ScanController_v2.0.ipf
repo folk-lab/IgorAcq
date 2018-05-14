@@ -12,12 +12,12 @@
 //			Therefore VDT and GPIB xop's should not be used anymore.
 //		-- "Request scripts" are removed from the scancontroller window. Its only use was
 //			 trying to do async communication (badly).
-//    -- Added Async checkbox in scancontroller window
+//     -- Added Async checkbox in scancontroller window
+//     -- FTP file upload
 
 //TODO:
-//   -- figure out how to keep track of data coming back in from threads
-// 
-//   -- if requesting data from the same resource more than once, make them use the same thread
+
+//     -- move FTP operations into their own thread
 
 
 //FIX:
@@ -271,10 +271,7 @@ function InitScanController(instrWave, [srv_push, config])
 	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
 	string /g sc_current_config = ""
 
-	string server = "10.5.254.1" // address for qdot-server
-	variable port = 7965 // port number the server is listening on
-	string /g server_url = ""
-	sprintf server_url, "http://%s:%d", server, port
+	string /g server_url = "qdash-server.phas.ubc.ca" // address for qdot-server
 
 	string /g sc_hostname = getHostName() // machine name
 
@@ -1599,14 +1596,14 @@ end
 function /s getExpStatus()
 	// returns JSON object full of details about the system and this run
 	nvar filenum, sweep_t_elapsed
-	svar sc_current_config
+	svar sc_current_config, sc_hostname
 
 	// create header with corresponding .ibw name and date
 	string jstr = "", buffer = ""
 
 	// information about the machine your working on
 	buffer = ""
-	buffer = addJSONKeyVal(buffer, "hostname", strVal=getHostName(), addQuotes = 1)
+	buffer = addJSONKeyVal(buffer, "hostname", strVal=sc_hostname, addQuotes = 1)
 	string sysinfo = igorinfo(3)
 	buffer = addJSONKeyVal(buffer, "OS", strVal=StringByKey("OS", sysinfo), addQuotes = 1)
 	buffer = addJSONKeyVal(buffer, "IGOR_VERSION", strVal=StringByKey("IGORFILEVERSION", sysinfo), addQuotes = 1)
@@ -1789,13 +1786,15 @@ function SaveWaves([msg, save_experiment])
 	endif
 
 	if(sc_srv_push==1)
+		svar server_url, sc_hostname
 		sc_findNewFiles(filenum)
-		sc_NotifyServer() // this may leave the experiment file open for some time
-							   // make sure to run saveExp before this
+		sc_FileTransfer() // this may leave the experiment file open for some time
+						   // make sure to run saveExp before this
+							                      
 	else
 		sc_findNewFiles(filenum)    // get list of new files
 		                            // keeps appending files until 
-		                            // qdot-server.notify is deleted
+		                            // server.notify is deleted
 		                            // or srv_push is turned on
 	endif
 
@@ -1968,14 +1967,13 @@ function sc_findNewFiles(datnum)
 	string configpath = getExpPath("config", full=0)
 	string datapath = getExpPath("data", full=0)
 
-	//// create/open qdot-server.notify ////
+	//// create/open server.notify ////
 	string notifyText = "", buffer
-	getfilefolderinfo /Q/Z/P=data "qdot-server.notify"
+	getfilefolderinfo /Q/Z/P=data "server.notify"
 	if(V_isFile==0) // if the file does not exist, create it with hostname/n at the top
-		open /A/P=data refNum as "qdot-server.notify"
-		fprintf refnum, "%s\n", getHostName()
+		open /A/P=data refNum as "server.notify"
 	else // if the file does exist, open it for appending
-		open /A/P=data refNum as "qdot-server.notify"
+		open /A/P=data refNum as "server.notify"
 		FSetPos refNum, 0
 		variable lines = 0
 		do
@@ -2111,47 +2109,85 @@ function sc_findNewFiles(datnum)
 		endfor
 	endfor
 
-	close refnum // close qdot-server.notify
+	close refnum // close server.notify
 end
 
-function sc_NotifyServer()
-	svar server_url
+function sc_ForceDataBackup()
+	// this function is never called automatically
+	// if you are worried about your data
+	// you can call it and it will write a fresh copy of the 
+	// "data" directory to the lab server
+	
+	svar server_url, sc_hostname
+	string username = "anonymous"
+	string password = "folklab101@gmail.com"
+	string ftpURL = "", fullpath = getExpPath("data", full=1)
+	sprintf ftpURL, "ftp://%s/data/%s%s", server_url, sc_hostname, getExpPath("data", full=0)
+	FTPUpload /N=21 /O /D ftpURL[0,strlen(ftpURL)-2], fullpath[0,strlen(fullpath)-2]
+
+end
+
+function sc_FileTransfer()
 
 	variable refnum
-	open /A/P=data refnum as "qdot-server.notify"
-
+	open /R/P=data refnum as "server.notify"
 
 	if(refnum==0)
-		// if there is not qdot-server.notify file
-		// I don't need to do anything
+		// if there is not server.notify file
+		// don't do anything
 		print "No new files available."
 		return 0
 	else
-		fprintf refnum, "\n"
-		close refnum
-	endif
+		// walk through server.notify and send data
+		svar sc_hostname, server_url
+		printf "Transfering new data over FTP to %s\r", server_url
+		
+		string username = "anonymous"
+		string password = "folklab101@gmail.com"
+		string datapath = getExpPath("data", full=0)
+		variable idx = strlen(datapath)
+		
+		string ftpURL = "", lineContent = "", filePath = ""
+		variable i
+		for (i = 0; ;i += 1)
+		
+			FReadLine refNum, lineContent
+			if (strlen(lineContent) == 0)
+				// no more data to be read
+				break
+			endif
+			
+			lineContent = TrimString(lineContent)
+			if (strlen(lineContent) == 0)
+				// blank line for some reason
+				continue
+			endif
+			
+			filePath = ReplaceString("/", lineContent[idx,inf], ":")
 
-	URLRequest /TIME=5.0 /P=data /DFIL="qdot-server.notify" url=server_url, method=post
-	if (V_flag == 0)    // No error
-		if (V_responseCode != 200)  // 200 is the HTTP OK code
-		    print "New file notification failed!"
-		    return 0
-		else
-			sc_DeleteNotificationFile()
-			return 1
-		endif
-	else
-		print "HTTP connection error. New file notification not attempted."
-		return 0
+			sprintf ftpURL, "ftp://%s/data/%s%s", server_url, sc_hostname, lineContent
+			print ftpURL, filePath
+			FTPUpload /N=21 /P=data /T=0 /U=username /W=password /V=4 /Z ftpURL, filePath 
+			if(V_flag!=0)
+				printf "Error transfering file to server -- %s (code = %d)\r", filePath, V_flag
+			endif
+			
+		endfor
+
+		close refnum
+//		sc_DeleteNotificationFile() // Sent everything possible
+									   // assume users will fix errors manually
+		
 	endif
 
 end
 
 function sc_DeleteNotificationFile()
-	// delete qdot-server.notify
-	deletefile /Z/P=data "qdot-server.notify"
+
+	// delete server.notify
+	deletefile /Z=1 /P=data "server.notify"
 	if(V_flag!=0)
-		print "Failed to delete 'qdot-server.notify'"
+		print "Failed to delete 'server.notify'"
 	endif
 end
 
