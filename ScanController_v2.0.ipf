@@ -12,10 +12,12 @@
 //			Therefore VDT and GPIB xop's should not be used anymore.
 //		-- "Request scripts" are removed from the scancontroller window. Its only use was
 //			 trying to do async communication (badly).
-//    -- Added Async checkbox in scancontroller window
+//     -- Added Async checkbox in scancontroller window
+//     -- FTP file upload
 
 //TODO:
-//   -- FTP file upload
+
+//     -- move FTP operations into their own thread
 
 
 //FIX:
@@ -2110,15 +2112,21 @@ function sc_findNewFiles(datnum)
 	close refnum // close server.notify
 end
 
-function sc_DirectoryFTP()
+function sc_ForceDataBackup()
 	// this function is never called automatically
-	// but if you are worried about your data
+	// if you are worried about your data
 	// you can call it and it will write a fresh copy of the 
-	// data directory to the lab server
+	// "data" directory to the lab server
 	
-	string ftpURL = ""
-	sprintf ftpURL, "ftp://%s/data/%s%s", server_url, sc_hostname, lineContent
-	FTPUpload /N=21 /O=2 /P=data /T=0 /U=username /W=password /Z /V=0 ftpURL, filePath
+	svar server_url, sc_hostname
+	string username = "anonymous"
+	string password = "folklab101@gmail.com"
+	string ftpURL = "", fullpath = getExpPath("data", full=1)
+	sprintf ftpURL, "ftp://%s/data/%s%s", server_url, sc_hostname, getExpPath("data", full=0)
+//	print ftpURL[0,strlen(ftpURL)-2], fullpath[0,strlen(fullpath)-2]
+	FTPUpload /N=21 /O /D ftpURL[0,strlen(ftpURL)-2], fullpath[0,strlen(fullpath)-2]
+
+end
 
 function sc_FileTransfer()
 
@@ -2127,11 +2135,11 @@ function sc_FileTransfer()
 
 	if(refnum==0)
 		// if there is not server.notify file
-		// I don't need to do anything
+		// don't do anything
 		print "No new files available."
 		return 0
 	else
-		// walk through file and send data
+		// walk through server.notify and send data
 		svar sc_hostname, server_url
 		printf "Transfering new data over FTP to %s\r", server_url
 		
@@ -2161,7 +2169,8 @@ function sc_FileTransfer()
 		endfor
 
 		close refnum
-		sc_DeleteNotificationFile()
+		sc_DeleteNotificationFile() // Sent everything possible
+									   // assume users will fix errors manually
 		
 	endif
 
