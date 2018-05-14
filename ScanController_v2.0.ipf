@@ -1786,12 +1786,13 @@ function SaveWaves([msg, save_experiment])
 	if(sc_srv_push==1)
 		svar server_url, sc_hostname
 		sc_findNewFiles(filenum)
-		sc_TransferData(sc_hostname, server_url) // this may leave the experiment file open for some time
-							                       // make sure to run saveExp before this
+		sc_FileTransfer() // this may leave the experiment file open for some time
+						   // make sure to run saveExp before this
+							                      
 	else
 		sc_findNewFiles(filenum)    // get list of new files
 		                            // keeps appending files until 
-		                            // qdot-server.notify is deleted
+		                            // server.notify is deleted
 		                            // or srv_push is turned on
 	endif
 
@@ -1964,13 +1965,13 @@ function sc_findNewFiles(datnum)
 	string configpath = getExpPath("config", full=0)
 	string datapath = getExpPath("data", full=0)
 
-	//// create/open qdot-server.notify ////
+	//// create/open server.notify ////
 	string notifyText = "", buffer
-	getfilefolderinfo /Q/Z/P=data "qdot-server.notify"
+	getfilefolderinfo /Q/Z/P=data "server.notify"
 	if(V_isFile==0) // if the file does not exist, create it with hostname/n at the top
-		open /A/P=data refNum as "qdot-server.notify"
+		open /A/P=data refNum as "server.notify"
 	else // if the file does exist, open it for appending
-		open /A/P=data refNum as "qdot-server.notify"
+		open /A/P=data refNum as "server.notify"
 		FSetPos refNum, 0
 		variable lines = 0
 		do
@@ -2106,57 +2107,71 @@ function sc_findNewFiles(datnum)
 		endfor
 	endfor
 
-	close refnum // close qdot-server.notify
+	close refnum // close server.notify
 end
 
-function sc_TransferData(hostname, svr_url)
-	string, hostname, svr_url
+function sc_DirectoryFTP()
+	// this function is never called automatically
+	// but if you are worried about your data
+	// you can call it and it will write a fresh copy of the 
+	// data directory to the lab server
+	
+	string ftpURL = ""
+	sprintf ftpURL, "ftp://%s/data/%s%s", server_url, sc_hostname, lineContent
+	FTPUpload /N=21 /O=2 /P=data /T=0 /U=username /W=password /Z /V=0 ftpURL, filePath
+
+function sc_FileTransfer()
 
 	variable refnum
-	open /R/P=data refnum as "qdot-server.notify"
+	open /R/P=data refnum as "server.notify"
 
 	if(refnum==0)
-		// if there is not qdot-server.notify file
+		// if there is not server.notify file
 		// I don't need to do anything
 		print "No new files available."
 		return 0
 	else
 		// walk through file and send data
-		string username = "igor-"+hostname
+		svar sc_hostname, server_url
+		printf "Transfering new data over FTP to %s\r", server_url
+		
+		string username = "anonymous"
 		string password = "folklab101@gmail.com"
 		string datapath = getExpPath("data", full=0)
 		variable idx = strlen(datapath)
 		
 		string ftpURL = "", lineContent = "", filePath = ""
 		variable i
-		for (i = 0; i < 1; i += 1)
+		for (i = 0; ; i += 1)
 			FReadLine refNum, lineContent
 			lineContent = TrimString(lineContent)
 			filePath = ReplaceString("/", lineContent[idx,inf], ":")
-			print filePath
 			
-//			if (strlen(lineContent) == 0)
-//				// no more data to be read
-//				return 0
-//			endif
-	
-			sprintf ftpURL, "ftp://%s/%s%s", svr_url, hostname, lineContent
-			FTPUpload /N=21 /O=2 /P=data /T=0 /U=username /W=password /Z ftpURL, filePath 
-			print V_Flag, S_Filename
+			if (strlen(lineContent) == 0)
+				// no more data to be read
+				return 0
+			endif
+
+			sprintf ftpURL, "ftp://%s/data/%s%s", server_url, sc_hostname, lineContent
+			FTPUpload /N=21 /O=2 /P=data /T=0 /U=username /W=password /Z /V=0 ftpURL, filePath 
+			if(V_flag!=0)
+				printf "Error transfering file to server -- %s (code = %d)\r", filePath, V_flag
+			endif
 			
 		endfor
 
 		close refnum
+		sc_DeleteNotificationFile()
 		
 	endif
 
 end
 
 function sc_DeleteNotificationFile()
-	// delete qdot-server.notify
-	deletefile /Z/P=data "qdot-server.notify"
+	// delete server.notify
+	deletefile /Z/P=data "server.notify"
 	if(V_flag!=0)
-		print "Failed to delete 'qdot-server.notify'"
+		print "Failed to delete 'server.notify'"
 	endif
 end
 
