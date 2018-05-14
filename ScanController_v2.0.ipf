@@ -2123,7 +2123,6 @@ function sc_ForceDataBackup()
 	string password = "folklab101@gmail.com"
 	string ftpURL = "", fullpath = getExpPath("data", full=1)
 	sprintf ftpURL, "ftp://%s/data/%s%s", server_url, sc_hostname, getExpPath("data", full=0)
-//	print ftpURL[0,strlen(ftpURL)-2], fullpath[0,strlen(fullpath)-2]
 	FTPUpload /N=21 /O /D ftpURL[0,strlen(ftpURL)-2], fullpath[0,strlen(fullpath)-2]
 
 end
@@ -2150,18 +2149,25 @@ function sc_FileTransfer()
 		
 		string ftpURL = "", lineContent = "", filePath = ""
 		variable i
-		for (i = 0; ; i += 1)
+		for (i = 0; ;i += 1)
+		
 			FReadLine refNum, lineContent
-			lineContent = TrimString(lineContent)
-			filePath = ReplaceString("/", lineContent[idx,inf], ":")
-			
 			if (strlen(lineContent) == 0)
 				// no more data to be read
-				return 0
+				break
 			endif
+			
+			lineContent = TrimString(lineContent)
+			if (strlen(lineContent) == 0)
+				// blank line for some reason
+				continue
+			endif
+			
+			filePath = ReplaceString("/", lineContent[idx,inf], ":")
 
 			sprintf ftpURL, "ftp://%s/data/%s%s", server_url, sc_hostname, lineContent
-			FTPUpload /N=21 /O=2 /P=data /T=0 /U=username /W=password /Z /V=0 ftpURL, filePath 
+			print ftpURL, filePath
+			FTPUpload /N=21 /P=data /T=0 /U=username /W=password /V=4 /Z ftpURL, filePath 
 			if(V_flag!=0)
 				printf "Error transfering file to server -- %s (code = %d)\r", filePath, V_flag
 			endif
@@ -2169,7 +2175,7 @@ function sc_FileTransfer()
 		endfor
 
 		close refnum
-		sc_DeleteNotificationFile() // Sent everything possible
+//		sc_DeleteNotificationFile() // Sent everything possible
 									   // assume users will fix errors manually
 		
 	endif
@@ -2177,8 +2183,9 @@ function sc_FileTransfer()
 end
 
 function sc_DeleteNotificationFile()
+
 	// delete server.notify
-	deletefile /Z/P=data "server.notify"
+	deletefile /Z=1 /P=data "server.notify"
 	if(V_flag!=0)
 		print "Failed to delete 'server.notify'"
 	endif
