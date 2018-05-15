@@ -1328,6 +1328,7 @@ function RecordValues(i, j, [readvstime, fillnan])
 	
 	if(innerindex==0 && outerindex==0)
 		variable/g sc_rvt = readvstime // needed for rescaling in SaveWaves()
+		print "created sc_rvt"
 	endif
 
 	if(readvstime==1 && sc_is2d)
@@ -1699,33 +1700,38 @@ function sc_update_xdata()
     // update the sc_xdata wave at the end of the scan
     // only does something if sc_rvt==1
     
-    nvar sc_rvt
-    if(sc_rvt) 
-        wave sc_xdata
-        
-        // look for the first wave that has recorded values
-        string wn = ""
-        variable i=0
-        for(i=0; i<numpnts(sc_RawWaveNames); i+=1)
-            if (sc_RawRecord[i] == 1 || sc_RawPlot[i]==1)
-                wn = sc_RawWaveNames[i]
-                break
-            endif
-        endfor
+	print "updating xdata"
+	wave sc_xdata, sc_RawRecord, sc_RawPlot
+	wave /t sc_RawWaveNames
+	
+	// look for the first wave that has recorded values
+	string wn = ""
+	variable i=0
+	for(i=0; i<numpnts(sc_RawWaveNames); i+=1)
+	    if (sc_RawRecord[i] == 1 || sc_RawPlot[i]==1)
+	        wn = sc_RawWaveNames[i]
+	        break
+	    endif
+	endfor
+	
+	if(strlen(wn)==0)
+		wave sc_xdata, sc_CalcRecord, sc_CalcPlot
+		wave /t sc_CalcWaveNames
+		
+		for(i=0; i<numpnts(sc_CalcWaveNames); i+=1)
+		    if (sc_CalcRecord[i] == 1 || sc_CalcPlot[i]==1)
+		        wn = sc_CalcWaveNames[i]
+		        break
+		    endif
+		endfor
+	endif
+	
+	print "using scaling from", wn
+	wave w = $wn  // open reference 
+	Redimension /N=(numpnts(w)) sc_xdata
+	CopyScales w, sc_xdata  // copy scaling
+	sc_xdata = x  // set wave data equal to x scaling
 
-        if(strlen(wn)==0)
-            for(i=0; i<numpnts(sc_CalcWaveNames); i+=1)
-                if (sc_CalcRecord[i] == 1 || sc_CalcPlot[i]==1)
-                    wn = sc_CalcWaveNames[i]
-                    break
-                endif
-            endfor
-        endif
-        
-        wave w = $wn  // open reference 
-        CopyScales w, sc_xdata  // copy scaling
-        sc_xdata = x  // set wave data equal to x scaling
-    endif
 end
 
 function SaveWaves([msg, save_experiment])
