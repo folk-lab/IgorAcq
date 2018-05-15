@@ -1313,15 +1313,22 @@ function RecordValues(i, j, [readvstime, fillnan])
 		// 2d
 		innerindex = j
 		outerindex = i
+		sc_numptsx = j
+		sc_numptsy = i
 	else
 		// 1d
 		innerindex = i
 		outerindex = i // meaningless
+		sc_numptsx = i
 	endif
 
 	// Set readvstime to 0 if it's not defined
 	if(paramisdefault(readvstime))
 		readvstime=0
+	endif
+	
+	if(innerindex==0 && outerindex==0)
+		variable/g sc_rvt = readvstime // needed for rescaling in SaveWaves()
 	endif
 
 	if(readvstime==1 && sc_is2d)
@@ -1593,10 +1600,15 @@ function /s getEquipLogs()
 	return buffer
 end
 
-function /s getExpStatus()
+function /s getExpStatus([msg])
 	// returns JSON object full of details about the system and this run
+	string msg
 	nvar filenum, sweep_t_elapsed
 	svar sc_current_config, sc_hostname
+	
+	if(paramisdefault(msg))
+		msg=""
+	endif
 
 	// create header with corresponding .ibw name and date
 	string jstr = "", buffer = ""
@@ -1623,6 +1635,7 @@ function /s getExpStatus()
 	jstr = addJSONKeyVal(jstr, "time_completed", strVal=Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
 	jstr = addJSONKeyVal(jstr, "time_elapsed", numVal = sweep_t_elapsed, fmtNum = "%.3f")
 	jstr = addJSONKeyVal(jstr, "saved_waves", strVal=recordedWaveArray())
+	jstr = addJSONKeyVal(jstr, "comment", strVal=msg)
 
 	return jstr
 end
@@ -1720,7 +1733,21 @@ function SaveWaves([msg, save_experiment])
 	// save timing variables
 	variable /g sweep_t_elapsed = datetime-sc_scanstarttime
 	printf "Time elapsed: %.2f s \r", sweep_t_elapsed
-
+	
+	nvar sc_rvt
+	if(sc_rvt) // rescale xdata and ydata if reading vs time
+		nvar sc_is2d, sc_numptsx
+		wave sc_xdata
+		redimension /n=(sc_numptsx) sc_xdata
+		setscale x 0,  sweep_t_elapsed, sc_xdata
+		if(sc_is2d)
+			nvar sc_numptsy
+			wave sc_ydata
+			redimension /n=(sc_numptsy) sc_ydata
+			setscale x 0,  sweep_t_elapsed, sc_ydata
+		endif
+	endif
+	
 	dowindow /k SweepControl // kill scan control window
 
 	// count up the number of data files to save
