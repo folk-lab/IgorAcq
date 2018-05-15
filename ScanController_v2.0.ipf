@@ -1312,13 +1312,10 @@ function RecordValues(i, j, [readvstime, fillnan])
 		// 2d
 		innerindex = j
 		outerindex = i
-		// sc_numptsx = j
-		// sc_numptsy = i
 	else
 		// 1d
 		innerindex = i
 		outerindex = i // meaningless
-		// sc_numptsx = i
 	endif
 
 	// Set readvstime to 0 if it's not defined
@@ -1328,7 +1325,6 @@ function RecordValues(i, j, [readvstime, fillnan])
 	
 	if(innerindex==0 && outerindex==0)
 		variable/g sc_rvt = readvstime // needed for rescaling in SaveWaves()
-		print "created sc_rvt"
 	endif
 
 	if(readvstime==1 && sc_is2d)
@@ -1697,10 +1693,9 @@ function saveExp()
 end
 
 function sc_update_xdata()
-    // update the sc_xdata wave at the end of the scan
-    // only does something if sc_rvt==1
+    // update the sc_xdata wave 
+    // to match the measured waves
     
-	print "updating xdata"
 	wave sc_xdata, sc_RawRecord, sc_RawPlot
 	wave /t sc_RawWaveNames
 	
@@ -1726,7 +1721,6 @@ function sc_update_xdata()
 		endfor
 	endif
 	
-	print "using scaling from", wn
 	wave w = $wn  // open reference 
 	Redimension /N=(numpnts(w)) sc_xdata
 	CopyScales w, sc_xdata  // copy scaling
@@ -1784,8 +1778,11 @@ function SaveWaves([msg, save_experiment])
 		// save it and increment the filenumber
 		printf "saving all dat%d files...\r", filenum
 
-        sc_update_xdata() // update xdata wave
-
+		nvar sc_rvt
+       	if(sc_rvt==1)
+       		sc_update_xdata() // update xdata wave
+		endif
+		
 		// Open up any files that may be needed
 	 	// Save scan controller meta data in this function as well
 		initSaveFiles(msg=msg)
