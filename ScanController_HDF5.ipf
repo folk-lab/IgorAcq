@@ -101,7 +101,7 @@ function initSaveFiles([msg])
 	// Create metadata group
 	variable /G metadata_group_ID
 	HDF5CreateGroup hdf5_id, "metadata", metadata_group_ID
-	json2attributes(getExpStatus(), "metadata", hdf5_id) // add experiment metadata
+	json2attributes(getExpStatus(msg=msg), "metadata", hdf5_id) // add experiment metadata
 	
 	// Create config group
 	svar sc_current_config

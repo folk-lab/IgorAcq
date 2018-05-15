@@ -916,7 +916,6 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	i=0
 
 	sc_findAsyncMeasurements() 
-//	printf "Measuring %d values asynchronously\r", sc_findAsyncMeasurements() // update sc_isAsyncScript
 
 	// connect VISA instruments
 	// do this here, because if it fails
@@ -1323,6 +1322,10 @@ function RecordValues(i, j, [readvstime, fillnan])
 	if(paramisdefault(readvstime))
 		readvstime=0
 	endif
+	
+	if(innerindex==0 && outerindex==0)
+		variable/g sc_rvt = readvstime // needed for rescaling in SaveWaves()
+	endif
 
 	if(readvstime==1 && sc_is2d)
 		abort "NOT IMPLEMENTED: Read vs Time is currently only supported for 1D sweeps."
@@ -1593,10 +1596,15 @@ function /s getEquipLogs()
 	return buffer
 end
 
-function /s getExpStatus()
+function /s getExpStatus([msg])
 	// returns JSON object full of details about the system and this run
+	string msg
 	nvar filenum, sweep_t_elapsed
 	svar sc_current_config, sc_hostname
+	
+	if(paramisdefault(msg))
+		msg=""
+	endif
 
 	// create header with corresponding .ibw name and date
 	string jstr = "", buffer = ""
@@ -1623,6 +1631,7 @@ function /s getExpStatus()
 	jstr = addJSONKeyVal(jstr, "time_completed", strVal=Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
 	jstr = addJSONKeyVal(jstr, "time_elapsed", numVal = sweep_t_elapsed, fmtNum = "%.3f")
 	jstr = addJSONKeyVal(jstr, "saved_waves", strVal=recordedWaveArray())
+	jstr = addJSONKeyVal(jstr, "comment", strVal=msg)
 
 	return jstr
 end
@@ -1683,6 +1692,42 @@ function saveExp()
 	SaveFromPXP(history=1, procedure=1) // grab some useful plain text docs from the pxp
 end
 
+function sc_update_xdata()
+    // update the sc_xdata wave 
+    // to match the measured waves
+    
+	wave sc_xdata, sc_RawRecord, sc_RawPlot
+	wave /t sc_RawWaveNames
+	
+	// look for the first wave that has recorded values
+	string wn = ""
+	variable i=0
+	for(i=0; i<numpnts(sc_RawWaveNames); i+=1)
+	    if (sc_RawRecord[i] == 1 || sc_RawPlot[i]==1)
+	        wn = sc_RawWaveNames[i]
+	        break
+	    endif
+	endfor
+	
+	if(strlen(wn)==0)
+		wave sc_xdata, sc_CalcRecord, sc_CalcPlot
+		wave /t sc_CalcWaveNames
+		
+		for(i=0; i<numpnts(sc_CalcWaveNames); i+=1)
+		    if (sc_CalcRecord[i] == 1 || sc_CalcPlot[i]==1)
+		        wn = sc_CalcWaveNames[i]
+		        break
+		    endif
+		endfor
+	endif
+	
+	wave w = $wn  // open reference 
+	Redimension /N=(numpnts(w)) sc_xdata
+	CopyScales w, sc_xdata  // copy scaling
+	sc_xdata = x  // set wave data equal to x scaling
+
+end
+
 function SaveWaves([msg, save_experiment])
 	// the message will be printed in the history, and will be saved in the winf file corresponding to this scan
 	// save_experiment=1 to save the experiment file
@@ -1720,24 +1765,26 @@ function SaveWaves([msg, save_experiment])
 	// save timing variables
 	variable /g sweep_t_elapsed = datetime-sc_scanstarttime
 	printf "Time elapsed: %.2f s \r", sweep_t_elapsed
-
+	
 	dowindow /k SweepControl // kill scan control window
 
 	// count up the number of data files to save
-	variable ii=0, Rawadd =0, Calcadd = 0
-	wavestats /Q/Z sc_RawRecord
-	Rawadd = V_Sum
-	wavestats /Q/Z sc_CalcRecord
-	Calcadd = V_Sum
+	variable ii=0
+	variable Rawadd = sum(sc_RawRecord)
+	variable Calcadd = sum(sc_CalcRecord)
 
 	if(Rawadd+Calcadd > 0)
 		// there is data to save!
 		// save it and increment the filenumber
 		printf "saving all dat%d files...\r", filenum
 
+		nvar sc_rvt
+       	if(sc_rvt==1)
+       		sc_update_xdata() // update xdata wave
+		endif
+		
 		// Open up any files that may be needed
 	 	// Save scan controller meta data in this function as well
-
 		initSaveFiles(msg=msg)
 
 		// save raw data waves
