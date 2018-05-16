@@ -298,25 +298,25 @@ function InitScanController(instrWave, [srv_push, config])
 			make/o sc_RawPlot = {0,0} // Whether you want to record and save the data for this wave
 			make/t/o sc_RawScripts = {"getg1x()", "getg1y()"}
 			// End of same-size waves
-	
+
 			// And these waves should be the same size too
 			make/t/o sc_CalcWaveNames = {"", ""} // Calculated wave names
 			make/t/o sc_CalcScripts = {"",""} // Scripts to calculate stuff
 			make/o sc_CalcRecord = {0,0} // Include this calculated field or not
 			make/o sc_CalcPlot = {0,0} // Include this calculated field or not
 			// end of same-size waves
-	
+
 			make /o sc_measAsync = {0,0}
-	
+
 			// default colormap
 			string /g sc_ColorMap = "Grays"
-	
+
 			// Print variables
 			variable/g sc_PrintRaw = 1,sc_PrintCalc = 1
-	
+
 			// logging string
 			string /g sc_LogStr = "GetSRSStatus(srs1);"
-	
+
 			nvar filenum
 			if (numtype(filenum) == 2)
 				print "Initializing FileNum to 0 since it didn't exist before.\n"
@@ -328,9 +328,9 @@ function InitScanController(instrWave, [srv_push, config])
 	else
 		sc_loadconfig(config)
 	endif
-	
+
 	sc_rebuildwindow()
-	
+
 end
 
 /////////////////////////////
@@ -616,7 +616,7 @@ end
 
 function sc_updatewindow(action) : ButtonControl
 	string action
-	
+
 	sc_createconfig()     // write (or overwrite) a config file
 end
 
@@ -734,69 +734,69 @@ function sc_checkAsyncScript(str)
 	// could be better
 	// returns position of first ( character if it is good
 	string str
-	
+
 	variable i = 0, firstOP = 0, countOP = 0, countCP = 0
 	for(i=0; i<strlen(str); i+=1)
-		
+
 		if( CmpStr(str[i], "(") == 0 )
-			countOP+=1 // count opening parentheses 
+			countOP+=1 // count opening parentheses
 			if( firstOP==0 )
 				firstOP = i // record position of first (
 				continue
 			endif
 		endif
-		
+
 		if( CmpStr(str[i], ")") == 0 )
-			countCP -=1 // count closing parentheses 
+			countCP -=1 // count closing parentheses
 			continue
 		endif
-		
+
 		if( CmpStr(str[i], ",") == 0 )
-			return -1 // stop on comma 
+			return -1 // stop on comma
 		endif
-			
+
 	endfor
-	
+
 	if( (countOP==1) && (countCP==-1) )
 		return firstOP
 	else
 		return -1
 	endif
 end
-						
+
 function sc_findAsyncMeasurements()
 	nvar sc_is2d
 	wave /t sc_RawScripts, sc_RawWaveNames
 	wave sc_RawRecord, sc_RawPlot, sc_measAsync
-	
+
 	// setup async folder
 	killdatafolder /z root:async // kill it if it exists
 	newdatafolder root:async // create an empty version
-	
+
 	variable i = 0, idx = 0, measIdx=0
 	string script, strID, queryFunc, threadFolder
 	string /g sc_asyncFolders = ""
 	make /o/n=1 /WAVE sc_asyncRefs
-	
+
 	for(i=0;i<numpnts(sc_RawScripts);i+=1)
-	
+
 		if ( (sc_RawRecord[i] == 1) || (sc_RawPlot[i] == 1) )
 			// this is something that will be measured
-			
+
 			if (sc_measAsync[i] == 1) // this is something that should be asyn
-				
+
 				script = sc_RawScripts[i]
 				idx = sc_checkAsyncScript(script) // check function format
-				
+
 				if(idx!=-1) // fucntion is good, this will be recorded asynchronously
-					sc_measAsync[i]=1 
+					sc_measAsync[i]=1
 
 					// keep track of function names and instrIDs in folder structure
 					strID = script[idx+1,strlen(script)-2]
-					queryFunc = script[0,idx-1] 
+					queryFunc = script[0,idx-1]
 					// creates root:async:instr1
 					sprintf threadFolder, "thread_%s", strID
-					
+
 					if(DataFolderExists("root:async:"+threadFolder))
 						// add measurements to the thread directory for this instrument
 						svar qF = root:async:$(threadFolder):queryFunc
@@ -806,7 +806,7 @@ function sc_findAsyncMeasurements()
 					else
 						// create a new thread directory for this instrument
 						newdatafolder root:async:$(threadFolder)
-						
+
 						nvar instrID = $strID
 						variable /g root:async:$(threadFolder):instrID = instrID   // creates variable instrID in root:thread
 																	                          // that has the same value as $strID
@@ -815,7 +815,7 @@ function sc_findAsyncMeasurements()
 																                             // that has a value queryFunc="readInstr"
 						sc_asyncFolders += threadFolder + ";"
 					endif
-					
+
 					// fill wave reference(s)
 					redimension /n=(2*measIdx+2) sc_asyncRefs
 					wave w=$sc_rawWaveNames[i] // 1d wave
@@ -825,18 +825,18 @@ function sc_findAsyncMeasurements()
 						sc_asyncRefs[2*measIdx+1] = w2d
 					endif
 					measIdx+=1
-					
+
 				else
 					// measurement script is formatted wrong
 					sc_measAsync[i]=0
 					printf "[WARNING] Async scripts must be formatted: \"readFunc(instrID)\"\r\t%s is no good and will be read synchronously,\r", sc_RawScripts[i]
 				endif
-				
+
 			endif
 		endif
-		
+
 	endfor
-	
+
 	if(sum(sc_measAsync)<2)
 		// no point in doing anyting async is only one instrument is capable of it
 		if(sum(sc_measAsync)==1)
@@ -844,7 +844,7 @@ function sc_findAsyncMeasurements()
 		endif
 		make /o/n=(numpnts(sc_RawScripts)) sc_measAsync = 0
 	endif
-		
+
 	// change state of check boxes based on what just happened here!
 	doupdate /W=ScanController
 	string cmd = ""
@@ -853,7 +853,7 @@ function sc_findAsyncMeasurements()
 		execute(cmd)
 	endfor
 	doupdate /W=ScanController
-	
+
 	if(sum(sc_measAsync)==0)
 		sc_asyncFolders = ""
 		KillDataFolder /Z root:async // don't need this
@@ -863,7 +863,7 @@ function sc_findAsyncMeasurements()
 		variable /g sc_numAvailThreads = threadProcessorCount
 		return sc_numInstrThreads
 	endif
-	
+
 end
 
 function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_label])
@@ -884,7 +884,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 
 	//do some sanity checks on wave names: they should not start or end with numbers.
 	do
-		
+
 		if (sc_RawRecord[i])
 			s = sc_RawWaveNames[i]
 			if (!((char2num(s[0]) >= 97 && char2num(s[0]) <= 122) || (char2num(s[0]) >= 65 && char2num(s[0]) <= 90)))
@@ -915,7 +915,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	while (i<numpnts(sc_CalcWaveNames))
 	i=0
 
-	sc_findAsyncMeasurements() 
+	sc_findAsyncMeasurements()
 
 	// connect VISA instruments
 	// do this here, because if it fails
@@ -1304,9 +1304,9 @@ function RecordValues(i, j, [readvstime, fillnan])
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
 	nvar sc_abortsweep, sc_pause, sc_scanstarttime
 	variable ii = 0
-	
+
 	//// setup all sorts of logic so we can store values correctly ////
-	
+
 	variable innerindex, outerindex
 	if (sc_is2d)
 		// 2d
@@ -1322,7 +1322,7 @@ function RecordValues(i, j, [readvstime, fillnan])
 	if(paramisdefault(readvstime))
 		readvstime=0
 	endif
-	
+
 	if(innerindex==0 && outerindex==0)
 		variable/g sc_rvt = readvstime // needed for rescaling in SaveWaves()
 	endif
@@ -1332,7 +1332,7 @@ function RecordValues(i, j, [readvstime, fillnan])
 	endif
 
 	//// fill NaNs? ////
-	
+
 	if(paramisdefault(fillnan))
 		fillnan = 0 // defaults to 0
 	elseif(fillnan==1)
@@ -1426,7 +1426,7 @@ function sc_ManageThreads(innerIndex, outerIndex, readvstime)
 	svar sc_asyncFolders
 	nvar sc_is2d, sc_scanstarttime, sc_numAvailThreads, sc_numInstrThreads
 	wave /WAVE sc_asyncRefs
-	
+
 	variable tgID = ThreadGroupCreate(min(sc_numInstrThreads, sc_numAvailThreads)) // open threads
 
 	variable i=0, idx=0, measIndex=0, threadIndex = 0
@@ -1434,28 +1434,28 @@ function sc_ManageThreads(innerIndex, outerIndex, readvstime)
 
 	// start new thread for each thread_* folder in data folder structure
 	for(i=0;i<sc_numInstrThreads;i+=1)
-	
+
 		do
 			threadIndex = ThreadGroupWait(tgID, -2) // relying on this to keep track of index
 		while(threadIndex<1)
-		
+
 		duplicatedatafolder root:async, root:asyncCopy //duplicate async folder
 		ThreadGroupPutDF tgID, root:asyncCopy // move root:asyncCopy to where threadGroup can access it
 											           // effectively kills root:asyncCopy in main thread
-		
+
 		// start thread
 		threadstart tgID, threadIndex-1, sc_Worker(sc_asyncRefs, innerindex, outerindex, \
 																 StringFromList(i, sc_asyncFolders, ";"), sc_is2d, \
 																 readvstime, sc_scanstarttime)
 
 	endfor
-	
+
 	// wait for all threads to finish and get the rest of the data
 	do
 		threadIndex = ThreadGroupWait(tgID, 0)
 		sleep /s 0.001
 	while(threadIndex!=0)
-	
+
 	return tgID
 end
 
@@ -1463,7 +1463,7 @@ threadsafe function sc_Worker(refWave, innerindex, outerindex, folderIndex, is2d
 	wave /WAVE refWave
 	variable innerindex, outerindex, is2d, rvt, starttime
 	string folderIndex
-	
+
 	do
 		DFREF dfr = ThreadGroupGetDFR(0,0)	// Get free data folder from input queue
 		if (DataFolderRefStatus(dfr) == 0)
@@ -1472,49 +1472,49 @@ threadsafe function sc_Worker(refWave, innerindex, outerindex, folderIndex, is2d
 			break
 		endif
 	while(1)
-	
+
 	setdatafolder dfr:$(folderIndex)
-	
+
 	nvar /z instrID = instrID
 	svar /z queryFunc = queryFunc
 	svar /z wavIdx = wavIdx
-	
+
 	if(nvar_exists(instrID) && svar_exists(queryFunc) && svar_exists(wavIdx))
-			
+
 		variable i, val
 		for(i=0;i<ItemsInList(queryFunc, ";");i+=1)
-			
+
 			// do the measurements
 			funcref funcAsync func = $(StringFromList(i, queryFunc, ";"))
 			val = func(instrID)
-			
+
 			if(numtype(val)==2)
 				// if NaN was returned, try the next function
 				continue
 			endif
-			
+
 			wave wref1d = refWave[2*str2num(StringFromList(i, wavIdx, ";"))]
-			
+
 			if(rvt == 1)
 				redimension /n=(innerindex+1) wref1d
 				setscale/I x 0, datetime - starttime, wref1d
 			endif
-			
+
 			wref1d[innerindex] = val
-			
+
 			if(is2d)
 				wave wref2d = refWave[2*str2num(StringFromList(i, wavIdx, ";"))+1]
 				wref2d[innerindex][outerindex] = val
 			endif
-			
+
 		endfor
-		
-		return i	
+
+		return i
 	else
 		// if no instrID/queryFunc/wavIdx exists, get out
 		return NaN
 	endif
-	
+
 end
 
 threadsafe function funcAsync(instrID)  // Reference functions for all *_async functions
@@ -1531,7 +1531,7 @@ function sc_KillThreads(tgID)
 	elseif(releaseResult == -1)
 		printf "ThreadGroupRelease failed. No fatal errors, will continue.\r"
 	endif
-	
+
 end
 
 function/s construct_calc_script(script)
@@ -1540,10 +1540,10 @@ function/s construct_calc_script(script)
 	string test_wave
 	variable i=0, j=0, strpos, numptsRaw, numptsCalc
 	wave/t sc_RawWaveNames, sc_CalcWaveNames
-	
+
 	numptsRaw = numpnts(sc_RawWaveNames)
 	numptsCalc = numpnts(sc_CalcWaveNames)
-	
+
 	for(i=0;i<numptsRaw+numptsCalc;i+=1)
 		j=0
 		if(i<numptsRaw)
@@ -1601,7 +1601,7 @@ function /s getExpStatus([msg])
 	string msg
 	nvar filenum, sweep_t_elapsed
 	svar sc_current_config, sc_hostname
-	
+
 	if(paramisdefault(msg))
 		msg=""
 	endif
@@ -1631,7 +1631,7 @@ function /s getExpStatus([msg])
 	jstr = addJSONKeyVal(jstr, "time_completed", strVal=Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
 	jstr = addJSONKeyVal(jstr, "time_elapsed", numVal = sweep_t_elapsed, fmtNum = "%.3f")
 	jstr = addJSONKeyVal(jstr, "saved_waves", strVal=recordedWaveArray())
-	jstr = addJSONKeyVal(jstr, "comment", strVal=msg)
+	jstr = addJSONKeyVal(jstr, "comment", strVal=msg, addQuotes = 1)
 
 	return jstr
 end
@@ -1693,12 +1693,12 @@ function saveExp()
 end
 
 function sc_update_xdata()
-    // update the sc_xdata wave 
+    // update the sc_xdata wave
     // to match the measured waves
-    
+
 	wave sc_xdata, sc_RawRecord, sc_RawPlot
 	wave /t sc_RawWaveNames
-	
+
 	// look for the first wave that has recorded values
 	string wn = ""
 	variable i=0
@@ -1708,11 +1708,11 @@ function sc_update_xdata()
 	        break
 	    endif
 	endfor
-	
+
 	if(strlen(wn)==0)
 		wave sc_xdata, sc_CalcRecord, sc_CalcPlot
 		wave /t sc_CalcWaveNames
-		
+
 		for(i=0; i<numpnts(sc_CalcWaveNames); i+=1)
 		    if (sc_CalcRecord[i] == 1 || sc_CalcPlot[i]==1)
 		        wn = sc_CalcWaveNames[i]
@@ -1720,8 +1720,8 @@ function sc_update_xdata()
 		    endif
 		endfor
 	endif
-	
-	wave w = $wn  // open reference 
+
+	wave w = $wn  // open reference
 	Redimension /N=(numpnts(w)) sc_xdata
 	CopyScales w, sc_xdata  // copy scaling
 	sc_xdata = x  // set wave data equal to x scaling
@@ -1765,7 +1765,7 @@ function SaveWaves([msg, save_experiment])
 	// save timing variables
 	variable /g sweep_t_elapsed = datetime-sc_scanstarttime
 	printf "Time elapsed: %.2f s \r", sweep_t_elapsed
-	
+
 	dowindow /k SweepControl // kill scan control window
 
 	// count up the number of data files to save
@@ -1782,7 +1782,7 @@ function SaveWaves([msg, save_experiment])
        	if(sc_rvt==1)
        		sc_update_xdata() // update xdata wave
 		endif
-		
+
 		// Open up any files that may be needed
 	 	// Save scan controller meta data in this function as well
 		initSaveFiles(msg=msg)
@@ -1837,10 +1837,10 @@ function SaveWaves([msg, save_experiment])
 		sc_findNewFiles(filenum)
 		sc_FileTransfer() // this may leave the experiment file open for some time
 						   // make sure to run saveExp before this
-							                      
+
 	else
 		sc_findNewFiles(filenum)    // get list of new files
-		                            // keeps appending files until 
+		                            // keeps appending files until
 		                            // server.notify is deleted
 		                            // or srv_push is turned on
 	endif
@@ -2162,9 +2162,9 @@ end
 function sc_ForceDataBackup()
 	// this function is never called automatically
 	// if you are worried about your data
-	// you can call it and it will write a fresh copy of the 
+	// you can call it and it will write a fresh copy of the
 	// "data" directory to the lab server
-	
+
 	svar server_url, sc_hostname
 	string username = "anonymous"
 	string password = "folklab101@gmail.com"
@@ -2188,43 +2188,42 @@ function sc_FileTransfer()
 		// walk through server.notify and send data
 		svar sc_hostname, server_url
 		printf "Transfering new data over FTP to %s\r", server_url
-		
+
 		string username = "anonymous"
 		string password = "folklab101@gmail.com"
 		string datapath = getExpPath("data", full=0)
 		variable idx = strlen(datapath)
-		
+
 		string ftpURL = "", lineContent = "", filePath = ""
 		variable i
 		for (i = 0; ;i += 1)
-		
+
 			FReadLine refNum, lineContent
 			if (strlen(lineContent) == 0)
 				// no more data to be read
 				break
 			endif
-			
+
 			lineContent = TrimString(lineContent)
 			if (strlen(lineContent) == 0)
 				// blank line for some reason
 				continue
 			endif
-			
+
 			filePath = ReplaceString("/", lineContent[idx,inf], ":")
 
 			sprintf ftpURL, "ftp://%s/data/%s%s", server_url, sc_hostname, lineContent
-			print ftpURL, filePath
-			FTPUpload /N=21 /P=data /T=0 /U=username /W=password /V=4 /Z ftpURL, filePath 
+			FTPUpload /N=21 /P=data /T=0 /U=username /W=password /V=0 /Z ftpURL, filePath
 			if(V_flag!=0)
 				printf "Error transfering file to server -- %s (code = %d)\r", filePath, V_flag
 			endif
-			
+
 		endfor
 
 		close refnum
-//		sc_DeleteNotificationFile() // Sent everything possible
+		sc_DeleteNotificationFile() // Sent everything possible
 									   // assume users will fix errors manually
-		
+
 	endif
 
 end
@@ -2233,6 +2232,7 @@ function sc_DeleteNotificationFile()
 
 	// delete server.notify
 	deletefile /Z=1 /P=data "server.notify"
+
 	if(V_flag!=0)
 		print "Failed to delete 'server.notify'"
 	endif
@@ -2241,7 +2241,7 @@ end
 function /S getSlackNotice(username, [message, channel, botname, emoji, min_time])
 	// this function will send a notification to Slack
 	// username = your slack username
-	
+
 	// message = string to include in Slack message
 	// channel = slack channel to post the message in
 	//            if no channel is provided a DM will be sent to username
@@ -2254,7 +2254,7 @@ function /S getSlackNotice(username, [message, channel, botname, emoji, min_time
 	nvar filenum, sweep_t_elapsed, sc_abortsweep
 	svar slack_url
 	string txt="", buffer="", payload="", out=""
-	
+
 	//// check if I need a notification ////
 	if (paramisdefault(min_time))
 		min_time = 60.0 // seconds
@@ -2263,51 +2263,51 @@ function /S getSlackNotice(username, [message, channel, botname, emoji, min_time
 	if(sweep_t_elapsed < min_time)
 		return addJSONKeyVal(out, "notified", strVal="false") // no notification if min_time is not exceeded
 	endif
-	
+
 	if(sc_abortsweep)
 		return addJSONKeyVal(out, "notified", strVal="false") // no notification if sweep was aborted by the user
 	endif
-	//// end notification checks //// 
-	
-	
+	//// end notification checks ////
+
+
 	//// build notification text ////
-	if (!paramisdefault(channel)) 
+	if (!paramisdefault(channel))
 		// message will be sent to public channel
 		// user who sent it will be mentioned at the beginning of the message
-		txt += "<@"+username+">\r" 
+		txt += "<@"+username+">\r"
 	endif
-	
+
 	if (!paramisdefault(message) && strlen(message)>0)
 		txt += RemoveTrailingWhitespace(message) + "\r"
 	endif
-		
-	sprintf buffer, "dat%d completed:  %s %s \r", filenum, Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); txt+=buffer 
+
+	sprintf buffer, "dat%d completed:  %s %s \r", filenum, Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); txt+=buffer
 	sprintf buffer, "time elapsed:  %.2f s \r", sweep_t_elapsed; txt+=buffer
 	//// end build txt ////
-	
-	
+
+
 	//// build payload ////
-	sprintf buffer, "{\"text\": \"%s\"", txt; payload+=buffer // 
-	
+	sprintf buffer, "{\"text\": \"%s\"", txt; payload+=buffer //
+
 	if (paramisdefault(botname))
 		botname = "qdotbot"
-	endif	
+	endif
 	sprintf buffer, ", \"username\": \"%s\"", botname; payload+=buffer
-	
+
 	if (paramisdefault(channel))
 		sprintf buffer, ", \"channel\": \"@%s\"", username; payload+=buffer
 	else
 		sprintf buffer, ", \"channel\": \"#%s\"", channel; payload+=buffer
 	endif
-	
+
 	if (paramisdefault(emoji))
 		emoji = ":the_horns:"
-	endif	
-	sprintf buffer, ", \"icon_emoji\": \"%s\"", emoji; payload+=buffer // 
-	
+	endif
+	sprintf buffer, ", \"icon_emoji\": \"%s\"", emoji; payload+=buffer //
+
 	payload += "}"
 	//// end payload ////
-	
+
 	URLRequest /DSTR=payload url=slack_url, method=post
 	if (V_flag == 0)    // No error
         if (V_responseCode != 200)  // 200 is the HTTP OK code
