@@ -1631,7 +1631,7 @@ function /s getExpStatus([msg])
 	jstr = addJSONKeyVal(jstr, "time_completed", strVal=Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
 	jstr = addJSONKeyVal(jstr, "time_elapsed", numVal = sweep_t_elapsed, fmtNum = "%.3f")
 	jstr = addJSONKeyVal(jstr, "saved_waves", strVal=recordedWaveArray())
-	jstr = addJSONKeyVal(jstr, "comment", strVal=msg)
+	jstr = addJSONKeyVal(jstr, "comment", strVal=msg, addQuotes = 1)
 
 	return jstr
 end
@@ -2234,7 +2234,6 @@ function sc_DeleteNotificationFile()
 	deletefile /Z=1 /P=data "server.notify"
 
 	if(V_flag!=0)
-		print V_flag
 		print "Failed to delete 'server.notify'"
 	endif
 end
