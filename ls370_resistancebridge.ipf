@@ -278,6 +278,7 @@ function setLS370tempcontrolmode(mode) // Units: No units
 		mcheater_led = 1
 		PopupMenu mcheater, mode=1
 		SetVariable mcheaterset, disable=2
+		PopupMenu tempcontrol, mode=1
 		interval = 10
 		maxcurrent = estimateheaterrangeLS370(temp_set)
 		setLS370PIDcontrol(channel,temp_set,maxcurrent)
@@ -293,7 +294,7 @@ function setLS370tempcontrolmode(mode) // Units: No units
 	elseif(mode == 4)
 		pid_led = 0
 		mcheater_led = 0
-		PopupMenu mcheater, mode=2
+		PopupMenu mcheater, mode=2, disable=0
 		SetVariable mcheaterset, disable=0
 		resetLS370exclusivereader()
 		sc_sleep(0.5)
@@ -309,12 +310,14 @@ end
 function setLS370PIDcontrol(channel,setpoint,maxcurrent) //Units: mK, mA
 	variable channel, setpoint, maxcurrent
 	string payload, command, headers, url, token = "vMqyDIcB"
+	nvar temp_set
 	
 	sprintf payload, "{ \"channel\": %d, \"set_point\": %g, \"max_current_ma\": %g, \"max_heater_level\": %s}", channel, setpoint/1000, maxcurrent, "8"
 	headers = "Content-Type: application/json"
 	sprintf command, "set-temperature-control-parameters?_at_=%s", token
 	url = generateLS370URL(command)
 	writeLS370(url,payload,headers)
+	temp_set = setpoint
 end
 
 function setLS370cmode(mode)
@@ -470,9 +473,9 @@ function turnoffLS370MCheater()
 	pid_led = 0
 	mcheater_led = 0
 	pid_mode = 4
-	PopupMenu mcheater, mode=2
-	SetVariable mcheaterset, disable=0
-	PopupMenu tempcontrol, value="Off"
+	PopupMenu mcheater, mode=2, disable=0, win=Lakeshore
+	SetVariable mcheaterset, disable=0, win=Lakeshore
+	PopupMenu tempcontrol, mode=2, win=Lakeshore
 end
 
 function toggleLS370magnetheater(onoff)
@@ -522,7 +525,7 @@ end
 function estimateheaterrangeLS370(temp) // Units: mK
 	// sets the heater range based on the wanted output
 	// uses the range lookup table
-	// avaliable ranges: 1,2,3,4,5,6,7,8 --> 0,10,30,95,500,1200,5000,10000 mK
+	// avaliable ranges: 1,2,3,4,5,6,7,8 --> 0,10,30,95,501,1200,5000,10000 mK
 	variable temp
 	wave mcheatertemp_lookup
 	make/o/n=8 heatervalues
@@ -612,7 +615,7 @@ function createLS370globals()
 	string/g bfheaterlookup = "mc;still;0;2"
 	string/g ighheaterlookup = "mc;still;sorb;0;2;1"
 	string/g ighgaugelookup = "P1;P2;G1;G2;G3"
-	make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,500,1200,5000,10000}} // mA,mK
+	make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,350,1201,1800,10000}} // mA,mK
 
 	// Create variables for control window
 	variable/g pid_led = 0

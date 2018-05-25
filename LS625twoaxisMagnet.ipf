@@ -74,8 +74,7 @@ endmacro
 function getLS625current(instrID) // Units: A
 	variable instrID
 	nvar ampsperteslax,ampsperteslaz
-	wave/t outputvalstr,sphericalvalstr
-	wave sphericalcoordinates
+	wave/t outputvalstr
 	variable current,field, ampspertesla
 	svar instrDescX,instrDescZ
 
@@ -91,10 +90,6 @@ function getLS625current(instrID) // Units: A
 	else
 		abort "Couldn't determine which axis to address"
 	endif
-
-//	CartisiantoSpherical(str2num(outputvalstr[0][1]),str2num(outputvalstr[1][1]),str2num(outputvalstr[2][1]))
-	sphericalvalstr[0][1] = num2str(sphericalcoordinates[0])
-	sphericalvalstr[1][1] = num2str(sphericalcoordinates[1])
 
 	return current
 end
