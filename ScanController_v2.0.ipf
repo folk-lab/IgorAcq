@@ -773,7 +773,7 @@ function sc_findAsyncMeasurements()
 	killdatafolder /z root:async // kill it if it exists
 	newdatafolder root:async // create an empty version
 
-	variable i = 0, idx = 0, measIdx=0
+	variable i = 0, idx = 0, measIdx=0, instrAsync=0
 	string script, strID, queryFunc, threadFolder
 	string /g sc_asyncFolders = ""
 	make /o/n=1 /WAVE sc_asyncRefs
@@ -783,13 +783,12 @@ function sc_findAsyncMeasurements()
 		if ( (sc_RawRecord[i] == 1) || (sc_RawPlot[i] == 1) )
 			// this is something that will be measured
 
-			if (sc_measAsync[i] == 1) // this is something that should be asyn
+			if (sc_measAsync[i] == 1) // this is something that should be async
 
 				script = sc_RawScripts[i]
 				idx = sc_checkAsyncScript(script) // check function format
 
 				if(idx!=-1) // fucntion is good, this will be recorded asynchronously
-					sc_measAsync[i]=1
 
 					// keep track of function names and instrIDs in folder structure
 					strID = script[idx+1,strlen(script)-2]
@@ -804,6 +803,7 @@ function sc_findAsyncMeasurements()
 						svar wI = root:async:$(threadFolder):wavIdx
 						wI += ";" + num2str(measIdx)
 					else
+						instrAsync =+ 1
 						// create a new thread directory for this instrument
 						newdatafolder root:async:$(threadFolder)
 
@@ -837,11 +837,9 @@ function sc_findAsyncMeasurements()
 
 	endfor
 
-	if(sum(sc_measAsync)<2)
+	if(instrAsync<2)
 		// no point in doing anyting async is only one instrument is capable of it
-		if(sum(sc_measAsync)==1)
-			print "[WARNING] Not using async for only one measurement. It will slow the measurement down."
-		endif
+		print "[WARNING] Not using async for only one instrument. It will slow the measurement down."
 		make /o/n=(numpnts(sc_RawScripts)) sc_measAsync = 0
 	endif
 
