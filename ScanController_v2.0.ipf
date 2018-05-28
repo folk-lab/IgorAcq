@@ -337,25 +337,13 @@ end
 //// configuration files ////
 /////////////////////////////
 
-function /S sc_createconfig()
-	wave/t sc_RawWaveNames
-	wave sc_RawRecord
-	wave sc_RawPlot
-	wave sc_measAsync
-	wave/t sc_RawScripts
-	wave/t sc_CalcWaveNames
-	wave/t sc_CalcScripts
-	wave sc_CalcRecord
-	wave sc_CalcPlot
-	nvar sc_PrintRaw
-	nvar sc_PrintCalc
-	svar sc_LogStr
-	svar sc_ColorMap
-	svar sc_current_config
-	nvar filenum
+function/s sc_createconfig()
+	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts
+	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
+	nvar sc_PrintRaw, sc_PrintCalc, filenum
+	svar sc_LogStr, sc_ColorMap, sc_current_config
 	variable refnum
 	string configfile
-
 	string configstr = "", tmpstr = ""
 
 	// wave names
@@ -363,24 +351,24 @@ function /S sc_createconfig()
 	tmpstr = addJSONKeyVal(tmpstr, "calc", strVal=TextWaveToStrArray(sc_CalcWaveNames))
 	configstr = addJSONKeyVal(configstr, "wave_names", strVal=tmpstr)
 
-	// record?
+	// record checkboxes
 	tmpstr = ""
 	tmpstr = addJSONKeyVal(tmpstr, "raw", strVal=NumericWaveToBoolArray(sc_RawRecord))
 	tmpstr = addJSONKeyVal(tmpstr, "calc", strVal=NumericWaveToBoolArray(sc_CalcRecord))
 	configstr = addJSONKeyVal(configstr, "record_waves", strVal=tmpstr)
 
-	// plot?
+	// plot checkboxes
 	tmpstr = ""
 	tmpstr = addJSONKeyVal(tmpstr, "raw", strVal=NumericWaveToBoolArray(sc_RawPlot))
 	tmpstr = addJSONKeyVal(tmpstr, "calc", strVal=NumericWaveToBoolArray(sc_CalcPlot))
 	configstr = addJSONKeyVal(configstr, "plot_waves", strVal=tmpstr)
 
-	// plot?
+	// async checkboxes
 	tmpstr = ""
 	tmpstr = addJSONKeyVal(tmpstr, "raw", strVal=NumericWaveToBoolArray(sc_measAsync))
 	configstr = addJSONKeyVal(configstr, "meas_async", strVal=tmpstr)
 
-	//scripts
+	// scripts
 	tmpstr = ""
 	tmpstr = addJSONKeyVal(tmpstr, "raw", strVal=TextWaveToStrArray(sc_RawScripts))
 	tmpstr = addJSONKeyVal(tmpstr, "calc", strVal=TextWaveToStrArray(sc_CalcScripts))
@@ -406,52 +394,54 @@ end
 
 function sc_loadconfig(configfile)
 	string configfile
-	variable refnum
-	string loadcontainer
-	nvar sc_PrintRaw
-	nvar sc_PrintCalc
-	svar sc_LogStr
-	svar sc_ColorMap
-	svar sc_current_config
-	nvar filenum
-	variable i, confignum=0
-	string file_string, configunix
-
+	string JSONstr, checkStr, textkeys, numkeys, textdestinations, numdestinations
+	variable i=0,escapePos=-1
+	nvar sc_PrintRaw, sc_PrintCalc
+	svar sc_LogStr, sc_current_config, sc_ColorMap, sc_current_config
+	
+	// load json string from config file
 	printf "Loading configuration from: %s\n", configfile
 	sc_current_config = configfile
-
-	string jstr = JSONfromFile("config", configfile)
-
+	JSONstr = JSONfromFile("config", configfile)
+	
+	// read JSON sting. Results will be dumped into: t_tokentext, w_tokensize, w_tokenparent and w_tokentype
+	JSONSimple JSONstr
+	wave/t t_tokentext
+   wave w_tokensize, w_tokenparent, w_tokentype
+	
+	// distribute JSON values
 	// load raw wave configuration
-	ArrayToTextWave(getJSONvalue(jstr, "wave_names:raw"), "sc_RawWaveNames")
-	ArrayToNumWave(getJSONvalue(jstr, "record_waves:raw"), "sc_RawRecord")
-	ArrayToNumWave(getJSONvalue(jstr, "plot_waves:raw"), "sc_RawPlot")
-	ArrayToNumWave(getJSONvalue(jstr, "meas_async:raw"), "sc_measAsync")
-	ArrayToTextWave(getJSONvalue(jstr, "scripts:raw"), "sc_RawScripts")
-
+	// keys are: wavenames:raw, record_waves:raw, plot_waves:raw, meas_async:raw, scripts:raw
+	textkeys = "wavenames,scripts"
+	numkeys = "record_waves,plot_waves,meas_async"
+	textdestinations = "sc_RawWaveNames,sc_RawScripts"
+	numdestinations = "sc_RawRecord,sc_RawPlot,sc_measAsync"
+	loadtextJSONfromkeys(textkeys,textdestinations,children="raw;raw")
+	loadbooleanJSONfromkeys(numkeys,numdestinations,children="raw;raw")
+	
 	// load calc wave configuration
-	ArrayToTextWave(getJSONvalue(jstr, "wave_names:calc"), "sc_CalcWaveNames")
-	ArrayToNumWave(getJSONvalue(jstr, "record_waves:calc"), "sc_CalcRecord")
-	ArrayToNumWave(getJSONvalue(jstr, "plot_waves:calc"), "sc_CalcPlot")
-	ArrayToTextWave(getJSONvalue(jstr, "scripts:calc"), "sc_CalcScripts")
-
+	// keys are: wavenames:calc, record_waves:calc, plot_waves:calc, scripts:calc
+	textkeys = "wavenames,scripts"
+	numkeys = "record_waves,plot_waves"
+	textdestinations = "sc_CalcWaveNames,sc_CalcScripts"
+	numdestinations = "sc_CalcRecord,sc_CalcPlot"
+	loadtextJSONfromkeys(textkeys,textdestinations,children="calc;calc")
+	loadbooleanJSONfromkeys(numkeys,numdestinations,children="calc;calc")
+	
 	// load print checkbox settings
-	sc_PrintRaw = str2num(getJSONvalue(jstr, "print_to_history:raw"))
-	sc_PrintCalc = str2num(getJSONvalue(jstr, "print_to_history:calc"))
-
+	sc_PrintRaw = booltonum(stringfromlist(0,exstractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="raw"),","))
+	sc_PrintCalc = booltonum(stringfromlist(0,exstractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="calc"),","))
+	
 	// load log string
-	sc_LogStr = stripCharacters(getJSONvalue(jstr, "log_string"), "\"")
-
+	sc_LogStr = stringfromlist(0,exstractJSONvalues(getJSONkeyindex("log_string",t_tokentext)),",")
+	
 	// load colormap
-	sc_ColorMap = stripCharacters(getJSONvalue(jstr, "colormap"), "\"")
-
+	sc_ColorMap = stringfromlist(0,exstractJSONvalues(getJSONkeyindex("colormap",t_tokentext)),",")
 end
-
 
 /////////////////////
 //// main window ////
 /////////////////////
-
 
 function sc_rebuildwindow()
 	dowindow /k ScanController
@@ -1585,7 +1575,7 @@ function /s getEquipLogs()
 				// need to get first key and value from sc_log_buffer
 				keylist = getJSONkeys(sc_log_buffer)
 				key = StringFromList(0,keylist, ",")
-				sval = getJSONValue(sc_log_buffer, key)
+				sval = getJSONvalue(sc_log_buffer, key)
 				buffer = addJSONKeyVal(buffer, key, strVal=sval)
 			else
 				print "[WARNING] command failed to log anything: "+command+"\r"
@@ -1725,7 +1715,6 @@ function sc_update_xdata()
 	Redimension /N=(numpnts(w)) sc_xdata
 	CopyScales w, sc_xdata  // copy scaling
 	sc_xdata = x  // set wave data equal to x scaling
-
 end
 
 function SaveWaves([msg, save_experiment])
@@ -2155,7 +2144,6 @@ function sc_findNewFiles(datnum)
 			endif
 		endfor
 	endfor
-
 	close refnum // close server.notify
 end
 
@@ -2175,7 +2163,6 @@ function sc_ForceDataBackup()
 end
 
 function sc_FileTransfer()
-
 	variable refnum
 	open /R/P=data refnum as "server.notify"
 
@@ -2223,9 +2210,7 @@ function sc_FileTransfer()
 		close refnum
 		sc_DeleteNotificationFile() // Sent everything possible
 									   // assume users will fix errors manually
-
 	endif
-
 end
 
 function sc_DeleteNotificationFile()
@@ -2340,4 +2325,624 @@ function sc_testreadtime(numpts, delay) //Units: s
 	printf "each RecordValues(...) call takes ~%.1fms \n", ttotal/numpts*1000 - delay*1000
 
 	sc_controlwindows("") // kill sweep control windows
+end
+
+////////////////////////
+//// JSON functions ////
+////////////////////////
+
+//// load from/write to file ////
+
+function/s JSONfromfile(path, filename)
+	// read JSON string from filename in path
+	string path, filename
+	variable refNum
+	string buffer = "", JSONstr = ""
+	
+	open /r/z/p=$path refNum as filename
+	if(V_flag!=0)
+		print "[ERROR]: Could not read JSON from: "+filename
+		return ""
+	endif
+
+	do 
+		FReadLine refNum, buffer
+		if(strlen(buffer)==0)
+			break
+		endif
+		JSONstr+=buffer
+	while(1)
+	close refNum
+	
+	return JSONstr
+end
+
+function writeJSONtoFile(JSONstr, filename, path)
+	string JSONstr, filename, path
+	variable refNum=0
+	
+	// write jstr to filename
+	// add whitespace to make it easier to read
+	// this is expected to be a valid json str
+	// it will be a disaster otherwise
+	
+	JSONstr = prettyJSONfmt(JSONstr)
+	
+	open /z/p=$path refNum as filename
+
+	do
+		if(strlen(JSONstr)<500)
+			fprintf refnum, "%s", JSONstr
+			break
+		else
+			fprintf refnum, "%s", JSONstr[0,499]
+			JSONstr = JSONstr[500,inf]
+		endif
+	while(1)
+
+	close refNum
+end
+
+//// JSON util ////
+
+function/s numToBool(val)
+	variable val
+	if(val==1)
+		return "true"
+	elseif(val==0)
+		return "false"
+	else
+		return ""
+	endif
+end
+
+function boolToNum(str)
+	string str
+	if(StringMatch(LowerStr(str), "true")==1)
+		// use string match to ignore whitespace
+		return 1
+	elseif(StringMatch(LowerStr(str), "false")==1)
+		return 0
+	else
+		return -1
+	endif
+end
+
+function/s textWaveToStrArray(w)
+	wave/t w	
+	string list, checkStr, escapedStr
+	variable i=0
+	
+	wfprintf list, "\"%s\",", w	
+	for(i=0;i<itemsinlist(list,";");i+=1)
+		checkStr = stringfromlist(i,list,";")
+		if(countQuotes(checkStr)>2)	
+			escapedStr = escapeInnerQuotes(checkStr)
+			list = removelistitem(i,list,";")
+			list = addlistitem(escapedStr,list,";",i)
+		endif
+	endfor
+	return "["+list[0,strlen(list)-2]+"]"
+end
+
+function countQuotes(str)
+	// count how many quotes are in the string
+	// +1 for "
+	// escaped quotes are ignored
+	string str
+	variable quoteCount = 0, i = 0, escaped = 0
+	for(i=0; i<strlen(str); i+=1)
+	
+		// check if the current character is escaped
+		if(i!=0)
+			if( CmpStr(str[i-1], "\\") == 0)
+				escaped = 1
+			else
+				escaped = 0
+			endif
+		endif
+	
+		// count opening brackets
+		if( CmpStr(str[i], "\"" ) == 0 && escaped == 0)
+			quoteCount += 1
+		endif
+		
+	endfor
+	return quoteCount
+end
+
+function/s escapeInnerQuotes(str)
+	string str
+	variable i, escaped
+	string dummy="", newStr=""
+	
+	for(i=1; i<strlen(str)-1; i+=1)
+	
+		// check if the current character is escaped
+		if(cmpStr(str[i-1], "\\") == 0)
+			escaped = 1
+		else
+			escaped = 0
+		endif
+	
+		// find extra quotes
+		dummy = str[i]
+		if(cmpStr(dummy, "\"" ) == 0 && escaped == 0)
+			dummy = "\\"+dummy
+		endif
+		newStr = newStr+dummy
+	endfor
+	return newStr
+end
+
+function/s numericWaveToBoolArray(w)
+	wave w	
+	string list = "["
+	variable i=0
+	
+	for(i=0; i<numpnts(w); i+=1)
+		list += numToBool(w[i])+", "
+	endfor
+	
+	return list[0,strlen(list)-3] + "]"
+end
+
+//// write to JSON ////
+
+function/s addJSONKeyVal(jstr, key, [numVal, strVal, fmtNum, addQuotes])
+	// new Key:Val goes at the end of JSON object, jstr
+	// it is up to the user to provide format strings that make sense
+	// defaults are %s and %f for strVal and numVal, respectively
+	string jstr, key, strVal, fmtNum
+	variable numVal, addQuotes
+	
+	if(paramisdefault(addQuotes))
+		addQuotes = 0
+	endif
+
+	if(paramisdefault(numVal) && paramisdefault(strVal))
+		printf "[ERROR]: A value has not been provided along with the key: \r", key
+	endif
+	
+	//// remove leading/trailing whitespace and quotes from key ////
+	do
+	    string firstChar= key[0]
+	    if (CmpStr(firstChar, "\"") == 0 || GrepString(firstChar, "\\s") == 1)
+	        key = key[1,inf]
+	    else
+	        break
+	    endif   
+	while (strlen(key) > 0)
+	do
+	    string lastChar = key[strlen(key) - 1]
+	    if (CmpStr(lastChar, "\"") == 0 || GrepString(lastChar, "\\s") == 1)
+	        key = key[0, strlen(key) - 2]
+	    else
+	        break
+	    endif   
+	while (strlen(key) > 0)
+
+	// cleanup starting string
+	if(strlen(jstr)==0)
+		// no starting string provided
+		// make a new one
+		jstr = "{"
+	else
+		// get only what is inside the starting and ending brakets
+		jstr = readJSONObject(jstr) // returns '{....}'
+		jstr = jstr[0,strlen(jstr)-2]+", " // returns '{....., '
+	endif
+	
+	variable err = 0
+	if(!paramisdefault(strVal))
+		// setup format string
+		if(addQuotes!=0)
+			strVal = "\""+strVal+"\""
+			err = findJSONtype(strVal)
+		endif
+		
+		// check if strVal is a valid type
+		err = findJSONtype(strVal)
+		if(err==-1)
+				return ""
+		endif 
+		return jstr+"\""+key+"\": "+strVal+"}"
+	endif
+
+	if(!paramisdefault(numVal))
+		// setup format string
+		string numStr = ""
+		if(paramisdefault(fmtNum))
+			sprintf numStr, "%g", numVal
+		else
+			sprintf numStr, fmtNum, numVal
+		endif
+		
+		// return output
+		return jstr+"\""+key+"\": "+numStr+"}"
+	endif
+end
+
+function/s prettyJSONfmt(jstr)
+	string jstr
+	
+	// write jstr to filename
+	// add whitespace to make it easier to read
+	// this is expected to be a valid json str
+	// it will be a disaster otherwise
+	
+	string outStr="", buffer=""
+
+	outStr += "{\r"
+
+	// get keys...
+	string keylist = getJSONkeys(jstr)
+	
+	variable i=0, level = 0
+	string key = "", printkey = "", strVal = "", group = ""
+	for(i=0;i<ItemsInList(keylist,",");i+=1) // loop over keys
+		
+		// check if the indent level has decreased
+		// if so, close out object with curly bracket
+		
+		key = StringFromList(i, keylist, ",")
+		printkey = StringFromList(ItemsInList(key, ":")-1, key, ":")
+		
+		if(i!=0 && ItemsInList(key, ":")<level)
+			level = ItemsInList(key, ":")
+			outStr= outStr[0,strlen(outStr)-3] + "\r" + getJSONindent(level) + "},\r"
+		else
+			level = ItemsInList(key, ":")
+		endif 
+		
+		strVal = getJSONValue(jstr, key)
+		
+		switch(findJSONtype(strVal))
+			case 1:
+				// don't put the value in, it will contain keys and be handled another way
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": {\r"
+				break
+			case 2: 
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+",\r"
+				break
+			case 3:
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+",\r"
+				break
+			case 4:
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+",\r"
+				break
+			case 5:
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+",\r"
+				break
+			case 6:
+				strVal = "null" 
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+",\r"
+				break
+			case -1:
+				strVal = ""
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+",\r"
+				break
+		endswitch
+	endfor
+	
+	outStr = outStr[0,strlen(outStr)-3]+"\r" // fix trailing comma trouble
+	
+	// need to close out open objects
+	do
+		level-=1
+		outStr+= getJSONindent(level)+"}\r"
+	while(level>0)
+	
+	return outStr
+end
+
+function loadtextJSONfromkeys(keys,destinations,[children])
+	string keys, destinations, children
+	variable i=0, j=0, index
+	string valuelist
+	wave/t t_tokentext
+	wave w_tokenparent, w_tokensize, w_tokentype
+	
+	if(paramisdefault(children))
+		children = ""
+	endif
+	
+	if(itemsinlist(keys)!=itemsinlist(destinations))
+		print "[ERROR]: Config load falied! Number of keys doesn't match numbers of destination waves!"
+		return -1
+	else
+		for(i=0;i<itemsinlist(keys);i+=1)
+			index = getJSONkeyindex(stringfromlist(i,keys),t_tokentext)
+			valuelist = exstractJSONvalues(index,children=stringfromlist(i,children,";"))
+			make/o/t/n=(itemsinlist(valuelist,",")) $stringfromlist(i,destinations,",") = stringfromlist(p,valuelist,",")
+			wave/t wref = $stringfromlist(i,destinations,",")
+			for(j=0;j<itemsinlist(valuelist,",");j+=1)
+				wref[i] = unescapeJSONstr(wref[i])
+			endfor
+		endfor
+	endif
+end
+
+function loadbooleanJSONfromkeys(keys,destinations,[children])
+	string keys, destinations, children
+	variable i=0, numchildren, index
+	string valuelist
+	wave/t t_tokentext
+	wave w_tokenparent, w_tokensize, w_tokentype
+	
+	if(paramisdefault(children))
+		numchildren = 0
+		children = ""
+	endif
+	
+	if(itemsinlist(keys)!=itemsinlist(destinations))
+		print "[ERROR]: Config load falied! Number of keys doesn't match numbers of destination waves!"
+		return -1
+	else
+		for(i=0;i<itemsinlist(keys);i+=1)
+			index = getJSONkeyindex(keys[i],t_tokentext)
+			valuelist = exstractJSONvalues(index,children=stringfromlist(i,children,";"))
+			make/o/n=(itemsinlist(valuelist,",")) $stringfromlist(i,destinations,",") = booltonum(stringfromlist(p,valuelist,","))
+		endfor
+	endif
+end
+
+function/s exstractJSONvalues(parentindex,[children])
+	variable parentindex
+	string children
+	wave/t t_tokentext
+	wave w_tokenparent, w_tokensize
+	string valuelist=""
+	variable i=0,j=0, childindex, newchildindex, numchildren, offset=0
+	
+	if(paramisdefault(children))
+		numchildren = 0
+		childindex=parentindex
+	else
+		numchildren = itemsinlist(children,",")
+		childindex=parentindex+mod(numchildren,2)
+	endif
+	
+	do
+		if(numchildren>1)
+			// get highlevel key index
+			newchildindex = getJSONkeyindex(stringfromlist(0,children,","),t_tokentext,offset=offset)
+			children = removelistitem(0,children,",")
+			numchildren -= 1
+			if(childindex >= newchildindex)
+				print "[ERROR]: children keys are not in correct order!"
+				return ""
+			endif
+			childindex = newchildindex
+			offset = childindex
+		elseif(numchildren==1)
+			newchildindex = getJSONkeyindex(stringfromlist(0,children),t_tokentext,offset=offset)
+			if(w_tokensize[newchildindex+1]>0)
+				childindex = newchildindex+1
+			else
+				childindex = newchildindex
+			endif
+			break
+		else
+			break
+		endif
+	while(numchildren>0)
+	
+	for(i=0;i<numpnts(w_tokenparent);i+=1)
+		if(w_tokenparent[i] == childindex)
+			valuelist = addlistitem(t_tokentext[i],valuelist,",",inf)
+		endif
+	endfor
+	
+	return valuelist
+end
+
+function/s getJSONkeys(JSONstr)
+	string JSONstr
+	string keylist=""
+	variable i=0
+	
+	JSONSimple JSONstr
+	wave/t t_tokentext
+	wave w_tokensize
+	
+	for(i=1;i<numpnts(w_tokensize);i+=1) // the first is not really a key!
+		if(w_tokensize[i]==1) // this is a key
+			keylist = addlistitem(t_tokentext[i],keylist,",",inf)
+		endif
+	endfor
+	
+	return keylist
+end
+
+function/s getJSONvalue(JSONstr,key,[parents])
+	// will return all values
+	// parents should be a sting list "parent1,parent2", where parent2 is down stream from parent1
+	string JSONstr, key, parents
+	string parentindexlist="", JSONvalues=""
+	variable i=0, j=0, numparents
+	
+	if(paramisdefault(parents))
+		parents = ""
+	endif
+	
+	JSONSimple JSONstr
+	wave/t t_tokentext
+	wave w_tokensize, w_tokenparent
+	
+	numparents = itemsinlist(parents,",")
+	for(i=0;i<numparents;i+=1)
+		parentindexlist = addlistitem(num2str(getJSONkeyindex(stringfromlist(i,parents,","),t_tokentext)),parentindexlist,",",inf)
+	endfor
+	
+	if(numparents>0)
+		return exstractJSONvalues(getJSONkeyindex(stringfromlist(0,parentindexlist,","),t_tokentext),children=removelistitem(0,parentindexlist,","))
+	else
+		return exstractJSONvalues(getJSONkeyindex(key,t_tokentext)) // no parents
+	endif
+end
+
+function/s getJSONindent(level)
+	// returning whitespace for formatting JSON strings
+	variable level
+	
+	variable i=0
+	string output = ""
+	for(i=0;i<level;i+=1)
+		output += "  "
+	endfor
+	
+	return output
+end
+
+function getJSONkeyindex(key,tokenwave,[offset])
+	string key
+	wave/t tokenwave
+	variable offset
+	variable i=0
+	
+	if(paramisdefault(offset))
+		offset = 0
+	endif
+	
+	for(i=offset;i<numpnts(tokenwave);i+=1)
+		if(cmpstr(key,tokenwave[i])==0)
+			return i
+		endif
+	endfor
+	
+	printf "[ERROR]: key (%s) not found!\r", key
+	return -1
+end
+
+function/s unescapeJSONstr(JSONstr)
+	string JSONstr
+	variable escapePos
+	
+	do
+		escapePos =strsearch(JSONstr,"\\",0)
+		if(escapePos > 0)
+			JSONstr = replacestring(JSONstr[escapePos,escapePos+4],JSONstr,num2char(str2num(JSONstr[escapePos+1,escapePos+4])))
+		endif
+	while(escapePos > 0)
+	
+	return JSONstr
+end
+
+function/s escapeJSONstr(JSONstr)
+	string JSONstr
+	variable escapePos, i=0
+	string checkStr, checklist = "\";," // add more if needed
+	
+	checkStr = JSONstr
+	for(i=0;i<itemsinlist(checklist,";");i+=1)
+		do
+			escapePos =strsearch(checkStr,stringfromlist(i,checklist,";"),0)
+		if(escapePos > 0)
+			checkStr = replacestring(checkStr[escapePos],checkStr,dectoescapedhexstr(char2num(checkStr[escapePos])))
+			endif
+		while(escapePos > 0)
+	endfor
+	
+	return "\""+checkStr+"\""
+end
+
+function/s dectoescapedhexstr(num)
+	variable num
+	string hexstring = "\0x", hextable = "0,1,2,3,4,5,6,7,8,9,A,B,C,D,E,F"
+	
+	return hexstring+num2str(floor(num/16))+stringfromlist(num-floor(num/16)*16,hextable,",")
+end
+
+function/s readJSONobject(jstr)
+	// given a string starting with {
+	// return everything upto and including the matching }
+	// ignores escaped brackets "\{" and "\}"
+	string jstr
+	variable i=0, openBrackets=0, startPos=-1, endPos=-1, escaped=0
+	
+	jstr = TrimString(jstr) // just in case this didn't already happen
+	
+	for(i=0; i<strlen(jstr); i+=1)
+		// check if the current character is escaped
+		if(i!=0)
+			if( CmpStr(jstr[i-1], "\\") == 0)
+				escaped = 1
+			else
+				escaped = 0
+			endif
+		endif
+	
+		// count opening brackets
+		if( CmpStr(jstr[i], "{" ) == 0 && escaped == 0)
+			openBrackets+=1
+			if(startPos==-1)
+				startPos = i
+			endif
+		endif
+		
+		// count closing brackets
+		if( CmpStr(jstr[i], "}" ) == 0 && escaped == 0)
+			openBrackets-=1
+			if(openBrackets==0)
+				// found the last closing bracket
+				endPos = i
+				break
+			endif
+		endif
+	endfor
+
+	if(openBrackets!=0 || startPos==-1 || endPos==-1)
+		print "[WARNING] This JSON string is bullshit: ", jstr
+		return ""
+	endif
+	
+	return jstr[startPos, endPos]
+end
+
+function findJSONtype(str)
+	// this checks quickly to find what type something is intended to be
+	// it makes no effort to check if str is a valid version of that type
+	
+	// in fact, I take advantage of that later by sending this function big chunks of 
+	// characters that only _start_ with the thing I want
+	
+	// RETURN TYPES:
+	// 1 -- object
+	// 2 -- array
+	// 3 -- number -- no float/int distinction in igor
+	// 4 -- string
+	// 5 -- bool
+	// 6 -- null
+	
+	string str
+	str = TrimString(str) // trim leading/trailing whitespace
+	str = LowerStr(str)   // I don't care if you got the cases right
+	if( strlen(str)==0 )
+		return -1
+	endif
+	
+	string numRegex = "([-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?)"
+	if(CmpStr(str[0], "{")==0)
+		// this is an object
+		return 1
+	elseif(CmpStr(str[0], "[")==0)
+		// this is an array
+		return 2
+	elseif(CmpStr(str[0], "\"")==0)
+		// this is a string
+		return 4
+	elseif(CmpStr(str[0,3], "true")==0 || CmpStr(str[0,4], "false")==0)
+		// this is a boolean
+		return 5
+	elseif(CmpStr(str[0,3], "null")==0)
+		// this is null
+		return 6
+	elseif(grepstring(str, "([-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?)")==1)
+		// this is a number
+		return 3
+	else
+		printf "[ERROR]: Value does not fit any JSON type: %s\r", str
+		return -1
+	endif
 end
