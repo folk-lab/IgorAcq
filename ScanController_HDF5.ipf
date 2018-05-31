@@ -58,7 +58,7 @@ function /s json2attributes(jstr, obj_name, h5id)
 		currentKey = StringFromList(j, keys, ",")
 		if(strsearch(currentKey, ":", 0)==-1)
 			currentVal = getJSONValue(jstr, currentKey) 
-			if(findJSONtype(currentVal)==3)
+			if(findJSONtype(currentVal)==0)
 				num_attr[0] = str2num(currentVal)
 				HDF5SaveData /A=currentKey num_attr, h5id, obj_name
 			else
@@ -163,22 +163,3 @@ function endSaveFiles()
 	endif
 	
 end
-
-// these should live in the procedures for the instrument
-// that way not all of the procedures need to be loaded for this WINF thing to compile correctly
-
-//function/S GetSRSStatus(srs)
-//	variable srs
-//	string winfcomments = "", buffer = "";
-//	sprintf buffer "SRS %s:\r\tLock-in  Amplitude = %.3f V\r\tTime Constant = %.2fms\r\tFrequency = %.2fHz\r\tSensitivity=%.2fV\r\tPhase = %.2f\r", GetSRSAmplitude(srs), GetSRSTimeConstInSeconds(srs)*1000, GetSRSFrequency(srs),getsrssensitivity(srs, realsens=1), GetSRSPhase(srs)
-//	winfcomments += buffer
-//	
-//	return winfcomments
-//end
-//
-//function /S GetIPSStatus()
-//	string winfcomments = "", buffer = "";
-//	sprintf buffer, "IPS:\r\tMagnetic Field = %.4f mT\r\tSweep Rate = %.4f mT/min\r", GetField(),   GetSweepRate(); winfcomments += buffer
-//	
-//	return winfcomments
-//end

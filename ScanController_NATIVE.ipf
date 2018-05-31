@@ -81,10 +81,10 @@ function /S saveScanComments([msg])
 	jstr += getExpStatus() // record date, time, wave names, time elapsed...
 	
 	if (!paramisdefault(msg) && strlen(msg)!=0)
-		jstr = addJSONKeyVal(jstr, "comments", strVal=TrimString(msg), addQuotes = 1)
+		jstr = addJSONkeyvalpair(jstr, "comments", TrimString(msg), addQuotes = 1)
 	endif
 	
-	jstr = addJSONKeyVal(jstr, "logs", strVal=getEquipLogs())
+	jstr = addJSONkeyvalpair(jstr, "logs", getEquipLogs())
 	
 	//// save file ////
 	nvar filenum
