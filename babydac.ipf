@@ -1139,7 +1139,7 @@ function/s GetBDDACStatus(instrID)
 	do
 		if(numtype(bd_boardnumbers[i])==0)
 			for(j=0;j<4;j+=1)
-				buffer = addJSONKeyVal(buffer, "CH"+num2istr(4*i+j), strVal=dacvalstr[4*i+j][1])
+				buffer = addJSONkeyvalpair(buffer, "CH"+num2istr(4*i+j), dacvalstr[4*i+j][1])
 			endfor
 		endif
 		i+=1
@@ -1149,14 +1149,14 @@ function/s GetBDDACStatus(instrID)
 	wave /z/t customdacvalstr = customdacvalstr
 	if(WaveExists(customdacvalstr))
 		do
-			buffer = addJSONKeyVal(buffer, customdacvalstr[i][0], strVal=customdacvalstr[i][1])
+			buffer = addJSONkeyvalpair(buffer, customdacvalstr[i][0], customdacvalstr[i][1])
 			i=i+1
 		while(i<bd_num_custom)
 	endif
 
-	buffer = addJSONKeyVal(buffer, "com_port", strVal=bd_controller_addr, addQuotes=1)
+	buffer = addJSONkeyvalpair(buffer, "com_port", bd_controller_addr, addQuotes=1)
 
-	return addJSONKeyVal("", "BabyDAC", strVal = buffer)
+	return addJSONkeyvalpair("", "BabyDAC", buffer)
 end
 
 /////////////////

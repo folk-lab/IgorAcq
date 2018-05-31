@@ -572,27 +572,27 @@ function/s getLS370status()
 
 	strswitch(system)
 		case "bfsmall":
-			buffer = addJSONKeyVal(buffer,"MC K",numVal = getLS370temp("mc"),fmtNum="%.3f")
-			buffer = addJSONKeyVal(buffer,"Still K",numVal = getLS370temp("still"),fmtNum="%.3f")
-			buffer = addJSONKeyVal(buffer,"4K Plate K",numVal = getLS370temp("4K"),fmtNum="%.3f")
-			buffer = addJSONKeyVal(buffer,"Magnet K",numVal = getLS370temp("magnet"),fmtNum="%.3f")
-			buffer = addJSONKeyVal(buffer,"50K Plate K",numVal = getLS370temp("50K"),fmtNum="%.3f")
+			buffer = addJSONkeyvalpair(buffer,"MC K",num2str(getLS370temp("mc")))
+			buffer = addJSONkeyvalpair(buffer,"Still K",num2str(getLS370temp("still")))
+			buffer = addJSONkeyvalpair(buffer,"4K Plate K",num2str(getLS370temp("4K")))
+			buffer = addJSONkeyvalpair(buffer,"Magnet K",num2str(getLS370temp("magnet")))
+			buffer = addJSONkeyvalpair(buffer,"50K Plate K",num2str(getLS370temp("50K")))
 //			for(i=1;i<7;i+=1)
 //				gauge = "P"+num2istr(i)
-//				buffer = addJSONKeyVal(buffer,gauge,numVal = GetPressureDB(gauge),fmtNum="%g")
+//				buffer = addJSONkeyvalpair(buffer,gauge,num2str(GetPressureDB(gauge)))
 //			endfor
-			return addJSONKeyVal("","BF Small",strval = buffer)
+			return addJSONkeyvalpair("","BF Small",buffer)
 		case "igh":
-			buffer = addJSONKeyVal(buffer,"MC K",numVal = getLS370temp("mc"),fmtNum="%.3f")
-			buffer = addJSONKeyVal(buffer,"Cold Plate K",numVal = getLS370temp("cold plate"),fmtNum="%.3f")
-			buffer = addJSONKeyVal(buffer,"Still K",numVal = getLS370temp("still"),fmtNum="%.3f")
-			buffer = addJSONKeyVal(buffer,"1K Pot K",numVal = getLS370temp("1Kt"),fmtNum="%.3f")
-			buffer = addJSONKeyVal(buffer,"Sorb K",numVal = getLS370temp("sorb"),fmtNum="%.3f")
+			buffer = addJSONkeyvalpair(buffer,"MC K",num2str(getLS370temp("mc")))
+			buffer = addJSONkeyvalpair(buffer,"Cold Plate K",num2str(getLS370temp("cold plate")))
+			buffer = addJSONkeyvalpair(buffer,"Still K",num2str(getLS370temp("still")))
+			buffer = addJSONkeyvalpair(buffer,"1K Pot K",num2str(getLS370temp("1Kt")))
+			buffer = addJSONkeyvalpair(buffer,"Sorb K",num2str(getLS370temp("sorb")))
 //			for(i=1;i<6;i+=1)
 //				gauge = stringfromlist(i,ighgaugelookup)
-//				buffer = addJSONKeyVal(buffer,"P"+num2istr(i),numVal = GetPressureDB(gauge),fmtNum="%g")
+//				buffer = addJSONkeyvalpair(buffer,"P"+num2istr(i),num2str(GetPressureDB(gauge)))
 //			endfor
-			return addJSONKeyVal("","IGH",strval = buffer)
+			return addJSONkeyvalpair("","IGH",buffer)
 	endswitch
 end
 
