@@ -670,16 +670,16 @@ function/s GetVectorStatus(instrIDx,instrIDy,instrIDz)
 	string buffer = "", subbuffer = ""
 
 	subbuffer = ""
-	subbuffer = addJSONKeyVal(subbuffer, "x", numVal=getLS625field(instrIDx), fmtNum="%.3f")
-	subbuffer = addJSONKeyVal(subbuffer, "y", numVal=getLS625field(instrIDy), fmtNum="%.3f")
-	subbuffer = addJSONKeyVal(subbuffer, "z", numVal=getLS625field(instrIDz), fmtNum="%.3f")
-	buffer = addJSONKeyVal(buffer, "field mT", strVal=subbuffer)
+	subbuffer = addJSONkeyvalpair(subbuffer, "x", num2str(getLS625field(instrIDx)))
+	subbuffer = addJSONkeyvalpair(subbuffer, "y", num2str(getLS625field(instrIDy)))
+	subbuffer = addJSONkeyvalpair(subbuffer, "z", num2str(getLS625field(instrIDz)))
+	buffer = addJSONkeyvalpair(buffer, "field mT", subbuffer)
 
 	subbuffer = ""
-	subbuffer = addJSONKeyVal(subbuffer, "x", numVal=getLS625rate(instrIDx), fmtNum="%.1f")
-	subbuffer = addJSONKeyVal(subbuffer, "y", numVal=getLS625rate(instrIDy), fmtNum="%.1f")
-	subbuffer = addJSONKeyVal(subbuffer, "z", numVal=getLS625rate(instrIDz), fmtNum="%.1f")
-	buffer = addJSONKeyVal(buffer, "rate mT/min", strVal=subbuffer)
+	subbuffer = addJSONkeyvalpair(subbuffer, "x", num2str(getLS625rate(instrIDx)))
+	subbuffer = addJSONkeyvalpair(subbuffer, "y", num2str(getLS625rate(instrIDy)))
+	subbuffer = aaddJSONkeyvalpair(subbuffer, "z", num2str(getLS625rate(instrIDz)))
+	buffer = addJSONkeyvalpair(buffer, "rate mT/min", subbuffer)
 
-	return addJSONKeyVal("", "Vector Magnet", strVal=buffer)
+	return addJSONkeyvalpair("", "Vector Magnet", buffer)
 end

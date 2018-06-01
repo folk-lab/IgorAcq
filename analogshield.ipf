@@ -525,9 +525,9 @@ function/s GetASStatus()
 	string buffer=""
 	variable j=0
 	for(j=0;j<4;j+=1)
-		buffer = addJSONKeyVal(buffer, "CH"+num2istr(j), strVal=as_valsstr[j][1])
+		buffer = addJSONkeyvalpair(buffer, "CH"+num2istr(j), as_valsstr[j][1])
 	endfor
-	buffer = addJSONKeyVal(buffer, "com_port", strVal=as_controller_addr, addQuotes=1)
+	buffer = addJSONkeyvalpair(buffer, "com_port", as_controller_addr, addQuotes=1)
 	
-	return addJSONKeyVal("", "AnalogShield", strVal = buffer)
+	return addJSONkeyvalpair("", "AnalogShield", buffer)
 end

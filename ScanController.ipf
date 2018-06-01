@@ -13,17 +13,14 @@
 //		-- "Request scripts" are removed from the scancontroller window. Its only use was
 //			 trying to do async communication (badly).
 //     -- Added Async checkbox in scancontroller window
-//     -- FTP file upload
 
 //TODO:
 
-//     -- move FTP operations into their own thread
+//     -- SFTP file upload with proper permissions
 
 
 //FIX:
 //     -- NaN handling in JSON package
-//     -- load config has a problem with strings in the logging function list, for example
-//            getSlackNotice("nik.hartman", min_time=120.0); reloads as getSlackNotice(
 
 
 ///////////////////////////////
@@ -86,9 +83,6 @@ function/s searchFullString(string_to_search,substring)
 
 	return index_list
 end
-
-// removeAllWhitespace() has been removed
-// use TrimString() instead
 
 Function/S RemoveLeadingWhitespace(str)
     String str
@@ -248,11 +242,12 @@ end
 //// start scan controller ////
 ///////////////////////////////
 
-function InitScanController(instrWave, [srv_push, config])
+function InitScanController(instrWave, [srv_push, config, filetype])
 	// srv_push = 1 to alert qdot-server of new data
 	wave /t instrWave
 	variable srv_push
 	string config // use this to specify which config file to load
+	string filetype // specify what type of files will be saved
 
 	// set reference to instrument wave for scan controller
 	string /g sc_instr_wave=nameofwave(instrWave)
@@ -265,6 +260,15 @@ function InitScanController(instrWave, [srv_push, config])
 	else
 		sc_srv_push = 0
 	endif
+
+// setup filetype for saved data/metadata
+// currently supports: ibw, hdf5
+//	variable /g sc_filtype
+//	if(paramisdefault(filetype))
+//		sc_filetype = "ibw"
+//	else
+//		sc_filetype = filtype
+//	endif
 
 	string filelist = ""
 	string /g slack_url =  "https://hooks.slack.com/services/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" // url for slack alert
@@ -317,8 +321,8 @@ function InitScanController(instrWave, [srv_push, config])
 			// logging string
 			string /g sc_LogStr = "GetSRSStatus(srs1);"
 
-			nvar filenum
-			if (numtype(filenum) == 2)
+			nvar/z filenum
+			if(!nvar_exists(filenum))
 				print "Initializing FileNum to 0 since it didn't exist before.\n"
 				variable /g filenum=0
 			else
@@ -337,68 +341,57 @@ end
 //// configuration files ////
 /////////////////////////////
 
-function /S sc_createconfig()
-	wave/t sc_RawWaveNames
-	wave sc_RawRecord
-	wave sc_RawPlot
-	wave sc_measAsync
-	wave/t sc_RawScripts
-	wave/t sc_CalcWaveNames
-	wave/t sc_CalcScripts
-	wave sc_CalcRecord
-	wave sc_CalcPlot
-	nvar sc_PrintRaw
-	nvar sc_PrintCalc
-	svar sc_LogStr
-	svar sc_ColorMap
-	svar sc_current_config
-	nvar filenum
+function/s sc_createconfig()
+	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts
+	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
+	nvar sc_PrintRaw, sc_PrintCalc, filenum
+	svar sc_LogStr, sc_ColorMap, sc_current_config
 	variable refnum
 	string configfile
-
 	string configstr = "", tmpstr = ""
 
 	// wave names
-	tmpstr = addJSONKeyVal(tmpstr, "raw", strVal=TextWaveToStrArray(sc_RawWaveNames))
-	tmpstr = addJSONKeyVal(tmpstr, "calc", strVal=TextWaveToStrArray(sc_CalcWaveNames))
-	configstr = addJSONKeyVal(configstr, "wave_names", strVal=tmpstr)
+	tmpstr = addJSONkeyvalpair(tmpstr, "raw", textwavetostrarray(sc_RawWaveNames))
+	tmpstr = addJSONkeyvalpair(tmpstr, "calc", textwavetostrarray(sc_CalcWaveNames))
+	configstr = addJSONkeyvalpair(configstr, "wave_names", tmpstr)
 
-	// record?
+	// record checkboxes
 	tmpstr = ""
-	tmpstr = addJSONKeyVal(tmpstr, "raw", strVal=NumericWaveToBoolArray(sc_RawRecord))
-	tmpstr = addJSONKeyVal(tmpstr, "calc", strVal=NumericWaveToBoolArray(sc_CalcRecord))
-	configstr = addJSONKeyVal(configstr, "record_waves", strVal=tmpstr)
+	tmpstr = addJSONkeyvalpair(tmpstr, "raw", numericwavetoboolarray(sc_RawRecord))
+	tmpstr = addJSONkeyvalpair(tmpstr, "calc", numericwavetoboolarray(sc_CalcRecord))
+	configstr = addJSONkeyvalpair(configstr, "record_waves", tmpstr)
 
-	// plot?
+	// plot checkboxes
 	tmpstr = ""
-	tmpstr = addJSONKeyVal(tmpstr, "raw", strVal=NumericWaveToBoolArray(sc_RawPlot))
-	tmpstr = addJSONKeyVal(tmpstr, "calc", strVal=NumericWaveToBoolArray(sc_CalcPlot))
-	configstr = addJSONKeyVal(configstr, "plot_waves", strVal=tmpstr)
+	tmpstr = addJSONkeyvalpair(tmpstr, "raw",  numericwavetoboolarray(sc_RawPlot))
+	tmpstr = addJSONkeyvalpair(tmpstr, "calc",  numericwavetoboolarray(sc_CalcPlot))
+	configstr = addJSONkeyvalpair(configstr, "plot_waves", tmpstr)
 
-	// plot?
+	// async checkboxes
 	tmpstr = ""
-	tmpstr = addJSONKeyVal(tmpstr, "raw", strVal=NumericWaveToBoolArray(sc_measAsync))
-	configstr = addJSONKeyVal(configstr, "meas_async", strVal=tmpstr)
+	tmpstr = addJSONkeyvalpair(tmpstr, "raw",  numericwavetoboolarray(sc_measAsync))
+	configstr = addJSONkeyvalpair(configstr, "meas_async", tmpstr)
 
-	//scripts
+	// scripts
 	tmpstr = ""
-	tmpstr = addJSONKeyVal(tmpstr, "raw", strVal=TextWaveToStrArray(sc_RawScripts))
-	tmpstr = addJSONKeyVal(tmpstr, "calc", strVal=TextWaveToStrArray(sc_CalcScripts))
-	configstr = addJSONKeyVal(configstr, "scripts", strVal=tmpstr)
+	tmpstr = addJSONkeyvalpair(tmpstr, "raw", textwavetostrarray(sc_RawScripts))
+	tmpstr = addJSONkeyvalpair(tmpstr, "calc", textwavetostrarray(sc_CalcScripts))
+	configstr = addJSONkeyvalpair(configstr, "scripts", tmpstr)
 
 	// executable string to get logs
-	configstr = addJSONKeyVal(configstr, "log_string", strVal="\""+sc_LogStr+"\"")
+	configstr = addJSONkeyvalpair(configstr, "log_string", sc_LogStr, addQuotes=1)
 
 	// print_to_history
 	tmpstr = ""
-	tmpstr = addJSONKeyVal(tmpstr, "raw", strVal=numToBool(sc_PrintRaw))
-	tmpstr = addJSONKeyVal(tmpstr, "calc", strVal=numToBool(sc_PrintCalc))
-	configstr = addJSONKeyVal(configstr, "print_to_history", strVal=tmpstr)
+	tmpstr = addJSONkeyvalpair(tmpstr, "raw", numToBool(sc_PrintRaw))
+	tmpstr = addJSONkeyvalpair(tmpstr, "calc", numToBool(sc_PrintCalc))
+	configstr = addJSONkeyvalpair(configstr, "print_to_history", tmpstr)
 
 	// igor stuff
-	configstr = addJSONKeyVal(configstr, "colormap", strVal="\""+sc_ColorMap+"\"")
-	configstr = addJSONKeyVal(configstr, "filenum", strVal=num2istr(filenum))
+	configstr = addJSONkeyvalpair(configstr, "colormap", sc_ColorMap, addQuotes=1)
+	configstr = addJSONkeyvalpair(configstr, "filenum", num2istr(filenum))
 
+//	print configstr
 	configfile = "sc" + num2istr(unixtime()) + ".config"
 	sc_current_config = configfile
 	writeJSONtoFile(configstr, configfile, "config")
@@ -406,52 +399,54 @@ end
 
 function sc_loadconfig(configfile)
 	string configfile
-	variable refnum
-	string loadcontainer
-	nvar sc_PrintRaw
-	nvar sc_PrintCalc
-	svar sc_LogStr
-	svar sc_ColorMap
-	svar sc_current_config
-	nvar filenum
-	variable i, confignum=0
-	string file_string, configunix
+	string JSONstr, checkStr, textkeys, numkeys, textdestinations, numdestinations
+	variable i=0,escapePos=-1
+	nvar sc_PrintRaw, sc_PrintCalc
+	svar sc_LogStr, sc_current_config, sc_ColorMap, sc_current_config
 
+	// load json string from config file
 	printf "Loading configuration from: %s\n", configfile
 	sc_current_config = configfile
+	JSONstr = JSONfromFile("config", configfile)
 
-	string jstr = JSONfromFile("config", configfile)
+	// read JSON sting. Results will be dumped into: t_tokentext, w_tokensize, w_tokenparent and w_tokentype
+	JSONSimple JSONstr
+	wave/t t_tokentext
+   wave w_tokensize, w_tokenparent, w_tokentype
 
+	// distribute JSON values
 	// load raw wave configuration
-	ArrayToTextWave(getJSONvalue(jstr, "wave_names:raw"), "sc_RawWaveNames")
-	ArrayToNumWave(getJSONvalue(jstr, "record_waves:raw"), "sc_RawRecord")
-	ArrayToNumWave(getJSONvalue(jstr, "plot_waves:raw"), "sc_RawPlot")
-	ArrayToNumWave(getJSONvalue(jstr, "meas_async:raw"), "sc_measAsync")
-	ArrayToTextWave(getJSONvalue(jstr, "scripts:raw"), "sc_RawScripts")
+	// keys are: wavenames:raw, record_waves:raw, plot_waves:raw, meas_async:raw, scripts:raw
+	textkeys = "wave_names,scripts"
+	numkeys = "record_waves,plot_waves,meas_async"
+	textdestinations = "sc_RawWaveNames,sc_RawScripts"
+	numdestinations = "sc_RawRecord,sc_RawPlot,sc_measAsync"
+	loadtextJSONfromkeys(textkeys,textdestinations,children="raw;raw")
+	loadbooleanJSONfromkeys(numkeys,numdestinations,children="raw;raw;raw")
 
 	// load calc wave configuration
-	ArrayToTextWave(getJSONvalue(jstr, "wave_names:calc"), "sc_CalcWaveNames")
-	ArrayToNumWave(getJSONvalue(jstr, "record_waves:calc"), "sc_CalcRecord")
-	ArrayToNumWave(getJSONvalue(jstr, "plot_waves:calc"), "sc_CalcPlot")
-	ArrayToTextWave(getJSONvalue(jstr, "scripts:calc"), "sc_CalcScripts")
+	// keys are: wavenames:calc, record_waves:calc, plot_waves:calc, scripts:calc
+	textkeys = "wave_names,scripts"
+	numkeys = "record_waves,plot_waves"
+	textdestinations = "sc_CalcWaveNames,sc_CalcScripts"
+	numdestinations = "sc_CalcRecord,sc_CalcPlot"
+	loadtextJSONfromkeys(textkeys,textdestinations,children="calc;calc")
+	loadbooleanJSONfromkeys(numkeys,numdestinations,children="calc;calc")
 
 	// load print checkbox settings
-	sc_PrintRaw = str2num(getJSONvalue(jstr, "print_to_history:raw"))
-	sc_PrintCalc = str2num(getJSONvalue(jstr, "print_to_history:calc"))
+	sc_PrintRaw = booltonum(stringfromlist(0,extractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="raw"),","))
+	sc_PrintCalc = booltonum(stringfromlist(0,extractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="calc"),","))
 
 	// load log string
-	sc_LogStr = stripCharacters(getJSONvalue(jstr, "log_string"), "\"")
+	sc_LogStr = stringfromlist(0,extractJSONvalues(getJSONkeyindex("log_string",t_tokentext)),",")
 
 	// load colormap
-	sc_ColorMap = stripCharacters(getJSONvalue(jstr, "colormap"), "\"")
-
+	sc_ColorMap = stringfromlist(0,extractJSONvalues(getJSONkeyindex("colormap",t_tokentext)),",")
 end
-
 
 /////////////////////
 //// main window ////
 /////////////////////
-
 
 function sc_rebuildwindow()
 	dowindow /k ScanController
@@ -913,8 +908,6 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	while (i<numpnts(sc_CalcWaveNames))
 	i=0
 
-	sc_findAsyncMeasurements()
-
 	// connect VISA instruments
 	// do this here, because if it fails
 	// i don't want to delete any old data
@@ -931,11 +924,17 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		sc_starty = starty
 		sc_finy = finy
 		sc_numptsy = numptsy
+		if(start==fin || starty==finy)
+			print "[WARNING]: Your start and end values are the same!"
+		endif
 	else
 		sc_is2d = 0
 		sc_startx = start
 		sc_finx = fin
 		sc_numptsx = numpts
+		if(start==fin)
+			print "[WARNING]: Your start and end values are the same!"
+		endif
 	endif
 
 	if(paramisdefault(x_label) || stringmatch(x_label,""))
@@ -1001,6 +1000,8 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		sc_CalcScripts[i] = construct_calc_script(sc_CalcScripts[i])
 		i+=1
 	while (i<numpnts(sc_CalcWaveNames))
+
+	sc_findAsyncMeasurements()
 
 	// Find all open plots
 	graphlist = winlist("*",";","WIN:1")
@@ -1583,8 +1584,8 @@ function /s getEquipLogs()
 				// need to get first key and value from sc_log_buffer
 				keylist = getJSONkeys(sc_log_buffer)
 				key = StringFromList(0,keylist, ",")
-				sval = getJSONValue(sc_log_buffer, key)
-				buffer = addJSONKeyVal(buffer, key, strVal=sval)
+				sval = getJSONvalue(sc_log_buffer, key)
+				buffer = addJSONkeyvalpair(buffer, key, sval)
 			else
 				print "[WARNING] command failed to log anything: "+command+"\r"
 			endif
@@ -1609,27 +1610,27 @@ function /s getExpStatus([msg])
 
 	// information about the machine your working on
 	buffer = ""
-	buffer = addJSONKeyVal(buffer, "hostname", strVal=sc_hostname, addQuotes = 1)
+	buffer = addJSONkeyvalpair(buffer, "hostname", sc_hostname, addQuotes = 1)
 	string sysinfo = igorinfo(3)
-	buffer = addJSONKeyVal(buffer, "OS", strVal=StringByKey("OS", sysinfo), addQuotes = 1)
-	buffer = addJSONKeyVal(buffer, "IGOR_VERSION", strVal=StringByKey("IGORFILEVERSION", sysinfo), addQuotes = 1)
-	jstr = addJSONKeyVal(jstr, "system_info", strVal=buffer)
+	buffer = addJSONkeyvalpair(buffer, "OS", StringByKey("OS", sysinfo), addQuotes = 1)
+	buffer = addJSONkeyvalpair(buffer, "IGOR_VERSION", StringByKey("IGORFILEVERSION", sysinfo), addQuotes = 1)
+	jstr = addJSONkeyvalpair(jstr, "system_info", buffer)
 
 	// information about the current experiment
-	jstr = addJSONKeyVal(jstr, "experiment", strVal=getExpPath("data")+igorinfo(1)+".pxp", addQuotes = 1)
-	jstr = addJSONKeyVal(jstr, "current_config", strVal=sc_current_config, addQuotes = 1)
+	jstr = addJSONkeyvalpair(jstr, "experiment", getExpPath("data")+igorinfo(1)+".pxp", addQuotes = 1)
+	jstr = addJSONkeyvalpair(jstr, "current_config", sc_current_config, addQuotes = 1)
 	buffer = ""
-	buffer = addJSONKeyVal(buffer, "data", strVal=getExpPath("data"), addQuotes = 1)
-	buffer = addJSONKeyVal(buffer, "winfs", strVal=getExpPath("winfs"), addQuotes = 1)
-	buffer = addJSONKeyVal(buffer, "config", strVal=getExpPath("config"), addQuotes = 1)
-	jstr = addJSONKeyVal(jstr, "paths", strVal=buffer)
+	buffer = addJSONkeyvalpair(buffer, "data", getExpPath("data"), addQuotes = 1)
+	buffer = addJSONkeyvalpair(buffer, "winfs", getExpPath("winfs"), addQuotes = 1)
+	buffer = addJSONkeyvalpair(buffer, "config", getExpPath("config"), addQuotes = 1)
+	jstr = addJSONkeyvalpair(jstr, "paths", buffer)
 
 	// information about this specific run
-	jstr = addJSONKeyVal(jstr, "filenum", numVal=filenum, fmtNum = "%.0f")
-	jstr = addJSONKeyVal(jstr, "time_completed", strVal=Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
-	jstr = addJSONKeyVal(jstr, "time_elapsed", numVal = sweep_t_elapsed, fmtNum = "%.3f")
-	jstr = addJSONKeyVal(jstr, "saved_waves", strVal=recordedWaveArray())
-	jstr = addJSONKeyVal(jstr, "comment", strVal=msg, addQuotes = 1)
+	jstr = addJSONkeyvalpair(jstr, "filenum", num2istr(filenum))
+	jstr = addJSONkeyvalpair(jstr, "time_completed", Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
+	jstr = addJSONkeyvalpair(jstr, "time_elapsed", num2str(sweep_t_elapsed))
+	jstr = addJSONkeyvalpair(jstr, "saved_waves", recordedWaveArray())
+	jstr = addJSONkeyvalpair(jstr, "comment", msg, addQuotes = 1)
 
 	return jstr
 end
@@ -1642,8 +1643,8 @@ function /s getWaveStatus(datname)
 	string jstr="", buffer=""
 
 	// date/time info
-	jstr = addJSONKeyVal(jstr, "wave_name", strVal=datname, addQuotes = 1)
-	jstr = addJSONKeyVal(jstr, "filenum", numVal=filenum, fmtNum = "%.0f")
+	jstr = addJSONkeyvalpair(jstr, "wave_name", datname, addQuotes = 1)
+	jstr = addJSONkeyvalpair(jstr, "filenum", num2istr(filenum))
 
 	// wave info
 	//check if wave is 1d or 2d
@@ -1659,28 +1660,28 @@ function /s getWaveStatus(datname)
 	if (dims==1)
 		wavestats/Q $datname
 		buffer = ""
-		buffer = addJSONKeyVal(buffer, "length", numVal=dimsize($datname,0), fmtNum = "%d")
-		buffer = addJSONKeyVal(buffer, "dx", numVal=dimdelta($datname, 0))
-		buffer = addJSONKeyVal(buffer, "mean", numVal=V_avg)
-		buffer = addJSONKeyVal(buffer, "standard_dev", numVal=V_avg)
-		jstr = addJSONKeyVal(jstr, "wave_stats", strVal=buffer)
+		buffer = addJSONkeyvalpair(buffer, "length", num2istr(dimsize($datname,0)))
+		buffer = addJSONkeyvalpair(buffer, "dx", num2str(dimdelta($datname, 0)))
+		buffer = addJSONkeyvalpair(buffer, "mean", num2str(V_avg))
+		buffer = addJSONkeyvalpair(buffer, "standard_dev", num2str(V_sdev))
+		jstr = addJSONkeyvalpair(jstr, "wave_stats", buffer)
 	elseif(dims==2)
 		wavestats/Q $datname
 		buffer = ""
-		buffer = addJSONKeyVal(buffer, "columns", numVal=dimsize($datname,0), fmtNum = "%d")
-		buffer = addJSONKeyVal(buffer, "rows", numVal=dimsize($datname,1), fmtNum = "%d")
-		buffer = addJSONKeyVal(buffer, "dx", numVal=dimdelta($datname, 0))
-		buffer = addJSONKeyVal(buffer, "dy", numVal=dimdelta($datname, 1))
-		buffer = addJSONKeyVal(buffer, "mean", numVal=V_avg)
-		buffer = addJSONKeyVal(buffer, "standard_dev", numVal=V_avg)
-		jstr = addJSONKeyVal(jstr, "wave_stats", strVal=buffer)
+		buffer = addJSONkeyvalpair(buffer, "columns", num2istr(dimsize($datname,0)))
+		buffer = addJSONkeyvalpair(buffer, "rows", num2istr(dimsize($datname,1)))
+		buffer = addJSONkeyvalpair(buffer, "dx", num2str(dimdelta($datname, 0)))
+		buffer = addJSONkeyvalpair(buffer, "dy", num2str(dimdelta($datname, 1)))
+		buffer = addJSONkeyvalpair(buffer, "mean", num2str(V_avg))
+		buffer = addJSONkeyvalpair(buffer, "standard_dev", num2str(V_sdev))
+		jstr = addJSONkeyvalpair(jstr, "wave_stats", buffer)
 	else
-		jstr = addJSONKeyVal(jstr, "wave_stats", strVal="Wave dimensions > 2. How did you get this far?", addQuotes = 1)
+		jstr = addJSONkeyvalpair(jstr, "wave_stats", "Wave dimensions > 2. How did you get this far?", addQuotes = 1)
 	endif
 
 	svar sc_x_label, sc_y_label
-	jstr = addJSONKeyVal(jstr, "x_label", strVal=sc_x_label, addQuotes = 1)
-	jstr = addJSONKeyVal(jstr, "y_label", strVal=sc_y_label, addQuotes = 1)
+	jstr = addJSONkeyvalpair(jstr, "x_label", sc_x_label, addQuotes = 1)
+	jstr = addJSONkeyvalpair(jstr, "y_label", sc_y_label, addQuotes = 1)
 
 	return jstr
 end
@@ -1723,7 +1724,6 @@ function sc_update_xdata()
 	Redimension /N=(numpnts(w)) sc_xdata
 	CopyScales w, sc_xdata  // copy scaling
 	sc_xdata = x  // set wave data equal to x scaling
-
 end
 
 function SaveWaves([msg, save_experiment])
@@ -1783,9 +1783,12 @@ function SaveWaves([msg, save_experiment])
 
 		// Open up any files that may be needed
 	 	// Save scan controller meta data in this function as well
+	 	svar sc_filetype
+	 	FUNCREF sc_initSaveTemp initSaveFiles = $("initSaveFiles_"+sc_filetype)
 		initSaveFiles(msg=msg)
 
 		// save raw data waves
+		FUNCREF sc_saveSingleTemp saveSingleWave = $("saveSingleWave_"+sc_filetype)
 		ii=0
 		do
 			if (sc_RawRecord[ii] == 1)
@@ -1845,6 +1848,7 @@ function SaveWaves([msg, save_experiment])
 
 	// close save files and increment filenum
 	if(Rawadd+Calcadd > 0)
+		FUNCREF sc_endSaveTemp endSaveFiles = $("endSaveFiles_"+sc_filetype)
 		endSaveFiles()
 		filenum+=1
 	endif
@@ -2153,7 +2157,6 @@ function sc_findNewFiles(datnum)
 			endif
 		endfor
 	endfor
-
 	close refnum // close server.notify
 end
 
@@ -2173,7 +2176,6 @@ function sc_ForceDataBackup()
 end
 
 function sc_FileTransfer()
-
 	variable refnum
 	open /R/P=data refnum as "server.notify"
 
@@ -2221,9 +2223,7 @@ function sc_FileTransfer()
 		close refnum
 		sc_DeleteNotificationFile() // Sent everything possible
 									   // assume users will fix errors manually
-
 	endif
-
 end
 
 function sc_DeleteNotificationFile()
@@ -2236,7 +2236,7 @@ function sc_DeleteNotificationFile()
 	endif
 end
 
-function /S getSlackNotice(username, [message, channel, botname, emoji, min_time])
+function /S getSlackNotice(username, [message, channel, botname, emoji, min_time]) //FIX!
 	// this function will send a notification to Slack
 	// username = your slack username
 
@@ -2259,11 +2259,11 @@ function /S getSlackNotice(username, [message, channel, botname, emoji, min_time
 	endif
 
 	if(sweep_t_elapsed < min_time)
-		return addJSONKeyVal(out, "notified", strVal="false") // no notification if min_time is not exceeded
+		return addJSONkeyvalpair(out, "notified", "false") // no notification if min_time is not exceeded
 	endif
 
 	if(sc_abortsweep)
-		return addJSONKeyVal(out, "notified", strVal="false") // no notification if sweep was aborted by the user
+		return addJSONkeyvalpair(out, "notified", "false") // no notification if sweep was aborted by the user
 	endif
 	//// end notification checks ////
 
@@ -2310,13 +2310,13 @@ function /S getSlackNotice(username, [message, channel, botname, emoji, min_time
 	if (V_flag == 0)    // No error
         if (V_responseCode != 200)  // 200 is the HTTP OK code
             print "Slack post failed!"
-            return addJSONKeyVal(out, "notified", strVal="false")
+            return addJSONkeyvalpair(out, "notified", "false")
         else
-            return addJSONKeyVal(out, "notified", strVal="true")
+            return addJSONkeyvalpair(out, "notified", "true")
         endif
     else
         print "HTTP connection error. Slack post not attempted."
-        return addJSONKeyVal(out, "notified", strVal="false")
+        return addJSONkeyvalpair(out, "notified", "false")
     endif
 end
 

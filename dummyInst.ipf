@@ -57,8 +57,8 @@ function ScanDummy(start, fin, numpts, delay, [comments])
 	setpoint = start
 	x_label = "x_var"
 
-	sc_sleep(5*delay)
 	InitializeWaves(start, fin, numpts, x_label=x_label)
+	sc_sleep(5*delay)
 	variable tstart = stopmstimer(-2)
 	do
 		setpoint = start + (i*(fin-start)/(numpts-1))
@@ -74,7 +74,7 @@ end
 
 function setDummyInstrID(instrID)
 	variable instrID
-	nvar dum1, dum2, dum3
+	nvar/z dum1, dum2, dum3
 	dum1 = 1
 	dum2 = 2
 	dum3 = 3
@@ -104,8 +104,8 @@ function /s GetDummyStatus(instrID)
 	string  buffer = ""
 
 	string id = num2istr(instrID)
-	buffer = addJSONKeyVal(buffer, "id", strVal=id)
-	buffer = addJSONKeyVal(buffer, "time", numVal=datetime, fmtNum = "%d")
+	buffer = addJSONkeyvalpair(buffer, "id", id)
+	buffer = addJSONkeyvalpair(buffer, "time", num2str(datetime))
 
-	return addJSONKeyVal("", "dum"+id, strVal=buffer)
+	return addJSONkeyvalpair("", "dum"+id, buffer)
 end

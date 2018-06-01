@@ -426,11 +426,11 @@ end
 ////////////////////////////
 
 function/s GetIPSStatus(instrID)
-    variable instrID
+	variable instrID
 	string buffer = ""
-	buffer = addJSONKeyVal(buffer, "field mT", numVal=getIPS120field(instrID), fmtNum="%.3f")
-	buffer = addJSONKeyVal(buffer, "rate mT/min", numVal=getIPS120rate(instrID), fmtNum="%.1f")
-    svar ips_controller_addr
-	buffer = addJSONKeyVal(buffer, "com_port", strVal=ips_controller_addr, addQuotes=1)
-	return addJSONKeyVal("", "IPS", strVal = buffer)
+	buffer = addJSONkeyvalpair(buffer, "field mT", num2str(getIPS120field(instrID)))
+	buffer = addJSONkeyvalpair(buffer, "rate mT/min", num2str(getIPS120rate(instrID)))
+	svar ips_controller_addr
+	buffer = addJSONkeyvalpair(buffer, "com_port", ips_controller_addr, addQuotes=1)
+	return addJSONkeyvalpair("", "IPS", buffer)
 end

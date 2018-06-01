@@ -195,7 +195,7 @@ function/s getK2400status(instrID)
 	string  buffer = ""
 
 	string gpib = num2istr(getAddressGPIB(instrID))
-	buffer = addJSONKeyVal(buffer, "gpib_address", strVal=gpib)
+	buffer = addJSONkeyvalpair(buffer, "gpib_address", gpib)
 
-	return addJSONKeyVal("", "K2400_"+gpib, strVal=buffer)
+	return addJSONkeyvalpair("", "K2400_"+gpib, buffer)
 end
