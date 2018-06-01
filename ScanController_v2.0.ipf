@@ -13,11 +13,10 @@
 //		-- "Request scripts" are removed from the scancontroller window. Its only use was
 //			 trying to do async communication (badly).
 //     -- Added Async checkbox in scancontroller window
-//     -- FTP file upload
 
 //TODO:
 
-//     -- move FTP operations into their own thread
+//     -- SFTP file upload with proper permissions
 
 
 //FIX:
@@ -370,7 +369,7 @@ function/s sc_createconfig()
 	configstr = addJSONkeyvalpair(configstr, "scripts", tmpstr)
 
 	// executable string to get logs
-	configstr = addJSONkeyvalpair(configstr, "log_string", "\""+sc_LogStr+"\"")
+	configstr = addJSONkeyvalpair(configstr, "log_string", sc_LogStr, addQuotes=1)
 
 	// print_to_history
 	tmpstr = ""
@@ -379,7 +378,7 @@ function/s sc_createconfig()
 	configstr = addJSONkeyvalpair(configstr, "print_to_history", tmpstr)
 
 	// igor stuff
-	configstr = addJSONkeyvalpair(configstr, "colormap", "\""+sc_ColorMap+"\"")
+	configstr = addJSONkeyvalpair(configstr, "colormap", sc_ColorMap, addQuotes=1)
 	configstr = addJSONkeyvalpair(configstr, "filenum", num2istr(filenum))
 
 //	print configstr
@@ -425,14 +424,14 @@ function sc_loadconfig(configfile)
 	loadbooleanJSONfromkeys(numkeys,numdestinations,children="calc;calc")
 	
 	// load print checkbox settings
-	sc_PrintRaw = booltonum(stringfromlist(0,exstractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="raw"),","))
-	sc_PrintCalc = booltonum(stringfromlist(0,exstractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="calc"),","))
+	sc_PrintRaw = booltonum(stringfromlist(0,extractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="raw"),","))
+	sc_PrintCalc = booltonum(stringfromlist(0,extractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="calc"),","))
 	
 	// load log string
-	sc_LogStr = stringfromlist(0,exstractJSONvalues(getJSONkeyindex("log_string",t_tokentext)),",")
+	sc_LogStr = stringfromlist(0,extractJSONvalues(getJSONkeyindex("log_string",t_tokentext)),",")
 	
 	// load colormap
-	sc_ColorMap = stringfromlist(0,exstractJSONvalues(getJSONkeyindex("colormap",t_tokentext)),",")
+	sc_ColorMap = stringfromlist(0,extractJSONvalues(getJSONkeyindex("colormap",t_tokentext)),",")
 end
 
 /////////////////////
@@ -2331,58 +2330,6 @@ end
 //// JSON functions ////
 ////////////////////////
 
-//// load from/write to file ////
-
-function/s JSONfromfile(path, filename)
-	// read JSON string from filename in path
-	string path, filename
-	variable refNum
-	string buffer = "", JSONstr = ""
-	
-	open /r/z/p=$path refNum as filename
-	if(V_flag!=0)
-		print "[ERROR]: Could not read JSON from: "+filename
-		return ""
-	endif
-
-	do 
-		FReadLine refNum, buffer
-		if(strlen(buffer)==0)
-			break
-		endif
-		JSONstr+=buffer
-	while(1)
-	close refNum
-	
-	return JSONstr
-end
-
-function writeJSONtoFile(JSONstr, filename, path)
-	string JSONstr, filename, path
-	variable refNum=0
-	
-	// write jstr to filename
-	// add whitespace to make it easier to read
-	// this is expected to be a valid json str
-	// it will be a disaster otherwise
-	
-	JSONstr = prettyJSONfmt(JSONstr)
-
-	open /z/p=$path refNum as filename
-
-	do
-		if(strlen(JSONstr)<500)
-			fprintf refnum, "%s", JSONstr
-			break
-		else
-			fprintf refnum, "%s", JSONstr[0,499]
-			JSONstr = JSONstr[500,inf]
-		endif
-	while(1)
-
-	close refNum
-end
-
 //// JSON util ////
 
 function/s numToBool(val)
@@ -2488,343 +2435,6 @@ function/s numericWaveToBoolArray(w)
 	endfor
 	
 	return list[0,strlen(list)-2] + "]"
-end
-
-//// write to JSON ////
-
-function/s addJSONkeyvalpair(JSONstr,key,value,[addquotes])
-	// returns a valid JSON string with a new key,value pair added.
-	// if JSONstr is empty, start a new JSON object
-	string JSONstr, key, value
-	variable addquotes
-	
-	if(!paramisdefault(addquotes))
-		value = "\""+value+"\""
-	endif
-	
-	if(strlen(JSONstr)==0)
-		JSONstr = "{"
-	else
-		JSONstr = readJSONobject(JSONstr)
-		JSONstr = JSONstr[0,strlen(JSONstr)-2]+","
-	endif
-	
-	return JSONstr+"\""+key+"\":"+value+"}"
-end
-
-function/s getJSONclosingbracket(num)
-	// return a closing bracket "}"
-	// if num==1 add a comma
-	variable num
-	variable i=0
-	string bracket="}"
-	
-	if(num)
-		bracket += ","
-	endif
-	
-	return bracket
-end
-
-function/s prettyJSONfmt(jstr)
-	// returns a "pretty" JSON str
-	string jstr
-	string outStr="{\r", buffer="", printkey="", strVal="", key="", parents=""
-	variable i=0, j=0, k=0, level = 0, delta_level
-
-	// get JSON keys
-	string keylist = getJSONkeys(jstr)
-	for(i=0;i<itemsinlist(keylist,",");i+=1) // loop over keys
-		
-		key = stringfromlist(i, keylist, ",")
-		printkey = stringfromlist(itemsinlist(key, ":")-1, key, ":")
-		
-		// if delta_level is > 0, then the previous object(s) must be closed.
-		delta_level = level-itemsinlist(key, ":")
-		if(i!=0 && delta_level>0)
-			for(k=delta_level;k>0;k-=1)
-				outStr= outStr[0,strlen(outStr)-3] + "\r" + getJSONindent(delta_level-1+k) + getJSONclosingbracket(k)+"\r"
-			endfor
-		endif 
-		
-		level = itemsinlist(key, ":")
-		if(level>1)
-			for(j=0;j<level-1;j+=1)
-				parents = addlistitem(stringfromlist(j,key,":"),parents,",")
-			endfor
-		else
-			parents = ""
-		endif 
-		strVal = getJSONValue(jstr, printkey, parents=parents)
-		
-		switch(findJSONtype(strVal))
-			case 1:
-				// this is an object! don't put the value in, it will contain keys and be handled in subsequent calls
-				outStr += getJSONindent(level)+"\""+printkey+"\""+": {\r"
-				break
-			case 2: 
-				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+",\r"
-				break
-			case 3:
-				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+",\r"
-				break
-			case 0:
-				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+",\r"
-				break
-			case -1:
-				strVal = ""
-				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+",\r"
-				break
-		endswitch
-	endfor
-	
-	outStr = outStr[0,strlen(outStr)-3]+"\r}" // fix trailing comma trouble
-	
-	return outStr
-end
-
-function loadtextJSONfromkeys(keys,destinations,[children])
-	// parse key,value pairs to text waves
-	string keys, destinations, children
-	variable i=0, j=0, index
-	string valuelist
-	wave/t t_tokentext
-	wave w_tokenparent, w_tokensize, w_tokentype
-	
-	if(paramisdefault(children))
-		children = ""
-	endif
-	
-	if(itemsinlist(keys,",")!=itemsinlist(destinations,","))
-		print "[ERROR]: Config load falied! Number of keys doesn't match numbers of destination waves!"
-		return -1
-	else
-		for(i=0;i<itemsinlist(keys,",");i+=1)
-			index = getJSONkeyindex(stringfromlist(i,keys,","),t_tokentext)
-			valuelist = exstractJSONvalues(index,children=stringfromlist(i,children,";"))
-			make/o/t/n=(itemsinlist(valuelist,",")) $stringfromlist(i,destinations,",") = stringfromlist(p,valuelist,",")
-			wave/t wref = $stringfromlist(i,destinations,",")
-			for(j=0;j<itemsinlist(valuelist,",");j+=1)
-				wref[j] = unescapeJSONstr(wref[j])
-			endfor
-		endfor
-	endif
-end
-
-function loadbooleanJSONfromkeys(keys,destinations,[children])
-	// parse key,value pairs to boolean waves
-	string keys, destinations, children
-	variable i=0, numchildren, index
-	string valuelist
-	wave/t t_tokentext
-	wave w_tokenparent, w_tokensize, w_tokentype
-	
-	if(paramisdefault(children))
-		numchildren = 0
-		children = ""
-	endif
-	
-	if(itemsinlist(keys,",")!=itemsinlist(destinations,","))
-		print "[ERROR]: Config load falied! Number of keys doesn't match numbers of destination waves!"
-		return -1
-	else
-		for(i=0;i<itemsinlist(keys,",");i+=1)
-			index = getJSONkeyindex(stringfromlist(i,keys,","),t_tokentext)
-			valuelist = exstractJSONvalues(index,children=stringfromlist(i,children,";"))
-			make/o/n=(itemsinlist(valuelist,",")) $stringfromlist(i,destinations,",") = booltonum(stringfromlist(p,valuelist,","))
-		endfor
-	endif
-end
-
-function/s exstractJSONvalues(parentindex,[children])
-	// returns a comma seperated list of all values belonging to the key with the index=parentindex
-	// or the values belonging to the lowest level child, if children are parsed.
-	// children must be a comma seperated string list
-	variable parentindex
-	string children
-	wave/t t_tokentext
-	wave w_tokenparent, w_tokensize
-	string valuelist=""
-	variable i=0,j=0, childindex, newchildindex, numchildren, offset=0
-	
-	// correct index based on the number of children
-	if(paramisdefault(children))
-		numchildren = 0
-		childindex=parentindex
-	else
-		numchildren = itemsinlist(children,",")
-		childindex=parentindex+mod(numchildren,2)
-	endif
-	
-	// find and check child index's
-	do
-		if(numchildren>1)
-			// get highlevel key index
-			newchildindex = getJSONkeyindex(stringfromlist(0,children,","),t_tokentext,offset=offset)
-			children = removelistitem(0,children,",")
-			numchildren -= 1
-			if(childindex >= newchildindex)
-				print "[ERROR]: children keys are not in correct order!"
-				return ""
-			endif
-			childindex = newchildindex
-			offset = childindex
-		elseif(numchildren==1)
-			offset = childindex
-			newchildindex = getJSONkeyindex(stringfromlist(0,children),t_tokentext,offset=offset)
-			if(w_tokensize[newchildindex+1]>0)
-				childindex = newchildindex+1
-			else
-				childindex = newchildindex
-			endif
-			break
-		else
-			break
-		endif
-	while(numchildren>0)
-	
-	// given the lowest level child index, find all values belonging to this key
-	for(i=0;i<numpnts(w_tokenparent);i+=1)
-		if(w_tokenparent[i] == childindex)
-			valuelist = addlistitem(t_tokentext[i],valuelist,",",inf)
-		endif
-	endfor
-	
-	// returns a comma seperated list of values
-	return valuelist
-end
-
-function/s getJSONkeys(JSONstr)
-	// returns a list of all keys, seperated by comma
-	// list will include a new entry per key
-	// the keys will be parsed along with its parents, e.g. "key1,key1:child1,key1:child1:child11"
-	string JSONstr
-	string keylist="", currentparentkeylist=""
-	variable i=0, j=0, k=0, topparentkeyindex=0, parentkeyindex=0
-	
-	JSONSimple JSONstr
-	wave/t t_tokentext
-	wave w_tokensize, w_tokenparent, w_tokentype
-	
-	for(i=1;i<numpnts(w_tokensize);i+=1) // the first is not really a key, so start af i=1
-		if(w_tokensize[i]==1 && w_tokentype[i]==3) // this is a key
-			if(w_tokenparent[i]==0)
-				if(itemsinlist(currentparentkeylist,":")>1)
-					keylist = addlistitem(currentparentkeylist,keylist,",",inf)
-				endif
-				currentparentkeylist = ""
-				keylist = addlistitem(t_tokentext[i],keylist,",",inf)
-				currentparentkeylist = addlistitem(t_tokentext[i],currentparentkeylist,":",inf)
-				if(w_tokentype[i+1]==1) // next "object" is a JSON object, so child keys sees this object as parent.
-					j = i+1
-				else
-					j=i
-				endif
-				topparentkeyindex = j
-				parentkeyindex = topparentkeyindex
-			elseif(w_tokenparent[i]==topparentkeyindex) // this is a "first" child
-				if(itemsinlist(currentparentkeylist,":")>1)
-					keylist = addlistitem(currentparentkeylist,keylist,",",inf)
-					currentparentkeylist = stringfromlist(0,currentparentkeylist,":")
-				endif
-				currentparentkeylist = addlistitem(t_tokentext[i],currentparentkeylist,":",inf)
-				if(w_tokentype[i+1]==1) // next "object" is a JSON object, so child keys sees this object as parent.
-					j = i+1
-				else
-					j=i
-				endif
-				parentkeyindex = j
-			elseif(w_tokenparent[i]==parentkeyindex)
-				if(itemsinlist(currentparentkeylist,":")>1)
-					keylist = addlistitem(currentparentkeylist,keylist,",",inf)
-				endif
-				currentparentkeylist = addlistitem(t_tokentext[i],currentparentkeylist,":",inf)
-				if(w_tokentype[i+1]==1) // next "object" is a JSON object, so child keys sees this object as parent.
-					j = i+1
-				else
-					j=i
-				endif
-				parentkeyindex = j
-			endif
-		endif
-	endfor
-	
-	if(itemsinlist(currentparentkeylist,":")>1) // if the last key is a child, add it to the keylist
-		keylist = addlistitem(currentparentkeylist,keylist,",",inf)
-	endif
-	
-	return keylist
-end
-
-function/s getJSONvalue(JSONstr,key,[parents])
-	// will return the value assosiated with the passed key
-	// parents should be a sting list "parent1,parent2", where parent2 is down stream from parent1
-	string JSONstr, key, parents
-	string parentindexlist="", JSONvalues=""
-	variable i=0, j=0, numparents, offset, index
-	
-	if(paramisdefault(parents))
-		parents = ""
-	endif
-	
-	JSONSimple JSONstr
-	wave/t t_tokentext
-	wave w_tokensize, w_tokenparent, w_tokentype
-	
-	numparents = itemsinlist(parents,",")
-	if(numparents>0)
-		for(i=0;i<numparents;i+=1)
-			parentindexlist = addlistitem(num2str(getJSONkeyindex(stringfromlist(i,parents,","),t_tokentext)),parentindexlist,",",inf)
-		endfor
-		offset = str2num(stringfromlist(itemsinlist(parentindexlist)-1,parentindexlist,","))
-	else
-		offset = 0
-	endif
-	
-	index = getJSONkeyindex(key,t_tokentext,offset=offset)
-	for(i=offset;i<numpnts(w_tokenparent);i+=1) // no need to check before i=offset
-		if(w_tokenparent[i]==index)
-			if(w_tokentype[i]==3)
-				return "\""+t_tokentext[i]+"\""
-			else
-				return t_tokentext[i]
-			endif
-		endif
-	endfor
-	return ""
-end
-
-function/s getJSONindent(level)
-	// returning whitespace for formatting JSON strings
-	variable level
-	
-	variable i=0
-	string output = ""
-	for(i=0;i<level;i+=1)
-		output += "  "
-	endfor
-	
-	return output
-end
-
-function getJSONkeyindex(key,tokenwave,[offset])
-	string key
-	wave/t tokenwave
-	variable offset
-	variable i=0
-	
-	if(paramisdefault(offset))
-		offset = 0
-	endif
-	
-	for(i=offset;i<numpnts(tokenwave);i+=1)
-		if(cmpstr(key,tokenwave[i])==0)
-			return i
-		endif
-	endfor
-	
-	printf "[ERROR]: key (%s) not found!\r", key
-	return -1
 end
 
 function/s unescapeJSONstr(JSONstr)
@@ -2961,4 +2571,397 @@ function/s stripJSONquotes(JSONstr)
 		JSONstr = JSONstr[1,strlen(JSONstr)-2]
 	endif
 	return JSONstr
+end
+
+//// load from/write to file ////
+
+function/s JSONfromfile(path, filename)
+	// read JSON string from filename in path
+	string path, filename
+	variable refNum
+	string buffer = "", JSONstr = ""
+	
+	open /r/z/p=$path refNum as filename
+	if(V_flag!=0)
+		print "[ERROR]: Could not read JSON from: "+filename
+		return ""
+	endif
+
+	do 
+		FReadLine refNum, buffer
+		if(strlen(buffer)==0)
+			break
+		endif
+		JSONstr+=buffer
+	while(1)
+	close refNum
+	
+	return JSONstr
+end
+
+function writeJSONtoFile(JSONstr, filename, path)
+	string JSONstr, filename, path
+	variable refNum=0
+	
+	// write jstr to filename
+	// add whitespace to make it easier to read
+	// this is expected to be a valid json str
+	// it will be a disaster otherwise
+	
+	JSONstr = prettyJSONfmt(JSONstr)
+
+	open /z/p=$path refNum as filename
+
+	do
+		if(strlen(JSONstr)<500)
+			fprintf refnum, "%s", JSONstr
+			break
+		else
+			fprintf refnum, "%s", JSONstr[0,499]
+			JSONstr = JSONstr[500,inf]
+		endif
+	while(1)
+
+	close refNum
+end
+
+//// create JSON strings ////
+
+function/s addJSONkeyvalpair(JSONstr,key,value,[addquotes])
+	// returns a valid JSON string with a new key,value pair added.
+	// if JSONstr is empty, start a new JSON object
+	string JSONstr, key, value
+	variable addquotes
+	
+	if(!paramisdefault(addquotes))
+		value = "\""+value+"\""
+	endif
+	
+	if(strlen(JSONstr)==0)
+		JSONstr = "{"
+	else
+		JSONstr = readJSONobject(JSONstr)
+		JSONstr = JSONstr[0,strlen(JSONstr)-2]+","
+	endif
+	
+	return JSONstr+"\""+key+"\":"+value+"}"
+end
+
+function/s getJSONindent(level)
+	// returning whitespace for formatting JSON strings
+	variable level
+	
+	variable i=0
+	string output = ""
+	for(i=0;i<level;i+=1)
+		output += "  "
+	endfor
+	
+	return output
+end
+
+function/s getJSONclosingbracket(num)
+	// return a closing bracket "}"
+	// if num==1 add a comma
+	variable num
+	variable i=0
+	string bracket="}"
+	
+	if(num)
+		bracket += ","
+	endif
+	
+	return bracket
+end
+
+function/s prettyJSONfmt(jstr)
+	// returns a "pretty" JSON str
+	string jstr
+	string outStr="{\r", buffer="", printkey="", strVal="", key="", parents=""
+	variable i=0, j=0, k=0, level = 0, delta_level
+
+	// get JSON keys
+	string keylist = getJSONkeys(jstr)
+	for(i=0;i<itemsinlist(keylist,",");i+=1) // loop over keys
+		
+		key = stringfromlist(i, keylist, ",")
+		printkey = stringfromlist(itemsinlist(key, ":")-1, key, ":")
+		
+		// if delta_level is > 0, then the previous object(s) must be closed.
+		delta_level = level-itemsinlist(key, ":")
+		if(i!=0 && delta_level>0)
+			for(k=delta_level;k>0;k-=1)
+				outStr= outStr[0,strlen(outStr)-3] + "\r" + getJSONindent(delta_level-1+k) + getJSONclosingbracket(k)+"\r"
+			endfor
+		endif 
+		
+		level = itemsinlist(key, ":")
+		if(level>1)
+			for(j=0;j<level-1;j+=1)
+				parents = addlistitem(stringfromlist(j,key,":"),parents,",")
+			endfor
+		else
+			parents = ""
+		endif 
+		strVal = getJSONValue(jstr, printkey, parents=parents)
+		
+		switch(findJSONtype(strVal))
+			case 1:
+				// this is an object! don't put the value in, it will contain keys and be handled in subsequent calls
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": {\r"
+				break
+			case 2: 
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+",\r"
+				break
+			case 3:
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+",\r"
+				break
+			case 0:
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+",\r"
+				break
+			case -1:
+				strVal = ""
+				outStr += getJSONindent(level)+"\""+printkey+"\""+": "+strVal+",\r"
+				break
+		endswitch
+	endfor
+	
+	outStr = outStr[0,strlen(outStr)-3]+"\r}" // fix trailing comma trouble
+	
+	return outStr
+end
+
+/// parse JSON strings to variables/waves ///
+
+function loadtextJSONfromkeys(keys,destinations,[children])
+	// parse key,value pairs to text waves
+	string keys, destinations, children
+	variable i=0, j=0, index
+	string valuelist
+	wave/t t_tokentext
+	wave w_tokenparent, w_tokensize, w_tokentype
+	
+	if(paramisdefault(children))
+		children = ""
+	endif
+	
+	if(itemsinlist(keys,",")!=itemsinlist(destinations,","))
+		print "[ERROR]: loadtextJSONfromkeys() Number of keys doesn't match numbers of destination waves!"
+		return -1
+	else
+		for(i=0;i<itemsinlist(keys,",");i+=1)
+			index = getJSONkeyindex(stringfromlist(i,keys,","),t_tokentext)
+			valuelist = extractJSONvalues(index,children=stringfromlist(i,children,";"))
+			make/o/t/n=(itemsinlist(valuelist,",")) $stringfromlist(i,destinations,",") = stringfromlist(p,valuelist,",")
+			wave/t wref = $stringfromlist(i,destinations,",")
+			for(j=0;j<itemsinlist(valuelist,",");j+=1)
+				wref[j] = unescapeJSONstr(wref[j])
+			endfor
+		endfor
+	endif
+end
+
+function loadbooleanJSONfromkeys(keys,destinations,[children])
+	// parse key,value pairs to boolean waves
+	string keys, destinations, children
+	variable i=0, numchildren, index
+	string valuelist
+	wave/t t_tokentext
+	wave w_tokenparent, w_tokensize, w_tokentype
+	
+	if(paramisdefault(children))
+		numchildren = 0
+		children = ""
+	endif
+	
+	if(itemsinlist(keys,",")!=itemsinlist(destinations,","))
+		print "[ERROR]: Config load falied! Number of keys doesn't match numbers of destination waves!"
+		return -1
+	else
+		for(i=0;i<itemsinlist(keys,",");i+=1)
+			index = getJSONkeyindex(stringfromlist(i,keys,","),t_tokentext)
+			valuelist = extractJSONvalues(index,children=stringfromlist(i,children,";"))
+			make/o/n=(itemsinlist(valuelist,",")) $stringfromlist(i,destinations,",") = booltonum(stringfromlist(p,valuelist,","))
+		endfor
+	endif
+end
+
+function/s extractJSONvalues(parentindex,[children])
+	// returns a comma seperated list of all values belonging to the key with the index=parentindex
+	// or the values belonging to the lowest level child, if children are parsed.
+	// children must be a comma seperated string list
+	variable parentindex
+	string children
+	wave/t t_tokentext
+	wave w_tokenparent, w_tokensize
+	string valuelist=""
+	variable i=0,j=0, childindex, newchildindex, numchildren, offset=0
+	
+	// correct index based on the number of children
+	if(paramisdefault(children))
+		numchildren = 0
+		childindex=parentindex
+	else
+		numchildren = itemsinlist(children,",")
+		childindex=parentindex+mod(numchildren,2)
+	endif
+	
+	// find and check child index's
+	do
+		if(numchildren>1)
+			// get highlevel key index
+			newchildindex = getJSONkeyindex(stringfromlist(0,children,","),t_tokentext,offset=offset)
+			children = removelistitem(0,children,",")
+			numchildren -= 1
+			if(childindex >= newchildindex)
+				print "[ERROR]: children keys are not in correct order!"
+				return ""
+			endif
+			childindex = newchildindex
+			offset = childindex
+		elseif(numchildren==1)
+			offset = childindex
+			newchildindex = getJSONkeyindex(stringfromlist(0,children),t_tokentext,offset=offset)
+			if(w_tokensize[newchildindex+1]>0)
+				childindex = newchildindex+1
+			else
+				childindex = newchildindex
+			endif
+			break
+		else
+			break
+		endif
+	while(numchildren>0)
+	
+	// given the lowest level child index, find all values belonging to this key
+	for(i=0;i<numpnts(w_tokenparent);i+=1)
+		if(w_tokenparent[i] == childindex)
+			valuelist = addlistitem(t_tokentext[i],valuelist,",",inf)
+		endif
+	endfor
+	
+	// returns a comma seperated list of values
+	return valuelist
+end
+
+
+
+function/s getJSONkeys(JSONstr)
+	// returns a list of all keys, seperated by comma
+	// list will include a new entry per key
+	// the keys will be parsed along with its parents, e.g. "key1,key1:child1,key1:child1:child11"
+	string JSONstr
+	string keylist="", currentparentkeylist=""
+	variable i=0, j=0, k=0, topparentkeyindex=0, parentkeyindex=0
+	
+	JSONSimple JSONstr
+	wave/t t_tokentext
+	wave w_tokensize, w_tokenparent, w_tokentype
+	
+	for(i=1;i<numpnts(w_tokensize);i+=1) // the first is not really a key, so start af i=1
+		if(w_tokensize[i]==1 && w_tokentype[i]==3) // this is a key
+			if(w_tokenparent[i]==0)
+				if(itemsinlist(currentparentkeylist,":")>1)
+					keylist = addlistitem(currentparentkeylist,keylist,",",inf)
+				endif
+				currentparentkeylist = ""
+				keylist = addlistitem(t_tokentext[i],keylist,",",inf)
+				currentparentkeylist = addlistitem(t_tokentext[i],currentparentkeylist,":",inf)
+				if(w_tokentype[i+1]==1) // next "object" is a JSON object, so child keys sees this object as parent.
+					j = i+1
+				else
+					j=i
+				endif
+				topparentkeyindex = j
+				parentkeyindex = topparentkeyindex
+			elseif(w_tokenparent[i]==topparentkeyindex) // this is a "first" child
+				if(itemsinlist(currentparentkeylist,":")>1)
+					keylist = addlistitem(currentparentkeylist,keylist,",",inf)
+					currentparentkeylist = stringfromlist(0,currentparentkeylist,":")
+				endif
+				currentparentkeylist = addlistitem(t_tokentext[i],currentparentkeylist,":",inf)
+				if(w_tokentype[i+1]==1) // next "object" is a JSON object, so child keys sees this object as parent.
+					j = i+1
+				else
+					j=i
+				endif
+				parentkeyindex = j
+			elseif(w_tokenparent[i]==parentkeyindex)
+				if(itemsinlist(currentparentkeylist,":")>1)
+					keylist = addlistitem(currentparentkeylist,keylist,",",inf)
+				endif
+				currentparentkeylist = addlistitem(t_tokentext[i],currentparentkeylist,":",inf)
+				if(w_tokentype[i+1]==1) // next "object" is a JSON object, so child keys sees this object as parent.
+					j = i+1
+				else
+					j=i
+				endif
+				parentkeyindex = j
+			endif
+		endif
+	endfor
+	
+	if(itemsinlist(currentparentkeylist,":")>1) // if the last key is a child, add it to the keylist
+		keylist = addlistitem(currentparentkeylist,keylist,",",inf)
+	endif
+	
+	return keylist
+end
+
+function/s getJSONvalue(JSONstr,key,[parents])
+	// will return the value assosiated with the passed key
+	// parents should be a sting list "parent1,parent2", where parent2 is down stream from parent1
+	string JSONstr, key, parents
+	string parentindexlist="", JSONvalues=""
+	variable i=0, j=0, numparents, offset, index
+	
+	if(paramisdefault(parents))
+		parents = ""
+	endif
+	
+	JSONSimple JSONstr
+	wave/t t_tokentext
+	wave w_tokensize, w_tokenparent, w_tokentype
+	
+	numparents = itemsinlist(parents,",")
+	if(numparents>0)
+		for(i=0;i<numparents;i+=1)
+			parentindexlist = addlistitem(num2str(getJSONkeyindex(stringfromlist(i,parents,","),t_tokentext)),parentindexlist,",",inf)
+		endfor
+		offset = str2num(stringfromlist(itemsinlist(parentindexlist)-1,parentindexlist,","))
+	else
+		offset = 0
+	endif
+	
+	index = getJSONkeyindex(key,t_tokentext,offset=offset)
+	for(i=offset;i<numpnts(w_tokenparent);i+=1) // no need to check before i=offset
+		if(w_tokenparent[i]==index)
+			if(w_tokentype[i]==3)
+				return "\""+t_tokentext[i]+"\""
+			else
+				return t_tokentext[i]
+			endif
+		endif
+	endfor
+	return ""
+end
+
+function getJSONkeyindex(key,tokenwave,[offset])
+	string key
+	wave/t tokenwave
+	variable offset
+	variable i=0
+	
+	if(paramisdefault(offset))
+		offset = 0
+	endif
+	
+	for(i=offset;i<numpnts(tokenwave);i+=1)
+		if(cmpstr(key,tokenwave[i])==0)
+			return i
+		endif
+	endfor
+	
+	printf "[ERROR]: key (%s) not found!\r", key
+	return -1
 end
