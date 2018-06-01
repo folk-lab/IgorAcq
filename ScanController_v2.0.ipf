@@ -266,7 +266,7 @@ function InitScanController(instrWave, [srv_push, config])
 	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
 	string /g sc_current_config = ""
 
-	string /g server_url = "qdash-server.phas.ubc.ca" // address for qdot-server
+	string /g sc_server_url = "qdash-server.phas.ubc.ca" // address for qdot-server
 
 	string /g sc_hostname = getHostName() // machine name
 
@@ -1822,7 +1822,7 @@ function SaveWaves([msg, save_experiment])
 	endif
 
 	if(sc_srv_push==1)
-		svar server_url, sc_hostname
+		svar sc_server_url, sc_hostname
 		sc_findNewFiles(filenum)
 		sc_FileTransfer() // this may leave the experiment file open for some time
 						   // make sure to run saveExp before this
@@ -2153,11 +2153,11 @@ function sc_ForceDataBackup()
 	// you can call it and it will write a fresh copy of the
 	// "data" directory to the lab server
 
-	svar server_url, sc_hostname
+	svar sc_server_url, sc_hostname
 	string username = "anonymous"
 	string password = "folklab101@gmail.com"
 	string ftpURL = "", fullpath = getExpPath("data", full=1)
-	sprintf ftpURL, "ftp://%s/data/%s%s", server_url, sc_hostname, getExpPath("data", full=0)
+	sprintf ftpURL, "ftp://%s/data/%s%s", sc_server_url, sc_hostname, getExpPath("data", full=0)
 	FTPUpload /N=21 /O /D ftpURL[0,strlen(ftpURL)-2], fullpath[0,strlen(fullpath)-2]
 
 end
@@ -2173,8 +2173,8 @@ function sc_FileTransfer()
 		return 0
 	else
 		// walk through server.notify and send data
-		svar sc_hostname, server_url
-		printf "Transfering new data over FTP to %s\r", server_url
+		svar sc_hostname, sc_server_url
+		printf "Transfering new data over FTP to %s\r", sc_server_url
 
 		string username = "anonymous"
 		string password = "folklab101@gmail.com"
@@ -2199,7 +2199,7 @@ function sc_FileTransfer()
 
 			filePath = ReplaceString("/", lineContent[idx,inf], ":")
 
-			sprintf ftpURL, "ftp://%s/data/%s%s", server_url, sc_hostname, lineContent
+			sprintf ftpURL, "ftp://%s/data/%s%s", sc_server_url, sc_hostname, lineContent
 			FTPUpload /N=21 /P=data /T=0 /U=username /W=password /V=0 /Z ftpURL, filePath
 			if(V_flag!=0)
 				printf "Error transfering file to server -- %s (code = %d)\r", filePath, V_flag
