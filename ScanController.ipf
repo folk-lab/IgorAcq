@@ -216,6 +216,7 @@ function /S getExpPath(whichpath, [full])
 		case "root":
 			// returns path to local_measurement_data on local machine
 			return ParseFilePath(5, temp1+temp2, "*", 0, 0)
+			break
 		case "data":
 			// returns path to data relative to local_measurement_data
 			if(full==0)
@@ -223,18 +224,21 @@ function /S getExpPath(whichpath, [full])
 			else
 				return ParseFilePath(5, temp1+temp2+temp3, "*", 0, 0)
 			endif
+			break
 		case "winfs":
 			if(full==0)
 				return "/"+ReplaceString(":", temp3[1,inf], "/")+"winfs/"
 			else
 				return ParseFilePath(5, temp1+temp2+temp3+"winfs:", "*", 0, 0)
 			endif
+			break
 		case "config":
 			if(full==0)
 				return "/"+ReplaceString(":", temp3[1,inf], "/")+"config/"
 			else
 				return ParseFilePath(5, temp1+temp2+temp3+"config:", "*", 0, 0)
 			endif
+			break
 	endswitch
 end
 
@@ -242,24 +246,24 @@ end
 //// start scan controller ////
 ///////////////////////////////
 
-function InitScanController(instrWave, [srv_push, config, filetype])
+function InitScanController(instrWave, [config])
 	// srv_push = 1 to alert qdot-server of new data
 	wave /t instrWave
-	variable srv_push
+//	variable srv_push
 	string config // use this to specify which config file to load
-	string filetype // specify what type of files will be saved
+//	string filetype // specify what type of files will be saved
 
 	// set reference to instrument wave for scan controller
 	string /g sc_instr_wave=nameofwave(instrWave)
 	initVISAinstruments(instrWave, verbose=1)
 
-	// set server push variable for scan controller
-	variable /g sc_srv_push
-	if(paramisdefault(srv_push) || srv_push==1)
-		sc_srv_push = 1
-	else
-		sc_srv_push = 0
-	endif
+//	// set server push variable for scan controller
+//	variable /g sc_srv_push
+//	if(paramisdefault(srv_push) || srv_push==1)
+//		sc_srv_push = 1
+//	else
+//		sc_srv_push = 0
+//	endif
 
 // setup filetype for saved data/metadata
 // currently supports: ibw, hdf5
@@ -275,7 +279,7 @@ function InitScanController(instrWave, [srv_push, config, filetype])
 	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
 	string /g sc_current_config = ""
 
-	string /g sc_server_url = "qdash-server.phas.ubc.ca" // address for qdot-server
+//	string /g sc_server_url = "qdash-server.phas.ubc.ca" // address for qdot-server
 
 	string /g sc_hostname = getHostName() // machine name
 
@@ -284,7 +288,8 @@ function InitScanController(instrWave, [srv_push, config, filetype])
 	if(v_flag != 0 || v_isfolder != 1)
 		abort "Data path not defined!\n"
 	endif
-
+	
+	newpath /C/O/Q setup getExpPath("data", full=1) // create/overwrite setup path
 	newpath /C/O/Q config getExpPath("config", full=1) // create/overwrite config path
 
 	// look for config files

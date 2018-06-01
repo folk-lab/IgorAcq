@@ -34,7 +34,7 @@ threadsafe function VISAerrormsg(descriptor, localRM, status)
 	viStatusDesc(localRM, status, desc)
 	Printf "%s error (%x): %s\r", descriptor, status, desc
 
-End
+end
 
 function openResourceManager()
 	variable status, localRM
@@ -56,9 +56,10 @@ function openResourceManager()
 
 end
 
-function openInstr(var_name, instrDesc, [localRM, verbose, timeout])
+function openInstr(var_name, instrDesc, [localRM, verbose, timeout, name])
 	string var_name, instrDesc  // name for global variable, VISA resource name (GPIB0::5::INSTR)
 	variable localRM, verbose, timeout
+	string name
 	variable instrID, status
 	string error
 
@@ -77,6 +78,10 @@ function openInstr(var_name, instrDesc, [localRM, verbose, timeout])
 		timeout = 100
 	endif
 
+	if(paramisdefault(timeout))
+		name = ""
+	endif
+
 	status = viOpen(localRM,instrDesc,0,0,instrID)
 	if (status < 0)
 		VISAerrormsg("openInstr() -- viOpen", localRM, status)
@@ -85,7 +90,7 @@ function openInstr(var_name, instrDesc, [localRM, verbose, timeout])
 		visaSetTimeout(instrID, timeout)
 		variable /g $var_name = instrID
 		if(verbose)
-			printf "%s connected as %s\r", instrDesc, var_name
+			printf "%s (%s) connected as %s\r", name, instrDesc, var_name
 		endif
 	endif
 
@@ -133,24 +138,24 @@ function initVISAinstruments(instrWave, [verbose])
 			openInstr(instrWave[0][i], instrWave[1][i], localRM = globalRM, verbose = verbose)
 			nvar inst = $instrWave[0][i]
 		else
-			// if the address was not provided, just assume 
+			// if the address was not provided, just assume
 			// a global variable should be created and move on
 			variable /g $instrWave[0][i] = 0
 			if(verbose)
 				printf "created global variable %s\r", instrWave[0][i]
 			endif
 		endif
-		
+
 		if(strlen(instrWave[3][i])!=0)
 			execute(instrWave[3][i]) // execute
 		endif
-		
+
 		if(strlen(instrWave[1][i])==0)
 			// get out of here with that
 			// get variable
 			continue
-		endif 
-		
+		endif
+
 		// test block
 		if( (strlen(instrWave[2][i])==0) && (strlen(instrWave[1][i])>0) )
 			if(verbose)
@@ -205,10 +210,10 @@ threadsafe function writeInstr(instrID, cmd)
 
     variable count = strlen(cmd) // strlen is a problem
                                  // with non-ascii characters
-                                 // it does not equal numBytes                               
-                                 
+                                 // it does not equal numBytes
+
     variable return_count = 0    // how many bytes were written
-    variable status = viWrite(instrID, cmd, count, return_count) 
+    variable status = viWrite(instrID, cmd, count, return_count)
     if (status)
 		VISAerrormsg("writeInstr() -- viWrite", instrID, status)
     	return NaN // abort not supported in threads (v7)
@@ -226,7 +231,7 @@ threadsafe function /s readInstr(instrID, [read_term, read_bytes])
         // read termination character read_term
         visaSetReadTerm(instrID, read_term)
         visaSetReadTermEnable(instrID, 1)
-       
+
     else
         // in this case it will read until some END signal
         // specified by the interface being used
@@ -609,7 +614,7 @@ function visaSetParity(instrID, parity)
 	// VI_ASRL_PAR_EVEN (2)
 	// VI_ASRL_PAR_MARK (3)
 	// VI_ASRL_PAR_SPACE (4)
-	
+
 	variable instrID	// An instrument referenced obtained from viOpen
 	variable parity
 
