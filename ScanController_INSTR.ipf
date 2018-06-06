@@ -221,7 +221,7 @@ threadsafe function writeInstr(instrID, cmd)
 
 end
 
-threadsafe function /s readInstr(instrID, [read_term, read_bytes])
+threadsafe function/s readInstr(instrID, [read_term, read_bytes])
 	// generic error checking read function
 	variable instrID, read_bytes
 	string read_term
@@ -271,6 +271,46 @@ threadsafe function/s queryInstr(instrID, cmd, [read_term, delay])
 
 	return response
 end
+
+function/s postHTTP(instrID,cmd,payload,headers)
+	string instrID, cmd, payload, headers
+	string response, error
+
+	URLRequest /TIME=5.0 /DSTR=payload url=instrID+cmd, method=post, headers=headers
+
+	if (V_flag == 0)    // No error
+		response = S_serverResponse // response is a JSON string
+		if (V_responseCode != 200)  // 200 is the HTTP OK code
+		   printf error, "[ERROR]: %s\r", getJSONvalue(response, "error")
+		   return ""
+		else
+			return response
+		endif
+   else
+        abort "HTTP connection error."
+   endif
+end
+
+function/s getHTTP(instrID,cmd,headers)
+	string instrID, cmd, headers
+	string response, error
+
+	URLRequest /TIME=5.0 url=instrID+cmd, method=get, headers=headers
+
+	if (V_flag == 0)    // No error
+		response = S_serverResponse // response is a JSON string
+		if (V_responseCode != 200)  // 200 is the HTTP OK code
+		   printf error, "[ERROR]: %s\r", getJSONvalue(response, "error")
+		   return ""
+		else
+			return response
+		endif
+   else
+    	print "HTTP connection error."
+		return ""
+   endif
+end
+
 
 ////////////
 /// GPIB ///

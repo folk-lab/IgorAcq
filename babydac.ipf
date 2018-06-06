@@ -13,14 +13,12 @@
 
 function bdCommSetup(instrID)
 	// baud=57600, databits=8, stopbits=1, parity=0
-
 	variable instrID
 
-  visaSetBaudRate(instrID, 57600)
-  visaSetDataBits(instrID, 8)
-  visaSetStopBits(instrID, 10)
-  visaSetParity(instrID, 0)
-
+	visaSetBaudRate(instrID, 57600)
+	visaSetDataBits(instrID, 8)
+	visaSetStopBits(instrID, 10)
+	visaSetParity(instrID, 0)
 end
 
 /////////////////////////////////
@@ -42,7 +40,7 @@ function InitBabyDACs(instrID, boards, ranges, [custom])
 	// if all boards have the same range, you can pass just one number
 	// otherwise number of boards must equal number of ranges given
 
-  variable instrID, custom
+	variable instrID, custom
 	string boards, ranges
 	string /g bd_controller_addr = getResourceAddress(instrID) // for use by window functions
 	variable /g bd_ramprate = 200 // default ramprate
@@ -50,11 +48,6 @@ function InitBabyDACs(instrID, boards, ranges, [custom])
 	if(paramisdefault(custom))
 		custom = 0
 	endif
-
-    // setup serial port attributes
-	bdCommSetup(instrID) // setup DAC com port
-						  // possibly redundant if setup done with ScanController_VISA
-						  // but it doesn't hurt (or take any time) to do it again
 
     // functions to handle a bunch of ugly waves
     //     these keep track of the current state of the outputs
@@ -472,7 +465,7 @@ threadsafe function /WAVE readBytesBD(instrID, nBytes)
 	for(i=0;i<nBytes;i+=1)
 		response_wave[i] = readSingleByteBD(instrID)
 	endfor
-	
+
 	return response_wave
 
 end
@@ -944,7 +937,7 @@ threadsafe function ReadBDadc(instrID, channel, board_number)
 			return NaN
 		endif
 	while(1)
-	
+
 	wave response_wave = ReadBytesBD(instrID, 5)
 	reading = bdReading2Voltage(response_wave[0], response_wave[1], response_wave[2])
 
