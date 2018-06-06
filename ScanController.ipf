@@ -192,7 +192,7 @@ end
 
 function /S getExpPath(whichpath, [full])
 	// whichpath determines which path will be returned (data, winfs, config)
-	// root always gives the path to local_measurement_data
+	// lmd always gives the path to local_measurement_data
 	// if full==1, the full path on the local machine is returned in native style
 	// if full==0, the path relative to local_measurement_data is returned in Unix style
 	string whichpath
@@ -213,7 +213,7 @@ function /S getExpPath(whichpath, [full])
 	SplitString/E="([\w\s\-\:]+)(?i)(local[\s\_]measurement[\s\_]data)([\w\s\-\:]+)" S_path, temp1, temp2, temp3
 
 	strswitch(whichpath)
-		case "root":
+		case "lmd":
 			// returns path to local_measurement_data on local machine
 			return ParseFilePath(5, temp1+temp2, "*", 0, 0)
 		case "data":
@@ -2012,9 +2012,9 @@ function sc_findNewFiles(datnum)
 	variable datnum
 	variable refNum
 	nvar sc_save_exp
-	string winfpath = getExpPath("winfs", full=0)
-	string configpath = getExpPath("config", full=0)
-	string datapath = getExpPath("data", full=0)
+	string winfpath = getExpPath("winfs", full=1)
+	string configpath = getExpPath("config", full=1)
+	string datapath = getExpPath("data", full=1)
 
 	//// create/open server.notify ////
 	string notifyText = "", buffer
@@ -2183,8 +2183,8 @@ function sc_FileTransfer()
 		nvar ssh_port
 		printf "Transfering new data over SFTP to %s\r", server_url
 		
-		string datapath = getExpPath("data", full=0)
-		variable idx = strlen(datapath)
+		string lmdPath = getExpPath("lmd", full=1)
+		variable idx = strlen(lmdPath)
 
 		string ftpURL = "", lineContent = "", filePath = ""
 		variable i
@@ -2201,19 +2201,21 @@ function sc_FileTransfer()
 				// blank line for some reason
 				continue
 			endif
-
-			filePath = ReplaceString("/", lineContent[idx,inf], ":")
 			
-			sprintf ftpURL, "sftp://%s:%d/measurement-data/%s%s", server_url,ssh_port,sc_hostname,lineContent
-//			print i, filePath, ftpURL
+			filePath = ReplaceString("\\", lineContent[idx,inf], "/")
+			sprintf ftpURL, "sftp://%s:%d/measurement-data/%s%s", server_url,ssh_port,sc_hostname, filePath
 			
-			EasyHTTP /PASS="sftp-data" /FTP=filePath
-
+			if(i==0)
+				print i, filePath, ftpURL
+				EasyHTTP /PASS="sftp-data:xxxxxx" /FTP=lineContent /TIME=5.0 ftpURL
+				print V_flag
+			endif
+			
 		endfor
 
 		close refnum
 //		sc_DeleteNotificationFile() // Sent everything possible
-									   // assume users will fix errors manually
+									     // assume users will fix errors manually
 	endif
 end
 
