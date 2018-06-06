@@ -2162,16 +2162,9 @@ end
 
 function sc_ForceDataBackup()
 	// this function is never called automatically
-	// if you are worried about your data
-	// you can call it and it will write a fresh copy of the
-	// "data" directory to the lab server
-
-	svar server_url, sc_hostname
-	string username = "anonymous"
-	string password = "folklab101@gmail.com"
-	string ftpURL = "", fullpath = getExpPath("data", full=1)
-	sprintf ftpURL, "ftp://%s/data/%s%s", server_url, sc_hostname, getExpPath("data", full=0)
-	FTPUpload /N=21 /O /D ftpURL[0,strlen(ftpURL)-2], fullpath[0,strlen(fullpath)-2]
+	// it will write a new copy of your entire `data` path 
+	// to the lab server
+	
 
 end
 
@@ -2186,11 +2179,10 @@ function sc_FileTransfer()
 		return 0
 	else
 		// walk through server.notify and send data
-		svar sc_hostname, server_url
-		printf "Transfering new data over FTP to %s\r", server_url
-
-		string username = "anonymous"
-		string password = "folklab101@gmail.com"
+		svar sc_hostname, server_url 
+		nvar ssh_port
+		printf "Transfering new data over SFTP to %s\r", server_url
+		
 		string datapath = getExpPath("data", full=0)
 		variable idx = strlen(datapath)
 
@@ -2211,17 +2203,16 @@ function sc_FileTransfer()
 			endif
 
 			filePath = ReplaceString("/", lineContent[idx,inf], ":")
-
-			sprintf ftpURL, "ftp://%s/data/%s%s", server_url, sc_hostname, lineContent
-			FTPUpload /N=21 /P=data /T=0 /U=username /W=password /V=0 /Z ftpURL, filePath
-			if(V_flag!=0)
-				printf "Error transfering file to server -- %s (code = %d)\r", filePath, V_flag
-			endif
+			
+			sprintf ftpURL, "sftp://%s:%d/measurement-data/%s%s", server_url,ssh_port,sc_hostname,lineContent
+//			print i, filePath, ftpURL
+			
+			EasyHTTP /PASS="sftp-data" /FTP=filePath
 
 		endfor
 
 		close refnum
-		sc_DeleteNotificationFile() // Sent everything possible
+//		sc_DeleteNotificationFile() // Sent everything possible
 									   // assume users will fix errors manually
 	endif
 end
