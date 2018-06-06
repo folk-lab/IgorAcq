@@ -1,12 +1,6 @@
 ﻿#pragma TextEncoding = "UTF-8"
 #pragma rtGlobals=3		// Use modern global access method and strict wave access.
 
-
-// TODO:
-// change all VISARead calls to viRead(...)
-// change all VISAWrite calls to viWrite(...)
-
-
 //////////////////////////////
 /// generic VISA functions ///
 //////////////////////////////
@@ -96,83 +90,83 @@ function openInstr(var_name, instrDesc, [localRM, verbose, timeout, name])
 
 end
 
-function initVISAinstruments(instrWave, [verbose])
-	// each column (d=1) in instrWave represents an instrument
-	// there should be 3 rows (d=0) for each column
-	//    with 'variable name', 'VISA address', and 'test function'
-
-	wave /t instrWave
-	variable verbose
-
-	if(dimsize(instrWave,0)!=4)
-		abort "instrWave must have 4 rows for each column -- {'variable name', 'VISA address', 'test function', 'setup function'}"
-	endif
-
-	if(paramisdefault(verbose))
-		verbose=1
-	elseif(verbose!=1)
-		verbose=0
-	endif
-
-	// open resource manager
-	nvar /z globalRM
-	if(!nvar_exists(globalRM))
-		// if globalRM does not exist
-		// open RM and create the global variable
-		openResourceManager()
-		nvar globalRM
-	else
-		// if globalRM does exist
-		// close all connection
-		// reopen everything
-		closeAllInstr()
-		openResourceManager()
-	endif
-
-	variable numInstr = dimsize(instrWave,1), i=0
-	string response
-	for(i=0;i<numInstr;i++)
-
-		if(strlen(instrWave[1][i])>0)
-			// open VISA connection to instrument
-			openInstr(instrWave[0][i], instrWave[1][i], localRM = globalRM, verbose = verbose)
-			nvar inst = $instrWave[0][i]
-		else
-			// if the address was not provided, just assume
-			// a global variable should be created and move on
-			variable /g $instrWave[0][i] = 0
-			if(verbose)
-				printf "created global variable %s\r", instrWave[0][i]
-			endif
-		endif
-
-		if(strlen(instrWave[3][i])!=0)
-			execute(instrWave[3][i]) // execute
-		endif
-
-		if(strlen(instrWave[1][i])==0)
-			// get out of here with that
-			// get variable
-			continue
-		endif
-
-		// test block
-		if( (strlen(instrWave[2][i])==0) && (strlen(instrWave[1][i])>0) )
-			if(verbose)
-				print "\t-- No test\r" + instrWave[2][i]
-			endif
-		else
-			response = queryInstr(inst, instrWave[2][i]+"\r\n", read_term = "\r\n") // all the term characters!
-			if(cmpstr(TrimString(response), "NaN")==0)
-				abort
-			endif
-			if(verbose)
-				printf "\t-- %s responded to %s with: %s\r", instrWave[0][i], instrWave[2][i], response
-			endif
-		endif
-		sleep /T 1
-	endfor
-end
+// function initVISAinstruments(instrWave, [verbose])
+// 	// each column (d=1) in instrWave represents an instrument
+// 	// there should be 3 rows (d=0) for each column
+// 	//    with 'variable name', 'VISA address', and 'test function'
+//
+// 	wave /t instrWave
+// 	variable verbose
+//
+// 	if(dimsize(instrWave,0)!=4)
+// 		abort "instrWave must have 4 rows for each column -- {'variable name', 'VISA address', 'test function', 'setup function'}"
+// 	endif
+//
+// 	if(paramisdefault(verbose))
+// 		verbose=1
+// 	elseif(verbose!=1)
+// 		verbose=0
+// 	endif
+//
+// 	// open resource manager
+// 	nvar /z globalRM
+// 	if(!nvar_exists(globalRM))
+// 		// if globalRM does not exist
+// 		// open RM and create the global variable
+// 		openResourceManager()
+// 		nvar globalRM
+// 	else
+// 		// if globalRM does exist
+// 		// close all connection
+// 		// reopen everything
+// 		closeAllInstr()
+// 		openResourceManager()
+// 	endif
+//
+// 	variable numInstr = dimsize(instrWave,1), i=0
+// 	string response
+// 	for(i=0;i<numInstr;i++)
+//
+// 		if(strlen(instrWave[1][i])>0)
+// 			// open VISA connection to instrument
+// 			openInstr(instrWave[0][i], instrWave[1][i], localRM = globalRM, verbose = verbose)
+// 			nvar inst = $instrWave[0][i]
+// 		else
+// 			// if the address was not provided, just assume
+// 			// a global variable should be created and move on
+// 			variable /g $instrWave[0][i] = 0
+// 			if(verbose)
+// 				printf "created global variable %s\r", instrWave[0][i]
+// 			endif
+// 		endif
+//
+// 		if(strlen(instrWave[3][i])!=0)
+// 			execute(instrWave[3][i]) // execute
+// 		endif
+//
+// 		if(strlen(instrWave[1][i])==0)
+// 			// get out of here with that
+// 			// get variable
+// 			continue
+// 		endif
+//
+// 		// test block
+// 		if( (strlen(instrWave[2][i])==0) && (strlen(instrWave[1][i])>0) )
+// 			if(verbose)
+// 				print "\t-- No test\r" + instrWave[2][i]
+// 			endif
+// 		else
+// 			response = queryInstr(inst, instrWave[2][i]+"\r\n", read_term = "\r\n") // all the term characters!
+// 			if(cmpstr(TrimString(response), "NaN")==0)
+// 				abort
+// 			endif
+// 			if(verbose)
+// 				printf "\t-- %s responded to %s with: %s\r", instrWave[0][i], instrWave[2][i], response
+// 			endif
+// 		endif
+// 		sleep /T 1
+// 	endfor
+// end
 
 function closeInstr(instrID)
 	variable instrID
@@ -310,7 +304,6 @@ function/s getHTTP(instrID,cmd,headers)
 		return ""
    endif
 end
-
 
 ////////////
 /// GPIB ///
