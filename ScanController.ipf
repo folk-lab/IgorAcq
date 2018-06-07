@@ -164,24 +164,24 @@ function /S executeWinCmd(command, [logFile])
 	Close batRef
 	
 	// execute batch file with output directed to logFile
-	ExecuteScriptText "\"" + batchFull + "\""
+	ExecuteScriptText /B "\"" + batchFull + "\""
 	
 	string result = ""
-//	if(paramisdefault(logFile))
-//		variable logRef
-//		Open/P=data logRef as logFile // overwrites previous batchfile
-//		string outputLine
-//		do
-//			FReadLine logRef, outputLine
-//			if( strlen(outputLine) == 0 )
-//				break
-//			endif
-//			result += outputLine
-//		while( 1 )
-//		Close logRef
-//	endif
-//	
-//	DeleteFile /P=data /Z=1 batchFile // delete batch file
+	if(paramisdefault(logFile))
+		variable logRef
+		Open/P=data logRef as logFile // overwrites previous batchfile
+		string outputLine
+		do
+			FReadLine logRef, outputLine
+			if( strlen(outputLine) == 0 )
+				break
+			endif
+			result += outputLine
+		while( 1 )
+		Close logRef
+	endif
+	
+	DeleteFile /P=data /Z=1 batchFile // delete batch file
 	return result
 	
 end
@@ -311,8 +311,7 @@ function InitScanController(instrWave, [srv_push, config, filetype])
 		sc_srv_push = 1
 		
 		print "Creating remote directories..."
-		sc_CreateRemoteDirectory("data")
-		sc_CreateRemoteDirectory("config")
+		sc_CreateRemoteDirectory("config") // creating config also creates data
 		if(CmpStr(sc_filetype, "ibw") == 0)
 			newpath /C/O/Q winfs getExpPath("winfs", full=1) // create/overwrite winf path
 			sc_CreateRemoteDirectory("winf")
