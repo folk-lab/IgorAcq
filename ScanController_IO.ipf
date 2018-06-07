@@ -1117,42 +1117,7 @@ function/s setupINIhttp(index)
 	return name+","
 end
 
-function openINIvisa(globalRM,mandatory_keys,mandatory_values,optional_keys,optional_values)
-	variable globalRM
-	string mandatory_keys,mandatory_values,optional_keys,optional_values
-	variable optkeyindex=0,i=0
-	string cmd="",response="",optkey=""
 
-	string name = stringfromlist(0,mandatory_values,",")
-	string var_name = stringfromlist(1,mandatory_values,",")
-	string instrDesc = stringfromlist(2,mandatory_values,",")
-	openInstr(var_name,instrDesc,localRM=globalRM,verbose=1,name=name)
-
-	nvar instrID = $var_name
-
-    // look for serial communication constants and set them
-    for(i=0;i<itemsinlist(optional_keys);i+=1)
-        optkey = stringfromlist(i,optional_keys,",")
-        setINIvisaparameter(instrID,optkey,stringfromlist(i,optional_values,","))
-    endfor
-	// first call the init_function, then query the instrument
-	optkeyindex = findlistitem("init_function",optional_keys,",",0,0)
-	if(optkeyindex>0)
-		execute(stringfromlist(optkeyindex,optional_keys,","))
-	endif
-
-	optkeyindex = findlistitem("test_query",optional_keys,",",0,0)
-	if(optkeyindex>0)
-		cmd = stringfromlist(optkeyindex,optional_keys,",")
-		response = queryInstr(instrID, cmd+"\r\n", read_term = "\r\n") // all the term characters!
-		if(cmpstr(TrimString(response), "NaN")==0)
-			abort
-		endif
-		printf "\t-- %s responded to %s with: %s\r", name, cmd, response
-	else
-		printf "\t-- No test\r"
-	endif
-end
 
 function setINIvisaparameter(instrID,optkey,optvalue)
     variable instrID

@@ -50,6 +50,8 @@ function openResourceManager()
 
 end
 
+/////////////// combine these two functions ///////////////////\
+
 function openInstr(var_name, instrDesc, [localRM, verbose, timeout, name])
 	string var_name, instrDesc  // name for global variable, VISA resource name (GPIB0::5::INSTR)
 	variable localRM, verbose, timeout
@@ -90,83 +92,46 @@ function openInstr(var_name, instrDesc, [localRM, verbose, timeout, name])
 
 end
 
-// function initVISAinstruments(instrWave, [verbose])
-// 	// each column (d=1) in instrWave represents an instrument
-// 	// there should be 3 rows (d=0) for each column
-// 	//    with 'variable name', 'VISA address', and 'test function'
-//
-// 	wave /t instrWave
-// 	variable verbose
-//
-// 	if(dimsize(instrWave,0)!=4)
-// 		abort "instrWave must have 4 rows for each column -- {'variable name', 'VISA address', 'test function', 'setup function'}"
-// 	endif
-//
-// 	if(paramisdefault(verbose))
-// 		verbose=1
-// 	elseif(verbose!=1)
-// 		verbose=0
-// 	endif
-//
-// 	// open resource manager
-// 	nvar /z globalRM
-// 	if(!nvar_exists(globalRM))
-// 		// if globalRM does not exist
-// 		// open RM and create the global variable
-// 		openResourceManager()
-// 		nvar globalRM
-// 	else
-// 		// if globalRM does exist
-// 		// close all connection
-// 		// reopen everything
-// 		closeAllInstr()
-// 		openResourceManager()
-// 	endif
-//
-// 	variable numInstr = dimsize(instrWave,1), i=0
-// 	string response
-// 	for(i=0;i<numInstr;i++)
-//
-// 		if(strlen(instrWave[1][i])>0)
-// 			// open VISA connection to instrument
-// 			openInstr(instrWave[0][i], instrWave[1][i], localRM = globalRM, verbose = verbose)
-// 			nvar inst = $instrWave[0][i]
-// 		else
-// 			// if the address was not provided, just assume
-// 			// a global variable should be created and move on
-// 			variable /g $instrWave[0][i] = 0
-// 			if(verbose)
-// 				printf "created global variable %s\r", instrWave[0][i]
-// 			endif
-// 		endif
-//
-// 		if(strlen(instrWave[3][i])!=0)
-// 			execute(instrWave[3][i]) // execute
-// 		endif
-//
-// 		if(strlen(instrWave[1][i])==0)
-// 			// get out of here with that
-// 			// get variable
-// 			continue
-// 		endif
-//
-// 		// test block
-// 		if( (strlen(instrWave[2][i])==0) && (strlen(instrWave[1][i])>0) )
-// 			if(verbose)
-// 				print "\t-- No test\r" + instrWave[2][i]
-// 			endif
-// 		else
-// 			response = queryInstr(inst, instrWave[2][i]+"\r\n", read_term = "\r\n") // all the term characters!
-// 			if(cmpstr(TrimString(response), "NaN")==0)
-// 				abort
-// 			endif
-// 			if(verbose)
-// 				printf "\t-- %s responded to %s with: %s\r", instrWave[0][i], instrWave[2][i], response
-// 			endif
-// 		endif
-// 		sleep /T 1
-// 	endfor
-// end
+function openINIvisa(globalRM,mandatory_keys,mandatory_values,optional_keys,optional_values)
+	variable globalRM
+	string mandatory_keys,mandatory_values,optional_keys,optional_values
+	variable optkeyindex=0,i=0
+	string cmd="",response="",optkey=""
+
+	string name = stringfromlist(0,mandatory_values,",")
+	string var_name = stringfromlist(1,mandatory_values,",")
+	string instrDesc = stringfromlist(2,mandatory_values,",")
+	
+	
+	openInstr(var_name,instrDesc,localRM=globalRM,verbose=1,name=name)
+
+	nvar instrID = $var_name
+
+    // look for serial communication constants and set them
+    for(i=0;i<itemsinlist(optional_keys);i+=1)
+        optkey = stringfromlist(i,optional_keys,",")
+        setINIvisaparameter(instrID,optkey,stringfromlist(i,optional_values,","))
+    endfor
+	// first call the init_function, then query the instrument
+	optkeyindex = findlistitem("init_function",optional_keys,",",0,0)
+	if(optkeyindex>0)
+		execute(stringfromlist(optkeyindex,optional_keys,","))
+	endif
+
+	optkeyindex = findlistitem("test_query",optional_keys,",",0,0)
+	if(optkeyindex>0)
+		cmd = stringfromlist(optkeyindex,optional_keys,",")
+		response = queryInstr(instrID, cmd+"\r\n", read_term = "\r\n") // all the term characters!
+		if(cmpstr(TrimString(response), "NaN")==0)
+			abort
+		endif
+		printf "\t-- %s responded to %s with: %s\r", name, cmd, response
+	else
+		printf "\t-- No test\r"
+	endif
+end
+
+///////////////////
 
 function closeInstr(instrID)
 	variable instrID
@@ -521,14 +486,14 @@ end
 /// SETUP FROM INI ///
 //////////////////////
 
-function/s setupVISAFromINI(index,globalRM)
+function/s visaInstrFromINI(index,globalRM)
 	variable index, globalRM
 	
-	string mandatory_keys="name,instrID,visa_addresse", mandatory_values = ",,"
+	string mandatory_keys="name,instrID,visa_address", mandatory_values = ",,"
 	string optional_keys="test_query,init_function,baudrate,stopbits,databits,parity,readterm,timeout", optional_values=",,,,,,,"
 	
-	variable sub_index = index+1, mankeyindex=0, optkeyindex=0, mankeycount=0
-	string key="", name=""
+	variable sub_index = index+1, manIdx=0, optIdx=0, manKeyCnt=0
+	string key="", instrName=""
 	
 	wave/t ini_text
 	wave ini_type
@@ -536,37 +501,42 @@ function/s setupVISAFromINI(index,globalRM)
 	do
 		if(ini_type[sub_index] == 2 && ini_type[sub_index+1] == 3)
 			key = ini_text[sub_index]
-			mankeyindex = findlistitem(key,mandatory_keys,",",0,0)
-			optkeyindex = findlistitem(key,optional_keys,",",0,0)
-			if(mankeyindex>0)
-				mandatory_values = removelistitem(mankeyindex,mandatory_values,",")
-				mandatory_values = addlistitem(ini_text[sub_index+1],mandatory_values,",",mankeyindex)
-				mankeycount+=1
-			elseif(optkeyindex>0)
-				optional_values = removelistitem(optkeyindex,optional_values,",")
-				optional_values = addlistitem(ini_text[sub_index+1],optional_values,",",optkeyindex)
+			
+			manIdx = findlistitem(key,mandatory_keys,",",0,0)
+			optIdx = findlistitem(key,optional_keys,",",0,0)
+			
+			if(manIdx>0)
+				mandatory_values = removelistitem(manIdx,mandatory_values,",")
+				mandatory_values = addlistitem(ini_text[sub_index+1],mandatory_values,",",manIdx)
+				manKeyCnt+=1
+			elseif(optIdx>0)
+				optional_values = removelistitem(optIdx,optional_values,",")
+				optional_values = addlistitem(ini_text[sub_index+1],optional_values,",",optIdx)
 			else
 				printf "[WARNING]: The key (%s) is not supported and will be ignored!", key
 			endif
 			if(cmpstr(key,"name")==0)
-				name = key
+				instrName = key
 			endif
 		endif
 		
 		sub_index+=1
-	while(ini_type[sub_index]>1 || sub_index>numpnts(ini_type)) // stop at next section
+		if(sub_index>numpnts(ini_type)-1)
+			break
+		endif
+	while(ini_type[sub_index]!=1) // stop at next section
 	
-	if(mankeycount!=itemsinlist(mandatory_keys,","))
+	if(manKeyCnt!=itemsinlist(mandatory_keys,","))
 		print "[ERROR] Missing required keys in setupVISAFromINI()!"
 		abort
 	else // found all keys
-//		openINIvisa(globalRM,mandatory_keys,mandatory_values,optional_keys,optional_values)
+		openINIvisa(globalRM,mandatory_keys,mandatory_values,optional_keys,optional_values)
 	endif
 
-	return name
+	return instrName
 end
 
-function /s sc_loadInstrINI([iniFile, path])
+function /s loadInstrsFromINI([iniFile, path])
 	// load all instruments from iniFile located in path
 	// if iniFile is specified, it will be reloaded into ini_type and ini_text
 	// otherwise the function will use the current content of those waves
@@ -607,11 +577,11 @@ function /s sc_loadInstrINI([iniFile, path])
 			strswitch(ini_text[i])
 			
 				case "[visa-instrument]":
-					instrList += setupVISAFromINI(i,globalRM)
+					instrList += visaInstrFromINI(i,globalRM)+","
 		 			continue
 		 			
  				case "[http-instrument]":
- 					instrList += setupINIhttp(i)
+ 					instrList += setupINIhttp(i)+","
  					continue
 
 			endswitch
