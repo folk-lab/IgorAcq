@@ -50,11 +50,10 @@ function openResourceManager()
 
 end
 
-
-function openVISAinstr(mandatory, [options, localRM, verbose, timeout])
+function openVISAinstr(mandatory, [options, localRM, verbose])
 
 	string mandatory, options
-	variable localRM, verbose, timeout
+	variable localRM, verbose
 	
 	if(paramisdefault(options))
 		options=""
@@ -70,60 +69,60 @@ function openVISAinstr(mandatory, [options, localRM, verbose, timeout])
 		nvar globalRM
 		localRM = globalRM
 	endif
-	
-	if(paramisdefault(timeout))
-		timeout = 100
-	endif
 
 	///// create VISA instance /////
-//	string name = stringfromlist(0,mandatory_values,",")
-//	string var_name = stringfromlist(1,mandatory_values,",")
-//	string instrDesc = stringfromlist(2,mandatory_values,",")
-//	
-//	variable instrID, status
-//	string error
-//	status = viOpen(localRM,instrDesc,0,0,instrID)
-//	if (status < 0)
-//		VISAerrormsg("openInstr() -- viOpen", localRM, status)
-//		abort
-//	else
-//		visaSetTimeout(instrID, timeout)
-//		variable /g $var_name = instrID
-//		if(verbose)
-//			printf "%s (%s) connected as %s\r", name, instrDesc, var_name
-//		endif
-//	endif
-//
-//	// look for serial communication constants and set them
-//   variable optkeyindex=0,i=0
-//	string cmd="",response="",optkey=""
-//	
-//	for(i=0;i<itemsinlist(optional_keys);i+=1)
-//		optkey = stringfromlist(i,optional_keys,",")
-//		setVISAoptions(instrID,optkey,stringfromlist(i,optional_values,","))
-//	endfor
-//	// first call the init_function, then query the instrument
-//	optkeyindex = findlistitem("init_function",optional_keys,",",0,0)
-//	if(optkeyindex>0)
-//		execute(stringfromlist(optkeyindex,optional_keys,","))
-//	endif
-//
-//	optkeyindex = findlistitem("test_query",optional_keys,",",0,0)
-//	if(optkeyindex>0)
-//		cmd = stringfromlist(optkeyindex,optional_keys,",")
-//		response = queryInstr(instrID, cmd+"\r\n", read_term = "\r\n") // all the term characters!
-//		if(cmpstr(TrimString(response), "NaN")==0)
-//			abort
-//		endif
-//		printf "\t-- %s responded to %s with: %s\r", name, cmd, response
-//	else
-//		printf "\t-- No test\r"
-//	endif
+	string name = StringByKey("name", mandatory, "=", ",")
+	string var_name = StringByKey("instrID", mandatory, "=", ",")
+	string instrDesc = StringByKey("visa_address", mandatory, "=", ",")
+	
+	variable instrID, status
+	string error
+	status = viOpen(localRM,instrDesc,0,0,instrID)
+	if (status < 0)
+		VISAerrormsg("openInstr() -- viOpen", localRM, status)
+		abort
+	else
+		variable /g $var_name = instrID
+		if(verbose)
+			printf "%s (%s) connected as %s\r", name, instrDesc, var_name
+		endif
+	endif
+
+	// look for optional parameters and set them
+	if(strlen(options)!=0)
+	
+		setVISAoptions(instrID,options)
+		
+		// run init function
+		variable idx
+		idx = findlistitem("init_function",options,",",0,0)
+		if(idx>0)
+			execute(stringfromlist(idx,options,",")) // execute the function if there is one
+		endif
+	
+		// run test query
+		idx = findlistitem("test_query",options,",",0,0)
+		if(idx>0)
+			string cmd = stringfromlist(idx,options,",")
+			string response = queryInstr(instrID, cmd+"\r\n") // throw a bunch of write term characters at it
+			
+			if(cmpstr(TrimString(response), "NaN")==0)
+				abort
+			endif
+			if(verbose)
+				printf "\t-- %s responded to %s with: %s\r", name, cmd, response
+			endif
+		else
+			if(verbose)
+				printf "\t-- No test\r"
+			endif
+		endif
+		
+	endif
+	
 end
 
-/////////////////////////////////
-
-function closeInstr(instrID)
+function closeVISAInstr(instrID)
 	variable instrID
 	string error
 
@@ -137,7 +136,7 @@ function closeInstr(instrID)
 
 end
 
-function closeAllInstr()
+function closeAllVISA()
 	// closing the current VISA session will close all instruments
 	nvar /z globalRM
 	if(!nvar_exists(globalRM))
@@ -388,35 +387,50 @@ end
 /// VISA ATTR Set/Get ///
 /////////////////////////
 
-function setVISAoptions(instrID,optkey,optvalue)
-    variable instrID
-    string optkey, optvalue
-//    variable status=0
-//
-//    strswitch(optkey)
-//        case "baudrate":
-//            status = visaSetBaudRate(instrID, str2num(optvalue))
-//            break
-//        case "stopbits":
-//            status = visaSetStopBits(instrID, str2num(optvalue))
-//             break
-//        case "databits":
-//            status = visaSetDataBits(instrID, str2num(optvalue))
-//            break
-//        case "parity":
-//            status = visaSetParity(instrID, str2num(optvalue))
-//            break
-//        case "readterm":
-//            status = visaSetReadTerm(instrID, optvalue)
-//            break
-//        case "timeout":
-//            status = visaSetTimeout(instrID, str2num(optvalue))
-//        default:
-//            // ignore the key!
-//    endswitch
-//    if(status<0)
-//        VISAerrormsg("viSetAttribute", instrID, status)
-//	endif
+function setVISAoptions(instrID,options)
+	variable instrID
+	string options
+	variable status=0
+
+	variable i=0
+	string keyval="", reg="(.*)=(.*)", key="", value=""
+	for(i=0;i<ItemsInList(options, ",");i+=1)
+		
+		// get key/value from list
+		keyval = StringFromList(i, options, ",")
+		splitstring/E=reg keyval, key, value
+		value = TrimString(value)
+		
+		if(strlen(value)==0)
+			continue // if there is no value, move on
+		endif
+		
+		strswitch(key)
+			case "baudrate":
+			    status = visaSetBaudRate(instrID, str2num(value))
+			    continue
+			case "stopbits":
+			    status = visaSetStopBits(instrID, str2num(value))
+			    continue
+			case "databits":
+			    status = visaSetDataBits(instrID, str2num(value))
+			    continue
+			case "parity":
+			    status = visaSetParity(instrID, str2num(value))
+			    continue
+			case "readterm":
+			    status = visaSetReadTerm(instrID, value)
+			    continue
+			case "timeout":
+			    status = visaSetTimeout(instrID, str2num(value))
+			    continue
+		endswitch
+		
+		if(status<0)
+			VISAerrormsg("viSetAttribute", instrID, status)
+		endif
+		
+	endfor
 end
 
 threadsafe function visaSetReadTerm(instrID, termChar)
@@ -561,11 +575,17 @@ function/s singleHTTPFromINI(index)
 //	return name
 end
 
-function/s singleVISAFromINI(index,localRM)
-	variable index, localRM
+function/s singleVISAFromINI(index,localRM,[verbose])
+	variable index, localRM, verbose
 	
-	string mandatory_keys="name,instrID,visa_address", mandatory_values = ",,"
-	string optional_keys="test_query,init_function,baudrate,stopbits,databits,parity,readterm,timeout", optional_values=",,,,,,,"
+	if(paramisdefault(verbose))
+		verbose = 1
+	endif
+	
+	string mandatory="name=,instrID=,visa_address="
+	string optional="test_query=,init_function=,baudrate=,stopbits=,databits=,parity=,readterm=,timeout="
+	// write term not included
+	// our default is to set it to "" and put any required term characters in the instr driver
 	
 	variable sub_index = index+1, manIdx=0, optIdx=0, manKeyCnt=0
 	string key="", instrName=""
@@ -577,22 +597,24 @@ function/s singleVISAFromINI(index,localRM)
 		if(ini_type[sub_index] == 2 && ini_type[sub_index+1] == 3)
 			key = ini_text[sub_index]
 			
-			manIdx = findlistitem(key,mandatory_keys,",",0,0)
-			optIdx = findlistitem(key,optional_keys,",",0,0)
-			
-			if(manIdx>0)
-				mandatory_values = removelistitem(manIdx,mandatory_values,",")
-				mandatory_values = addlistitem(ini_text[sub_index+1],mandatory_values,",",manIdx)
-				manKeyCnt+=1
-			elseif(optIdx>0)
-				optional_values = removelistitem(optIdx,optional_values,",")
-				optional_values = addlistitem(ini_text[sub_index+1],optional_values,",",optIdx)
-			else
-				printf "[WARNING]: The key (%s) is not supported and will be ignored!", key
-			endif
 			if(cmpstr(key,"name")==0)
-				instrName = key
+				instrName = ini_text[sub_index+1]
 			endif
+						
+			if(WhichListItem(key+"=", mandatory, ",")>-1)
+				mandatory = ReplaceStringByKey(key, mandatory, ini_text[sub_index+1], "=", ",")	
+				manKeyCnt+=1
+
+			elseif(WhichListItem(key+"=", optional, ",")>-1)
+				optional = ReplaceStringByKey(key, optional, ini_text[sub_index+1], "=", ",")
+
+			else
+				if(verbose)
+					printf "[WARNING]: The key (%s) is not recognized (or duplicate) and will be ignored!\r", key
+				endif
+			endif
+
+			
 		endif
 		
 		sub_index+=1
@@ -601,21 +623,22 @@ function/s singleVISAFromINI(index,localRM)
 		endif
 	while(ini_type[sub_index]!=1) // stop at next section
 	
-	if(manKeyCnt!=itemsinlist(mandatory_keys,","))
+	if(manKeyCnt!=itemsinlist(mandatory,","))
 		print "[ERROR] Missing required keys in setupVISAFromINI()!"
 		abort
 	else // found all keys
-//		openVISAinstr(localRM,mandatory_keys,mandatory_values,optional_keys,optional_values)
+		openVISAinstr(mandatory, options=optional, localRM=localRM, verbose=verbose)
 	endif
-
+	
 	return instrName
 end
 
-function /s loadInstrsFromINI([iniFile, path])
+function /s loadInstrsFromINI([iniFile, path, verbose])
 	// load all instruments from iniFile located in path
 	// if iniFile is specified, it will be reloaded into ini_type and ini_text
 	// otherwise the function will use the current content of those waves
 	string iniFile, path
+	variable verbose
 	
 	if(paramisdefault(path))
 		path = "data"
@@ -623,6 +646,10 @@ function /s loadInstrsFromINI([iniFile, path])
 	
 	if(!paramisdefault(iniFile))
 		loadINIconfig(iniFile, path)
+	endif
+	
+	if(paramisdefault(verbose))
+		verbose = 1
 	endif
 	
 	wave ini_type
@@ -639,7 +666,7 @@ function /s loadInstrsFromINI([iniFile, path])
  		// if globalRM does exist
  		// close all connection
  		// reopen everything
- 		closeAllInstr()
+ 		closeAllVISA()
  		openResourceManager()
  	endif
  	
@@ -652,11 +679,12 @@ function /s loadInstrsFromINI([iniFile, path])
 			strswitch(ini_text[i])
 			
 				case "[visa-instrument]":
-					instrList += singleVISAFromINI(i,globalRM)+","
+					instrList += singleVISAFromINI(i,globalRM,verbose=verbose)+","
 		 			continue
 		 			
  				case "[http-instrument]":
  					instrList += singleHTTPFromINI(i)+","
+					print "skipping HTTP instruments for now"
  					continue
 
 			endswitch
