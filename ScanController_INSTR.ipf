@@ -96,15 +96,12 @@ function openVISAinstr(mandatory, [options, localRM, verbose])
 		setVISAoptions(instrID,options)
 		
 		// run init function
-		variable idx
-		idx = findlistitem("init_function",options,",",0,0)
-		if(idx>0)
+		if(StringMatch(options, "*,init_function=*"))
 			execute(StringByKey("init_function",options,"=", ",")) // execute the function if there is one
 		endif
 	
 		// run test query
-		idx = findlistitem("test_query",options,",",0,0)
-		if(idx>0)
+		if(StringMatch(options, "*,test_query=*"))
 			string cmd = StringByKey("test_query",options,"=", ",")
 			string response = queryInstr(instrID, cmd+"\r\n") // throw a bunch of write term characters at it
 			
@@ -179,16 +176,16 @@ function openHTTPinstr(mandatory, [options, verbose])
 	if(strlen(options)>0)
 	
 		// run init function
-		variable idx
-		idx = findlistitem("init_function",options,",",0,0)
-		if(idx>0)
-			execute(StringByKey("init_function",options,"=", ",")) // execute the function if there is one
+		string cmd = ""
+		if(StringMatch(options, "*,init_function=*"))  // still doesn't tell me if there is a value!!
+		
+			
+			execute()) // execute the function if there is one
 		endif
 	
 		// run test query
-		idx = findlistitem("test_ping",options,",",0,0)
-		if(idx>0)
-			string pingval = StringByKey("test_ping",options,"=", ",")
+		if(StringMatch(options, "*,test_ping=*"))
+			cmd = StringByKey("test_ping",options,"=", ",")
 			// do something here with ping val
 			string response = ""
 			
