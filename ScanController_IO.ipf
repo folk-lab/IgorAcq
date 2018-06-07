@@ -967,81 +967,6 @@ end
 /// INI ///
 ///////////
 
-// function sc_loadINIconfig()
-//     // open setup.ini and setup communication with instruments
-//     string INIstr
-//     string sectionlist="", checkstr="", dummy="", section="", instr_names=""
-//     variable i=0, sc_index=-1, offset=0, server_sub_index=0, index=0, gui_index=-1
-//
-//     INIstr = INIfromfile("setup") // setup is the igor symbolic path
-//
-//     sectionlist = parseINIfile(INIstr)
-//     wave/t ini_text
-//     wave ini_type
-//     // results will be dumped into two waves: ini_text & ini_type
-//     // a list of section indices is returned
-//     // ini_text will contain the parsed strings
-//     // ini_type[i]==1 if the entry is a section title
-//     // ini_type[i]==2 if the entry is a key
-//     // ini_type[i]==3 if the entry is a value
-//
-// 	// find scancontroller and GUI sections first
-// 	for(i=0;i<itemsinlist(sectionlist,",");i+=1)
-// 		checkstr = lowerstr(ini_text[str2num(stringfromlist(i,sectionlist,","))])
-// 		if(cmpstr(checkstr[1,strlen(checkstr)-1],"scancontroller")==0)
-// 			sc_index = str2num(stringfromlist(i,sectionlist,","))
-// 			sectionlist = removelistitem(sc_index,sectionlist,",")
-// 		elseif(cmpstr(checkstr[1,strlen(checkstr)-1],"gui")==0)
-// 			gui_index = str2num(stringfromlist(i,sectionlist,","))
-// 			sectionlist = removelistitem(sc_index,sectionlist,",")
-// 		endif
-// 	endfor
-//
-// 	// setup scancontroller variables
-// 	if(sc_index>=0)
-// 		setupINIscancontroller(sc_index)
-// 	else
-// 		print "[ERROR]: scancontroller section not found! Add it to setup.ini"
-// 		abort
-// 	endif
-//
-// 	// all sections left must be instruments!
-//
-//    // open resource manager
-// 	nvar /z globalRM
-// 	if(!nvar_exists(globalRM))
-// 		// if globalRM does not exist
-// 		// open RM and create the global variable
-// 		openResourceManager()
-// 		nvar globalRM
-// 	else
-// 		// if globalRM does exist
-// 		// close all connection
-// 		// reopen everything
-// 		closeAllInstr()
-// 		openResourceManager()
-// 	endif
-//
-// 	// loop over instrument sections
-// 	for(i=0;i<itemsinlist(sectionlist,",");i+=1)
-// 		index = str2num(stringfromlist(i,sectionlist,","))
-// 		section = ini_text[index]
-// 		section = section[1,strlen(section)-1]
-// 		if(cmpstr(section,"visa-instrument"))
-// 			instr_names += setupINIvisa(index,globalRM)
-// 		elseif(cmpstr(section,"http-instrument"))
-// 			instr_names += setupINIhttp(index)
-// 		else
-// 			printf "[WARNING]: Section (%s) not recognised and will be ignored!", ini_text[index]
-// 		endif
-// 	endfor
-//
-// 	// setup GUI windows
-// 	if(gui_index>=0)
-// 		setupINIgui(gui_index,instr_names)
-// 	endif
-// end
-
 function /s loadINIconfig(iniFile, path)
 	// read INI file into some useful waves
 	// assumes general INI rules: https://en.wikipedia.org/wiki/INI_file
@@ -1136,45 +1061,7 @@ end
 
 
 
-function/s setupINIvisa(index,globalRM)
-	variable index, globalRM
-	string mandatory_keys="name,instrID,visa_addresse", mandatory_values = ",,"
-	string optional_keys="test_query,init_function,baudrate,stopbits,databits,parity,readterm,timeout", optional_values=",,,,,,,"
-	variable sub_index = index+1, mankeyindex=0, optkeyindex=0, mankeycount=0
-	string key="", name=""
-	wave/t ini_text
-	wave ini_type
 
-	do
-		if(ini_type[sub_index] == 2 && ini_type[sub_index+1] == 3)
-			key = ini_text[sub_index]
-			mankeyindex = findlistitem(key,mandatory_keys,",",0,0)
-			optkeyindex = findlistitem(key,optional_keys,",",0,0)
-			if(mankeyindex>0)
-				mandatory_values = removelistitem(mankeyindex,mandatory_values,",")
-				mandatory_values = addlistitem(ini_text[sub_index+1],mandatory_values,",",mankeyindex)
-				mankeycount+=1
-			elseif(optkeyindex>0)
-				optional_values = removelistitem(optkeyindex,optional_values,",")
-				optional_values = addlistitem(ini_text[sub_index+1],optional_values,",",optkeyindex)
-			else
-				printf "[WARNING]: The key (%s) is not supported and will be ignored!", key
-			endif
-			if(cmpstr(key,"name")==0)
-				name = key
-			endif
-		endif
-			sub_index+=1
-	while(ini_type[sub_index]>1 || sub_index>numpnts(ini_type)) // stop at next section
-	if(mankeycount!=itemsinlist(mandatory_keys,","))
-		print "[ERROR]: Not all mandatory keys are supplied!"
-		abort
-	else // all mandatory keys are provided! Open instrument communication.
-		openINIvisa(globalRM,mandatory_keys,mandatory_values,optional_keys,optional_values)
-	endif
-
-	return name+","
-end
 
 function/s setupINIhttp(index)
 	variable index

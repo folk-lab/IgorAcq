@@ -521,6 +521,108 @@ end
 /// SETUP FROM INI ///
 //////////////////////
 
+function/s setupVISAFromINI(index,globalRM)
+	variable index, globalRM
+	
+	string mandatory_keys="name,instrID,visa_addresse", mandatory_values = ",,"
+	string optional_keys="test_query,init_function,baudrate,stopbits,databits,parity,readterm,timeout", optional_values=",,,,,,,"
+	
+	variable sub_index = index+1, mankeyindex=0, optkeyindex=0, mankeycount=0
+	string key="", name=""
+	
+	wave/t ini_text
+	wave ini_type
+
+	do
+		if(ini_type[sub_index] == 2 && ini_type[sub_index+1] == 3)
+			key = ini_text[sub_index]
+			mankeyindex = findlistitem(key,mandatory_keys,",",0,0)
+			optkeyindex = findlistitem(key,optional_keys,",",0,0)
+			if(mankeyindex>0)
+				mandatory_values = removelistitem(mankeyindex,mandatory_values,",")
+				mandatory_values = addlistitem(ini_text[sub_index+1],mandatory_values,",",mankeyindex)
+				mankeycount+=1
+			elseif(optkeyindex>0)
+				optional_values = removelistitem(optkeyindex,optional_values,",")
+				optional_values = addlistitem(ini_text[sub_index+1],optional_values,",",optkeyindex)
+			else
+				printf "[WARNING]: The key (%s) is not supported and will be ignored!", key
+			endif
+			if(cmpstr(key,"name")==0)
+				name = key
+			endif
+		endif
+		
+		sub_index+=1
+	while(ini_type[sub_index]>1 || sub_index>numpnts(ini_type)) // stop at next section
+	
+	if(mankeycount!=itemsinlist(mandatory_keys,","))
+		print "[ERROR] Missing required keys in setupVISAFromINI()!"
+		abort
+	else // found all keys
+//		openINIvisa(globalRM,mandatory_keys,mandatory_values,optional_keys,optional_values)
+	endif
+
+	return name
+end
+
+function /s sc_loadInstrINI([iniFile, path])
+	// load all instruments from iniFile located in path
+	// if iniFile is specified, it will be reloaded into ini_type and ini_text
+	// otherwise the function will use the current content of those waves
+	string iniFile, path
+	
+	if(paramisdefault(path))
+		path = "data"
+	endif
+	
+	if(!paramisdefault(iniFile))
+		loadINIconfig(iniFile, path)
+	endif
+	
+	wave ini_type
+	wave /t ini_text
+	
+	// open resource manager
+ 	nvar /z globalRM
+ 	if(!nvar_exists(globalRM))
+ 		// if globalRM does not exist
+ 		// open RM and create the global variable
+ 		openResourceManager()
+ 		nvar globalRM
+ 	else
+ 		// if globalRM does exist
+ 		// close all connection
+ 		// reopen everything
+ 		closeAllInstr()
+ 		openResourceManager()
+ 	endif
+ 	
+ 	string instrList = ""
+ 	variable i=0
+ 	for(i=0;i<numpnts(ini_type);i+=1)
+	
+		if(ini_type[i]==1)
+
+			strswitch(ini_text[i])
+			
+				case "[visa-instrument]":
+					instrList += setupVISAFromINI(i,globalRM)
+		 			continue
+		 			
+ 				case "[http-instrument]":
+ 					instrList += setupINIhttp(i)
+ 					continue
+
+			endswitch
+			
+		endif
+		
+	endfor
+	
+	return instrList
+end
+	 
 function sc_loadGUIsINI(iniIdx, [instrList])
 	// runs GUI functions as specified in INI file (loaded into ini_text, ini_type)
 	// if instrList is passed, then the key must be in instrList for the val(function) to be executed
@@ -538,8 +640,7 @@ function sc_loadGUIsINI(iniIdx, [instrList])
 	do
 		if(ini_type[sub_index] == 2 && ini_type[sub_index+1] == 3)
 			if(strlen(instrList)==0 || findlistitem(ini_text[sub_index],instrList,",",0,0))
-//				execute(ini_text[sub_index+1])
-				print ini_text[sub_index+1]
+				execute(ini_text[sub_index+1])
 			else
 				printf "[WARNING] GUI key \"%s\" not recognized or instrument not loaded" ini_text[sub_index]
 			endif

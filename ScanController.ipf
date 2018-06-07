@@ -357,6 +357,9 @@ function sc_setupAllFromINI(iniFile, [path])
 		path = "data"
 	endif
 	
+	string /g sc_setup_ini = iniFile
+	string /g sc_setup_path = path
+	
 	loadINIconfig(iniFile, path)
 	wave ini_type
 	wave /t ini_text
@@ -386,14 +389,26 @@ function sc_setupAllFromINI(iniFile, [path])
 						print "[WARNING] Found more than one [gui] entry. Using first entry."
 					endif
 					continue
-					
+				case "[visa-instrument]":
+					// handle this elsewhere
+		 			continue
+		 			
+ 				case "[http-instrument]":
+ 					// handle this elsewhere
+ 					continue
+ 					
+ 				default:
+ 					printf "[WARNING]: Section (%s) not recognized and will be ignored!\r", ini_text[i]
+ 					
 			endswitch
 		endif
 		
 	endfor
 	
+	// load instruments
+	
 	if(guiCnt>0)
-		sc_loadGUIsINI(guiIdx, instrList=instrList)
+//		sc_loadGUIsINI(guiIdx, instrList=instrList)
 	endif
 	
 end
