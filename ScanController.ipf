@@ -16,7 +16,8 @@
 
 //TODO:
 
-//     -- SFTP file upload with proper permissions
+//     -- SFTP file upload
+//     -- INI configuration files for scancontroller/instruments
 
 
 //FIX:
@@ -140,13 +141,13 @@ function /S executeWinCmd(command, [logFile])
 	// otherwise, return output
 	string command, logFile
 	string dataPath = getExpPath("data", full=1)
-	
+
 	// open batch file to store command
 	variable batRef
 	string batchFile = "_execute_cmd.bat"
 	string batchFull = datapath + batchFile
 	Open/P=data batRef as batchFile	// overwrites previous batchfile
-	
+
 	// setup log file paths
 	string outChar = ">"
 	if(paramisdefault(logFile))
@@ -158,14 +159,14 @@ function /S executeWinCmd(command, [logFile])
 		endif
 	endif
 	string logFull = datapath + logFile
-	
+
 	// write command to batch file and close
 	fprintf batRef,"cmd/c \"%s %s \"%s\"\"\r", command, outChar, logFull
 	Close batRef
-	
+
 	// execute batch file with output directed to logFile
 	ExecuteScriptText /B "\"" + batchFull + "\""
-	
+
 	string result = ""
 	if(paramisdefault(logFile))
 		variable logRef
@@ -180,10 +181,10 @@ function /S executeWinCmd(command, [logFile])
 		while( 1 )
 		Close logRef
 	endif
-	
+
 	DeleteFile /P=data /Z=1 batchFile // delete batch file
 	return result
-	
+
 end
 
 function/S executeMacCmd(command)
@@ -252,18 +253,18 @@ function /S getExpPath(whichpath, [full])
 				return ParseFilePath(5, temp1+temp2+temp3, "*", 0, 0)
 			endif
 			break
+		case "config":
+				if(full==0)
+					return ReplaceString(":", temp3[1,inf], "/")+"config/"
+				else
+					return ParseFilePath(5, temp1+temp2+temp3+"config:", "*", 0, 0)
+				endif
+				break
 		case "winfs":
 			if(full==0)
 				return ReplaceString(":", temp3[1,inf], "/")+"winfs/"
 			else
 				return ParseFilePath(5, temp1+temp2+temp3+"winfs:", "*", 0, 0)
-			endif
-			break
-		case "config":
-			if(full==0)
-				return ReplaceString(":", temp3[1,inf], "/")+"config/"
-			else
-				return ParseFilePath(5, temp1+temp2+temp3+"config:", "*", 0, 0)
 			endif
 			break
 	endswitch
@@ -277,7 +278,8 @@ function InitScanController([config])
 	string config // use this to specify which config file to load
 
 	// setup instruments and scancontroller from setup.ini
-	sc_loadINIconfig()
+	// sc_loadINIconfig()
+
 	// get created global variables and strings
 	nvar sc_srv_push,sc_sftp_port
 	svar sc_server_url,sc_filetype,sc_slack_url,sc_sftp_user,sc_colormap
@@ -296,29 +298,20 @@ function InitScanController([config])
 	newpath /C/O/Q setup getExpPath("data", full=1) // create/overwrite setup path
 	newpath /C/O/Q config getExpPath("config", full=1) // create/overwrite config path
 
-	//	setup filetype for saved data/metadata
-	//	currently supports: ibw, hdf5
-	string /g sc_filetype
-	if(paramisdefault(filetype))
-		sc_filetype = "ibw"
-	else
-		sc_filetype = filetype
-	endif
+	// create remote path(s)
+	if(sc_srv_push==1)
 
-	// set server push variable for scan controller
-	variable /g sc_srv_push
-	if(paramisdefault(srv_push) || srv_push==1)
-		sc_srv_push = 1
-		
 		print "Creating remote directories..."
+		
 		sc_CreateRemoteDirectory("config") // creating config also creates data
+		
 		if(CmpStr(sc_filetype, "ibw") == 0)
 			newpath /C/O/Q winfs getExpPath("winfs", full=1) // create/overwrite winf path
 			sc_CreateRemoteDirectory("winf")
 		endif
+		
 	else
-		print "Only keeping local copies of data."
-		sc_srv_push = 0
+		print "[WARNING] Only saving local copies of data."
 	endif
 
 	// look for old config file
@@ -938,7 +931,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	// i don't want to delete any old data
 	svar sc_instr_wave
 	wave /t instrWave = $sc_instr_wave
-	initVISAinstruments(instrWave, verbose=0)
+//	initVISAinstruments(instrWave, verbose=0)
 
 	// The status of the upcoming scan will be set when waves are initialized.
 	if(!paramisdefault(starty) && !paramisdefault(finy) && !paramisdefault(numptsy))
@@ -2038,13 +2031,13 @@ function sc_write2batch(fileref, searchStr, localFull)
 	variable fileref
 	string searchStr, localFull
 	localFull = TrimString(localFull)
-	
+
 	svar sc_hostname
 	string lmdpath = getExpPath("lmd", full=1)
 	variable idx = strlen(lmdpath)+1, result=0
 	string srvFull = ""
 	sprintf srvFull, "/measurement-data/%s/%s" sc_hostname, localFull[idx,inf]
-	
+
 	if(strlen(searchStr)==0)
 		// there is no notification file, add this immediately
 		fprintf fileref, "put \"%s\" \"%s\"\n", localFull, srvFull
@@ -2057,17 +2050,17 @@ function sc_write2batch(fileref, searchStr, localFull)
 			fprintf fileref, "put \"%s\" \"%s\"\n", localFull, srvFull
 		endif
 	endif
-	
+
 end
 
 function sc_findNewFiles(datnum)
 	// locate newly created/appended files
 	// add to sftp batch file
-	
+
 	variable datnum // data set to look for
 	variable result = 0
 	string tmpname = ""
-	
+
 	//// create/open batch file ////
 	variable refnum
 	string notifyText = "", buffer
@@ -2096,12 +2089,12 @@ function sc_findNewFiles(datnum)
 
 		// add history file
 		tmpname = datapath+igorinfo(1)+".history"
-		sc_write2batch(refnum, notifyText, tmpname)	
-		
+		sc_write2batch(refnum, notifyText, tmpname)
+
 		// add procedure file
 		tmpname = datapath+igorinfo(1)+".ipf"
 		sc_write2batch(refnum, notifyText, tmpname)
-			
+
 	endif
 
 	// find new data files
@@ -2132,7 +2125,7 @@ function sc_findNewFiles(datnum)
 	if(V_flag==0 && V_isFolder==1)
 		configlist = greplist(indexedfile(config,-1,".config"),"sc")
 	endif
-	
+
 	if(itemsinlist(configlist)>0)
 		configlist = SortList(configlist, ";", 1+16)
 		tmpname = configpath+StringFromList(0,configlist, ";")
@@ -2163,18 +2156,18 @@ function sc_findNewFiles(datnum)
 			sc_write2batch(refnum, notifyText, tmpname)
 		endfor
 	endfor
-	
+
 	close refnum // close server_transfer.bat
-	
+
 end
 
 function /S sc_CreateRemoteDirectory(path)
 	string path // any path recognized by getExpPath
 	svar sc_hostname
-	
+
 	string remDirectory = ""
 	sprintf remDirectory "/measurement-data/%s/%s", sc_hostname, getExpPath(path,full=0)
-	
+
 	variable sftp_port = 7743
 	string srv_address = "qdash-server.phas.ubc.ca"
 	string sftp_user = "igor-data"
@@ -2182,7 +2175,7 @@ function /S sc_CreateRemoteDirectory(path)
 
 	string cmd = ""
 	sprintf cmd, "ssh -p %d %s@%s \"mkdir -p %s\"" sftp_port, sftp_user, srv_address, remDirectory
-	
+
 	string response = executeWinCmd(cmd)
 	return response
 end
@@ -2194,24 +2187,24 @@ function sc_FileTransfer()
 	if( V_Flag == 0 && V_isFile ) // file exists
 		string batchFull = "", cmd = ""
 		batchFull = getExpPath("data", full=1) + "server_transfer.bat"
-		
+
 		variable sftp_port = 7743
 		string srv_address = "qdash-server.phas.ubc.ca"
 		string sftp_user = "igor-data"
 		sprintf cmd, "sftp -P %d -b \"%s\" %s@%s" sftp_port, batchFull, sftp_user, srv_address
-		
+
 		executeWinCmd(cmd, logFile="file_transfer.log")
-		
+
 //		sc_DeleteBatchFile() // Sent everything possible
 								  // assume users will fix errors manually
 		return 1
-		
-	else							     
+
+	else
 		// if there is not server.notify file
 		// don't do anything
 		print "No new files available."
 		return 0
-   
+
 	endif
 
 end

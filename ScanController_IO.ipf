@@ -967,159 +967,154 @@ end
 /// INI ///
 ///////////
 
-function sc_loadINIconfig()
-    // open setup.ini and setup communication with instruments
-    string INIstr
-    string sectionlist="", checkstr="", dummy="", section="", instr_names=""
-    variable i=0, sc_index=-1, offset=0, server_sub_index=0, index=0, gui_index=-1
+// function sc_loadINIconfig()
+//     // open setup.ini and setup communication with instruments
+//     string INIstr
+//     string sectionlist="", checkstr="", dummy="", section="", instr_names=""
+//     variable i=0, sc_index=-1, offset=0, server_sub_index=0, index=0, gui_index=-1
+//
+//     INIstr = INIfromfile("setup") // setup is the igor symbolic path
+//
+//     sectionlist = parseINIfile(INIstr)
+//     wave/t ini_text
+//     wave ini_type
+//     // results will be dumped into two waves: ini_text & ini_type
+//     // a list of section indices is returned
+//     // ini_text will contain the parsed strings
+//     // ini_type[i]==1 if the entry is a section title
+//     // ini_type[i]==2 if the entry is a key
+//     // ini_type[i]==3 if the entry is a value
+//
+// 	// find scancontroller and GUI sections first
+// 	for(i=0;i<itemsinlist(sectionlist,",");i+=1)
+// 		checkstr = lowerstr(ini_text[str2num(stringfromlist(i,sectionlist,","))])
+// 		if(cmpstr(checkstr[1,strlen(checkstr)-1],"scancontroller")==0)
+// 			sc_index = str2num(stringfromlist(i,sectionlist,","))
+// 			sectionlist = removelistitem(sc_index,sectionlist,",")
+// 		elseif(cmpstr(checkstr[1,strlen(checkstr)-1],"gui")==0)
+// 			gui_index = str2num(stringfromlist(i,sectionlist,","))
+// 			sectionlist = removelistitem(sc_index,sectionlist,",")
+// 		endif
+// 	endfor
+//
+// 	// setup scancontroller variables
+// 	if(sc_index>=0)
+// 		setupINIscancontroller(sc_index)
+// 	else
+// 		print "[ERROR]: scancontroller section not found! Add it to setup.ini"
+// 		abort
+// 	endif
+//
+// 	// all sections left must be instruments!
+//
+//    // open resource manager
+// 	nvar /z globalRM
+// 	if(!nvar_exists(globalRM))
+// 		// if globalRM does not exist
+// 		// open RM and create the global variable
+// 		openResourceManager()
+// 		nvar globalRM
+// 	else
+// 		// if globalRM does exist
+// 		// close all connection
+// 		// reopen everything
+// 		closeAllInstr()
+// 		openResourceManager()
+// 	endif
+//
+// 	// loop over instrument sections
+// 	for(i=0;i<itemsinlist(sectionlist,",");i+=1)
+// 		index = str2num(stringfromlist(i,sectionlist,","))
+// 		section = ini_text[index]
+// 		section = section[1,strlen(section)-1]
+// 		if(cmpstr(section,"visa-instrument"))
+// 			instr_names += setupINIvisa(index,globalRM)
+// 		elseif(cmpstr(section,"http-instrument"))
+// 			instr_names += setupINIhttp(index)
+// 		else
+// 			printf "[WARNING]: Section (%s) not recognised and will be ignored!", ini_text[index]
+// 		endif
+// 	endfor
+//
+// 	// setup GUI windows
+// 	if(gui_index>=0)
+// 		setupINIgui(gui_index,instr_names)
+// 	endif
+// end
 
-    INIstr = INIfromfile("setup") // setup is the igor symbolic path
+function /s sc_loadINIconfig(iniFile, [path])
+	// read INI file into some useful waves
+	// assumes general INI rules: https://en.wikipedia.org/wiki/INI_file
+	string iniFile, path
+	variable refnum
+	string line="", INIstr = "", filename = "setup.ini"
+	
+	if(paramisdefault(path))
+		path = "data"
+	endif
+	
+	// open setup file
+	// abort if it does not exist
+	open /r/z/p=$(path) refnum as iniFile
+	if(v_flag!=0)
+	    print "[ERROR]: Could not read the setup file! It might not exist."
+	    return ""
+	endif
 
-    sectionlist = parseINIfile(INIstr)
-    wave/t ini_text
-    wave ini_type
-    // results will be dumped into two waves: ini_text & ini_type
-    // a list of section indices is returned
-    // ini_text will contain the parsed strings
-    // ini_type[i]==1 if the entry is a section title
-    // ini_type[i]==2 if the entry is a key
-    // ini_type[i]==3 if the entry is a value
-
-	// find scancontroller and GUI sections first
-	for(i=0;i<itemsinlist(sectionlist,",");i+=1)
-		checkstr = lowerstr(ini_text[str2num(stringfromlist(i,sectionlist,","))])
-		if(cmpstr(checkstr[1,strlen(checkstr)-1],"scancontroller")==0)
-			sc_index = str2num(stringfromlist(i,sectionlist,","))
-			sectionlist = removelistitem(sc_index,sectionlist,",")
-		elseif(cmpstr(checkstr[1,strlen(checkstr)-1],"gui")==0)
-			gui_index = str2num(stringfromlist(i,sectionlist,","))
-			sectionlist = removelistitem(sc_index,sectionlist,",")
+	// make the waves that will hold the parsed data
+	make/t/o/n=0 ini_text
+	make/o/n=0 ini_type
+	
+	variable i=0, type=0, sectionIdx=0
+	string reg="(.*)=(.*)", key="", value=""
+	do
+		freadline refnum, line
+		if(strlen(line)==0)
+		    break
 		endif
-	endfor
-
-	// setup scancontroller variables
-	if(sc_index>=0)
-		setupINIscancontroller(sc_index)
-	else
-		print "[ERROR]: scancontroller section not found! Add it to setup.ini"
-		abort
-	endif
-
-	// all sections left must be instruments!
-
-   // open resource manager
-	nvar /z globalRM
-	if(!nvar_exists(globalRM))
-		// if globalRM does not exist
-		// open RM and create the global variable
-		openResourceManager()
-		nvar globalRM
-	else
-		// if globalRM does exist
-		// close all connection
-		// reopen everything
-		closeAllInstr()
-		openResourceManager()
-	endif
-
-	// loop over instrument sections
-	for(i=0;i<itemsinlist(sectionlist,",");i+=1)
-		index = str2num(stringfromlist(i,sectionlist,","))
-		section = ini_text[index]
-		section = section[1,strlen(section)-1]
-		if(cmpstr(section,"visa-instrument"))
-			instr_names += setupINIvisa(index,globalRM)
-		elseif(cmpstr(section,"http-instrument"))
-			instr_names += setupINIhttp(index)
-		else
-			printf "[WARNING]: Section (%s) not recognised and will be ignored!", ini_text[index]
+	    
+	   type = getINItype(line)
+		// if type=0 then it's a comment or some BS, ignore it!
+		if(type==1) // section
+			sectionIdx = addINIstring(line,type)
+		elseif(type==2) // key/value pair
+			splitstring/E=reg line, key, value
+			addINIstring(key,type)
+			addINIstring(value,type+1)
 		endif
-	endfor
 
-	// setup GUI windows
-	if(gui_index>=0)
-		setupINIgui(gui_index,instr_names)
+		i+=1
+	while(1)
+	close refnum
+
+end
+
+function getINItype(iniLine)
+	// decide if this line represents a 
+	//  (0) blank/comment
+	//  (1) section heading
+	//  (2) key (really it is a key/value pair)
+	//  (3) not returned here, used in ini_type to represent values
+	string iniLine
+	variable type=0
+	
+	iniLine = TrimString(iniLine)
+	
+	if(cmpstr(iniLine[0],"#")==0 || cmpstr(iniLine[0],";")==0) // comment
+	    return 0
+	elseif(cmpstr(iniLine[0],"[")==0) // section
+	    return 1
+	elseif(strsearch(iniLine, "=",0)>0) // key/value pair
+	    return 2
+	else // blank/comment
+	    return 0
 	endif
-end
-
-function/s INIfromfile(path)
-    // read INI file into string
-    // filename must be setup.ini
-    // assumes general INI rules: https://en.wikipedia.org/wiki/INI_file
-    string path
-    variable refnum
-    string buffer="", INIstr = "", filename = "setup.ini"
-
-    open /r/z/p=$path refnum as filename
-    if(v_flag!=0)
-        print "[ERROR]: Could not read the setup file! It might not exist."
-        return ""
-    endif
-
-    do
-        freadline refnum, buffer
-        if(strlen(buffer)==0)
-            break
-        endif
-        INIstr+=buffer
-    while(1)
-    close refnum
-
-    return INIstr
-end
-
-function/s parseINIfile(INIstr)
-    string INIstr
-    variable line_start=0, line_end=0, type=0, index=0
-    string line="", reg="(.*)=(.*)", key="", value="", sectionlist=""
-
-    // make the waves that will hold the parsed data
-    make/t/o/n=0 ini_text
-    make/o/n=0 ini_type
-
-    // read until "\r"
-    do
-        line_end = strsearch(INIstr, "\r", line_start)
-        if(line_end>0)
-            line=TrimString(INIstr[line_start,line_end-1])
-        else // this is the last line
-            line=TrimString(INIstr[line_start,strlen(INIstr)-1])
-        endif
-        type = getINItype(line)
-        if(type!=0) // if type=0 then it's a comment or some BS, ignore it!
-            if(type==1) // section
-                index = addINIstring(line,type)
-                sectionlist = addlistitem(num2istr(index),sectionlist,",")
-            elseif(type==2) // key/value pair
-                splitstring/E=reg line , key, value
-                addINIstring(key,type)
-                addINIstring(value,type+1)
-            endif
-        endif
-        line_start=line_end+1
-    while(line_end>0)
-
-    return sectionlist
-end
-
-function getINItype(INIstr)
-    string INIstr
-    variable type=0
-
-    INIstr = TrimString(INIstr)
-
-    if(cmpstr(INIstr[0],"#")==0 || cmpstr(INIstr[0],";")==0) // comment
-        return 0
-    elseif(cmpstr(INIstr[0],"[")==0) // section
-        return 1
-    elseif(strsearch(INIstr, "=",0)>0) // key/value pair
-        return 2
-    else // some BS
-        return 0
-    endif
 end
 
 function addINIstring(str,type)
+	// adds strings to init_text
+	// adds what types those strings represent to ini_type
+	// returns line_num if a section heading was added
     string str
     variable type
     variable line_num=0
@@ -1131,12 +1126,21 @@ function addINIstring(str,type)
     redimension /n=(line_num) ini_text
     redimension /n=(line_num) ini_type
 
-    // add new valuew
-    ini_text[line_num-1] = str
+    // add new value
+    ini_text[line_num-1] = TrimString(str)
     ini_type[line_num-1] = type
-
-    return line_num
+	
+	if(type==1)
+		return line_num
+	endif
 end
+
+
+
+
+
+
+
 
 function setupINIgui(gui_index, instr_names)
 	variable gui_index
@@ -1153,6 +1157,15 @@ function setupINIgui(gui_index, instr_names)
 		sub_index+=1
 	while(ini_type(sub_index)>1 || sub_index>numpnts(ini_type))
 end
+
+
+
+
+
+
+
+
+
 
 function setupINIscancontroller(sc_index)
 	variable sc_index
@@ -1186,6 +1199,21 @@ function setupINIscancontroller(sc_index)
 		abort
 	endif
 end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 function/s setupINIvisa(index,globalRM)
 	variable index, globalRM
