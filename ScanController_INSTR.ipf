@@ -545,10 +545,9 @@ function sc_loadGUIsINI(iniIdx, [instrList])
 			endif
 		endif
 		
-		if(sub_index==numpnts(ini_type)-1)
+		sub_index+=1
+		if(sub_index>numpnts(ini_type)-1)
 			break
-		else
-			sub_index+=1
 		endif
 	while(ini_type[sub_index]!=1)
 	

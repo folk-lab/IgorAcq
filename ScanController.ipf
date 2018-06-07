@@ -282,7 +282,9 @@ function sc_loadGlobalsINI(iniIdx)
 	
 	// some values are required
 	string mandatory_keys = "server_url,srv_push,filetype,slack_url,sftp_port,sftp_user"
-	string val_type = "str,var,str,str,var,str"
+	string man_type = "str,var,str,str,var,str"
+	string optional_keys = "colormap,"
+	string opt_type = "str,"
 	
 	string key=""
 	variable sub_index=iniIdx+1, keyIdx=0, manKeyCnt=0
@@ -298,32 +300,54 @@ function sc_loadGlobalsINI(iniIdx)
 				// this is in the manadtory key list
 				key = "sc_"+key // global variable names created from mandatory keys
 				
-				if(cmpstr(stringfromlist(keyIdx,val_type,","),"str")) // create string variables
+				if(cmpstr(stringfromlist(keyIdx, man_type,","),"str")) // create string variables
 					string/g $key = ini_text[sub_index+1]
-				elseif(cmpstr(stringfromlist(keyIdx,val_type,","),"var")) // create numeric variables
+				elseif(cmpstr(stringfromlist(keyIdx,man_type,","),"var")) // create numeric variables
 					variable/g $key = str2num(ini_text[sub_index+1])
 				endif
 				
 				manKeyCnt+=1
-			else
-				// unknown key
-				printf "[WARNING] The key \"%s\" is not supported and will be ignored!\r", key
+				sub_index+=1
+				continue
+			endif
+			
+			// handle optional keys here
+			keyIdx = findlistitem(key,optional_keys,",",0,0)
+			if(keyIdx>=0)
+				// this is in the manadtory key list
+				key = "sc_"+key // global variable names created from optional keys
+				
+				if(cmpstr(stringfromlist(keyIdx,opt_type,","),"str")) // create string variables
+					string/g $key = ini_text[sub_index+1]
+				elseif(cmpstr(stringfromlist(keyIdx,opt_type,","),"var")) // create numeric variables
+					variable/g $key = str2num(ini_text[sub_index+1])
+				endif
+				
+				sub_index+=1
+				continue
 			endif
 			
 		endif
 		
-		if(sub_index==numpnts(ini_type)-1)
+		sub_index+=1
+		if(sub_index>numpnts(ini_type)-1)
 			break
-		else
-			sub_index+=1
 		endif
 		
 	while(ini_type[sub_index]!=1) // stop at next section
 	
+	// defaults for optional parameters
+	svar/z sc_colormap
+	if(!svar_exists(sc_colormap))
+		string /g sc_colormap = "VioletOrangeYellow"
+	endif
+	
+	// error if not all mandatory keys were loaded 
 	if(manKeyCnt!=itemsinlist(mandatory_keys,","))
 		print "[ERROR] Not all mandatory keys were supplied to [scancontroller]!"
 		abort
 	endif
+	
 end
 
 function sc_setupAllFromINI(iniFile, [path])
@@ -374,28 +398,30 @@ function sc_setupAllFromINI(iniFile, [path])
 	
 end
 
-function InitScanController([config])
-	string config // use this to specify which config file to load
+function InitScanController([setupFile, setupPath, configFile])
+	string setupFile, setupPath, configFile // use these to point to specific setup and config files
+											        // defaults are setup.ini in data path and most recent config
 	
-	// Check if data path is definded
-	GetFileFolderInfo/Z/Q/P=data
+	GetFileFolderInfo/Z/Q/P=data  // Check if data path is definded
 	if(v_flag != 0 || v_isfolder != 1)
 		abort "Data path not defined!\n"
 	endif
 
-	// setup instruments and scancontroller from setup.ini
-	// sc_loadINIconfig()
-
-	// get created global variables and strings
+	if(paramisdefault(setupFile))
+		setupFile = "setup.ini"
+	endif
+	
+	if(paramisdefault(setupPath))
+		setupPath = "data"
+	endif 
+	
+	sc_setupAllFromINI(setupFile, path=setupPath)   // setup instruments and scancontroller from setup.ini
+	string /g sc_hostname = getHostName() // get machine name
+	
+	// load all the scan controller globals
 	nvar sc_srv_push,sc_sftp_port
 	svar sc_server_url,sc_filetype,sc_slack_url,sc_sftp_user,sc_colormap
-
 	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
-	string /g sc_current_config = ""
-
-	string /g sc_hostname = getHostName() // machine name
-
-	
 
 	newpath /C/O/Q setup getExpPath("data", full=1) // create/overwrite setup path
 	newpath /C/O/Q config getExpPath("config", full=1) // create/overwrite config path
@@ -416,19 +442,22 @@ function InitScanController([config])
 		print "[WARNING] Only saving local copies of data."
 	endif
 
-	// look for old config file
-	string filelist = greplist(indexedfile(config,-1,".config"),"sc")
-	if(paramisdefault(config))
+	// deal with config file
+	string /g sc_current_config
+	if(paramisdefault(configFile))
+		// look for newest config file
+		string filelist = greplist(indexedfile(config,-1,".config"),"sc")
 		if(itemsinlist(filelist)>0)
 			// read content into waves
 			filelist = SortList(filelist, ";", 1+16)
-			sc_loadconfig(StringFromList(0,filelist, ";"))
+			sc_loadConfig(StringFromList(0,filelist, ";"))
 		else
+			// if there are no config files, use defaults
 			// These arrays should have the same size. Their indeces correspond to each other.
 			make/t/o sc_RawWaveNames = {"g1x", "g1y"} // Wave names to be created and saved
 			make/o sc_RawRecord = {0,0} // Whether you want to record and save the data for this wave
 			make/o sc_RawPlot = {0,0} // Whether you want to record and save the data for this wave
-			make/t/o sc_RawScripts = {"getg1x()", "getg1y()"}
+			make/t/o sc_RawScripts = {"readSRSx(srs1)", "readSRSy(srs1)"}
 			// End of same-size waves
 
 			// And these waves should be the same size too
@@ -455,7 +484,7 @@ function InitScanController([config])
 			endif
 		endif
 	else
-		sc_loadconfig(config)
+		sc_loadconfig(configFile)
 	endif
 
 	sc_rebuildwindow()
@@ -520,7 +549,7 @@ function/s sc_createconfig()
 	writeJSONtoFile(configstr, configfile, "config")
 end
 
-function sc_loadconfig(configfile)
+function sc_loadConfig(configfile)
 	string configfile
 	string JSONstr, checkStr, textkeys, numkeys, textdestinations, numdestinations
 	variable i=0,escapePos=-1
