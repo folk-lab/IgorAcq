@@ -28,6 +28,12 @@
 ////// utility functions //////
 ///////////////////////////////
 
+function sc_randomInt()
+	variable from=-1e6, to=1e6
+	variable amp = to - from
+	return floor(from + mod(abs(enoise(100*amp)),amp+1))
+end
+
 function unixtime()
 	// returns the current unix time in seconds
 	return DateTime - date2secs(1970,1,1) - date2secs(-1,-1,-1)
