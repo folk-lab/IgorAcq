@@ -134,30 +134,56 @@ function /S ReplaceBullets(str)
 	return ReplaceString(U+2022, str, ">>> ")
 end
 
-function/S executeWinCmd(command)
-	// http://www.igorexchange.com/node/938
-	string command
-	string IPUFpath = SpecialDirPath("Igor Pro User Files",0,1,0)	// guaranteed writeable path in IP7
-	string batchFileName = "ExecuteWinCmd.bat", outputFileName = "ExecuteWinCmd.out"
-	string outputLine, result = ""
-	variable refNum
-
-	NewPath/O/Q IgorProUserFiles, IPUFpath
-	Open/P=IgorProUserFiles refNum as batchFileName	// overwrites previous batchfile
-	fprintf refNum,"cmd/c \"%s > \"%s%s\"\"\r", command, IPUFpath, outputFileName
-	Close refNum
-	ExecuteScriptText/B "\"" + IPUFpath + "\\" + batchFileName + "\""
-	Open/P=IgorProUserFiles/R refNum as outputFileName
-
-	do
-		FReadLine refNum, outputLine
-		if( strlen(outputLine) == 0 )
-			break
+function /S executeWinCmd(command, [logFile])
+	// run the shell command
+	// if logFile is selected, put output there
+	// otherwise, return output
+	string command, logFile
+	string dataPath = getExpPath("data", full=1)
+	
+	// open batch file to store command
+	variable batRef
+	string batchFile = "_execute_cmd.bat"
+	string batchFull = datapath + batchFile
+	Open/P=data batRef as batchFile	// overwrites previous batchfile
+	
+	// setup log file paths
+	string outChar = ">"
+	if(paramisdefault(logFile))
+		logFile = "_execute_cmd.log"
+	else
+		GetFileFolderInfo /Q/Z/P=data logFile
+		if( V_Flag == 0 && V_isFile ) // file exists
+			outChar = ">>"
 		endif
-		result += outputLine
-	while( 1 )
-	Close refNum
+	endif
+	string logFull = datapath + logFile
+	
+	// write command to batch file and close
+	fprintf batRef,"cmd/c \"%s %s \"%s\"\"\r", command, outChar, logFull
+	Close batRef
+	
+	// execute batch file with output directed to logFile
+	ExecuteScriptText /B "\"" + batchFull + "\""
+	
+	string result = ""
+	if(paramisdefault(logFile))
+		variable logRef
+		Open/P=data logRef as logFile // overwrites previous batchfile
+		string outputLine
+		do
+			FReadLine logRef, outputLine
+			if( strlen(outputLine) == 0 )
+				break
+			endif
+			result += outputLine
+		while( 1 )
+		Close logRef
+	endif
+	
+	DeleteFile /P=data /Z=1 batchFile // delete batch file
 	return result
+	
 end
 
 function/S executeMacCmd(command)
@@ -192,7 +218,7 @@ end
 
 function /S getExpPath(whichpath, [full])
 	// whichpath determines which path will be returned (data, winfs, config)
-	// root always gives the path to local_measurement_data
+	// lmd always gives the path to local_measurement_data
 	// if full==1, the full path on the local machine is returned in native style
 	// if full==0, the path relative to local_measurement_data is returned in Unix style
 	string whichpath
@@ -213,28 +239,29 @@ function /S getExpPath(whichpath, [full])
 	SplitString/E="([\w\s\-\:]+)(?i)(local[\s\_]measurement[\s\_]data)([\w\s\-\:]+)" S_path, temp1, temp2, temp3
 
 	strswitch(whichpath)
-		case "root":
+		case "lmd":
 			// returns path to local_measurement_data on local machine
+			// always assumes you want the full path
 			return ParseFilePath(5, temp1+temp2, "*", 0, 0)
 			break
 		case "data":
 			// returns path to data relative to local_measurement_data
 			if(full==0)
-				return "/"+ReplaceString(":", temp3[1,inf], "/")
+				return ReplaceString(":", temp3[1,inf], "/")
 			else
 				return ParseFilePath(5, temp1+temp2+temp3, "*", 0, 0)
 			endif
 			break
 		case "winfs":
 			if(full==0)
-				return "/"+ReplaceString(":", temp3[1,inf], "/")+"winfs/"
+				return ReplaceString(":", temp3[1,inf], "/")+"winfs/"
 			else
 				return ParseFilePath(5, temp1+temp2+temp3+"winfs:", "*", 0, 0)
 			endif
 			break
 		case "config":
 			if(full==0)
-				return "/"+ReplaceString(":", temp3[1,inf], "/")+"config/"
+				return ReplaceString(":", temp3[1,inf], "/")+"config/"
 			else
 				return ParseFilePath(5, temp1+temp2+temp3+"config:", "*", 0, 0)
 			endif
@@ -255,7 +282,6 @@ function InitScanController([config])
 	nvar sc_srv_push,sc_sftp_port
 	svar sc_server_url,sc_filetype,sc_slack_url,sc_sftp_user,sc_colormap
 
-	string filelist = ""
 	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
 	string /g sc_current_config = ""
 
@@ -270,9 +296,33 @@ function InitScanController([config])
 	newpath /C/O/Q setup getExpPath("data", full=1) // create/overwrite setup path
 	newpath /C/O/Q config getExpPath("config", full=1) // create/overwrite config path
 
-	// look for config files
-	filelist = greplist(indexedfile(config,-1,".config"),"sc")
+	//	setup filetype for saved data/metadata
+	//	currently supports: ibw, hdf5
+	string /g sc_filetype
+	if(paramisdefault(filetype))
+		sc_filetype = "ibw"
+	else
+		sc_filetype = filetype
+	endif
 
+	// set server push variable for scan controller
+	variable /g sc_srv_push
+	if(paramisdefault(srv_push) || srv_push==1)
+		sc_srv_push = 1
+		
+		print "Creating remote directories..."
+		sc_CreateRemoteDirectory("config") // creating config also creates data
+		if(CmpStr(sc_filetype, "ibw") == 0)
+			newpath /C/O/Q winfs getExpPath("winfs", full=1) // create/overwrite winf path
+			sc_CreateRemoteDirectory("winf")
+		endif
+	else
+		print "Only keeping local copies of data."
+		sc_srv_push = 0
+	endif
+
+	// look for old config file
+	string filelist = greplist(indexedfile(config,-1,".config"),"sc")
 	if(paramisdefault(config))
 		if(itemsinlist(filelist)>0)
 			// read content into waves
@@ -1979,93 +2029,79 @@ function SaveFromPXP([history, procedure])
 end
 
 
-////////////////////////
-////  notifications ////
-////////////////////////
+////////////////////
+////  move data ////
+////////////////////
+
+function sc_write2batch(fileref, searchStr, localFull)
+
+	variable fileref
+	string searchStr, localFull
+	localFull = TrimString(localFull)
+	
+	svar sc_hostname
+	string lmdpath = getExpPath("lmd", full=1)
+	variable idx = strlen(lmdpath)+1, result=0
+	string srvFull = ""
+	sprintf srvFull, "/measurement-data/%s/%s" sc_hostname, localFull[idx,inf]
+	
+	if(strlen(searchStr)==0)
+		// there is no notification file, add this immediately
+		fprintf fileref, "put \"%s\" \"%s\"\n", localFull, srvFull
+	else
+		// search for localFull in searchStr
+		print searchStr, localFull
+		result = strsearch(searchStr, localFull, 0)
+		print result
+		if(result==-1)
+			fprintf fileref, "put \"%s\" \"%s\"\n", localFull, srvFull
+		endif
+	endif
+	
+end
 
 function sc_findNewFiles(datnum)
-	variable datnum
-	variable refNum
-	nvar sc_save_exp
-	string winfpath = getExpPath("winfs", full=0)
-	string configpath = getExpPath("config", full=0)
-	string datapath = getExpPath("data", full=0)
-
-	//// create/open server.notify ////
+	// locate newly created/appended files
+	// add to sftp batch file
+	
+	variable datnum // data set to look for
+	variable result = 0
+	string tmpname = ""
+	
+	//// create/open batch file ////
+	variable refnum
 	string notifyText = "", buffer
-	getfilefolderinfo /Q/Z/P=data "server.notify"
+	getfilefolderinfo /Q/Z/P=data "server_transfer.bat"
 	if(V_isFile==0) // if the file does not exist, create it with hostname/n at the top
-		open /A/P=data refNum as "server.notify"
+		open /A/P=data refNum as "server_transfer.bat"
 	else // if the file does exist, open it for appending
-		open /A/P=data refNum as "server.notify"
+		open /A/P=data refNum as "server_transfer.bat"
 		FSetPos refNum, 0
 		variable lines = 0
 		do
 			FReadLine refNum, buffer
-			if(lines>0)
-				notifyText+=buffer
-			endif
+			notifyText+=buffer
 			lines +=1
 		while(strlen(buffer)>0)
 	endif
 
-	variable notifyLen = strlen(notifyText)
-	variable result = 0
-	string tmpname = ""
-
-	// add the most recent scan controller config file
-
-	string configlist=""
-	getfilefolderinfo /Q/Z/P=config // check if config folder exists before looking for files
-	if(V_flag==0 && V_isFolder==1)
-		configlist = greplist(indexedfile(config,-1,".config"),"sc")
-	endif
-	if(itemsinlist(configlist)>0)
-		configlist = SortList(configlist, ";", 1+16)
-		tmpname = configpath+StringFromList(0,configlist, ";")
-		if(notifyLen==0)
-			// if there is no notification file
-			// add this immediately
-			fprintf refnum, "%s\n", tmpname
-		else
-			// search for tmpname in notifyText
-			result = strsearch(notifyText, tmpname, 0)
-			if(result==-1)
-				fprintf refnum, "%s\n", tmpname
-			endif
-		endif
-	endif
-
-	// add experiment and history files
+	// add experiment/history/procedure files
 	// only if I saved the experiment this run
+	string datapath = getExpPath("data", full=1)
+	nvar sc_save_exp
 	if(sc_save_exp == 1)
 		// add experiment file
 		tmpname = datapath+igorinfo(1)+".pxp"
-		if(notifyLen==0)
-			// if there is no notification file
-			// add this immediately
-			fprintf refnum, "%s\n", tmpname
-		else
-			// search for tmpname in notifyText
-			result = strsearch(notifyText, tmpname, 0)
-			if(result==-1)
-				fprintf refnum, "%s\n", tmpname
-			endif
-		endif
+		sc_write2batch(refnum, notifyText, tmpname)
 
 		// add history file
 		tmpname = datapath+igorinfo(1)+".history"
-		if(notifyLen==0)
-			// if there is no notification file
-			// add this immediately
-			fprintf refnum, "%s\n", tmpname
-		else
-			// search for tmpname in notifyText
-			result = strsearch(notifyText, tmpname, 0)
-			if(result==-1)
-				fprintf refnum, "%s\n", tmpname
-			endif
-		endif
+		sc_write2batch(refnum, notifyText, tmpname)	
+		
+		// add procedure file
+		tmpname = datapath+igorinfo(1)+".ipf"
+		sc_write2batch(refnum, notifyText, tmpname)
+			
 	endif
 
 	// find new data files
@@ -2085,21 +2121,26 @@ function sc_findNewFiles(datnum)
 
 		for(j=0;j<ItemsInList(matchList, ";");j+=1)
 			tmpname = datapath+StringFromList(j,matchList, ";")
-			if(notifyLen==0)
-				// if there is no notification file
-				// add this immediately
-				fprintf refnum, "%s\n", tmpname
-			else
-				// search for tmpname in notifyText
-				result = strsearch(notifyText, tmpname, 0)
-				if(result==-1)
-					fprintf refnum, "%s\n", tmpname
-				endif
-			endif
+			sc_write2batch(refnum, notifyText, tmpname)
 		endfor
 	endfor
 
+	// add the most recent scan controller config file
+	string configpath = getExpPath("config", full=1)
+	string configlist=""
+	getfilefolderinfo /Q/Z/P=config // check if config folder exists before looking for files
+	if(V_flag==0 && V_isFolder==1)
+		configlist = greplist(indexedfile(config,-1,".config"),"sc")
+	endif
+	
+	if(itemsinlist(configlist)>0)
+		configlist = SortList(configlist, ";", 1+16)
+		tmpname = configpath+StringFromList(0,configlist, ";")
+		sc_write2batch(refnum, notifyText, tmpname)
+	endif
+
 	// find new metadata files in winfs folder (if it exists)
+	string winfpath = getExpPath("winfs", full=1)
 	extensions = ".winf;"
 	string winfstr = ""
 	idxList = ""
@@ -2119,95 +2160,69 @@ function sc_findNewFiles(datnum)
 
 		for(j=0;j<ItemsInList(matchList, ";");j+=1)
 			tmpname = winfpath+StringFromList(j,matchList, ";")
-			if(notifyLen==0)
-				// if there is no notification file
-				// add this immediately
-				fprintf refnum, "%s\n", tmpname
-			else
-				// search for tmpname in notifyText
-				result = strsearch(notifyText, tmpname, 0)
-				if(result==-1)
-					fprintf refnum, "%s\n", tmpname
-				endif
-			endif
+			sc_write2batch(refnum, notifyText, tmpname)
 		endfor
 	endfor
-	close refnum // close server.notify
+	
+	close refnum // close server_transfer.bat
+	
 end
 
-function sc_ForceDataBackup()
-	// this function is never called automatically
-	// if you are worried about your data
-	// you can call it and it will write a fresh copy of the
-	// "data" directory to the lab server
+function /S sc_CreateRemoteDirectory(path)
+	string path // any path recognized by getExpPath
+	svar sc_hostname
+	
+	string remDirectory = ""
+	sprintf remDirectory "/measurement-data/%s/%s", sc_hostname, getExpPath(path,full=0)
+	
+	variable sftp_port = 7743
+	string srv_address = "qdash-server.phas.ubc.ca"
+	string sftp_user = "igor-data"
 
-	svar sc_server_url, sc_hostname
-	string username = "anonymous"
-	string password = "folklab101@gmail.com"
-	string ftpURL = "", fullpath = getExpPath("data", full=1)
-	sprintf ftpURL, "ftp://%s/data/%s%s", sc_server_url, sc_hostname, getExpPath("data", full=0)
-	FTPUpload /N=21 /O /D ftpURL[0,strlen(ftpURL)-2], fullpath[0,strlen(fullpath)-2]
 
+	string cmd = ""
+	sprintf cmd, "ssh -p %d %s@%s \"mkdir -p %s\"" sftp_port, sftp_user, srv_address, remDirectory
+	
+	string response = executeWinCmd(cmd)
+	return response
 end
 
 function sc_FileTransfer()
-	variable refnum
-	open /R/P=data refnum as "server.notify"
 
-	if(refnum==0)
+	string batchFile = "server_transfer.bat"
+	GetFileFolderInfo /Q/Z/P=data batchFile
+	if( V_Flag == 0 && V_isFile ) // file exists
+		string batchFull = "", cmd = ""
+		batchFull = getExpPath("data", full=1) + "server_transfer.bat"
+		
+		variable sftp_port = 7743
+		string srv_address = "qdash-server.phas.ubc.ca"
+		string sftp_user = "igor-data"
+		sprintf cmd, "sftp -P %d -b \"%s\" %s@%s" sftp_port, batchFull, sftp_user, srv_address
+		
+		executeWinCmd(cmd, logFile="file_transfer.log")
+		
+//		sc_DeleteBatchFile() // Sent everything possible
+								  // assume users will fix errors manually
+		return 1
+		
+	else							     
 		// if there is not server.notify file
 		// don't do anything
 		print "No new files available."
 		return 0
-	else
-		// walk through server.notify and send data
-		svar sc_hostname, sc_server_url
-		printf "Transfering new data over FTP to %s\r", sc_server_url
-
-		string username = "anonymous"
-		string password = "folklab101@gmail.com"
-		string datapath = getExpPath("data", full=0)
-		variable idx = strlen(datapath)
-
-		string ftpURL = "", lineContent = "", filePath = ""
-		variable i
-		for (i = 0; ;i += 1)
-
-			FReadLine refNum, lineContent
-			if (strlen(lineContent) == 0)
-				// no more data to be read
-				break
-			endif
-
-			lineContent = TrimString(lineContent)
-			if (strlen(lineContent) == 0)
-				// blank line for some reason
-				continue
-			endif
-
-			filePath = ReplaceString("/", lineContent[idx,inf], ":")
-
-			sprintf ftpURL, "ftp://%s/data/%s%s", sc_server_url, sc_hostname, lineContent
-			FTPUpload /N=21 /P=data /T=0 /U=username /W=password /V=0 /Z ftpURL, filePath
-			if(V_flag!=0)
-				printf "Error transfering file to server -- %s (code = %d)\r", filePath, V_flag
-			endif
-
-		endfor
-
-		close refnum
-		sc_DeleteNotificationFile() // Sent everything possible
-									   // assume users will fix errors manually
+   
 	endif
+
 end
 
-function sc_DeleteNotificationFile()
+function sc_DeleteBatchFile()
 
 	// delete server.notify
-	deletefile /Z=1 /P=data "server.notify"
+	deletefile /Z=1 /P=data "server_transfer.bat"
 
 	if(V_flag!=0)
-		print "Failed to delete 'server.notify'"
+		print "Failed to delete 'server_transfer.bat'"
 	endif
 end
 
