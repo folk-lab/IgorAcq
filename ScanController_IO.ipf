@@ -190,8 +190,6 @@ function initSaveFiles_ibw([msg])
 		msg=""
 	endif
 
-	// check winfs path
-	newpath /C/O/Q winfs getExpPath("winfs", full=1) // create/overwrite winf path
 	SaveScanComments(msg=msg)
 
 end
