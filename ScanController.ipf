@@ -274,8 +274,114 @@ end
 //// start scan controller ////
 ///////////////////////////////
 
+function sc_loadGlobalsINI(iniIdx)
+	variable iniIdx
+	
+	wave/t ini_text
+	wave ini_type
+	
+	// some values are required
+	string mandatory_keys = "server_url,srv_push,filetype,slack_url,sftp_port,sftp_user"
+	string val_type = "str,var,str,str,var,str"
+	
+	string key=""
+	variable sub_index=iniIdx+1, keyIdx=0, manKeyCnt=0
+
+	do
+		if(ini_type[sub_index] == 2 && ini_type[sub_index+1] == 3) // find key/value pairs
+			
+			key = ini_text[sub_index]
+			
+			// handle mandatory keys here
+			keyIdx = findlistitem(key,mandatory_keys,",",0,0)
+			if(keyIdx>=0)
+				// this is in the manadtory key list
+				key = "sc_"+key // global variable names created from mandatory keys
+				
+				if(cmpstr(stringfromlist(keyIdx,val_type,","),"str")) // create string variables
+					string/g $key = ini_text[sub_index+1]
+				elseif(cmpstr(stringfromlist(keyIdx,val_type,","),"var")) // create numeric variables
+					variable/g $key = str2num(ini_text[sub_index+1])
+				endif
+				
+				manKeyCnt+=1
+			else
+				// unknown key
+				printf "[WARNING] The key \"%s\" is not supported and will be ignored!\r", key
+			endif
+			
+		endif
+		
+		if(sub_index==numpnts(ini_type)-1)
+			break
+		else
+			sub_index+=1
+		endif
+		
+	while(ini_type[sub_index]!=1) // stop at next section
+	
+	if(manKeyCnt!=itemsinlist(mandatory_keys,","))
+		print "[ERROR] Not all mandatory keys were supplied to [scancontroller]!"
+		abort
+	endif
+end
+
+function sc_setupAllFromINI(iniFile, [path])
+	string iniFile, path
+
+	if(paramisdefault(path))
+		path = "data"
+	endif
+	
+	loadINIconfig(iniFile, path)
+	wave ini_type
+	wave /t ini_text
+	
+	variable i=0, scCnt=0, guiCnt=0, guiIdx=0
+	string instrList = ""
+	for(i=0;i<numpnts(ini_type);i+=1)
+	
+		if(ini_type[i]==1)
+
+			strswitch(ini_text[i])
+				case "[scancontroller]":
+				
+					if(scCnt==0)
+						scCnt+=1
+						sc_loadGlobalsINI(i)
+					else
+						print "[WARNING] Found more than one [scancontroller] entry. Using first entry."
+					endif
+					continue
+					
+				case "[gui]":
+					if(guiCnt==0)
+						guiCnt+=1
+						guiIdx=i // do this after instruments are loaded
+					else
+						print "[WARNING] Found more than one [gui] entry. Using first entry."
+					endif
+					continue
+					
+			endswitch
+		endif
+		
+	endfor
+	
+	if(guiCnt>0)
+		sc_loadGUIsINI(guiIdx, instrList=instrList)
+	endif
+	
+end
+
 function InitScanController([config])
 	string config // use this to specify which config file to load
+	
+	// Check if data path is definded
+	GetFileFolderInfo/Z/Q/P=data
+	if(v_flag != 0 || v_isfolder != 1)
+		abort "Data path not defined!\n"
+	endif
 
 	// setup instruments and scancontroller from setup.ini
 	// sc_loadINIconfig()
@@ -289,11 +395,7 @@ function InitScanController([config])
 
 	string /g sc_hostname = getHostName() // machine name
 
-	// Check if data path is definded
-	GetFileFolderInfo/Z/Q/P=data
-	if(v_flag != 0 || v_isfolder != 1)
-		abort "Data path not defined!\n"
-	endif
+	
 
 	newpath /C/O/Q setup getExpPath("data", full=1) // create/overwrite setup path
 	newpath /C/O/Q config getExpPath("config", full=1) // create/overwrite config path

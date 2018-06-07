@@ -348,145 +348,6 @@ function listGPIBinstr()
 
 end
 
-//function autoInitGPIB()
-//	variable status, findlist=0, instrcnt=0, i=0
-//	string instrDesc="", instrtype, instrname, error, summary
-//	variable instrID
-//	string/g serialinfo = "\rSerial instruments:\r\t"
-//
-//	// check for resource manager
-//	nvar /z globalRM
-//	if(!nvar_exists(globalRM))
-//		openResourceManager()
-//		nvar globalRM
-//	endif
-//
-//	make/o/t/n=30 idwave=""
-//	make/o/n=5 gpibCount=0  // n=5 refers to how many known instrument
-//									// types there are. see DetermineGPIBInstrType()
-//
-//	// create list of GPIB instruments
-//	status = viFindRsrc(globalRM,"GPIB?*INSTR",findlist,instrcnt,instrDesc)
-//	if(status < 0)
-//		viStatusDesc(globalRM, status, error)
-//		printf "viFindRsrc error (GPIB): %s\r", error
-//		return 0
-//	elseif(instrcnt==0)
-//		printf "viFindRsrc found no GPIB instruments to connect"
-//		return 0
-//	endif
-//
-//	// connect GPIB instruments
-//	for(i=0;i<instrcnt;i+=1)
-//
-//		if(i!=0)
-//			viFindNext(findlist,instrDesc) // get the next instrument descriptor
-//		endif
-//
-//		instrID = openinstr(globalRM,instrDesc)
-//		instrtype = DetermineGPIBInstrType(instrDesc,globalRM,instrID)
-//		instrname = CreateGPIBInstrID(instrtype,instrDesc,instrID)
-//		idwave[i] = instrname
-//	endfor
-//	CreateGPIBSummary(instrcnt)
-//
-//	return instrcnt
-//end
-
-//function/s DetermineGPIBInstrType(instrDesc,localRM,instrID)
-//	string instrDesc
-//	variable localRM,instrID
-//	string answer_long, answer, instrtype
-//	wave gpibCount
-//
-//	answer_long = QueryInstr(instrID,"*IDN?")
-//
-//	answer = stringfromlist(1,answer_long,",")
-//	strswitch(answer)
-//		case "SR830": // SR830 lockin
-//			instrtype = "srs"
-//			gpibCount[0] += 1
-//			break
-//		case "MODEL 2400": // Keithley 2400
-//			instrtype = "k2400"
-//			gpibCount[1] += 1
-//			break
-//		case "34401A": // HP34401A DMM
-//			instrtype = "dmm"
-//			gpibCount[2] += 1
-//			break
-//		case "3478A": // HP3478A DMM FIX!
-//			instrtype = "dmm"
-//			gpibCount[2] += 1
-//			break
-//		case "33250A": // Agilent AWG 33250A
-//			instrtype = "awg"
-//			gpibCount[3] += 1
-//			break
-//		default:
-//			instrtype = "unknown"
-//			gpibCount[4] += 1
-//			break
-//	endswitch
-//
-//	return instrtype
-//end
-
-//function/s CreateGPIBInstrID(instrtype,instrDesc,instrID)
-//	string instrtype, instrDesc
-//	variable instrID
-//	string instrname, expr, gpib_address, gpib_board
-//
-//	expr = "GPIB([[:digit:]])::([[:digit:]]+)::INSTR"
-//	splitstring/e=(expr) instrDesc, gpib_board, gpib_address
-//	instrname = instrtype+gpib_address
-//	variable/g $instrname = instrID
-//
-//	return instrname
-//end
-
-//function/s CreateGPIBSummary(instrcnt)
-//	variable instrcnt
-//	string header, expr, type, gpib_address
-//	string srsline, k2400line, dmmline, awgline, unknownline
-//	string srsid = "", k2400id = "", dmmid = "", awgid = "", unknownid = ""
-//	variable i
-//
-//	wave /t idwave
-//	wave gpibCount
-//
-//	expr = "([[:alpha:]]+)([[:digit:]]+)"
-//	for(i=0;i<instrcnt;i+=1)
-//			splitstring/E=(expr) idwave[i], type, gpib_address
-//			strswitch(type)
-//				case "srs":
-//					srsid += idwave[i]+", "
-//					break
-//				case "k":
-//					k2400id += idwave[i]+", "
-//					break
-//				case "dmm":
-//					dmmid += idwave[i]+", "
-//					break
-//				case "awg":
-//					awgid += idwave[i]+", "
-//					break
-//				case "unknown":
-//					unknownid += idwave[i]+", "
-//					break
-//			endswitch
-//	endfor
-//
-//	header = "\rGPIB instruments connected to the setup:\r\t"
-//	sprintf srsline, "%d SR830's are connected. They are: %s\r\t", gpibCount[0], srsid
-//	sprintf k2400line, "%d Keithley's are connected. They are: %s\r\t", gpibCount[1], k2400id
-//	sprintf dmmline, "%d DMM's are connected. They are: %s\r\t", gpibCount[2], dmmid
-//	sprintf awgline, "%d AWG's are connected. They are: %s\r\t", gpibCount[3], awgid
-//	sprintf unknownline, "%d unknown instruments are connected. They are: %s", gpibCount[4], unknownid
-//
-//	print header+srsline+k2400line+dmmline+awgline+unknownline
-//end
-
 function getAddressGPIB(instrID)
 	variable instrID
 	variable gpib_address
@@ -656,6 +517,42 @@ function visaSetParity(instrID, parity)
 	return status
 end
 
+//////////////////////
+/// SETUP FROM INI ///
+//////////////////////
+
+function sc_loadGUIsINI(iniIdx, [instrList])
+	// runs GUI functions as specified in INI file (loaded into ini_text, ini_type)
+	// if instrList is passed, then the key must be in instrList for the val(function) to be executed
+	variable iniIdx
+	string instrList
+	
+	if(paramisdefault(instrList))
+		instrList=""
+	endif
+	
+	variable sub_index = iniIdx+1
+	wave/t ini_text
+	wave ini_type
+	
+	do
+		if(ini_type[sub_index] == 2 && ini_type[sub_index+1] == 3)
+			if(strlen(instrList)==0 || findlistitem(ini_text[sub_index],instrList,",",0,0))
+//				execute(ini_text[sub_index+1])
+				print ini_text[sub_index+1]
+			else
+				printf "[WARNING] GUI key \"%s\" not recognized or instrument not loaded" ini_text[sub_index]
+			endif
+		endif
+		
+		if(sub_index==numpnts(ini_type)-1)
+			break
+		else
+			sub_index+=1
+		endif
+	while(ini_type[sub_index]!=1)
+	
+end
 
 //////////////////////
 /// VISA CONSTANTS ///

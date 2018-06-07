@@ -1042,16 +1042,11 @@ end
 // 	endif
 // end
 
-function /s sc_loadINIconfig(iniFile, [path])
+function /s loadINIconfig(iniFile, path)
 	// read INI file into some useful waves
 	// assumes general INI rules: https://en.wikipedia.org/wiki/INI_file
 	string iniFile, path
 	variable refnum
-	string line="", INIstr = "", filename = "setup.ini"
-	
-	if(paramisdefault(path))
-		path = "data"
-	endif
 	
 	// open setup file
 	// abort if it does not exist
@@ -1066,7 +1061,7 @@ function /s sc_loadINIconfig(iniFile, [path])
 	make/o/n=0 ini_type
 	
 	variable i=0, type=0, sectionIdx=0
-	string reg="(.*)=(.*)", key="", value=""
+	string line="", reg="(.*)=(.*)", key="", value=""
 	do
 		freadline refnum, line
 		if(strlen(line)==0)
@@ -1113,8 +1108,8 @@ end
 
 function addINIstring(str,type)
 	// adds strings to init_text
-	// adds what types those strings represent to ini_type
-	// returns line_num if a section heading was added
+	// adds types to ini_type
+	// returns line_num if str is a section heading
     string str
     variable type
     variable line_num=0
@@ -1134,80 +1129,6 @@ function addINIstring(str,type)
 		return line_num
 	endif
 end
-
-
-
-
-
-
-
-
-function setupINIgui(gui_index, instr_names)
-	variable gui_index
-	string instr_names
-	variable sub_index
-	wave/t ini_text
-	wave ini_type
-
-	sub_index = gui_index+1
-	do
-		if(ini_type[sub_index] == 2 && ini_type[sub_index+1] == 3 && findlistitem(ini_text[sub_index],instr_names,",",0,0))
-			execute(ini_text[sub_index+1])
-		endif
-		sub_index+=1
-	while(ini_type(sub_index)>1 || sub_index>numpnts(ini_type))
-end
-
-
-
-
-
-
-
-
-
-
-function setupINIscancontroller(sc_index)
-	variable sc_index
-	string mandatory_keys = "server_url,srv_push,filetype,slack_url,sftp_port,sftp_user"
-	string mandatory_type = "str,var,str,str,var,str", key=""
-	variable sub_index, mankeyindex=0, mankeycount=0
-	wave/t ini_text
-	wave ini_type
-
-	sub_index = sc_index+1
-	do
-		if(ini_type[sub_index] == 2 && ini_type[sub_index+1] == 3)
-			key = ini_text[sub_index]
-			mankeyindex = findlistitem(key,mandatory_keys,",",0,0)
-			if(mankeyindex>=0)
-				key = "sc_"+key
-				if(cmpstr(stringfromlist(mankeyindex,mandatory_type,","),"str"))
-					string/g $key = ini_text[sub_index+1]
-				elseif(cmpstr(stringfromlist(mankeyindex,mandatory_type,","),"var"))
-					variable/g $key = str2num(ini_text[sub_index+1])
-				endif
-				mankeycount+=1
-			else
-				printf "[WARNING]: The key (%s) is not supported and will be ignored!", key
-			endif
-		endif
-		sub_index += 1
-	while(ini_type(sub_index)>1 || sub_index>numpnts(ini_type)) // stop at next section
-	if(mankeycount!=itemsinlist(mandatory_keys,","))
-		print "[ERROR]: Not all mandatory keys were supplied!"
-		abort
-	endif
-end
-
-
-
-
-
-
-
-
-
 
 
 
