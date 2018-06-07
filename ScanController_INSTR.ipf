@@ -52,7 +52,9 @@ end
 
 function openVISAinstr(mandatory, [options, localRM, verbose])
 
-	string mandatory, options
+	string mandatory //  mandatory: "name= ,instrID= ,visa_address= "
+	string options   //  options: "test_query= ,init_function= ,baudrate= ,stopbits= ,databits= ,parity= ,readterm= ,timeout= " 
+
 	variable localRM, verbose
 	
 	if(paramisdefault(options))
@@ -97,13 +99,13 @@ function openVISAinstr(mandatory, [options, localRM, verbose])
 		variable idx
 		idx = findlistitem("init_function",options,",",0,0)
 		if(idx>0)
-			execute(stringfromlist(idx,options,",")) // execute the function if there is one
+			execute(StringByKey("init_function",options,"=", ",")) // execute the function if there is one
 		endif
 	
 		// run test query
 		idx = findlistitem("test_query",options,",",0,0)
 		if(idx>0)
-			string cmd = stringfromlist(idx,options,",")
+			string cmd = StringByKey("test_query",options,"=", ",")
 			string response = queryInstr(instrID, cmd+"\r\n") // throw a bunch of write term characters at it
 			
 			if(cmpstr(TrimString(response), "NaN")==0)
@@ -145,6 +147,62 @@ function closeAllVISA()
 	else
 		viClose(globalRM)
 	endif
+end
+
+//////////////////
+/// HTTP INSTR ///
+//////////////////
+
+
+function openHTTPinstr(mandatory, [options, verbose])
+	string mandatory // mandatory: "name= ,instrID= ,ur = "
+	string options   // options: "init_function= , test_ping= "
+	variable verbose
+
+	// create global variable
+	string name = StringByKey("name", mandatory, "=", ",")
+	string url = StringByKey("url", mandatory, "=", ",")
+	string var_name = StringByKey("instrID", mandatory, "=", ",")
+	string /g $var_name = url
+	
+	if(paramisdefault(options))
+		options=""
+	endif
+	
+	if(paramisdefault(verbose))
+		verbose=1
+	elseif(verbose!=1)
+		verbose=0
+	endif
+	
+
+	if(strlen(options)>0)
+	
+		// run init function
+		variable idx
+		idx = findlistitem("init_function",options,",",0,0)
+		if(idx>0)
+			execute(StringByKey("init_function",options,"=", ",")) // execute the function if there is one
+		endif
+	
+		// run test query
+		idx = findlistitem("test_ping",options,",",0,0)
+		if(idx>0)
+			string pingval = StringByKey("test_ping",options,"=", ",")
+			// do something here with ping val
+			string response = ""
+			
+			if(verbose)
+				printf "\t-- %s responded with: %s\r", name, response
+			endif
+		else
+			if(verbose)
+				printf "\t-- No test\r"
+			endif
+		endif
+
+	endif
+
 end
 
 ////////////////////////
@@ -521,58 +579,59 @@ end
 /// SETUP FROM INI ///
 //////////////////////
 
-function/s singleHTTPFromINI(index)
-	variable index
-//	string mandatory_keys="name,instrID,url", mandatory_values=",,"
-//	string optional_keys="test_ping,init_function", optional_values=","
-//	variable sub_index = index+1, mankeyindex=0, optkeyindex=0, mankeycount=0,num_ping=0
-//	string key="", name="",cmd="",response=""
-//	wave/t ini_text
-//	wave ini_type
-//
-//	do
-//		if(ini_type[sub_index] == 2 && ini_type[sub_index+1] == 3)
-//			key = ini_text[sub_index]
-//			mankeyindex = findlistitem(key,mandatory_keys,",",0,0)
-//			optkeyindex = findlistitem(key,optional_keys,",",0,0)
-//			if(mankeyindex>0)
-//				mandatory_values = removelistitem(mankeyindex,mandatory_values,",")
-//				mandatory_values = addlistitem(ini_text[sub_index+1],mandatory_values,",",mankeyindex)
-//				mankeycount+=1
-//			elseif(optkeyindex>0)
-//				optional_values = removelistitem(optkeyindex,optional_values,",")
-//				optional_values = addlistitem(ini_text[sub_index+1],optional_values,",",optkeyindex)
-//			else
-//				printf "[WARNING]: The key (%s) is not supported and will be ignored!", key
-//			endif
-//			if(cmpstr(key,"name")==0)
-//				name = key
-//			endif
-//		endif
-//			sub_index+=1
-//	while(ini_type[sub_index]>1 || sub_index>numpnts(ini_type)) // stop at next section
-//	if(mankeycount!=itemsinlist(mandatory_keys,","))
-//		print "[ERROR]: Not all mandatory keys are supplied!"
-//		abort
-//	else // all mandatory keys are provided!
-//		string/g $stringfromlist(1,mandatory_values,",") = stringfromlist(2,mandatory_values,",")
-//	endif
-//
-//	// first call the init_function, then query the instrument
-//	optkeyindex = findlistitem("init_function",optional_keys,",",0,0)
-//	if(optkeyindex>0)
-//		execute(stringfromlist(optkeyindex,optional_keys,","))
-//	endif
-//
-//	optkeyindex = findlistitem("test_ping",optional_keys,",",0,0)
-//	if(optkeyindex>0)
-//		num_ping = str2num(stringfromlist(optkeyindex,optional_values,","))
-//		// add some ping-ish function
-//		printf "\t-- %s responded to ping\r", name
-//	else
-//		printf "\t-- No test\r"
-//	endif
-//	return name
+function/s singleHTTPFromINI(index, [verbose])
+	variable index, verbose
+	
+	if(paramisdefault(verbose))
+		verbose = 1
+	endif
+
+	string mandatory="name=,instrID=,url="
+	string optional="test_ping=,init_function="
+	
+	variable sub_index = index+1, manKeyCnt=0
+	string key="", instrName=""
+
+	wave/t ini_text
+	wave ini_type
+
+	do
+		if(ini_type[sub_index] == 2 && ini_type[sub_index+1] == 3)
+			key = ini_text[sub_index]
+			
+			if(cmpstr(key,"name")==0)
+				instrName = ini_text[sub_index+1]
+			endif
+						
+			if(WhichListItem(key+"=", mandatory, ",")>-1)
+				mandatory = ReplaceStringByKey(key, mandatory, ini_text[sub_index+1], "=", ",")	
+				manKeyCnt+=1
+
+			elseif(WhichListItem(key+"=", optional, ",")>-1)
+				optional = ReplaceStringByKey(key, optional, ini_text[sub_index+1], "=", ",")
+
+			else
+				if(verbose)
+					printf "[WARNING]: The key (%s) is not recognized (or duplicate) and will be ignored!\r", key
+				endif
+			endif
+			
+		endif
+
+		sub_index+=1
+		if(sub_index>numpnts(ini_type)-1)
+			break
+		endif
+	while(ini_type[sub_index]!=1) // stop at next section
+	
+	if(manKeyCnt!=itemsinlist(mandatory,","))
+		print "[ERROR] Missing required keys in setupHTTPFromINI()!"
+		abort
+	else // found all keys
+		openHTTPinstr(mandatory, options=optional, verbose=verbose)
+	endif
+
+	return instrName
 end
 
 function/s singleVISAFromINI(index,localRM,[verbose])
@@ -613,7 +672,6 @@ function/s singleVISAFromINI(index,localRM,[verbose])
 					printf "[WARNING]: The key (%s) is not recognized (or duplicate) and will be ignored!\r", key
 				endif
 			endif
-
 			
 		endif
 		
@@ -684,7 +742,6 @@ function /s loadInstrsFromINI([iniFile, path, verbose])
 		 			
  				case "[http-instrument]":
  					instrList += singleHTTPFromINI(i)+","
-					print "skipping HTTP instruments for now"
  					continue
 
 			endswitch
@@ -696,7 +753,7 @@ function /s loadInstrsFromINI([iniFile, path, verbose])
 	return instrList
 end
 	 
-function sc_loadGUIsINI(iniIdx, [instrList])
+function loadGUIsINI(iniIdx, [instrList])
 	// runs GUI functions as specified in INI file (loaded into ini_text, ini_type)
 	// if instrList is passed, then the key must be in instrList for the val(function) to be executed
 	variable iniIdx

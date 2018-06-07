@@ -287,10 +287,8 @@ function sc_loadGlobalsINI(iniIdx)
 	wave ini_type
 	
 	// some values are required
-	string mandatory_keys = "server_url,srv_push,filetype,slack_url,sftp_port,sftp_user"
-	string man_type = "str,var,str,str,var,str"
-	string optional_keys = "colormap,"
-	string opt_type = "str,"
+	string mandatory = "server_url=str,srv_push=var,filetype=str,slack_url=str,sftp_por=vart,sftp_userstr,"
+	string optional = "colormap=str,"
 	
 	string key=""
 	variable sub_index=iniIdx+1, keyIdx=0, manKeyCnt=0
@@ -301,37 +299,37 @@ function sc_loadGlobalsINI(iniIdx)
 			key = ini_text[sub_index]
 			
 			// handle mandatory keys here
-			keyIdx = findlistitem(key,mandatory_keys,",",0,0)
-			if(keyIdx>=0)
-				// this is in the manadtory key list
-				key = "sc_"+key // global variable names created from mandatory keys
-				
-				if(cmpstr(stringfromlist(keyIdx, man_type,","),"str")) // create string variables
-					string/g $key = ini_text[sub_index+1]
-				elseif(cmpstr(stringfromlist(keyIdx,man_type,","),"var")) // create numeric variables
-					variable/g $key = str2num(ini_text[sub_index+1])
-				endif
-				
-				manKeyCnt+=1
-				sub_index+=1
-				continue
-			endif
+//			keyIdx = findlistitem(key,mandatory_keys,",",0,0)
+//			if(keyIdx>=0)
+//				// this is in the manadtory key list
+//				key = "sc_"+key // global variable names created from mandatory keys
+//				
+//				if(cmpstr(stringfromlist(keyIdx, man_type,","),"str")) // create string variables
+//					string/g $key = ini_text[sub_index+1]
+//				elseif(cmpstr(stringfromlist(keyIdx,man_type,","),"var")) // create numeric variables
+//					variable/g $key = str2num(ini_text[sub_index+1])
+//				endif
+//				
+//				manKeyCnt+=1
+//				sub_index+=1
+//				continue
+//			endif
 			
-			// handle optional keys here
-			keyIdx = findlistitem(key,optional_keys,",",0,0)
-			if(keyIdx>=0)
-				// this is in the manadtory key list
-				key = "sc_"+key // global variable names created from optional keys
-				
-				if(cmpstr(stringfromlist(keyIdx,opt_type,","),"str")) // create string variables
-					string/g $key = ini_text[sub_index+1]
-				elseif(cmpstr(stringfromlist(keyIdx,opt_type,","),"var")) // create numeric variables
-					variable/g $key = str2num(ini_text[sub_index+1])
-				endif
-				
-				sub_index+=1
-				continue
-			endif
+//			// handle optional keys here
+//			keyIdx = findlistitem(key,optional_keys,",",0,0)
+//			if(keyIdx>=0)
+//				// this is in the manadtory key list
+//				key = "sc_"+key // global variable names created from optional keys
+//				
+//				if(cmpstr(stringfromlist(keyIdx,opt_type,","),"str")) // create string variables
+//					string/g $key = ini_text[sub_index+1]
+//				elseif(cmpstr(stringfromlist(keyIdx,opt_type,","),"var")) // create numeric variables
+//					variable/g $key = str2num(ini_text[sub_index+1])
+//				endif
+//				
+//				sub_index+=1
+//				continue
+//			endif
 			
 		endif
 		
@@ -349,7 +347,7 @@ function sc_loadGlobalsINI(iniIdx)
 	endif
 	
 	// error if not all mandatory keys were loaded 
-	if(manKeyCnt!=itemsinlist(mandatory_keys,","))
+	if(manKeyCnt!=itemsinlist(mandatory,","))
 		print "[ERROR] Not all mandatory keys were supplied to [scancontroller]!"
 		abort
 	endif
@@ -412,9 +410,10 @@ function sc_setupAllFromINI(iniFile, [path])
 	endfor
 	
 	// load instruments
+	loadInstrsFromINI(verbose=1)
 	
 	if(guiCnt>0)
-//		sc_loadGUIsINI(guiIdx, instrList=instrList)
+		loadGUIsINI(guiIdx, instrList=instrList)
 	endif
 	
 end
