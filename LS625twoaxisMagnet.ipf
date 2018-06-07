@@ -33,9 +33,6 @@ function initLS625TwoAxis(instrIDx,instrIDz)
 	string/g instrDescX = getResourceAddress(instrIDx)
 	string/g instrDescZ = getResourceAddress(instrIDz)
 
-	// create string constants for use in get/set functions
-	execute("L625StrConst(instrDescX,instrDescZ)")
-
 	variable/g ampsperteslax=55.49, ampsperteslaz=9.950// A/T
 	variable/g maxfieldx=1000, maxfieldz=6000 // mT
 	variable/g maxrampratex=300, maxrampratez=300 // mT/min
@@ -59,13 +56,6 @@ function initLS625TwoAxis(instrIDx,instrIDz)
 	dowindow/k TwoAxis_Window
 	execute("TwoAxis_Window()")
 end
-
-macro L625StrConst(instrDescX,instrDescZ)
-	string instrDescX,instrDescZ
-	// create string constants for use in get/set functions
-	StrConstant strX=instrDescX
-	StrConstant strZ=instrDescZ
-endmacro
 
 ////////////////////////
 //// Get functions ////
@@ -546,6 +536,7 @@ function openTempcommLS625(instrDesc)
     endif
     openInstr(var_name, instrDesc, localRM=localRM, verbose=0)
     nvar localhandle = $var_name
+	ls625CommSetup(localhandle)
     return localhandle
 end
 
@@ -567,5 +558,5 @@ function/s GetTwoAxisStatus(instrIDx,instrIDz)
 	subbuffer = addJSONkeyvalpair(subbuffer, "z", num2str(getLS625rate(instrIDz)))
 	buffer = addJSONkeyvalpair(buffer, "rate mT/min", subbuffer)
 
-	return addJSONkeyvalpairl("", "Two Axis Magnet", buffer)
+	return addJSONkeyvalpair("", "Two Axis Magnet", buffer)
 end

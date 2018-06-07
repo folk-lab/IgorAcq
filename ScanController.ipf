@@ -243,6 +243,7 @@ function /S getExpPath(whichpath, [full])
 			// returns path to local_measurement_data on local machine
 			// always assumes you want the full path
 			return ParseFilePath(5, temp1+temp2, "*", 0, 0)
+			break
 		case "data":
 			// returns path to data relative to local_measurement_data
 			if(full==0)
@@ -250,18 +251,21 @@ function /S getExpPath(whichpath, [full])
 			else
 				return ParseFilePath(5, temp1+temp2+temp3, "*", 0, 0)
 			endif
+			break
 		case "winfs":
 			if(full==0)
 				return ReplaceString(":", temp3[1,inf], "/")+"winfs/"
 			else
 				return ParseFilePath(5, temp1+temp2+temp3+"winfs:", "*", 0, 0)
 			endif
+			break
 		case "config":
 			if(full==0)
 				return ReplaceString(":", temp3[1,inf], "/")+"config/"
 			else
 				return ParseFilePath(5, temp1+temp2+temp3+"config:", "*", 0, 0)
 			endif
+			break
 	endswitch
 end
 
@@ -269,22 +273,17 @@ end
 //// start scan controller ////
 ///////////////////////////////
 
-function InitScanController(instrWave, [srv_push, config, filetype])
-	// srv_push = 1 to alert qdot-server of new data
-	wave /t instrWave
-	variable srv_push
+function InitScanController([config])
 	string config // use this to specify which config file to load
-	string filetype // specify what type of files will be saved
 
-	// set reference to instrument wave for scan controller
-	string /g sc_instr_wave=nameofwave(instrWave)
-	initVISAinstruments(instrWave, verbose=1)
+	// setup instruments and scancontroller from setup.ini
+	sc_loadINIconfig()
+	// get created global variables and strings
+	nvar sc_srv_push,sc_sftp_port
+	svar sc_server_url,sc_filetype,sc_slack_url,sc_sftp_user,sc_colormap
 
-	string /g slack_url =  "https://hooks.slack.com/services/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" // url for slack alert
 	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
 	string /g sc_current_config = ""
-
-	string /g server_url = "qdash-server.phas.ubc.ca" // address for qdot-server
 
 	string /g sc_hostname = getHostName() // machine name
 
@@ -294,6 +293,7 @@ function InitScanController(instrWave, [srv_push, config, filetype])
 		abort "Data path not defined!\n"
 	endif
 
+	newpath /C/O/Q setup getExpPath("data", full=1) // create/overwrite setup path
 	newpath /C/O/Q config getExpPath("config", full=1) // create/overwrite config path
 
 	//	setup filetype for saved data/metadata
@@ -345,9 +345,6 @@ function InitScanController(instrWave, [srv_push, config, filetype])
 
 			make /o sc_measAsync = {0,0}
 
-			// default colormap
-			string /g sc_ColorMap = "Grays"
-
 			// Print variables
 			variable/g sc_PrintRaw = 1,sc_PrintCalc = 1
 
@@ -378,7 +375,7 @@ function/s sc_createconfig()
 	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts
 	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
 	nvar sc_PrintRaw, sc_PrintCalc, filenum
-	svar sc_LogStr, sc_ColorMap, sc_current_config
+	svar sc_LogStr, sc_current_config
 	variable refnum
 	string configfile
 	string configstr = "", tmpstr = ""
@@ -420,8 +417,6 @@ function/s sc_createconfig()
 	tmpstr = addJSONkeyvalpair(tmpstr, "calc", numToBool(sc_PrintCalc))
 	configstr = addJSONkeyvalpair(configstr, "print_to_history", tmpstr)
 
-	// igor stuff
-	configstr = addJSONkeyvalpair(configstr, "colormap", sc_ColorMap, addQuotes=1)
 	configstr = addJSONkeyvalpair(configstr, "filenum", num2istr(filenum))
 
 //	print configstr
@@ -435,7 +430,7 @@ function sc_loadconfig(configfile)
 	string JSONstr, checkStr, textkeys, numkeys, textdestinations, numdestinations
 	variable i=0,escapePos=-1
 	nvar sc_PrintRaw, sc_PrintCalc
-	svar sc_LogStr, sc_current_config, sc_ColorMap, sc_current_config
+	svar sc_LogStr, sc_current_config, sc_current_config
 
 	// load json string from config file
 	printf "Loading configuration from: %s\n", configfile
@@ -472,9 +467,6 @@ function sc_loadconfig(configfile)
 
 	// load log string
 	sc_LogStr = stringfromlist(0,extractJSONvalues(getJSONkeyindex("log_string",t_tokentext)),",")
-
-	// load colormap
-	sc_ColorMap = stringfromlist(0,extractJSONvalues(getJSONkeyindex("colormap",t_tokentext)),",")
 end
 
 /////////////////////
@@ -906,7 +898,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, activegraphs="", cmd1="",window_string=""
 	string cmd2=""
 	variable index, graphopen, graphopen2d
-	svar sc_ColorMap
+	svar sc_colormap
 
 	//do some sanity checks on wave names: they should not start or end with numbers.
 	do
@@ -1867,7 +1859,7 @@ function SaveWaves([msg, save_experiment])
 	endif
 
 	if(sc_srv_push==1)
-		svar server_url, sc_hostname
+		svar sc_server_url, sc_hostname
 		sc_findNewFiles(filenum)
 		sc_FileTransfer() // this may leave the experiment file open for some time
 						   // make sure to run saveExp before this
@@ -2187,6 +2179,7 @@ function /S sc_CreateRemoteDirectory(path)
 	string srv_address = "qdash-server.phas.ubc.ca"
 	string sftp_user = "igor-data"
 
+
 	string cmd = ""
 	sprintf cmd, "ssh -p %d %s@%s \"mkdir -p %s\"" sftp_port, sftp_user, srv_address, remDirectory
 	
@@ -2218,6 +2211,7 @@ function sc_FileTransfer()
 		// don't do anything
 		print "No new files available."
 		return 0
+   
 	endif
 
 end
@@ -2246,7 +2240,7 @@ function /S getSlackNotice(username, [message, channel, botname, emoji, min_time
 	string username, channel, message, botname, emoji
 	variable min_time
 	nvar filenum, sweep_t_elapsed, sc_abortsweep
-	svar slack_url
+	svar sc_slack_url
 	string txt="", buffer="", payload="", out=""
 
 	//// check if I need a notification ////
@@ -2302,7 +2296,7 @@ function /S getSlackNotice(username, [message, channel, botname, emoji, min_time
 	payload += "}"
 	//// end payload ////
 
-	URLRequest /DSTR=payload url=slack_url, method=post
+	URLRequest /DSTR=payload url=sc_slack_url, method=post
 	if (V_flag == 0)    // No error
         if (V_responseCode != 200)  // 200 is the HTTP OK code
             print "Slack post failed!"

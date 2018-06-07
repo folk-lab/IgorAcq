@@ -1,12 +1,6 @@
 ﻿#pragma TextEncoding = "UTF-8"
 #pragma rtGlobals=3		// Use modern global access method and strict wave access.
 
-
-// TODO:
-// change all VISARead calls to viRead(...)
-// change all VISAWrite calls to viWrite(...)
-
-
 //////////////////////////////
 /// generic VISA functions ///
 //////////////////////////////
@@ -34,7 +28,7 @@ threadsafe function VISAerrormsg(descriptor, localRM, status)
 	viStatusDesc(localRM, status, desc)
 	Printf "%s error (%x): %s\r", descriptor, status, desc
 
-End
+end
 
 function openResourceManager()
 	variable status, localRM
@@ -56,9 +50,10 @@ function openResourceManager()
 
 end
 
-function openInstr(var_name, instrDesc, [localRM, verbose, timeout])
+function openInstr(var_name, instrDesc, [localRM, verbose, timeout, name])
 	string var_name, instrDesc  // name for global variable, VISA resource name (GPIB0::5::INSTR)
 	variable localRM, verbose, timeout
+	string name
 	variable instrID, status
 	string error
 
@@ -77,6 +72,10 @@ function openInstr(var_name, instrDesc, [localRM, verbose, timeout])
 		timeout = 100
 	endif
 
+	if(paramisdefault(timeout))
+		name = ""
+	endif
+
 	status = viOpen(localRM,instrDesc,0,0,instrID)
 	if (status < 0)
 		VISAerrormsg("openInstr() -- viOpen", localRM, status)
@@ -85,89 +84,89 @@ function openInstr(var_name, instrDesc, [localRM, verbose, timeout])
 		visaSetTimeout(instrID, timeout)
 		variable /g $var_name = instrID
 		if(verbose)
-			printf "%s connected as %s\r", instrDesc, var_name
+			printf "%s (%s) connected as %s\r", name, instrDesc, var_name
 		endif
 	endif
 
 end
 
-function initVISAinstruments(instrWave, [verbose])
-	// each column (d=1) in instrWave represents an instrument
-	// there should be 3 rows (d=0) for each column
-	//    with 'variable name', 'VISA address', and 'test function'
-
-	wave /t instrWave
-	variable verbose
-
-	if(dimsize(instrWave,0)!=4)
-		abort "instrWave must have 4 rows for each column -- {'variable name', 'VISA address', 'test function', 'setup function'}"
-	endif
-
-	if(paramisdefault(verbose))
-		verbose=1
-	elseif(verbose!=1)
-		verbose=0
-	endif
-
-	// open resource manager
-	nvar /z globalRM
-	if(!nvar_exists(globalRM))
-		// if globalRM does not exist
-		// open RM and create the global variable
-		openResourceManager()
-		nvar globalRM
-	else
-		// if globalRM does exist
-		// close all connection
-		// reopen everything
-		closeAllInstr()
-		openResourceManager()
-	endif
-
-	variable numInstr = dimsize(instrWave,1), i=0
-	string response
-	for(i=0;i<numInstr;i++)
-
-		if(strlen(instrWave[1][i])>0)
-			// open VISA connection to instrument
-			openInstr(instrWave[0][i], instrWave[1][i], localRM = globalRM, verbose = verbose)
-			nvar inst = $instrWave[0][i]
-		else
-			// if the address was not provided, just assume 
-			// a global variable should be created and move on
-			variable /g $instrWave[0][i] = 0
-			if(verbose)
-				printf "created global variable %s\r", instrWave[0][i]
-			endif
-		endif
-		
-		if(strlen(instrWave[3][i])!=0)
-			execute(instrWave[3][i]) // execute
-		endif
-		
-		if(strlen(instrWave[1][i])==0)
-			// get out of here with that
-			// get variable
-			continue
-		endif 
-		
-		// test block
-		if( (strlen(instrWave[2][i])==0) && (strlen(instrWave[1][i])>0) )
-			if(verbose)
-				print "\t-- No test\r" + instrWave[2][i]
-			endif
-		else
-			response = queryInstr(inst, instrWave[2][i]+"\r\n", read_term = "\r\n") // all the term characters!
-			if(cmpstr(TrimString(response), "NaN")==0)
-				abort
-			endif
-			if(verbose)
-				printf "\t-- %s responded to %s with: %s\r", instrWave[0][i], instrWave[2][i], response
-			endif
-		endif
-		sleep /T 1
-	endfor
-end
+// function initVISAinstruments(instrWave, [verbose])
+// 	// each column (d=1) in instrWave represents an instrument
+// 	// there should be 3 rows (d=0) for each column
+// 	//    with 'variable name', 'VISA address', and 'test function'
+//
+// 	wave /t instrWave
+// 	variable verbose
+//
+// 	if(dimsize(instrWave,0)!=4)
+// 		abort "instrWave must have 4 rows for each column -- {'variable name', 'VISA address', 'test function', 'setup function'}"
+// 	endif
+//
+// 	if(paramisdefault(verbose))
+// 		verbose=1
+// 	elseif(verbose!=1)
+// 		verbose=0
+// 	endif
+//
+// 	// open resource manager
+// 	nvar /z globalRM
+// 	if(!nvar_exists(globalRM))
+// 		// if globalRM does not exist
+// 		// open RM and create the global variable
+// 		openResourceManager()
+// 		nvar globalRM
+// 	else
+// 		// if globalRM does exist
+// 		// close all connection
+// 		// reopen everything
+// 		closeAllInstr()
+// 		openResourceManager()
+// 	endif
+//
+// 	variable numInstr = dimsize(instrWave,1), i=0
+// 	string response
+// 	for(i=0;i<numInstr;i++)
+//
+// 		if(strlen(instrWave[1][i])>0)
+// 			// open VISA connection to instrument
+// 			openInstr(instrWave[0][i], instrWave[1][i], localRM = globalRM, verbose = verbose)
+// 			nvar inst = $instrWave[0][i]
+// 		else
+// 			// if the address was not provided, just assume
+// 			// a global variable should be created and move on
+// 			variable /g $instrWave[0][i] = 0
+// 			if(verbose)
+// 				printf "created global variable %s\r", instrWave[0][i]
+// 			endif
+// 		endif
+//
+// 		if(strlen(instrWave[3][i])!=0)
+// 			execute(instrWave[3][i]) // execute
+// 		endif
+//
+// 		if(strlen(instrWave[1][i])==0)
+// 			// get out of here with that
+// 			// get variable
+// 			continue
+// 		endif
+//
+// 		// test block
+// 		if( (strlen(instrWave[2][i])==0) && (strlen(instrWave[1][i])>0) )
+// 			if(verbose)
+// 				print "\t-- No test\r" + instrWave[2][i]
+// 			endif
+// 		else
+// 			response = queryInstr(inst, instrWave[2][i]+"\r\n", read_term = "\r\n") // all the term characters!
+// 			if(cmpstr(TrimString(response), "NaN")==0)
+// 				abort
+// 			endif
+// 			if(verbose)
+// 				printf "\t-- %s responded to %s with: %s\r", instrWave[0][i], instrWave[2][i], response
+// 			endif
+// 		endif
+// 		sleep /T 1
+// 	endfor
+// end
 
 function closeInstr(instrID)
 	variable instrID
@@ -205,10 +204,10 @@ threadsafe function writeInstr(instrID, cmd)
 
     variable count = strlen(cmd) // strlen is a problem
                                  // with non-ascii characters
-                                 // it does not equal numBytes                               
-                                 
+                                 // it does not equal numBytes
+
     variable return_count = 0    // how many bytes were written
-    variable status = viWrite(instrID, cmd, count, return_count) 
+    variable status = viWrite(instrID, cmd, count, return_count)
     if (status)
 		VISAerrormsg("writeInstr() -- viWrite", instrID, status)
     	return NaN // abort not supported in threads (v7)
@@ -216,7 +215,7 @@ threadsafe function writeInstr(instrID, cmd)
 
 end
 
-threadsafe function /s readInstr(instrID, [read_term, read_bytes])
+threadsafe function/s readInstr(instrID, [read_term, read_bytes])
 	// generic error checking read function
 	variable instrID, read_bytes
 	string read_term
@@ -226,7 +225,7 @@ threadsafe function /s readInstr(instrID, [read_term, read_bytes])
         // read termination character read_term
         visaSetReadTerm(instrID, read_term)
         visaSetReadTermEnable(instrID, 1)
-       
+
     else
         // in this case it will read until some END signal
         // specified by the interface being used
@@ -265,6 +264,45 @@ threadsafe function/s queryInstr(instrID, cmd, [read_term, delay])
     endif
 
 	return response
+end
+
+function/s postHTTP(instrID,cmd,payload,headers)
+	string instrID, cmd, payload, headers
+	string response, error
+
+	URLRequest /TIME=5.0 /DSTR=payload url=instrID+cmd, method=post, headers=headers
+
+	if (V_flag == 0)    // No error
+		response = S_serverResponse // response is a JSON string
+		if (V_responseCode != 200)  // 200 is the HTTP OK code
+		   printf error, "[ERROR]: %s\r", getJSONvalue(response, "error")
+		   return ""
+		else
+			return response
+		endif
+   else
+        abort "HTTP connection error."
+   endif
+end
+
+function/s getHTTP(instrID,cmd,headers)
+	string instrID, cmd, headers
+	string response, error
+
+	URLRequest /TIME=5.0 url=instrID+cmd, method=get, headers=headers
+
+	if (V_flag == 0)    // No error
+		response = S_serverResponse // response is a JSON string
+		if (V_responseCode != 200)  // 200 is the HTTP OK code
+		   printf error, "[ERROR]: %s\r", getJSONvalue(response, "error")
+		   return ""
+		else
+			return response
+		endif
+   else
+    	print "HTTP connection error."
+		return ""
+   endif
 end
 
 ////////////
@@ -609,7 +647,7 @@ function visaSetParity(instrID, parity)
 	// VI_ASRL_PAR_EVEN (2)
 	// VI_ASRL_PAR_MARK (3)
 	// VI_ASRL_PAR_SPACE (4)
-	
+
 	variable instrID	// An instrument referenced obtained from viOpen
 	variable parity
 
