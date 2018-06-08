@@ -290,7 +290,7 @@ function sc_loadGlobalsINI(iniIdx)
 	string mandatory = "server_url=str,srv_push=var,filetype=str,slack_url=str,sftp_por=vart,sftp_userstr,"
 	string optional = "colormap=str,"
 	
-	string key=""
+	string key="", val=""
 	variable sub_index=iniIdx+1, keyIdx=0, manKeyCnt=0
 
 	do
@@ -299,37 +299,37 @@ function sc_loadGlobalsINI(iniIdx)
 			key = ini_text[sub_index]
 			
 			// handle mandatory keys here
-//			keyIdx = findlistitem(key,mandatory_keys,",",0,0)
-//			if(keyIdx>=0)
-//				// this is in the manadtory key list
-//				key = "sc_"+key // global variable names created from mandatory keys
-//				
-//				if(cmpstr(stringfromlist(keyIdx, man_type,","),"str")) // create string variables
-//					string/g $key = ini_text[sub_index+1]
-//				elseif(cmpstr(stringfromlist(keyIdx,man_type,","),"var")) // create numeric variables
-//					variable/g $key = str2num(ini_text[sub_index+1])
-//				endif
-//				
-//				manKeyCnt+=1
-//				sub_index+=1
-//				continue
-//			endif
+			val = StringByKey("test_ping",mandatory,"=", ",")
+			if(strlen(val)>0)
+				// this is in the manadtory key list
+				key = "sc_"+key // global variable names created from mandatory keys
+				
+				if(cmpstr(val,"str")) // create string variables
+					string/g $key = ini_text[sub_index+1]
+				elseif(cmpstr(val,"var")) // create numeric variables
+					variable/g $key = str2num(ini_text[sub_index+1])
+				endif
+				
+				manKeyCnt+=1
+				sub_index+=1
+				continue
+			endif
 			
-//			// handle optional keys here
-//			keyIdx = findlistitem(key,optional_keys,",",0,0)
-//			if(keyIdx>=0)
-//				// this is in the manadtory key list
-//				key = "sc_"+key // global variable names created from optional keys
-//				
-//				if(cmpstr(stringfromlist(keyIdx,opt_type,","),"str")) // create string variables
-//					string/g $key = ini_text[sub_index+1]
-//				elseif(cmpstr(stringfromlist(keyIdx,opt_type,","),"var")) // create numeric variables
-//					variable/g $key = str2num(ini_text[sub_index+1])
-//				endif
-//				
-//				sub_index+=1
-//				continue
-//			endif
+			// handle optional keys here
+			val = StringByKey("test_ping",optional,"=", ",")
+			if(keyIdx>=0)
+				// this is in the manadtory key list
+				key = "sc_"+key // global variable names created from optional keys
+				
+				if(cmpstr(val,"str")) // create string variables
+					string/g $key = ini_text[sub_index+1]
+				elseif(cmpstr(val,"var")) // create numeric variables
+					variable/g $key = str2num(ini_text[sub_index+1])
+				endif
+				
+				sub_index+=1
+				continue
+			endif
 			
 		endif
 		
@@ -1080,10 +1080,8 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	// connect VISA instruments
 	// do this here, because if it fails
 	// i don't want to delete any old data
-	svar sc_instr_wave
-	wave /t instrWave = $sc_instr_wave
-//	initVISAinstruments(instrWave, verbose=0)
-
+	loadInstrsFromINI(verbose=0)
+	
 	// The status of the upcoming scan will be set when waves are initialized.
 	if(!paramisdefault(starty) && !paramisdefault(finy) && !paramisdefault(numptsy))
 		sc_is2d = 1
