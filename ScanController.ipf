@@ -9,16 +9,14 @@
 // Updates in 2.0:
 
 //		-- All drivers now uses the VISA xop, as it is the only one supporting multiple threads.
-//			Therefore VDT and GPIB xop's should not be used anymore.
+//			VDT and GPIB xop's should not be used anymore.
 //		-- "Request scripts" are removed from the scancontroller window. Its only use was
 //			 trying to do async communication (badly).
 //     -- Added Async checkbox in scancontroller window
-
-//TODO:
-
-//     -- SFTP file upload
 //     -- INI configuration files for scancontroller/instruments
 
+//TODO:
+//     -- SFTP file upload
 
 //FIX:
 //     -- NaN handling in JSON package
@@ -402,7 +400,7 @@ function sc_setupAllFromINI(iniFile, [path])
  					continue
  					
  				default:
- 					printf "[WARNING]: Section (%s) not recognized and will be ignored!\r", ini_text[i]
+ 					printf "[WARNING] Section (%s) in INI not recognized and will be ignored!\r", ini_text[i]
  					
 			endswitch
 		endif
@@ -2181,22 +2179,22 @@ function sc_write2batch(fileref, searchStr, localFull)
 	string searchStr, localFull
 	localFull = TrimString(localFull)
 
-	svar sc_hostname
+	svar sc_hostname, sc_server_dir
 	string lmdpath = getExpPath("lmd", full=1)
 	variable idx = strlen(lmdpath)+1, result=0
 	string srvFull = ""
-	sprintf srvFull, "/measurement-data/%s/%s" sc_hostname, localFull[idx,inf]
+	sprintf srvFull, "%s/%s/%s" sc_server_dir, sc_hostname, localFull[idx,inf]
 
 	if(strlen(searchStr)==0)
 		// there is no notification file, add this immediately
-		fprintf fileref, "put \"%s\" \"%s\"\n", localFull, srvFull
+		fprintf fileref, "%s,%s\n", localFull, srvFull
 	else
 		// search for localFull in searchStr
 		print searchStr, localFull
 		result = strsearch(searchStr, localFull, 0)
 		print result
 		if(result==-1)
-			fprintf fileref, "put \"%s\" \"%s\"\n", localFull, srvFull
+			fprintf fileref, "%s,%s\n", localFull, srvFull
 		endif
 	endif
 
@@ -2213,11 +2211,17 @@ function sc_findNewFiles(datnum)
 	//// create/open batch file ////
 	variable refnum
 	string notifyText = "", buffer
-	getfilefolderinfo /Q/Z/P=data "server_transfer.bat"
-	if(V_isFile==0) // if the file does not exist, create it with hostname/n at the top
-		open /A/P=data refNum as "server_transfer.bat"
+	getfilefolderinfo /Q/Z/P=data "pending_sftp.lst"
+	if(V_isFile==0) // if the file does not exist, create it with header
+		open /A/P=data refNum as "pending_sftp.lst"
+		
+		// create/write header
+		nvar sc_sftp_port
+		svar sc_server_url,sc_sftp_user
+		fprintf refNum, "%s, %s, %d\n" sc_sftp_user, sc_server_url, sc_sftp_port 
+		
 	else // if the file does exist, open it for appending
-		open /A/P=data refNum as "server_transfer.bat"
+		open /A/P=data refNum as "pending_sftp.lst"
 		FSetPos refNum, 0
 		variable lines = 0
 		do
@@ -2306,7 +2310,7 @@ function sc_findNewFiles(datnum)
 		endfor
 	endfor
 
-	close refnum // close server_transfer.bat
+	close refnum // close pending_sftp.lst
 
 end
 
@@ -2331,11 +2335,11 @@ end
 
 function sc_FileTransfer()
 
-	string batchFile = "server_transfer.bat"
+	string batchFile = "pending_sftp.lst"
 	GetFileFolderInfo /Q/Z/P=data batchFile
 	if( V_Flag == 0 && V_isFile ) // file exists
 		string batchFull = "", cmd = ""
-		batchFull = getExpPath("data", full=1) + "server_transfer.bat"
+		batchFull = getExpPath("data", full=1) + "pending_sftp.lst"
 
 		variable sftp_port = 7743
 		string srv_address = "qdash-server.phas.ubc.ca"
@@ -2361,10 +2365,10 @@ end
 function sc_DeleteBatchFile()
 
 	// delete server.notify
-	deletefile /Z=1 /P=data "server_transfer.bat"
+	deletefile /Z=1 /P=data "pending_sftp.lst"
 
 	if(V_flag!=0)
-		print "Failed to delete 'server_transfer.bat'"
+		print "Failed to delete 'pending_sftp.lst'"
 	endif
 end
 
