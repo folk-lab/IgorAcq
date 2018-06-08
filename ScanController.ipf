@@ -16,7 +16,8 @@
 
 //TODO:
 
-//     -- SFTP file upload with proper permissions
+//     -- SFTP file upload
+//     -- INI configuration files for scancontroller/instruments
 
 
 //FIX:
@@ -26,6 +27,12 @@
 ///////////////////////////////
 ////// utility functions //////
 ///////////////////////////////
+
+function sc_randomInt()
+	variable from=-1e6, to=1e6
+	variable amp = to - from
+	return floor(from + mod(abs(enoise(100*amp)),amp+1))
+end
 
 function unixtime()
 	// returns the current unix time in seconds
@@ -140,13 +147,13 @@ function /S executeWinCmd(command, [logFile])
 	// otherwise, return output
 	string command, logFile
 	string dataPath = getExpPath("data", full=1)
-	
+
 	// open batch file to store command
 	variable batRef
 	string batchFile = "_execute_cmd.bat"
 	string batchFull = datapath + batchFile
 	Open/P=data batRef as batchFile	// overwrites previous batchfile
-	
+
 	// setup log file paths
 	string outChar = ">"
 	if(paramisdefault(logFile))
@@ -158,14 +165,14 @@ function /S executeWinCmd(command, [logFile])
 		endif
 	endif
 	string logFull = datapath + logFile
-	
+
 	// write command to batch file and close
 	fprintf batRef,"cmd/c \"%s %s \"%s\"\"\r", command, outChar, logFull
 	Close batRef
-	
+
 	// execute batch file with output directed to logFile
 	ExecuteScriptText /B "\"" + batchFull + "\""
-	
+
 	string result = ""
 	if(paramisdefault(logFile))
 		variable logRef
@@ -180,10 +187,10 @@ function /S executeWinCmd(command, [logFile])
 		while( 1 )
 		Close logRef
 	endif
-	
+
 	DeleteFile /P=data /Z=1 batchFile // delete batch file
 	return result
-	
+
 end
 
 function/S executeMacCmd(command)
@@ -252,18 +259,18 @@ function /S getExpPath(whichpath, [full])
 				return ParseFilePath(5, temp1+temp2+temp3, "*", 0, 0)
 			endif
 			break
+		case "config":
+				if(full==0)
+					return ReplaceString(":", temp3[1,inf], "/")+"config/"
+				else
+					return ParseFilePath(5, temp1+temp2+temp3+"config:", "*", 0, 0)
+				endif
+				break
 		case "winfs":
 			if(full==0)
 				return ReplaceString(":", temp3[1,inf], "/")+"winfs/"
 			else
 				return ParseFilePath(5, temp1+temp2+temp3+"winfs:", "*", 0, 0)
-			endif
-			break
-		case "config":
-			if(full==0)
-				return ReplaceString(":", temp3[1,inf], "/")+"config/"
-			else
-				return ParseFilePath(5, temp1+temp2+temp3+"config:", "*", 0, 0)
 			endif
 			break
 	endswitch
@@ -273,67 +280,204 @@ end
 //// start scan controller ////
 ///////////////////////////////
 
-function InitScanController([config])
-	string config // use this to specify which config file to load
+function sc_loadGlobalsINI(iniIdx)
+	variable iniIdx
+	
+	wave/t ini_text
+	wave ini_type
+	
+	// some values are required
+	string mandatory = "server_url=str,srv_push=var,filetype=str,slack_url=str,sftp_por=vart,sftp_userstr,"
+	string optional = "colormap=str,"
+	
+	string key="", val=""
+	variable sub_index=iniIdx+1, keyIdx=0, manKeyCnt=0
 
-	// setup instruments and scancontroller from setup.ini
-	sc_loadINIconfig()
-	// get created global variables and strings
-	nvar sc_srv_push,sc_sftp_port
-	svar sc_server_url,sc_filetype,sc_slack_url,sc_sftp_user,sc_colormap
+	do
+		if(ini_type[sub_index] == 2 && ini_type[sub_index+1] == 3) // find key/value pairs
+			
+			key = ini_text[sub_index]
+			
+			// handle mandatory keys here
+			val = StringByKey("test_ping",mandatory,"=", ",")
+			if(strlen(val)>0)
+				// this is in the manadtory key list
+				key = "sc_"+key // global variable names created from mandatory keys
+				
+				if(cmpstr(val,"str")) // create string variables
+					string/g $key = ini_text[sub_index+1]
+				elseif(cmpstr(val,"var")) // create numeric variables
+					variable/g $key = str2num(ini_text[sub_index+1])
+				endif
+				
+				manKeyCnt+=1
+				sub_index+=1
+				continue
+			endif
+			
+			// handle optional keys here
+			val = StringByKey("test_ping",optional,"=", ",")
+			if(keyIdx>=0)
+				// this is in the manadtory key list
+				key = "sc_"+key // global variable names created from optional keys
+				
+				if(cmpstr(val,"str")) // create string variables
+					string/g $key = ini_text[sub_index+1]
+				elseif(cmpstr(val,"var")) // create numeric variables
+					variable/g $key = str2num(ini_text[sub_index+1])
+				endif
+				
+				sub_index+=1
+				continue
+			endif
+			
+		endif
+		
+		sub_index+=1
+		if(sub_index>numpnts(ini_type)-1)
+			break
+		endif
+		
+	while(ini_type[sub_index]!=1) // stop at next section
+	
+	// defaults for optional parameters
+	svar/z sc_colormap
+	if(!svar_exists(sc_colormap))
+		string /g sc_colormap = "VioletOrangeYellow"
+	endif
+	
+	// error if not all mandatory keys were loaded 
+	if(manKeyCnt!=itemsinlist(mandatory,","))
+		print "[ERROR] Not all mandatory keys were supplied to [scancontroller]!"
+		abort
+	endif
+	
+end
 
-	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
-	string /g sc_current_config = ""
+function sc_setupAllFromINI(iniFile, [path])
+	string iniFile, path
 
-	string /g sc_hostname = getHostName() // machine name
+	if(paramisdefault(path))
+		path = "data"
+	endif
+	
+	string /g sc_setup_ini = iniFile
+	string /g sc_setup_path = path
+	
+	loadINIconfig(iniFile, path)
+	wave ini_type
+	wave /t ini_text
+	
+	variable i=0, scCnt=0, guiCnt=0, guiIdx=0
+	string instrList = ""
+	for(i=0;i<numpnts(ini_type);i+=1)
+	
+		if(ini_type[i]==1)
 
-	// Check if data path is definded
-	GetFileFolderInfo/Z/Q/P=data
+			strswitch(ini_text[i])
+				case "[scancontroller]":
+				
+					if(scCnt==0)
+						scCnt+=1
+						sc_loadGlobalsINI(i)
+					else
+						print "[WARNING] Found more than one [scancontroller] entry. Using first entry."
+					endif
+					continue
+					
+				case "[gui]":
+					if(guiCnt==0)
+						guiCnt+=1
+						guiIdx=i // do this after instruments are loaded
+					else
+						print "[WARNING] Found more than one [gui] entry. Using first entry."
+					endif
+					continue
+				case "[visa-instrument]":
+					// handle this elsewhere
+		 			continue
+		 			
+ 				case "[http-instrument]":
+ 					// handle this elsewhere
+ 					continue
+ 					
+ 				default:
+ 					printf "[WARNING]: Section (%s) not recognized and will be ignored!\r", ini_text[i]
+ 					
+			endswitch
+		endif
+		
+	endfor
+	
+	// load instruments
+	loadInstrsFromINI(verbose=1)
+	
+	if(guiCnt>0)
+		loadGUIsINI(guiIdx, instrList=instrList)
+	endif
+	
+end
+
+function InitScanController([setupFile, setupPath, configFile])
+	string setupFile, setupPath, configFile // use these to point to specific setup and config files
+											        // defaults are setup.ini in data path and most recent config
+	
+	GetFileFolderInfo/Z/Q/P=data  // Check if data path is definded
 	if(v_flag != 0 || v_isfolder != 1)
 		abort "Data path not defined!\n"
 	endif
 
+	if(paramisdefault(setupFile))
+		setupFile = "setup.ini"
+	endif
+	
+	if(paramisdefault(setupPath))
+		setupPath = "data"
+	endif 
+	
+	sc_setupAllFromINI(setupFile, path=setupPath)   // setup instruments and scancontroller from setup.ini
+	string /g sc_hostname = getHostName() // get machine name
+	
+	// load all the scan controller globals
+	nvar sc_srv_push,sc_sftp_port
+	svar sc_server_url,sc_filetype,sc_slack_url,sc_sftp_user,sc_colormap
+	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
+
 	newpath /C/O/Q setup getExpPath("data", full=1) // create/overwrite setup path
 	newpath /C/O/Q config getExpPath("config", full=1) // create/overwrite config path
 
-	//	setup filetype for saved data/metadata
-	//	currently supports: ibw, hdf5
-	string /g sc_filetype
-	if(paramisdefault(filetype))
-		sc_filetype = "ibw"
-	else
-		sc_filetype = filetype
-	endif
+	// create remote path(s)
+	if(sc_srv_push==1)
 
-	// set server push variable for scan controller
-	variable /g sc_srv_push
-	if(paramisdefault(srv_push) || srv_push==1)
-		sc_srv_push = 1
-		
 		print "Creating remote directories..."
+		
 		sc_CreateRemoteDirectory("config") // creating config also creates data
+		
 		if(CmpStr(sc_filetype, "ibw") == 0)
 			newpath /C/O/Q winfs getExpPath("winfs", full=1) // create/overwrite winf path
 			sc_CreateRemoteDirectory("winf")
 		endif
+		
 	else
-		print "Only keeping local copies of data."
-		sc_srv_push = 0
+		print "[WARNING] Only saving local copies of data."
 	endif
 
-	// look for old config file
-	string filelist = greplist(indexedfile(config,-1,".config"),"sc")
-	if(paramisdefault(config))
+	// deal with config file
+	string /g sc_current_config
+	if(paramisdefault(configFile))
+		// look for newest config file
+		string filelist = greplist(indexedfile(config,-1,".config"),"sc")
 		if(itemsinlist(filelist)>0)
 			// read content into waves
 			filelist = SortList(filelist, ";", 1+16)
-			sc_loadconfig(StringFromList(0,filelist, ";"))
+			sc_loadConfig(StringFromList(0,filelist, ";"))
 		else
+			// if there are no config files, use defaults
 			// These arrays should have the same size. Their indeces correspond to each other.
 			make/t/o sc_RawWaveNames = {"g1x", "g1y"} // Wave names to be created and saved
 			make/o sc_RawRecord = {0,0} // Whether you want to record and save the data for this wave
 			make/o sc_RawPlot = {0,0} // Whether you want to record and save the data for this wave
-			make/t/o sc_RawScripts = {"getg1x()", "getg1y()"}
+			make/t/o sc_RawScripts = {"readSRSx(srs1)", "readSRSy(srs1)"}
 			// End of same-size waves
 
 			// And these waves should be the same size too
@@ -360,7 +504,7 @@ function InitScanController([config])
 			endif
 		endif
 	else
-		sc_loadconfig(config)
+		sc_loadconfig(configFile)
 	endif
 
 	sc_rebuildwindow()
@@ -425,7 +569,7 @@ function/s sc_createconfig()
 	writeJSONtoFile(configstr, configfile, "config")
 end
 
-function sc_loadconfig(configfile)
+function sc_loadConfig(configfile)
 	string configfile
 	string JSONstr, checkStr, textkeys, numkeys, textdestinations, numdestinations
 	variable i=0,escapePos=-1
@@ -936,10 +1080,8 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	// connect VISA instruments
 	// do this here, because if it fails
 	// i don't want to delete any old data
-	svar sc_instr_wave
-	wave /t instrWave = $sc_instr_wave
-	initVISAinstruments(instrWave, verbose=0)
-
+	loadInstrsFromINI(verbose=0)
+	
 	// The status of the upcoming scan will be set when waves are initialized.
 	if(!paramisdefault(starty) && !paramisdefault(finy) && !paramisdefault(numptsy))
 		sc_is2d = 1
@@ -2038,13 +2180,13 @@ function sc_write2batch(fileref, searchStr, localFull)
 	variable fileref
 	string searchStr, localFull
 	localFull = TrimString(localFull)
-	
+
 	svar sc_hostname
 	string lmdpath = getExpPath("lmd", full=1)
 	variable idx = strlen(lmdpath)+1, result=0
 	string srvFull = ""
 	sprintf srvFull, "/measurement-data/%s/%s" sc_hostname, localFull[idx,inf]
-	
+
 	if(strlen(searchStr)==0)
 		// there is no notification file, add this immediately
 		fprintf fileref, "put \"%s\" \"%s\"\n", localFull, srvFull
@@ -2057,17 +2199,17 @@ function sc_write2batch(fileref, searchStr, localFull)
 			fprintf fileref, "put \"%s\" \"%s\"\n", localFull, srvFull
 		endif
 	endif
-	
+
 end
 
 function sc_findNewFiles(datnum)
 	// locate newly created/appended files
 	// add to sftp batch file
-	
+
 	variable datnum // data set to look for
 	variable result = 0
 	string tmpname = ""
-	
+
 	//// create/open batch file ////
 	variable refnum
 	string notifyText = "", buffer
@@ -2096,12 +2238,12 @@ function sc_findNewFiles(datnum)
 
 		// add history file
 		tmpname = datapath+igorinfo(1)+".history"
-		sc_write2batch(refnum, notifyText, tmpname)	
-		
+		sc_write2batch(refnum, notifyText, tmpname)
+
 		// add procedure file
 		tmpname = datapath+igorinfo(1)+".ipf"
 		sc_write2batch(refnum, notifyText, tmpname)
-			
+
 	endif
 
 	// find new data files
@@ -2132,7 +2274,7 @@ function sc_findNewFiles(datnum)
 	if(V_flag==0 && V_isFolder==1)
 		configlist = greplist(indexedfile(config,-1,".config"),"sc")
 	endif
-	
+
 	if(itemsinlist(configlist)>0)
 		configlist = SortList(configlist, ";", 1+16)
 		tmpname = configpath+StringFromList(0,configlist, ";")
@@ -2163,18 +2305,18 @@ function sc_findNewFiles(datnum)
 			sc_write2batch(refnum, notifyText, tmpname)
 		endfor
 	endfor
-	
+
 	close refnum // close server_transfer.bat
-	
+
 end
 
 function /S sc_CreateRemoteDirectory(path)
 	string path // any path recognized by getExpPath
 	svar sc_hostname
-	
+
 	string remDirectory = ""
 	sprintf remDirectory "/measurement-data/%s/%s", sc_hostname, getExpPath(path,full=0)
-	
+
 	variable sftp_port = 7743
 	string srv_address = "qdash-server.phas.ubc.ca"
 	string sftp_user = "igor-data"
@@ -2182,7 +2324,7 @@ function /S sc_CreateRemoteDirectory(path)
 
 	string cmd = ""
 	sprintf cmd, "ssh -p %d %s@%s \"mkdir -p %s\"" sftp_port, sftp_user, srv_address, remDirectory
-	
+
 	string response = executeWinCmd(cmd)
 	return response
 end
@@ -2194,24 +2336,24 @@ function sc_FileTransfer()
 	if( V_Flag == 0 && V_isFile ) // file exists
 		string batchFull = "", cmd = ""
 		batchFull = getExpPath("data", full=1) + "server_transfer.bat"
-		
+
 		variable sftp_port = 7743
 		string srv_address = "qdash-server.phas.ubc.ca"
 		string sftp_user = "igor-data"
 		sprintf cmd, "sftp -P %d -b \"%s\" %s@%s" sftp_port, batchFull, sftp_user, srv_address
-		
+
 		executeWinCmd(cmd, logFile="file_transfer.log")
-		
+
 //		sc_DeleteBatchFile() // Sent everything possible
 								  // assume users will fix errors manually
 		return 1
-		
-	else							     
+
+	else
 		// if there is not server.notify file
 		// don't do anything
 		print "No new files available."
 		return 0
-   
+
 	endif
 
 end
