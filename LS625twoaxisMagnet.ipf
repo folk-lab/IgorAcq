@@ -550,8 +550,8 @@ function openTempcommLS625(instrDesc)
 end
 
 //////////////////
-//// Logging ////
-////////////////
+//// Logging /////
+//////////////////
 
 function/s GetTwoAxisStatus(instrIDx,instrIDz)
 	variable instrIDx,instrIDz
@@ -567,5 +567,5 @@ function/s GetTwoAxisStatus(instrIDx,instrIDz)
 	subbuffer = addJSONkeyvalpair(subbuffer, "z", num2str(getLS625rate(instrIDz)))
 	buffer = addJSONkeyvalpair(buffer, "rate mT/min", subbuffer)
 
-	return addJSONkeyvalpairl("", "Two Axis Magnet", buffer)
+	return addJSONkeyvalpair("", "Two Axis Magnet", buffer)
 end
