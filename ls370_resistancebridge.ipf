@@ -49,7 +49,7 @@ function getLS370temp(instrID,plate, [max_age]) // Units: K
 	string headers, command, token = "vMqyDIcB"
 
 	if(paramisdefault(max_age))
-		//return GetTempDB(plate) // Maybe it is better to set max_age = 120
+		//return GetTempDB(plate)? // Maybe it is better to set max_age = 120
 		max_age = 120
 	endif
 
@@ -428,7 +428,7 @@ function setLS370heaterpower(instrID,heater,output) //Units: mW
 	string heater
 	variable output
 	svar system, bfheaterlookup,ighheaterlookup
-	nvar mcheater_set, stillheater_set, sorbheater_set
+	nvar mcheater_set, stillheater_set, sorbheater_set, stillheater_led
 	variable channel, heater_idx
 	string command, payload, headers, token = "vMqyDIcB"
 
@@ -461,6 +461,11 @@ function setLS370heaterpower(instrID,heater,output) //Units: mW
 		sprintf command, "set-analog-output-power?_at_=%s", token
 		if(channel > 1)
 			stillheater_set = output
+			if(output>0)
+				stillheater_led = 1
+			else
+				stillheater_led = 0
+			endif
 		else
 			sorbheater_set = output
 		endif
@@ -583,31 +588,57 @@ end
 
 // FIX pressure readings
 
+<<<<<<< HEAD
 function/s getLS370status(instrID)
 	// returns loggable parameters to meta-data file
 	string instrID
+=======
+function/s getLS370status([max_age])
+	// returns loggable parameters to meta-data file
+	variable max_age
+	if(paramisdefault(max_age))
+		max_age=120
+	endif
+	
+>>>>>>> scancontroller_async
 	svar system, ighgaugelookup
 	string  buffer="", gauge=""
 	variable i=0
 
 	strswitch(system)
 		case "bfsmall":
+<<<<<<< HEAD
 			buffer = addJSONkeyvalpair(buffer,"MC K",num2str(getLS370temp(instrID,"mc")))
 			buffer = addJSONkeyvalpair(buffer,"Still K",num2str(getLS370temp(instrID,"still")))
 			buffer = addJSONkeyvalpair(buffer,"4K Plate K",num2str(getLS370temp(instrID,"4K")))
 			buffer = addJSONkeyvalpair(buffer,"Magnet K",num2str(getLS370temp(instrID,"magnet")))
 			buffer = addJSONkeyvalpair(buffer,"50K Plate K",num2str(getLS370temp(instrID,"50K")))
+=======
+			buffer = addJSONkeyvalpair(buffer,"MC K",num2str(getLS370temp("mc", max_age=max_age)))
+			buffer = addJSONkeyvalpair(buffer,"Still K",num2str(getLS370temp("still", max_age=max_age)))
+			buffer = addJSONkeyvalpair(buffer,"4K Plate K",num2str(getLS370temp("4K", max_age=max_age)))
+			buffer = addJSONkeyvalpair(buffer,"Magnet K",num2str(getLS370temp("magnet", max_age=max_age)))
+			buffer = addJSONkeyvalpair(buffer,"50K Plate K",num2str(getLS370temp("50K", max_age=max_age)))
+>>>>>>> scancontroller_async
 //			for(i=1;i<7;i+=1)
 //				gauge = "P"+num2istr(i)
 //				buffer = addJSONkeyvalpair(buffer,gauge,num2str(GetPressureDB(instrID,gauge)))
 //			endfor
 			return addJSONkeyvalpair("","BF Small",buffer)
 		case "igh":
+<<<<<<< HEAD
 			buffer = addJSONkeyvalpair(buffer,"MC K",num2str(getLS370temp(instrID,"mc")))
 			buffer = addJSONkeyvalpair(buffer,"Cold Plate K",num2str(getLS370temp(instrID,"cold plate")))
 			buffer = addJSONkeyvalpair(buffer,"Still K",num2str(getLS370temp(instrID,"still")))
 			buffer = addJSONkeyvalpair(buffer,"1K Pot K",num2str(getLS370temp(instrID,"1Kt")))
 			buffer = addJSONkeyvalpair(buffer,"Sorb K",num2str(getLS370temp(instrID,"sorb")))
+=======
+			buffer = addJSONkeyvalpair(buffer,"MC K",num2str(getLS370temp("mc", max_age=max_age)))
+			buffer = addJSONkeyvalpair(buffer,"Cold Plate K",num2str(getLS370temp("cold plate", max_age=max_age)))
+			buffer = addJSONkeyvalpair(buffer,"Still K",num2str(getLS370temp("still", max_age=max_age)))
+			buffer = addJSONkeyvalpair(buffer,"1K Pot K",num2str(getLS370temp("1K", max_age=max_age)))
+			buffer = addJSONkeyvalpair(buffer,"Sorb K",num2str(getLS370temp("sorb", max_age=max_age)))
+>>>>>>> scancontroller_async
 //			for(i=1;i<6;i+=1)
 //				gauge = stringfromlist(i,ighgaugelookup)
 //				buffer = addJSONkeyvalpair(buffer,"P"+num2istr(i),num2str(GetPressureDB(instrID,gauge)))

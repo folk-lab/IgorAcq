@@ -541,8 +541,8 @@ function openTempcommLS625(instrDesc)
 end
 
 //////////////////
-//// Logging ////
-////////////////
+//// Logging /////
+//////////////////
 
 function/s GetTwoAxisStatus(instrIDx,instrIDz)
 	variable instrIDx,instrIDz
