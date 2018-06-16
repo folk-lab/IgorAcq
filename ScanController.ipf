@@ -9,16 +9,14 @@
 // Updates in 2.0:
 
 //		-- All drivers now uses the VISA xop, as it is the only one supporting multiple threads.
-//			Therefore VDT and GPIB xop's should not be used anymore.
+//			VDT and GPIB xop's should not be used anymore.
 //		-- "Request scripts" are removed from the scancontroller window. Its only use was
 //			 trying to do async communication (badly).
 //     -- Added Async checkbox in scancontroller window
-
-//TODO:
-
-//     -- SFTP file upload
 //     -- INI configuration files for scancontroller/instruments
 
+//TODO:
+//     -- SFTP file upload
 
 //FIX:
 //     -- NaN handling in JSON package
@@ -141,11 +139,11 @@ function /S ReplaceBullets(str)
 	return ReplaceString(U+2022, str, ">>> ")
 end
 
-function /S executeWinCmd(command, [logFile])
+function /S executeWinCmd(command)
 	// run the shell command
 	// if logFile is selected, put output there
 	// otherwise, return output
-	string command, logFile
+	string command
 	string dataPath = getExpPath("data", full=1)
 
 	// open batch file to store command
@@ -155,40 +153,30 @@ function /S executeWinCmd(command, [logFile])
 	Open/P=data batRef as batchFile	// overwrites previous batchfile
 
 	// setup log file paths
-	string outChar = ">"
-	if(paramisdefault(logFile))
-		logFile = "_execute_cmd.log"
-	else
-		GetFileFolderInfo /Q/Z/P=data logFile
-		if( V_Flag == 0 && V_isFile ) // file exists
-			outChar = ">>"
-		endif
-	endif
+	string logFile = "_execute_cmd.log"
 	string logFull = datapath + logFile
 
 	// write command to batch file and close
-	fprintf batRef,"cmd/c \"%s %s \"%s\"\"\r", command, outChar, logFull
+	fprintf batRef,"cmd/c \"%s > \"%s\"\"\r", command, logFull
 	Close batRef
 
 	// execute batch file with output directed to logFile
 	ExecuteScriptText /B "\"" + batchFull + "\""
 
-	string result = ""
-	if(paramisdefault(logFile))
-		variable logRef
-		Open/P=data logRef as logFile // overwrites previous batchfile
-		string outputLine
-		do
-			FReadLine logRef, outputLine
-			if( strlen(outputLine) == 0 )
-				break
-			endif
-			result += outputLine
-		while( 1 )
-		Close logRef
-	endif
+	string outputLine, result = ""
+	variable logRef
+	Open/P=data logRef as logFile 
+	do
+		FReadLine logRef, outputLine
+		if( strlen(outputLine) == 0 )
+			break
+		endif
+		result += outputLine
+	while( 1 )
+	Close logRef
 
 	DeleteFile /P=data /Z=1 batchFile // delete batch file
+	DeleteFile /P=data /Z=1 logFile // delete batch file
 	return result
 
 end
@@ -251,6 +239,13 @@ function /S getExpPath(whichpath, [full])
 			// always assumes you want the full path
 			return ParseFilePath(5, temp1+temp2, "*", 0, 0)
 			break
+		case "sc":
+			// returns full path to the directory where ScanController lives
+			// always assumes you want the full path
+			string sc_dir = FunctionPath("getExpPath")
+			variable pathLen = itemsinlist(sc_dir, ":")-1
+			sc_dir = RemoveListItem(pathLen, sc_dir, ":")
+			return ParseFilePath(5, sc_dir, "*", 0, 0)
 		case "data":
 			// returns path to data relative to local_measurement_data
 			if(full==0)
@@ -402,8 +397,8 @@ function sc_setupAllFromINI(iniFile, [path])
  					continue
 
  				default:
- 					printf "[WARNING]: Section (%s) not recognized and will be ignored!\r", ini_text[i]
-
+ 					printf "[WARNING] Section (%s) in INI not recognized and will be ignored!\r", ini_text[i]
+ 				
 			endswitch
 		endif
 
@@ -419,6 +414,8 @@ function sc_setupAllFromINI(iniFile, [path])
 end
 
 function InitScanController([setupFile, setupPath, configFile])
+	// start up a whole mess of scancontroller functionality
+
 	string setupFile, setupPath, configFile // use these to point to specific setup and config files
 											        // defaults are setup.ini in data path and most recent config
 
@@ -449,13 +446,8 @@ function InitScanController([setupFile, setupPath, configFile])
 	// create remote path(s)
 	if(sc_srv_push==1)
 
-		print "Creating remote directories..."
-
-		sc_CreateRemoteDirectory("config") // creating config also creates data
-
 		if(CmpStr(sc_filetype, "ibw") == 0)
 			newpath /C/O/Q winfs getExpPath("winfs", full=1) // create/overwrite winf path
-			sc_CreateRemoteDirectory("winf")
 		endif
 
 	else
@@ -2181,22 +2173,28 @@ function sc_write2batch(fileref, searchStr, localFull)
 	string searchStr, localFull
 	localFull = TrimString(localFull)
 
-	svar sc_hostname
+	svar sc_hostname, sc_server_dir
 	string lmdpath = getExpPath("lmd", full=1)
 	variable idx = strlen(lmdpath)+1, result=0
 	string srvFull = ""
-	sprintf srvFull, "/measurement-data/%s/%s" sc_hostname, localFull[idx,inf]
+	
+	string platform = igorinfo(2), localPart = localFull[idx,inf]
+	if(cmpstr(platform,"Windows")==0)
+		localPart = replaceString("\\", LocalPart, "/")
+	endif
+	
+	sprintf srvFull, "%s/%s/%s" sc_server_dir, sc_hostname, localPart
 
 	if(strlen(searchStr)==0)
 		// there is no notification file, add this immediately
-		fprintf fileref, "put \"%s\" \"%s\"\n", localFull, srvFull
+		fprintf fileref, "%s,%s\n", localFull, srvFull
 	else
 		// search for localFull in searchStr
 		print searchStr, localFull
 		result = strsearch(searchStr, localFull, 0)
 		print result
 		if(result==-1)
-			fprintf fileref, "put \"%s\" \"%s\"\n", localFull, srvFull
+			fprintf fileref, "%s,%s\n", localFull, srvFull
 		endif
 	endif
 
@@ -2213,11 +2211,17 @@ function sc_findNewFiles(datnum)
 	//// create/open batch file ////
 	variable refnum
 	string notifyText = "", buffer
-	getfilefolderinfo /Q/Z/P=data "server_transfer.bat"
-	if(V_isFile==0) // if the file does not exist, create it with hostname/n at the top
-		open /A/P=data refNum as "server_transfer.bat"
+	getfilefolderinfo /Q/Z/P=data "pending_sftp.lst"
+	if(V_isFile==0) // if the file does not exist, create it with header
+		open /A/P=data refNum as "pending_sftp.lst"
+		
+		// create/write header
+		nvar sc_sftp_port
+		svar sc_server_url,sc_sftp_user
+		fprintf refNum, "%s, %s, %d\n" sc_sftp_user, sc_server_url, sc_sftp_port 
+		
 	else // if the file does exist, open it for appending
-		open /A/P=data refNum as "server_transfer.bat"
+		open /A/P=data refNum as "pending_sftp.lst"
 		FSetPos refNum, 0
 		variable lines = 0
 		do
@@ -2306,45 +2310,34 @@ function sc_findNewFiles(datnum)
 		endfor
 	endfor
 
-	close refnum // close server_transfer.bat
+	close refnum // close pending_sftp.lst
 
-end
-
-function /S sc_CreateRemoteDirectory(path)
-	string path // any path recognized by getExpPath
-	svar sc_hostname
-
-	string remDirectory = ""
-	sprintf remDirectory "/measurement-data/%s/%s", sc_hostname, getExpPath(path,full=0)
-
-	variable sftp_port = 7743
-	string srv_address = "qdash-server.phas.ubc.ca"
-	string sftp_user = "igor-data"
-
-
-	string cmd = ""
-	sprintf cmd, "ssh -p %d %s@%s \"mkdir -p %s\"" sftp_port, sftp_user, srv_address, remDirectory
-
-	string response = executeWinCmd(cmd)
-	return response
 end
 
 function sc_FileTransfer()
 
-	string batchFile = "server_transfer.bat"
+	string batchFile = "pending_sftp.lst"
 	GetFileFolderInfo /Q/Z/P=data batchFile
 	if( V_Flag == 0 && V_isFile ) // file exists
-		string batchFull = "", cmd = ""
-		batchFull = getExpPath("data", full=1) + "server_transfer.bat"
-
-		variable sftp_port = 7743
-		string srv_address = "qdash-server.phas.ubc.ca"
-		string sftp_user = "igor-data"
-		sprintf cmd, "sftp -P %d -b \"%s\" %s@%s" sftp_port, batchFull, sftp_user, srv_address
-
-		executeWinCmd(cmd, logFile="file_transfer.log")
-
-//		sc_DeleteBatchFile() // Sent everything possible
+		string batchFull = "", cmd = "", upload_script
+		
+		batchFull = getExpPath("data", full=1) + batchFile
+		
+		string platform = igorinfo(2)
+		strswitch(platform)
+			case "Macintosh":
+				upload_script = getExpPath("sc", full=1)+"/SCRIPTS/transfer_data.py"		
+				sprintf cmd, "python %s %s" upload_script, batchFull
+				print cmd
+				break
+			case "Windows":
+				upload_script = getExpPath("sc", full=1)+"SCRIPTS\\transfer_data.py"		
+				sprintf cmd, "python \"%s\" \"%s\"" upload_script, batchFull
+				executeWinCmd(cmd)
+				break
+		endswitch
+		
+		sc_DeleteBatchFile() // Sent everything possible
 								  // assume users will fix errors manually
 		return 1
 
@@ -2361,10 +2354,10 @@ end
 function sc_DeleteBatchFile()
 
 	// delete server.notify
-	deletefile /Z=1 /P=data "server_transfer.bat"
+	deletefile /Z=1 /P=data "pending_sftp.lst"
 
 	if(V_flag!=0)
-		print "Failed to delete 'server_transfer.bat'"
+		print "Failed to delete 'pending_sftp.lst'"
 	endif
 end
 
