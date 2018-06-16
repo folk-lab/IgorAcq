@@ -110,7 +110,7 @@ end
 //// get functions ////
 ///////////////////////
 
-threadsafe function read34401A_async(instrID)
+threadsafe function read34401A(instrID)
 	Variable instrID
 	string response
 

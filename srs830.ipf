@@ -186,8 +186,8 @@ end
 function SetSRSAmplitude(instrID,amplitude) // Units: mV
 	variable instrID, amplitude
 
-	if(amplitude > 4)
-		print "max amplitude is 4mV."
+	if(amplitude < 4)
+		print "min amplitude is 4mV."
 		amplitude = 4
 	endif
 

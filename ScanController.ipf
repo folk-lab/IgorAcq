@@ -379,7 +379,7 @@ function/s sc_createconfig()
 	configstr = addJSONkeyvalpair(configstr, "scripts", tmpstr)
 
 	// executable string to get logs
-	configstr = addJSONkeyvalpair(configstr, "log_string", sc_LogStr, addQuotes=1)
+//	configstr = addJSONkeyvalpair(configstr, "log_string", sc_LogStr, addQuotes=1)
 
 	// print_to_history
 	tmpstr = ""
@@ -788,20 +788,21 @@ function sc_findAsyncMeasurements()
 					// keep track of function names and instrIDs in folder structure
 					strID = script[idx+1,strlen(script)-2]
 					queryFunc = script[0,idx-1]
+					
 					// creates root:async:instr1
 					sprintf threadFolder, "thread_%s", strID
-
 					if(DataFolderExists("root:async:"+threadFolder))
 						// add measurements to the thread directory for this instrument
+						
 						svar qF = root:async:$(threadFolder):queryFunc
 						qF += ";"+queryFunc
 						svar wI = root:async:$(threadFolder):wavIdx
 						wI += ";" + num2str(measIdx)
 					else
-						instrAsync =+ 1
+						instrAsync += 1
+
 						// create a new thread directory for this instrument
 						newdatafolder root:async:$(threadFolder)
-
 						nvar instrID = $strID
 						variable /g root:async:$(threadFolder):instrID = instrID   // creates variable instrID in root:thread
 																	                          // that has the same value as $strID
