@@ -277,76 +277,76 @@ end
 
 function sc_loadGlobalsINI(iniIdx)
 	variable iniIdx
-	
+
 	wave/t ini_text
 	wave ini_type
-	
+
 	// some values are required
-	string mandatory = "server_url=str,srv_push=var,filetype=str,slack_url=str,sftp_por=vart,sftp_userstr,"
+	string mandatory = "server_url=str,srv_push=var,filetype=str,slack_url=str,sftp_port=var,sftp_user=str,"
 	string optional = "colormap=str,"
-	
+
 	string key="", val=""
 	variable sub_index=iniIdx+1, keyIdx=0, manKeyCnt=0
 
 	do
 		if(ini_type[sub_index] == 2 && ini_type[sub_index+1] == 3) // find key/value pairs
-			
+
 			key = ini_text[sub_index]
-			
+
 			// handle mandatory keys here
-			val = StringByKey("test_ping",mandatory,"=", ",")
+			val = StringByKey(key,mandatory,"=", ",")
 			if(strlen(val)>0)
 				// this is in the manadtory key list
 				key = "sc_"+key // global variable names created from mandatory keys
-				
+
 				if(cmpstr(val,"str")) // create string variables
 					string/g $key = ini_text[sub_index+1]
 				elseif(cmpstr(val,"var")) // create numeric variables
 					variable/g $key = str2num(ini_text[sub_index+1])
 				endif
-				
+
 				manKeyCnt+=1
 				sub_index+=1
 				continue
 			endif
-			
+
 			// handle optional keys here
-			val = StringByKey("test_ping",optional,"=", ",")
+			val = StringByKey(key,optional,"=", ",")
 			if(keyIdx>=0)
 				// this is in the manadtory key list
 				key = "sc_"+key // global variable names created from optional keys
-				
+
 				if(cmpstr(val,"str")) // create string variables
 					string/g $key = ini_text[sub_index+1]
 				elseif(cmpstr(val,"var")) // create numeric variables
 					variable/g $key = str2num(ini_text[sub_index+1])
 				endif
-				
+
 				sub_index+=1
 				continue
 			endif
-			
+
 		endif
-		
+
 		sub_index+=1
 		if(sub_index>numpnts(ini_type)-1)
 			break
 		endif
-		
+
 	while(ini_type[sub_index]!=1) // stop at next section
-	
+
 	// defaults for optional parameters
 	svar/z sc_colormap
 	if(!svar_exists(sc_colormap))
 		string /g sc_colormap = "VioletOrangeYellow"
 	endif
-	
-	// error if not all mandatory keys were loaded 
+
+	// error if not all mandatory keys were loaded
 	if(manKeyCnt!=itemsinlist(mandatory,","))
 		print "[ERROR] Not all mandatory keys were supplied to [scancontroller]!"
 		abort
 	endif
-	
+
 end
 
 function sc_setupAllFromINI(iniFile, [path])
@@ -355,23 +355,23 @@ function sc_setupAllFromINI(iniFile, [path])
 	if(paramisdefault(path))
 		path = "data"
 	endif
-	
+
 	string /g sc_setup_ini = iniFile
 	string /g sc_setup_path = path
-	
+
 	loadINIconfig(iniFile, path)
 	wave ini_type
 	wave /t ini_text
-	
+
 	variable i=0, scCnt=0, guiCnt=0, guiIdx=0
 	string instrList = ""
 	for(i=0;i<numpnts(ini_type);i+=1)
-	
+
 		if(ini_type[i]==1)
 
 			strswitch(ini_text[i])
 				case "[scancontroller]":
-				
+
 					if(scCnt==0)
 						scCnt+=1
 						sc_loadGlobalsINI(i)
@@ -379,7 +379,7 @@ function sc_setupAllFromINI(iniFile, [path])
 						print "[WARNING] Found more than one [scancontroller] entry. Using first entry."
 					endif
 					continue
-					
+
 				case "[gui]":
 					if(guiCnt==0)
 						guiCnt+=1
@@ -391,26 +391,26 @@ function sc_setupAllFromINI(iniFile, [path])
 				case "[visa-instrument]":
 					// handle this elsewhere
 		 			continue
-		 			
+
  				case "[http-instrument]":
  					// handle this elsewhere
  					continue
- 					
+
  				default:
  					printf "[WARNING] Section (%s) in INI not recognized and will be ignored!\r", ini_text[i]
- 					
+ 				
 			endswitch
 		endif
-		
+
 	endfor
-	
+
 	// load instruments
-	loadInstrsFromINI(verbose=1)
-	
+	instrList = loadInstrsFromINI(verbose=1)
+
 	if(guiCnt>0)
 		loadGUIsINI(guiIdx, instrList=instrList)
 	endif
-	
+
 end
 
 function InitScanController([setupFile, setupPath, configFile])
@@ -418,7 +418,7 @@ function InitScanController([setupFile, setupPath, configFile])
 
 	string setupFile, setupPath, configFile // use these to point to specific setup and config files
 											        // defaults are setup.ini in data path and most recent config
-	
+
 	GetFileFolderInfo/Z/Q/P=data  // Check if data path is definded
 	if(v_flag != 0 || v_isfolder != 1)
 		abort "Data path not defined!\n"
@@ -427,14 +427,14 @@ function InitScanController([setupFile, setupPath, configFile])
 	if(paramisdefault(setupFile))
 		setupFile = "setup.ini"
 	endif
-	
+
 	if(paramisdefault(setupPath))
 		setupPath = "data"
-	endif 
-	
+	endif
+
 	sc_setupAllFromINI(setupFile, path=setupPath)   // setup instruments and scancontroller from setup.ini
 	string /g sc_hostname = getHostName() // get machine name
-	
+
 	// load all the scan controller globals
 	nvar sc_srv_push,sc_sftp_port
 	svar sc_server_url,sc_filetype,sc_slack_url,sc_sftp_user,sc_colormap
@@ -449,7 +449,7 @@ function InitScanController([setupFile, setupPath, configFile])
 		if(CmpStr(sc_filetype, "ibw") == 0)
 			newpath /C/O/Q winfs getExpPath("winfs", full=1) // create/overwrite winf path
 		endif
-		
+
 	else
 		print "[WARNING] Only saving local copies of data."
 	endif
@@ -1073,7 +1073,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	// do this here, because if it fails
 	// i don't want to delete any old data
 	loadInstrsFromINI(verbose=0)
-	
+
 	// The status of the upcoming scan will be set when waves are initialized.
 	if(!paramisdefault(starty) && !paramisdefault(finy) && !paramisdefault(numptsy))
 		sc_is2d = 1
