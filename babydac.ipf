@@ -315,11 +315,12 @@ function bdCalcCustomValues()
 	make/o/n=(bd_num_custom) bdoutput = nan
 	make/o/n=(bd_num_custom) scalefunc = nan
 	make/o/n=(bd_num_custom) offset = nan
+	make/o/n=(bd_num_custom) dotproduct_helper = 1
 	bdoutput = str2num(dacvalstr[p][1])
 	for(i=0;i<bd_num_custom;i=i+1)
 		scalefunc = bdtocustom_vec[p][i]
 		offset = offsets[p][i]
-		matrixop/o placeholder = (scalefunc.(bdoutput + offset))
+		matrixop/o placeholder = (scalefunc*bdoutput + offset).dotproduct_helper
 		customoutput[i] = placeholder[0]
 	endfor
 	oldcustom = customoutput[p]
