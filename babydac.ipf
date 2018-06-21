@@ -11,15 +11,33 @@
 /// BabyDAC specific COMM ///
 /////////////////////////////
 
-function bdCommSetup(instrID)
-	// baud=57600, databits=8, stopbits=1, parity=0
-	variable instrID
-
-	visaSetBaudRate(instrID, 57600)
-	visaSetDataBits(instrID, 8)
-	visaSetStopBits(instrID, 10)
-	visaSetParity(instrID, 0)
+function openBabyDACconnection(instrID, visa_address, [verbose])
+	// instrID is the name of the global variable that will be used for communication
+	// visa_address is the VISA address string, i.e. ASRL::1
+	string instrID, visa_address
+	variable verbose
+	
+	
+	status = viOpenDefaultRM(localRM) // open local copy of resource manager
+	if(status < 0)
+		VISAerrormsg("open BD connection:", localRM, status)
+		abort
+	endif
+	
+	string comm = "name=babydac,instrID=bd_window_resource,visa_address="+visa_address
+	string options = "baudrate=57600,databits=8,stopbits=1,parity=0"
+	openVISAinstr(comm, options=options, localRM=localRM, verbose=0)
 end
+
+//function bdCommSetup(instrID)
+//	// baud=57600, databits=8, stopbits=1, parity=0
+//	variable instrID
+//
+//	visaSetBaudRate(instrID, 57600)
+//	visaSetDataBits(instrID, 8)
+//	visaSetStopBits(instrID, 10)
+//	visaSetParity(instrID, 0)
+//end
 
 /////////////////////////////////
 ///// Initiate DAC board(s) /////
@@ -1011,12 +1029,12 @@ function update_BabyDAC(action) : ButtonControl
     svar bd_controller_addr
     variable status, localRM
 
-    status = viOpenDefaultRM(localRM) // open local copy of resource manager
-    if(status < 0)
-        VISAerrormsg("open BD connection:", localRM, status)
-        abort
-    endif
-    openInstr("bd_window_resource", bd_controller_addr, localRM=localRM, verbose=0)
+
+
+	// open temporary VISA connection to babyDAC
+    string comm = "name=babydac,instrID=bd_window_resource,visa_address="+bd_controller_addr
+    string options = "baudrate=57600,databits=8,stopbits=1,parity=0"
+    openVISAinstr(comm, options=options, localRM=localRM, verbose=0)
     nvar bd_window_resource
 
 	strswitch(action)
