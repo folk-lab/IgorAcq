@@ -14,16 +14,29 @@
 /// IPS specific COMM ///
 /////////////////////////
 
-function ipsCommSetup(instrID)
-	// baud=9600, stopbits=2
-	// write_term = "\r"
-	// read_term = "\r"
-	variable instrID
-
-	visaSetBaudRate(instrID, 9600)
-	visaSetSerialEndOut(instrID, 0)
-	visaSetDataBits(instrID, 8)
-	visaSetStopBits(instrID, 20)
+function openIPSconnection(instrID, visa_address, [verbose])
+	// instrID is the name of the global variable that will be used for communication
+	// visa_address is the VISA address string, i.e. ASRL1::INSTR
+	string instrID, visa_address
+	variable verbose
+	
+	if(paramisdefault(verbose))
+		verbose=1
+	elseif(verbose!=1)
+		verbose=0
+	endif
+	
+	variable localRM
+	variable status = viOpenDefaultRM(localRM) // open local copy of resource manager
+	if(status < 0)
+		VISAerrormsg("open IPS120 connection:", localRM, status)
+		abort
+	endif
+	
+	string comm = ""
+	sprintf comm, "name=IPS120,instrID=%s,visa_address=%s" instrID, visa_address
+	string options = "baudrate=9600,databits=8,stopbits=2,readterm=\r"
+	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
 end
 
 function writeIPScheck(instrID, cmd)	// Checks response for error
@@ -48,11 +61,6 @@ function initIPS120(instrID)
 	variable/g ampspertesla=9.569 // A/T
 	variable/g maxfield=9         // mT
 	variable/g maxramprate=182    // mT/min, depends on max field
-
-	ipsCommSetup(instrID) // Setting up serial communication
-							// possibly redundant if setup done with ScanController_VISA
-						  	// but it doesn't hurt (or take any time) to do it again
-
 
 	writeIPScheck(instrID, "C3\r") // Remote and unlocked
 	sc_sleep(0.02)
@@ -354,14 +362,7 @@ function update_magnet(action) : ButtonControl
 
     // open temporary connection to IPS
     svar ips_controller_addr
-    variable status, localRM
-
-    status = viOpenDefaultRM(localRM) // open local copy of resource manager
-    if(status < 0)
-        VISAerrormsg("open IPS connection:", localRM, status)
-        abort
-    endif
-    openInstr("ips_window_resource", ips_controller_addr, localRM=localRM, verbose=0)
+    openIPSconnection("ips_window_resource", ips_controller_addr, verbose=0)
     nvar ips_window_resource
 
 	strswitch(action)

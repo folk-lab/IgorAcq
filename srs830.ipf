@@ -12,6 +12,8 @@
 /////////////////////////
 
 function openSRSconnection(instrID, visa_address, [verbose])
+	// works for GPIB -- may need to add some more 'option' paramters if using serial
+	//                -- does not hurt to send extra parameters when using GPIB, they are ignored
 	// instrID is the name of the global variable that will be used for communication
 	// visa_address is the VISA address string, i.e. GPIB0::1::INSTR
 	string instrID, visa_address

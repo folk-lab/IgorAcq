@@ -53,7 +53,7 @@ end
 function openVISAinstr(mandatory, [options, localRM, verbose])
 
 	string mandatory //  mandatory: "name= ,instrID= ,visa_address= "
-	string options   //  options: "test_query= ,init_function= ,baudrate= ,stopbits= ,databits= ,parity= ,readterm= ,timeout= " 
+	string options   //  options: "test_query= ,init_function= ,baudrate= ,stopbits= ,databits= ,parity= ,timeout= " 
 
 	variable localRM, verbose
 	
@@ -473,9 +473,6 @@ function setVISAoptions(instrID,options)
 			    continue
 			case "parity":
 			    status = visaSetParity(instrID, str2num(value))
-			    continue
-			case "readterm":
-			    status = visaSetReadTerm(instrID, value)
 			    continue
 			case "timeout":
 			    status = visaSetTimeout(instrID, str2num(value))
