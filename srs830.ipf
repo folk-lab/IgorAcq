@@ -7,9 +7,9 @@
 // Units: mV, nA or Hz
 // Written by Christian/Nik, 2018-05-01
 
-/////////////////////////////
-/// BabyDAC specific COMM ///
-/////////////////////////////
+/////////////////////////
+/// SRS specific COMM ///
+/////////////////////////
 
 function openSRSconnection(instrID, visa_address, [verbose])
 	// instrID is the name of the global variable that will be used for communication
@@ -30,7 +30,8 @@ function openSRSconnection(instrID, visa_address, [verbose])
 		abort
 	endif
 	
-	string comm = "name=srs,instrID=bd_window_resource,visa_address="+visa_address
+	string comm = ""
+	sprintf comm, "name=SRS,instrID=%s,visa_address=%s" instrID, visa_address
 	string options = "test_query=*IDN?"
 	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
 	
