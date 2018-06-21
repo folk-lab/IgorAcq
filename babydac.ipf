@@ -13,12 +13,18 @@
 
 function openBabyDACconnection(instrID, visa_address, [verbose])
 	// instrID is the name of the global variable that will be used for communication
-	// visa_address is the VISA address string, i.e. ASRL::1
+	// visa_address is the VISA address string, i.e. ASRL1::INSTR
 	string instrID, visa_address
 	variable verbose
 	
+	if(paramisdefault(verbose))
+		verbose=1
+	elseif(verbose!=1)
+		verbose=0
+	endif
 	
-	status = viOpenDefaultRM(localRM) // open local copy of resource manager
+	variable localRM
+	variable status = viOpenDefaultRM(localRM) // open local copy of resource manager
 	if(status < 0)
 		VISAerrormsg("open BD connection:", localRM, status)
 		abort
@@ -26,7 +32,7 @@ function openBabyDACconnection(instrID, visa_address, [verbose])
 	
 	string comm = "name=babydac,instrID=bd_window_resource,visa_address="+visa_address
 	string options = "baudrate=57600,databits=8,stopbits=1,parity=0"
-	openVISAinstr(comm, options=options, localRM=localRM, verbose=0)
+	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
 end
 
 //function bdCommSetup(instrID)
@@ -1026,16 +1032,9 @@ function update_BabyDAC(action) : ButtonControl
 	nvar bd_num_custom
 
 	// open temporary connection to babyDAC
-    svar bd_controller_addr
-    variable status, localRM
-
-
-
-	// open temporary VISA connection to babyDAC
-    string comm = "name=babydac,instrID=bd_window_resource,visa_address="+bd_controller_addr
-    string options = "baudrate=57600,databits=8,stopbits=1,parity=0"
-    openVISAinstr(comm, options=options, localRM=localRM, verbose=0)
-    nvar bd_window_resource
+	svar bd_controller_addr
+	openBabyDACconnection("bd_window_resource", bd_controller_addr, verbose=0)
+	nvar bd_window_resource
 
 	strswitch(action)
 		case "ramp":
@@ -1099,17 +1098,9 @@ function update_BabyDAC_custom(action) : ButtonControl
 	wave oldcustom
 
 	// open temporary connection to babyDAC
-    svar bd_controller_addr
-    variable status, localRM
-
-    status = viOpenDefaultRM(localRM) // open local copy of resource manager
-    if(status < 0)
-        VISAerrormsg("open BD connection:", localRM, status)
-        abort
-    endif
-    openInstr("bd_window_resource", bd_controller_addr, localRM=localRM, verbose=0)
-    nvar bd_window_resource
-    bdCommSetup(bd_window_resource)
+	svar bd_controller_addr
+	openBabyDACconnection("bd_window_resource", bd_controller_addr, verbose=0)
+	nvar bd_window_resource
 
 	for(i=0;i<bd_num_custom;i=i+1)
 		if(str2num(customdacvalstr[i][1]) != oldcustom[i])
