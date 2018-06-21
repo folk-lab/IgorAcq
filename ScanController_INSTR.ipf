@@ -502,7 +502,7 @@ end
 threadsafe function visaSetReadTermEnable(instrID, enable)
 	// enable use of read termination character
 	variable instrID	// An instrument referenced obtained from viOpen
-	variable enable     // 1 = yes, 0 = no
+	variable enable   // 1 = yes, 0 = no
 
 	variable status
 	status = viSetAttribute(instrID, VI_ATTR_TERMCHAR_EN, enable)
@@ -538,11 +538,21 @@ end
 
 function visaSetStopBits(instrID, bits)
 	// acceptable values for stop bits:
-    //    10 (1 bit), 15 (1.5 bits), and 20 (2 bits)
+    //    1 (1 bit), 1.5 (1.5 bits), and 2.0 (2 bits)
 	variable instrID	// An instrument referenced obtained from viOpen
 	variable bits
 
+	variable stopbits = 1
+	if(bits == 1)
+		stopbits = 10
+	elseif(bits == 1.5)
+		stopbits = 15
+	elseif(bits == 	2)
+		stopbits = 20
+	endif
+	
 	variable status = viSetAttribute(instrID, VI_ATTR_ASRL_STOP_BITS, bits)
+	
 	return status
 end
 
@@ -559,7 +569,7 @@ end
 
 function visaSetParity(instrID, parity)
 	// acceptable values for parity:
-   	// VI_ASRL_PAR_NONE (0)
+   // VI_ASRL_PAR_NONE (0)
 	// VI_ASRL_PAR_ODD (1)
 	// VI_ASRL_PAR_EVEN (2)
 	// VI_ASRL_PAR_MARK (3)

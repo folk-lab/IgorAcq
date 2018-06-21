@@ -5,21 +5,35 @@
 // update for VISA by Nik May XX 2018 
 // removed calibration and updated COMM functions Jun 2018 -- Nik
 
-// TODO: update Arduino code to include calibration
+// TODO: update Arduino code to include calibration and IDN string
 
 ////////////////////////
 /// AnalogShield COM ///
 ////////////////////////
 
-function AS_CommSetup(instrID)
-	// baud=115200, databits=8, stopbits=1, parity=0
-	variable instrID
-
-	visaSetBaudRate(instrID, 115200)
-    visaSetDataBits(instrID, 8)
-    visaSetStopBits(instrID, 10)
-    visaSetParity(instrID, 0)
-
+function openASconnection(instrID, visa_address, [verbose])
+	// instrID is the name of the global variable that will be used for communication
+	// visa_address is the VISA address string, i.e. ASRL1::INSTR
+	string instrID, visa_address
+	variable verbose
+	
+	if(paramisdefault(verbose))
+		verbose=1
+	elseif(verbose!=1)
+		verbose=0
+	endif
+	
+	variable localRM
+	variable status = viOpenDefaultRM(localRM) // open local copy of resource manager
+	if(status < 0)
+		VISAerrormsg("open BD connection:", localRM, status)
+		abort
+	endif
+	
+	string comm = ""
+	sprintf comm, "name=AnalogShield,instrID=%s,visa_address=%s" instrID, visa_address
+	string options = "baudrate=11520,databits=8,stopbits=1,parity=0"
+	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
 end
 
 ///// CALIBRATION CONSTANTS /////
@@ -446,16 +460,8 @@ function update_AnalogShield(action) : ButtonControl
 	
 	// setup temporary control for Analog Shield
     svar as_controller_addr
-    variable status, localRM
-    
-    status = viOpenDefaultRM(localRM) // open local copy of resource manager
-    if(status < 0)
-        VISAerrormsg("open BD connection:", localRM, status)
-        abort
-    endif
-    openInstr("as_window_resource", as_controller_addr, localRM=localRM, verbose=0)
+    openASconnection("as_window_resource", as_controller_addr, verbose=0)
     nvar as_window_resource
-    AS_CommSetup(as_window_resource)
     
 	strswitch(action)
 		case "ramp":
