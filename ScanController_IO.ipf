@@ -4,7 +4,7 @@
 /// scan controller needs for file I/O and custom formatted string handling
 /// currently that includes -- saving IBW and HDF5 files
 ///                            reading/writing/parsing JSON
-///                            loading/saving ini config files
+///                            loading ini config files
 
 //////////////////////////////
 /// SAVING EXPERIMENT DATA ///
@@ -123,7 +123,6 @@ function initSaveFiles_hdf5([msg])
 	json2hdf5attributes(JSONfromFile("config", sc_current_config), "config", hdf5_id) // add current scancontroller config
 
 	// Create logs group
-	svar sc_current_config
 	variable /G logs_group_ID
 	HDF5CreateGroup hdf5_id, "logs", logs_group_ID
 	json2hdf5attributes(getEquipLogs(), "logs", hdf5_id) // add current scancontroller config
@@ -190,8 +189,6 @@ function initSaveFiles_ibw([msg])
 		msg=""
 	endif
 
-	// check winfs path
-	newpath /C/O/Q winfs getExpPath("winfs", full=1) // create/overwrite winf path
 	SaveScanComments(msg=msg)
 
 end
@@ -969,3 +966,91 @@ end
 ///////////
 /// INI ///
 ///////////
+
+function /s loadINIconfig(iniFile, path)
+	// read INI file into some useful waves
+	// assumes general INI rules: https://en.wikipedia.org/wiki/INI_file
+	string iniFile, path
+	variable refnum
+	
+	// open setup file
+	// abort if it does not exist
+	open /r/z/p=$(path) refnum as iniFile
+	if(v_flag!=0)
+	    print "[ERROR]: Could not read the setup file! It might not exist."
+	    return ""
+	endif
+
+	// make the waves that will hold the parsed data
+	make/t/o/n=0 ini_text
+	make/o/n=0 ini_type
+	
+	variable i=0, type=0, sectionIdx=0
+	string line="", reg="([a-zA-Z0-9.-_]+)\s*=\s*(.*)", key="", value=""
+	do
+		freadline refnum, line
+		if(strlen(line)==0)
+		    break
+		endif
+	   
+	   type = getINItype(line)
+		// if type=0 then it's a comment or some BS, ignore it!
+		if(type==1) // section
+			sectionIdx = addINIstring(line,type)
+		elseif(type==2) // key/value pair
+			splitstring/E=reg line, key, value
+			addINIstring(key,type)
+			addINIstring(value,type+1)
+		endif
+
+		i+=1
+	while(1)
+	close refnum
+
+end
+
+function getINItype(iniLine)
+	// decide if this line represents a 
+	//  (0) blank/comment
+	//  (1) section heading
+	//  (2) key (really it is a key/value pair)
+	//  (3) not returned here, used in ini_type to represent values
+	string iniLine
+	variable type=0
+	
+	iniLine = TrimString(iniLine)
+	
+	if(cmpstr(iniLine[0],"#")==0 || cmpstr(iniLine[0],";")==0) // comment
+	    return 0
+	elseif(cmpstr(iniLine[0],"[")==0) // section
+	    return 1
+	elseif(strsearch(iniLine, "=",0)>0) // key/value pair
+	    return 2
+	else // blank/comment
+	    return 0
+	endif
+end
+
+function addINIstring(str,type)
+	// adds strings to init_text
+	// adds types to ini_type
+	// returns line_num if str is a section heading
+    string str
+    variable type
+    variable line_num=0
+
+    wave/t ini_text
+    wave ini_type
+    // redimension waves
+    line_num = numpnts(ini_text)+1
+    redimension /n=(line_num) ini_text
+    redimension /n=(line_num) ini_type
+
+    // add new value
+    ini_text[line_num-1] = TrimString(str)
+    ini_type[line_num-1] = type
+	
+	if(type==1)
+		return line_num
+	endif
+end

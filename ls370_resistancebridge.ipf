@@ -14,37 +14,77 @@
 // QueryDB()
 // Add support for BF #2
 
-////////////////////////////
-//// Initiate Lakeshore ////
+///////////////////////////
+/// LS37X specific COMM ///
 ///////////////////////////
 
-function initLS370()
+function openLS370connection(instrID, http_address, [verbose, gui])
+	// open/test a connection to the LS37X RPi interface written by Ovi
+	//      the whole thing _should_ work for LS370 and LS372
+	// instrID is the name of the global variable that will be used for communication
+	// http_address is exactly what it sounds like
+	// verbose=0 will not print any information about the connection
+	// gui=1 will open the Igor GUI for the LS370
+	string instrID, http_address
+	variable verbose, gui
+	
+	if(paramisdefault(verbose))
+		verbose=1
+	elseif(verbose!=1)
+		verbose=0
+	endif
+	
+	if(paramisdefault(gui))
+		gui=0
+	elseif(verbose!=0)
+		gui=1
+	endif
+	
+	string comm = ""
+	sprintf comm, "name=LS370,instrID=%s,url=%s" instrID, http_address
+	string options = ""
+	openHTTPinstr(comm, options=options, verbose=verbose)
+	
+	if(gui==1)
+		svar localID = $instrID
+		initLS370(localID)
+	endif
+end
+
+////////////////////////////
+//// Initiate Lakeshore ////
+////////////////////////////
+
+function initLS370(instrID)
+	// opens 
+	string instrID
+
 	setLS370system() // Set the correct system!
 	createLS370globals() // Create the needed global variables for the GUI
 	// Build main control window
 	dowindow/k Lakeshore
 	execute("lakeshore_window()")
 	// Update current values
-	updateLS370GUI()
+	updateLS370GUI(instrID)
 end
 
 ///////////////////////
 //// Get Functions ////
 //////////////////////
 
-function getLS370temp(plate, [max_age]) // Units: K
+function getLS370temp(instrID, plate, [max_age]) // Units: K
 	// returns the temperature of the selected "plate".
 	// avaliable plates on BF systems: mc (mixing chamber), still, magnet, 4K, 50K
 	// avaliable plates on IGH systems: mc (mixing chamber), cold plate, still, 1K, sorb
 	// max_age determines how old a reading can be (in sec), before I demand a new one
-   // from the server
-   // max_age=0 always requests a new reading
-
+	// from the server
+	// max_age=0 always requests a new reading
+	string instrID
 	string plate
 	variable max_age
 	svar system, bfchannellookup, ighchannellookup
 	variable channel_idx, channel
-	string headers, command, url, token = "vMqyDIcB"
+	string headers, command, token = "vMqyDIcB"
 
 	if(paramisdefault(max_age))
 		//return GetTempDB(plate)? // Maybe it is better to set max_age = 120
@@ -73,28 +113,28 @@ function getLS370temp(plate, [max_age]) // Units: K
 		case "bfbig":
 			break
 	endswitch
-	
+
 	headers = "Content-Type: application/json"
 	sprintf command, "get-channel-data/%d?max_age=%d&_at_=%s", channel, max_age, token
-	url = generateLS370URL(command)
-	return str2num(queryLS370(url,headers,"t","get"))
+	checkLS370URL(instrID)
+	return str2num(queryLS370(instrID,command,headers,"t","get"))
 end
 
-function getLS370heaterpower(heater, [max_age]) // Units: mW
+function getLS370heaterpower(instrID,heater, [max_age]) // Units: mW
 	// returns the power of the selected heater.
 	// avaliable heaters on BF systems: still (analog 2), mc
 	// avaliable heaters on IGH systems: sorb (analog 1), still (analog 2), mc
 	// max_age determines how old a reading can be (in sec), before a new is demanded
 	// from the server
-   // max_age=0 always requests a new reading
+	// max_age=0 always requests a new reading
+	string instrID
+	string heater
+	variable max_age
+	svar system, bfheaterlookup, ighheaterlookup
+	variable heater_idx, channel
+	string headers, command, token = "vMqyDIcB"
 
-   string heater
-   variable max_age
-   svar system, bfheaterlookup, ighheaterlookup
-   variable heater_idx, channel
-   string headers, command, url, token = "vMqyDIcB"
-
-   if(paramisdefault(max_age))
+	if(paramisdefault(max_age))
 		//return GetHeaterPowerDB(heater)
 		max_age = 120
 	endif
@@ -128,54 +168,57 @@ function getLS370heaterpower(heater, [max_age]) // Units: mW
 	else
 		sprintf command, "get-heater-data?max_age=%d&_at_=%s", max_age, token
 	endif
-	url = generateLS370URL(command)
-	return str2num(queryLS370(url,headers,"power_mw","get"))
+	checkLS370URL(instrID)
+	return str2num(queryLS370(instrID,command,headers,"power_mw","get"))
 end
 
-function getLS370PIDtemp() // Units: mK
+function getLS370PIDtemp(instrID) // Units: mK
 	// returns the setpoint of the PID loop.
 	// the setpoint is set regardless of the actual state of the PID loop
 	// and one can therefore always read the current setpoint (active or not)
+	string instrID
 	variable temp
-	string headers, payload, url, command, token = "vMqyDIcB"
+	string headers, payload, command, token = "vMqyDIcB"
 	nvar temp_set
 
 	headers = "Content-Type: application/json"
 	payload = "{\"command\": \"SETP?\"}"
 	sprintf command, "command?_at_=%s", token
-	url = generateLS370URL(command)
-	string test = queryLS370(url,headers,"v","post",payload=payload)
+	checkLS370URL(instrID)
+	string test = queryLS370(instrID,command,headers,"v","post",payload=payload)
 	temp = str2num(test[1,inf])*1000
 	temp_set = temp
 
 	return temp
 end
 
-function/s getLS370heaterrange() // Units: AU
+function/s getLS370heaterrange(instrID) // Units: AU
 	// range must be a number between 0 and 8
+	string instrID
 	variable range
-	string command,payload,headers,url,response,token = "vMqyDIcB"
-	
+	string command,payload,headers,response,token = "vMqyDIcB"
+
 	sprintf payload, "{\"command\": \"HTRRNG?\"}", range
 	sprintf command, "command?_at_=%s", token
 	headers = "Content-Type: application/json"
-	url = generateLS370URL(command)
-	response = queryLS370(url,headers,"v","post",payload=payload)
+	checkLS370URL(instrID)
+	response = queryLS370(instrID,command,headers,"v","post",payload=payload)
 	return response[1,inf]
 end
 
-function/s getLS370PIDparameters() // Units: No units
+function/s getLS370PIDparameters(instrID) // Units: No units
 	// returns the PID parameters used.
 	// the retruned values are comma seperated values.
 	// P = {0.001 1000}, I = {0 10000}, D = {0 2500}
+	string instrID
 	nvar p_value,i_value,d_value
-	string headers, payload, url, pid, token = "vMqyDIcB", command
+	string headers, payload, pid, token = "vMqyDIcB", command
 
 	headers = "Content-Type: application/json"
 	payload = "{\"command\": \"PID?\"}"
 	sprintf command, "command?_at_=%s", token
-	url = generateLS370URL(command)
-	pid = queryLS370(url,headers,"v","post",payload=payload)
+	checkLS370URL(instrID)
+	pid = queryLS370(instrID,command,headers,"v","post",payload=payload)
 	p_value = str2num(stringfromlist(0,pid[1,inf],","))
 	i_value = str2num(stringfromlist(1,pid[1,inf],","))
 	d_value = str2num(stringfromlist(2,pid[1,inf],","))
@@ -183,17 +226,18 @@ function/s getLS370PIDparameters() // Units: No units
 	return pid
 end
 
-function getLS370controlmode() // Units: No units
+function getLS370controlmode(instrID) // Units: No units
 	// returns the temperature control mode.
 	// 1: PID, 3: Open loop, 4: Off
+	string instrID
 	nvar pid_mode, pid_led, mcheater_led
-	string headers,payload,url,token = "vMqyDIcB", command,response
+	string headers,payload,token = "vMqyDIcB", command,response
 
 	headers = "Content-Type: application/json"
 	payload = "{\"command\": \"CMODE?\"}"
 	sprintf command, "command?_at_=%s", token
-	url = generateLS370URL(command)
-	response = queryLS370(url,headers,"v","post",payload=payload)
+	checkLS370URL(instrID)
+	response = queryLS370(instrID,command,headers,"v","post",payload=payload)
 	pid_mode = str2num(response[1,inf])
 
 	if(pid_mode == 1)
@@ -214,7 +258,7 @@ function getLS370controlmode() // Units: No units
 	else
 		print "Control mode not in supported modes, turning off heater!"
 		sc_sleep(0.5)
-		setLS370tempcontrolmode(4)
+		setLS370tempcontrolmode(instrID,4)
 	endif
 end
 
@@ -222,28 +266,31 @@ end
 
 // NOT implimented yet!
 
-function getLS370tempDB(plate) // Units: mK
+function getLS370tempDB(instrID,plate) // Units: mK
 	// returns the temperature of the selected "plate".
 	// avaliable plates on BF systems: mc (mixing chamber), still, magnet, 4K, 50K
 	// avaliable plates on IGH systems: mc (mixing chamber), cold plate, still, 1K, sorb
 	// data is queried directly from the SQL database
+	string instrID
 	string plate
 
 end
 
-function getLS370heaterpowerDB(heater) // Units: mW
+function getLS370heaterpowerDB(instrID,heater) // Units: mW
 	// returns the power of the selected heater.
 	// avaliable heaters on BF systems: still (analog 2), mc
 	// avaliable heaters on IGH systems: sorb (analog 1), still (analog 2), mc
 	// data is queried directly from the SQL database
+	string instrID
 	string heater
 end
 
-function getLS370pressureDB(gauge) // Units: mbar
+function getLS370pressureDB(instrID,gauge) // Units: mbar
 	// returns the pressure from the selected pressure gauge
 	// avaliable gauges on BF systems: P1,P2,P3,P4,P5,P6
 	// avaliable gauges on IGH systems: P1,P2,G1,G2,G3
 	// data is queried directly from the SQL database
+	string instrID
 	string gauge
 end
 
@@ -251,12 +298,12 @@ end
 //// Set Functions ////
 //////////////////////
 
-function setLS370tempcontrolmode(mode) // Units: No units
+function setLS370tempcontrolmode(instrID,mode) // Units: No units
 	// sets the temperature control mode
 	// avaliable options are: off (4), PID (1) and Open loop (3)
+	string instrID
 	variable mode
 	nvar pid_mode, pid_led, mcheater_led, mcheater_set, temp_set
-	string command, payload, headers, url
 	svar system, bfchannellookup, ighchannellookup
 	variable channel, interval, maxcurrent
 
@@ -281,85 +328,90 @@ function setLS370tempcontrolmode(mode) // Units: No units
 		PopupMenu tempcontrol, mode=1
 		interval = 10
 		maxcurrent = estimateheaterrangeLS370(temp_set)
-		setLS370PIDcontrol(channel,temp_set,maxcurrent)
-		setLS370exclusivereader(channel,interval)
+		setLS370PIDcontrol(instrID,channel,temp_set,maxcurrent)
+		setLS370exclusivereader(instrID,channel,interval)
 	elseif(mode == 3)
 		pid_led = 0
 		mcheater_led = 1
 		PopupMenu mcheater, mode=1
 		SetVariable mcheaterset, disable=0
-		resetLS370exclusivereader()
+		resetLS370exclusivereader(instrID)
 		sc_sleep(0.5)
-		setLS370cmode(mode)
+		setLS370cmode(instrID,mode)
 	elseif(mode == 4)
 		pid_led = 0
 		mcheater_led = 0
 		PopupMenu mcheater, mode=2, disable=0
 		SetVariable mcheaterset, disable=0
-		resetLS370exclusivereader()
+		resetLS370exclusivereader(instrID)
 		sc_sleep(0.5)
-		setLS370cmode(mode)
+		setLS370cmode(instrID,mode)
 		sc_sleep(0.5)
-		turnoffLS370MCheater()
+		turnoffLS370MCheater(instrID)
 	else
 		abort "Choose between: PID (1), Open loop (3) and off (4)"
 	endif
 	pid_mode = mode
 end
 
-function setLS370PIDcontrol(channel,setpoint,maxcurrent) //Units: mK, mA
+function setLS370PIDcontrol(instrID,channel,setpoint,maxcurrent) //Units: mK, mA
+	string instrID
 	variable channel, setpoint, maxcurrent
-	string payload, command, headers, url, token = "vMqyDIcB"
+	string payload, command, headers, token = "vMqyDIcB"
 	nvar temp_set
-	
+
 	sprintf payload, "{ \"channel\": %d, \"set_point\": %g, \"max_current_ma\": %g, \"max_heater_level\": %s}", channel, setpoint/1000, maxcurrent, "8"
 	headers = "Content-Type: application/json"
 	sprintf command, "set-temperature-control-parameters?_at_=%s", token
-	url = generateLS370URL(command)
-	writeLS370(url,payload,headers)
+	checkLS370URL(instrID)
+	postHTTP(instrID,command,payload,headers)
 	temp_set = setpoint
 end
 
-function setLS370cmode(mode)
+function setLS370cmode(instrID,mode)
 	//PID: 1, open loop: 3, off: 4
+	string instrID
 	variable mode
-	string payload, command, headers, url, token = "vMqyDIcB"
-	
+	string payload, command, headers, token = "vMqyDIcB"
+
 	sprintf payload, "{\"command\": \"CMODE %d\"}", mode
 	headers = "Content-Type: application/json"
 	sprintf command, "command?_at_=%s", token
-	url = generateLS370URL(command)
-	writeLS370(url,payload,headers)
+	checkLS370URL(instrID)
+	postHTTP(instrID,command,payload,headers)
 end
 
-function setLS370exclusivereader(channel,interval) // interval units: ms
+function setLS370exclusivereader(instrID,channel,interval) // interval units: ms
+	string instrID
 	variable channel,interval
-	string command, payload, headers, url, token = "vMqyDIcB"
+	string command, payload, headers, token = "vMqyDIcB"
 
 	sprintf command, "set-exclusive-reader?_at_=%s", token
 	sprintf payload, "{\"channel_label\": \"ch.%s\", \"interval_ms\": \"%s\"}", num2str(channel), num2str(interval)
 	headers = "Content-Type: application/json"
 
-	url = generateLS370URL(command)
-	writeLS370(url,payload,headers)
+	checkLS370URL(instrID)
+	postHTTP(instrID,command,payload,headers)
 end
 
-function resetLS370exclusivereader()
-	string command, payload, headers, url, token = "vMqyDIcB"
+function resetLS370exclusivereader(instrID)
+	string instrID
+	string command, payload, headers, token = "vMqyDIcB"
 
 	sprintf command, "reset-exclusive-reader?_at_=%s", token
 	payload = "{}"
 	headers = "Content-Type: application/json"
 
-	url = generateLS370URL(command)
-	writeLS370(url,payload,headers)
+	checkLS370URL(instrID)
+	postHTTP(instrID,command,payload,headers)
 end
 
 
-function setLS370PIDtemp(temp) // Units: mK
+function setLS370PIDtemp(instrID,temp) // Units: mK
 	// sets the temperature for PID control and heater range
+	string instrID
 	variable temp
-	string command,payload,headers,url,token = "vMqyDIcB"
+	string command,payload,headers,token = "vMqyDIcB"
 	variable interval=10 //ms
 	nvar temp_set
 	svar bfchannellookup, ighchannellookup
@@ -367,37 +419,38 @@ function setLS370PIDtemp(temp) // Units: mK
 	sprintf payload, "{\"command\": \"SETP %g\"}", temp/1000
 	headers = "Content-Type: application/json"
 	sprintf command, "command?_at_=%s", token
-	url = generateLS370URL(command)
-	writeLS370(url,payload,headers)
+	checkLS370URL(instrID)
+	postHTTP(instrID,command,payload,headers)
 	temp_set = temp
 end
 
-function setLS370heaterrange(range) // Units: AU
+function setLS370heaterrange(instrID,range) // Units: AU
 	// range must be a number between 0 and 8
-	variable range
-	string command,payload,headers,url,token = "vMqyDIcB"
-	
+	string instrID,range
+	string command,payload,headers,token = "vMqyDIcB"
+
 	sprintf payload, "{\"command\": \"HTRRNG %d\"}", range
 	sprintf command, "command?_at_=%s", token
 	headers = "Content-Type: application/json"
-	url = generateLS370URL(command)
-	writeLS370(url,payload,headers)
+	checkLS370URL(instrID)
+	postHTTP(instrID,command,payload,headers)
 end
 
-function setLS370PIDparameters(p,i,d) // Units: No units
+function setLS370PIDparameters(instrID,p,i,d) // Units: No units
 	// set the PID parameters for the PID control loop
 	// P = {0.001 1000}, I = {0 10000}, D = {0 2500}
+	string instrID
 	variable p,i,d
 	nvar p_value,i_value,d_value
-	string command,url,payload,headers,cmd, token = "vMqyDIcB"
+	string command,payload,headers,cmd, token = "vMqyDIcB"
 
 	if(0.001 <= p && p <= 1000 && 0 <= i && i <= 10000 && 0 <= d && d <= 2500)
 		sprintf cmd,"PID %s,%s,%s", num2str(p), num2str(i), num2str(d)
 		headers = "Content-Type: application/json"
 		sprintf payload, "{\"command\": \"%s\"}", cmd
 		sprintf command, "command?_at_=%s", token
-		url = generateLS370URL(command)
-		writeLS370(url,payload,headers)
+		checkLS370URL(instrID)
+		postHTTP(instrID,command,payload,headers)
 		p_value = p
 		i_value = i
 		d_value = d
@@ -406,16 +459,17 @@ function setLS370PIDparameters(p,i,d) // Units: No units
 	endif
 end
 
-function setLS370heaterpower(heater,output) //Units: mW
+function setLS370heaterpower(instrID,heater,output) //Units: mW
 	// sets the manual heater output
 	// avaliable heaters on BF systems: mc,still
 	// avaliable heaters on IGH: mc,still,sorb
+	string instrID
 	string heater
 	variable output
 	svar system, bfheaterlookup,ighheaterlookup
 	nvar mcheater_set, stillheater_set, sorbheater_set, stillheater_led
 	variable channel, heater_idx
-	string command, payload, url, headers, token = "vMqyDIcB"
+	string command, payload, headers, token = "vMqyDIcB"
 
 	strswitch(system)
 		case "bfsmall":
@@ -459,22 +513,23 @@ function setLS370heaterpower(heater,output) //Units: mW
 		sprintf command, "set-heater-power?_at_=%s", token
 		mcheater_set = output
 	endif
-	url = generateLS370URL(command)
-	writeLS370(url,payload,headers)
+	checkLS370URL(instrID)
+	postHTTP(instrID,command,payload,headers)
 end
 
-function turnoffLS370MCheater()
+function turnoffLS370MCheater(instrID)
 	// turns off MC heater.
 	// this function can seem unnecessary, but is in some cases need
 	// and therefore it is a good practise to always use it.
-	string command, payload, headers, url, token = "vMqyDIcB"
+	string instrID
+	string command, payload, headers, token = "vMqyDIcB"
 	nvar pid_led, mcheater_led, pid_mode
 
 	sprintf command, "turn-heater-off?_at_=%s", token
 	headers = "Content-Type: application/json"
 	payload = "{}"
-	url = generateLS370URL(command)
-	writeLS370(url,payload,headers)
+	checkLS370URL(instrID)
+	postHTTP(instrID,command,payload,headers)
 	pid_led = 0
 	mcheater_led = 0
 	pid_mode = 4
@@ -483,16 +538,17 @@ function turnoffLS370MCheater()
 	PopupMenu tempcontrol, mode=2, win=Lakeshore
 end
 
-function toggleLS370magnetheater(onoff)
+function toggleLS370magnetheater(instrID,onoff)
 	// toggles the state of the magnet heater on BF #1.
 	// it sets ANALOG 1 to -50% (-5V) in the "on" state
 	// and 0% (0V) in the off state.
 	// ANALOG 1 controls a voltage controlled switch!
+	string instrID
 	string onoff
 	variable output
 	nvar magnetheater_led
 	svar system
-	string command,url,payload,headers,cmd,token = "vMqyDIcB"
+	string command,payload,headers,cmd,token = "vMqyDIcB"
 
 	if(cmpstr(system,"igh") == 0)
 		abort "No heater installed on this system!"
@@ -519,8 +575,8 @@ function toggleLS370magnetheater(onoff)
 	sprintf cmd, "ANALOG 1,1,2,1,1,100.0,0.0,%g", output
 	sprintf payload, "{\"command\":%s}", cmd
 	sprintf command, "command?_at_=%s", token
-	url = generateLS370URL(command)
-	writeLS370(url,payload,headers)
+	checkLS370URL(instrID)
+	postHTTP(instrID,command,payload,headers)
 end
 
 ////////////////////
@@ -552,58 +608,21 @@ function estimateheaterrangeLS370(temp) // Units: mK
 	return maxcurrent
 end
 
-function updateLS370GUI()
+function updateLS370GUI(instrID)
 	// updates all control variables for the main control window
-	getLS370controlmode()
-	sc_sleep(0.5)
-	getLS370PIDtemp()
-	sc_sleep(0.5)
-	getLS370PIDparameters()
-	sc_sleep(0.5)
-	getLS370heaterpower("mc")
-	sc_sleep(0.5)
-	getLS370heaterpower("still")
-	//GetHeaterPowerDB("mc")
-	//GetHeaterPowerDB("still")
-end
+	string instrID
 
-// FIX pressure readings
-
-function/s getLS370status([max_age])
-	// returns loggable parameters to meta-data file
-	variable max_age
-	if(paramisdefault(max_age))
-		max_age=120
-	endif
-	
-	svar system, ighgaugelookup
-	string  buffer="", gauge=""
-	variable i=0
-
-	strswitch(system)
-		case "bfsmall":
-			buffer = addJSONkeyvalpair(buffer,"MC K",num2str(getLS370temp("mc", max_age=max_age)))
-			buffer = addJSONkeyvalpair(buffer,"Still K",num2str(getLS370temp("still", max_age=max_age)))
-			buffer = addJSONkeyvalpair(buffer,"4K Plate K",num2str(getLS370temp("4K", max_age=max_age)))
-			buffer = addJSONkeyvalpair(buffer,"Magnet K",num2str(getLS370temp("magnet", max_age=max_age)))
-			buffer = addJSONkeyvalpair(buffer,"50K Plate K",num2str(getLS370temp("50K", max_age=max_age)))
-//			for(i=1;i<7;i+=1)
-//				gauge = "P"+num2istr(i)
-//				buffer = addJSONkeyvalpair(buffer,gauge,num2str(GetPressureDB(gauge)))
-//			endfor
-			return addJSONkeyvalpair("","BF Small",buffer)
-		case "igh":
-			buffer = addJSONkeyvalpair(buffer,"MC K",num2str(getLS370temp("mc", max_age=max_age)))
-			buffer = addJSONkeyvalpair(buffer,"Cold Plate K",num2str(getLS370temp("cold plate", max_age=max_age)))
-			buffer = addJSONkeyvalpair(buffer,"Still K",num2str(getLS370temp("still", max_age=max_age)))
-			buffer = addJSONkeyvalpair(buffer,"1K Pot K",num2str(getLS370temp("1K", max_age=max_age)))
-			buffer = addJSONkeyvalpair(buffer,"Sorb K",num2str(getLS370temp("sorb", max_age=max_age)))
-//			for(i=1;i<6;i+=1)
-//				gauge = stringfromlist(i,ighgaugelookup)
-//				buffer = addJSONkeyvalpair(buffer,"P"+num2istr(i),num2str(GetPressureDB(gauge)))
-//			endfor
-			return addJSONkeyvalpair("","IGH",buffer)
-	endswitch
+	getLS370controlmode(instrID)
+	sc_sleep(0.5)
+	getLS370PIDtemp(instrID)
+	sc_sleep(0.5)
+	getLS370PIDparameters(instrID)
+	sc_sleep(0.5)
+	getLS370heaterpower(instrID,"mc")
+	sc_sleep(0.5)
+	getLS370heaterpower(instrID,"still")
+	//GetHeaterPowerDB(instrID,"mc")
+	//GetHeaterPowerDB(instrID,"still")
 end
 
 function setLS370system()
@@ -643,26 +662,35 @@ function createLS370globals()
 	variable/g pid_mode = 4
 end
 
-function/s generateLS370URL(command)
+function/s checkLS370URL(instrID)
 	// Generate the command URL
-	string command
+	string instrID
 	svar system
-	string url
 
 	strswitch(system)
 		case "bfsmall":
-			sprintf url, "http://bfsmall-wifi:7777/api/v1/%s", command
+			if(cmpstr(instrID,getLS370URL())==0)
+				// pass
+			else
+				printf "[ERROR]: The URL passed (%s) does not match the BF small URL!\r", instrID
+				abort
+			endif
 			break
 		case "igh":
-			sprintf url, "http://qdash.qdot.lab:7777/api/v1/%s", command
+			if(cmpstr(instrID,getLS370URL())==0)
+				// pass
+			else
+				printf "[ERROR]: The URL passed (%s) does not match the IGH URL!\r", instrID
+				abort
+			endif
 			break
 		case "bfbig":
 			break
 		endswitch
-	return url
 end
 
-function/s GenerateDBURL(data_type,data_label)
+function/s GenerateDBURL(instrID,data_type,data_label)
+	string instrID
 	string data_type,data_label
 	svar system
 	string query_url
@@ -674,84 +702,55 @@ end
 //// Communication ////
 //////////////////////
 
-function/s writeLS370(url,payload,headers)
-	string url,payload,headers
-	string response, error
-
-	URLRequest /TIME=5.0 /DSTR=payload url=url, method=post, headers=headers
-
-	if (V_flag == 0)    // No error
-		response = S_serverResponse // response is a JSON string
-		if (V_responseCode != 200)  // 200 is the HTTP OK code
-		   printf error, "[ERROR]: %s\r", getJSONvalue(response, "error")
-		   return ""
-		else
-			return "" // do nothing
-		endif
-   else
-        abort "HTTP connection error."
-   endif
-end
-
-function/s queryLS370(url,headers,responseformat,method,[payload])
-	// function takes four strings: url,payload,headers,responseformat
-	// url most be generated by GenerateURL(), paylod is a json string containing "key:value" pairs
+function/s queryLS370(instrID,cmd,headers,responseformat,method,[payload])
+	// function takes six strings: instrID,cmd,headers,responseformat,method and payload
+	// paylod is a json string containing "key:value" pairs
 	// headers is always "Content-Type: application/json" and responseformat is the "key" of the returned data.
 	// the returned value is a string.
-	string url,headers,responseformat,method,payload
-	variable ok
-	string response, error, keys
-	
+	string instrID
+	string cmd,headers,responseformat,method,payload
+	string response, keys
+
 	if(cmpstr(method,"get")==0)
-		URLRequest /TIME=5.0 url=url, method=get, headers=headers
+		response = getHTTP(instrID,cmd,headers)
 	elseif(cmpstr(method,"post")==0 && !paramisdefault(payload))
-		URLRequest /TIME=5.0 /DSTR=payload url=url, method=post, headers=headers
+		response = postHTTP(instrID,cmd,payload,headers)
 	else
 		abort "Not a supported method or you forgot to add a payload."
 	endif
 
-	if (V_flag == 0)    // No error
-		response = S_serverResponse // response is a JSON string
-		if (V_responseCode != 200)  // 200 is the HTTP OK code
-		   printf error, "[ERROR]: %s\r", getJSONvalue(response, "error")
-		   return ""
-		else
-		    keys = getJSONkeys(response) // if heater output is 0, we only get time back!
-		    if(findlistitem(responseformat,keys,",",0) == -1)
-		    	return "0"
-		    else
-		    	return getJSONvalue(response, responseformat)
-		    endif
-		endif
-   else
-        printf error, "[ERROR]: HTTP connection error\r"
-        return ""
-   endif
+	keys = getJSONkeys(response) // if heater output is 0, we only get time back!
+	if(findlistitem(responseformat,keys,",",0) == -1)
+		return "0"
+	else
+		return getJSONvalue(response, responseformat)
+	endif
 end
 
-function/s queryLS370DB(query_url)
-	string query_url
-	string headers,url,response
-
-	headers = "Content-Type: application/x-www-form-urlencoded"
-	sprintf url, "http://qdot-server.phas.ubc.ca:8086/query? --data_urlencode \"db=test\" --data_urlencode \"%s\"", query_url
-
-
-	URLRequest /TIME=5.0 url=url, method=get, headers=headers
-
-	if (V_flag == 0)    // No error
-		if (V_responseCode != 200)  // 200 is the HTTP OK code
-		    print "Reading failed!"
-		    return num2str(-1.0)
-		else
-		    response = S_serverResponse
-		    print response
-		endif
-   else
-        print "HTTP connection error."
-        return num2str(-1.0)
-   endif
-end
+// function/s queryLS370DB(instrID,query_url)
+// 	string instrID
+// 	string query_url
+// 	string headers,url,response
+//
+// 	headers = "Content-Type: application/x-www-form-urlencoded"
+// 	sprintf url, "http://qdot-server.phas.ubc.ca:8086/query? --data_urlencode \"db=test\" --data_urlencode \"%s\"", query_url
+//
+//
+// 	URLRequest /TIME=5.0 url=url, method=get, headers=headers
+//
+// 	if (V_flag == 0)    // No error
+// 		if (V_responseCode != 200)  // 200 is the HTTP OK code
+// 		    print "Reading failed!"
+// 		    return num2str(-1.0)
+// 		else
+// 		    response = S_serverResponse
+// 		    print response
+// 		endif
+//    else
+//         print "HTTP connection error."
+//         return num2str(-1.0)
+//    endif
+// end
 
 /////////////////////////
 //// Control Windows ////
@@ -814,6 +813,8 @@ function tempcontrol_control(action,popnum,popstr) : PopupMenuControl
 	variable mode
 	nvar pid_led, mcheater_led, pid_mode
 
+	string instrID = getLS370URL()
+
 	strswitch(popstr)
 		case "On":
 			pid_led = 1
@@ -830,7 +831,7 @@ function tempcontrol_control(action,popnum,popstr) : PopupMenuControl
 			mode = 4
 			break
 	endswitch
-	setLS370tempcontrolmode(mode)
+	setLS370tempcontrolmode(instrID,mode)
 	pid_mode = mode
 end
 
@@ -839,14 +840,18 @@ function tempset_control(action,varnum,varstr,varname) : SetVariableControl
 	variable varnum
 	string varstr, varname
 
-	setLS370PIDtemp(varnum) // mK
+	string instrID = getLS370URL()
+
+	setLS370PIDtemp(instrID,varnum) // mK
 end
 
 function pid_control(action) : ButtonControl
 	string action
 	nvar p_value,i_value,d_value
 
-	setLS370PIDparameters(p_value,i_value,d_value)
+	string instrID = getLS370URL()
+
+	setLS370PIDparameters(instrID,p_value,i_value,d_value)
 end
 
 function mcheater_control(action,popnum,popstr) : PopupMenuControl
@@ -855,16 +860,18 @@ function mcheater_control(action,popnum,popstr) : PopupMenuControl
 	string popstr
 	nvar mcheater_led, mcheater_set
 
+	string instrID = getLS370URL()
+
 	strswitch(popstr)
 		case "On":
 			mcheater_led = 1
-			setLS370tempcontrolmode(3) // set to "open loop"
+			setLS370tempcontrolmode(instrID,3) // set to "open loop"
 			sc_sleep(0.5)
-			setLS370heaterpower("mc",mcheater_set) //mW
+			setLS370heaterpower(instrID,"mc",mcheater_set) //mW
 			break
 		case "Off":
 			mcheater_led = 0
-			turnoffLS370MCheater()
+			turnoffLS370MCheater(instrID)
 			break
 	endswitch
 end
@@ -875,7 +882,9 @@ function mcheaterset_control(action,varnum,varstr,varname) : SetVariableControl
 	string varstr, varname
 	nvar mcheater_led, pid_mode
 
-	setLS370heaterpower("mc",varnum)
+	string instrID = getLS370URL()
+
+	setLS370heaterpower(instrID,"mc",varnum)
 	if(varnum > 0)
 		mcheater_led = 1
 		pid_mode = 3
@@ -893,14 +902,16 @@ function stillheater_control(action,popnum,popstr) : PopupMenuControl
 	string popstr
 	nvar stillheater_led, stillheater_set
 
+	string instrID = getLS370URL()
+
 	strswitch(popstr)
 		case "On":
 			stillheater_led = 1
-			setLS370heaterpower("still",stillheater_set) //mW
+			setLS370heaterpower(instrID,"still",stillheater_set) //mW
 			break
 		case "Off":
 			stillheater_led = 0
-			setLS370heaterpower("still",0) //mW
+			setLS370heaterpower(instrID,"still",0) //mW
 			break
 	endswitch
 end
@@ -911,7 +922,9 @@ function stillheaterset_control(action,varnum,varstr,varname) : SetVariableContr
 	string varstr, varname
 	nvar stillheater_led
 
-	setLS370heaterpower("still",varnum) //mW
+	string instrID = getLS370URL()
+
+	setLS370heaterpower(instrID,"still",varnum) //mW
 	if(varnum > 0)
 		stillheater_led = 1
 		PopupMenu stillheater, mode=1
@@ -927,14 +940,16 @@ function magnetheater_control(action,popnum,popstr) : PopupMenuControl
 	string popstr
 	nvar magnetheater_led
 
+	string instrID = getLS370URL()
+
 	strswitch(popstr)
 		case "On":
 			magnetheater_led = 1
-			toggleLS370magnetheater("on")
+			toggleLS370magnetheater(instrID,"on")
 			break
 		case "Off":
 			magnetheater_led = 0
-			toggleLS370magnetheater("off")
+			toggleLS370magnetheater(instrID,"off")
 			break
 	endswitch
 end
@@ -945,14 +960,16 @@ function sorbheater_control(action,popnum,popstr) : PopupMenuControl
 	string popstr
 	nvar sorbheater_led, sorbheater_set
 
+	string instrID = getLS370URL()
+
 	strswitch(popstr)
 		case "On":
 			sorbheater_led = 1
-			setLS370heaterpower("sorb",sorbheater_set) //mW
+			setLS370heaterpower(instrID,"sorb",sorbheater_set) //mW
 			break
 		case "Off":
 			sorbheater_led = 0
-			setLS370heaterpower("sorb",0) //mW
+			setLS370heaterpower(instrID,"sorb",0) //mW
 			break
 	endswitch
 end
@@ -963,7 +980,9 @@ function sorbheaterset_control(action,varnum,varstr,varname) : SetVariableContro
 	string varstr, varname
 	nvar sorbheater_led
 
-	setLS370heaterpower("sorb",varnum) //mW
+	string instrID = getLS370URL()
+
+	setLS370heaterpower(instrID,"sorb",varnum) //mW
 	if(varnum > 0)
 		sorbheater_led = 1
 		PopupMenu sorbheater, mode=1
@@ -971,6 +990,22 @@ function sorbheaterset_control(action,varnum,varstr,varname) : SetVariableContro
 		sorbheater_led = 0
 		PopupMenu sorbheater, mode=0
 	endif
+end
+
+function/s getLS370URL()
+	svar system
+
+	strswitch(system)
+		case "bfsmall":
+			return "http://bfsmall-wifi:7777/api/v1/"
+			break
+		case "igh":
+			return "http://qdash.qdot.lab:7777/api/v1/"
+			break
+		case "bfbig":
+			return ""
+			break
+	endswitch
 end
 
 //// System set control wondow ////
@@ -1006,5 +1041,48 @@ function selectsystem_control(action,popnum,popstr) : PopupMenuControl
 			dowindow/k AskUserSystem
 			execute("AskUserSystem()")
 			break
+	endswitch
+end
+
+//////////////////
+///// Status /////
+//////////////////
+
+function/s getLS370status(instrID, [max_age])
+	// FIX pressure readings
+	// returns JSON string with current status
+	string instrID
+	variable max_age
+	if(paramisdefault(max_age))
+		max_age=120
+	endif
+
+	svar system, ighgaugelookup
+	string  buffer="", gauge=""
+	variable i=0
+
+	strswitch(system)
+		case "bfsmall":
+			buffer = addJSONkeyvalpair(buffer,"MC K",num2str(getLS370temp(instrID, "mc", max_age=max_age)))
+			buffer = addJSONkeyvalpair(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age=max_age)))
+			buffer = addJSONkeyvalpair(buffer,"4K Plate K",num2str(getLS370temp(instrID, "4K", max_age=max_age)))
+			buffer = addJSONkeyvalpair(buffer,"Magnet K",num2str(getLS370temp(instrID, "magnet", max_age=max_age)))
+			buffer = addJSONkeyvalpair(buffer,"50K Plate K",num2str(getLS370temp(instrID, "50K", max_age=max_age)))
+//			for(i=1;i<7;i+=1)
+//				gauge = "P"+num2istr(i)
+//				buffer = addJSONkeyvalpair(buffer,gauge,num2str(GetPressureDB(instrID,gauge)))
+//			endfor
+			return addJSONkeyvalpair("","BF Small",buffer)
+		case "igh":
+			buffer = addJSONkeyvalpair(buffer,"MC K",num2str(getLS370temp(instrID, "mc", max_age=max_age)))
+			buffer = addJSONkeyvalpair(buffer,"Cold Plate K",num2str(getLS370temp(instrID, "cold plate", max_age=max_age)))
+			buffer = addJSONkeyvalpair(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age=max_age)))
+			buffer = addJSONkeyvalpair(buffer,"1K Pot K",num2str(getLS370temp(instrID, "1K", max_age=max_age)))
+			buffer = addJSONkeyvalpair(buffer,"Sorb K",num2str(getLS370temp(instrID, "sorb", max_age=max_age)))
+//			for(i=1;i<6;i+=1)
+//				gauge = stringfromlist(i,ighgaugelookup)
+//				buffer = addJSONkeyvalpair(buffer,"P"+num2istr(i),num2str(GetPressureDB(instrID,gauge)))
+//			endfor
+			return addJSONkeyvalpair("","IGH",buffer)
 	endswitch
 end

@@ -1,12 +1,6 @@
 ﻿#pragma TextEncoding = "UTF-8"
 #pragma rtGlobals=3		// Use modern global access method and strict wave access.
 
-
-// TODO:
-// change all VISARead calls to viRead(...)
-// change all VISAWrite calls to viWrite(...)
-
-
 //////////////////////////////
 /// generic VISA functions ///
 //////////////////////////////
@@ -34,7 +28,7 @@ threadsafe function VISAerrormsg(descriptor, localRM, status)
 	viStatusDesc(localRM, status, desc)
 	Printf "%s error (%x): %s\r", descriptor, status, desc
 
-End
+end
 
 function openResourceManager()
 	variable status, localRM
@@ -56,120 +50,75 @@ function openResourceManager()
 
 end
 
-function openInstr(var_name, instrDesc, [localRM, verbose, timeout])
-	string var_name, instrDesc  // name for global variable, VISA resource name (GPIB0::5::INSTR)
-	variable localRM, verbose, timeout
-	variable instrID, status
-	string error
+function openVISAinstr(mandatory, [options, localRM, verbose])
 
+	string mandatory //  mandatory: "name= ,instrID= ,visa_address= "
+	string options   //  options: "test_query= ,baudrate= ,stopbits= ,databits= ,parity= ,timeout= "
+
+	variable localRM, verbose
+	
+	if(paramisdefault(options))
+		options=""
+	endif
+	
 	if(paramisdefault(verbose))
 		verbose=1
 	elseif(verbose!=1)
 		verbose=0
 	endif
-
+	
 	if(paramisdefault(localRM))
 		nvar globalRM
 		localRM = globalRM
 	endif
 
-	if(paramisdefault(timeout))
-		timeout = 100
-	endif
-
+	///// create VISA instance /////
+	string name = StringByKey("name", mandatory, "=", ",")
+	string var_name = StringByKey("instrID", mandatory, "=", ",")
+	string instrDesc = StringByKey("visa_address", mandatory, "=", ",")
+	
+	variable instrID, status
+	string error
 	status = viOpen(localRM,instrDesc,0,0,instrID)
 	if (status < 0)
 		VISAerrormsg("openInstr() -- viOpen", localRM, status)
 		abort
 	else
-		visaSetTimeout(instrID, timeout)
 		variable /g $var_name = instrID
 		if(verbose)
-			printf "%s connected as %s\r", instrDesc, var_name
+			printf "%s (%s) connected as %s\r", name, instrDesc, var_name
 		endif
 	endif
 
-end
-
-function initVISAinstruments(instrWave, [verbose])
-	// each column (d=1) in instrWave represents an instrument
-	// there should be 3 rows (d=0) for each column
-	//    with 'variable name', 'VISA address', and 'test function'
-
-	wave /t instrWave
-	variable verbose
-
-	if(dimsize(instrWave,0)!=4)
-		abort "instrWave must have 4 rows for each column -- {'variable name', 'VISA address', 'test function', 'setup function'}"
-	endif
-
-	if(paramisdefault(verbose))
-		verbose=1
-	elseif(verbose!=1)
-		verbose=0
-	endif
-
-	// open resource manager
-	nvar /z globalRM
-	if(!nvar_exists(globalRM))
-		// if globalRM does not exist
-		// open RM and create the global variable
-		openResourceManager()
-		nvar globalRM
-	else
-		// if globalRM does exist
-		// close all connection
-		// reopen everything
-		closeAllInstr()
-		openResourceManager()
-	endif
-
-	variable numInstr = dimsize(instrWave,1), i=0
-	string response
-	for(i=0;i<numInstr;i++)
-
-		if(strlen(instrWave[1][i])>0)
-			// open VISA connection to instrument
-			openInstr(instrWave[0][i], instrWave[1][i], localRM = globalRM, verbose = verbose)
-			nvar inst = $instrWave[0][i]
-		else
-			// if the address was not provided, just assume 
-			// a global variable should be created and move on
-			variable /g $instrWave[0][i] = 0
-			if(verbose)
-				printf "created global variable %s\r", instrWave[0][i]
-			endif
-		endif
+	// look for optional parameters and set them
+	if(strlen(options)!=0)
+	
+		setVISAoptions(instrID,options)
+	
+		// run test query
+		string cmd
+		cmd = StringByKey("test_query",options,"=", ",")
+		if(strlen(cmd)>0)
 		
-		if(strlen(instrWave[3][i])!=0)
-			execute(instrWave[3][i]) // execute
-		endif
-		
-		if(strlen(instrWave[1][i])==0)
-			// get out of here with that
-			// get variable
-			continue
-		endif 
-		
-		// test block
-		if( (strlen(instrWave[2][i])==0) && (strlen(instrWave[1][i])>0) )
-			if(verbose)
-				print "\t-- No test\r" + instrWave[2][i]
-			endif
-		else
-			response = queryInstr(inst, instrWave[2][i]+"\r\n", read_term = "\r\n") // all the term characters!
+			string response = queryInstr(instrID, cmd+"\r\n") // throw a bunch of write term characters at it
+			
 			if(cmpstr(TrimString(response), "NaN")==0)
 				abort
 			endif
 			if(verbose)
-				printf "\t-- %s responded to %s with: %s\r", instrWave[0][i], instrWave[2][i], response
+				printf "\t-- %s responded to %s with: %s\r", name, cmd, response
+			endif
+		else
+			if(verbose)
+				printf "\t-- No test\r"
 			endif
 		endif
-		sleep /T 1
-	endfor
+		
+	endif
+	
 end
 
-function closeInstr(instrID)
+function closeVISAInstr(instrID)
 	variable instrID
 	string error
 
@@ -183,7 +132,7 @@ function closeInstr(instrID)
 
 end
 
-function closeAllInstr()
+function closeAllVISA()
 	// closing the current VISA session will close all instruments
 	nvar /z globalRM
 	if(!nvar_exists(globalRM))
@@ -192,6 +141,61 @@ function closeAllInstr()
 	else
 		viClose(globalRM)
 	endif
+end
+
+//////////////////
+/// HTTP INSTR ///
+//////////////////
+
+
+function openHTTPinstr(mandatory, [options, verbose])
+	string mandatory // mandatory: "name= ,instrID= ,url = "
+	string options   // options: "test_ping= "
+	variable verbose
+
+	// create global variable
+	string name = StringByKey("name", mandatory, "=", ",")
+	string url = StringByKey("url", mandatory, "=", ",")
+	string var_name = StringByKey("instrID", mandatory, "=", ",")
+	
+	string /g $var_name = url
+	if(verbose)
+		printf "%s (%s) connected as %s\r", name, url, var_name
+	endif
+
+	
+	if(paramisdefault(options))
+		options=""
+	endif
+	
+	if(paramisdefault(verbose))
+		verbose=1
+	elseif(verbose!=1)
+		verbose=0
+	endif
+	
+
+	if(strlen(options)>0)
+	
+		// run test query
+		string cmd
+		cmd = StringByKey("test_ping",options,"=", ",")
+		if(strlen(cmd)>0)
+			
+			// do something here with that command
+			string response = ""
+			
+			if(verbose)
+				printf "\t-- %s responded with: %s\r", name, response
+			endif
+		else
+			if(verbose)
+				printf "\t-- No test\r"
+			endif
+		endif
+
+	endif
+
 end
 
 ////////////////////////
@@ -205,10 +209,10 @@ threadsafe function writeInstr(instrID, cmd)
 
     variable count = strlen(cmd) // strlen is a problem
                                  // with non-ascii characters
-                                 // it does not equal numBytes                               
-                                 
+                                 // it does not equal numBytes
+
     variable return_count = 0    // how many bytes were written
-    variable status = viWrite(instrID, cmd, count, return_count) 
+    variable status = viWrite(instrID, cmd, count, return_count)
     if (status)
 		VISAerrormsg("writeInstr() -- viWrite", instrID, status)
     	return NaN // abort not supported in threads (v7)
@@ -216,7 +220,7 @@ threadsafe function writeInstr(instrID, cmd)
 
 end
 
-threadsafe function /s readInstr(instrID, [read_term, read_bytes])
+threadsafe function/s readInstr(instrID, [read_term, read_bytes])
 	// generic error checking read function
 	variable instrID, read_bytes
 	string read_term
@@ -226,7 +230,7 @@ threadsafe function /s readInstr(instrID, [read_term, read_bytes])
         // read termination character read_term
         visaSetReadTerm(instrID, read_term)
         visaSetReadTermEnable(instrID, 1)
-       
+
     else
         // in this case it will read until some END signal
         // specified by the interface being used
@@ -265,6 +269,45 @@ threadsafe function/s queryInstr(instrID, cmd, [read_term, delay])
     endif
 
 	return response
+end
+
+function/s postHTTP(instrID,cmd,payload,headers)
+	string instrID, cmd, payload, headers
+	string response, error
+
+	URLRequest /TIME=5.0 /DSTR=payload url=instrID+cmd, method=post, headers=headers
+
+	if (V_flag == 0)    // No error
+		response = S_serverResponse // response is a JSON string
+		if (V_responseCode != 200)  // 200 is the HTTP OK code
+		   printf error, "[ERROR]: %s\r", getJSONvalue(response, "error")
+		   return ""
+		else
+			return response
+		endif
+   else
+        abort "HTTP connection error."
+   endif
+end
+
+function/s getHTTP(instrID,cmd,headers)
+	string instrID, cmd, headers
+	string response, error
+
+	URLRequest /TIME=5.0 url=instrID+cmd, method=get, headers=headers
+
+	if (V_flag == 0)    // No error
+		response = S_serverResponse // response is a JSON string
+		if (V_responseCode != 200)  // 200 is the HTTP OK code
+		   printf error, "[ERROR]: %s\r", getJSONvalue(response, "error")
+		   return ""
+		else
+			return response
+		endif
+   else
+    	print "HTTP connection error."
+		return ""
+   endif
 end
 
 ////////////
@@ -309,145 +352,6 @@ function listGPIBinstr()
 	endfor
 
 end
-
-//function autoInitGPIB()
-//	variable status, findlist=0, instrcnt=0, i=0
-//	string instrDesc="", instrtype, instrname, error, summary
-//	variable instrID
-//	string/g serialinfo = "\rSerial instruments:\r\t"
-//
-//	// check for resource manager
-//	nvar /z globalRM
-//	if(!nvar_exists(globalRM))
-//		openResourceManager()
-//		nvar globalRM
-//	endif
-//
-//	make/o/t/n=30 idwave=""
-//	make/o/n=5 gpibCount=0  // n=5 refers to how many known instrument
-//									// types there are. see DetermineGPIBInstrType()
-//
-//	// create list of GPIB instruments
-//	status = viFindRsrc(globalRM,"GPIB?*INSTR",findlist,instrcnt,instrDesc)
-//	if(status < 0)
-//		viStatusDesc(globalRM, status, error)
-//		printf "viFindRsrc error (GPIB): %s\r", error
-//		return 0
-//	elseif(instrcnt==0)
-//		printf "viFindRsrc found no GPIB instruments to connect"
-//		return 0
-//	endif
-//
-//	// connect GPIB instruments
-//	for(i=0;i<instrcnt;i+=1)
-//
-//		if(i!=0)
-//			viFindNext(findlist,instrDesc) // get the next instrument descriptor
-//		endif
-//
-//		instrID = openinstr(globalRM,instrDesc)
-//		instrtype = DetermineGPIBInstrType(instrDesc,globalRM,instrID)
-//		instrname = CreateGPIBInstrID(instrtype,instrDesc,instrID)
-//		idwave[i] = instrname
-//	endfor
-//	CreateGPIBSummary(instrcnt)
-//
-//	return instrcnt
-//end
-
-//function/s DetermineGPIBInstrType(instrDesc,localRM,instrID)
-//	string instrDesc
-//	variable localRM,instrID
-//	string answer_long, answer, instrtype
-//	wave gpibCount
-//
-//	answer_long = QueryInstr(instrID,"*IDN?")
-//
-//	answer = stringfromlist(1,answer_long,",")
-//	strswitch(answer)
-//		case "SR830": // SR830 lockin
-//			instrtype = "srs"
-//			gpibCount[0] += 1
-//			break
-//		case "MODEL 2400": // Keithley 2400
-//			instrtype = "k2400"
-//			gpibCount[1] += 1
-//			break
-//		case "34401A": // HP34401A DMM
-//			instrtype = "dmm"
-//			gpibCount[2] += 1
-//			break
-//		case "3478A": // HP3478A DMM FIX!
-//			instrtype = "dmm"
-//			gpibCount[2] += 1
-//			break
-//		case "33250A": // Agilent AWG 33250A
-//			instrtype = "awg"
-//			gpibCount[3] += 1
-//			break
-//		default:
-//			instrtype = "unknown"
-//			gpibCount[4] += 1
-//			break
-//	endswitch
-//
-//	return instrtype
-//end
-
-//function/s CreateGPIBInstrID(instrtype,instrDesc,instrID)
-//	string instrtype, instrDesc
-//	variable instrID
-//	string instrname, expr, gpib_address, gpib_board
-//
-//	expr = "GPIB([[:digit:]])::([[:digit:]]+)::INSTR"
-//	splitstring/e=(expr) instrDesc, gpib_board, gpib_address
-//	instrname = instrtype+gpib_address
-//	variable/g $instrname = instrID
-//
-//	return instrname
-//end
-
-//function/s CreateGPIBSummary(instrcnt)
-//	variable instrcnt
-//	string header, expr, type, gpib_address
-//	string srsline, k2400line, dmmline, awgline, unknownline
-//	string srsid = "", k2400id = "", dmmid = "", awgid = "", unknownid = ""
-//	variable i
-//
-//	wave /t idwave
-//	wave gpibCount
-//
-//	expr = "([[:alpha:]]+)([[:digit:]]+)"
-//	for(i=0;i<instrcnt;i+=1)
-//			splitstring/E=(expr) idwave[i], type, gpib_address
-//			strswitch(type)
-//				case "srs":
-//					srsid += idwave[i]+", "
-//					break
-//				case "k":
-//					k2400id += idwave[i]+", "
-//					break
-//				case "dmm":
-//					dmmid += idwave[i]+", "
-//					break
-//				case "awg":
-//					awgid += idwave[i]+", "
-//					break
-//				case "unknown":
-//					unknownid += idwave[i]+", "
-//					break
-//			endswitch
-//	endfor
-//
-//	header = "\rGPIB instruments connected to the setup:\r\t"
-//	sprintf srsline, "%d SR830's are connected. They are: %s\r\t", gpibCount[0], srsid
-//	sprintf k2400line, "%d Keithley's are connected. They are: %s\r\t", gpibCount[1], k2400id
-//	sprintf dmmline, "%d DMM's are connected. They are: %s\r\t", gpibCount[2], dmmid
-//	sprintf awgline, "%d AWG's are connected. They are: %s\r\t", gpibCount[3], awgid
-//	sprintf unknownline, "%d unknown instruments are connected. They are: %s", gpibCount[4], unknownid
-//
-//	print header+srsline+k2400line+dmmline+awgline+unknownline
-//end
 
 function getAddressGPIB(instrID)
 	variable instrID
@@ -534,6 +438,49 @@ end
 /// VISA ATTR Set/Get ///
 /////////////////////////
 
+function setVISAoptions(instrID,options)
+	variable instrID
+	string options
+	variable status=0
+
+	variable i=0
+	string keyval="", reg="(.*)=(.*)", key="", value=""
+	for(i=0;i<ItemsInList(options, ",");i+=1)
+		
+		// get key/value from list
+		keyval = StringFromList(i, options, ",")
+		splitstring/E=reg keyval, key, value
+		value = TrimString(value)
+		
+		if(strlen(value)==0)
+			continue // if there is no value, move on
+		endif
+		
+		strswitch(key)
+			case "baudrate":
+			    status = visaSetBaudRate(instrID, str2num(value))
+			    continue
+			case "stopbits":
+			    status = visaSetStopBits(instrID, str2num(value))
+			    continue
+			case "databits":
+			    status = visaSetDataBits(instrID, str2num(value))
+			    continue
+			case "parity":
+			    status = visaSetParity(instrID, str2num(value))
+			    continue
+			case "timeout":
+			    status = visaSetTimeout(instrID, str2num(value))
+			    continue
+		endswitch
+		
+		if(status<0)
+			VISAerrormsg("viSetAttribute", instrID, status)
+		endif
+		
+	endfor
+end
+
 threadsafe function visaSetReadTerm(instrID, termChar)
 	// set the read termination character for this instrument
 	variable instrID	// An instrument referenced obtained from viOpen
@@ -547,7 +494,7 @@ end
 threadsafe function visaSetReadTermEnable(instrID, enable)
 	// enable use of read termination character
 	variable instrID	// An instrument referenced obtained from viOpen
-	variable enable     // 1 = yes, 0 = no
+	variable enable   // 1 = yes, 0 = no
 
 	variable status
 	status = viSetAttribute(instrID, VI_ATTR_TERMCHAR_EN, enable)
@@ -583,11 +530,21 @@ end
 
 function visaSetStopBits(instrID, bits)
 	// acceptable values for stop bits:
-    //    10 (1 bit), 15 (1.5 bits), and 20 (2 bits)
+    //    1 (1 bit), 1.5 (1.5 bits), and 2.0 (2 bits)
 	variable instrID	// An instrument referenced obtained from viOpen
 	variable bits
 
+	variable stopbits = 1
+	if(bits == 1)
+		stopbits = 10
+	elseif(bits == 1.5)
+		stopbits = 15
+	elseif(bits == 	2)
+		stopbits = 20
+	endif
+	
 	variable status = viSetAttribute(instrID, VI_ATTR_ASRL_STOP_BITS, bits)
+	
 	return status
 end
 
@@ -604,12 +561,12 @@ end
 
 function visaSetParity(instrID, parity)
 	// acceptable values for parity:
-   	// VI_ASRL_PAR_NONE (0)
+   // VI_ASRL_PAR_NONE (0)
 	// VI_ASRL_PAR_ODD (1)
 	// VI_ASRL_PAR_EVEN (2)
 	// VI_ASRL_PAR_MARK (3)
 	// VI_ASRL_PAR_SPACE (4)
-	
+
 	variable instrID	// An instrument referenced obtained from viOpen
 	variable parity
 
@@ -618,6 +575,214 @@ function visaSetParity(instrID, parity)
 	return status
 end
 
+//////////////////////
+/// SETUP FROM INI ///
+//////////////////////
+
+function/s singleHTTPFromINI(index, [verbose])
+	variable index, verbose
+	
+	if(paramisdefault(verbose))
+		verbose = 1
+	endif
+
+	string mandatory="name=,instrID=,url="
+	string optional="test_ping="
+	
+	variable sub_index = index+1, manKeyCnt=0
+	string key="", instrName=""
+
+	wave/t ini_text
+	wave ini_type
+
+	do
+		if(ini_type[sub_index] == 2 && ini_type[sub_index+1] == 3)
+			key = ini_text[sub_index]
+			
+			if(cmpstr(key,"name")==0)
+				instrName = ini_text[sub_index+1]
+			endif
+						
+			if(WhichListItem(key+"=", mandatory, ",")>-1)
+				mandatory = ReplaceStringByKey(key, mandatory, ini_text[sub_index+1], "=", ",")	
+				manKeyCnt+=1
+
+			elseif(WhichListItem(key+"=", optional, ",")>-1)
+				optional = ReplaceStringByKey(key, optional, ini_text[sub_index+1], "=", ",")
+
+			else
+				if(verbose)
+					printf "[WARNING]: The key (%s) is not recognized (or duplicate) and will be ignored!\r", key
+				endif
+			endif
+			
+		endif
+
+		sub_index+=1
+		if(sub_index>numpnts(ini_type)-1)
+			break
+		endif
+	while(ini_type[sub_index]!=1) // stop at next section
+	
+	if(manKeyCnt!=itemsinlist(mandatory,","))
+		print "[ERROR] Missing required keys in setupHTTPFromINI()!"
+		abort
+	else // found all keys
+		openHTTPinstr(mandatory, options=optional, verbose=verbose)
+	endif
+
+	return instrName
+end
+
+function/s singleVISAFromINI(index,localRM,[verbose])
+	variable index, localRM, verbose
+	
+	if(paramisdefault(verbose))
+		verbose = 1
+	endif
+	
+	string mandatory="name=,instrID=,visa_address="
+	string optional="test_query=,baudrate=,stopbits=,databits=,parity=,readterm=,timeout="
+	// write term not included
+	// our default is to set it to "" and put any required term characters in the instr driver
+	
+	variable sub_index = index+1, manIdx=0, optIdx=0, manKeyCnt=0
+	string key="", instrName=""
+	
+	wave/t ini_text
+	wave ini_type
+
+	do
+		if(ini_type[sub_index] == 2 && ini_type[sub_index+1] == 3)
+			key = ini_text[sub_index]
+			
+			if(cmpstr(key,"name")==0)
+				instrName = ini_text[sub_index+1]
+			endif
+						
+			if(WhichListItem(key+"=", mandatory, ",")>-1)
+				mandatory = ReplaceStringByKey(key, mandatory, ini_text[sub_index+1], "=", ",")	
+				manKeyCnt+=1
+
+			elseif(WhichListItem(key+"=", optional, ",")>-1)
+				optional = ReplaceStringByKey(key, optional, ini_text[sub_index+1], "=", ",")
+
+			else
+				if(verbose)
+					printf "[WARNING]: The key (%s) is not recognized (or duplicate) and will be ignored!\r", key
+				endif
+			endif
+			
+		endif
+		
+		sub_index+=1
+		if(sub_index>numpnts(ini_type)-1)
+			break
+		endif
+	while(ini_type[sub_index]!=1) // stop at next section
+	
+	if(manKeyCnt!=itemsinlist(mandatory,","))
+		print "[ERROR] Missing required keys in setupVISAFromINI()!"
+		abort
+	else // found all keys
+		openVISAinstr(mandatory, options=optional, localRM=localRM, verbose=verbose)
+	endif
+	
+	return instrName
+end
+
+function /s loadInstrsFromINI([iniFile, path, verbose])
+	// load all instruments from iniFile located in path
+	// if iniFile is specified, it will be reloaded into ini_type and ini_text
+	// otherwise the function will use the current content of those waves
+	string iniFile, path
+	variable verbose
+	
+	if(paramisdefault(path))
+		path = "data"
+	endif
+	
+	if(!paramisdefault(iniFile))
+		loadINIconfig(iniFile, path)
+	endif
+	
+	if(paramisdefault(verbose))
+		verbose = 1
+	endif
+	
+	wave ini_type
+	wave /t ini_text
+	
+	// open resource manager
+ 	nvar /z globalRM
+ 	if(!nvar_exists(globalRM))
+ 		// if globalRM does not exist
+ 		// open RM and create the global variable
+ 		openResourceManager()
+ 		nvar globalRM
+ 	else
+ 		// if globalRM does exist
+ 		// close all connection
+ 		// reopen everything
+ 		closeAllVISA()
+ 		openResourceManager()
+ 	endif
+ 	
+ 	string instrList = ""
+ 	variable i=0
+ 	for(i=0;i<numpnts(ini_type);i+=1)
+	
+		if(ini_type[i]==1)
+
+			strswitch(ini_text[i])
+			
+				case "[visa-instrument]":
+					instrList += singleVISAFromINI(i,globalRM,verbose=verbose)+","
+		 			continue
+		 			
+ 				case "[http-instrument]":
+ 					instrList += singleHTTPFromINI(i)+","
+ 					continue
+
+			endswitch
+			
+		endif
+		
+	endfor
+	
+	return instrList
+end
+	 
+function loadGUIsINI(iniIdx, [instrList])
+	// runs GUI functions as specified in INI file (loaded into ini_text, ini_type)
+	// if instrList is passed, then the key must be in instrList for the val(function) to be executed
+	variable iniIdx
+	string instrList
+	
+	if(paramisdefault(instrList))
+		instrList=""
+	endif
+	
+	variable sub_index = iniIdx+1
+	wave/t ini_text
+	wave ini_type
+	
+	do
+		if(ini_type[sub_index] == 2 && ini_type[sub_index+1] == 3)
+			if(strlen(instrList)==0 || findlistitem(ini_text[sub_index],instrList,",",0,0))
+				execute(ini_text[sub_index+1])
+			else
+				printf "[WARNING] GUI key \"%s\" not recognized or instrument not loaded" ini_text[sub_index]
+			endif
+		endif
+		
+		sub_index+=1
+		if(sub_index>numpnts(ini_type)-1)
+			break
+		endif
+	while(ini_type[sub_index]!=1)
+	
+end
 
 //////////////////////
 /// VISA CONSTANTS ///

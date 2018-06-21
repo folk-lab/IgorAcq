@@ -5,7 +5,54 @@
 
 // TODO:
 //    Figure out how to interpret binary responses in error and status strings
-//    Test async read function
+
+/////////////////////////
+///// setup HP3478A /////
+/////////////////////////
+
+function openHP3478Aconnection(instrID, visa_address, [verbose])
+	// works for GPIB -- may need to add some more 'option' paramters if using serial
+	//                -- does not hurt to send extra parameters when using GPIB, they are ignored
+	// instrID is the name of the global variable that will be used for communication
+	// visa_address is the VISA address string, i.e. GPIB0::23::INSTR
+	string instrID, visa_address
+	variable verbose
+	
+	if(paramisdefault(verbose))
+		verbose=1
+	elseif(verbose!=1)
+		verbose=0
+	endif
+	
+	variable localRM
+	variable status = viOpenDefaultRM(localRM) // open local copy of resource manager
+	if(status < 0)
+		VISAerrormsg("open HP3478A connection:", localRM, status)
+		abort
+	endif
+	
+	string comm = ""
+	sprintf comm, "name=HP3478A,instrID=%s,visa_address=%s" instrID, visa_address
+	string options = ""
+	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
+	
+end
+
+function  setup3478Adcvolts(instrID, range, linecycles)
+	// setup dmm to take dc voltage readings
+	// Ranges: 0.03, 0.3, 3, 30, 300V
+	// Linecycles: 0.1, 1, 10 (60Hz cycles)
+	// autozero off (set in this function) with 1NPLC gives 5.5 digits of resolution
+	// according to the manual
+	// this is a pretty good default and makes the read time comparable to an srs830
+	Variable instrID, range, linecycles
+
+	writeInstr(instrID, "F1\n")   // set to measure DC voltage
+	set3478Arange(instrID, range)     // set range
+	set3478Arate(instrID, linecycles) // set NPLC
+	writeInstr(instrID, "Z0\n")   // autozero off
+
+end
 
 ///////////////////
 ///// set/get /////
@@ -51,22 +98,6 @@ function set3478Arate(instrID, linecycles)
 	endif
 
 	writeInstr(instrID, cmd+"\n")
-end
-
-function  setup3478Adcvolts(instrID, range, linecycles)
-	// setup dmm to take dc voltage readings
-	// Ranges: 0.03, 0.3, 3, 30, 300V
-	// Linecycles: 0.1, 1, 10 (60Hz cycles)
-	// autozero off (set in this function) with 1NPLC gives 5.5 digits of resolution
-	// according to the manual
-	// this is a pretty good default and makes the read time comparable to an srs830
-	Variable instrID, range, linecycles
-
-	writeInstr(instrID, "F1\n")   // set to measure DC voltage
-	set3478Arange(instrID, range)     // set range
-	set3478Arate(instrID, linecycles) // set NPLC
-	writeInstr(instrID, "Z0\n")   // autozero off
-
 end
 
 function set3478Atext(instrID, text)

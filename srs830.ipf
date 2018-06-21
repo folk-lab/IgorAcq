@@ -7,6 +7,38 @@
 // Units: mV, nA or Hz
 // Written by Christian/Nik, 2018-05-01
 
+/////////////////////////
+/// SRS specific COMM ///
+/////////////////////////
+
+function openSRSconnection(instrID, visa_address, [verbose])
+	// works for GPIB -- may need to add some more 'option' paramters if using serial
+	//                -- does not hurt to send extra parameters when using GPIB, they are ignored
+	// instrID is the name of the global variable that will be used for communication
+	// visa_address is the VISA address string, i.e. GPIB0::1::INSTR
+	string instrID, visa_address
+	variable verbose
+	
+	if(paramisdefault(verbose))
+		verbose=1
+	elseif(verbose!=1)
+		verbose=0
+	endif
+	
+	variable localRM
+	variable status = viOpenDefaultRM(localRM) // open local copy of resource manager
+	if(status < 0)
+		VISAerrormsg("open SRS connection:", localRM, status)
+		abort
+	endif
+	
+	string comm = ""
+	sprintf comm, "name=SRS,instrID=%s,visa_address=%s" instrID, visa_address
+	string options = "test_query=*IDN?"
+	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
+	
+end
+
 /////////////////////////////
 //// Sync get functions ////
 ////////////////////////////

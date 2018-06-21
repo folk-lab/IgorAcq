@@ -11,16 +11,30 @@
 /// BabyDAC specific COMM ///
 /////////////////////////////
 
-function bdCommSetup(instrID)
-	// baud=57600, databits=8, stopbits=1, parity=0
-
-	variable instrID
-
-  visaSetBaudRate(instrID, 57600)
-  visaSetDataBits(instrID, 8)
-  visaSetStopBits(instrID, 10)
-  visaSetParity(instrID, 0)
-
+function openBabyDACconnection(instrID, visa_address, [verbose])
+	// instrID is the name of the global variable that will be used for communication
+	// visa_address is the VISA address string, i.e. ASRL1::INSTR
+	string instrID, visa_address
+	variable verbose
+	
+	if(paramisdefault(verbose))
+		verbose=1
+	elseif(verbose!=1)
+		verbose=0
+	endif
+	
+	variable localRM
+	variable status = viOpenDefaultRM(localRM) // open local copy of resource manager
+	if(status < 0)
+		VISAerrormsg("open BD connection:", localRM, status)
+		abort
+	endif
+	
+	string comm = ""
+	sprintf comm, "name=BabyDAC,instrID=%s,visa_address=%s" instrID, visa_address
+	string options = "baudrate=57600,databits=8,stopbits=1,parity=0"
+	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
+	
 end
 
 /////////////////////////////////
@@ -42,7 +56,7 @@ function InitBabyDACs(instrID, boards, ranges, [custom])
 	// if all boards have the same range, you can pass just one number
 	// otherwise number of boards must equal number of ranges given
 
-  variable instrID, custom
+	variable instrID, custom
 	string boards, ranges
 	string /g bd_controller_addr = getResourceAddress(instrID) // for use by window functions
 	variable /g bd_ramprate = 200 // default ramprate
@@ -50,11 +64,6 @@ function InitBabyDACs(instrID, boards, ranges, [custom])
 	if(paramisdefault(custom))
 		custom = 0
 	endif
-
-    // setup serial port attributes
-	bdCommSetup(instrID) // setup DAC com port
-						  // possibly redundant if setup done with ScanController_VISA
-						  // but it doesn't hurt (or take any time) to do it again
 
     // functions to handle a bunch of ugly waves
     //     these keep track of the current state of the outputs
@@ -473,7 +482,7 @@ threadsafe function /WAVE readBytesBD(instrID, nBytes)
 	for(i=0;i<nBytes;i+=1)
 		response_wave[i] = readSingleByteBD(instrID)
 	endfor
-	
+
 	return response_wave
 
 end
@@ -945,7 +954,7 @@ threadsafe function ReadBDadc(instrID, channel, board_number)
 			return NaN
 		endif
 	while(1)
-	
+
 	wave response_wave = ReadBytesBD(instrID, 5)
 	reading = bdReading2Voltage(response_wave[0], response_wave[1], response_wave[2])
 
@@ -1016,16 +1025,9 @@ function update_BabyDAC(action) : ButtonControl
 	nvar bd_num_custom
 
 	// open temporary connection to babyDAC
-    svar bd_controller_addr
-    variable status, localRM
-
-    status = viOpenDefaultRM(localRM) // open local copy of resource manager
-    if(status < 0)
-        VISAerrormsg("open BD connection:", localRM, status)
-        abort
-    endif
-    openInstr("bd_window_resource", bd_controller_addr, localRM=localRM, verbose=0)
-    nvar bd_window_resource
+	svar bd_controller_addr
+	openBabyDACconnection("bd_window_resource", bd_controller_addr, verbose=0)
+	nvar bd_window_resource
 
 	strswitch(action)
 		case "ramp":
@@ -1089,17 +1091,9 @@ function update_BabyDAC_custom(action) : ButtonControl
 	wave oldcustom
 
 	// open temporary connection to babyDAC
-    svar bd_controller_addr
-    variable status, localRM
-
-    status = viOpenDefaultRM(localRM) // open local copy of resource manager
-    if(status < 0)
-        VISAerrormsg("open BD connection:", localRM, status)
-        abort
-    endif
-    openInstr("bd_window_resource", bd_controller_addr, localRM=localRM, verbose=0)
-    nvar bd_window_resource
-    bdCommSetup(bd_window_resource)
+	svar bd_controller_addr
+	openBabyDACconnection("bd_window_resource", bd_controller_addr, verbose=0)
+	nvar bd_window_resource
 
 	for(i=0;i<bd_num_custom;i=i+1)
 		if(str2num(customdacvalstr[i][1]) != oldcustom[i])

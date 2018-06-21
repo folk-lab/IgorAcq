@@ -9,15 +9,14 @@
 // Updates in 2.0:
 
 //		-- All drivers now uses the VISA xop, as it is the only one supporting multiple threads.
-//			Therefore VDT and GPIB xop's should not be used anymore.
+//			VDT and GPIB xop's should not be used anymore.
 //		-- "Request scripts" are removed from the scancontroller window. Its only use was
 //			 trying to do async communication (badly).
 //     -- Added Async checkbox in scancontroller window
+//     -- INI configuration files for scancontroller/instruments
 
 //TODO:
-
-//     -- SFTP file upload with proper permissions
-
+//     -- SFTP file upload
 
 //FIX:
 //     -- NaN handling in JSON package
@@ -26,6 +25,12 @@
 ///////////////////////////////
 ////// utility functions //////
 ///////////////////////////////
+
+function sc_randomInt()
+	variable from=-1e6, to=1e6
+	variable amp = to - from
+	return floor(from + mod(abs(enoise(100*amp)),amp+1))
+end
 
 function unixtime()
 	// returns the current unix time in seconds
@@ -134,30 +139,46 @@ function /S ReplaceBullets(str)
 	return ReplaceString(U+2022, str, ">>> ")
 end
 
-function/S executeWinCmd(command)
-	// http://www.igorexchange.com/node/938
+function /S executeWinCmd(command)
+	// run the shell command
+	// if logFile is selected, put output there
+	// otherwise, return output
 	string command
-	string IPUFpath = SpecialDirPath("Igor Pro User Files",0,1,0)	// guaranteed writeable path in IP7
-	string batchFileName = "ExecuteWinCmd.bat", outputFileName = "ExecuteWinCmd.out"
+	string dataPath = getExpPath("data", full=1)
+
+	// open batch file to store command
+	variable batRef
+	string batchFile = "_execute_cmd.bat"
+	string batchFull = datapath + batchFile
+	Open/P=data batRef as batchFile	// overwrites previous batchfile
+
+	// setup log file paths
+	string logFile = "_execute_cmd.log"
+	string logFull = datapath + logFile
+
+	// write command to batch file and close
+	fprintf batRef,"cmd/c \"%s > \"%s\"\"\r", command, logFull
+	Close batRef
+
+	// execute batch file with output directed to logFile
+	ExecuteScriptText /B "\"" + batchFull + "\""
+
 	string outputLine, result = ""
-	variable refNum
-
-	NewPath/O/Q IgorProUserFiles, IPUFpath
-	Open/P=IgorProUserFiles refNum as batchFileName	// overwrites previous batchfile
-	fprintf refNum,"cmd/c \"%s > \"%s%s\"\"\r", command, IPUFpath, outputFileName
-	Close refNum
-	ExecuteScriptText/B "\"" + IPUFpath + "\\" + batchFileName + "\""
-	Open/P=IgorProUserFiles/R refNum as outputFileName
-
+	variable logRef
+	Open/P=data logRef as logFile 
 	do
-		FReadLine refNum, outputLine
+		FReadLine logRef, outputLine
 		if( strlen(outputLine) == 0 )
 			break
 		endif
 		result += outputLine
 	while( 1 )
-	Close refNum
+	Close logRef
+
+	DeleteFile /P=data /Z=1 batchFile // delete batch file
+	DeleteFile /P=data /Z=1 logFile // delete batch file
 	return result
+
 end
 
 function/S executeMacCmd(command)
@@ -192,7 +213,7 @@ end
 
 function /S getExpPath(whichpath, [full])
 	// whichpath determines which path will be returned (data, winfs, config)
-	// root always gives the path to local_measurement_data
+	// lmd always gives the path to local_measurement_data
 	// if full==1, the full path on the local machine is returned in native style
 	// if full==0, the path relative to local_measurement_data is returned in Unix style
 	string whichpath
@@ -213,28 +234,40 @@ function /S getExpPath(whichpath, [full])
 	SplitString/E="([\w\s\-\:]+)(?i)(local[\s\_]measurement[\s\_]data)([\w\s\-\:]+)" S_path, temp1, temp2, temp3
 
 	strswitch(whichpath)
-		case "root":
+		case "lmd":
 			// returns path to local_measurement_data on local machine
+			// always assumes you want the full path
 			return ParseFilePath(5, temp1+temp2, "*", 0, 0)
+			break
+		case "sc":
+			// returns full path to the directory where ScanController lives
+			// always assumes you want the full path
+			string sc_dir = FunctionPath("getExpPath")
+			variable pathLen = itemsinlist(sc_dir, ":")-1
+			sc_dir = RemoveListItem(pathLen, sc_dir, ":")
+			return ParseFilePath(5, sc_dir, "*", 0, 0)
 		case "data":
 			// returns path to data relative to local_measurement_data
 			if(full==0)
-				return "/"+ReplaceString(":", temp3[1,inf], "/")
+				return ReplaceString(":", temp3[1,inf], "/")
 			else
 				return ParseFilePath(5, temp1+temp2+temp3, "*", 0, 0)
 			endif
+			break
+		case "config":
+				if(full==0)
+					return ReplaceString(":", temp3[1,inf], "/")+"config/"
+				else
+					return ParseFilePath(5, temp1+temp2+temp3+"config:", "*", 0, 0)
+				endif
+				break
 		case "winfs":
 			if(full==0)
-				return "/"+ReplaceString(":", temp3[1,inf], "/")+"winfs/"
+				return ReplaceString(":", temp3[1,inf], "/")+"winfs/"
 			else
 				return ParseFilePath(5, temp1+temp2+temp3+"winfs:", "*", 0, 0)
 			endif
-		case "config":
-			if(full==0)
-				return "/"+ReplaceString(":", temp3[1,inf], "/")+"config/"
-			else
-				return ParseFilePath(5, temp1+temp2+temp3+"config:", "*", 0, 0)
-			endif
+			break
 	endswitch
 end
 
@@ -242,65 +275,201 @@ end
 //// start scan controller ////
 ///////////////////////////////
 
-function InitScanController(instrWave, [srv_push, config, filetype])
-	// srv_push = 1 to alert qdot-server of new data
-	wave /t instrWave
-	variable srv_push
-	string config // use this to specify which config file to load
-	string filetype // specify what type of files will be saved
+function sc_loadGlobalsINI(iniIdx)
+	variable iniIdx
 
-	// set reference to instrument wave for scan controller
-	string /g sc_instr_wave=nameofwave(instrWave)
-	initVISAinstruments(instrWave, verbose=1)
+	wave/t ini_text
+	wave ini_type
 
-	// set server push variable for scan controller
-	variable /g sc_srv_push
-	if(paramisdefault(srv_push) || srv_push==1)
-		sc_srv_push = 1
-	else
-		sc_srv_push = 0
+	// some values are required
+	string mandatory = "server_url=str,srv_push=var,filetype=str,slack_url=str,sftp_port=var,sftp_user=str,"
+	string optional = "colormap=str,"
+
+	string key="", val=""
+	variable sub_index=iniIdx+1, keyIdx=0, manKeyCnt=0
+
+	do
+		if(ini_type[sub_index] == 2 && ini_type[sub_index+1] == 3) // find key/value pairs
+
+			key = ini_text[sub_index]
+
+			// handle mandatory keys here
+			val = StringByKey(key,mandatory,"=", ",")
+			if(strlen(val)>0)
+				// this is in the manadtory key list
+				key = "sc_"+key // global variable names created from mandatory keys
+
+				if(cmpstr(val,"str")) // create string variables
+					string/g $key = ini_text[sub_index+1]
+				elseif(cmpstr(val,"var")) // create numeric variables
+					variable/g $key = str2num(ini_text[sub_index+1])
+				endif
+
+				manKeyCnt+=1
+				sub_index+=1
+				continue
+			endif
+
+			// handle optional keys here
+			val = StringByKey(key,optional,"=", ",")
+			if(keyIdx>=0)
+				// this is in the manadtory key list
+				key = "sc_"+key // global variable names created from optional keys
+
+				if(cmpstr(val,"str")) // create string variables
+					string/g $key = ini_text[sub_index+1]
+				elseif(cmpstr(val,"var")) // create numeric variables
+					variable/g $key = str2num(ini_text[sub_index+1])
+				endif
+
+				sub_index+=1
+				continue
+			endif
+
+		endif
+
+		sub_index+=1
+		if(sub_index>numpnts(ini_type)-1)
+			break
+		endif
+
+	while(ini_type[sub_index]!=1) // stop at next section
+
+	// defaults for optional parameters
+	svar/z sc_colormap
+	if(!svar_exists(sc_colormap))
+		string /g sc_colormap = "VioletOrangeYellow"
 	endif
 
-// setup filetype for saved data/metadata
-// currently supports: ibw, hdf5
-//	variable /g sc_filtype
-//	if(paramisdefault(filetype))
-//		sc_filetype = "ibw"
-//	else
-//		sc_filetype = filtype
-//	endif
+	// error if not all mandatory keys were loaded
+	if(manKeyCnt!=itemsinlist(mandatory,","))
+		print "[ERROR] Not all mandatory keys were supplied to [scancontroller]!"
+		abort
+	endif
 
-	string filelist = ""
-	string /g slack_url =  "https://hooks.slack.com/services/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" // url for slack alert
-	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
-	string /g sc_current_config = ""
+end
 
-	string /g server_url = "qdash-server.phas.ubc.ca" // address for qdot-server
+function sc_setupAllFromINI(iniFile, [path])
+	string iniFile, path
 
-	string /g sc_hostname = getHostName() // machine name
+	if(paramisdefault(path))
+		path = "data"
+	endif
 
-	// Check if data path is definded
-	GetFileFolderInfo/Z/Q/P=data
+	string /g sc_setup_ini = iniFile
+	string /g sc_setup_path = path
+
+	loadINIconfig(iniFile, path)
+	wave ini_type
+	wave /t ini_text
+
+	variable i=0, scCnt=0, guiCnt=0, guiIdx=0
+	string instrList = ""
+	for(i=0;i<numpnts(ini_type);i+=1)
+
+		if(ini_type[i]==1)
+
+			strswitch(ini_text[i])
+				case "[scancontroller]":
+
+					if(scCnt==0)
+						scCnt+=1
+						sc_loadGlobalsINI(i)
+					else
+						print "[WARNING] Found more than one [scancontroller] entry. Using first entry."
+					endif
+					continue
+
+				case "[gui]":
+					if(guiCnt==0)
+						guiCnt+=1
+						guiIdx=i // do this after instruments are loaded
+					else
+						print "[WARNING] Found more than one [gui] entry. Using first entry."
+					endif
+					continue
+				case "[visa-instrument]":
+					// handle this elsewhere
+		 			continue
+
+ 				case "[http-instrument]":
+ 					// handle this elsewhere
+ 					continue
+
+ 				default:
+ 					printf "[WARNING] Section (%s) in INI not recognized and will be ignored!\r", ini_text[i]
+ 				
+			endswitch
+		endif
+
+	endfor
+
+	// load instruments
+	instrList = loadInstrsFromINI(verbose=1)
+
+	if(guiCnt>0)
+		loadGUIsINI(guiIdx, instrList=instrList)
+	endif
+
+end
+
+function InitScanController([setupFile, setupPath, configFile])
+	// start up a whole mess of scancontroller functionality
+
+	string setupFile, setupPath, configFile // use these to point to specific setup and config files
+											        // defaults are setup.ini in data path and most recent config
+
+	GetFileFolderInfo/Z/Q/P=data  // Check if data path is definded
 	if(v_flag != 0 || v_isfolder != 1)
 		abort "Data path not defined!\n"
 	endif
 
+	if(paramisdefault(setupFile))
+		setupFile = "setup.ini"
+	endif
+
+	if(paramisdefault(setupPath))
+		setupPath = "data"
+	endif
+
+	sc_setupAllFromINI(setupFile, path=setupPath)   // setup instruments and scancontroller from setup.ini
+	string /g sc_hostname = getHostName() // get machine name
+
+	// load all the scan controller globals
+	nvar sc_srv_push,sc_sftp_port
+	svar sc_server_url,sc_filetype,sc_slack_url,sc_sftp_user,sc_colormap
+	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
+
+	newpath /C/O/Q setup getExpPath("data", full=1) // create/overwrite setup path
 	newpath /C/O/Q config getExpPath("config", full=1) // create/overwrite config path
 
-	// look for config files
-	filelist = greplist(indexedfile(config,-1,".config"),"sc")
+	// create remote path(s)
+	if(sc_srv_push==1)
 
-	if(paramisdefault(config))
+		if(CmpStr(sc_filetype, "ibw") == 0)
+			newpath /C/O/Q winfs getExpPath("winfs", full=1) // create/overwrite winf path
+		endif
+
+	else
+		print "[WARNING] Only saving local copies of data."
+	endif
+
+	// deal with config file
+	string /g sc_current_config
+	if(paramisdefault(configFile))
+		// look for newest config file
+		string filelist = greplist(indexedfile(config,-1,".config"),"sc")
 		if(itemsinlist(filelist)>0)
 			// read content into waves
 			filelist = SortList(filelist, ";", 1+16)
-			sc_loadconfig(StringFromList(0,filelist, ";"))
+			sc_loadConfig(StringFromList(0,filelist, ";"))
 		else
+			// if there are no config files, use defaults
 			// These arrays should have the same size. Their indeces correspond to each other.
 			make/t/o sc_RawWaveNames = {"g1x", "g1y"} // Wave names to be created and saved
 			make/o sc_RawRecord = {0,0} // Whether you want to record and save the data for this wave
 			make/o sc_RawPlot = {0,0} // Whether you want to record and save the data for this wave
-			make/t/o sc_RawScripts = {"getg1x()", "getg1y()"}
+			make/t/o sc_RawScripts = {"readSRSx(srs1)", "readSRSy(srs1)"}
 			// End of same-size waves
 
 			// And these waves should be the same size too
@@ -311,9 +480,6 @@ function InitScanController(instrWave, [srv_push, config, filetype])
 			// end of same-size waves
 
 			make /o sc_measAsync = {0,0}
-
-			// default colormap
-			string /g sc_ColorMap = "Grays"
 
 			// Print variables
 			variable/g sc_PrintRaw = 1,sc_PrintCalc = 1
@@ -330,7 +496,7 @@ function InitScanController(instrWave, [srv_push, config, filetype])
 			endif
 		endif
 	else
-		sc_loadconfig(config)
+		sc_loadconfig(configFile)
 	endif
 
 	sc_rebuildwindow()
@@ -345,7 +511,7 @@ function/s sc_createconfig()
 	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts
 	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
 	nvar sc_PrintRaw, sc_PrintCalc, filenum
-	svar sc_LogStr, sc_ColorMap, sc_current_config
+	svar sc_LogStr, sc_current_config
 	variable refnum
 	string configfile
 	string configstr = "", tmpstr = ""
@@ -387,8 +553,6 @@ function/s sc_createconfig()
 	tmpstr = addJSONkeyvalpair(tmpstr, "calc", numToBool(sc_PrintCalc))
 	configstr = addJSONkeyvalpair(configstr, "print_to_history", tmpstr)
 
-	// igor stuff
-	configstr = addJSONkeyvalpair(configstr, "colormap", sc_ColorMap, addQuotes=1)
 	configstr = addJSONkeyvalpair(configstr, "filenum", num2istr(filenum))
 
 //	print configstr
@@ -397,12 +561,12 @@ function/s sc_createconfig()
 	writeJSONtoFile(configstr, configfile, "config")
 end
 
-function sc_loadconfig(configfile)
+function sc_loadConfig(configfile)
 	string configfile
 	string JSONstr, checkStr, textkeys, numkeys, textdestinations, numdestinations
 	variable i=0,escapePos=-1
 	nvar sc_PrintRaw, sc_PrintCalc
-	svar sc_LogStr, sc_current_config, sc_ColorMap, sc_current_config
+	svar sc_LogStr, sc_current_config, sc_current_config
 
 	// load json string from config file
 	printf "Loading configuration from: %s\n", configfile
@@ -438,8 +602,11 @@ function sc_loadconfig(configfile)
 	sc_PrintCalc = booltonum(stringfromlist(0,extractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="calc"),","))
 
 	// load log string
+  // loading from config files is not working 
+  // tons of problems handling \" in logString while loading from .config file
 //	sc_LogStr = stringfromlist(0,extractJSONvalues(getJSONkeyindex("log_string",t_tokentext)),",")
-	svar /Z sc_LogStr
+
+svar /Z sc_LogStr
 	if(!svar_exists(sc_LogStr))
 		sc_LogStr = ""
 	endif	
@@ -878,7 +1045,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, activegraphs="", cmd1="",window_string=""
 	string cmd2=""
 	variable index, graphopen, graphopen2d
-	svar sc_ColorMap
+	svar sc_colormap
 
 	//do some sanity checks on wave names: they should not start or end with numbers.
 	do
@@ -916,9 +1083,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	// connect VISA instruments
 	// do this here, because if it fails
 	// i don't want to delete any old data
-	svar sc_instr_wave
-	wave /t instrWave = $sc_instr_wave
-	initVISAinstruments(instrWave, verbose=0)
+	loadInstrsFromINI(verbose=0)
 
 	// The status of the upcoming scan will be set when waves are initialized.
 	if(!paramisdefault(starty) && !paramisdefault(finy) && !paramisdefault(numptsy))
@@ -1219,48 +1384,52 @@ function resumesweep(action) : Buttoncontrol
 	print "Sweep resumed"
 end
 
-function sc_checksweepstate()
-	nvar sc_abortsweep, sc_pause, sc_abortnosave
-	if (GetKeyState(0) & 32)
-			// If the ESC button is pressed during the scan, save existing data and stop the scan.
-			SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0)
-			abort
-		endif
 
-		if(sc_abortsweep)
-			// If the Abort button is pressed during the scan, save existing data and stop the scan.
-			SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0)
-			dowindow /k SweepControl
-			sc_abortsweep=0
-			sc_abortnosave=0
-			sc_pause=0
-			abort "Measurement aborted by user"
-		elseif(sc_abortnosave)
-			// Abort measurement without saving anything!
-			dowindow /k SweepControl
-			sc_abortnosave = 0
-			sc_abortsweep = 0
-			sc_pause=0
-			abort "Measurement aborted by user. Data NOT saved!"
-		elseif(sc_pause)
-			// Pause sweep if button is pressed
-			do
-				if(sc_abortsweep)
-					SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0)
-					dowindow /k SweepControl
-					sc_abortsweep=0
-					sc_abortnosave=0
-					sc_pause=0
-					abort "Measurement aborted by user"
-				elseif(sc_abortnosave)
-					dowindow /k SweepControl
-					sc_abortsweep=0
-					sc_abortnosave=0
-					sc_pause=0
-					abort "Measurement aborted by user. Data NOT saved!"
-				endif
-			while(sc_pause)
+
+function sc_checksweepstate()
+	nvar /Z sc_abortsweep, sc_pause, sc_abortnosave	
+	
+	if (GetKeyState(0) & 32)
+		// If the ESC button is pressed during the scan, save existing data and stop the scan.
+		abort "Measurement aborted by user. Data not saved automatically. Run \"SaveWaves()\" if needed"	
 	endif
+
+	if(NVAR_Exists(sc_abortsweep) && sc_abortsweep==1)
+		// If the Abort button is pressed during the scan, save existing data and stop the scan.
+		SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0)
+		dowindow /k SweepControl
+		sc_abortsweep=0
+		sc_abortnosave=0
+		sc_pause=0
+		abort "Measurement aborted by user. Data saved automatically."
+	elseif(NVAR_Exists(sc_abortnosave) && sc_abortnosave==1)
+		// Abort measurement without saving anything!
+		dowindow /k SweepControl
+		sc_abortnosave = 0
+		sc_abortsweep = 0
+		sc_pause=0
+		abort "Measurement aborted by user. Data not saved automatically. Run \"SaveWaves()\" if needed"
+	elseif(NVAR_Exists(sc_pause) && sc_pause==1)
+		// Pause sweep if button is pressed
+		do
+			if(sc_abortsweep)
+				SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0)
+				dowindow /k SweepControl
+				sc_abortsweep=0
+				sc_abortnosave=0
+				sc_pause=0
+				abort "Measurement aborted by user"
+			elseif(sc_abortnosave)
+				dowindow /k SweepControl
+				sc_abortsweep=0
+				sc_abortnosave=0
+				sc_pause=0
+				abort "Measurement aborted by user. Data NOT saved!"
+			endif
+		while(sc_pause)
+		
+	endif
+	
 end
 
 function sc_sleep(delay)
@@ -1839,7 +2008,7 @@ function SaveWaves([msg, save_experiment])
 	endif
 
 	if(sc_srv_push==1)
-		svar server_url, sc_hostname
+		svar sc_server_url, sc_hostname
 		sc_findNewFiles(filenum)
 		sc_FileTransfer() // this may leave the experiment file open for some time
 						   // make sure to run saveExp before this
@@ -2009,93 +2178,91 @@ function SaveFromPXP([history, procedure])
 end
 
 
-////////////////////////
-////  notifications ////
-////////////////////////
+////////////////////
+////  move data ////
+////////////////////
+
+function sc_write2batch(fileref, searchStr, localFull)
+
+	variable fileref
+	string searchStr, localFull
+	localFull = TrimString(localFull)
+
+	svar sc_hostname, sc_server_dir
+	string lmdpath = getExpPath("lmd", full=1)
+	variable idx = strlen(lmdpath)+1, result=0
+	string srvFull = ""
+	
+	string platform = igorinfo(2), localPart = localFull[idx,inf]
+	if(cmpstr(platform,"Windows")==0)
+		localPart = replaceString("\\", LocalPart, "/")
+	endif
+	
+	sprintf srvFull, "%s/%s/%s" sc_server_dir, sc_hostname, localPart
+
+	if(strlen(searchStr)==0)
+		// there is no notification file, add this immediately
+		fprintf fileref, "%s,%s\n", localFull, srvFull
+	else
+		// search for localFull in searchStr
+		print searchStr, localFull
+		result = strsearch(searchStr, localFull, 0)
+		print result
+		if(result==-1)
+			fprintf fileref, "%s,%s\n", localFull, srvFull
+		endif
+	endif
+
+end
 
 function sc_findNewFiles(datnum)
-	variable datnum
-	variable refNum
-	nvar sc_save_exp
-	string winfpath = getExpPath("winfs", full=0)
-	string configpath = getExpPath("config", full=0)
-	string datapath = getExpPath("data", full=0)
+	// locate newly created/appended files
+	// add to sftp batch file
 
-	//// create/open server.notify ////
+	variable datnum // data set to look for
+	variable result = 0
+	string tmpname = ""
+
+	//// create/open batch file ////
+	variable refnum
 	string notifyText = "", buffer
-	getfilefolderinfo /Q/Z/P=data "server.notify"
-	if(V_isFile==0) // if the file does not exist, create it with hostname/n at the top
-		open /A/P=data refNum as "server.notify"
+	getfilefolderinfo /Q/Z/P=data "pending_sftp.lst"
+	if(V_isFile==0) // if the file does not exist, create it with header
+		open /A/P=data refNum as "pending_sftp.lst"
+		
+		// create/write header
+		nvar sc_sftp_port
+		svar sc_server_url,sc_sftp_user
+		fprintf refNum, "%s, %s, %d\n" sc_sftp_user, sc_server_url, sc_sftp_port 
+		
 	else // if the file does exist, open it for appending
-		open /A/P=data refNum as "server.notify"
+		open /A/P=data refNum as "pending_sftp.lst"
 		FSetPos refNum, 0
 		variable lines = 0
 		do
 			FReadLine refNum, buffer
-			if(lines>0)
-				notifyText+=buffer
-			endif
+			notifyText+=buffer
 			lines +=1
 		while(strlen(buffer)>0)
 	endif
 
-	variable notifyLen = strlen(notifyText)
-	variable result = 0
-	string tmpname = ""
-
-	// add the most recent scan controller config file
-
-	string configlist=""
-	getfilefolderinfo /Q/Z/P=config // check if config folder exists before looking for files
-	if(V_flag==0 && V_isFolder==1)
-		configlist = greplist(indexedfile(config,-1,".config"),"sc")
-	endif
-	if(itemsinlist(configlist)>0)
-		configlist = SortList(configlist, ";", 1+16)
-		tmpname = configpath+StringFromList(0,configlist, ";")
-		if(notifyLen==0)
-			// if there is no notification file
-			// add this immediately
-			fprintf refnum, "%s\n", tmpname
-		else
-			// search for tmpname in notifyText
-			result = strsearch(notifyText, tmpname, 0)
-			if(result==-1)
-				fprintf refnum, "%s\n", tmpname
-			endif
-		endif
-	endif
-
-	// add experiment and history files
+	// add experiment/history/procedure files
 	// only if I saved the experiment this run
+	string datapath = getExpPath("data", full=1)
+	nvar sc_save_exp
 	if(sc_save_exp == 1)
 		// add experiment file
 		tmpname = datapath+igorinfo(1)+".pxp"
-		if(notifyLen==0)
-			// if there is no notification file
-			// add this immediately
-			fprintf refnum, "%s\n", tmpname
-		else
-			// search for tmpname in notifyText
-			result = strsearch(notifyText, tmpname, 0)
-			if(result==-1)
-				fprintf refnum, "%s\n", tmpname
-			endif
-		endif
+		sc_write2batch(refnum, notifyText, tmpname)
 
 		// add history file
 		tmpname = datapath+igorinfo(1)+".history"
-		if(notifyLen==0)
-			// if there is no notification file
-			// add this immediately
-			fprintf refnum, "%s\n", tmpname
-		else
-			// search for tmpname in notifyText
-			result = strsearch(notifyText, tmpname, 0)
-			if(result==-1)
-				fprintf refnum, "%s\n", tmpname
-			endif
-		endif
+		sc_write2batch(refnum, notifyText, tmpname)
+
+		// add procedure file
+		tmpname = datapath+igorinfo(1)+".ipf"
+		sc_write2batch(refnum, notifyText, tmpname)
+
 	endif
 
 	// find new data files
@@ -2115,21 +2282,26 @@ function sc_findNewFiles(datnum)
 
 		for(j=0;j<ItemsInList(matchList, ";");j+=1)
 			tmpname = datapath+StringFromList(j,matchList, ";")
-			if(notifyLen==0)
-				// if there is no notification file
-				// add this immediately
-				fprintf refnum, "%s\n", tmpname
-			else
-				// search for tmpname in notifyText
-				result = strsearch(notifyText, tmpname, 0)
-				if(result==-1)
-					fprintf refnum, "%s\n", tmpname
-				endif
-			endif
+			sc_write2batch(refnum, notifyText, tmpname)
 		endfor
 	endfor
 
+	// add the most recent scan controller config file
+	string configpath = getExpPath("config", full=1)
+	string configlist=""
+	getfilefolderinfo /Q/Z/P=config // check if config folder exists before looking for files
+	if(V_flag==0 && V_isFolder==1)
+		configlist = greplist(indexedfile(config,-1,".config"),"sc")
+	endif
+
+	if(itemsinlist(configlist)>0)
+		configlist = SortList(configlist, ";", 1+16)
+		tmpname = configpath+StringFromList(0,configlist, ";")
+		sc_write2batch(refnum, notifyText, tmpname)
+	endif
+
 	// find new metadata files in winfs folder (if it exists)
+	string winfpath = getExpPath("winfs", full=1)
 	extensions = ".winf;"
 	string winfstr = ""
 	idxList = ""
@@ -2149,95 +2321,58 @@ function sc_findNewFiles(datnum)
 
 		for(j=0;j<ItemsInList(matchList, ";");j+=1)
 			tmpname = winfpath+StringFromList(j,matchList, ";")
-			if(notifyLen==0)
-				// if there is no notification file
-				// add this immediately
-				fprintf refnum, "%s\n", tmpname
-			else
-				// search for tmpname in notifyText
-				result = strsearch(notifyText, tmpname, 0)
-				if(result==-1)
-					fprintf refnum, "%s\n", tmpname
-				endif
-			endif
+			sc_write2batch(refnum, notifyText, tmpname)
 		endfor
 	endfor
-	close refnum // close server.notify
-end
 
-function sc_ForceDataBackup()
-	// this function is never called automatically
-	// if you are worried about your data
-	// you can call it and it will write a fresh copy of the
-	// "data" directory to the lab server
-
-	svar server_url, sc_hostname
-	string username = "anonymous"
-	string password = "folklab101@gmail.com"
-	string ftpURL = "", fullpath = getExpPath("data", full=1)
-	sprintf ftpURL, "ftp://%s/data/%s%s", server_url, sc_hostname, getExpPath("data", full=0)
-	FTPUpload /N=21 /O /D ftpURL[0,strlen(ftpURL)-2], fullpath[0,strlen(fullpath)-2]
+	close refnum // close pending_sftp.lst
 
 end
 
 function sc_FileTransfer()
-	variable refnum
-	open /R/P=data refnum as "server.notify"
 
-	if(refnum==0)
+	string batchFile = "pending_sftp.lst"
+	GetFileFolderInfo /Q/Z/P=data batchFile
+	if( V_Flag == 0 && V_isFile ) // file exists
+		string batchFull = "", cmd = "", upload_script
+		
+		batchFull = getExpPath("data", full=1) + batchFile
+		
+		string platform = igorinfo(2)
+		strswitch(platform)
+			case "Macintosh":
+				upload_script = getExpPath("sc", full=1)+"/SCRIPTS/transfer_data.py"		
+				sprintf cmd, "python %s %s" upload_script, batchFull
+				print cmd
+				break
+			case "Windows":
+				upload_script = getExpPath("sc", full=1)+"SCRIPTS\\transfer_data.py"		
+				sprintf cmd, "python \"%s\" \"%s\"" upload_script, batchFull
+				executeWinCmd(cmd)
+				break
+		endswitch
+		
+		sc_DeleteBatchFile() // Sent everything possible
+								  // assume users will fix errors manually
+		return 1
+
+	else
 		// if there is not server.notify file
 		// don't do anything
 		print "No new files available."
 		return 0
-	else
-		// walk through server.notify and send data
-		svar sc_hostname, server_url
-		printf "Transfering new data over FTP to %s\r", server_url
 
-		string username = "anonymous"
-		string password = "folklab101@gmail.com"
-		string datapath = getExpPath("data", full=0)
-		variable idx = strlen(datapath)
-
-		string ftpURL = "", lineContent = "", filePath = ""
-		variable i
-		for (i = 0; ;i += 1)
-
-			FReadLine refNum, lineContent
-			if (strlen(lineContent) == 0)
-				// no more data to be read
-				break
-			endif
-
-			lineContent = TrimString(lineContent)
-			if (strlen(lineContent) == 0)
-				// blank line for some reason
-				continue
-			endif
-
-			filePath = ReplaceString("/", lineContent[idx,inf], ":")
-
-			sprintf ftpURL, "ftp://%s/data/%s%s", server_url, sc_hostname, lineContent
-			FTPUpload /N=21 /P=data /T=0 /U=username /W=password /V=0 /Z ftpURL, filePath
-			if(V_flag!=0)
-				printf "Error transfering file to server -- %s (code = %d)\r", filePath, V_flag
-			endif
-
-		endfor
-
-		close refnum
-		sc_DeleteNotificationFile() // Sent everything possible
-									   // assume users will fix errors manually
 	endif
+
 end
 
-function sc_DeleteNotificationFile()
+function sc_DeleteBatchFile()
 
 	// delete server.notify
-	deletefile /Z=1 /P=data "server.notify"
+	deletefile /Z=1 /P=data "pending_sftp.lst"
 
 	if(V_flag!=0)
-		print "Failed to delete 'server.notify'"
+		print "Failed to delete 'pending_sftp.lst'"
 	endif
 end
 
@@ -2255,7 +2390,7 @@ function /S getSlackNotice(username, [message, channel, botname, emoji, min_time
 	string username, channel, message, botname, emoji
 	variable min_time
 	nvar filenum, sweep_t_elapsed, sc_abortsweep
-	svar slack_url
+	svar sc_slack_url
 	string txt="", buffer="", payload="", out=""
 
 	//// check if I need a notification ////
@@ -2311,7 +2446,7 @@ function /S getSlackNotice(username, [message, channel, botname, emoji, min_time
 	payload += "}"
 	//// end payload ////
 
-	URLRequest /DSTR=payload url=slack_url, method=post
+	URLRequest /DSTR=payload url=sc_slack_url, method=post
 	if (V_flag == 0)    // No error
         if (V_responseCode != 200)  // 200 is the HTTP OK code
             print "Slack post failed!"

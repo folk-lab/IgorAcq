@@ -11,14 +11,29 @@
 //// Lakeshore 625 COMM ////
 ////////////////////////////
 
-function ls625CommSetup(instrID)
-	variable instrID
-
-	// setup communication attr
-	visaSetBaudRate(instrID, 57600) // baud rate
-	visaSetStopBits(instrID, 10) // 1 stop bit
-	visaSetDataBits(instrID, 7) // 7 data bits
-	visaSetParity(instrID, 1) // Odd parity
+function openLS625connection(instrID, visa_address, [verbose])
+	// instrID is the name of the global variable that will be used for communication
+	// visa_address is the VISA address string, i.e. ASRL1::INSTR
+	string instrID, visa_address
+	variable verbose
+	
+	if(paramisdefault(verbose))
+		verbose=1
+	elseif(verbose!=1)
+		verbose=0
+	endif
+	
+	variable localRM
+	variable status = viOpenDefaultRM(localRM) // open local copy of resource manager
+	if(status < 0)
+		VISAerrormsg("open LS625 connection:", localRM, status)
+		abort
+	endif
+	
+	string comm = ""
+	sprintf comm, "name=LS625,instrID=%s,visa_address=%s" instrID, visa_address
+	string options = "baudrate=57600,databits=7,stopbits=1,parity=1"
+	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
 end
 
 ///////////////////////
@@ -32,9 +47,6 @@ function initLS625TwoAxis(instrIDx,instrIDz)
 	// local copies of the serial port addresses
 	string/g instrDescX = getResourceAddress(instrIDx)
 	string/g instrDescZ = getResourceAddress(instrIDz)
-
-	// create string constants for use in get/set functions
-	execute("L625StrConst(instrDescX,instrDescZ)")
 
 	variable/g ampsperteslax=55.49, ampsperteslaz=9.950// A/T
 	variable/g maxfieldx=1000, maxfieldz=6000 // mT
@@ -59,13 +71,6 @@ function initLS625TwoAxis(instrIDx,instrIDz)
 	dowindow/k TwoAxis_Window
 	execute("TwoAxis_Window()")
 end
-
-macro L625StrConst(instrDescX,instrDescZ)
-	string instrDescX,instrDescZ
-	// create string constants for use in get/set functions
-	StrConstant strX=instrDescX
-	StrConstant strZ=instrDescZ
-endmacro
 
 ////////////////////////
 //// Get functions ////
@@ -450,13 +455,13 @@ function update_setpoint(action) : ButtonControl
 	variable check
 	wave/t setpointvalstr
 	svar oldsetpointx,oldsetpointz,instrDescX,instrDescZ
-	variable localInstrIDx,localInstrIDz
 
 	// open local instr connections
-	localInstrIDx = openTempcommLS625(instrDescX)
-	localInstrIDz = openTempcommLS625(instrDescZ)
+	openLS625connection("tempIDx", instrDescX, verbose=0)
+	openLS625connection("tempIDz", instrDescX, verbose=0)
+	nvar tempIDx,tempIDz
 
-	check = setLS625allfield(localInstrIDx,localInstrIDz,str2num(setpointvalstr[0][1]),str2num(setpointvalstr[1][1]))
+	check = setLS625allfield(tempIDx,tempIDz,str2num(setpointvalstr[0][1]),str2num(setpointvalstr[1][1]))
 	if(check == 5) // all good
 		oldsetpointx = setpointvalstr[0][1]
 		oldsetpointz = setpointvalstr[1][1]
@@ -471,8 +476,8 @@ function update_setpoint(action) : ButtonControl
 		setpointvalstr[1][1] = oldsetpointz
 	endif
 
-	viClose(localInstrIDx)
-	viClose(localInstrIDz)
+	viClose(tempIDx)
+	viClose(tempIDz)
 end
 
 function update_sweeprate(action) : ButtonControl
@@ -480,13 +485,13 @@ function update_sweeprate(action) : ButtonControl
 	variable check
 	wave/t sweepratevalstr
 	svar oldsweepratex,oldsweepratez,instrDescX,instrDescZ
-	variable localInstrIDx,localInstrIDz
 
 	// open local instr connections
-	localInstrIDx = openTempcommLS625(instrDescX)
-	localInstrIDz = openTempcommLS625(instrDescZ)
+	openLS625connection("tempIDx", instrDescX, verbose=0)
+	openLS625connection("tempIDz", instrDescX, verbose=0)
+	nvar tempIDx,tempIDz
 
-	check = setLS625allrate(localInstrIDx,localInstrIDz,str2num(sweepratevalstr[0][1]),str2num(sweepratevalstr[1][1]))
+	check = setLS625allrate(tempIDx,tempIDz,str2num(sweepratevalstr[0][1]),str2num(sweepratevalstr[1][1]))
 	if(check == 5) // all good
 		oldsweepratex = sweepratevalstr[0][1]
 		oldsweepratez = sweepratevalstr[1][1]
@@ -501,26 +506,26 @@ function update_sweeprate(action) : ButtonControl
 		sweepratevalstr[1][1] = oldsweepratez
 	endif
 
-	viClose(localInstrIDx)
-	viClose(localInstrIDz)
+	viClose(tempIDx)
+	viClose(tempIDz)
 end
 
 function update_everything(action) : ButtonControl
 	string action
 	wave fieldwave
-	variable localInstrIDx,localInstrIDz
 	svar instrDescX,instrDescZ
 
 	// open local instr connections
-	localInstrIDx = openTempcommLS625(instrDescX)
-	localInstrIDz = openTempcommLS625(instrDescZ)
+	openLS625connection("tempIDx", instrDescX, verbose=0)
+	openLS625connection("tempIDz", instrDescX, verbose=0)
+	nvar tempIDx,tempIDz
 
-	getL625allfield(localInstrIDx,localInstrIDz)
-	getLS625allrate(localInstrIDx,localInstrIDz)
+	getL625allfield(tempIDx,tempIDz)
+	getLS625allrate(tempIDx,tempIDz)
 	update_output()
 
-	viClose(localInstrIDx)
-	viClose(localInstrIDz)
+	viClose(tempIDx)
+	viClose(tempIDz)
 end
 
 function update_output()
@@ -532,21 +537,6 @@ function update_output()
 		outputvalstr[i][1] = num2str(fieldwave[i])
 		sweepratevalstr[i][1] = num2str(sweepratewave[i])
 	endfor
-end
-
-function openTempcommLS625(instrDesc)
-	string instrDesc
-	variable status, localRM
-	string var_name="localhandle"
-
-	status = viOpenDefaultRM(localRM) // open local copy of resource manager
-    if(status < 0)
-        VISAerrormsg("open LS625 connection:", localRM, status)
-        abort
-    endif
-    openInstr(var_name, instrDesc, localRM=localRM, verbose=0)
-    nvar localhandle = $var_name
-    return localhandle
 end
 
 //////////////////

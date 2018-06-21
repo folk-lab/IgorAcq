@@ -2,31 +2,51 @@
 
 //	Supports a single AnalogShield/Arduino
 //	Procedure written by Nik Sept 2016 (borrows heavily from babyDAC procedures)
-//  update for VISA by Nik May XX 2018 (needs to be tested!)
+// update for VISA by Nik May XX 2018 
+// removed calibration and updated COMM functions Jun 2018 -- Nik
+
+// TODO: 
+//    fix all read functions that broke with VISA update -- see babydac driver for working examples
+//    update Arduino code to include calibration and IDN string
 
 ////////////////////////
 /// AnalogShield COM ///
 ////////////////////////
 
-function AS_CommSetup(instrID)
-	// baud=115200, databits=8, stopbits=1, parity=0
-	variable instrID
-
-	visaSetBaudRate(instrID, 115200)
-    visaSetDataBits(instrID, 8)
-    visaSetStopBits(instrID, 10)
-    visaSetParity(instrID, 0)
-
+function openASconnection(instrID, visa_address, [verbose])
+	// instrID is the name of the global variable that will be used for communication
+	// visa_address is the VISA address string, i.e. ASRL1::INSTR
+	string instrID, visa_address
+	variable verbose
+	
+	if(paramisdefault(verbose))
+		verbose=1
+	elseif(verbose!=1)
+		verbose=0
+	endif
+	
+	variable localRM
+	variable status = viOpenDefaultRM(localRM) // open local copy of resource manager
+	if(status < 0)
+		VISAerrormsg("open BD connection:", localRM, status)
+		abort
+	endif
+	
+	string comm = ""
+	sprintf comm, "name=AnalogShield,instrID=%s,visa_address=%s" instrID, visa_address
+	string options = "baudrate=11520,databits=8,stopbits=1,parity=0"
+	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
 end
 
 ///// CALIBRATION CONSTANTS /////
 
-function AS_setADCcalibration()
-	variable /g as_adc0_mult = 0.97807
-	variable /g as_adc0_offset = 18.27185
-	variable /g as_adc2_mult = 0.97490
-	variable /g as_adc2_offset = -18.90508
-end
+//function AS_setADCcalibration()
+//	// this calibration should really live on the Arduino
+//	variable /g as_adc0_mult = 0.97807
+//	variable /g as_adc0_offset = 18.27185
+//	variable /g as_adc2_mult = 0.97490
+//	variable /g as_adc2_offset = -18.90508
+//end
 
 ///// Initiate board /////
 
@@ -39,16 +59,13 @@ function InitAnalogShield(instrID)
 	as_range_low = -5000
 	as_range_high = 5000
 	as_range_span = abs(as_range_low-as_range_high)
-	
-	AS_CommSetup(instrID)
-	AS_setADCcalibration()
+
 	AS_CheckForOldInit()
 	
 	// open window
 	dowindow /k AnalogShieldWindow
 	execute("AnalogShieldWindow()")
 	
-//	ClearBufferAS(instrID)
 end
 
 function AS_CheckForOldInit()
@@ -328,17 +345,6 @@ threadsafe function AS_Reading2mV(int_reading)
     return((int_reading/(2^16-1))*(as_adc_high-as_adc_low)+as_adc_low)
 end
 
-function correctReadingAS(readingmV, channel)
-	// use this to correct for calibration in ADC readings
-	variable readingmV, channel
-	nvar as_adc0_mult,  as_adc0_offset,  as_adc2_mult, as_adc2_offset
-	if(channel == 0)
-		return (readingmV - as_adc0_offset)/as_adc0_mult
-	else
-		return (readingmV - as_adc2_offset)/as_adc2_mult
-	endif
-end
-
 threadsafe function ReadADCsingleAS(instrID, channel, numavg)
 	// will read up to 100 points of data at ~64kHz
 	variable instrID, channel // 0 or 2
@@ -385,7 +391,6 @@ function ReadADCtimeAS(instrID, channel, numpts)
 	variable numpts 
 	string cmd
 	wave as_response_wave=as_response_wave
-	nvar as_adc0_mult,  as_adc0_offset,  as_adc2_mult, as_adc2_offset
 
 	// check channel number	
 	if(channel!=0 && channel!=2)
@@ -405,11 +410,6 @@ function ReadADCtimeAS(instrID, channel, numpts)
 	variable i=0
 	for(i=0;i<numpts;i+=1)
 		as_adc_readings[i] = AS_Reading2mV(as_response_wave[2*i] + as_response_wave[2*i+1]*256)
-		if(channel == 0)
-			 as_adc_readings[i] = (as_adc_readings[i] - as_adc0_offset)/as_adc0_mult
-		else
-			 as_adc_readings[i] = (as_adc_readings[i] - as_adc2_offset)/as_adc2_mult
-		endif
 	endfor
 	
 end
@@ -445,16 +445,8 @@ function update_AnalogShield(action) : ButtonControl
 	
 	// setup temporary control for Analog Shield
     svar as_controller_addr
-    variable status, localRM
-    
-    status = viOpenDefaultRM(localRM) // open local copy of resource manager
-    if(status < 0)
-        VISAerrormsg("open BD connection:", localRM, status)
-        abort
-    endif
-    openInstr("as_window_resource", as_controller_addr, localRM=localRM, verbose=0)
+    openASconnection("as_window_resource", as_controller_addr, verbose=0)
     nvar as_window_resource
-    AS_CommSetup(as_window_resource)
     
 	strswitch(action)
 		case "ramp":
