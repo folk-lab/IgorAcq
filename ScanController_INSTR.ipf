@@ -153,17 +153,6 @@ function openHTTPinstr(mandatory, [options, verbose])
 	string options   // options: "test_ping= "
 	variable verbose
 
-	// create global variable
-	string name = StringByKey("name", mandatory, "=", ",")
-	string url = StringByKey("url", mandatory, "=", ",")
-	string var_name = StringByKey("instrID", mandatory, "=", ",")
-	
-	string /g $var_name = url
-	if(verbose)
-		printf "%s (%s) connected as %s\r", name, url, var_name
-	endif
-
-	
 	if(paramisdefault(options))
 		options=""
 	endif
@@ -174,6 +163,15 @@ function openHTTPinstr(mandatory, [options, verbose])
 		verbose=0
 	endif
 	
+	// create global variable
+	string name = StringByKey("name", mandatory, "=", ",")
+	string url = StringByKey("url", mandatory, "=", ",")
+	string var_name = StringByKey("instrID", mandatory, "=", ",")
+	
+	string /g $var_name = url
+	if(verbose==1)
+		printf "%s (%s) connected as %s\r", name, url, var_name
+	endif
 
 	if(strlen(options)>0)
 	
@@ -741,7 +739,7 @@ function /s loadInstrsFromINI([iniFile, path, verbose])
 		 			continue
 		 			
  				case "[http-instrument]":
- 					instrList += singleHTTPFromINI(i)+","
+ 					instrList += singleHTTPFromINI(i, verbose=verbose)+","
  					continue
 
 			endswitch

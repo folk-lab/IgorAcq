@@ -282,7 +282,7 @@ function sc_loadGlobalsINI(iniIdx)
 	wave ini_type
 
 	// some values are required
-	string mandatory = "server_url=str,srv_push=var,filetype=str,slack_url=str,sftp_port=var,sftp_user=str,"
+	string mandatory = "srv_url=str,srv_push=var,srv_dir=str,filetype=str,slack_url=str,sftp_port=var,sftp_user=str,"
 	string optional = "colormap=str,"
 
 	string key="", val=""
@@ -437,7 +437,7 @@ function InitScanController([setupFile, setupPath, configFile])
 
 	// load all the scan controller globals
 	nvar sc_srv_push,sc_sftp_port
-	svar sc_server_url,sc_filetype,sc_slack_url,sc_sftp_user,sc_colormap
+	svar sc_srv_url,sc_filetype,sc_slack_url,sc_sftp_user,sc_colormap
 	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
 
 	newpath /C/O/Q setup getExpPath("data", full=1) // create/overwrite setup path
@@ -555,7 +555,6 @@ function/s sc_createconfig()
 
 	configstr = addJSONkeyvalpair(configstr, "filenum", num2istr(filenum))
 
-//	print configstr
 	configfile = "sc" + num2istr(unixtime()) + ".config"
 	sc_current_config = configfile
 	writeJSONtoFile(configstr, configfile, "config")
@@ -602,17 +601,16 @@ function sc_loadConfig(configfile)
 	sc_PrintCalc = booltonum(stringfromlist(0,extractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="calc"),","))
 
 	// load log string
-  // loading from config files is not working 
-  // tons of problems handling \" in logString while loading from .config file
+	// loading from config files is not working 
+	// tons of problems handling \" in logString while loading from .config file
+  
 //	sc_LogStr = stringfromlist(0,extractJSONvalues(getJSONkeyindex("log_string",t_tokentext)),",")
 
-svar /Z sc_LogStr
+	svar /Z sc_LogStr
 	if(!svar_exists(sc_LogStr))
 		sc_LogStr = ""
 	endif	
 
-	// load colormap
-	sc_ColorMap = stringfromlist(0,extractJSONvalues(getJSONkeyindex("colormap",t_tokentext)),",")
 end
 
 /////////////////////
@@ -1951,8 +1949,8 @@ function SaveWaves([msg, save_experiment])
 		printf "saving all dat%d files...\r", filenum
 
 		nvar sc_rvt
-       	if(sc_rvt==1)
-       		sc_update_xdata() // update xdata wave
+   	if(sc_rvt==1)
+   		sc_update_xdata() // update xdata wave
 		endif
 
 		// Open up any files that may be needed
@@ -2008,7 +2006,7 @@ function SaveWaves([msg, save_experiment])
 	endif
 
 	if(sc_srv_push==1)
-		svar sc_server_url, sc_hostname
+		svar sc_srv_url, sc_hostname
 		sc_findNewFiles(filenum)
 		sc_FileTransfer() // this may leave the experiment file open for some time
 						   // make sure to run saveExp before this
@@ -2188,7 +2186,7 @@ function sc_write2batch(fileref, searchStr, localFull)
 	string searchStr, localFull
 	localFull = TrimString(localFull)
 
-	svar sc_hostname, sc_server_dir
+	svar sc_hostname, sc_srv_dir
 	string lmdpath = getExpPath("lmd", full=1)
 	variable idx = strlen(lmdpath)+1, result=0
 	string srvFull = ""
@@ -2198,16 +2196,14 @@ function sc_write2batch(fileref, searchStr, localFull)
 		localPart = replaceString("\\", LocalPart, "/")
 	endif
 	
-	sprintf srvFull, "%s/%s/%s" sc_server_dir, sc_hostname, localPart
+	sprintf srvFull, "%s/%s/%s" sc_srv_dir, sc_hostname, localPart
 
 	if(strlen(searchStr)==0)
 		// there is no notification file, add this immediately
 		fprintf fileref, "%s,%s\n", localFull, srvFull
 	else
 		// search for localFull in searchStr
-		print searchStr, localFull
 		result = strsearch(searchStr, localFull, 0)
-		print result
 		if(result==-1)
 			fprintf fileref, "%s,%s\n", localFull, srvFull
 		endif
@@ -2232,8 +2228,8 @@ function sc_findNewFiles(datnum)
 		
 		// create/write header
 		nvar sc_sftp_port
-		svar sc_server_url,sc_sftp_user
-		fprintf refNum, "%s, %s, %d\n" sc_sftp_user, sc_server_url, sc_sftp_port 
+		svar sc_srv_url,sc_sftp_user
+		fprintf refNum, "%s, %s, %d\n" sc_sftp_user, sc_srv_url, sc_sftp_port 
 		
 	else // if the file does exist, open it for appending
 		open /A/P=data refNum as "pending_sftp.lst"
