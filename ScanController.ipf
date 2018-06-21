@@ -438,7 +438,11 @@ function sc_loadconfig(configfile)
 	sc_PrintCalc = booltonum(stringfromlist(0,extractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="calc"),","))
 
 	// load log string
-	sc_LogStr = stringfromlist(0,extractJSONvalues(getJSONkeyindex("log_string",t_tokentext)),",")
+//	sc_LogStr = stringfromlist(0,extractJSONvalues(getJSONkeyindex("log_string",t_tokentext)),",")
+	svar /Z sc_LogStr
+	if(!svar_exists(sc_LogStr))
+		sc_LogStr = ""
+	endif	
 
 	// load colormap
 	sc_ColorMap = stringfromlist(0,extractJSONvalues(getJSONkeyindex("colormap",t_tokentext)),",")
