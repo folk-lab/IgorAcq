@@ -2,7 +2,10 @@
 
 //	Supports a single AnalogShield/Arduino
 //	Procedure written by Nik Sept 2016 (borrows heavily from babyDAC procedures)
-//  update for VISA by Nik May XX 2018 (needs to be tested!)
+// update for VISA by Nik May XX 2018 
+// removed calibration and updated COMM functions Jun 2018 -- Nik
+
+// TODO: update Arduino code to include calibration
 
 ////////////////////////
 /// AnalogShield COM ///
@@ -21,12 +24,13 @@ end
 
 ///// CALIBRATION CONSTANTS /////
 
-function AS_setADCcalibration()
-	variable /g as_adc0_mult = 0.97807
-	variable /g as_adc0_offset = 18.27185
-	variable /g as_adc2_mult = 0.97490
-	variable /g as_adc2_offset = -18.90508
-end
+//function AS_setADCcalibration()
+//	// this calibration should really live on the Arduino
+//	variable /g as_adc0_mult = 0.97807
+//	variable /g as_adc0_offset = 18.27185
+//	variable /g as_adc2_mult = 0.97490
+//	variable /g as_adc2_offset = -18.90508
+//end
 
 ///// Initiate board /////
 
@@ -39,16 +43,13 @@ function InitAnalogShield(instrID)
 	as_range_low = -5000
 	as_range_high = 5000
 	as_range_span = abs(as_range_low-as_range_high)
-	
-	AS_CommSetup(instrID)
-	AS_setADCcalibration()
+
 	AS_CheckForOldInit()
 	
 	// open window
 	dowindow /k AnalogShieldWindow
 	execute("AnalogShieldWindow()")
 	
-//	ClearBufferAS(instrID)
 end
 
 function AS_CheckForOldInit()
