@@ -233,11 +233,18 @@ function /S getExpPath(whichpath, [full])
 	string temp1, temp2, temp3
 	SplitString/E="([\w\s\-\:]+)(?i)(local[\s\_]measurement[\s\_]data)([\w\s\-\:]+)" S_path, temp1, temp2, temp3
 
+	string platform = igorinfo(2), separatorStr=""
+	if(cmpstr(platform,"Windows")==0)
+		separatorStr="*"
+	else
+		separatorStr="/"
+	endif
+	
 	strswitch(whichpath)
 		case "lmd":
 			// returns path to local_measurement_data on local machine
 			// always assumes you want the full path
-			return ParseFilePath(5, temp1+temp2, "*", 0, 0)
+			return ParseFilePath(5, temp1+temp2, separatorStr, 0, 0)
 			break
 		case "sc":
 			// returns full path to the directory where ScanController lives
@@ -245,27 +252,27 @@ function /S getExpPath(whichpath, [full])
 			string sc_dir = FunctionPath("getExpPath")
 			variable pathLen = itemsinlist(sc_dir, ":")-1
 			sc_dir = RemoveListItem(pathLen, sc_dir, ":")
-			return ParseFilePath(5, sc_dir, "*", 0, 0)
+			return ParseFilePath(5, sc_dir, separatorStr, 0, 0)
 		case "data":
 			// returns path to data relative to local_measurement_data
 			if(full==0)
 				return ReplaceString(":", temp3[1,inf], "/")
 			else
-				return ParseFilePath(5, temp1+temp2+temp3, "*", 0, 0)
+				return ParseFilePath(5, temp1+temp2+temp3, separatorStr, 0, 0)
 			endif
 			break
 		case "config":
 				if(full==0)
 					return ReplaceString(":", temp3[1,inf], "/")+"config/"
 				else
-					return ParseFilePath(5, temp1+temp2+temp3+"config:", "*", 0, 0)
+					return ParseFilePath(5, temp1+temp2+temp3+"config:", separatorStr, 0, 0)
 				endif
 				break
 		case "winfs":
 			if(full==0)
 				return ReplaceString(":", temp3[1,inf], "/")+"winfs/"
 			else
-				return ParseFilePath(5, temp1+temp2+temp3+"winfs:", "*", 0, 0)
+				return ParseFilePath(5, temp1+temp2+temp3+"winfs:", separatorStr, 0, 0)
 			endif
 			break
 	endswitch
@@ -2187,8 +2194,6 @@ function sc_write2batch(fileref, searchStr, localFull)
 	variable fileref
 	string searchStr, localFull
 	localFull = TrimString(localFull)
-
-	svar sc_hostname, sc_srv_dir
 	
 	string lmdpath = getExpPath("lmd", full=1)
 	variable idx = strlen(lmdpath)+1, result=0
@@ -2199,6 +2204,7 @@ function sc_write2batch(fileref, searchStr, localFull)
 		localPart = replaceString("\\", LocalPart, "/")
 	endif
 	
+	svar sc_hostname, sc_srv_dir
 	sprintf srvFull, "%s/%s/%s" sc_srv_dir, sc_hostname, localPart
 
 	if(strlen(searchStr)==0)
@@ -2286,10 +2292,10 @@ function sc_findNewFiles(datnum)
 	endfor
 
 	// add the most recent scan controller config file
-	string configpath = getExpPath("config", full=1)
-	string configlist=""
 	getfilefolderinfo /Q/Z/P=config // check if config folder exists before looking for files
 	if(V_flag==0 && V_isFolder==1)
+		string configpath = getExpPath("config", full=1)
+		string configlist=""
 		configlist = greplist(indexedfile(config,-1,".config"),"sc")
 	endif
 
@@ -2300,29 +2306,33 @@ function sc_findNewFiles(datnum)
 	endif
 
 	// find new metadata files in winfs folder (if it exists)
-	string winfpath = getExpPath("winfs", full=1)
-	extensions = ".winf;"
-	string winfstr = ""
-	idxList = ""
-	for(i=0;i<ItemsInList(extensions, ";");i+=1)
-		sprintf winfstr, "dat%d*%s", datnum, StringFromList(i, extensions, ";") // grep string
-		getfilefolderinfo /Q/Z/P=winfs
-		if(V_flag==0 && V_isFolder==1)
+	getfilefolderinfo /Q/Z/P=winfs
+	if(V_flag==0 && V_isFolder==1)
+		
+		string winfpath = getExpPath("winfs", full=1)
+		extensions = ".winf;"
+		string winfstr = ""
+		idxList = ""
+		for(i=0;i<ItemsInList(extensions, ";");i+=1)
+			sprintf winfstr, "dat%d*%s", datnum, StringFromList(i, extensions, ";") // grep string
+			
 			idxList = IndexedFile(winfs, -1, StringFromList(i, extensions, ";"))
-		endif
-		if(strlen(idxList)==0)
-			continue
-		endif
-		matchList = ListMatch(idxList, winfstr, ";")
-		if(strlen(matchlist)==0)
-			continue
-		endif
-
-		for(j=0;j<ItemsInList(matchList, ";");j+=1)
-			tmpname = winfpath+StringFromList(j,matchList, ";")
-			sc_write2batch(refnum, notifyText, tmpname)
+			if(strlen(idxList)==0)
+				continue
+			endif
+			
+			matchList = ListMatch(idxList, winfstr, ";")
+			if(strlen(matchlist)==0)
+				continue
+			endif
+	
+			for(j=0;j<ItemsInList(matchList, ";");j+=1)
+				tmpname = winfpath+StringFromList(j,matchList, ";")
+				sc_write2batch(refnum, notifyText, tmpname)
+			endfor
 		endfor
-	endfor
+		
+	endif
 
 	close refnum // close pending_sftp.lst
 
