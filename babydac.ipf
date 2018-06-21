@@ -36,16 +36,6 @@ function openBabyDACconnection(instrID, visa_address, [verbose])
 	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
 end
 
-//function bdCommSetup(instrID)
-//	// baud=57600, databits=8, stopbits=1, parity=0
-//	variable instrID
-//
-//	visaSetBaudRate(instrID, 57600)
-//	visaSetDataBits(instrID, 8)
-//	visaSetStopBits(instrID, 10)
-//	visaSetParity(instrID, 0)
-//end
-
 /////////////////////////////////
 ///// Initiate DAC board(s) /////
 /////////////////////////////////

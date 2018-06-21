@@ -5,7 +5,9 @@
 // update for VISA by Nik May XX 2018 
 // removed calibration and updated COMM functions Jun 2018 -- Nik
 
-// TODO: update Arduino code to include calibration and IDN string
+// TODO: 
+//    fix all read functions that broke with VISA update -- see babydac driver for working examples
+//    update Arduino code to include calibration and IDN string
 
 ////////////////////////
 /// AnalogShield COM ///
@@ -343,17 +345,6 @@ threadsafe function AS_Reading2mV(int_reading)
     return((int_reading/(2^16-1))*(as_adc_high-as_adc_low)+as_adc_low)
 end
 
-function correctReadingAS(readingmV, channel)
-	// use this to correct for calibration in ADC readings
-	variable readingmV, channel
-	nvar as_adc0_mult,  as_adc0_offset,  as_adc2_mult, as_adc2_offset
-	if(channel == 0)
-		return (readingmV - as_adc0_offset)/as_adc0_mult
-	else
-		return (readingmV - as_adc2_offset)/as_adc2_mult
-	endif
-end
-
 threadsafe function ReadADCsingleAS(instrID, channel, numavg)
 	// will read up to 100 points of data at ~64kHz
 	variable instrID, channel // 0 or 2
@@ -400,7 +391,6 @@ function ReadADCtimeAS(instrID, channel, numpts)
 	variable numpts 
 	string cmd
 	wave as_response_wave=as_response_wave
-	nvar as_adc0_mult,  as_adc0_offset,  as_adc2_mult, as_adc2_offset
 
 	// check channel number	
 	if(channel!=0 && channel!=2)
@@ -420,11 +410,6 @@ function ReadADCtimeAS(instrID, channel, numpts)
 	variable i=0
 	for(i=0;i<numpts;i+=1)
 		as_adc_readings[i] = AS_Reading2mV(as_response_wave[2*i] + as_response_wave[2*i+1]*256)
-		if(channel == 0)
-			 as_adc_readings[i] = (as_adc_readings[i] - as_adc0_offset)/as_adc0_mult
-		else
-			 as_adc_readings[i] = (as_adc_readings[i] - as_adc2_offset)/as_adc2_mult
-		endif
 	endfor
 	
 end
