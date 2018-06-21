@@ -986,13 +986,13 @@ function /s loadINIconfig(iniFile, path)
 	make/o/n=0 ini_type
 	
 	variable i=0, type=0, sectionIdx=0
-	string line="", reg="(.*)=(.*)", key="", value=""
+	string line="", reg="([a-zA-Z0-9.-_]+)\s*=\s*(.*)", key="", value=""
 	do
 		freadline refnum, line
 		if(strlen(line)==0)
 		    break
 		endif
-	    
+	   
 	   type = getINItype(line)
 		// if type=0 then it's a comment or some BS, ignore it!
 		if(type==1) // section

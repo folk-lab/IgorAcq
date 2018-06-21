@@ -157,7 +157,12 @@ function openHTTPinstr(mandatory, [options, verbose])
 	string name = StringByKey("name", mandatory, "=", ",")
 	string url = StringByKey("url", mandatory, "=", ",")
 	string var_name = StringByKey("instrID", mandatory, "=", ",")
+	
 	string /g $var_name = url
+	if(verbose)
+		printf "%s (%s) connected as %s\r", name, url, var_name
+	endif
+
 	
 	if(paramisdefault(options))
 		options=""
