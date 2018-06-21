@@ -101,7 +101,7 @@ if __name__ == '__main__':
         filenames = [l.split(',') for l in lines[1:]]
         for loc, rem in filenames:
             put(sftp, loc, rem)
-            print "Uploaded: {0:s}".format(loc)
+            print("Uploaded: {0:s}".format(loc))
     except Exception as e:
         print('Exception caught during sftp.put: '.format(e))
 
