@@ -34,6 +34,7 @@ function openBabyDACconnection(instrID, visa_address, [verbose])
 	sprintf comm, "name=BabyDAC,instrID=%s,visa_address=%s" instrID, visa_address
 	string options = "baudrate=57600,databits=8,stopbits=1,parity=0"
 	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
+	
 end
 
 /////////////////////////////////

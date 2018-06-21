@@ -14,11 +14,49 @@
 // QueryDB()
 // Add support for BF #2
 
-////////////////////////////
-//// Initiate Lakeshore ////
+///////////////////////////
+/// LS37X specific COMM ///
 ///////////////////////////
 
+function openLS370connection(instrID, http_address, [verbose, gui])
+	// open/test a connection to the LS37X RPi interface written by Ovi
+	//      the whole thing _should_ work for LS370 and LS372
+	// instrID is the name of the global variable that will be used for communication
+	// http_address is exactly what it sounds like
+	// verbose=0 will not print any information about the connection
+	// gui=1 will open the Igor GUI for the LS370
+	string instrID, http_address
+	variable verbose, gui
+	
+	if(paramisdefault(verbose))
+		verbose=1
+	elseif(verbose!=1)
+		verbose=0
+	endif
+	
+	if(paramisdefault(gui))
+		gui=0
+	elseif(verbose!=0)
+		gui=1
+	endif
+	
+	string comm = ""
+	sprintf comm, "name=LS370,instrID=%s,url=%s" instrID, http_address
+	string options = ""
+	openHTTPinstr(comm, options=options, verbose=verbose)
+	
+	if(gui==1)
+		svar localID = $instrID
+		initLS370(localID)
+	endif
+end
+
+////////////////////////////
+//// Initiate Lakeshore ////
+////////////////////////////
+
 function initLS370(instrID)
+	// opens 
 	string instrID
 
 	setLS370system() // Set the correct system!
@@ -34,7 +72,7 @@ end
 //// Get Functions ////
 //////////////////////
 
-function getLS370temp(instrID,plate, [max_age]) // Units: K
+function getLS370temp(instrID, plate, [max_age]) // Units: K
 	// returns the temperature of the selected "plate".
 	// avaliable plates on BF systems: mc (mixing chamber), still, magnet, 4K, 50K
 	// avaliable plates on IGH systems: mc (mixing chamber), cold plate, still, 1K, sorb
@@ -289,7 +327,7 @@ function setLS370tempcontrolmode(instrID,mode) // Units: No units
 		SetVariable mcheaterset, disable=2
 		PopupMenu tempcontrol, mode=1
 		interval = 10
-		maxcurrent = estimateheaterrangeLS370(instrID,temp_set)
+		maxcurrent = estimateheaterrangeLS370(temp_set)
 		setLS370PIDcontrol(instrID,channel,temp_set,maxcurrent)
 		setLS370exclusivereader(instrID,channel,interval)
 	elseif(mode == 3)
@@ -317,7 +355,8 @@ function setLS370tempcontrolmode(instrID,mode) // Units: No units
 end
 
 function setLS370PIDcontrol(instrID,channel,setpoint,maxcurrent) //Units: mK, mA
-	string instrID,channel, setpoint, maxcurrent
+	string instrID
+	variable channel, setpoint, maxcurrent
 	string payload, command, headers, token = "vMqyDIcB"
 	nvar temp_set
 
@@ -586,51 +625,6 @@ function updateLS370GUI(instrID)
 	//GetHeaterPowerDB(instrID,"still")
 end
 
-// FIX pressure readings
-
-<<<<<<< HEAD
-function/s getLS370status(instrID)
-	// returns loggable parameters to meta-data file
-	string instrID
-=======
-function/s getLS370status([max_age])
-	// returns loggable parameters to meta-data file
-	variable max_age
-	if(paramisdefault(max_age))
-		max_age=120
-	endif
-
->>>>>>> scancontroller_async
-	svar system, ighgaugelookup
-	string  buffer="", gauge=""
-	variable i=0
-
-	strswitch(system)
-		case "bfsmall":
-			buffer = addJSONkeyvalpair(buffer,"MC K",num2str(getLS370temp("mc", max_age=max_age)))
-			buffer = addJSONkeyvalpair(buffer,"Still K",num2str(getLS370temp("still", max_age=max_age)))
-			buffer = addJSONkeyvalpair(buffer,"4K Plate K",num2str(getLS370temp("4K", max_age=max_age)))
-			buffer = addJSONkeyvalpair(buffer,"Magnet K",num2str(getLS370temp("magnet", max_age=max_age)))
-			buffer = addJSONkeyvalpair(buffer,"50K Plate K",num2str(getLS370temp("50K", max_age=max_age)))
-//			for(i=1;i<7;i+=1)
-//				gauge = "P"+num2istr(i)
-//				buffer = addJSONkeyvalpair(buffer,gauge,num2str(GetPressureDB(instrID,gauge)))
-//			endfor
-			return addJSONkeyvalpair("","BF Small",buffer)
-		case "igh":
-			buffer = addJSONkeyvalpair(buffer,"MC K",num2str(getLS370temp("mc", max_age=max_age)))
-			buffer = addJSONkeyvalpair(buffer,"Cold Plate K",num2str(getLS370temp("cold plate", max_age=max_age)))
-			buffer = addJSONkeyvalpair(buffer,"Still K",num2str(getLS370temp("still", max_age=max_age)))
-			buffer = addJSONkeyvalpair(buffer,"1K Pot K",num2str(getLS370temp("1K", max_age=max_age)))
-			buffer = addJSONkeyvalpair(buffer,"Sorb K",num2str(getLS370temp("sorb", max_age=max_age)))
-//			for(i=1;i<6;i+=1)
-//				gauge = stringfromlist(i,ighgaugelookup)
-//				buffer = addJSONkeyvalpair(buffer,"P"+num2istr(i),num2str(GetPressureDB(instrID,gauge)))
-//			endfor
-			return addJSONkeyvalpair("","IGH",buffer)
-	endswitch
-end
-
 function setLS370system()
 	// opens a control window and ask user to pick the correct system.
 	// this is important, because it sets the correct url for the selected RPi.
@@ -675,7 +669,7 @@ function/s checkLS370URL(instrID)
 
 	strswitch(system)
 		case "bfsmall":
-			if(cmpstr(instrID,getLS370URL(system))==0)
+			if(cmpstr(instrID,getLS370URL())==0)
 				// pass
 			else
 				printf "[ERROR]: The URL passed (%s) does not match the BF small URL!\r", instrID
@@ -683,7 +677,7 @@ function/s checkLS370URL(instrID)
 			endif
 			break
 		case "igh":
-			if(cmpstr(instrID,getLS370URL(system))==0)
+			if(cmpstr(instrID,getLS370URL())==0)
 				// pass
 			else
 				printf "[ERROR]: The URL passed (%s) does not match the IGH URL!\r", instrID
@@ -1047,5 +1041,48 @@ function selectsystem_control(action,popnum,popstr) : PopupMenuControl
 			dowindow/k AskUserSystem
 			execute("AskUserSystem()")
 			break
+	endswitch
+end
+
+//////////////////
+///// Status /////
+//////////////////
+
+function/s getLS370status(instrID, [max_age])
+	// FIX pressure readings
+	// returns JSON string with current status
+	string instrID
+	variable max_age
+	if(paramisdefault(max_age))
+		max_age=120
+	endif
+
+	svar system, ighgaugelookup
+	string  buffer="", gauge=""
+	variable i=0
+
+	strswitch(system)
+		case "bfsmall":
+			buffer = addJSONkeyvalpair(buffer,"MC K",num2str(getLS370temp(instrID, "mc", max_age=max_age)))
+			buffer = addJSONkeyvalpair(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age=max_age)))
+			buffer = addJSONkeyvalpair(buffer,"4K Plate K",num2str(getLS370temp(instrID, "4K", max_age=max_age)))
+			buffer = addJSONkeyvalpair(buffer,"Magnet K",num2str(getLS370temp(instrID, "magnet", max_age=max_age)))
+			buffer = addJSONkeyvalpair(buffer,"50K Plate K",num2str(getLS370temp(instrID, "50K", max_age=max_age)))
+//			for(i=1;i<7;i+=1)
+//				gauge = "P"+num2istr(i)
+//				buffer = addJSONkeyvalpair(buffer,gauge,num2str(GetPressureDB(instrID,gauge)))
+//			endfor
+			return addJSONkeyvalpair("","BF Small",buffer)
+		case "igh":
+			buffer = addJSONkeyvalpair(buffer,"MC K",num2str(getLS370temp(instrID, "mc", max_age=max_age)))
+			buffer = addJSONkeyvalpair(buffer,"Cold Plate K",num2str(getLS370temp(instrID, "cold plate", max_age=max_age)))
+			buffer = addJSONkeyvalpair(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age=max_age)))
+			buffer = addJSONkeyvalpair(buffer,"1K Pot K",num2str(getLS370temp(instrID, "1K", max_age=max_age)))
+			buffer = addJSONkeyvalpair(buffer,"Sorb K",num2str(getLS370temp(instrID, "sorb", max_age=max_age)))
+//			for(i=1;i<6;i+=1)
+//				gauge = stringfromlist(i,ighgaugelookup)
+//				buffer = addJSONkeyvalpair(buffer,"P"+num2istr(i),num2str(GetPressureDB(instrID,gauge)))
+//			endfor
+			return addJSONkeyvalpair("","IGH",buffer)
 	endswitch
 end

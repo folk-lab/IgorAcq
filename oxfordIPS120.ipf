@@ -14,16 +14,24 @@
 /// IPS specific COMM ///
 /////////////////////////
 
-function openIPSconnection(instrID, visa_address, [verbose])
+function openIPSconnection(instrID, visa_address, [verbose, gui])
 	// instrID is the name of the global variable that will be used for communication
 	// visa_address is the VISA address string, i.e. ASRL1::INSTR
+	// verbose=0 will not print any information about the connection
+	// gui=1 will open the Igor GUI for the IPS
 	string instrID, visa_address
-	variable verbose
+	variable verbose, gui
 	
 	if(paramisdefault(verbose))
 		verbose=1
 	elseif(verbose!=1)
 		verbose=0
+	endif
+	
+	if(paramisdefault(gui))
+		gui=0
+	elseif(verbose!=0)
+		gui=1
 	endif
 	
 	variable localRM
@@ -37,6 +45,11 @@ function openIPSconnection(instrID, visa_address, [verbose])
 	sprintf comm, "name=IPS120,instrID=%s,visa_address=%s" instrID, visa_address
 	string options = "baudrate=9600,databits=8,stopbits=2"
 	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
+	
+	if(gui==1)
+		nvar localID = $instrID
+		initIPS120(localID)
+	endif
 end
 
 function writeIPScheck(instrID, cmd)	// Checks response for error

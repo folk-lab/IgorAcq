@@ -53,7 +53,7 @@ end
 function openVISAinstr(mandatory, [options, localRM, verbose])
 
 	string mandatory //  mandatory: "name= ,instrID= ,visa_address= "
-	string options   //  options: "test_query= ,init_function= ,baudrate= ,stopbits= ,databits= ,parity= ,timeout= " 
+	string options   //  options: "test_query= ,init_function= ,baudrate= ,stopbits= ,databits= ,parity= ,timeout= "
 
 	variable localRM, verbose
 	
@@ -154,7 +154,7 @@ end
 
 
 function openHTTPinstr(mandatory, [options, verbose])
-	string mandatory // mandatory: "name= ,instrID= ,ur = "
+	string mandatory // mandatory: "name= ,instrID= ,url = "
 	string options   // options: "init_function= , test_ping= "
 	variable verbose
 
