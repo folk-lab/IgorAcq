@@ -11,14 +11,29 @@
 //// Lakeshore 625 COMM ////
 ////////////////////////////
 
-function ls625CommSetup(instrID)
-	variable instrID
-
-	// setup communication attr
-	visaSetBaudRate(instrID, 57600) // baud rate
-	visaSetStopBits(instrID, 10) // 1 stop bit
-	visaSetDataBits(instrID, 7) // 7 data bits
-	visaSetParity(instrID, 1) // Odd parity
+function openLS625connection(instrID, visa_address, [verbose])
+	// instrID is the name of the global variable that will be used for communication
+	// visa_address is the VISA address string, i.e. ASRL1::INSTR
+	string instrID, visa_address
+	variable verbose
+	
+	if(paramisdefault(verbose))
+		verbose=1
+	elseif(verbose!=1)
+		verbose=0
+	endif
+	
+	variable localRM
+	variable status = viOpenDefaultRM(localRM) // open local copy of resource manager
+	if(status < 0)
+		VISAerrormsg("open LS625 connection:", localRM, status)
+		abort
+	endif
+	
+	string comm = ""
+	sprintf comm, "name=LS625,instrID=%s,visa_address=%s" instrID, visa_address
+	string options = "baudrate=57600,databits=7,stopbits=1,parity=1"
+	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
 end
 
 ///////////////////////
@@ -53,11 +68,6 @@ function initLS625Vector(instrIDx,instrIDy,instrIDz)
 	make/o listboxattr_sphericallist={{0,0,0},{0,0,0}}
 	string/g oldsweepratex,oldsweepratey,oldsweepratez
 	string/g oldsetpointx="0",oldsetpointy="0",oldsetpointz="0"
-
-	// Setting up serial communication
-	ls625CommSetup(instrIDx)
-	ls625CommSetup(instrIDy)
-	ls625CommSetup(instrIDz)
 
 	// Set sweep rates, unit: mT/s
 	setLS625rate(instrIDx,100)
@@ -514,14 +524,14 @@ function update_setpoint(action) : ButtonControl
 	variable check
 	wave/t setpointvalstr
 	svar oldsetpointx,oldsetpointy,oldsetpointz,instrDescX,instrDescY,instrDescZ
-	variable localInstrIDx,localInstrIDy,localInstrIDz
 
 	// open local instr connections
-	localInstrIDx = openTempcommLS625(instrDescX)
-	localInstrIDy = openTempcommLS625(instrDescY)
-	localInstrIDz = openTempcommLS625(instrDescZ)
+	openLS625connection("tempIDx", instrDescX, verbose=0)
+	openLS625connection("tempIDy", instrDescY, verbose=0)
+	openLS625connection("tempIDz", instrDescZ, verbose=0)
+	nvar tempIDx, tempIDy, tempIDz
 
-	check = setLS625allfield(localInstrIDx,localInstrIDy,localInstrIDz,str2num(setpointvalstr[0][1]),str2num(setpointvalstr[1][1]),str2num(setpointvalstr[2][1]))
+	check = setLS625allfield(tempIDx,tempIDy,tempIDz,str2num(setpointvalstr[0][1]),str2num(setpointvalstr[1][1]),str2num(setpointvalstr[2][1]))
 	if (check == 9)
 		oldsetpointx = setpointvalstr[0][1]
 		oldsetpointy = setpointvalstr[1][1]
@@ -556,9 +566,9 @@ function update_setpoint(action) : ButtonControl
 		setpointvalstr[2][1] = oldsetpointz
 	endif
 
-	viClose(localInstrIDx)
-	viClose(localInstrIDy)
-	viClose(localInstrIDz)
+	viClose(tempIDx)
+	viClose(tempIDy)
+	viClose(tempIDz)
 end
 
 function update_sweeprate(action) : ButtonControl
@@ -566,14 +576,14 @@ function update_sweeprate(action) : ButtonControl
 	variable check
 	wave/t sweepratevalstr
 	svar oldsweepratex,oldsweepratey,oldsweepratez,instrDescX,instrDescY,instrDescZ
-	variable localInstrIDx,localInstrIDy,localInstrIDz
 
 	// open local instr connections
-	localInstrIDx = openTempcommLS625(instrDescX)
-	localInstrIDy = openTempcommLS625(instrDescY)
-	localInstrIDz = openTempcommLS625(instrDescZ)
+	openLS625connection("tempIDx", instrDescX, verbose=0)
+	openLS625connection("tempIDy", instrDescY, verbose=0)
+	openLS625connection("tempIDz", instrDescZ, verbose=0)
+	nvar tempIDx, tempIDy, tempIDz
 
-	check = setLS625allrate(localInstrIDx,localInstrIDy,localInstrIDz,str2num(sweepratevalstr[0][1]),str2num(sweepratevalstr[1][1]),str2num(sweepratevalstr[2][1]))
+	check = setLS625allrate(tempIDx,tempIDy,tempIDz,str2num(sweepratevalstr[0][1]),str2num(sweepratevalstr[1][1]),str2num(sweepratevalstr[2][1]))
 	if (check == 9)
 		oldsweepratex = sweepratevalstr[0][1]
 		oldsweepratey = sweepratevalstr[1][1]
@@ -608,30 +618,30 @@ function update_sweeprate(action) : ButtonControl
 		sweepratevalstr[2][1] = oldsweepratez
 	endif
 
-	viClose(localInstrIDx)
-	viClose(localInstrIDy)
-	viClose(localInstrIDz)
+	viClose(tempIDx)
+	viClose(tempIDy)
+	viClose(tempIDz)
 end
 
 function update_everything(action) : ButtonControl
 	string action
 	wave fieldwave
-	variable localInstrIDx,localInstrIDy,localInstrIDz
 	svar instrDescX,instrDescY,instrDescZ
 
 	// open local instr connections
-	localInstrIDx = openTempcommLS625(instrDescX)
-	localInstrIDy = openTempcommLS625(instrDescY)
-	localInstrIDz = openTempcommLS625(instrDescZ)
+	openLS625connection("tempIDx", instrDescX, verbose=0)
+	openLS625connection("tempIDy", instrDescY, verbose=0)
+	openLS625connection("tempIDz", instrDescZ, verbose=0)
+	nvar tempIDx, tempIDy, tempIDz
 
-	getL625allfield(localInstrIDx,localInstrIDy,localInstrIDz)
-	getLS625allrate(localInstrIDx,localInstrIDy,localInstrIDz)
+	getL625allfield(tempIDx,tempIDy,tempIDz)
+	getLS625allrate(tempIDx,tempIDy,tempIDz)
 	CartisiantoSpherical(fieldwave[0],fieldwave[1],fieldwave[2])
 	update_output()
 
-	viClose(localInstrIDx)
-	viClose(localInstrIDy)
-	viClose(localInstrIDz)
+	viClose(tempIDx)
+	viClose(tempIDy)
+	viClose(tempIDz)
 end
 
 function update_output()
@@ -644,21 +654,6 @@ function update_output()
 		sphericalvalstr[i][1] = num2str(sphericalcoordinates[i])
 		sweepratevalstr[i][1] = num2str(sweepratewave[i])
 	endfor
-end
-
-function openTempcommLS625(instrDesc)
-	string instrDesc
-	variable status, localRM
-	string var_name="localhandle"
-
-	status = viOpenDefaultRM(localRM) // open local copy of resource manager
-    if(status < 0)
-        VISAerrormsg("open LS625 connection:", localRM, status)
-        abort
-    endif
-    openInstr(var_name, instrDesc, localRM=localRM, verbose=0)
-    nvar localhandle = $var_name
-    return localhandle
 end
 
 //////////////////
@@ -678,7 +673,7 @@ function/s GetVectorStatus(instrIDx,instrIDy,instrIDz)
 	subbuffer = ""
 	subbuffer = addJSONkeyvalpair(subbuffer, "x", num2str(getLS625rate(instrIDx)))
 	subbuffer = addJSONkeyvalpair(subbuffer, "y", num2str(getLS625rate(instrIDy)))
-	subbuffer = aaddJSONkeyvalpair(subbuffer, "z", num2str(getLS625rate(instrIDz)))
+	subbuffer = addJSONkeyvalpair(subbuffer, "z", num2str(getLS625rate(instrIDz)))
 	buffer = addJSONkeyvalpair(buffer, "rate mT/min", subbuffer)
 
 	return addJSONkeyvalpair("", "Vector Magnet", buffer)
