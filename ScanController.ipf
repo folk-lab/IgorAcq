@@ -1374,48 +1374,52 @@ function resumesweep(action) : Buttoncontrol
 	print "Sweep resumed"
 end
 
-function sc_checksweepstate()
-	nvar sc_abortsweep, sc_pause, sc_abortnosave
-	if (GetKeyState(0) & 32)
-			// If the ESC button is pressed during the scan, save existing data and stop the scan.
-			SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0)
-			abort
-		endif
 
-		if(sc_abortsweep)
-			// If the Abort button is pressed during the scan, save existing data and stop the scan.
-			SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0)
-			dowindow /k SweepControl
-			sc_abortsweep=0
-			sc_abortnosave=0
-			sc_pause=0
-			abort "Measurement aborted by user"
-		elseif(sc_abortnosave)
-			// Abort measurement without saving anything!
-			dowindow /k SweepControl
-			sc_abortnosave = 0
-			sc_abortsweep = 0
-			sc_pause=0
-			abort "Measurement aborted by user. Data NOT saved!"
-		elseif(sc_pause)
-			// Pause sweep if button is pressed
-			do
-				if(sc_abortsweep)
-					SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0)
-					dowindow /k SweepControl
-					sc_abortsweep=0
-					sc_abortnosave=0
-					sc_pause=0
-					abort "Measurement aborted by user"
-				elseif(sc_abortnosave)
-					dowindow /k SweepControl
-					sc_abortsweep=0
-					sc_abortnosave=0
-					sc_pause=0
-					abort "Measurement aborted by user. Data NOT saved!"
-				endif
-			while(sc_pause)
+
+function sc_checksweepstate()
+	nvar /Z sc_abortsweep, sc_pause, sc_abortnosave	
+	
+	if (GetKeyState(0) & 32)
+		// If the ESC button is pressed during the scan, save existing data and stop the scan.
+		abort "Measurement aborted by user. Data not saved automatically. Run \"SaveWaves()\" if needed"	
 	endif
+
+	if(NVAR_Exists(sc_abortsweep) && sc_abortsweep==1)
+		// If the Abort button is pressed during the scan, save existing data and stop the scan.
+		SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0)
+		dowindow /k SweepControl
+		sc_abortsweep=0
+		sc_abortnosave=0
+		sc_pause=0
+		abort "Measurement aborted by user. Data saved automatically."
+	elseif(NVAR_Exists(sc_abortnosave) && sc_abortnosave==1)
+		// Abort measurement without saving anything!
+		dowindow /k SweepControl
+		sc_abortnosave = 0
+		sc_abortsweep = 0
+		sc_pause=0
+		abort "Measurement aborted by user. Data not saved automatically. Run \"SaveWaves()\" if needed"
+	elseif(NVAR_Exists(sc_pause) && sc_pause==1)
+		// Pause sweep if button is pressed
+		do
+			if(sc_abortsweep)
+				SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0)
+				dowindow /k SweepControl
+				sc_abortsweep=0
+				sc_abortnosave=0
+				sc_pause=0
+				abort "Measurement aborted by user"
+			elseif(sc_abortnosave)
+				dowindow /k SweepControl
+				sc_abortsweep=0
+				sc_abortnosave=0
+				sc_pause=0
+				abort "Measurement aborted by user. Data NOT saved!"
+			endif
+		while(sc_pause)
+		
+	endif
+	
 end
 
 function sc_sleep(delay)
