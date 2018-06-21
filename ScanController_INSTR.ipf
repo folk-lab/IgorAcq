@@ -53,7 +53,7 @@ end
 function openVISAinstr(mandatory, [options, localRM, verbose])
 
 	string mandatory //  mandatory: "name= ,instrID= ,visa_address= "
-	string options   //  options: "test_query= ,init_function= ,baudrate= ,stopbits= ,databits= ,parity= ,timeout= "
+	string options   //  options: "test_query= ,baudrate= ,stopbits= ,databits= ,parity= ,timeout= "
 
 	variable localRM, verbose
 	
@@ -94,14 +94,9 @@ function openVISAinstr(mandatory, [options, localRM, verbose])
 	if(strlen(options)!=0)
 	
 		setVISAoptions(instrID,options)
-		
-		// run init function
-		string cmd = StringByKey("init_function",options,"=", ",")
-		if(strlen(cmd)>0)
-			execute(cmd) // execute the function if there is one
-		endif
 	
 		// run test query
+		string cmd
 		cmd = StringByKey("test_query",options,"=", ",")
 		if(strlen(cmd)>0)
 		
@@ -155,7 +150,7 @@ end
 
 function openHTTPinstr(mandatory, [options, verbose])
 	string mandatory // mandatory: "name= ,instrID= ,url = "
-	string options   // options: "init_function= , test_ping= "
+	string options   // options: "test_ping= "
 	variable verbose
 
 	// create global variable
@@ -177,13 +172,8 @@ function openHTTPinstr(mandatory, [options, verbose])
 
 	if(strlen(options)>0)
 	
-		// run init function
-		string cmd = StringByKey("init_function",options,"=", ",")
-		if(strlen(cmd)>0)  // still doesn't tell me if there is a value!!
-			execute(cmd) // execute the function if there is one
-		endif
-	
 		// run test query
+		string cmd
 		cmd = StringByKey("test_ping",options,"=", ",")
 		if(strlen(cmd)>0)
 			
@@ -592,7 +582,7 @@ function/s singleHTTPFromINI(index, [verbose])
 	endif
 
 	string mandatory="name=,instrID=,url="
-	string optional="test_ping=,init_function="
+	string optional="test_ping="
 	
 	variable sub_index = index+1, manKeyCnt=0
 	string key="", instrName=""
@@ -647,7 +637,7 @@ function/s singleVISAFromINI(index,localRM,[verbose])
 	endif
 	
 	string mandatory="name=,instrID=,visa_address="
-	string optional="test_query=,init_function=,baudrate=,stopbits=,databits=,parity=,readterm=,timeout="
+	string optional="test_query=,baudrate=,stopbits=,databits=,parity=,readterm=,timeout="
 	// write term not included
 	// our default is to set it to "" and put any required term characters in the instr driver
 	
