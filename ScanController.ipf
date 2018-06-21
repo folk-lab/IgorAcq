@@ -295,13 +295,15 @@ function sc_loadGlobalsINI(iniIdx)
 
 			// handle mandatory keys here
 			val = StringByKey(key,mandatory,"=", ",")
+
 			if(strlen(val)>0)
 				// this is in the manadtory key list
 				key = "sc_"+key // global variable names created from mandatory keys
 
-				if(cmpstr(val,"str")) // create string variables
+				if(cmpstr(val,"str")==0) // create string variables
+					print "strings", key, val, ini_text[sub_index+1]
 					string/g $key = ini_text[sub_index+1]
-				elseif(cmpstr(val,"var")) // create numeric variables
+				elseif(cmpstr(val,"var")==0) // create numeric variables
 					variable/g $key = str2num(ini_text[sub_index+1])
 				endif
 
@@ -316,9 +318,9 @@ function sc_loadGlobalsINI(iniIdx)
 				// this is in the manadtory key list
 				key = "sc_"+key // global variable names created from optional keys
 
-				if(cmpstr(val,"str")) // create string variables
+				if(cmpstr(val,"str")==0) // create string variables
 					string/g $key = ini_text[sub_index+1]
-				elseif(cmpstr(val,"var")) // create numeric variables
+				elseif(cmpstr(val,"var")==0) // create numeric variables
 					variable/g $key = str2num(ini_text[sub_index+1])
 				endif
 
@@ -404,12 +406,12 @@ function sc_setupAllFromINI(iniFile, [path])
 
 	endfor
 
-	// load instruments
-	instrList = loadInstrsFromINI(verbose=1)
-
-	if(guiCnt>0)
-		loadGUIsINI(guiIdx, instrList=instrList)
-	endif
+//	// load instruments
+//	instrList = loadInstrsFromINI(verbose=1)
+//
+//	if(guiCnt>0)
+//		loadGUIsINI(guiIdx, instrList=instrList)
+//	endif
 
 end
 
@@ -2187,6 +2189,7 @@ function sc_write2batch(fileref, searchStr, localFull)
 	localFull = TrimString(localFull)
 
 	svar sc_hostname, sc_srv_dir
+	
 	string lmdpath = getExpPath("lmd", full=1)
 	variable idx = strlen(lmdpath)+1, result=0
 	string srvFull = ""
