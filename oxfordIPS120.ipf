@@ -35,7 +35,7 @@ function openIPSconnection(instrID, visa_address, [verbose])
 	
 	string comm = ""
 	sprintf comm, "name=IPS120,instrID=%s,visa_address=%s" instrID, visa_address
-	string options = "baudrate=9600,databits=8,stopbits=2,readterm=\r"
+	string options = "baudrate=9600,databits=8,stopbits=2"
 	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
 end
 
