@@ -70,7 +70,7 @@ def mkdir_p(sftp, remote_directory):
     except IOError:
         dirname, basename = os.path.split(remote_directory.rstrip('/'))
         mkdir_p(sftp, dirname) # make parent directories
-        sftp.mkdir(basename) # sub-directory missing, so created it
+        sftp.mkdir(basename) # sub-directory missing, so create it
         sftp.chdir(basename)
         return True
 
@@ -99,12 +99,12 @@ if __name__ == '__main__':
     sftp = connect_sftp(username, server, port)
 
     # send files
-    # try:
-    filenames = [l.split(',') for l in lines[1:]]
-    for loc, rem in filenames:
-        put(sftp, loc, rem)
-        print("Uploaded: {0:s}".format(loc))
-    # except Exception as e:
-        # print('Exception caught during sftp.put: '.format(e))
+    try:
+        filenames = [l.split(',') for l in lines[1:]]
+        for loc, rem in filenames:
+            put(sftp, loc, rem)
+            print("Uploaded: {0:s}".format(loc))
+    except Exception as e:
+        print('Exception caught during sftp.put: '.format(e))
 
     sftp.close()

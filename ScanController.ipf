@@ -214,8 +214,10 @@ end
 function /S getExpPath(whichpath, [full])
 	// whichpath determines which path will be returned (data, winfs, config)
 	// lmd always gives the path to local_measurement_data
-	// if full==1, the full path on the local machine is returned in native style
 	// if full==0, the path relative to local_measurement_data is returned in Unix style
+	// if full==1, the full path on the local machine is returned in native style
+	// if full==2, the full path is returned in color-separated igor format
+
 	string whichpath
 	variable full
 
@@ -232,7 +234,7 @@ function /S getExpPath(whichpath, [full])
 	// get relative path to data
 	string temp1, temp2, temp3
 	SplitString/E="([\w\s\-\:]+)(?i)(local[\s\_]measurement[\s\_]data)([\w\s\-\:]+)" S_path, temp1, temp2, temp3
-	
+
 	string platform = igorinfo(2), separatorStr=""
 	if(cmpstr(platform,"Windows")==0)
 		separatorStr="*"
@@ -244,7 +246,11 @@ function /S getExpPath(whichpath, [full])
 		case "lmd":
 			// returns path to local_measurement_data on local machine
 			// always assumes you want the full path
-			return ParseFilePath(5, temp1+temp2, separatorStr, 0, 0)
+			if(full==2)
+				return temp1+temp2+":"
+			else // full=0 or 1
+				return ParseFilePath(5, temp1+temp2+":", separatorStr, 0, 0)
+			endif
 			break
 		case "sc":
 			// returns full path to the directory where ScanController lives
@@ -252,30 +258,52 @@ function /S getExpPath(whichpath, [full])
 			string sc_dir = FunctionPath("getExpPath")
 			variable pathLen = itemsinlist(sc_dir, ":")-1
 			sc_dir = RemoveListItem(pathLen, sc_dir, ":")
-			return ParseFilePath(5, sc_dir, separatorStr, 0, 0)
+			if(full==2)
+				return sc_dir
+			else // full=0 or 1
+				return ParseFilePath(5, sc_dir, separatorStr, 0, 0)
+			endif
 		case "data":
 			// returns path to data relative to local_measurement_data
 			if(full==0)
 				return ReplaceString(":", temp3[1,inf], "/")
-			else
-				print temp1+temp2+temp3
+			elseif(full==1)
 				return ParseFilePath(5, temp1+temp2+temp3, separatorStr, 0, 0)
+			elseif(full==2)
+				return S_path
+			else
+				return ""
 			endif
 			break
 		case "config":
-				if(full==0)
-					return ReplaceString(":", temp3[1,inf], "/")+"config/"
-				else
+			if(full==0)
+				return ReplaceString(":", temp3[1,inf], "/")+"config/"
+			elseif(full==1)
+				if(cmpstr(platform,"Windows")==0)
 					return ParseFilePath(5, temp1+temp2+temp3+"config:", separatorStr, 0, 0)
+				else
+					return ParseFilePath(5, temp1+temp2+temp3, separatorStr, 0, 0)+"config/"
 				endif
-				break
+			elseif(full==2)
+				return S_path+"config:"
+			else
+				return ""
+			endif
+			break
 		case "winfs":
 			if(full==0)
 				return ReplaceString(":", temp3[1,inf], "/")+"winfs/"
+			elseif(full==1)
+				if(cmpstr(platform,"Windows")==0)
+					return ParseFilePath(5, temp1+temp2+temp3+"winfs:", separatorStr, 0, 0)
+				else
+					return ParseFilePath(5, temp1+temp2+temp3, separatorStr, 0, 0)+"winfs/"
+				endif
+			elseif(full==2)
+				return S_path+"winfs:"
 			else
-				return ParseFilePath(5, temp1+temp2+temp3+"winfs:", separatorStr, 0, 0)
+				return ""
 			endif
-			break
 	endswitch
 end
 
@@ -450,14 +478,13 @@ function InitScanController([setupFile, setupPath, configFile])
 	svar sc_srv_url,sc_filetype,sc_slack_url,sc_sftp_user,sc_colormap
 	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
 
-	newpath /C/O/Q setup getExpPath("data", full=1) // create/overwrite setup path
-	newpath /C/O/Q config getExpPath("config", full=1) // create/overwrite config path
+	newpath /C/O/Q config getExpPath("config", full=2) // create/overwrite config path
 
 	// create remote path(s)
 	if(sc_srv_push==1)
 
 		if(CmpStr(sc_filetype, "ibw") == 0)
-			newpath /C/O/Q winfs getExpPath("winfs", full=1) // create/overwrite winf path
+			newpath /C/O/Q winfs getExpPath("winfs", full=2) // create/overwrite winf path
 		endif
 
 	else
