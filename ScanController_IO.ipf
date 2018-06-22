@@ -474,7 +474,7 @@ function/s escapeJSONstr(JSONstr,[notwave,double_slash])
 		notwave = 1
 	endif
 	
-	checkStr = JSONstr[1-notwave,strlen(JSONstr)-2]
+	checkStr = JSONstr[1-notwave,strlen(JSONstr)-2+notwave]
 	for(i=0;i<itemsinlist(checklist,";");i+=1)
 		do
 			escapePos =strsearch(checkStr,stringfromlist(i,checklist,";"),0)

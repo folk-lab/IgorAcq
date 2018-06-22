@@ -594,8 +594,7 @@ function/s sc_createconfig()
 
 	configfile = "sc" + num2istr(unixtime()) + ".config"
 	sc_current_config = configfile
-	return configstr
-	//writeJSONtoFile(configstr, configfile, "config")
+	writeJSONtoFile(configstr, configfile, "config")
 end
 
 function sc_loadConfig(configfile)
@@ -639,7 +638,7 @@ function sc_loadConfig(configfile)
 	sc_PrintCalc = booltonum(stringfromlist(0,extractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="calc"),","))
 
 	// load log string
-	sc_LogStr = unescapeJSONstr(stringfromlist(0,extractJSONvalues(getJSONkeyindex("log_string",t_tokentext)),","))
+	sc_LogStr = unescapeJSONstr(stringfromlist(0,extractJSONvalues(getJSONkeyindex("log_string",t_tokentext)),","),notwave=1)
 end
 
 /////////////////////
