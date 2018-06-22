@@ -244,7 +244,7 @@ function /S getExpPath(whichpath, [full])
 		case "lmd":
 			// returns path to local_measurement_data on local machine
 			// always assumes you want the full path
-			return ParseFilePath(5, temp1+temp2, separatorStr, 0, 0)
+			return ParseFilePath(5, temp1+temp2+":", separatorStr, 0, 0)
 			break
 		case "sc":
 			// returns full path to the directory where ScanController lives
@@ -262,12 +262,12 @@ function /S getExpPath(whichpath, [full])
 			endif
 			break
 		case "config":
-				if(full==0)
-					return ReplaceString(":", temp3[1,inf], "/")+"config/"
-				else
-					return ParseFilePath(5, temp1+temp2+temp3+"config:", separatorStr, 0, 0)
-				endif
-				break
+			if(full==0)
+				return ReplaceString(":", temp3[1,inf], "/")+"config/"
+			else
+				return ParseFilePath(5, temp1+temp2+temp3+"config:", separatorStr, 0, 0)
+			endif
+			break
 		case "winfs":
 			if(full==0)
 				return ReplaceString(":", temp3[1,inf], "/")+"winfs/"
