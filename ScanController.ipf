@@ -232,6 +232,7 @@ function /S getExpPath(whichpath, [full])
 	// get relative path to data
 	string temp1, temp2, temp3
 	SplitString/E="([\w\s\-\:]+)(?i)(local[\s\_]measurement[\s\_]data)([\w\s\-\:]+)" S_path, temp1, temp2, temp3
+	temp3 = RemoveTrailingWhitespace(temp3)
 
 	string platform = igorinfo(2), separatorStr=""
 	if(cmpstr(platform,"Windows")==0)
@@ -265,16 +266,23 @@ function /S getExpPath(whichpath, [full])
 			if(full==0)
 				return ReplaceString(":", temp3[1,inf], "/")+"config/"
 			else
-				return ParseFilePath(5, temp1+temp2+temp3+"config:", separatorStr, 0, 0)
+				if(cmpstr(platform,"Windows")==0)
+					return ParseFilePath(5, temp1+temp2+temp3+"config:", separatorStr, 0, 0)
+				else
+					return ParseFilePath(5, temp1+temp2+temp3, separatorStr, 0, 0)+"config/"
+				endif
 			endif
 			break
 		case "winfs":
 			if(full==0)
 				return ReplaceString(":", temp3[1,inf], "/")+"winfs/"
 			else
-				return ParseFilePath(5, temp1+temp2+temp3+"winfs:", separatorStr, 0, 0)
+				if(cmpstr(platform,"Windows")==0)
+					return ParseFilePath(5, temp1+temp2+temp3+"winfs:", separatorStr, 0, 0)
+				else
+					return ParseFilePath(5, temp1+temp2+temp3, separatorStr, 0, 0)+"winfs/"
+				endif
 			endif
-			break
 	endswitch
 end
 
