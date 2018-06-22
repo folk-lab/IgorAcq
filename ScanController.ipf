@@ -247,7 +247,11 @@ function /S getExpPath(whichpath, [full])
 		case "lmd":
 			// returns path to local_measurement_data on local machine
 			// always assumes you want the full path
-			return ParseFilePath(5, temp1+temp2+":", separatorStr, 0, 0)
+			if(full==2)
+				return temp1+temp2+":"
+			else // full=0 or 1
+				return ParseFilePath(5, temp1+temp2+":", separatorStr, 0, 0)
+			endif
 			break
 		case "sc":
 			// returns full path to the directory where ScanController lives
@@ -475,14 +479,13 @@ function InitScanController([setupFile, setupPath, configFile])
 	svar sc_srv_url,sc_filetype,sc_slack_url,sc_sftp_user,sc_colormap
 	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
 
-	newpath /C/O/Q setup getExpPath("data", full=1) // create/overwrite setup path
-	newpath /C/O/Q config getExpPath("config", full=1) // create/overwrite config path
+	newpath /C/O/Q config getExpPath("config", full=2) // create/overwrite config path
 
 	// create remote path(s)
 	if(sc_srv_push==1)
 
 		if(CmpStr(sc_filetype, "ibw") == 0)
-			newpath /C/O/Q winfs getExpPath("winfs", full=1) // create/overwrite winf path
+			newpath /C/O/Q winfs getExpPath("winfs", full=2) // create/overwrite winf path
 		endif
 
 	else
