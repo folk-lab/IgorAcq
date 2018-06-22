@@ -187,7 +187,7 @@ function/S executeMacCmd(command)
 
 	string cmd
 	sprintf cmd, "do shell script \"%s\"", command
-	ExecuteScriptText cmd
+	ExecuteScriptText /UNQ cmd
 
 	return S_value
 end
@@ -2351,18 +2351,21 @@ function sc_FileTransfer()
 		strswitch(platform)
 			case "Macintosh":
 				upload_script = getExpPath("sc", full=1)+"/SCRIPTS/transfer_data.py"		
-				sprintf cmd, "python %s %s" upload_script, batchFull
-				print cmd
+				// build command
+				// make sure we are using whatever python is prefered in .bash_profile
+				// .bash_profile is not loaded unless done explicitly
+				sprintf cmd, ". ~/.bash_profile;python %s %s" upload_script, batchFull
+				executeMacCmd(cmd) // this will actually print the results
 				break
 			case "Windows":
 				upload_script = getExpPath("sc", full=1)+"SCRIPTS\\transfer_data.py"		
 				sprintf cmd, "python \"%s\" \"%s\"" upload_script, batchFull
-				executeWinCmd(cmd)
+				executeWinCmd(cmd) // this _might_ print the results
 				break
 		endswitch
 		
 		sc_DeleteBatchFile() // Sent everything possible
-								  // assume users will fix errors manually
+								   // assume users will fix errors manually
 		return 1
 
 	else

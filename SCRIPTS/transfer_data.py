@@ -24,11 +24,13 @@ def read_private_key(pkey):
 def yield_private_keys():
     ''' look for private keys in ~/.ssh/id_* '''
 
-    private_key_search = os.path.join(os.path.expanduser('~'),
-                                  '.ssh\id_*')
+    user_directory = os.path.expanduser('~')
+    private_key_search = os.path.join(user_directory,'.ssh/id_*')
+
     key_list = glob.glob(private_key_search) # get all keys
     if(len(key_list)==0):
-        raise IOError('Public key not found!')
+        raise IOError('No SSH keys found!')
+
     public_keys = [k for k in key_list if k.endswith('.pub')]
     private_keys = [k for k in key_list if not k.endswith('.pub')]
     for pkey in private_keys:
@@ -97,12 +99,12 @@ if __name__ == '__main__':
     sftp = connect_sftp(username, server, port)
 
     # send files
-    try:
-        filenames = [l.split(',') for l in lines[1:]]
-        for loc, rem in filenames:
-            put(sftp, loc, rem)
-            print("Uploaded: {0:s}".format(loc))
-    except Exception as e:
-        print('Exception caught during sftp.put: '.format(e))
+    # try:
+    filenames = [l.split(',') for l in lines[1:]]
+    for loc, rem in filenames:
+        put(sftp, loc, rem)
+        print("Uploaded: {0:s}".format(loc))
+    # except Exception as e:
+        # print('Exception caught during sftp.put: '.format(e))
 
     sftp.close()
