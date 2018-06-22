@@ -214,8 +214,10 @@ end
 function /S getExpPath(whichpath, [full])
 	// whichpath determines which path will be returned (data, winfs, config)
 	// lmd always gives the path to local_measurement_data
-	// if full==1, the full path on the local machine is returned in native style
 	// if full==0, the path relative to local_measurement_data is returned in Unix style
+	// if full==1, the full path on the local machine is returned in native style
+	// if full==2, the full path is returned in color-separated igor format
+	
 	string whichpath
 	variable full
 
@@ -258,30 +260,42 @@ function /S getExpPath(whichpath, [full])
 			// returns path to data relative to local_measurement_data
 			if(full==0)
 				return ReplaceString(":", temp3[1,inf], "/")
-			else
+			elseif(full==1)
 				return ParseFilePath(5, temp1+temp2+temp3, separatorStr, 0, 0)
+			elseif(full==2)
+				return S_path
+			else
+				return ""
 			endif
 			break
 		case "config":
 			if(full==0)
 				return ReplaceString(":", temp3[1,inf], "/")+"config/"
-			else
+			elseif(full==1)
 				if(cmpstr(platform,"Windows")==0)
 					return ParseFilePath(5, temp1+temp2+temp3+"config:", separatorStr, 0, 0)
 				else
 					return ParseFilePath(5, temp1+temp2+temp3, separatorStr, 0, 0)+"config/"
 				endif
+			elseif(full==2)
+				return S_path+"config:"
+			else
+				return ""
 			endif
 			break
 		case "winfs":
 			if(full==0)
 				return ReplaceString(":", temp3[1,inf], "/")+"winfs/"
-			else
+			elseif(full==1)
 				if(cmpstr(platform,"Windows")==0)
 					return ParseFilePath(5, temp1+temp2+temp3+"winfs:", separatorStr, 0, 0)
 				else
 					return ParseFilePath(5, temp1+temp2+temp3, separatorStr, 0, 0)+"winfs/"
 				endif
+			elseif(full==2)
+				return S_path+"winfs:"
+			else
+				return ""
 			endif
 	endswitch
 end
