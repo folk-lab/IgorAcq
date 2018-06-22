@@ -12,14 +12,9 @@
 //			VDT and GPIB xop's should not be used anymore.
 //		-- "Request scripts" are removed from the scancontroller window. Its only use was
 //			 trying to do async communication (badly).
-//     -- Added Async checkbox in scancontroller window
-//     -- INI configuration files for scancontroller/instruments
-
-//TODO:
-//     -- SFTP file upload
-
-//FIX:
-//     -- NaN handling in JSON package
+//    -- Added Async checkbox in scancontroller window
+//    -- INI configuration files for scancontroller/instruments
+//    -- SFTP file upload using external python script
 
 
 ///////////////////////////////
@@ -442,12 +437,12 @@ function sc_setupAllFromINI(iniFile, [path])
 
 	endfor
 
-//	// load instruments
-//	instrList = loadInstrsFromINI(verbose=1)
-//
-//	if(guiCnt>0)
-//		loadGUIsINI(guiIdx, instrList=instrList)
-//	endif
+	// load instruments
+	instrList = loadInstrsFromINI(verbose=1)
+
+	if(guiCnt>0)
+		loadGUIsINI(guiIdx, instrList=instrList)
+	endif
 
 end
 
