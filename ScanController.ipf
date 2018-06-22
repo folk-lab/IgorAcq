@@ -165,7 +165,7 @@ function /S executeWinCmd(command)
 
 	string outputLine, result = ""
 	variable logRef
-	Open/P=data logRef as logFile 
+	Open/P=data logRef as logFile
 	do
 		FReadLine logRef, outputLine
 		if( strlen(outputLine) == 0 )
@@ -232,14 +232,14 @@ function /S getExpPath(whichpath, [full])
 	// get relative path to data
 	string temp1, temp2, temp3
 	SplitString/E="([\w\s\-\:]+)(?i)(local[\s\_]measurement[\s\_]data)([\w\s\-\:]+)" S_path, temp1, temp2, temp3
-
+	
 	string platform = igorinfo(2), separatorStr=""
 	if(cmpstr(platform,"Windows")==0)
 		separatorStr="*"
 	else
 		separatorStr="/"
 	endif
-	
+
 	strswitch(whichpath)
 		case "lmd":
 			// returns path to local_measurement_data on local machine
@@ -258,6 +258,7 @@ function /S getExpPath(whichpath, [full])
 			if(full==0)
 				return ReplaceString(":", temp3[1,inf], "/")
 			else
+				print temp1+temp2+temp3
 				return ParseFilePath(5, temp1+temp2+temp3, separatorStr, 0, 0)
 			endif
 			break
@@ -407,7 +408,7 @@ function sc_setupAllFromINI(iniFile, [path])
 
  				default:
  					printf "[WARNING] Section (%s) in INI not recognized and will be ignored!\r", ini_text[i]
- 				
+
 			endswitch
 		endif
 
@@ -554,7 +555,7 @@ function/s sc_createconfig()
 	configstr = addJSONkeyvalpair(configstr, "scripts", tmpstr)
 
 	// executable string to get logs
-//	configstr = addJSONkeyvalpair(configstr, "log_string", sc_LogStr, addQuotes=1)
+	configstr = addJSONkeyvalpair(configstr, "log_string", escapeJSONstr(sc_LogStr,notwave=1,double_slash=1))
 
 	// print_to_history
 	tmpstr = ""
@@ -566,7 +567,8 @@ function/s sc_createconfig()
 
 	configfile = "sc" + num2istr(unixtime()) + ".config"
 	sc_current_config = configfile
-	writeJSONtoFile(configstr, configfile, "config")
+	return configstr
+	//writeJSONtoFile(configstr, configfile, "config")
 end
 
 function sc_loadConfig(configfile)
@@ -584,7 +586,7 @@ function sc_loadConfig(configfile)
 	// read JSON sting. Results will be dumped into: t_tokentext, w_tokensize, w_tokenparent and w_tokentype
 	JSONSimple JSONstr
 	wave/t t_tokentext
-   wave w_tokensize, w_tokenparent, w_tokentype
+	wave w_tokensize, w_tokenparent, w_tokentype
 
 	// distribute JSON values
 	// load raw wave configuration
@@ -610,16 +612,7 @@ function sc_loadConfig(configfile)
 	sc_PrintCalc = booltonum(stringfromlist(0,extractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="calc"),","))
 
 	// load log string
-	// loading from config files is not working 
-	// tons of problems handling \" in logString while loading from .config file
-  
-//	sc_LogStr = stringfromlist(0,extractJSONvalues(getJSONkeyindex("log_string",t_tokentext)),",")
-
-	svar /Z sc_LogStr
-	if(!svar_exists(sc_LogStr))
-		sc_LogStr = ""
-	endif	
-
+	sc_LogStr = unescapeJSONstr(stringfromlist(0,extractJSONvalues(getJSONkeyindex("log_string",t_tokentext)),","))
 end
 
 /////////////////////
@@ -966,12 +959,12 @@ function sc_findAsyncMeasurements()
 					// keep track of function names and instrIDs in folder structure
 					strID = script[idx+1,strlen(script)-2]
 					queryFunc = script[0,idx-1]
-					
+
 					// creates root:async:instr1
 					sprintf threadFolder, "thread_%s", strID
 					if(DataFolderExists("root:async:"+threadFolder))
 						// add measurements to the thread directory for this instrument
-						
+
 						svar qF = root:async:$(threadFolder):queryFunc
 						qF += ";"+queryFunc
 						svar wI = root:async:$(threadFolder):wavIdx
@@ -1394,11 +1387,11 @@ end
 
 
 function sc_checksweepstate()
-	nvar /Z sc_abortsweep, sc_pause, sc_abortnosave	
-	
+	nvar /Z sc_abortsweep, sc_pause, sc_abortnosave
+
 	if (GetKeyState(0) & 32)
 		// If the ESC button is pressed during the scan, save existing data and stop the scan.
-		abort "Measurement aborted by user. Data not saved automatically. Run \"SaveWaves()\" if needed"	
+		abort "Measurement aborted by user. Data not saved automatically. Run \"SaveWaves()\" if needed"
 	endif
 
 	if(NVAR_Exists(sc_abortsweep) && sc_abortsweep==1)
@@ -1434,9 +1427,9 @@ function sc_checksweepstate()
 				abort "Measurement aborted by user. Data NOT saved!"
 			endif
 		while(sc_pause)
-		
+
 	endif
-	
+
 end
 
 function sc_sleep(delay)
@@ -2194,16 +2187,16 @@ function sc_write2batch(fileref, searchStr, localFull)
 	variable fileref
 	string searchStr, localFull
 	localFull = TrimString(localFull)
-	
+
 	string lmdpath = getExpPath("lmd", full=1)
 	variable idx = strlen(lmdpath)+1, result=0
 	string srvFull = ""
-	
+
 	string platform = igorinfo(2), localPart = localFull[idx,inf]
 	if(cmpstr(platform,"Windows")==0)
 		localPart = replaceString("\\", LocalPart, "/")
 	endif
-	
+
 	svar sc_hostname, sc_srv_dir
 	sprintf srvFull, "%s/%s/%s" sc_srv_dir, sc_hostname, localPart
 
@@ -2234,12 +2227,12 @@ function sc_findNewFiles(datnum)
 	getfilefolderinfo /Q/Z/P=data "pending_sftp.lst"
 	if(V_isFile==0) // if the file does not exist, create it with header
 		open /A/P=data refNum as "pending_sftp.lst"
-		
+
 		// create/write header
 		nvar sc_sftp_port
 		svar sc_srv_url,sc_sftp_user
-		fprintf refNum, "%s, %s, %d\n" sc_sftp_user, sc_srv_url, sc_sftp_port 
-		
+		fprintf refNum, "%s, %s, %d\n" sc_sftp_user, sc_srv_url, sc_sftp_port
+
 	else // if the file does exist, open it for appending
 		open /A/P=data refNum as "pending_sftp.lst"
 		FSetPos refNum, 0
@@ -2308,30 +2301,30 @@ function sc_findNewFiles(datnum)
 	// find new metadata files in winfs folder (if it exists)
 	getfilefolderinfo /Q/Z/P=winfs
 	if(V_flag==0 && V_isFolder==1)
-		
+
 		string winfpath = getExpPath("winfs", full=1)
 		extensions = ".winf;"
 		string winfstr = ""
 		idxList = ""
 		for(i=0;i<ItemsInList(extensions, ";");i+=1)
 			sprintf winfstr, "dat%d*%s", datnum, StringFromList(i, extensions, ";") // grep string
-			
+
 			idxList = IndexedFile(winfs, -1, StringFromList(i, extensions, ";"))
 			if(strlen(idxList)==0)
 				continue
 			endif
-			
+
 			matchList = ListMatch(idxList, winfstr, ";")
 			if(strlen(matchlist)==0)
 				continue
 			endif
-	
+
 			for(j=0;j<ItemsInList(matchList, ";");j+=1)
 				tmpname = winfpath+StringFromList(j,matchList, ";")
 				sc_write2batch(refnum, notifyText, tmpname)
 			endfor
 		endfor
-		
+
 	endif
 
 	close refnum // close pending_sftp.lst
@@ -2344,13 +2337,13 @@ function sc_FileTransfer()
 	GetFileFolderInfo /Q/Z/P=data batchFile
 	if( V_Flag == 0 && V_isFile ) // file exists
 		string batchFull = "", cmd = "", upload_script
-		
+
 		batchFull = getExpPath("data", full=1) + batchFile
-		
+
 		string platform = igorinfo(2)
 		strswitch(platform)
 			case "Macintosh":
-				upload_script = getExpPath("sc", full=1)+"/SCRIPTS/transfer_data.py"		
+				upload_script = getExpPath("sc", full=1)+"/SCRIPTS/transfer_data.py"
 				// build command
 				// make sure we are using whatever python is prefered in .bash_profile
 				// .bash_profile is not loaded unless done explicitly
@@ -2358,12 +2351,12 @@ function sc_FileTransfer()
 				executeMacCmd(cmd) // this will actually print the results
 				break
 			case "Windows":
-				upload_script = getExpPath("sc", full=1)+"SCRIPTS\\transfer_data.py"		
+				upload_script = getExpPath("sc", full=1)+"SCRIPTS\\transfer_data.py"
 				sprintf cmd, "python \"%s\" \"%s\"" upload_script, batchFull
 				executeWinCmd(cmd) // this _might_ print the results
 				break
 		endswitch
-		
+
 		sc_DeleteBatchFile() // Sent everything possible
 								   // assume users will fix errors manually
 		return 1

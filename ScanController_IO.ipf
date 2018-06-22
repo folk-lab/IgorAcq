@@ -436,14 +436,21 @@ function/s numericWaveToBoolArray(w)
 	return list[0,strlen(list)-2] + "]"
 end
 
-function/s unescapeJSONstr(JSONstr)
+function/s unescapeJSONstr(JSONstr,[notwave])
 	string JSONstr
+	variable notwave
 	variable escapePos
+
+	if(paramisdefault(notwave) || notwave==0)
+		notwave = 0
+	else
+		notwave = 1
+	endif
 
 	do
 		escapePos =strsearch(JSONstr,"\\",0)
 		if(escapePos > 0)
-			JSONstr = replacestring(JSONstr[escapePos,escapePos+4],JSONstr,num2char(str2num(JSONstr[escapePos+1,escapePos+4])))
+			JSONstr = replacestring(JSONstr[escapePos,escapePos+4+notwave],JSONstr,num2char(str2num(JSONstr[escapePos+1+notwave,escapePos+4+notwave])))
 		endif
 	while(escapePos > 0)
 
@@ -454,17 +461,25 @@ function/s unescapeJSONstr(JSONstr)
 	return JSONstr
 end
 
-function/s escapeJSONstr(JSONstr)
+function/s escapeJSONstr(JSONstr,[notwave,double_slash])
 	string JSONstr
+	variable notwave, double_slash
 	variable escapePos, i=0
 	string checkStr, checklist = "\";," // add more if needed
-
-	checkStr = JSONstr[1,strlen(JSONstr)-2]
+	
+	
+	if(paramisdefault(notwave) || notwave==0)
+		notwave = 0
+	else
+		notwave = 1
+	endif
+	
+	checkStr = JSONstr[1-notwave,strlen(JSONstr)-2]
 	for(i=0;i<itemsinlist(checklist,";");i+=1)
 		do
 			escapePos =strsearch(checkStr,stringfromlist(i,checklist,";"),0)
 			if(escapePos > 0)
-					checkStr = replacestring(checkStr[escapePos],checkStr,dectoescapedhexstr(char2num(checkStr[escapePos])))
+					checkStr = replacestring(checkStr[escapePos],checkStr,dectoescapedhexstr(char2num(checkStr[escapePos]),double_slash=double_slash))
 			endif
 		while(escapePos > 0)
 	endfor
@@ -472,14 +487,14 @@ function/s escapeJSONstr(JSONstr)
 	return "\""+checkStr+"\""
 end
 
-function/s dectoescapedhexstr(num,[add_slash])
-	variable num, add_slash
+function/s dectoescapedhexstr(num,[double_slash])
+	variable num, double_slash
 	string hexstring, hextable = "0,1,2,3,4,5,6,7,8,9,A,B,C,D,E,F"
 
-	if(paramisdefault(add_slash))
+	if(paramisdefault(double_slash) || double_slash==0)
 		hexstring = "\0x"
 	else
-		hexstring = "0x"
+		hexstring = "\\\0x"
 	endif
 
 	return hexstring+num2str(floor(num/16))+stringfromlist(num-floor(num/16)*16,hextable,",")
