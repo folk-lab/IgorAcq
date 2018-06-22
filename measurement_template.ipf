@@ -1,58 +1,11 @@
 #pragma rtGlobals=1    // Use modern global access method.
 
-///////////////////////
-/////    SETUP    /////
-///////////////////////
-
-macro initexp()
-    // customize this setup to each individual experiment
-    // try write all functions such that initexp() can be run
-    //     at any time without losing any setup/configuration info
-    
-    ///// setup ScanController /////
-    
-    // define instruments --
-    //      this wave should have columns with {instrument name, VISA address, test function}
-    //      use test = "" to skip query tests when connecting instruments
-	make /o/t connInstr = {{"srs1", "GPIB::1::INSTR",  "*IDN?", ""}, {\
-	                        "srs2", "GPIB::2::INSTR",  "*IDN?", ""}, {\
-	                        "dmm18","GPIB::18::INSTR", ""     , ""}, {\
-	                        "ips2", "ASRL2::INSTR",    "",      "ipsCommSetup(ips2)"}, {\
-	                        "bd1",  "ASRL1::INSTR",    "",      "bdCommSetup(bd1)"  }}
-
-	InitScanController(connInstr, srv_push=0) // pass instrument list wave to scan controller
-	sc_ColorMap = "VioletOrangeYellow" // change default colormap (default=Grays)
-
-	///// configure instruments /////
-	// setup individual instruments here for particular readings
-//	initIPS120(ips2)
-	setup3478Adcvolts(dmm18, 3, 1)
-	initIPS120(ips2)
-	InitBabyDACs(bd1, "5,6,1,2", "55,55,50,50")
-	
-end
-
-function testReadTime(numpts, delay) //Units: s
-  variable numpts, delay
-  wave /t connInstr
-
-  InitializeWaves(0, numpts, numpts, x_label="index")
-
-  variable i=0, ttotal = 0, tstart = datetime
-  do
-    sc_sleep(delay)
-    RecordValues(i, 0, fillnan=0)
-    i+=1
-  while (i<numpts)
-  ttotal = datetime-tstart
-  printf "each RecordValues(...) call takes ~%.1fms \n", ttotal/numpts*1000 - delay*1000
-
-  saveWaves(msg = "readtime tests")
-end
-
 ////////////////////////////
 //// MEAUREMENT SCRIPTS ////
 ////////////////////////////
+
+// put things here that need to be wrapped
+// so they can measure asynchronously
 
 threadsafe function read51adc(instrID)
 	variable instrID
@@ -193,7 +146,7 @@ function ScanBabyDACUntil(instrID, start, fin, channels, numpts, delay, ramprate
   string channels, operator, checkwave, comments
   string x_label
   variable i=0, j=0, setpoint
-  
+
   if(paramisdefault(comments))
     comments=""
   endif
@@ -466,7 +419,7 @@ function ScanBabyDACMultiRange(instrID, startvalues,finvalues,channels,numpts,de
   fin = Str2num(StringFromList(0,finvalues,","))
   InitializeWaves(start, fin, numpts, x_label=x_label)
   do
-  
+
     for(k=0;k<nChannels;k+=1)
       start = Str2num(StringFromList(k,startvalues,","))
       fin = Str2num(StringFromList(k,finvalues,","))
@@ -474,13 +427,13 @@ function ScanBabyDACMultiRange(instrID, startvalues,finvalues,channels,numpts,de
       setpoint = start + (i*(fin-start)/(numpts-1))
     endfor
     UpdateMultipleBD(instrID, action="ramp", ramprate=ramprate)
-    
+
     sc_sleep(delay)
     RecordValues(i, 0)
     i+=1
-    
+
   while (i<numpts)
-  
+
   SaveWaves(msg=comments)
 end
 
@@ -584,11 +537,11 @@ function ScanBabyDACIPS(ipsID, babyID, startx, finx, channelsx, numptsx, delayx,
   do
     setpointx = startx
     setpointy = starty + (i*(finy-starty)/(numptsy-1))
-    
+
     setIPS120fieldWait(ipsID, setpointy)
     RampMultipleBD(babyID, channelsx, setpointx, ramprate=rampratex)
     sc_sleep(delayy)
-    
+
     j=0
     do
       setpointx = startx + (j*(finx-startx)/(numptsx-1))
