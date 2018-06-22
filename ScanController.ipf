@@ -255,7 +255,11 @@ function /S getExpPath(whichpath, [full])
 			string sc_dir = FunctionPath("getExpPath")
 			variable pathLen = itemsinlist(sc_dir, ":")-1
 			sc_dir = RemoveListItem(pathLen, sc_dir, ":")
-			return ParseFilePath(5, sc_dir, separatorStr, 0, 0)
+			if(full==2)
+				return sc_dir
+			else // full=0 or 1
+				return ParseFilePath(5, sc_dir, separatorStr, 0, 0)
+			endif
 		case "data":
 			// returns path to data relative to local_measurement_data
 			if(full==0)
