@@ -332,7 +332,6 @@ function sc_loadGlobalsINI(iniIdx)
 				key = "sc_"+key // global variable names created from mandatory keys
 
 				if(cmpstr(val,"str")==0) // create string variables
-					print "strings", key, val, ini_text[sub_index+1]
 					string/g $key = ini_text[sub_index+1]
 				elseif(cmpstr(val,"var")==0) // create numeric variables
 					variable/g $key = str2num(ini_text[sub_index+1])
@@ -1105,7 +1104,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	// do this here, because if it fails
 	// i don't want to delete any old data
 	loadInstrsFromINI(verbose=0)
-
+	
 	// The status of the upcoming scan will be set when waves are initialized.
 	if(!paramisdefault(starty) && !paramisdefault(finy) && !paramisdefault(numptsy))
 		sc_is2d = 1
@@ -1331,15 +1330,18 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	while(i<numpnts(sc_CalcWaveNames))
 
 	execute("abortmeasurementwindow()")
-
+	
 	cmd1 = "TileWindows/O=1/A=(3,4) "
+	cmd2 = ""
 	// Tile graphs
 	for(i=0;i<itemsinlist(activegraphs);i=i+1)
 		window_string = stringfromlist(i,activegraphs)
 		cmd1+= window_string +","
+		
 		cmd2 = "DoWindow/F " + window_string
 		execute(cmd2)
 	endfor
+	
 	cmd1 += "SweepControl"
 	execute(cmd1)
 end
