@@ -611,7 +611,7 @@ function setOutputBD(instrID, channel, output) // in mV
 	board_index = floor(channel/4)
 
 	// Check that the voltage is valid
-	if(output > bd_range_high[board_index] || output < bd_range_low[board_index])
+	if(output > bd_range_high[board_index] || output < bd_range_low[board_index] || numtype(output) != 0)
 		string err
 		sprintf err, "voltage out of DAC range, %.3fmV", output
 		abort err
