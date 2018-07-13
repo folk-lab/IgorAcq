@@ -226,7 +226,12 @@ function setLS625current(instrID,output) // Units: A
 	wave/t setpointvalstr
 	nvar maxfieldx,maxfieldy,maxfieldz,ampsperteslax,ampsperteslay,ampsperteslaz
 	variable maxfield,ampspertesla,i=-1
-
+	
+	// check for NAN and INF
+	if(sc_check_naninf(output) != 0)
+		abort "trying to set output to NaN or Inf"
+	endif
+	
 	string l625 = getResourceAddress(instrID)
 
 	strswitch(l625)
@@ -314,7 +319,12 @@ function setLS625rate(instrID,output) // Units: mT/min
 	variable ramprate_amps
 	string cmd
 	variable maxramprate,ampspertesla,i=0,j=-1
-
+	
+	// check for NAN and INF
+	if(sc_check_naninf(output) != 0)
+		abort "trying to set ramp rate to NaN or Inf"
+	endif
+	
 	string l625 = getResourceAddress(instrID)
 
 	strswitch(l625)

@@ -359,8 +359,13 @@ function setLS370PIDcontrol(instrID,channel,setpoint,maxcurrent) //Units: mK, mA
 	variable channel, setpoint, maxcurrent
 	string payload, command, headers, token = "vMqyDIcB"
 	nvar temp_set
+	
+	// check for NAN and INF
+	if(sc_check_naninf(setpoint) != 0)
+		abort "trying to set setpoint to NaN or Inf"
+	endif
 
-	sprintf payload, "{ \"channel\": %d, \"set_point\": %g, \"max_current_ma\": %g, \"max_heater_level\": %s}", channel, setpoint/1000, maxcurrent, "8"
+	sprintf payload, "{\"channel\": %d, \"set_point\": %g, \"max_current_ma\": %g, \"max_heater_level\": %s}", channel, setpoint/1000, maxcurrent, "8"
 	headers = "Content-Type: application/json"
 	sprintf command, "set-temperature-control-parameters?_at_=%s", token
 	checkLS370URL(instrID)
@@ -415,7 +420,12 @@ function setLS370PIDtemp(instrID,temp) // Units: mK
 	variable interval=10 //ms
 	nvar temp_set
 	svar bfchannellookup, ighchannellookup
-
+	
+	// check for NAN and INF
+	if(sc_check_naninf(temp) != 0)
+		abort "trying to set temperarture to NaN or Inf"
+	endif
+	
 	sprintf payload, "{\"command\": \"SETP %g\"}", temp/1000
 	headers = "Content-Type: application/json"
 	sprintf command, "command?_at_=%s", token
@@ -443,7 +453,12 @@ function setLS370PIDparameters(instrID,p,i,d) // Units: No units
 	variable p,i,d
 	nvar p_value,i_value,d_value
 	string command,payload,headers,cmd, token = "vMqyDIcB"
-
+	
+	// check for NAN and INF
+	if(sc_check_naninf(p) != 0 || sc_check_naninf(i) != 0 || sc_check_naninf(d) != 0)
+		abort "trying to set PID parameters to NaN or Inf"
+	endif
+	
 	if(0.001 <= p && p <= 1000 && 0 <= i && i <= 10000 && 0 <= d && d <= 2500)
 		sprintf cmd,"PID %s,%s,%s", num2str(p), num2str(i), num2str(d)
 		headers = "Content-Type: application/json"
@@ -471,6 +486,11 @@ function setLS370heaterpower(instrID,heater,output) //Units: mW
 	variable channel, heater_idx
 	string command, payload, headers, token = "vMqyDIcB"
 
+	// check for NAN and INF
+	if(sc_check_naninf(output) != 0)
+		abort "trying to set power to NaN or Inf"
+	endif
+	
 	strswitch(system)
 		case "bfsmall":
 			heater_idx = whichlistitem(heater,bfheaterlookup,";")

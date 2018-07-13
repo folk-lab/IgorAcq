@@ -184,7 +184,13 @@ end
 
 threadsafe function SetSRSHarmonic(instrID,harm) // Units: AU
 	variable instrID,harm
-
+	
+	// check for NAN and INF
+	if(sc_check_naninf(harm) != 0)
+		print "trying to set harmonic to NaN or Inf"
+		return 0
+	endif
+	
 	writeInstr(instrID, "HARM "+num2str(harm)+"\n")
 end
 
@@ -192,7 +198,12 @@ function SetSRSTimeConst(instrID,timeConst) // Units: s
 	variable instrID, timeConst
 	variable range
 	make/o srs_tc_lookup = {0.00001,0.00003,0.0001,0.0003,0.001,0.003,0.01,0.03,0.1,0.3,1,3,10,30,100,300,1000,3000,10000,30000}
-
+	
+	// check for NAN and INF
+	if(sc_check_naninf(timeconst) != 0)
+		abort "trying to set time constant to NaN or Inf"
+	endif
+	
 	// check that time constant is within range
 	if(timeConst > 30000)
 		print "Time constant not within range, setting to nearest possible."
@@ -211,13 +222,23 @@ end
 
 function SetSRSPhase(instrID,phase) // Units: AU
 	variable instrID, phase
-
+	
+	// check for NAN and INF
+	if(sc_check_naninf(phase) != 0)
+		abort "trying to set phase to NaN or Inf"
+	endif
+	
 	writeInstr(instrID, "PHAS "+num2str(phase)+"\n")
 end
 
 function SetSRSAmplitude(instrID,amplitude) // Units: mV
 	variable instrID, amplitude
-
+	
+	// check for NAN and INF
+	if(sc_check_naninf(amplitude) != 0)
+		abort "trying to set amplitude to NaN or Inf"
+	endif
+	
 	if(amplitude < 4)
 		print "min amplitude is 4mV."
 		amplitude = 4
@@ -228,14 +249,24 @@ end
 
 function SetSRSFrequency(instrID,frequency)
 	variable instrID, frequency
-
+	
+	// check for NAN and INF
+	if(sc_check_naninf(frequency) != 0)
+		abort "trying to set frequency to NaN or Inf"
+	endif
+	
 	writeInstr(instrID, "FREQ "+num2str(frequency)+"\n")
 end
 
 function SetSRSSensitivity(instrID,sens) // Units: mV or nA
 	variable instrID, sens
 	make/o lookuptable={0.000002,0.000005,0.00001,0.00002,0.00005,0.0001,0.0002,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.2,0.5,1,2,5,10,20,50,100,200,500,1000}
-
+	
+	// check for NAN and INF
+	if(sc_check_naninf(sens) != 0)
+		abort "trying to set sensitivity to NaN or Inf"
+	endif
+	
 	make/o minsens = abs(lookuptable-sens)
 	findvalue/v=(wavemin(minsens)) minsens
 
