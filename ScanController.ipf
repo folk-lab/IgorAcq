@@ -302,6 +302,12 @@ function /S getExpPath(whichpath, [full])
 	endswitch
 end
 
+threadsafe function sc_check_NaNInf(num)
+	variable num
+	
+	return numtype(num)
+end
+
 ///////////////////////////////
 //// start scan controller ////
 ///////////////////////////////

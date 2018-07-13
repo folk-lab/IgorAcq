@@ -140,6 +140,12 @@ function setIPS120current(instrID, amps) // in A
 	NVAR maxfield=maxfield
 	NVAR ampspertesla=ampspertesla
 	wave/t magnetvalsstr=magnetvalsstr
+	
+	// check for NAN and INF
+	if(sc_check_naninf(amps) != 0)
+		abort "trying to set output to NaN or Inf"
+	endif
+	
 	if (abs(amps) > maxfield*ampspertesla/1000)
 		print "Magnet current not set, exceeds limit: "+num2str(maxfield*ampspertesla/1000)+" A"
 		return -1
@@ -157,6 +163,12 @@ function setIPS120field(instrID, field) // in mT
 	NVAR ampspertesla
 	variable amps
 	wave/t magnetvalsstr=magnetvalsstr
+	
+	// check for NAN and INF
+	if(sc_check_naninf(field) != 0)
+		abort "trying to set output to NaN or Inf"
+	endif
+	
 	if (abs(field) > maxfield)
 		print "Max field is "+num2str(maxfield)+" mT"
 		return -1
@@ -176,7 +188,12 @@ function setIPS120rate(instrID, ramprate) // mT/min
 	NVAR ampspertesla=ampspertesla
 	wave/t magnetvalsstr=magnetvalsstr
 	variable ramprate_amps
-
+	
+	// check for NAN and INF
+	if(sc_check_naninf(ramprate) != 0)
+		abort "trying to set ramp rate to NaN or Inf"
+	endif
+	
 	if (ramprate < 0 || ramprate > maxramprate)
 		print "Max sweep rate is "+num2str(maxramprate)+" mT/min"
 		return -1

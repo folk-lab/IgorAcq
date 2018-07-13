@@ -609,9 +609,14 @@ function setOutputBD(instrID, channel, output) // in mV
 	// Check that the DAC board is initialized
 	bdGetBoard(channel)
 	board_index = floor(channel/4)
-
+	
+	// check for NAN and INF
+	if(sc_check_naninf(output) != 0)
+		abort "trying to set voltage to NaN or Inf"
+	endif
+	
 	// Check that the voltage is valid
-	if(output > bd_range_high[board_index] || output < bd_range_low[board_index] || numtype(output) != 0)
+	if(output > bd_range_high[board_index] || output < bd_range_low[board_index])
 		string err
 		sprintf err, "voltage out of DAC range, %.3fmV", output
 		abort err

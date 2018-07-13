@@ -46,6 +46,11 @@ end
 function setK2400Current(instrID,curr) //Units: nA
 	variable instrID,curr
 	string cmd
+	
+	// check for NAN and INF
+	if(sc_check_naninf(curr) != 0)
+		abort "trying to set current to NaN or Inf"
+	endif
 
 	sprintf cmd, ":sour:func curr;:sour:curr:mode fix;:sour:curr:lev %.10f\n", curr*1e-9
 	writeInstr(instrID,cmd)
@@ -54,7 +59,12 @@ end
 function setK2400Voltage(instrID,volt) // Units: mV
 	variable instrID,volt
 	string cmd
-
+	
+	// check for NAN and INF
+	if(sc_check_naninf(volt) != 0)
+		abort "trying to set voltage to NaN or Inf"
+	endif
+	
 	sprintf cmd, ":sour:func volt;:sour:volt:mode fix;:sour:volt:lev %.10f\n", volt*1e-3
 	writeInstr(instrID,cmd)
 end
@@ -148,6 +158,11 @@ function setK2400compl(instrID, voltcurr, compl) // Pass "volt" or "curr", the v
 	string voltcurr
 	variable compl
 	string cmd
+	
+	// check for NaN and INF
+	if(sc_check_naninf(compl) != 0)
+		abort "trying to set compl to NaN or Inf"
+	endif
 
 	strswitch(voltcurr)
 		case "volt":
@@ -169,6 +184,11 @@ function setK2400range(instrID,voltcurr,range)
 	string voltcurr
 	variable range
 	string cmd
+	
+	// check for NAN and INF
+	if(sc_check_naninf(range) != 0)
+		abort "trying to set range to NaN or Inf"
+	endif
 
 	strswitch(voltcurr)
 		case "volt":
