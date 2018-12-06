@@ -85,7 +85,8 @@ threadsafe function getK2400voltage(instrID) // Units: mV
 	variable instrID
 	string response
 
-	response = queryInstr(instrID,":sens:func \"volt\";:form:elem volt\n",read_term="\n")
+	writeInstr(instrID,":sens:func \"volt\";:form:elem volt\n")
+	response = queryInstr(instrID,"READ?",read_term="\n")
 	return str2num(response)*1e3
 end
 

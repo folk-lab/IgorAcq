@@ -455,7 +455,7 @@ function InitScanController([setupFile, setupPath, configFile])
 	// start up a whole mess of scancontroller functionality
 
 	string setupFile, setupPath, configFile // use these to point to specific setup and config files
-											        // defaults are setup.ini in data path and most recent config
+											          // defaults are setup.ini in data path and most recent config
 
 	GetFileFolderInfo/Z/Q/P=data  // Check if data path is definded
 	if(v_flag != 0 || v_isfolder != 1)

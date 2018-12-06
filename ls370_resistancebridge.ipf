@@ -36,7 +36,7 @@ function openLS370connection(instrID, http_address, [verbose, gui])
 	
 	if(paramisdefault(gui))
 		gui=0
-	elseif(verbose!=0)
+	elseif(gui!=0)
 		gui=1
 	endif
 	
@@ -266,33 +266,33 @@ end
 
 // NOT implimented yet!
 
-function getLS370tempDB(instrID,plate) // Units: mK
-	// returns the temperature of the selected "plate".
-	// avaliable plates on BF systems: mc (mixing chamber), still, magnet, 4K, 50K
-	// avaliable plates on IGH systems: mc (mixing chamber), cold plate, still, 1K, sorb
-	// data is queried directly from the SQL database
-	string instrID
-	string plate
+//function getLS370tempDB(instrID,plate) // Units: mK
+//	// returns the temperature of the selected "plate".
+//	// avaliable plates on BF systems: mc (mixing chamber), still, magnet, 4K, 50K
+//	// avaliable plates on IGH systems: mc (mixing chamber), cold plate, still, 1K, sorb
+//	// data is queried directly from the SQL database
+//	string instrID
+//	string plate
+//
+//end
 
-end
+//function getLS370heaterpowerDB(instrID,heater) // Units: mW
+//	// returns the power of the selected heater.
+//	// avaliable heaters on BF systems: still (analog 2), mc
+//	// avaliable heaters on IGH systems: sorb (analog 1), still (analog 2), mc
+//	// data is queried directly from the SQL database
+//	string instrID
+//	string heater
+//end
 
-function getLS370heaterpowerDB(instrID,heater) // Units: mW
-	// returns the power of the selected heater.
-	// avaliable heaters on BF systems: still (analog 2), mc
-	// avaliable heaters on IGH systems: sorb (analog 1), still (analog 2), mc
-	// data is queried directly from the SQL database
-	string instrID
-	string heater
-end
-
-function getLS370pressureDB(instrID,gauge) // Units: mbar
-	// returns the pressure from the selected pressure gauge
-	// avaliable gauges on BF systems: P1,P2,P3,P4,P5,P6
-	// avaliable gauges on IGH systems: P1,P2,G1,G2,G3
-	// data is queried directly from the SQL database
-	string instrID
-	string gauge
-end
+//function getLS370pressureDB(instrID,gauge) // Units: mbar
+//	// returns the pressure from the selected pressure gauge
+//	// avaliable gauges on BF systems: P1,P2,P3,P4,P5,P6
+//	// avaliable gauges on IGH systems: P1,P2,G1,G2,G3
+//	// data is queried directly from the SQL database
+//	string instrID
+//	string gauge
+//end
 
 ///////////////////////
 //// Set Functions ////
@@ -709,14 +709,14 @@ function/s checkLS370URL(instrID)
 		endswitch
 end
 
-function/s GenerateDBURL(instrID,data_type,data_label)
-	string instrID
-	string data_type,data_label
-	svar system
-	string query_url
-
-	return query_url
-end
+//function/s GenerateDBURL(instrID,data_type,data_label)
+//	string instrID
+//	string data_type,data_label
+//	svar system
+//	string query_url
+//
+//	return query_url
+//end
 
 ///////////////////////
 //// Communication ////
@@ -1017,7 +1017,7 @@ function/s getLS370URL()
 
 	strswitch(system)
 		case "bfsmall":
-			return "http://bfsmall-wifi:7777/api/v1/"
+			return "http://bfsmall-wifi:17007/api/v1/"
 			break
 		case "igh":
 			return "http://qdash.qdot.lab:7777/api/v1/"
