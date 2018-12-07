@@ -48,6 +48,9 @@ function openLS370connection(instrID, http_address, [verbose, gui])
 	if(gui==1)
 		svar localID = $instrID
 		initLS370(localID)
+	else
+		setLS370system() // Set the correct system!
+		createLS370globals() // Create the needed global variables for the GUI
 	endif
 end
 
@@ -118,7 +121,8 @@ function getLS370temp(instrID, plate, [max_age]) // Units: K
 	headers = "Content-Type: application/json"
 	sprintf command, "get-channel-data/%d?max_age=%d&_at_=%s", channel, max_age, ls_token
 
-	return str2num(queryLS370(instrID,command,headers,"t","get"))
+	string result = queryLS370(instrID,command,headers,"data:temperature","get")
+	return str2num(result)
 end
 
 function getLS370heaterpower(instrID,heater, [max_age]) // Units: mW
@@ -722,6 +726,7 @@ function/s queryLS370(instrID,cmd,headers,responseformat,method,[payload])
 	endif
 
 	keys = getJSONkeys(response) // if heater output is 0, we only get time back!
+	print keys
 	if(findlistitem(responseformat,keys,",",0) == -1)
 		return "0"
 	else

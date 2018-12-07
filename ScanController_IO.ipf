@@ -717,7 +717,7 @@ function/s prettyJSONfmt(jstr)
 		else
 			parents = ""
 		endif
-		strVal = getJSONValue(jstr, printkey, parents=parents)
+		strVal = getJSONValue(jstr, addlistitem(printkey,parents,","))
 
 		switch(findJSONtype(strVal))
 			case 1:
@@ -920,27 +920,36 @@ function/s getJSONkeys(JSONstr)
 	return keylist
 end
 
-function/s getJSONvalue(JSONstr,key,[parents])
+function/s getJSONvalue(JSONstr,key)
 	// will return the value assosiated with the passed key
 	// parents should be a sting list "parent1,parent2", where parent2 is down stream from parent1
-	string JSONstr, key, parents
+	string JSONstr, key
 	string parentindexlist="", JSONvalues=""
 	variable i=0, j=0, numparents, offset, index
 
-	if(paramisdefault(parents))
+	variable key_len = itemsinlist(key, ":")
+	print key_len
+	string parents = ""
+	if(key_len>1)
+		parents = RemoveListItem(key_len-1, key, ":")
+		parents = parents[0,strlen(parents)-2]
+		key = StringFromList(key_len-1, key, ":")
+	else
 		parents = ""
 	endif
+	
+//	print key, parents
 
 	JSONSimple JSONstr
 	wave/t t_tokentext
 	wave w_tokensize, w_tokenparent, w_tokentype
 
-	numparents = itemsinlist(parents,",")
+	numparents = itemsinlist(parents,":")
 	if(numparents>0)
 		for(i=0;i<numparents;i+=1)
-			parentindexlist = addlistitem(num2str(getJSONkeyindex(stringfromlist(i,parents,","),t_tokentext)),parentindexlist,",",inf)
+			parentindexlist = addlistitem(num2str(getJSONkeyindex(stringfromlist(i,parents,":"),t_tokentext)),parentindexlist,":",inf)
 		endfor
-		offset = str2num(stringfromlist(itemsinlist(parentindexlist)-1,parentindexlist,","))
+		offset = str2num(stringfromlist(itemsinlist(parentindexlist)-1,parentindexlist,":"))
 	else
 		offset = 0
 	endif

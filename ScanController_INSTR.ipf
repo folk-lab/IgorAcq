@@ -167,7 +167,7 @@ function openHTTPinstr(mandatory, [options, verbose])
 	string name = StringByKey("name", mandatory, "=", ",")
 	string url = StringByKey("url", mandatory, "=", ",")
 	string var_name = StringByKey("instrID", mandatory, "=", ",")
-	
+
 	string /g $var_name = url
 	if(verbose==1)
 		printf "%s (%s) connected as %s\r", name, url, var_name
@@ -293,11 +293,10 @@ function/s getHTTP(instrID,cmd,headers)
 	string response, error
 
 //	print instrID+cmd
-	URLRequest /TIME=5.0 url=instrID+cmd, method=get, headers=headers
+	URLRequest /TIME=15.0 url=instrID+cmd, method=get, headers=headers
 
 	if (V_flag == 0)    // No error
 		response = S_serverResponse // response is a JSON string
-		print response
 		if (V_responseCode != 200)  // 200 is the HTTP OK code
 		   printf error, "[ERROR]: %s\r", getJSONvalue(response, "error")
 		   return ""
