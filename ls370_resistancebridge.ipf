@@ -218,6 +218,7 @@ function/s getLS370PIDparameters(instrID) // Units: No units
 	// returns the PID parameters used.
 	// the retruned values are comma seperated values.
 	// P = {0.001 1000}, I = {0 10000}, D = {0 2500}
+	
 	string instrID
 	nvar p_value,i_value,d_value
 	string headers, payload, pid, command
@@ -726,7 +727,7 @@ function/s queryLS370(instrID,cmd,headers,responseformat,method,[payload])
 	endif
 
 	keys = getJSONkeys(response) // if heater output is 0, we only get time back!
-	print keys
+
 	if(findlistitem(responseformat,keys,",",0) == -1)
 		return "0"
 	else

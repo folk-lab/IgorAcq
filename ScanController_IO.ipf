@@ -917,7 +917,8 @@ function/s getJSONkeys(JSONstr)
 		keylist = addlistitem(currentparentkeylist,keylist,",",inf)
 	endif
 
-	return keylist
+	// strip trailing ":" from parent:child lists and return
+	return ReplaceString(":,", keylist, ",")
 end
 
 function/s getJSONvalue(JSONstr,key)
@@ -928,7 +929,6 @@ function/s getJSONvalue(JSONstr,key)
 	variable i=0, j=0, numparents, offset, index
 
 	variable key_len = itemsinlist(key, ":")
-	print key_len
 	string parents = ""
 	if(key_len>1)
 		parents = RemoveListItem(key_len-1, key, ":")

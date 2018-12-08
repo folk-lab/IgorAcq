@@ -292,13 +292,13 @@ function/s getHTTP(instrID,cmd,headers)
 	string instrID, cmd, headers
 	string response, error
 
-//	print instrID+cmd
+	print instrID+cmd
 	URLRequest /TIME=15.0 url=instrID+cmd, method=get, headers=headers
 
 	if (V_flag == 0)    // No error
 		response = S_serverResponse // response is a JSON string
 		if (V_responseCode != 200)  // 200 is the HTTP OK code
-		   printf error, "[ERROR]: %s\r", getJSONvalue(response, "error")
+			print "[ERROR] HTTP response code " + num2str(V_responseCode)
 		   return ""
 		else
 			return response
