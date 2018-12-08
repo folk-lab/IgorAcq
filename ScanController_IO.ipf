@@ -747,115 +747,96 @@ end
 
 /// parse JSON strings to variables/waves ///
 
-function loadtextJSONfromkeys(keys,destinations,[children])
+function loadtextJSONfromkeys(keys,destinations)
 	// parse key,value pairs to text waves
-	string keys, destinations, children
+	string keys, destinations
 	variable i=0, j=0, index
 	string valuelist
 	wave/t t_tokentext
 	wave w_tokenparent, w_tokensize, w_tokentype
 
-	if(paramisdefault(children))
-		children = ""
-	endif
-
-	if(itemsinlist(keys,",")!=itemsinlist(destinations,","))
-		print "[ERROR]: loadtextJSONfromkeys() Number of keys doesn't match numbers of destination waves!"
-		return -1
-	else
-		for(i=0;i<itemsinlist(keys,",");i+=1)
-			index = getJSONkeyindex(stringfromlist(i,keys,","),t_tokentext)
-			valuelist = extractJSONvalues(index,children=stringfromlist(i,children,";"))
-			make/o/t/n=(itemsinlist(valuelist,",")) $stringfromlist(i,destinations,",") = stringfromlist(p,valuelist,",")
-			wave/t wref = $stringfromlist(i,destinations,",")
-			for(j=0;j<itemsinlist(valuelist,",");j+=1)
-				wref[j] = unescapeJSONstr(wref[j])
-			endfor
-		endfor
-	endif
+//	if(itemsinlist(keys,",")!=itemsinlist(destinations,","))
+//		print "[ERROR]: loadtextJSONfromkeys() Number of keys doesn't match numbers of destination waves!"
+//		return -1
+//	else
+//		for(i=0;i<itemsinlist(keys,",");i+=1)
+//			index = getJSONkeyindex(stringfromlist(i,keys,","),t_tokentext)
+//			valuelist = extractJSONvalues(index,children=stringfromlist(i,children,";"))
+//			make/o/t/n=(itemsinlist(valuelist,",")) $stringfromlist(i,destinations,",") = stringfromlist(p,valuelist,",")
+//			wave/t wref = $stringfromlist(i,destinations,",")
+//			for(j=0;j<itemsinlist(valuelist,",");j+=1)
+//				wref[j] = unescapeJSONstr(wref[j])
+//			endfor
+//		endfor
+//	endif
 end
 
-function loadbooleanJSONfromkeys(keys,destinations,[children])
+function loadbooleanJSONfromkeys(keys,destinations)
 	// parse key,value pairs to boolean waves
-	string keys, destinations, children
-	variable i=0, numchildren, index
+	string keys, destinations
+	variable i=0, index
 	string valuelist
 	wave/t t_tokentext
 	wave w_tokenparent, w_tokensize, w_tokentype
 
-	if(paramisdefault(children))
-		numchildren = 0
-		children = ""
-	endif
-
-	if(itemsinlist(keys,",")!=itemsinlist(destinations,","))
-		print "[ERROR]: Config load falied! Number of keys doesn't match numbers of destination waves!"
-		return -1
-	else
-		for(i=0;i<itemsinlist(keys,",");i+=1)
-			index = getJSONkeyindex(stringfromlist(i,keys,","),t_tokentext)
-			valuelist = extractJSONvalues(index,children=stringfromlist(i,children,";"))
-			make/o/n=(itemsinlist(valuelist,",")) $stringfromlist(i,destinations,",") = booltonum(stringfromlist(p,valuelist,","))
-		endfor
-	endif
+//	if(itemsinlist(keys,",")!=itemsinlist(destinations,","))
+//		print "[ERROR]: Config load falied! Number of keys doesn't match numbers of destination waves!"
+//		return -1
+//	else
+//		for(i=0;i<itemsinlist(keys,",");i+=1)
+//			index = getJSONkeyindex(stringfromlist(i,keys,","),t_tokentext)
+//			valuelist = extractJSONvalues(index,children=stringfromlist(i,children,";"))
+//			make/o/n=(itemsinlist(valuelist,",")) $stringfromlist(i,destinations,",") = booltonum(stringfromlist(p,valuelist,","))
+//		endfor
+//	endif
 end
 
-function/s extractJSONvalues(parentindex,[children])
+function/s extractJSONvalues(parentindex)
 	// returns a comma seperated list of all values belonging to the key with the index=parentindex
 	// or the values belonging to the lowest level child, if children are parsed.
 	// children must be a comma seperated string list
 	variable parentindex
-	string children
 	wave/t t_tokentext
 	wave w_tokenparent, w_tokensize
 	string valuelist=""
-	variable i=0,j=0, childindex, newchildindex, numchildren, offset=0
+	variable i=0,j=0, childindex, newchildindex, offset=0
 
-	// correct index based on the number of children
-	if(paramisdefault(children))
-		numchildren = 0
-		childindex=parentindex
-	else
-		numchildren = itemsinlist(children,",")
-		childindex=parentindex+mod(numchildren,2)
-	endif
-
-	// find and check child index's
-	do
-		if(numchildren>1)
-			// get highlevel key index
-			newchildindex = getJSONkeyindex(stringfromlist(0,children,","),t_tokentext,offset=offset)
-			children = removelistitem(0,children,",")
-			numchildren -= 1
-			if(childindex >= newchildindex)
-				print "[ERROR]: children keys are not in correct order!"
-				return ""
-			endif
-			childindex = newchildindex
-			offset = childindex
-		elseif(numchildren==1)
-			offset = childindex
-			newchildindex = getJSONkeyindex(stringfromlist(0,children),t_tokentext,offset=offset)
-			if(w_tokensize[newchildindex+1]>0)
-				childindex = newchildindex+1
-			else
-				childindex = newchildindex
-			endif
-			break
-		else
-			break
-		endif
-	while(numchildren>0)
-
-	// given the lowest level child index, find all values belonging to this key
-	for(i=0;i<numpnts(w_tokenparent);i+=1)
-		if(w_tokenparent[i] == childindex)
-			valuelist = addlistitem(t_tokentext[i],valuelist,",",inf)
-		endif
-	endfor
-
-	// returns a comma seperated list of values
-	return valuelist
+//	// find and check child index's
+//	do
+//		if(numchildren>1)
+//			// get highlevel key index
+//			newchildindex = getJSONkeyindex(stringfromlist(0,children,","),t_tokentext,offset=offset)
+//			children = removelistitem(0,children,",")
+//			numchildren -= 1
+//			if(childindex >= newchildindex)
+//				print "[ERROR]: children keys are not in correct order!"
+//				return ""
+//			endif
+//			childindex = newchildindex
+//			offset = childindex
+//		elseif(numchildren==1)
+//			offset = childindex
+//			newchildindex = getJSONkeyindex(stringfromlist(0,children),t_tokentext,offset=offset)
+//			if(w_tokensize[newchildindex+1]>0)
+//				childindex = newchildindex+1
+//			else
+//				childindex = newchildindex
+//			endif
+//			break
+//		else
+//			break
+//		endif
+//	while(numchildren>0)
+//
+//	// given the lowest level child index, find all values belonging to this key
+//	for(i=0;i<numpnts(w_tokenparent);i+=1)
+//		if(w_tokenparent[i] == childindex)
+//			valuelist = addlistitem(t_tokentext[i],valuelist,",",inf)
+//		endif
+//	endfor
+//
+//	// returns a comma seperated list of values
+//	return valuelist
 end
 
 function/s getJSONkeys(JSONstr)

@@ -617,28 +617,28 @@ function sc_loadConfig(configfile)
 	// distribute JSON values
 	// load raw wave configuration
 	// keys are: wavenames:raw, record_waves:raw, plot_waves:raw, meas_async:raw, scripts:raw
-	textkeys = "wave_names,scripts"
-	numkeys = "record_waves,plot_waves,meas_async"
+	textkeys = "wave_names:raw,scripts:raw"
+	numkeys = "record_waves:raw,plot_waves:raw,meas_async:raw"
 	textdestinations = "sc_RawWaveNames,sc_RawScripts"
 	numdestinations = "sc_RawRecord,sc_RawPlot,sc_measAsync"
-	loadtextJSONfromkeys(textkeys,textdestinations,children="raw;raw")
-	loadbooleanJSONfromkeys(numkeys,numdestinations,children="raw;raw;raw")
+	loadtextJSONfromkeys(textkeys,textdestinations)
+	loadbooleanJSONfromkeys(numkeys,numdestinations)
 
 	// load calc wave configuration
 	// keys are: wavenames:calc, record_waves:calc, plot_waves:calc, scripts:calc
-	textkeys = "wave_names,scripts"
-	numkeys = "record_waves,plot_waves"
+	textkeys = "wave_names:calc,scripts:calc"
+	numkeys = "record_waves:calc,plot_waves:calc"
 	textdestinations = "sc_CalcWaveNames,sc_CalcScripts"
 	numdestinations = "sc_CalcRecord,sc_CalcPlot"
-	loadtextJSONfromkeys(textkeys,textdestinations,children="calc;calc")
-	loadbooleanJSONfromkeys(numkeys,numdestinations,children="calc;calc")
+	loadtextJSONfromkeys(textkeys,textdestinations)
+	loadbooleanJSONfromkeys(numkeys,numdestinations)
 
 	// load print checkbox settings
-	sc_PrintRaw = booltonum(stringfromlist(0,extractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="raw"),","))
-	sc_PrintCalc = booltonum(stringfromlist(0,extractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="calc"),","))
+//	sc_PrintRaw = booltonum(stringfromlist(0,extractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="raw"),","))
+//	sc_PrintCalc = booltonum(stringfromlist(0,extractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="calc"),","))
 
 	// load log string
-	sc_LogStr = unescapeJSONstr(stringfromlist(0,extractJSONvalues(getJSONkeyindex("log_string",t_tokentext)),","),notwave=1)
+//	sc_LogStr = unescapeJSONstr(stringfromlist(0,extractJSONvalues(getJSONkeyindex("log_string",t_tokentext)),","),notwave=1)
 end
 
 /////////////////////
