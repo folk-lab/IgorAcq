@@ -1900,30 +1900,30 @@ function sc_write2batch(fileref, searchStr, localFull)
 
 	variable fileref
 	string searchStr, localFull
-	localFull = TrimString(localFull)
-
-	string lmdpath = getExpPath("lmd", full=1)
-	variable idx = strlen(lmdpath)+1, result=0
-	string srvFull = ""
-
-	string platform = igorinfo(2), localPart = localFull[idx,inf]
-	if(cmpstr(platform,"Windows")==0)
-		localPart = replaceString("\\", LocalPart, "/")
-	endif
-
-	svar sc_hostname, sc_srv_dir
-	sprintf srvFull, "%s/%s/%s" sc_srv_dir, sc_hostname, localPart
-
-	if(strlen(searchStr)==0)
-		// there is no notification file, add this immediately
-		fprintf fileref, "%s,%s\n", localFull, srvFull
-	else
-		// search for localFull in searchStr
-		result = strsearch(searchStr, localFull, 0)
-		if(result==-1)
-			fprintf fileref, "%s,%s\n", localFull, srvFull
-		endif
-	endif
+//	localFull = TrimString(localFull)
+//
+//	string lmdpath = getExpPath("lmd", full=1)
+//	variable idx = strlen(lmdpath)+1, result=0
+//	string srvFull = ""
+//
+//	string platform = igorinfo(2), localPart = localFull[idx,inf]
+//	if(cmpstr(platform,"Windows")==0)
+//		localPart = replaceString("\\", LocalPart, "/")
+//	endif
+//
+//	svar sc_hostname, sc_srv_dir
+//	sprintf srvFull, "%s/%s/%s" sc_srv_dir, sc_hostname, localPart
+//
+//	if(strlen(searchStr)==0)
+//		// there is no notification file, add this immediately
+//		fprintf fileref, "%s,%s\n", localFull, srvFull
+//	else
+//		// search for localFull in searchStr
+//		result = strsearch(searchStr, localFull, 0)
+//		if(result==-1)
+//			fprintf fileref, "%s,%s\n", localFull, srvFull
+//		endif
+//	endif
 
 end
 
@@ -1962,15 +1962,15 @@ function sc_findNewFiles(datnum)
 	if(sc_save_exp == 1)
 		// add experiment file
 		tmpname = datapath+igorinfo(1)+".pxp"
-		sc_write2batch(refnum, notifyText, tmpname)
+//		sc_write2batch(refnum, notifyText, tmpname)
 
 		// add history file
 		tmpname = datapath+igorinfo(1)+".history"
-		sc_write2batch(refnum, notifyText, tmpname)
+//		sc_write2batch(refnum, notifyText, tmpname)
 
 		// add procedure file
 		tmpname = datapath+igorinfo(1)+".ipf"
-		sc_write2batch(refnum, notifyText, tmpname)
+//		sc_write2batch(refnum, notifyText, tmpname)
 
 	endif
 
@@ -1991,7 +1991,7 @@ function sc_findNewFiles(datnum)
 
 		for(j=0;j<ItemsInList(matchList, ";");j+=1)
 			tmpname = datapath+StringFromList(j,matchList, ";")
-			sc_write2batch(refnum, notifyText, tmpname)
+//			sc_write2batch(refnum, notifyText, tmpname)
 		endfor
 	endfor
 
