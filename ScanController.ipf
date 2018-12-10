@@ -622,7 +622,7 @@ function/s readtxtfile(filename, path)
 	endif
 
 	do
-		freadline refnum, buffer
+		freadline refnum, buffer // returns \r no matter what was used in the file
 		if(strlen(buffer)==0)
 			break
 		endif
@@ -690,15 +690,109 @@ end
 
 function sc_loadConfig(configfile)
 	string configfile
-	string JSONstr, checkStr, textkeys, numkeys, textdestinations, numdestinations
-	variable i=0,escapePos=-1
+	string TOMLstr
 	nvar sc_PrintRaw, sc_PrintCalc
 	svar sc_LogStr, sc_current_config, sc_current_config
 
-	// load json string from config file
+	// load TOML string from config file
 	printf "Loading configuration from: %s\n", configfile
 	sc_current_config = configfile
-	TOMLstr = readtxtfile("config", configfile)
+	TOMLstr = readtxtfile(configfile,"config")
+	
+	// waves
+	loadtextarrayintowave(getvalueTOML(TOMLstr,"waves:raw"),"sc_RawWaveNames")
+	loadtextarrayintowave(getvalueTOML(TOMLstr,"waves:calc"),"sc_CalcWaveNames")
+	
+	// record checkboxes
+	loadbooleanarrayintowave(getvalueTOML(TOMLstr,"checkboxes.record:raw"),"sc_RawRecord")
+	loadbooleanarrayintowave(getvalueTOML(TOMLstr,"checkboxes.record:calc"),"sc_CalcRecord")
+	
+	// plot checkboxes
+	loadbooleanarrayintowave(getvalueTOML(TOMLstr,"checkboxes.plot:raw"),"sc_RawPlot")
+	loadbooleanarrayintowave(getvalueTOML(TOMLstr,"checkboxes.plot:calc"),"sc_CalcPlot")
+	
+	// async checkboxes
+	loadbooleanarrayintowave(getvalueTOML(TOMLstr,"checkboxes.asybc:async"),"sc_measAsync")
+	
+	// print_to_history
+	loadbooleanintovariable(getvalueTOML(TOMLstr,"checkboxes.history:raw"),"sc_PrintRaw")
+	loadbooleanintovariable(getvalueTOML(TOMLstr,"checkboxes.history:calc"),"sc_PrintCalc")
+	
+	// scripts
+	loadtextarrayintowave(getvalueTOML(TOMLstr,"scripts:raw"),"sc_RawScripts")
+	loadtextarrayintowave(getvalueTOML(TOMLstr,"scripts:calc"),"sc_CalcScripts")
+	
+	// executable string to get logs
+	loadtextintostring(getvalueTOML(TOMLstr,"logstring:logstr"),"sc_Logstr")
+	
+	//filenum
+	loadnumintovariable(getvalueTOML(TOMLstr,"filenum:num"),"sc_filenum")
+	
+	// reload ScanController window
+	//sc_rebuildwindow()
+end
+
+function/s getvalueTOML(TOMLstr,key)
+	// returns the value associated with key
+	// returns an empty string is key is not valid
+	string TOMLstr,key
+	variable key_length,index,old_index,i=0, val_start, val_end
+	string str
+	
+	key_length = itemsinlist(key,":")
+	
+	// search TOMLstr for key
+	old_index = 0
+	for(i=0;i<key_length;i+=1)
+		if(i<key_length-1)
+			str = "["+stringfromlist(i,key,":")+"]"
+		else
+			str = stringfromlist(i,key,":")
+		endif
+		index = strsearch(TOMLstr,str,old_index)
+		if(index==-1 || index<old_index)
+			return ""
+		endif
+		old_index=index+strlen(str)
+	endfor
+	val_start = index+strlen(str)+1
+	val_end = strsearch(TOMLstr,num2char(13),val_start) // look for \r
+
+	return TOMLstr[val_start,val_end-1]
+end
+
+function loadtextarrayintowave(array,destwave)
+	string array,destwave
+	
+	array = array[1,strlen(array)-2]
+	
+	make/o/t/n=(itemsinlist(array,",")) $destwave = stringfromlist(p,array,",")
+end
+
+function loadbooleanarrayintowave(array,destwave)
+	string array,destwave
+	
+	array = array[1,strlen(array)-2]
+	
+	make/o/n=(itemsinlist(array,",")) $destwave = booltonum(stringfromlist(p,array,","))
+end
+
+function loadbooleanintovariable(boolean,destvar)
+	string boolean,destvar
+	
+	variable/g $destvar = booltonum(boolean)
+end
+
+function loadtextintostring(str,deststring)
+	string str,deststring
+	
+	string/g $deststring = str
+end
+
+function loadnumintovariable(numasstr,destvar)
+	string numasstr,destvar
+	
+	variable/g $destvar = str2num(numasstr)
 end
 
 /////////////////////
