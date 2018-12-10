@@ -310,7 +310,7 @@ function InitScanController([configFile, srv_push])
 	variable /g sc_srv_push
 	if(paramisdefault(srv_push) || srv_push==1)
 		sc_srv_push = 1
-		print "[WARNING] pusing data to server is temporarily disabled"
+		print "[WARNING] pushing data to server is temporarily disabled"
 	else
 		sc_srv_push = 0
 		print "[WARNING] Only saving local copies of data."
@@ -2167,7 +2167,7 @@ function sc_FileTransfer()
 		batchFull = getExpPath("data", full=1) + batchFile
 
 		/// send data here ///
-		print "[WARNING] config file support temporarily disabled"
+		print "[WARNING] pushing data to the server is temporarily disabled"
 
 		sc_DeleteBatchFile() // Sent everything possible
 								   // assume users will fix errors manually
