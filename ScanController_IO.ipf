@@ -248,13 +248,69 @@ function countQuotes(str)
 	return quoteCount
 end
 
-function/s removeEscapedQuotes(str)
-	// this is going to be all messed up if there needs to be
-	// something quoted in the string
-	// i think we really want "RemoveOuterEscapedQuotes(str)" that only removes the first and last
+function countSqBrackets(str)
+	// count how many brackets are in the string
+	// +1 for ]
+	// -1 for [
 	string str
+	variable bracketCount = 0, i = 0, escaped = 0
+	for(i=0; i<strlen(str); i+=1)
+	
+		// check if the current character is escaped
+		if(i!=0)
+			if( CmpStr(str[i-1], "\\") == 0)
+				escaped = 1
+			else
+				escaped = 0
+			endif
+		endif
+	
+		// count opening brackets
+		if( CmpStr(str[i], "[" ) == 0 && escaped == 0)
+			bracketCount -= 1
+		endif
+		
+		// count closing brackets
+		if( CmpStr(str[i], "]" ) == 0 && escaped == 0)
+			bracketCount += 1
+		endif
+		
+	endfor
+	return bracketCount
+end
 
-	return replacestring("\"",str,"")
+function/s removeLiteralQuotes(str)
+	string str
+//
+//	return replacestring("\"",str,"")
+end
+
+function/s removeSqBrackets(str)
+	// removes outermost brackets
+	// and whitespace from a string
+	string str
+	
+	variable i=0
+	for(i=0;i<strlen(str);i+=1)
+		if(CmpStr(str[i],"[")==0)
+			break
+		endif
+	endfor
+	
+	if(i==strlen(str)-1)
+		print "[ERROR] String not surrounded by brackets. str: "+str
+		return ""
+	endif
+	
+	str = str[i+1,inf]
+	variable j
+	for(j=strlen(str); j>0; j-=1)
+		if(CmpStr(str[j],"]")==0)
+			break
+		endif
+	endfor
+
+	return str[0,j-1]	
 end
 
 Function/t removeStringListDuplicates(theListStr)
@@ -291,19 +347,19 @@ function LoadTextArrayToWave(array,destwave)
 	string array,destwave
 	variable i=0
 	
-	array = array[1,strlen(array)-2]
+	array = removeSqBrackets(array)
 	
 	make/o/t/n=(itemsinlist(array,",")) $destwave = stringfromlist(p,array,",")
 	wave/t wref = $destwave
 	for(i=0;i<(itemsinlist(array,","));i+=1)
-		wref[i] = removeEscapedQuotes(wref[i])
+		wref[i] = removeLiteralQuotes(wref[i])
 	endfor
 end
 
 function LoadBoolArrayToWave(array,destwave)
 	string array,destwave
 
-	array = array[1,strlen(array)-2]
+	array = removeSqBrackets(array)
 
 	make/o/n=(itemsinlist(array,",")) $destwave = booltonum(stringfromlist(p,array,","))
 end
@@ -317,7 +373,7 @@ end
 function LoadTextToString(str,deststring)
 	string str,deststring
 	
-	string/g $deststring = removeEscapedQuotes(str)
+	string/g $deststring = removeLiteralQuotes(str)
 end
 
 function LoadNumToVar(numasstr,destvar)
@@ -436,7 +492,9 @@ end
 
 // a quick attempt at writing a TOML parser
 // https://en.wikipedia.org/wiki/TOML
-// most of the more complicated stuff is not supported
+// https://github.com/toml-lang/toml
+
+// most of the more complicated stuff (nested arrays, tables) is not supported
 
 function/s getTOMLvalue(TOMLstr,key)
 	// returns the value associated with key
@@ -451,28 +509,65 @@ function/s getTOMLvalue(TOMLstr,key)
 	// record index of first character _after_ key
 	old_index = 0
 	for(i=0;i<key_length;i+=1)
-		if(i<key_length-1)
-			str = "["+stringfromlist(i,key,":")+"]"
-		else
-			str = stringfromlist(i,key,":")
-		endif
+		str = stringfromlist(i,key,":") 
 		index = strsearch(TOMLstr,str,old_index)
+		
 		if(index==-1 || index<old_index)
+			print "[ERROR] key not found in TOML: "+key
 			return ""
 		endif
 		old_index=index+strlen(str)
 	endfor
-
-	// starting from key find "="
-	// read values until "\r"
-	// if "\r" is found, check for unclosed "["
-	//   if there are any, keep reading for next "\r"
-
-	val_start = index+strlen(str)+1
-
-	val_end = strsearch(TOMLstr,num2char(13),val_start) // look for \r
-
-	return TOMLstr[val_start,val_end-1]
+	TOMLstr = TOMLstr[old_index,inf] // everything from the key onward
+										      // look for equal sign next
+	i=0
+	do
+		if(i>strlen(TOMLstr)-1)
+			// end of string. something wasn't formatted right.
+			print "[ERROR] key = value line incorrectly formatted for key: "+key
+			return ""
+		endif
+		
+		if(char2num(TOMLstr[i])==char2num("="))
+			// found the equal sign. great.
+			i+=1
+			break
+		elseif(IsWhiteSpace(TOMLstr[i]))
+			// white space. keep looking.
+			i+=1
+		else
+			// not white space. not an equal sign. bad formatting.
+			print "[ERROR] key = value line incorrectly formatted for key: "+key
+			return ""
+		endif
+	while(1==1)
+	TOMLstr = TOMLstr[i,inf] // everything from the = onward
+							       // look for full value next
+							       
+	i=0
+	do
+		if(i>strlen(TOMLstr)-1)
+			// end of string. something wasn't formatted right.
+			print "[ERROR] key = value line incorrectly formatted for key: "+key
+			return ""
+		endif
+		
+		if(char2num(TOMLstr[i])==char2num("\r"))
+			// line break!
+			if(countSqBrackets(TOMLstr[i,inf])!=0 || mod(countQuotes(TOMLstr[i,inf]),2)!=0)
+				// there are unclosed brackets or quotes
+				// this is a multi line array or string
+				i+=1
+				continue
+			else
+				break
+			endif
+		endif
+		i+=1
+	while(1==1)
+	
+	TOMLstr = removeTrailingWhitespace(TOMLstr[0,i])
+	return removeLeadingWhitespace(TOMLstr)
 end
 
 function/s addTOMLblock(name,[str,indent])
