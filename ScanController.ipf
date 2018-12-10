@@ -19,13 +19,7 @@
 ////// utility functions //////
 ///////////////////////////////
 
-function sc_randomInt()
-	variable from=-1e6, to=1e6
-	variable amp = to - from
-	return floor(from + mod(abs(enoise(100*amp)),amp+1))
-end
-
-function unixtime()
+function unixTime()
 	// returns the current unix time in seconds
 	return DateTime - date2secs(1970,1,1) - date2secs(-1,-1,-1)
 end
@@ -66,7 +60,6 @@ Function/t removeStringListDuplicates(theListStr)
 End
 
 function/s searchFullString(string_to_search,substring)
-    // returns
 	string string_to_search, substring
 	string index_list=""
 	variable test, startpoint=0
@@ -124,13 +117,6 @@ Function IsWhiteSpace(char)
 
     return GrepString(char, "\\s")
 End
-
-function /S ReplaceBullets(str)
-	// replace bullet points with >>> in string
-	string str
-
-	return ReplaceString(U+2022, str, ">>> ")
-end
 
 function /S executeWinCmd(command)
 	// run the shell command
@@ -1972,7 +1958,7 @@ function SaveFromPXP([history, procedure])
 		do
 			FReadLine /N=(numHistoryBytes-bytes) expRef, buffer
 			bytes+=strlen(buffer)
-			fprintf histRef, "%s", ReplaceBullets(buffer)
+			fprintf histRef, "%s", buffer
 
 			if(datetime-t_start>2.0)
 				// timeout at 2 seconds

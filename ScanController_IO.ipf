@@ -274,6 +274,56 @@ end
 /// formatting ///
 //////////////////
 
+function countQuotes(str)
+	// count how many quotes are in the string
+	// +1 for "
+	// escaped quotes are ignored
+	string str
+	variable quoteCount = 0, i = 0, escaped = 0
+	for(i=0; i<strlen(str); i+=1)
+
+		// check if the current character is escaped
+		if(i!=0)
+			if( CmpStr(str[i-1], "\\") == 0)
+				escaped = 1
+			else
+				escaped = 0
+			endif
+		endif
+
+		// count opening brackets
+		if( CmpStr(str[i], "\"" ) == 0 && escaped == 0)
+			quoteCount += 1
+		endif
+
+	endfor
+	return quoteCount
+end
+
+function/s escapeInnerQuotes(str)
+	string str
+	variable i, escaped
+	string dummy="", newStr=""
+
+	for(i=1; i<strlen(str)-1; i+=1)
+
+		// check if the current character is escaped
+		if(cmpStr(str[i-1], "\\") == 0)
+			escaped = 1
+		else
+			escaped = 0
+		endif
+
+		// find extra quotes
+		dummy = str[i]
+		if(cmpStr(dummy, "\"" )==0 && escaped==0)
+			dummy = "\\"+dummy
+		endif
+		newStr = newStr+dummy
+	endfor
+	return newStr
+end
+
 function/s numToBool(val)
 	variable val
 	if(val==1)
@@ -298,7 +348,7 @@ function boolToNum(str)
 end
 
 function/s numericWaveToBoolArray(w)
-	// returns a JSON array
+	// returns an array
 	wave w
 	string list = "["
 	variable i=0
@@ -311,7 +361,7 @@ function/s numericWaveToBoolArray(w)
 end
 
 function/s textWaveToStrArray(w)
-	// returns a JSON array and makes sure quotes and commas are parsed correctly.
+	// returns an array and makes sure quotes and commas are parsed correctly.
 	wave/t w
 	string list, checkStr, escapedStr
 	variable i=0
@@ -320,7 +370,7 @@ function/s textWaveToStrArray(w)
 	for(i=0;i<itemsinlist(list,";");i+=1)
 		checkStr = stringfromlist(i,list,";")
 		if(countQuotes(checkStr)>2)
-			escapedStr = escapeJSONstr(checkStr)
+			escapedStr = escapeInnerQuotes(checkStr)
 			list = removelistitem(i,list,";")
 			list = addlistitem(escapedStr,list,";",i)
 		endif
