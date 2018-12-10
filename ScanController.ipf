@@ -310,6 +310,7 @@ function InitScanController([configFile, srv_push])
 	variable /g sc_srv_push
 	if(paramisdefault(srv_push) || srv_push==1)
 		sc_srv_push = 1
+		print "[WARNING] pusing data to server is temporarily disabled"
 	else
 		sc_srv_push = 0
 		print "[WARNING] Only saving local copies of data."
@@ -319,7 +320,6 @@ function InitScanController([configFile, srv_push])
 	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
 	string /g sc_current_config = ""
 
-	string server = "qdot-server" // address/name for data server
 	string /g sc_hostname = getHostName() // get machine name
 
 	// deal with config file
@@ -375,6 +375,8 @@ end
 /////////////////////////////
 
 function/s sc_createconfig()
+
+	print "[WARNING] config file support temporarily disabled"
 //	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts
 //	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
 //	nvar sc_PrintRaw, sc_PrintCalc, filenum
@@ -429,6 +431,8 @@ end
 
 function sc_loadConfig(configfile)
 	string configfile
+	
+	print "[WARNING] config file support temporarily disabled"
 //	string JSONstr, checkStr, textkeys, numkeys, textdestinations, numdestinations
 //	variable i=0,escapePos=-1
 //	nvar sc_PrintRaw, sc_PrintCalc
@@ -2163,6 +2167,7 @@ function sc_FileTransfer()
 		batchFull = getExpPath("data", full=1) + batchFile
 
 		/// send data here ///
+		print "[WARNING] config file support temporarily disabled"
 
 		sc_DeleteBatchFile() // Sent everything possible
 								   // assume users will fix errors manually
