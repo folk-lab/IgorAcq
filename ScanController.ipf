@@ -712,6 +712,7 @@ function sc_findAsyncMeasurements()
 	string /g sc_asyncFolders = ""
 	make /o/n=1 /WAVE sc_asyncRefs
 
+
 	for(i=0;i<numpnts(sc_RawScripts);i+=1)
 
 		if ( (sc_RawRecord[i] == 1) || (sc_RawPlot[i] == 1) )
@@ -774,7 +775,6 @@ function sc_findAsyncMeasurements()
 
 	if(instrAsync<2)
 		// no point in doing anyting async is only one instrument is capable of it
-		print "[WARNING] Not using async for only one instrument. It will slow the measurement down."
 		make /o/n=(numpnts(sc_RawScripts)) sc_measAsync = 0
 	endif
 
