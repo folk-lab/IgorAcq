@@ -244,12 +244,12 @@ end
 
 //// Logging functions ////
 
-function/s getK2400status(instrID)
+function/s getK2400Status(instrID)
 	variable instrID
-	string  buffer = ""
-
-	string gpib = num2istr(getAddressGPIB(instrID))
-	buffer = addJSONkeyvalpair(buffer, "gpib_address", gpib)
-
-	return addJSONkeyvalpair("", "K2400_"+gpib, buffer)
+//	string  buffer = ""
+//
+//	string gpib = num2istr(getAddressGPIB(instrID))
+//	buffer = addJSONkeyvalpair(buffer, "gpib_address", gpib)
+//
+//	return addJSONkeyvalpair("", "K2400_"+gpib, buffer)
 end

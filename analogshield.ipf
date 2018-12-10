@@ -514,12 +514,12 @@ function/s GetASStatus()
 	wave /t as_valsstr = as_valsstr
 	svar as_controller_addr
 
-	string buffer=""
-	variable j=0
-	for(j=0;j<4;j+=1)
-		buffer = addJSONkeyvalpair(buffer, "CH"+num2istr(j), as_valsstr[j][1])
-	endfor
-	buffer = addJSONkeyvalpair(buffer, "com_port", as_controller_addr, addQuotes=1)
-	
-	return addJSONkeyvalpair("", "AnalogShield", buffer)
+//	string buffer=""
+//	variable j=0
+//	for(j=0;j<4;j+=1)
+//		buffer = addJSONkeyvalpair(buffer, "CH"+num2istr(j), as_valsstr[j][1])
+//	endfor
+//	buffer = addJSONkeyvalpair(buffer, "com_port", as_controller_addr, addQuotes=1)
+//	
+//	return addJSONkeyvalpair("", "AnalogShield", buffer)
 end

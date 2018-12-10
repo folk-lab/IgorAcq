@@ -1133,30 +1133,29 @@ function/s GetBDDACStatus(instrID)
 	svar bd_controller_addr
 	nvar bd_num_custom
 
-
-	string buffer=""
-	variable i=0, j=0
-	do
-		if(numtype(bd_boardnumbers[i])==0)
-			for(j=0;j<4;j+=1)
-				buffer = addJSONkeyvalpair(buffer, "CH"+num2istr(4*i+j), dacvalstr[4*i+j][1])
-			endfor
-		endif
-		i+=1
-	while(i<numpnts(bd_boardnumbers))
-	i=0
-
-	wave /z/t customdacvalstr = customdacvalstr
-	if(WaveExists(customdacvalstr))
-		do
-			buffer = addJSONkeyvalpair(buffer, customdacvalstr[i][0], customdacvalstr[i][1])
-			i=i+1
-		while(i<bd_num_custom)
-	endif
-
-	buffer = addJSONkeyvalpair(buffer, "com_port", bd_controller_addr, addQuotes=1)
-
-	return addJSONkeyvalpair("", "BabyDAC", buffer)
+//	string buffer=""
+//	variable i=0, j=0
+//	do
+//		if(numtype(bd_boardnumbers[i])==0)
+//			for(j=0;j<4;j+=1)
+//				buffer = addJSONkeyvalpair(buffer, "CH"+num2istr(4*i+j), dacvalstr[4*i+j][1])
+//			endfor
+//		endif
+//		i+=1
+//	while(i<numpnts(bd_boardnumbers))
+//	i=0
+//
+//	wave /z/t customdacvalstr = customdacvalstr
+//	if(WaveExists(customdacvalstr))
+//		do
+//			buffer = addJSONkeyvalpair(buffer, customdacvalstr[i][0], customdacvalstr[i][1])
+//			i=i+1
+//		while(i<bd_num_custom)
+//	endif
+//
+//	buffer = addJSONkeyvalpair(buffer, "com_port", bd_controller_addr, addQuotes=1)
+//
+//	return addJSONkeyvalpair("", "BabyDAC", buffer)
 end
 
 /////////////////
