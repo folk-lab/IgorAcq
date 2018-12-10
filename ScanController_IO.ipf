@@ -280,9 +280,46 @@ function countSqBrackets(str)
 end
 
 function/s removeLiteralQuotes(str)
+	// removes outermost quotes
+	// handles single or triple quotes (TOML standards)
+	// there are about ten different ways to break this
 	string str
-//
-//	return replacestring("\"",str,"")
+	
+	variable i=0, openQuotes=0
+	for(i=0;i<strlen(str);i+=1)
+		if(CmpStr(str[i],"\"")==0)
+			openQuotes+=1
+		endif
+		
+		if(openQuotes>0 && CmpStr(str[i],"\"")!=0)
+			break
+		endif
+	endfor
+	
+	if(openQuotes==0)
+		print "[ERROR] String not surrounded by quotes. str: "+str
+		return ""
+	elseif(openQuotes==2)
+		openQuotes=1
+	elseif(openQuotes>3)
+		openQuotes=3
+	endif
+	
+	str = str[i,inf]
+	variable j, closeQuotes=0
+	for(j=strlen(str); j>0; j-=1)
+	
+		if(CmpStr(str[j],"\"")==0)
+			closeQuotes+=1
+		endif
+		
+		if(closeQuotes==openQuotes)
+			break
+		endif
+		
+	endfor
+
+	return str[0,j-1]
 end
 
 function/s removeSqBrackets(str)
@@ -494,7 +531,9 @@ end
 // https://en.wikipedia.org/wiki/TOML
 // https://github.com/toml-lang/toml
 
-// most of the more complicated stuff (nested arrays, tables) is not supported
+// a good amount of the format (nested arrays, tables, single quotes) is not supported
+// general philosophy is that everything written to a .toml is valid TOML
+//     but our parser cannot read all valid TOML because it is complicated and we don't need it
 
 function/s getTOMLvalue(TOMLstr,key)
 	// returns the value associated with key
