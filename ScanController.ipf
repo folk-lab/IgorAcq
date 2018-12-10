@@ -940,10 +940,10 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	while (i<numpnts(sc_CalcWaveNames))
 	i=0
 
-	// connect VISA instruments
-	// do this here, because if it fails
-	// i don't want to delete any old data
-	loadInstrsFromINI(verbose=0)
+	// because VISA tends to drop connections when the 
+	// measurement computer is left idle
+	// we may want to add a function here to setup all the instruments
+	print "[WARNING] VISA instrument connections may have expired if your measurement has been idle."
 	
 	// The status of the upcoming scan will be set when waves are initialized.
 	if(!paramisdefault(starty) && !paramisdefault(finy) && !paramisdefault(numptsy))
