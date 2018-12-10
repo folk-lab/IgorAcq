@@ -179,6 +179,49 @@ end
 /// text formatting utilities ///
 /////////////////////////////////
 
+Function IsWhiteSpace(char)
+    String char
+
+    return GrepString(char, "\\s")
+End
+
+Function/S RemoveLeadingWhitespace(str)
+    String str
+
+    if (strlen(str) == 0)
+        return ""
+    endif
+
+    do
+        String firstChar= str[0]
+        if (IsWhiteSpace(firstChar))
+            str= str[1,inf]
+        else
+            break
+        endif
+    while (strlen(str) > 0)
+
+    return str
+End
+
+Function/S RemoveTrailingWhitespace(str)
+    String str
+
+    if (strlen(str) == 0)
+        return ""
+    endif
+
+    do
+        String lastChar = str[strlen(str) - 1]
+        if (IsWhiteSpace(lastChar))
+            str = str[0, strlen(str) - 2]
+        else
+        	break
+        endif
+    while (strlen(str) > 0)
+    return str
+End
+
 function countQuotes(str)
 	// count how many quotes are in the string
 	// +1 for "
@@ -205,12 +248,56 @@ function countQuotes(str)
 	return quoteCount
 end
 
+function/s removeEscapedQuotes(str)
+	// this is going to be all messed up if there needs to be
+	// something quoted in the string
+	// i think we really want "RemoveOuterEscapedQuotes(str)" that only removes the first and last
+	string str
+
+	return replacestring("\"",str,"")
+end
+
+Function/t removeStringListDuplicates(theListStr)
+	// credit: http://www.igorexchange.com/node/1071
+	String theListStr
+
+	String retStr = ""
+	variable ii
+	for(ii = 0 ; ii < itemsinlist(theListStr) ; ii+=1)
+		if(whichlistitem(stringfromlist(ii , theListStr), retStr) == -1)
+			retStr = addlistitem(stringfromlist(ii, theListStr), retStr, ";", inf)
+		endif
+	endfor
+	return retStr
+End
+
+function/s searchFullString(string_to_search,substring)
+	string string_to_search, substring
+	string index_list=""
+	variable test, startpoint=0
+
+	do
+		test = strsearch(string_to_search, substring, startpoint)
+		if(test != -1)
+			index_list = index_list+num2istr(test)+","
+			startpoint = test+1
+		endif
+	while(test > -1)
+
+	return index_list
+end
+
 function LoadTextArrayToWave(array,destwave)
 	string array,destwave
-
+	variable i=0
+	
 	array = array[1,strlen(array)-2]
-
+	
 	make/o/t/n=(itemsinlist(array,",")) $destwave = stringfromlist(p,array,",")
+	wave/t wref = $destwave
+	for(i=0;i<(itemsinlist(array,","));i+=1)
+		wref[i] = removeEscapedQuotes(wref[i])
+	endfor
 end
 
 function LoadBoolArrayToWave(array,destwave)
@@ -229,8 +316,8 @@ end
 
 function LoadTextToString(str,deststring)
 	string str,deststring
-
-	string/g $deststring = str
+	
+	string/g $deststring = removeEscapedQuotes(str)
 end
 
 function LoadNumToVar(numasstr,destvar)
@@ -348,6 +435,8 @@ end
 ////////////
 
 // a quick attempt at writing a TOML parser
+// https://en.wikipedia.org/wiki/TOML
+// most of the more complicated stuff is not supported
 
 function/s getTOMLvalue(TOMLstr,key)
 	// returns the value associated with key
@@ -373,14 +462,14 @@ function/s getTOMLvalue(TOMLstr,key)
 		endif
 		old_index=index+strlen(str)
 	endfor
-	
+
 	// starting from key find "="
 	// read values until "\r"
 	// if "\r" is found, check for unclosed "["
 	//   if there are any, keep reading for next "\r"
-	
+
 	val_start = index+strlen(str)+1
-	
+
 	val_end = strsearch(TOMLstr,num2char(13),val_start) // look for \r
 
 	return TOMLstr[val_start,val_end-1]
@@ -401,18 +490,25 @@ function/s addTOMLblock(name,[str,indent])
 	return returnstr+indent+"["+name+"]"+"\n"
 end
 
-function/s addTOMLkey(name,value,[str,indent])
+function/s addTOMLkey(name,value,[str,indent,addQuotes])
 	string name, value, str, indent
+	variable addquotes
 	string returnstr
-
+	
 	if(paramisdefault(str))
 		str = ""
 	endif
-
+	
 	if(paramisdefault(indent))
 		indent = ""
 	endif
-
+	
+	if(paramisdefault(addquotes))
+		addquotes = 0
+	elseif(addquotes==1)
+		value = "\""+value+"\""
+	endif
+	
 	return str+indent+name+"="+value+"\n"
 end
 

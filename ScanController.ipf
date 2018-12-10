@@ -45,79 +45,6 @@ function AppendString(thewave, thestring)
 	thewave[numpnts(thewave)-1] = thestring
 end
 
-Function/t removeStringListDuplicates(theListStr)
-	// credit: http://www.igorexchange.com/node/1071
-	String theListStr
-
-	String retStr = ""
-	variable ii
-	for(ii = 0 ; ii < itemsinlist(theListStr) ; ii+=1)
-		if(whichlistitem(stringfromlist(ii , theListStr), retStr) == -1)
-			retStr = addlistitem(stringfromlist(ii, theListStr), retStr, ";", inf)
-		endif
-	endfor
-	return retStr
-End
-
-function/s searchFullString(string_to_search,substring)
-	string string_to_search, substring
-	string index_list=""
-	variable test, startpoint=0
-
-	do
-		test = strsearch(string_to_search, substring, startpoint)
-		if(test != -1)
-			index_list = index_list+num2istr(test)+","
-			startpoint = test+1
-		endif
-	while(test > -1)
-
-	return index_list
-end
-
-Function/S RemoveLeadingWhitespace(str)
-    String str
-
-    if (strlen(str) == 0)
-        return ""
-    endif
-
-    do
-        String firstChar= str[0]
-        if (IsWhiteSpace(firstChar))
-            str= str[1,inf]
-        else
-            break
-        endif
-    while (strlen(str) > 0)
-
-    return str
-End
-
-Function/S RemoveTrailingWhitespace(str)
-    String str
-
-    if (strlen(str) == 0)
-        return ""
-    endif
-
-    do
-        String lastChar = str[strlen(str) - 1]
-        if (IsWhiteSpace(lastChar))
-            str = str[0, strlen(str) - 2]
-        else
-        	break
-        endif
-    while (strlen(str) > 0)
-    return str
-End
-
-Function IsWhiteSpace(char)
-    String char
-
-    return GrepString(char, "\\s")
-End
-
 function /S executeWinCmd(command)
 	// run the shell command
 	// if logFile is selected, put output there
@@ -403,7 +330,7 @@ function/s sc_createconfig()
 	configstr = addTOMLkey("calc",textwavetostrarray(sc_CalcScripts),str=configstr)
 
 	// executable string to get logs
-	configstr = addTOMLkey("logstring","\""+sc_LogStr+"\"",str=configstr,indent="\n")
+	configstr = addTOMLkey("logstring",sc_LogStr,str=configstr,indent="\n", addQuotes=1)
 
 	//filenum
 	configstr = addTOMLkey("filenum",num2str(filenum),str=configstr,indent="\n")
@@ -436,13 +363,8 @@ function sc_loadConfig(configfile)
 	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.plot:calc"),"sc_CalcPlot")
 
 	// async checkboxes
-<<<<<<< HEAD
 	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.asybc:async"),"sc_measAsync")
 
-=======
-	loadbooleanarrayintowave(getTOMLvalue(TOMLstr,"checkboxes.async:async"),"sc_measAsync")
-	
->>>>>>> c653ee910b467bc96bf9ffc72e821f0e0c245912
 	// print_to_history
 	LoadBoolToVar(getTOMLvalue(TOMLstr,"checkboxes.history:raw"),"sc_PrintRaw")
 	LoadBoolToVar(getTOMLvalue(TOMLstr,"checkboxes.history:calc"),"sc_PrintCalc")
