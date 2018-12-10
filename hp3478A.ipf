@@ -161,16 +161,16 @@ end
 
 function /s GetDMMStatus(instrID)
 	variable instrID
-	string  buffer = ""
-
-	string gpib = num2istr(getAddressGPIB(instrID))
-	buffer = addJSONkeyvalpair(buffer, "gpib_address", gpib)
-
-	// get configuration
-	writeInstr(instrID, "B\n")
-	string config = readInstr(instrID, read_bytes=5)
-
-	buffer = addJSONkeyvalpair(buffer, "config_bytes", TrimString(config), addQuotes=1)
-
-	return addJSONkeyvalpair("", "HP3478A"+gpib, buffer)
+//	string  buffer = ""
+//
+//	string gpib = num2istr(getAddressGPIB(instrID))
+//	buffer = addJSONkeyvalpair(buffer, "gpib_address", gpib)
+//
+//	// get configuration
+//	writeInstr(instrID, "B\n")
+//	string config = readInstr(instrID, read_bytes=5)
+//
+//	buffer = addJSONkeyvalpair(buffer, "config_bytes", TrimString(config), addQuotes=1)
+//
+//	return addJSONkeyvalpair("", "HP3478A"+gpib, buffer)
 end

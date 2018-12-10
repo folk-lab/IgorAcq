@@ -27,7 +27,7 @@ function ScanDummy(start, fin, numpts, delay, [comments])
 		i+=1
 	while (i<numpts)
 	variable telapsed = stopmstimer(-2) - tstart
-	printf "each RecordValues(...) call takes ~%.1fms \n", telapsed/numpts/1000 - delay*1000
+//	printf "each RecordValues(...) call takes ~%.1fms \n", telapsed/numpts/1000 - delay*1000
 	SaveWaves(msg=comments)
 end
 
@@ -68,11 +68,12 @@ end
 
 function /s GetDummyStatus(instrID)
 	variable instrID
-	string  buffer = ""
-
-	string id = num2istr(instrID)
-	buffer = addJSONkeyvalpair(buffer, "id", id)
-	buffer = addJSONkeyvalpair(buffer, "time", num2str(datetime))
-
-	return addJSONkeyvalpair("", "dum"+id, buffer)
+//	string  buffer = ""
+//
+//	string id = num2istr(instrID)
+//	buffer = addJSONkeyvalpair(buffer, "id", id)
+//	buffer = addJSONkeyvalpair(buffer, "time", num2str(datetime))
+//
+//	return addJSONkeyvalpair("", "dum"+id, buffer)
+   return "dummy param = value"
 end

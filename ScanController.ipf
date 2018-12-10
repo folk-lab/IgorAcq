@@ -13,8 +13,6 @@
 //		-- "Request scripts" are removed from the scancontroller window. Its only use was
 //			 trying to do async communication (badly).
 //    -- Added Async checkbox in scancontroller window
-//    -- INI configuration files for scancontroller/instruments
-//    -- SFTP file upload using external python script
 
 
 ///////////////////////////////
@@ -207,7 +205,7 @@ function /S getHostName()
 end
 
 function /S getExpPath(whichpath, [full])
-	// whichpath determines which path will be returned (data, winfs, config)
+	// whichpath determines which path will be returned (data, config)
 	// lmd always gives the path to local_measurement_data
 	// if full==0, the path relative to local_measurement_data is returned in Unix style
 	// if full==1, the full path on the local machine is returned in native style
@@ -285,20 +283,6 @@ function /S getExpPath(whichpath, [full])
 				return ""
 			endif
 			break
-		case "winfs":
-			if(full==0)
-				return ReplaceString(":", temp3[1,inf], "/")+"winfs/"
-			elseif(full==1)
-				if(cmpstr(platform,"Windows")==0)
-					return ParseFilePath(5, temp1+temp2+temp3+"winfs:", separatorStr, 0, 0)
-				else
-					return ParseFilePath(5, temp1+temp2+temp3, separatorStr, 0, 0)+"winfs/"
-				endif
-			elseif(full==2)
-				return S_path+"winfs:"
-			else
-				return ""
-			endif
 	endswitch
 end
 
@@ -312,187 +296,35 @@ end
 //// start scan controller ////
 ///////////////////////////////
 
-function sc_loadGlobalsINI(iniIdx)
-	variable iniIdx
+function InitScanController([configFile, srv_push])
 
-	wave/t ini_text
-	wave ini_type
-
-	// some values are required
-	string mandatory = "srv_url=str,srv_push=var,srv_dir=str,filetype=str,slack_url=str,sftp_port=var,sftp_user=str,"
-	string optional = "colormap=str,"
-
-	string key="", val=""
-	variable sub_index=iniIdx+1, keyIdx=0, manKeyCnt=0
-
-	do
-		if(ini_type[sub_index] == 2 && ini_type[sub_index+1] == 3) // find key/value pairs
-
-			key = ini_text[sub_index]
-
-			// handle mandatory keys here
-			val = StringByKey(key,mandatory,"=", ",")
-
-			if(strlen(val)>0)
-				// this is in the manadtory key list
-				key = "sc_"+key // global variable names created from mandatory keys
-
-				if(cmpstr(val,"str")==0) // create string variables
-					string/g $key = ini_text[sub_index+1]
-				elseif(cmpstr(val,"var")==0) // create numeric variables
-					variable/g $key = str2num(ini_text[sub_index+1])
-				endif
-
-				manKeyCnt+=1
-				sub_index+=1
-				continue
-			endif
-
-			// handle optional keys here
-			val = StringByKey(key,optional,"=", ",")
-			if(keyIdx>=0)
-				// this is in the manadtory key list
-				key = "sc_"+key // global variable names created from optional keys
-
-				if(cmpstr(val,"str")==0) // create string variables
-					string/g $key = ini_text[sub_index+1]
-				elseif(cmpstr(val,"var")==0) // create numeric variables
-					variable/g $key = str2num(ini_text[sub_index+1])
-				endif
-
-				sub_index+=1
-				continue
-			endif
-
-		endif
-
-		sub_index+=1
-		if(sub_index>numpnts(ini_type)-1)
-			break
-		endif
-
-	while(ini_type[sub_index]!=1) // stop at next section
-
-	// defaults for optional parameters
-	svar/z sc_colormap
-	if(!svar_exists(sc_colormap))
-		string /g sc_colormap = "VioletOrangeYellow"
-	endif
-
-	// error if not all mandatory keys were loaded
-	if(manKeyCnt!=itemsinlist(mandatory,","))
-		print "[ERROR] Not all mandatory keys were supplied to [scancontroller]!"
-		abort
-	endif
-
-end
-
-function sc_setupAllFromINI(iniFile, [path])
-	string iniFile, path
-
-	if(paramisdefault(path))
-		path = "data"
-	endif
-
-	string /g sc_setup_ini = iniFile
-	string /g sc_setup_path = path
-
-	loadINIconfig(iniFile, path)
-	wave ini_type
-	wave /t ini_text
-
-	variable i=0, scCnt=0, guiCnt=0, guiIdx=0
-	string instrList = ""
-	for(i=0;i<numpnts(ini_type);i+=1)
-
-		if(ini_type[i]==1)
-
-			strswitch(ini_text[i])
-				case "[scancontroller]":
-
-					if(scCnt==0)
-						scCnt+=1
-						sc_loadGlobalsINI(i)
-					else
-						print "[WARNING] Found more than one [scancontroller] entry. Using first entry."
-					endif
-					continue
-
-				case "[gui]":
-					if(guiCnt==0)
-						guiCnt+=1
-						guiIdx=i // do this after instruments are loaded
-					else
-						print "[WARNING] Found more than one [gui] entry. Using first entry."
-					endif
-					continue
-				case "[visa-instrument]":
-					// handle this elsewhere
-		 			continue
-
- 				case "[http-instrument]":
- 					// handle this elsewhere
- 					continue
-
- 				default:
- 					printf "[WARNING] Section (%s) in INI not recognized and will be ignored!\r", ini_text[i]
-
-			endswitch
-		endif
-
-	endfor
-
-	// load instruments
-	instrList = loadInstrsFromINI(verbose=1)
-
-	if(guiCnt>0)
-		loadGUIsINI(guiIdx, instrList=instrList)
-	endif
-
-end
-
-function InitScanController([setupFile, setupPath, configFile])
-	// start up a whole mess of scancontroller functionality
-
-	string setupFile, setupPath, configFile // use these to point to specific setup and config files
-											          // defaults are setup.ini in data path and most recent config
+	string configFile // use this to point to a specific old config
+	variable srv_push // send data to qdot-server automatically (0=no, 1=yes)
 
 	GetFileFolderInfo/Z/Q/P=data  // Check if data path is definded
 	if(v_flag != 0 || v_isfolder != 1)
 		abort "Data path not defined!\n"
 	endif
 
-	if(paramisdefault(setupFile))
-		setupFile = "setup.ini"
-	endif
-
-	if(paramisdefault(setupPath))
-		setupPath = "data"
-	endif
-
-	sc_setupAllFromINI(setupFile, path=setupPath)   // setup instruments and scancontroller from setup.ini
-	string /g sc_hostname = getHostName() // get machine name
-
-	// load all the scan controller globals
-	nvar sc_srv_push,sc_sftp_port
-	svar sc_srv_url,sc_filetype,sc_slack_url,sc_sftp_user,sc_colormap
-	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
-
-	newpath /C/O/Q config getExpPath("config", full=2) // create/overwrite config path
-
-	// create remote path(s)
-	if(sc_srv_push==1)
-
-		if(CmpStr(sc_filetype, "ibw") == 0)
-			newpath /C/O/Q winfs getExpPath("winfs", full=2) // create/overwrite winf path
-		endif
-
+	// srv_push == 1 to send new data to server
+	variable /g sc_srv_push
+	if(paramisdefault(srv_push) || srv_push==1)
+		sc_srv_push = 1
+		print "[WARNING] pushing data to server is temporarily disabled"
 	else
+		sc_srv_push = 0
 		print "[WARNING] Only saving local copies of data."
 	endif
+	
+	string /g slack_url =  "https://hooks.slack.com/services/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" // url for slack alert
+	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
+	string /g sc_current_config = ""
+
+	string /g sc_hostname = getHostName() // get machine name
 
 	// deal with config file
-	string /g sc_current_config
+	string /g sc_current_config = ""
+	newpath /C/O/Q config getExpPath("config", full=2) // create/overwrite config path
 	if(paramisdefault(configFile))
 		// look for newest config file
 		string filelist = greplist(indexedfile(config,-1,".config"),"sc")
@@ -507,14 +339,12 @@ function InitScanController([setupFile, setupPath, configFile])
 			make/o sc_RawRecord = {0,0} // Whether you want to record and save the data for this wave
 			make/o sc_RawPlot = {0,0} // Whether you want to record and save the data for this wave
 			make/t/o sc_RawScripts = {"readSRSx(srs1)", "readSRSy(srs1)"}
-			// End of same-size waves
 
 			// And these waves should be the same size too
 			make/t/o sc_CalcWaveNames = {"", ""} // Calculated wave names
 			make/t/o sc_CalcScripts = {"",""} // Scripts to calculate stuff
 			make/o sc_CalcRecord = {0,0} // Include this calculated field or not
 			make/o sc_CalcPlot = {0,0} // Include this calculated field or not
-			// end of same-size waves
 
 			make /o sc_measAsync = {0,0}
 
@@ -545,100 +375,104 @@ end
 /////////////////////////////
 
 function/s sc_createconfig()
-	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts
-	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
-	nvar sc_PrintRaw, sc_PrintCalc, filenum
-	svar sc_LogStr, sc_current_config
-	variable refnum
-	string configfile
-	string configstr = "", tmpstr = ""
 
-	// wave names
-	tmpstr = addJSONkeyvalpair(tmpstr, "raw", textwavetostrarray(sc_RawWaveNames))
-	tmpstr = addJSONkeyvalpair(tmpstr, "calc", textwavetostrarray(sc_CalcWaveNames))
-	configstr = addJSONkeyvalpair(configstr, "wave_names", tmpstr)
-
-	// record checkboxes
-	tmpstr = ""
-	tmpstr = addJSONkeyvalpair(tmpstr, "raw", numericwavetoboolarray(sc_RawRecord))
-	tmpstr = addJSONkeyvalpair(tmpstr, "calc", numericwavetoboolarray(sc_CalcRecord))
-	configstr = addJSONkeyvalpair(configstr, "record_waves", tmpstr)
-
-	// plot checkboxes
-	tmpstr = ""
-	tmpstr = addJSONkeyvalpair(tmpstr, "raw",  numericwavetoboolarray(sc_RawPlot))
-	tmpstr = addJSONkeyvalpair(tmpstr, "calc",  numericwavetoboolarray(sc_CalcPlot))
-	configstr = addJSONkeyvalpair(configstr, "plot_waves", tmpstr)
-
-	// async checkboxes
-	tmpstr = ""
-	tmpstr = addJSONkeyvalpair(tmpstr, "raw",  numericwavetoboolarray(sc_measAsync))
-	configstr = addJSONkeyvalpair(configstr, "meas_async", tmpstr)
-
-	// scripts
-	tmpstr = ""
-	tmpstr = addJSONkeyvalpair(tmpstr, "raw", textwavetostrarray(sc_RawScripts))
-	tmpstr = addJSONkeyvalpair(tmpstr, "calc", textwavetostrarray(sc_CalcScripts))
-	configstr = addJSONkeyvalpair(configstr, "scripts", tmpstr)
-
-	// executable string to get logs
-	configstr = addJSONkeyvalpair(configstr, "log_string", escapeJSONstr(sc_LogStr,notwave=1,double_slash=1))
-
-	// print_to_history
-	tmpstr = ""
-	tmpstr = addJSONkeyvalpair(tmpstr, "raw", numToBool(sc_PrintRaw))
-	tmpstr = addJSONkeyvalpair(tmpstr, "calc", numToBool(sc_PrintCalc))
-	configstr = addJSONkeyvalpair(configstr, "print_to_history", tmpstr)
-
-	configstr = addJSONkeyvalpair(configstr, "filenum", num2istr(filenum))
-
-	configfile = "sc" + num2istr(unixtime()) + ".config"
-	sc_current_config = configfile
-	writeJSONtoFile(configstr, configfile, "config")
+	print "[WARNING] config file support temporarily disabled"
+//	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts
+//	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
+//	nvar sc_PrintRaw, sc_PrintCalc, filenum
+//	svar sc_LogStr, sc_current_config
+//	variable refnum
+//	string configfile
+//	string configstr = "", tmpstr = ""
+//
+//	// wave names
+//	tmpstr = addJSONkeyvalpair(tmpstr, "raw", textwavetostrarray(sc_RawWaveNames))
+//	tmpstr = addJSONkeyvalpair(tmpstr, "calc", textwavetostrarray(sc_CalcWaveNames))
+//	configstr = addJSONkeyvalpair(configstr, "wave_names", tmpstr)
+//
+//	// record checkboxes
+//	tmpstr = ""
+//	tmpstr = addJSONkeyvalpair(tmpstr, "raw", numericwavetoboolarray(sc_RawRecord))
+//	tmpstr = addJSONkeyvalpair(tmpstr, "calc", numericwavetoboolarray(sc_CalcRecord))
+//	configstr = addJSONkeyvalpair(configstr, "record_waves", tmpstr)
+//
+//	// plot checkboxes
+//	tmpstr = ""
+//	tmpstr = addJSONkeyvalpair(tmpstr, "raw",  numericwavetoboolarray(sc_RawPlot))
+//	tmpstr = addJSONkeyvalpair(tmpstr, "calc",  numericwavetoboolarray(sc_CalcPlot))
+//	configstr = addJSONkeyvalpair(configstr, "plot_waves", tmpstr)
+//
+//	// async checkboxes
+//	tmpstr = ""
+//	tmpstr = addJSONkeyvalpair(tmpstr, "raw",  numericwavetoboolarray(sc_measAsync))
+//	configstr = addJSONkeyvalpair(configstr, "meas_async", tmpstr)
+//
+//	// scripts
+//	tmpstr = ""
+//	tmpstr = addJSONkeyvalpair(tmpstr, "raw", textwavetostrarray(sc_RawScripts))
+//	tmpstr = addJSONkeyvalpair(tmpstr, "calc", textwavetostrarray(sc_CalcScripts))
+//	configstr = addJSONkeyvalpair(configstr, "scripts", tmpstr)
+//
+//	// executable string to get logs
+//	configstr = addJSONkeyvalpair(configstr, "log_string", escapeJSONstr(sc_LogStr,notwave=1,double_slash=1))
+//
+//	// print_to_history
+//	tmpstr = ""
+//	tmpstr = addJSONkeyvalpair(tmpstr, "raw", numToBool(sc_PrintRaw))
+//	tmpstr = addJSONkeyvalpair(tmpstr, "calc", numToBool(sc_PrintCalc))
+//	configstr = addJSONkeyvalpair(configstr, "print_to_history", tmpstr)
+//
+//	configstr = addJSONkeyvalpair(configstr, "filenum", num2istr(filenum))
+//
+//	configfile = "sc" + num2istr(unixtime()) + ".config"
+//	sc_current_config = configfile
+//	writeJSONtoFile(configstr, configfile, "config")
 end
 
 function sc_loadConfig(configfile)
 	string configfile
-	string JSONstr, checkStr, textkeys, numkeys, textdestinations, numdestinations
-	variable i=0,escapePos=-1
-	nvar sc_PrintRaw, sc_PrintCalc
-	svar sc_LogStr, sc_current_config, sc_current_config
-
-	// load json string from config file
-	printf "Loading configuration from: %s\n", configfile
-	sc_current_config = configfile
-	JSONstr = JSONfromFile("config", configfile)
-
-	// read JSON sting. Results will be dumped into: t_tokentext, w_tokensize, w_tokenparent and w_tokentype
-	JSONSimple JSONstr
-	wave/t t_tokentext
-	wave w_tokensize, w_tokenparent, w_tokentype
-
-	// distribute JSON values
-	// load raw wave configuration
-	// keys are: wavenames:raw, record_waves:raw, plot_waves:raw, meas_async:raw, scripts:raw
-	textkeys = "wave_names:raw,scripts:raw"
-	numkeys = "record_waves:raw,plot_waves:raw,meas_async:raw"
-	textdestinations = "sc_RawWaveNames,sc_RawScripts"
-	numdestinations = "sc_RawRecord,sc_RawPlot,sc_measAsync"
-	loadtextJSONfromkeys(textkeys,textdestinations)
-	loadbooleanJSONfromkeys(numkeys,numdestinations)
-
-	// load calc wave configuration
-	// keys are: wavenames:calc, record_waves:calc, plot_waves:calc, scripts:calc
-	textkeys = "wave_names:calc,scripts:calc"
-	numkeys = "record_waves:calc,plot_waves:calc"
-	textdestinations = "sc_CalcWaveNames,sc_CalcScripts"
-	numdestinations = "sc_CalcRecord,sc_CalcPlot"
-	loadtextJSONfromkeys(textkeys,textdestinations)
-	loadbooleanJSONfromkeys(numkeys,numdestinations)
-
-	// load print checkbox settings
-//	sc_PrintRaw = booltonum(stringfromlist(0,extractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="raw"),","))
-//	sc_PrintCalc = booltonum(stringfromlist(0,extractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="calc"),","))
-
-	// load log string
-//	sc_LogStr = unescapeJSONstr(stringfromlist(0,extractJSONvalues(getJSONkeyindex("log_string",t_tokentext)),","),notwave=1)
+	
+	print "[WARNING] config file support temporarily disabled"
+//	string JSONstr, checkStr, textkeys, numkeys, textdestinations, numdestinations
+//	variable i=0,escapePos=-1
+//	nvar sc_PrintRaw, sc_PrintCalc
+//	svar sc_LogStr, sc_current_config, sc_current_config
+//
+//	// load json string from config file
+//	printf "Loading configuration from: %s\n", configfile
+//	sc_current_config = configfile
+//	JSONstr = JSONfromFile("config", configfile)
+//
+//	// read JSON sting. Results will be dumped into: t_tokentext, w_tokensize, w_tokenparent and w_tokentype
+//	JSONSimple JSONstr
+//	wave/t t_tokentext
+//	wave w_tokensize, w_tokenparent, w_tokentype
+//
+//	// distribute JSON values
+//	// load raw wave configuration
+//	// keys are: wavenames:raw, record_waves:raw, plot_waves:raw, meas_async:raw, scripts:raw
+//	textkeys = "wave_names:raw,scripts:raw"
+//	numkeys = "record_waves:raw,plot_waves:raw,meas_async:raw"
+//	textdestinations = "sc_RawWaveNames,sc_RawScripts"
+//	numdestinations = "sc_RawRecord,sc_RawPlot,sc_measAsync"
+//	loadtextJSONfromkeys(textkeys,textdestinations)
+//	loadbooleanJSONfromkeys(numkeys,numdestinations)
+//
+//	// load calc wave configuration
+//	// keys are: wavenames:calc, record_waves:calc, plot_waves:calc, scripts:calc
+//	textkeys = "wave_names:calc,scripts:calc"
+//	numkeys = "record_waves:calc,plot_waves:calc"
+//	textdestinations = "sc_CalcWaveNames,sc_CalcScripts"
+//	numdestinations = "sc_CalcRecord,sc_CalcPlot"
+//	loadtextJSONfromkeys(textkeys,textdestinations)
+//	loadbooleanJSONfromkeys(numkeys,numdestinations)
+//
+//	// load print checkbox settings
+////	sc_PrintRaw = booltonum(stringfromlist(0,extractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="raw"),","))
+////	sc_PrintCalc = booltonum(stringfromlist(0,extractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="calc"),","))
+//
+//	// load log string
+////	sc_LogStr = unescapeJSONstr(stringfromlist(0,extractJSONvalues(getJSONkeyindex("log_string",t_tokentext)),","),notwave=1)
 end
 
 /////////////////////
@@ -809,7 +643,7 @@ end
 function sc_updatewindow(action) : ButtonControl
 	string action
 
-	sc_createconfig()     // write (or overwrite) a config file
+//	sc_createconfig()     // write (or overwrite) a config file
 end
 
 function sc_addrow(action) : ButtonControl
@@ -1106,10 +940,10 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	while (i<numpnts(sc_CalcWaveNames))
 	i=0
 
-	// connect VISA instruments
-	// do this here, because if it fails
-	// i don't want to delete any old data
-	loadInstrsFromINI(verbose=0)
+	// because VISA tends to drop connections when the 
+	// measurement computer is left idle
+	// we may want to add a function here to setup all the instruments
+	print "[WARNING] VISA instrument connections may have expired if your measurement has been idle."
 	
 	// The status of the upcoming scan will be set when waves are initialized.
 	if(!paramisdefault(starty) && !paramisdefault(finy) && !paramisdefault(numptsy))
@@ -1771,123 +1605,122 @@ end
 ////  save all data ////
 ////////////////////////
 
-function /s getEquipLogs()
-	string buffer = ""
-	svar sc_LogStr
+//function /s getEquipLogs()
+//	string buffer = ""
+//	svar sc_LogStr
+//
+//	//// all log strings should be valid JSON objects ////
+//	if (strlen(sc_LogStr)>0)
+//		string command, keylist = "", key = "", sval = ""
+//		string /G sc_log_buffer=""
+//		variable i = 0
+//		for(i=0;i<ItemsInList(sc_logStr, ";");i+=1)
+//			command = StringFromList(i, sc_logStr, ";")
+//			Execute/Q/Z "sc_log_buffer="+command
+//			if(strlen(sc_log_buffer)!=0)
+//				// need to get first key and value from sc_log_buffer
+//				keylist = getJSONkeys(sc_log_buffer)
+//				key = StringFromList(0,keylist, ",")
+//				sval = getJSONvalue(sc_log_buffer, key)
+//				buffer = addJSONkeyvalpair(buffer, key, sval)
+//			else
+//				print "[WARNING] command failed to log anything: "+command+"\r"
+//			endif
+//		endfor
+//	endif
+//
+//	return buffer
+//end
 
-	//// all log strings should be valid JSON objects ////
-	if (strlen(sc_LogStr)>0)
-		string command, keylist = "", key = "", sval = ""
-		string /G sc_log_buffer=""
-		variable i = 0
-		for(i=0;i<ItemsInList(sc_logStr, ";");i+=1)
-			command = StringFromList(i, sc_logStr, ";")
-			Execute/Q/Z "sc_log_buffer="+command
-			if(strlen(sc_log_buffer)!=0)
-				// need to get first key and value from sc_log_buffer
-				keylist = getJSONkeys(sc_log_buffer)
-				key = StringFromList(0,keylist, ",")
-				sval = getJSONvalue(sc_log_buffer, key)
-				buffer = addJSONkeyvalpair(buffer, key, sval)
-			else
-				print "[WARNING] command failed to log anything: "+command+"\r"
-			endif
-		endfor
-	endif
+//function /s getExpStatus([msg])
+//	// returns JSON object full of details about the system and this run
+//	string msg
+//	nvar filenum, sweep_t_elapsed
+//	svar sc_current_config, sc_hostname
+//
+//	if(paramisdefault(msg))
+//		msg=""
+//	endif
+//
+//	// create header with corresponding wave name and date
+//	string jstr = "", buffer = ""
+//
+//	// information about the machine your working on
+//	buffer = ""
+//	buffer = addJSONkeyvalpair(buffer, "hostname", sc_hostname, addQuotes = 1)
+//	string sysinfo = igorinfo(3)
+//	buffer = addJSONkeyvalpair(buffer, "OS", StringByKey("OS", sysinfo), addQuotes = 1)
+//	buffer = addJSONkeyvalpair(buffer, "IGOR_VERSION", StringByKey("IGORFILEVERSION", sysinfo), addQuotes = 1)
+//	jstr = addJSONkeyvalpair(jstr, "system_info", buffer)
+//
+//	// information about the current experiment
+//	jstr = addJSONkeyvalpair(jstr, "experiment", getExpPath("data")+igorinfo(1)+".pxp", addQuotes = 1)
+//	jstr = addJSONkeyvalpair(jstr, "current_config", sc_current_config, addQuotes = 1)
+//	buffer = ""
+//	buffer = addJSONkeyvalpair(buffer, "data", getExpPath("data"), addQuotes = 1)
+//	buffer = addJSONkeyvalpair(buffer, "config", getExpPath("config"), addQuotes = 1)
+//	jstr = addJSONkeyvalpair(jstr, "paths", buffer)
+//
+//	// information about this specific run
+//	jstr = addJSONkeyvalpair(jstr, "filenum", num2istr(filenum))
+//	jstr = addJSONkeyvalpair(jstr, "time_completed", Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
+//	jstr = addJSONkeyvalpair(jstr, "time_elapsed", num2str(sweep_t_elapsed))
+//	jstr = addJSONkeyvalpair(jstr, "saved_waves", recordedWaveArray())
+//	jstr = addJSONkeyvalpair(jstr, "comment", msg, addQuotes = 1)
+//
+//	return jstr
+//end
 
-	return buffer
-end
-
-function /s getExpStatus([msg])
-	// returns JSON object full of details about the system and this run
-	string msg
-	nvar filenum, sweep_t_elapsed
-	svar sc_current_config, sc_hostname
-
-	if(paramisdefault(msg))
-		msg=""
-	endif
-
-	// create header with corresponding .ibw name and date
-	string jstr = "", buffer = ""
-
-	// information about the machine your working on
-	buffer = ""
-	buffer = addJSONkeyvalpair(buffer, "hostname", sc_hostname, addQuotes = 1)
-	string sysinfo = igorinfo(3)
-	buffer = addJSONkeyvalpair(buffer, "OS", StringByKey("OS", sysinfo), addQuotes = 1)
-	buffer = addJSONkeyvalpair(buffer, "IGOR_VERSION", StringByKey("IGORFILEVERSION", sysinfo), addQuotes = 1)
-	jstr = addJSONkeyvalpair(jstr, "system_info", buffer)
-
-	// information about the current experiment
-	jstr = addJSONkeyvalpair(jstr, "experiment", getExpPath("data")+igorinfo(1)+".pxp", addQuotes = 1)
-	jstr = addJSONkeyvalpair(jstr, "current_config", sc_current_config, addQuotes = 1)
-	buffer = ""
-	buffer = addJSONkeyvalpair(buffer, "data", getExpPath("data"), addQuotes = 1)
-	buffer = addJSONkeyvalpair(buffer, "winfs", getExpPath("winfs"), addQuotes = 1)
-	buffer = addJSONkeyvalpair(buffer, "config", getExpPath("config"), addQuotes = 1)
-	jstr = addJSONkeyvalpair(jstr, "paths", buffer)
-
-	// information about this specific run
-	jstr = addJSONkeyvalpair(jstr, "filenum", num2istr(filenum))
-	jstr = addJSONkeyvalpair(jstr, "time_completed", Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
-	jstr = addJSONkeyvalpair(jstr, "time_elapsed", num2str(sweep_t_elapsed))
-	jstr = addJSONkeyvalpair(jstr, "saved_waves", recordedWaveArray())
-	jstr = addJSONkeyvalpair(jstr, "comment", msg, addQuotes = 1)
-
-	return jstr
-end
-
-function /s getWaveStatus(datname)
-	string datname
-	nvar filenum
-
-	// create header with corresponding .ibw name and date
-	string jstr="", buffer=""
-
-	// date/time info
-	jstr = addJSONkeyvalpair(jstr, "wave_name", datname, addQuotes = 1)
-	jstr = addJSONkeyvalpair(jstr, "filenum", num2istr(filenum))
-
-	// wave info
-	//check if wave is 1d or 2d
-	variable dims
-	if(dimsize($datname, 1)==0)
-		dims =1
-	elseif(dimsize($datname, 1)!=0 && dimsize($datname, 2)==0)
-		dims = 2
-	else
-		dims = 3
-	endif
-
-	if (dims==1)
-		wavestats/Q $datname
-		buffer = ""
-		buffer = addJSONkeyvalpair(buffer, "length", num2istr(dimsize($datname,0)))
-		buffer = addJSONkeyvalpair(buffer, "dx", num2str(dimdelta($datname, 0)))
-		buffer = addJSONkeyvalpair(buffer, "mean", num2str(V_avg))
-		buffer = addJSONkeyvalpair(buffer, "standard_dev", num2str(V_sdev))
-		jstr = addJSONkeyvalpair(jstr, "wave_stats", buffer)
-	elseif(dims==2)
-		wavestats/Q $datname
-		buffer = ""
-		buffer = addJSONkeyvalpair(buffer, "columns", num2istr(dimsize($datname,0)))
-		buffer = addJSONkeyvalpair(buffer, "rows", num2istr(dimsize($datname,1)))
-		buffer = addJSONkeyvalpair(buffer, "dx", num2str(dimdelta($datname, 0)))
-		buffer = addJSONkeyvalpair(buffer, "dy", num2str(dimdelta($datname, 1)))
-		buffer = addJSONkeyvalpair(buffer, "mean", num2str(V_avg))
-		buffer = addJSONkeyvalpair(buffer, "standard_dev", num2str(V_sdev))
-		jstr = addJSONkeyvalpair(jstr, "wave_stats", buffer)
-	else
-		jstr = addJSONkeyvalpair(jstr, "wave_stats", "Wave dimensions > 2. How did you get this far?", addQuotes = 1)
-	endif
-
-	svar sc_x_label, sc_y_label
-	jstr = addJSONkeyvalpair(jstr, "x_label", sc_x_label, addQuotes = 1)
-	jstr = addJSONkeyvalpair(jstr, "y_label", sc_y_label, addQuotes = 1)
-
-	return jstr
-end
+//function /s getWaveStatus(datname)
+//	string datname
+//	nvar filenum
+//
+//	// create header with corresponding wave name and date
+//	string jstr="", buffer=""
+//
+//	// date/time info
+//	jstr = addJSONkeyvalpair(jstr, "wave_name", datname, addQuotes = 1)
+//	jstr = addJSONkeyvalpair(jstr, "filenum", num2istr(filenum))
+//
+//	// wave info
+//	//check if wave is 1d or 2d
+//	variable dims
+//	if(dimsize($datname, 1)==0)
+//		dims =1
+//	elseif(dimsize($datname, 1)!=0 && dimsize($datname, 2)==0)
+//		dims = 2
+//	else
+//		dims = 3
+//	endif
+//
+//	if (dims==1)
+//		wavestats/Q $datname
+//		buffer = ""
+//		buffer = addJSONkeyvalpair(buffer, "length", num2istr(dimsize($datname,0)))
+//		buffer = addJSONkeyvalpair(buffer, "dx", num2str(dimdelta($datname, 0)))
+//		buffer = addJSONkeyvalpair(buffer, "mean", num2str(V_avg))
+//		buffer = addJSONkeyvalpair(buffer, "standard_dev", num2str(V_sdev))
+//		jstr = addJSONkeyvalpair(jstr, "wave_stats", buffer)
+//	elseif(dims==2)
+//		wavestats/Q $datname
+//		buffer = ""
+//		buffer = addJSONkeyvalpair(buffer, "columns", num2istr(dimsize($datname,0)))
+//		buffer = addJSONkeyvalpair(buffer, "rows", num2istr(dimsize($datname,1)))
+//		buffer = addJSONkeyvalpair(buffer, "dx", num2str(dimdelta($datname, 0)))
+//		buffer = addJSONkeyvalpair(buffer, "dy", num2str(dimdelta($datname, 1)))
+//		buffer = addJSONkeyvalpair(buffer, "mean", num2str(V_avg))
+//		buffer = addJSONkeyvalpair(buffer, "standard_dev", num2str(V_sdev))
+//		jstr = addJSONkeyvalpair(jstr, "wave_stats", buffer)
+//	else
+//		jstr = addJSONkeyvalpair(jstr, "wave_stats", "Wave dimensions > 2. How did you get this far?", addQuotes = 1)
+//	endif
+//
+//	svar sc_x_label, sc_y_label
+//	jstr = addJSONkeyvalpair(jstr, "x_label", sc_x_label, addQuotes = 1)
+//	jstr = addJSONkeyvalpair(jstr, "y_label", sc_y_label, addQuotes = 1)
+//
+//	return jstr
+//end
 
 function saveExp()
 	SaveExperiment /P=data // save current experiment as .pxp
@@ -1930,7 +1763,7 @@ function sc_update_xdata()
 end
 
 function SaveWaves([msg, save_experiment])
-	// the message will be printed in the history, and will be saved in the winf file corresponding to this scan
+	// the message will be printed in the history, and will be saved in the HDF file corresponding to this scan
 	// save_experiment=1 to save the experiment file
 	// srv_push=1 to alert qdot-server of new data
 	string msg
@@ -1984,14 +1817,11 @@ function SaveWaves([msg, save_experiment])
    		sc_update_xdata() // update xdata wave
 		endif
 
-		// Open up any files that may be needed
+		// Open up HDF5 files
 	 	// Save scan controller meta data in this function as well
-	 	svar sc_filetype
-	 	FUNCREF sc_initSaveTemp initSaveFiles = $("initSaveFiles_"+sc_filetype)
 		initSaveFiles(msg=msg)
 
 		// save raw data waves
-		FUNCREF sc_saveSingleTemp saveSingleWave = $("saveSingleWave_"+sc_filetype)
 		ii=0
 		do
 			if (sc_RawRecord[ii] == 1)
@@ -2049,10 +1879,9 @@ function SaveWaves([msg, save_experiment])
 		                            // or srv_push is turned on
 	endif
 
-	// close save files and increment filenum
+	// close HDF5 files and increment filenum
 	if(Rawadd+Calcadd > 0)
-		FUNCREF sc_endSaveTemp endSaveFiles = $("endSaveFiles_"+sc_filetype)
-		endSaveFiles()
+		closeSaveFiles()
 		filenum+=1
 	endif
 
@@ -2244,7 +2073,7 @@ end
 
 function sc_findNewFiles(datnum)
 	// locate newly created/appended files
-	// add to sftp batch file
+	// add to pending_transfer file
 
 	variable datnum // data set to look for
 	variable result = 0
@@ -2253,17 +2082,14 @@ function sc_findNewFiles(datnum)
 	//// create/open batch file ////
 	variable refnum
 	string notifyText = "", buffer
-	getfilefolderinfo /Q/Z/P=data "pending_sftp.lst"
+	getfilefolderinfo /Q/Z/P=data "pending_transfer.lst"
 	if(V_isFile==0) // if the file does not exist, create it with header
-		open /A/P=data refNum as "pending_sftp.lst"
+		open /A/P=data refNum as "pending_transfer.lst"
 
-		// create/write header
-		nvar sc_sftp_port
-		svar sc_srv_url,sc_sftp_user
-		fprintf refNum, "%s, %s, %d\n" sc_sftp_user, sc_srv_url, sc_sftp_port
+		// create/write header, if needed
 
 	else // if the file does exist, open it for appending
-		open /A/P=data refNum as "pending_sftp.lst"
+		open /A/P=data refNum as "pending_transfer.lst"
 		FSetPos refNum, 0
 		variable lines = 0
 		do
@@ -2293,7 +2119,7 @@ function sc_findNewFiles(datnum)
 	endif
 
 	// find new data files
-	string extensions = ".ibw;.h5;.txt;.itx"
+	string extensions = ".h5;.txt;.itx"
 	string datstr = "", idxList, matchList
 	variable i, j
 	for(i=0;i<ItemsInList(extensions, ";");i+=1)
@@ -2327,71 +2153,28 @@ function sc_findNewFiles(datnum)
 		sc_write2batch(refnum, notifyText, tmpname)
 	endif
 
-	// find new metadata files in winfs folder (if it exists)
-	getfilefolderinfo /Q/Z/P=winfs
-	if(V_flag==0 && V_isFolder==1)
-
-		string winfpath = getExpPath("winfs", full=1)
-		extensions = ".winf;"
-		string winfstr = ""
-		idxList = ""
-		for(i=0;i<ItemsInList(extensions, ";");i+=1)
-			sprintf winfstr, "dat%d*%s", datnum, StringFromList(i, extensions, ";") // grep string
-
-			idxList = IndexedFile(winfs, -1, StringFromList(i, extensions, ";"))
-			if(strlen(idxList)==0)
-				continue
-			endif
-
-			matchList = ListMatch(idxList, winfstr, ";")
-			if(strlen(matchlist)==0)
-				continue
-			endif
-
-			for(j=0;j<ItemsInList(matchList, ";");j+=1)
-				tmpname = winfpath+StringFromList(j,matchList, ";")
-				sc_write2batch(refnum, notifyText, tmpname)
-			endfor
-		endfor
-
-	endif
-
-	close refnum // close pending_sftp.lst
+	close refnum // close pending_transfer.lst
 
 end
 
 function sc_FileTransfer()
 
-	string batchFile = "pending_sftp.lst"
+	string batchFile = "pending_transfer.lst"
 	GetFileFolderInfo /Q/Z/P=data batchFile
 	if( V_Flag == 0 && V_isFile ) // file exists
 		string batchFull = "", cmd = "", upload_script
 
 		batchFull = getExpPath("data", full=1) + batchFile
 
-		string platform = igorinfo(2)
-		strswitch(platform)
-			case "Macintosh":
-				upload_script = getExpPath("sc", full=1)+"/SCRIPTS/transfer_data.py"
-				// build command
-				// make sure we are using whatever python is prefered in .bash_profile
-				// .bash_profile is not loaded unless done explicitly
-				sprintf cmd, ". ~/.bash_profile;python %s %s" upload_script, batchFull
-				executeMacCmd(cmd) // this will actually print the results
-				break
-			case "Windows":
-				upload_script = getExpPath("sc", full=1)+"SCRIPTS\\transfer_data.py"
-				sprintf cmd, "python \"%s\" \"%s\"" upload_script, batchFull
-				executeWinCmd(cmd) // this _might_ print the results
-				break
-		endswitch
+		/// send data here ///
+		print "[WARNING] pushing data to the server is temporarily disabled"
 
 		sc_DeleteBatchFile() // Sent everything possible
 								   // assume users will fix errors manually
 		return 1
 
 	else
-		// if there is not server.notify file
+		// if there is not pending_transfer file
 		// don't do anything
 		print "No new files available."
 		return 0
@@ -2403,17 +2186,16 @@ end
 function sc_DeleteBatchFile()
 
 	// delete server.notify
-	deletefile /Z=1 /P=data "pending_sftp.lst"
+	deletefile /Z=1 /P=data "pending_transfer.lst"
 
 	if(V_flag!=0)
-		print "Failed to delete 'pending_sftp.lst'"
+		print "Failed to delete 'pending_transfer.lst'"
 	endif
 end
 
 function /S getSlackNotice(username, [message, channel, botname, emoji, min_time]) //FIX!
 	// this function will send a notification to Slack
 	// username = your slack username
-
 	// message = string to include in Slack message
 	// channel = slack channel to post the message in
 	//            if no channel is provided a DM will be sent to username
@@ -2425,73 +2207,73 @@ function /S getSlackNotice(username, [message, channel, botname, emoji, min_time
 	variable min_time
 	nvar filenum, sweep_t_elapsed, sc_abortsweep
 	svar sc_slack_url
-	string txt="", buffer="", payload="", out=""
-
-	//// check if I need a notification ////
-	if (paramisdefault(min_time))
-		min_time = 60.0 // seconds
-	endif
-
-	if(sweep_t_elapsed < min_time)
-		return addJSONkeyvalpair(out, "notified", "false") // no notification if min_time is not exceeded
-	endif
-
-	if(sc_abortsweep)
-		return addJSONkeyvalpair(out, "notified", "false") // no notification if sweep was aborted by the user
-	endif
-	//// end notification checks ////
-
-
-	//// build notification text ////
-	if (!paramisdefault(channel))
-		// message will be sent to public channel
-		// user who sent it will be mentioned at the beginning of the message
-		txt += "<@"+username+">\r"
-	endif
-
-	if (!paramisdefault(message) && strlen(message)>0)
-		txt += RemoveTrailingWhitespace(message) + "\r"
-	endif
-
-	sprintf buffer, "dat%d completed:  %s %s \r", filenum, Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); txt+=buffer
-	sprintf buffer, "time elapsed:  %.2f s \r", sweep_t_elapsed; txt+=buffer
-	//// end build txt ////
-
-
-	//// build payload ////
-	sprintf buffer, "{\"text\": \"%s\"", txt; payload+=buffer //
-
-	if (paramisdefault(botname))
-		botname = "qdotbot"
-	endif
-	sprintf buffer, ", \"username\": \"%s\"", botname; payload+=buffer
-
-	if (paramisdefault(channel))
-		sprintf buffer, ", \"channel\": \"@%s\"", username; payload+=buffer
-	else
-		sprintf buffer, ", \"channel\": \"#%s\"", channel; payload+=buffer
-	endif
-
-	if (paramisdefault(emoji))
-		emoji = ":the_horns:"
-	endif
-	sprintf buffer, ", \"icon_emoji\": \"%s\"", emoji; payload+=buffer //
-
-	payload += "}"
-	//// end payload ////
-
-	URLRequest /DSTR=payload url=sc_slack_url, method=post
-	if (V_flag == 0)    // No error
-        if (V_responseCode != 200)  // 200 is the HTTP OK code
-            print "Slack post failed!"
-            return addJSONkeyvalpair(out, "notified", "false")
-        else
-            return addJSONkeyvalpair(out, "notified", "true")
-        endif
-    else
-        print "HTTP connection error. Slack post not attempted."
-        return addJSONkeyvalpair(out, "notified", "false")
-    endif
+//	string txt="", buffer="", payload="", out=""
+//
+//	//// check if I need a notification ////
+//	if (paramisdefault(min_time))
+//		min_time = 60.0 // seconds
+//	endif
+//
+//	if(sweep_t_elapsed < min_time)
+//		return addJSONkeyvalpair(out, "notified", "false") // no notification if min_time is not exceeded
+//	endif
+//
+//	if(sc_abortsweep)
+//		return addJSONkeyvalpair(out, "notified", "false") // no notification if sweep was aborted by the user
+//	endif
+//	//// end notification checks ////
+//
+//
+//	//// build notification text ////
+//	if (!paramisdefault(channel))
+//		// message will be sent to public channel
+//		// user who sent it will be mentioned at the beginning of the message
+//		txt += "<@"+username+">\r"
+//	endif
+//
+//	if (!paramisdefault(message) && strlen(message)>0)
+//		txt += RemoveTrailingWhitespace(message) + "\r"
+//	endif
+//
+//	sprintf buffer, "dat%d completed:  %s %s \r", filenum, Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); txt+=buffer
+//	sprintf buffer, "time elapsed:  %.2f s \r", sweep_t_elapsed; txt+=buffer
+//	//// end build txt ////
+//
+//
+//	//// build payload ////
+//	sprintf buffer, "{\"text\": \"%s\"", txt; payload+=buffer //
+//
+//	if (paramisdefault(botname))
+//		botname = "qdotbot"
+//	endif
+//	sprintf buffer, ", \"username\": \"%s\"", botname; payload+=buffer
+//
+//	if (paramisdefault(channel))
+//		sprintf buffer, ", \"channel\": \"@%s\"", username; payload+=buffer
+//	else
+//		sprintf buffer, ", \"channel\": \"#%s\"", channel; payload+=buffer
+//	endif
+//
+//	if (paramisdefault(emoji))
+//		emoji = ":the_horns:"
+//	endif
+//	sprintf buffer, ", \"icon_emoji\": \"%s\"", emoji; payload+=buffer //
+//
+//	payload += "}"
+//	//// end payload ////
+//
+//	URLRequest /DSTR=payload url=sc_slack_url, method=post
+//	if (V_flag == 0)    // No error
+//        if (V_responseCode != 200)  // 200 is the HTTP OK code
+//            print "Slack post failed!"
+//            return addJSONkeyvalpair(out, "notified", "false")
+//        else
+//            return addJSONkeyvalpair(out, "notified", "true")
+//        endif
+//    else
+//        print "HTTP connection error. Slack post not attempted."
+//        return addJSONkeyvalpair(out, "notified", "false")
+//    endif
 end
 
 ////////////////////////

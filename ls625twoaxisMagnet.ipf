@@ -555,17 +555,17 @@ end
 
 function/s GetTwoAxisStatus(instrIDx,instrIDz)
 	variable instrIDx,instrIDz
-	string buffer = "", subbuffer = ""
-
-	subbuffer = ""
-	subbuffer = addJSONkeyvalpair(subbuffer, "x", num2str(getLS625field(instrIDx)))
-	subbuffer = addJSONkeyvalpair(subbuffer, "z", num2str(getLS625field(instrIDz)))
-	buffer = addJSONkeyvalpair(buffer, "field mT", subbuffer)
-
-	subbuffer = ""
-	subbuffer = addJSONkeyvalpair(subbuffer, "x", num2str(getLS625rate(instrIDx)))
-	subbuffer = addJSONkeyvalpair(subbuffer, "z", num2str(getLS625rate(instrIDz)))
-	buffer = addJSONkeyvalpair(buffer, "rate mT/min", subbuffer)
-
-	return addJSONkeyvalpair("", "Two Axis Magnet", buffer)
+//	string buffer = "", subbuffer = ""
+//
+//	subbuffer = ""
+//	subbuffer = addJSONkeyvalpair(subbuffer, "x", num2str(getLS625field(instrIDx)))
+//	subbuffer = addJSONkeyvalpair(subbuffer, "z", num2str(getLS625field(instrIDz)))
+//	buffer = addJSONkeyvalpair(buffer, "field mT", subbuffer)
+//
+//	subbuffer = ""
+//	subbuffer = addJSONkeyvalpair(subbuffer, "x", num2str(getLS625rate(instrIDx)))
+//	subbuffer = addJSONkeyvalpair(subbuffer, "z", num2str(getLS625rate(instrIDz)))
+//	buffer = addJSONkeyvalpair(buffer, "rate mT/min", subbuffer)
+//
+//	return addJSONkeyvalpair("", "Two Axis Magnet", buffer)
 end
