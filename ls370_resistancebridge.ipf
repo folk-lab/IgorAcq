@@ -1031,32 +1031,32 @@ function/s getLS370status(instrID, [max_age])
 		max_age=120
 	endif
 
-	svar ls_system, ighgaugelookup
-	string  buffer="", gauge=""
-	variable i=0
-
-	strswitch(ls_system)
-		case "bfsmall":
-			buffer = addJSONkeyvalpair(buffer,"MC K",num2str(getLS370temp(instrID, "mc", max_age=max_age)))
-			buffer = addJSONkeyvalpair(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age=max_age)))
-			buffer = addJSONkeyvalpair(buffer,"4K Plate K",num2str(getLS370temp(instrID, "4K", max_age=max_age)))
-			buffer = addJSONkeyvalpair(buffer,"Magnet K",num2str(getLS370temp(instrID, "magnet", max_age=max_age)))
-			buffer = addJSONkeyvalpair(buffer,"50K Plate K",num2str(getLS370temp(instrID, "50K", max_age=max_age)))
-//			for(i=1;i<7;i+=1)
-//				gauge = "P"+num2istr(i)
-//				buffer = addJSONkeyvalpair(buffer,gauge,num2str(GetPressureDB(instrID,gauge)))
-//			endfor
-			return addJSONkeyvalpair("","BF Small",buffer)
-		case "igh":
-			buffer = addJSONkeyvalpair(buffer,"MC K",num2str(getLS370temp(instrID, "mc", max_age=max_age)))
-			buffer = addJSONkeyvalpair(buffer,"Cold Plate K",num2str(getLS370temp(instrID, "cold plate", max_age=max_age)))
-			buffer = addJSONkeyvalpair(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age=max_age)))
-			buffer = addJSONkeyvalpair(buffer,"1K Pot K",num2str(getLS370temp(instrID, "1K", max_age=max_age)))
-			buffer = addJSONkeyvalpair(buffer,"Sorb K",num2str(getLS370temp(instrID, "sorb", max_age=max_age)))
-//			for(i=1;i<6;i+=1)
-//				gauge = stringfromlist(i,ighgaugelookup)
-//				buffer = addJSONkeyvalpair(buffer,"P"+num2istr(i),num2str(GetPressureDB(instrID,gauge)))
-//			endfor
-			return addJSONkeyvalpair("","IGH",buffer)
-	endswitch
+//	svar ls_system, ighgaugelookup
+//	string  buffer="", gauge=""
+//	variable i=0
+//
+//	strswitch(ls_system)
+//		case "bfsmall":
+//			buffer = addJSONkeyvalpair(buffer,"MC K",num2str(getLS370temp(instrID, "mc", max_age=max_age)))
+//			buffer = addJSONkeyvalpair(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age=max_age)))
+//			buffer = addJSONkeyvalpair(buffer,"4K Plate K",num2str(getLS370temp(instrID, "4K", max_age=max_age)))
+//			buffer = addJSONkeyvalpair(buffer,"Magnet K",num2str(getLS370temp(instrID, "magnet", max_age=max_age)))
+//			buffer = addJSONkeyvalpair(buffer,"50K Plate K",num2str(getLS370temp(instrID, "50K", max_age=max_age)))
+////			for(i=1;i<7;i+=1)
+////				gauge = "P"+num2istr(i)
+////				buffer = addJSONkeyvalpair(buffer,gauge,num2str(GetPressureDB(instrID,gauge)))
+////			endfor
+//			return addJSONkeyvalpair("","BF Small",buffer)
+//		case "igh":
+//			buffer = addJSONkeyvalpair(buffer,"MC K",num2str(getLS370temp(instrID, "mc", max_age=max_age)))
+//			buffer = addJSONkeyvalpair(buffer,"Cold Plate K",num2str(getLS370temp(instrID, "cold plate", max_age=max_age)))
+//			buffer = addJSONkeyvalpair(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age=max_age)))
+//			buffer = addJSONkeyvalpair(buffer,"1K Pot K",num2str(getLS370temp(instrID, "1K", max_age=max_age)))
+//			buffer = addJSONkeyvalpair(buffer,"Sorb K",num2str(getLS370temp(instrID, "sorb", max_age=max_age)))
+////			for(i=1;i<6;i+=1)
+////				gauge = stringfromlist(i,ighgaugelookup)
+////				buffer = addJSONkeyvalpair(buffer,"P"+num2istr(i),num2str(GetPressureDB(instrID,gauge)))
+////			endfor
+//			return addJSONkeyvalpair("","IGH",buffer)
+//	endswitch
 end

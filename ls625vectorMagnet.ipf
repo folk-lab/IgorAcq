@@ -672,19 +672,19 @@ end
 
 function/s GetVectorStatus(instrIDx,instrIDy,instrIDz)
 	variable instrIDx,instrIDy,instrIDz
-	string buffer = "", subbuffer = ""
-
-	subbuffer = ""
-	subbuffer = addJSONkeyvalpair(subbuffer, "x", num2str(getLS625field(instrIDx)))
-	subbuffer = addJSONkeyvalpair(subbuffer, "y", num2str(getLS625field(instrIDy)))
-	subbuffer = addJSONkeyvalpair(subbuffer, "z", num2str(getLS625field(instrIDz)))
-	buffer = addJSONkeyvalpair(buffer, "field mT", subbuffer)
-
-	subbuffer = ""
-	subbuffer = addJSONkeyvalpair(subbuffer, "x", num2str(getLS625rate(instrIDx)))
-	subbuffer = addJSONkeyvalpair(subbuffer, "y", num2str(getLS625rate(instrIDy)))
-	subbuffer = addJSONkeyvalpair(subbuffer, "z", num2str(getLS625rate(instrIDz)))
-	buffer = addJSONkeyvalpair(buffer, "rate mT/min", subbuffer)
-
-	return addJSONkeyvalpair("", "Vector Magnet", buffer)
+//	string buffer = "", subbuffer = ""
+//
+//	subbuffer = ""
+//	subbuffer = addJSONkeyvalpair(subbuffer, "x", num2str(getLS625field(instrIDx)))
+//	subbuffer = addJSONkeyvalpair(subbuffer, "y", num2str(getLS625field(instrIDy)))
+//	subbuffer = addJSONkeyvalpair(subbuffer, "z", num2str(getLS625field(instrIDz)))
+//	buffer = addJSONkeyvalpair(buffer, "field mT", subbuffer)
+//
+//	subbuffer = ""
+//	subbuffer = addJSONkeyvalpair(subbuffer, "x", num2str(getLS625rate(instrIDx)))
+//	subbuffer = addJSONkeyvalpair(subbuffer, "y", num2str(getLS625rate(instrIDy)))
+//	subbuffer = addJSONkeyvalpair(subbuffer, "z", num2str(getLS625rate(instrIDz)))
+//	buffer = addJSONkeyvalpair(buffer, "rate mT/min", subbuffer)
+//
+//	return addJSONkeyvalpair("", "Vector Magnet", buffer)
 end

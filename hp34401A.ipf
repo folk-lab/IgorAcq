@@ -154,25 +154,25 @@ end
 //// Status function ////
 ////////////////////////
 
-function/s get34401Astatus(instrID)
+function/s get34401AStatus(instrID)
 	variable instrID
-	string  buffer = ""
-
-	string gpib = num2istr(getAddressGPIB(instrID))
-	buffer = addJSONkeyvalpair(buffer, "gpib_address", gpib)
-
-	// get configuration
-	string config = TrimString(check34401Aconfig(instrID))
-	variable i=0
-	do
-		if(CmpStr(config[i], "+")==0 || CmpStr(config[i], "-")==0)
-			break
-		endif
-		i+=1
-	while(i<strlen(config))
-	buffer = addJSONkeyvalpair(buffer, "units", TrimString(config[1,i-1]), addQuotes=1)
-	buffer = addJSONkeyvalpair(buffer, "range", StringFromList(0, config[i,strlen(config)-2],","))
-	buffer = addJSONkeyvalpair(buffer, "resolution", StringFromList(1, config[i,strlen(config)-2],","))
-
-	return addJSONkeyvalpair("", "HP34401A_"+gpib, buffer)
+//	string  buffer = ""
+//
+//	string gpib = num2istr(getAddressGPIB(instrID))
+//	buffer = addJSONkeyvalpair(buffer, "gpib_address", gpib)
+//
+//	// get configuration
+//	string config = TrimString(check34401Aconfig(instrID))
+//	variable i=0
+//	do
+//		if(CmpStr(config[i], "+")==0 || CmpStr(config[i], "-")==0)
+//			break
+//		endif
+//		i+=1
+//	while(i<strlen(config))
+//	buffer = addJSONkeyvalpair(buffer, "units", TrimString(config[1,i-1]), addQuotes=1)
+//	buffer = addJSONkeyvalpair(buffer, "range", StringFromList(0, config[i,strlen(config)-2],","))
+//	buffer = addJSONkeyvalpair(buffer, "resolution", StringFromList(1, config[i,strlen(config)-2],","))
+//
+//	return addJSONkeyvalpair("", "HP34401A_"+gpib, buffer)
 end
