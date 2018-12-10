@@ -274,7 +274,7 @@ end
 
 threadsafe function sc_check_NaNInf(num)
 	variable num
-	
+
 	return numtype(num)
 end
 
@@ -301,7 +301,7 @@ function InitScanController([configFile, srv_push])
 		sc_srv_push = 0
 		print "[WARNING] Only saving local copies of data."
 	endif
-	
+
 	string /g slack_url =  "https://hooks.slack.com/services/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" // url for slack alert
 	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
 	string /g sc_current_config = ""
@@ -363,44 +363,44 @@ end
 function/s addTOMLblock(name,[str,indent])
 	string name, str, indent
 	string returnstr=""
-	
+
 	if(!paramisdefault(str))
 		returnstr = str+"\n"
 	endif
-	
+
 	if(paramisdefault(indent))
 		indent = ""
 	endif
-	
+
 	return returnstr+indent+"["+name+"]"+"\n"
 end
 
 function/s addTOMLkey(name,value,[str,indent])
 	string name, value, str, indent
 	string returnstr
-	
+
 	if(paramisdefault(str))
 		str = ""
 	endif
-	
+
 	if(paramisdefault(indent))
 		indent = ""
 	endif
-	
+
 	return str+indent+name+"="+value+"\n"
 end
-	
+
 function/s addTOMLcomment(comment,[str,indent])
 	string comment, str, indent
-	
+
 	if(paramisdefault(str))
 		str = ""
 	endif
-	
+
 	if(paramisdefault(indent))
 		indent = ""
 	endif
-	
+
 	return str+indent+"# "+comment+"\n"
 end
 
@@ -410,7 +410,6 @@ function/s sc_createconfig()
 	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
 	nvar sc_PrintRaw, sc_PrintCalc, filenum
 	svar sc_LogStr, sc_current_config
-	variable refnum
 	string configfile
 	string configstr = "", tmpstr = ""
 
@@ -441,19 +440,17 @@ function/s sc_createconfig()
 	configstr = addTOMLblock("checkboxes.history",str=configstr,indent="\t")
 	configstr = addTOMLkey("raw",numToBool(sc_PrintRaw),str=configstr,indent="\t")
 	configstr = addTOMLkey("calc",numToBool(sc_PrintCalc),str=configstr,indent="\t")
-	
+
 	// scripts
 	configstr = addTOMLblock("scripts",str=configstr)
 	configstr = addTOMLkey("raw",textwavetostrarray(sc_RawScripts),str=configstr)
 	configstr = addTOMLkey("calc",textwavetostrarray(sc_CalcScripts),str=configstr)
 
 	// executable string to get logs
-	configstr = addTOMLblock("logstring",str=configstr)
-	configstr = addTOMLkey("logstr",sc_LogStr,str=configstr)
+	configstr = addTOMLkey("logstring","\""+sc_LogStr+"\"",str=configstr,indent="\n")
 
 	//filenum
-	configstr = addTOMLblock("filenum",str=configstr)
-	configstr = addTOMLkey("num",num2str(filenum),str=configstr)
+	configstr = addTOMLkey("filenum",num2str(filenum),str=configstr,indent="\n")
 
 	sc_current_config = configfile
 	writetofile(configstr,configfile,"config")
@@ -469,49 +466,49 @@ function sc_loadConfig(configfile)
 	printf "Loading configuration from: %s\n", configfile
 	sc_current_config = configfile
 	TOMLstr = readtxtfile(configfile,"config")
-	
+
 	// waves
-	loadtextarrayintowave(getvalueTOML(TOMLstr,"waves:raw"),"sc_RawWaveNames")
-	loadtextarrayintowave(getvalueTOML(TOMLstr,"waves:calc"),"sc_CalcWaveNames")
-	
+	loadtextarrayintowave(getTOMLvalue(TOMLstr,"waves:raw"),"sc_RawWaveNames")
+	loadtextarrayintowave(getTOMLvalue(TOMLstr,"waves:calc"),"sc_CalcWaveNames")
+
 	// record checkboxes
-	loadbooleanarrayintowave(getvalueTOML(TOMLstr,"checkboxes.record:raw"),"sc_RawRecord")
-	loadbooleanarrayintowave(getvalueTOML(TOMLstr,"checkboxes.record:calc"),"sc_CalcRecord")
-	
+	loadbooleanarrayintowave(getTOMLvalue(TOMLstr,"checkboxes.record:raw"),"sc_RawRecord")
+	loadbooleanarrayintowave(getTOMLvalue(TOMLstr,"checkboxes.record:calc"),"sc_CalcRecord")
+
 	// plot checkboxes
-	loadbooleanarrayintowave(getvalueTOML(TOMLstr,"checkboxes.plot:raw"),"sc_RawPlot")
-	loadbooleanarrayintowave(getvalueTOML(TOMLstr,"checkboxes.plot:calc"),"sc_CalcPlot")
-	
+	loadbooleanarrayintowave(getTOMLvalue(TOMLstr,"checkboxes.plot:raw"),"sc_RawPlot")
+	loadbooleanarrayintowave(getTOMLvalue(TOMLstr,"checkboxes.plot:calc"),"sc_CalcPlot")
+
 	// async checkboxes
-	loadbooleanarrayintowave(getvalueTOML(TOMLstr,"checkboxes.asybc:async"),"sc_measAsync")
-	
+	loadbooleanarrayintowave(getTOMLvalue(TOMLstr,"checkboxes.asybc:async"),"sc_measAsync")
+
 	// print_to_history
-	loadbooleanintovariable(getvalueTOML(TOMLstr,"checkboxes.history:raw"),"sc_PrintRaw")
-	loadbooleanintovariable(getvalueTOML(TOMLstr,"checkboxes.history:calc"),"sc_PrintCalc")
-	
+	loadbooleanintovariable(getTOMLvalue(TOMLstr,"checkboxes.history:raw"),"sc_PrintRaw")
+	loadbooleanintovariable(getTOMLvalue(TOMLstr,"checkboxes.history:calc"),"sc_PrintCalc")
+
 	// scripts
-	loadtextarrayintowave(getvalueTOML(TOMLstr,"scripts:raw"),"sc_RawScripts")
-	loadtextarrayintowave(getvalueTOML(TOMLstr,"scripts:calc"),"sc_CalcScripts")
-	
+	loadtextarrayintowave(getTOMLvalue(TOMLstr,"scripts:raw"),"sc_RawScripts")
+	loadtextarrayintowave(getTOMLvalue(TOMLstr,"scripts:calc"),"sc_CalcScripts")
+
 	// executable string to get logs
-	loadtextintostring(getvalueTOML(TOMLstr,"logstring:logstr"),"sc_Logstr")
-	
+	loadtextintostring(getTOMLvalue(TOMLstr,"logstring"),"sc_Logstr")
+
 	//filenum
-	loadnumintovariable(getvalueTOML(TOMLstr,"filenum:num"),"sc_filenum")
-	
+	loadnumintovariable(getTOMLvalue(TOMLstr,"filenum"),"sc_filenum")
+
 	// reload ScanController window
 	// sc_rebuildwindow()
 end
 
-function/s getvalueTOML(TOMLstr,key)
+function/s getTOMLvalue(TOMLstr,key)
 	// returns the value associated with key
 	// returns an empty string is key is not valid
 	string TOMLstr,key
 	variable key_length,index,old_index,i=0, val_start, val_end
 	string str
-	
+
 	key_length = itemsinlist(key,":")
-	
+
 	// search TOMLstr for key
 	old_index = 0
 	for(i=0;i<key_length;i+=1)
@@ -534,35 +531,35 @@ end
 
 function loadtextarrayintowave(array,destwave)
 	string array,destwave
-	
+
 	array = array[1,strlen(array)-2]
-	
+
 	make/o/t/n=(itemsinlist(array,",")) $destwave = stringfromlist(p,array,",")
 end
 
 function loadbooleanarrayintowave(array,destwave)
 	string array,destwave
-	
+
 	array = array[1,strlen(array)-2]
-	
+
 	make/o/n=(itemsinlist(array,",")) $destwave = booltonum(stringfromlist(p,array,","))
 end
 
 function loadbooleanintovariable(boolean,destvar)
 	string boolean,destvar
-	
+
 	variable/g $destvar = booltonum(boolean)
 end
 
 function loadtextintostring(str,deststring)
 	string str,deststring
-	
+
 	string/g $deststring = str
 end
 
 function loadnumintovariable(numasstr,destvar)
 	string numasstr,destvar
-	
+
 	variable/g $destvar = str2num(numasstr)
 end
 
@@ -1031,11 +1028,11 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	while (i<numpnts(sc_CalcWaveNames))
 	i=0
 
-	// because VISA tends to drop connections when the 
+	// because VISA tends to drop connections when the
 	// measurement computer is left idle
 	// we may want to add a function here to setup all the instruments
 	print "[WARNING] VISA instrument connections may have expired if your measurement has been idle."
-	
+
 	// The status of the upcoming scan will be set when waves are initialized.
 	if(!paramisdefault(starty) && !paramisdefault(finy) && !paramisdefault(numptsy))
 		sc_is2d = 1
@@ -1261,18 +1258,18 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	while(i<numpnts(sc_CalcWaveNames))
 
 	execute("abortmeasurementwindow()")
-	
+
 	cmd1 = "TileWindows/O=1/A=(3,4) "
 	cmd2 = ""
 	// Tile graphs
 	for(i=0;i<itemsinlist(activegraphs);i=i+1)
 		window_string = stringfromlist(i,activegraphs)
 		cmd1+= window_string +","
-		
+
 		cmd2 = "DoWindow/F " + window_string
 		execute(cmd2)
 	endfor
-	
+
 	cmd1 += "SweepControl"
 	execute(cmd1)
 end

@@ -1,4 +1,4 @@
-#pragma rtGlobals=1		// Use modern global access method.
+pragma rtGlobals=1		// Use modern global access method.
 
 /// this procedure contains all of the functions that
 /// scan controller needs for file I/O and custom formatted string handling
@@ -275,7 +275,7 @@ function/s textWaveToStrArray(w)
 	for(i=0;i<itemsinlist(list,";");i+=1)
 		checkStr = stringfromlist(i,list,";")
 		if(countQuotes(checkStr)>2)
-			escapedStr = escapeInnerQuotes(checkStr)
+			//escapedStr = escapeJSONstr(checkStr)
 			list = removelistitem(i,list,";")
 			list = addlistitem(escapedStr,list,";",i)
 		endif
@@ -293,7 +293,7 @@ function writetofile(anyStr,filename,path)
 	// path must be a predefined path
 	string anyStr,filename,path
 	variable refnum=0
-	
+
 	open /z/p=$path refnum as filename
 
 	do
