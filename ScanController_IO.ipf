@@ -747,6 +747,87 @@ end
 
 /// parse JSON strings to variables/waves ///
 
+function/s getJSONkey(jstr, key)
+	// returns the value of the parsed key
+	// function returns can be: object, array, value
+	// expected format: "parent1:parent2:parent3:key"
+	string jstr, key
+	variable offset, key_length
+	string indices
+	
+	key_length = itemsinlist(key,":")
+	
+	JSONSimple jstr
+	wave/t t_tokentext
+	wave w_tokentype, w_tokensize
+	
+	if(key_length==1)
+		// this is the only key with this name
+		// if not, the first key will be returned
+		offset = 0	
+		return getJSONkeyoffset(key,offset)
+	else
+		// the key has parents, and there could be multiple keys with this name
+		// find the indices of the keys parsed
+		indices = getJSONindices(key)
+		if(itemsinlist(indices,",")<key_length)
+			return ""
+		else
+			return getJSONkeyoffset(stringfromlist(key_length-1,key,":"),str2num(stringfromlist(key_length-1,indices,","))-1)
+		endif
+	endif
+end
+
+function/s getJSONindices(keys)
+	// returns string list with indices of parsed keys
+	string keys
+	string indices="", key
+	wave/t t_tokentext
+	wave w_tokentype, w_tokensize, w_tokenparent
+	variable i=0, j=0, index, k=0
+	
+	for(i=0;i<itemsinlist(keys,":");i+=1)
+		key = stringfromlist(i,keys,":")
+		if(i==0)
+			index = 0
+		else
+			index = str2num(stringfromlist(i-1,indices,","))
+		endif
+		for(j=0;j<numpnts(t_tokentext);j+=1)
+			if(cmpstr(t_tokentext[j],key)==0 && w_tokensize[j]>0)
+				if(w_tokenparent[j]==index)
+					if(w_tokensize[j+1]>0)
+						k = j+1
+					else
+						k = j
+					endif
+					indices = addlistitem(num2str(k),indices,",",inf)
+					break
+				endif
+			endif
+		endfor
+	endfor
+	
+	return indices
+end
+
+function/s getJSONkeyoffset(key,offset)
+	string key
+	variable offset
+	wave/t t_tokentext
+	wave w_tokentype, w_tokensize
+	variable i=0
+	
+	// find key and check that it is infact a key
+	for(i=offset;i<numpnts(t_tokentext);i+=1)
+		if(cmpstr(t_tokentext[i],key)==0 && w_tokensize[i]>0)
+			return t_tokentext[i+1]
+		endif
+	endfor
+	// if key is not found, return an empty string
+	return ""
+end
+
 function loadtextJSONfromkeys(keys,destinations)
 	// parse key,value pairs to text waves
 	string keys, destinations
