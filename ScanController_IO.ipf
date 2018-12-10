@@ -283,3 +283,52 @@ function/s textWaveToStrArray(w)
 	list = replacestring(";",list,",")
 	return "["+list[0,strlen(list)-2]+"]"
 end
+
+///////////////////////
+/// file read/write ///
+///////////////////////
+
+function writetofile(anyStr,filename,path)
+	// write any string to a file called "filename"
+	// path must be a predefined path
+	string anyStr,filename,path
+	variable refnum=0
+	
+	open /z/p=$path refnum as filename
+
+	do
+		if(strlen(anyStr)<500)
+			fprintf refnum, "%s", anyStr
+			break
+		else
+			fprintf refnum, "%s", anyStr[0,499]
+			anyStr = anyStr[500,inf]
+		endif
+	while(1)
+
+	close refnum
+end
+
+function/s readtxtfile(filename, path)
+	// read textfile into string from filename on path
+	string filename,path
+	variable refnum
+	string buffer="", txtstr=""
+
+	open /r/z/p=$path refNum as filename
+	if(V_flag!=0)
+		print "[ERROR]: Could not read file: "+filename
+		return ""
+	endif
+
+	do
+		freadline refnum, buffer // returns \r no matter what was used in the file
+		if(strlen(buffer)==0)
+			break
+		endif
+		txtstr+=buffer
+	while(1)
+	close refnum
+
+	return txtstr
+end
