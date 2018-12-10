@@ -360,50 +360,6 @@ end
 //// configuration files ////
 /////////////////////////////
 
-function/s addTOMLblock(name,[str,indent])
-	string name, str, indent
-	string returnstr=""
-
-	if(!paramisdefault(str))
-		returnstr = str+"\n"
-	endif
-
-	if(paramisdefault(indent))
-		indent = ""
-	endif
-
-	return returnstr+indent+"["+name+"]"+"\n"
-end
-
-function/s addTOMLkey(name,value,[str,indent])
-	string name, value, str, indent
-	string returnstr
-
-	if(paramisdefault(str))
-		str = ""
-	endif
-
-	if(paramisdefault(indent))
-		indent = ""
-	endif
-
-	return str+indent+name+"="+value+"\n"
-end
-
-function/s addTOMLcomment(comment,[str,indent])
-	string comment, str, indent
-
-	if(paramisdefault(str))
-		str = ""
-	endif
-
-	if(paramisdefault(indent))
-		indent = ""
-	endif
-
-	return str+indent+"# "+comment+"\n"
-end
-
 function/s sc_createconfig()
 	// create a new config.toml file
 	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts
@@ -468,99 +424,36 @@ function sc_loadConfig(configfile)
 	TOMLstr = readtxtfile(configfile,"config")
 
 	// waves
-	loadtextarrayintowave(getTOMLvalue(TOMLstr,"waves:raw"),"sc_RawWaveNames")
-	loadtextarrayintowave(getTOMLvalue(TOMLstr,"waves:calc"),"sc_CalcWaveNames")
+	LoadTextArrayToWave(getTOMLvalue(TOMLstr,"waves:raw"),"sc_RawWaveNames")
+	LoadTextArrayToWave(getTOMLvalue(TOMLstr,"waves:calc"),"sc_CalcWaveNames")
 
 	// record checkboxes
-	loadbooleanarrayintowave(getTOMLvalue(TOMLstr,"checkboxes.record:raw"),"sc_RawRecord")
-	loadbooleanarrayintowave(getTOMLvalue(TOMLstr,"checkboxes.record:calc"),"sc_CalcRecord")
+	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.record:raw"),"sc_RawRecord")
+	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.record:calc"),"sc_CalcRecord")
 
 	// plot checkboxes
-	loadbooleanarrayintowave(getTOMLvalue(TOMLstr,"checkboxes.plot:raw"),"sc_RawPlot")
-	loadbooleanarrayintowave(getTOMLvalue(TOMLstr,"checkboxes.plot:calc"),"sc_CalcPlot")
+	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.plot:raw"),"sc_RawPlot")
+	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.plot:calc"),"sc_CalcPlot")
 
 	// async checkboxes
-	loadbooleanarrayintowave(getTOMLvalue(TOMLstr,"checkboxes.asybc:async"),"sc_measAsync")
+	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.asybc:async"),"sc_measAsync")
 
 	// print_to_history
-	loadbooleanintovariable(getTOMLvalue(TOMLstr,"checkboxes.history:raw"),"sc_PrintRaw")
-	loadbooleanintovariable(getTOMLvalue(TOMLstr,"checkboxes.history:calc"),"sc_PrintCalc")
+	LoadBoolToVar(getTOMLvalue(TOMLstr,"checkboxes.history:raw"),"sc_PrintRaw")
+	LoadBoolToVar(getTOMLvalue(TOMLstr,"checkboxes.history:calc"),"sc_PrintCalc")
 
 	// scripts
-	loadtextarrayintowave(getTOMLvalue(TOMLstr,"scripts:raw"),"sc_RawScripts")
-	loadtextarrayintowave(getTOMLvalue(TOMLstr,"scripts:calc"),"sc_CalcScripts")
+	LoadTextArrayToWave(getTOMLvalue(TOMLstr,"scripts:raw"),"sc_RawScripts")
+	LoadTextArrayToWave(getTOMLvalue(TOMLstr,"scripts:calc"),"sc_CalcScripts")
 
 	// executable string to get logs
-	loadtextintostring(getTOMLvalue(TOMLstr,"logstring"),"sc_Logstr")
+	LoadTextToString(getTOMLvalue(TOMLstr,"logstring"),"sc_Logstr")
 
 	//filenum
-	loadnumintovariable(getTOMLvalue(TOMLstr,"filenum"),"sc_filenum")
+	LoadNumToVar(getTOMLvalue(TOMLstr,"filenum"),"sc_filenum")
 
 	// reload ScanController window
-	// sc_rebuildwindow()
-end
-
-function/s getTOMLvalue(TOMLstr,key)
-	// returns the value associated with key
-	// returns an empty string is key is not valid
-	string TOMLstr,key
-	variable key_length,index,old_index,i=0, val_start, val_end
-	string str
-
-	key_length = itemsinlist(key,":")
-
-	// search TOMLstr for key
-	old_index = 0
-	for(i=0;i<key_length;i+=1)
-		if(i<key_length-1)
-			str = "["+stringfromlist(i,key,":")+"]"
-		else
-			str = stringfromlist(i,key,":")
-		endif
-		index = strsearch(TOMLstr,str,old_index)
-		if(index==-1 || index<old_index)
-			return ""
-		endif
-		old_index=index+strlen(str)
-	endfor
-	val_start = index+strlen(str)+1
-	val_end = strsearch(TOMLstr,num2char(13),val_start) // look for \r
-
-	return TOMLstr[val_start,val_end-1]
-end
-
-function loadtextarrayintowave(array,destwave)
-	string array,destwave
-
-	array = array[1,strlen(array)-2]
-
-	make/o/t/n=(itemsinlist(array,",")) $destwave = stringfromlist(p,array,",")
-end
-
-function loadbooleanarrayintowave(array,destwave)
-	string array,destwave
-
-	array = array[1,strlen(array)-2]
-
-	make/o/n=(itemsinlist(array,",")) $destwave = booltonum(stringfromlist(p,array,","))
-end
-
-function loadbooleanintovariable(boolean,destvar)
-	string boolean,destvar
-
-	variable/g $destvar = booltonum(boolean)
-end
-
-function loadtextintostring(str,deststring)
-	string str,deststring
-
-	string/g $deststring = str
-end
-
-function loadnumintovariable(numasstr,destvar)
-	string numasstr,destvar
-
-	variable/g $destvar = str2num(numasstr)
+	sc_rebuildwindow()
 end
 
 /////////////////////

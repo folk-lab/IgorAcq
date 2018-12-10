@@ -175,9 +175,9 @@ function/s getJSONkeyoffset(key,offset)
 	return ""
 end
 
-//////////////////
-/// formatting ///
-//////////////////
+/////////////////////////////////
+/// text formatting utilities ///
+/////////////////////////////////
 
 function countQuotes(str)
 	// count how many quotes are in the string
@@ -196,7 +196,7 @@ function countQuotes(str)
 			endif
 		endif
 
-		// count opening brackets
+		// count quotes
 		if( CmpStr(str[i], "\"" ) == 0 && escaped == 0)
 			quoteCount += 1
 		endif
@@ -205,28 +205,38 @@ function countQuotes(str)
 	return quoteCount
 end
 
-function/s escapeInnerQuotes(str)
-	string str
-	variable i, escaped
-	string dummy="", newStr=""
+function LoadTextArrayToWave(array,destwave)
+	string array,destwave
 
-	for(i=1; i<strlen(str)-1; i+=1)
+	array = array[1,strlen(array)-2]
 
-		// check if the current character is escaped
-		if(cmpStr(str[i-1], "\\") == 0)
-			escaped = 1
-		else
-			escaped = 0
-		endif
+	make/o/t/n=(itemsinlist(array,",")) $destwave = stringfromlist(p,array,",")
+end
 
-		// find extra quotes
-		dummy = str[i]
-		if(cmpStr(dummy, "\"" )==0 && escaped==0)
-			dummy = "\\"+dummy
-		endif
-		newStr = newStr+dummy
-	endfor
-	return newStr
+function LoadBoolArrayToWave(array,destwave)
+	string array,destwave
+
+	array = array[1,strlen(array)-2]
+
+	make/o/n=(itemsinlist(array,",")) $destwave = booltonum(stringfromlist(p,array,","))
+end
+
+function LoadBoolToVar(boolean,destvar)
+	string boolean,destvar
+
+	variable/g $destvar = booltonum(boolean)
+end
+
+function LoadTextToString(str,deststring)
+	string str,deststring
+
+	string/g $deststring = str
+end
+
+function LoadNumToVar(numasstr,destvar)
+	string numasstr,destvar
+
+	variable/g $destvar = str2num(numasstr)
 end
 
 function/s numToBool(val)
@@ -285,10 +295,10 @@ function/s textWaveToStrArray(w)
 end
 
 ///////////////////////
-/// file read/write ///
+/// text read/write ///
 ///////////////////////
 
-function writetofile(anyStr,filename,path)
+function writeToFile(anyStr,filename,path)
 	// write any string to a file called "filename"
 	// path must be a predefined path
 	string anyStr,filename,path
@@ -309,7 +319,7 @@ function writetofile(anyStr,filename,path)
 	close refnum
 end
 
-function/s readtxtfile(filename, path)
+function/s readTXTFile(filename, path)
 	// read textfile into string from filename on path
 	string filename,path
 	variable refnum
@@ -331,4 +341,91 @@ function/s readtxtfile(filename, path)
 	close refnum
 
 	return txtstr
+end
+
+////////////
+/// TOML ///
+////////////
+
+// a quick attempt at writing a TOML parser
+
+function/s getTOMLvalue(TOMLstr,key)
+	// returns the value associated with key
+	// returns an empty string is key is not valid
+	string TOMLstr,key
+	variable key_length,index,old_index,i=0, val_start, val_end
+	string str
+
+	key_length = itemsinlist(key,":")
+
+	// search TOMLstr for key
+	// record index of first character _after_ key
+	old_index = 0
+	for(i=0;i<key_length;i+=1)
+		if(i<key_length-1)
+			str = "["+stringfromlist(i,key,":")+"]"
+		else
+			str = stringfromlist(i,key,":")
+		endif
+		index = strsearch(TOMLstr,str,old_index)
+		if(index==-1 || index<old_index)
+			return ""
+		endif
+		old_index=index+strlen(str)
+	endfor
+	
+	// starting from key find "="
+	// read values until "\r"
+	// if "\r" is found, check for unclosed "["
+	//   if there are any, keep reading for next "\r"
+	
+	val_start = index+strlen(str)+1
+	
+	val_end = strsearch(TOMLstr,num2char(13),val_start) // look for \r
+
+	return TOMLstr[val_start,val_end-1]
+end
+
+function/s addTOMLblock(name,[str,indent])
+	string name, str, indent
+	string returnstr=""
+
+	if(!paramisdefault(str))
+		returnstr = str+"\n"
+	endif
+
+	if(paramisdefault(indent))
+		indent = ""
+	endif
+
+	return returnstr+indent+"["+name+"]"+"\n"
+end
+
+function/s addTOMLkey(name,value,[str,indent])
+	string name, value, str, indent
+	string returnstr
+
+	if(paramisdefault(str))
+		str = ""
+	endif
+
+	if(paramisdefault(indent))
+		indent = ""
+	endif
+
+	return str+indent+name+"="+value+"\n"
+end
+
+function/s addTOMLcomment(comment,[str,indent])
+	string comment, str, indent
+
+	if(paramisdefault(str))
+		str = ""
+	endif
+
+	if(paramisdefault(indent))
+		indent = ""
+	endif
+
+	return str+indent+"# "+comment+"\n"
 end
