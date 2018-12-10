@@ -544,7 +544,97 @@ end
 //// configuration files ////
 /////////////////////////////
 
+function/s addTOMLblock(name,[str,indent])
+	string name, str, indent
+	string returnstr=""
+	
+	if(!paramisdefault(str))
+		returnstr = str+"\n"
+	endif
+	
+	if(paramisdefault(indent))
+		indent = ""
+	endif
+	
+	return returnstr+indent+"["+name+"]"+"\n"
+end
+
+function/s addTOMLkey(name,value,[str,indent])
+	string name, value, str, indent
+	string returnstr
+	
+	if(paramisdefault(str))
+		str = ""
+	endif
+	
+	if(paramisdefault(indent))
+		indent = ""
+	endif
+	
+	return str+indent+name+"="+value+"\n"
+end
+	
+function/s addTOMLcomment(comment,[str,indent])
+	string comment, str, indent
+	
+	if(paramisdefault(str))
+		str = ""
+	endif
+	
+	if(paramisdefault(indent))
+		indent = ""
+	endif
+	
+	return str+indent+"# "+comment+"\n"
+end
+
+function writetofile(anyStr,filename,path)
+	// write any string to a file called "filename"
+	// path must be a predefined path
+	string anyStr,filename,path
+	variable refnum=0
+	
+	open /z/p=$path refnum as filename
+
+	do
+		if(strlen(anyStr)<500)
+			fprintf refnum, "%s", anyStr
+			break
+		else
+			fprintf refnum, "%s", anyStr[0,499]
+			anyStr = anyStr[500,inf]
+		endif
+	while(1)
+
+	close refnum
+end
+
+function/s readtxtfile(filename, path)
+	// read textfile into string from filename on path
+	string filename,path
+	variable refnum
+	string buffer="", txtstr=""
+
+	open /r/z/p=$path refNum as filename
+	if(V_flag!=0)
+		print "[ERROR]: Could not read file: "+filename
+		return ""
+	endif
+
+	do
+		freadline refnum, buffer
+		if(strlen(buffer)==0)
+			break
+		endif
+		txtstr+=buffer
+	while(1)
+	close refnum
+
+	return txtstr
+end
+
 function/s sc_createconfig()
+	// create a new config.toml file
 	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts
 	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
 	nvar sc_PrintRaw, sc_PrintCalc, filenum
@@ -553,48 +643,49 @@ function/s sc_createconfig()
 	string configfile
 	string configstr = "", tmpstr = ""
 
+	configfile = "sc" + num2istr(unixtime()) + ".toml"
+	configstr = addTOMLcomment(configfile,str=configstr)
+
 	// wave names
-	tmpstr = addJSONkeyvalpair(tmpstr, "raw", textwavetostrarray(sc_RawWaveNames))
-	tmpstr = addJSONkeyvalpair(tmpstr, "calc", textwavetostrarray(sc_CalcWaveNames))
-	configstr = addJSONkeyvalpair(configstr, "wave_names", tmpstr)
+	configstr = addTOMLblock("waves",str=configstr)
+	configstr = addTOMLkey("raw",textwavetostrarray(sc_RawWaveNames),str=configstr)
+	configstr = addTOMLkey("calc",textwavetostrarray(sc_CalcWaveNames),str=configstr)
 
 	// record checkboxes
-	tmpstr = ""
-	tmpstr = addJSONkeyvalpair(tmpstr, "raw", numericwavetoboolarray(sc_RawRecord))
-	tmpstr = addJSONkeyvalpair(tmpstr, "calc", numericwavetoboolarray(sc_CalcRecord))
-	configstr = addJSONkeyvalpair(configstr, "record_waves", tmpstr)
+	configstr = addTOMLblock("checkboxes",str=configstr)
+	configstr = addTOMLblock("checkboxes.record",str=configstr,indent="\t")
+	configstr = addTOMLkey("raw",numericwavetoboolarray(sc_RawRecord),str=configstr,indent="\t")
+	configstr = addTOMLkey("calc",numericwavetoboolarray(sc_CalcRecord),str=configstr,indent="\t")
 
 	// plot checkboxes
-	tmpstr = ""
-	tmpstr = addJSONkeyvalpair(tmpstr, "raw",  numericwavetoboolarray(sc_RawPlot))
-	tmpstr = addJSONkeyvalpair(tmpstr, "calc",  numericwavetoboolarray(sc_CalcPlot))
-	configstr = addJSONkeyvalpair(configstr, "plot_waves", tmpstr)
+	configstr = addTOMLblock("checkboxes.plot",str=configstr,indent="\t")
+	configstr = addTOMLkey("raw",numericwavetoboolarray(sc_RawPlot),str=configstr,indent="\t")
+	configstr = addTOMLkey("calc",numericwavetoboolarray(sc_CalcPlot),str=configstr,indent="\t")
 
 	// async checkboxes
-	tmpstr = ""
-	tmpstr = addJSONkeyvalpair(tmpstr, "raw",  numericwavetoboolarray(sc_measAsync))
-	configstr = addJSONkeyvalpair(configstr, "meas_async", tmpstr)
-
-	// scripts
-	tmpstr = ""
-	tmpstr = addJSONkeyvalpair(tmpstr, "raw", textwavetostrarray(sc_RawScripts))
-	tmpstr = addJSONkeyvalpair(tmpstr, "calc", textwavetostrarray(sc_CalcScripts))
-	configstr = addJSONkeyvalpair(configstr, "scripts", tmpstr)
-
-	// executable string to get logs
-	configstr = addJSONkeyvalpair(configstr, "log_string", escapeJSONstr(sc_LogStr,notwave=1,double_slash=1))
+	configstr = addTOMLblock("checkboxes.async",str=configstr,indent="\t")
+	configstr = addTOMLkey("async",numericwavetoboolarray(sc_measAsync),str=configstr,indent="\t")
 
 	// print_to_history
-	tmpstr = ""
-	tmpstr = addJSONkeyvalpair(tmpstr, "raw", numToBool(sc_PrintRaw))
-	tmpstr = addJSONkeyvalpair(tmpstr, "calc", numToBool(sc_PrintCalc))
-	configstr = addJSONkeyvalpair(configstr, "print_to_history", tmpstr)
+	configstr = addTOMLblock("checkboxes.history",str=configstr,indent="\t")
+	configstr = addTOMLkey("raw",numToBool(sc_PrintRaw),str=configstr,indent="\t")
+	configstr = addTOMLkey("calc",numToBool(sc_PrintCalc),str=configstr,indent="\t")
+	
+	// scripts
+	configstr = addTOMLblock("scripts",str=configstr)
+	configstr = addTOMLkey("raw",textwavetostrarray(sc_RawScripts),str=configstr)
+	configstr = addTOMLkey("calc",textwavetostrarray(sc_CalcScripts),str=configstr)
 
-	configstr = addJSONkeyvalpair(configstr, "filenum", num2istr(filenum))
+	// executable string to get logs
+	configstr = addTOMLblock("logstring",str=configstr)
+	configstr = addTOMLkey("logstr",sc_LogStr,str=configstr)
 
-	configfile = "sc" + num2istr(unixtime()) + ".config"
+	//filenum
+	configstr = addTOMLblock("filenum",str=configstr)
+	configstr = addTOMLkey("num",num2str(filenum),str=configstr)
+
 	sc_current_config = configfile
-	writeJSONtoFile(configstr, configfile, "config")
+	writetofile(configstr,configfile,"config")
 end
 
 function sc_loadConfig(configfile)
@@ -607,38 +698,7 @@ function sc_loadConfig(configfile)
 	// load json string from config file
 	printf "Loading configuration from: %s\n", configfile
 	sc_current_config = configfile
-	JSONstr = JSONfromFile("config", configfile)
-
-	// read JSON sting. Results will be dumped into: t_tokentext, w_tokensize, w_tokenparent and w_tokentype
-	JSONSimple JSONstr
-	wave/t t_tokentext
-	wave w_tokensize, w_tokenparent, w_tokentype
-
-	// distribute JSON values
-	// load raw wave configuration
-	// keys are: wavenames:raw, record_waves:raw, plot_waves:raw, meas_async:raw, scripts:raw
-	textkeys = "wave_names:raw,scripts:raw"
-	numkeys = "record_waves:raw,plot_waves:raw,meas_async:raw"
-	textdestinations = "sc_RawWaveNames,sc_RawScripts"
-	numdestinations = "sc_RawRecord,sc_RawPlot,sc_measAsync"
-	loadtextJSONfromkeys(textkeys,textdestinations)
-	loadbooleanJSONfromkeys(numkeys,numdestinations)
-
-	// load calc wave configuration
-	// keys are: wavenames:calc, record_waves:calc, plot_waves:calc, scripts:calc
-	textkeys = "wave_names:calc,scripts:calc"
-	numkeys = "record_waves:calc,plot_waves:calc"
-	textdestinations = "sc_CalcWaveNames,sc_CalcScripts"
-	numdestinations = "sc_CalcRecord,sc_CalcPlot"
-	loadtextJSONfromkeys(textkeys,textdestinations)
-	loadbooleanJSONfromkeys(numkeys,numdestinations)
-
-	// load print checkbox settings
-//	sc_PrintRaw = booltonum(stringfromlist(0,extractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="raw"),","))
-//	sc_PrintCalc = booltonum(stringfromlist(0,extractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="calc"),","))
-
-	// load log string
-//	sc_LogStr = unescapeJSONstr(stringfromlist(0,extractJSONvalues(getJSONkeyindex("log_string",t_tokentext)),","),notwave=1)
+	TOMLstr = readtxtfile("config", configfile)
 end
 
 /////////////////////
