@@ -195,7 +195,7 @@ function /S getExpPath(whichpath, [full])
 	// lmd always gives the path to local_measurement_data
 	// if full==0, the path relative to local_measurement_data is returned in Unix style
 	// if full==1, the full path on the local machine is returned in native style
-	// if full==2, the full path is returned in color-separated igor format
+	// if full==2, the full path is returned in colon-separated igor format
 
 	string whichpath
 	variable full
@@ -1591,16 +1591,16 @@ end
 ////  save all data ////
 ////////////////////////
 
-//function /s getEquipLogs()
-//	string buffer = ""
-//	svar sc_LogStr
-//
-//	//// all log strings should be valid JSON objects ////
-//	if (strlen(sc_LogStr)>0)
-//		string command, keylist = "", key = "", sval = ""
-//		string /G sc_log_buffer=""
-//		variable i = 0
-//		for(i=0;i<ItemsInList(sc_logStr, ";");i+=1)
+function /s getEquipLogs()
+	string buffer = ""
+	svar sc_LogStr
+
+	//// all log strings should be TOML blocks ////
+	if (strlen(sc_LogStr)>0)
+		string command, keylist = "", key = "", sval = ""
+		string /G sc_log_buffer=""
+		variable i = 0
+		for(i=0;i<ItemsInList(sc_logStr, ";");i+=1)
 //			command = StringFromList(i, sc_logStr, ";")
 //			Execute/Q/Z "sc_log_buffer="+command
 //			if(strlen(sc_log_buffer)!=0)
@@ -1612,25 +1612,25 @@ end
 //			else
 //				print "[WARNING] command failed to log anything: "+command+"\r"
 //			endif
-//		endfor
-//	endif
-//
-//	return buffer
-//end
+		endfor
+	endif
 
-//function /s getExpStatus([msg])
-//	// returns JSON object full of details about the system and this run
-//	string msg
-//	nvar filenum, sweep_t_elapsed
-//	svar sc_current_config, sc_hostname
-//
-//	if(paramisdefault(msg))
-//		msg=""
-//	endif
-//
-//	// create header with corresponding wave name and date
+	return buffer
+end
+
+function /s getExpStatus([msg])
+	// returns TOML string full of details about the system and this run
+	string msg
+	nvar filenum, sweep_t_elapsed
+	svar sc_current_config, sc_hostname
+
+	if(paramisdefault(msg))
+		msg=""
+	endif
+
+	// create header with corresponding wave name and date
 //	string jstr = "", buffer = ""
-//
+
 //	// information about the machine your working on
 //	buffer = ""
 //	buffer = addJSONkeyvalpair(buffer, "hostname", sc_hostname, addQuotes = 1)
@@ -1638,7 +1638,7 @@ end
 //	buffer = addJSONkeyvalpair(buffer, "OS", StringByKey("OS", sysinfo), addQuotes = 1)
 //	buffer = addJSONkeyvalpair(buffer, "IGOR_VERSION", StringByKey("IGORFILEVERSION", sysinfo), addQuotes = 1)
 //	jstr = addJSONkeyvalpair(jstr, "system_info", buffer)
-//
+
 //	// information about the current experiment
 //	jstr = addJSONkeyvalpair(jstr, "experiment", getExpPath("data")+igorinfo(1)+".pxp", addQuotes = 1)
 //	jstr = addJSONkeyvalpair(jstr, "current_config", sc_current_config, addQuotes = 1)
@@ -1654,59 +1654,7 @@ end
 //	jstr = addJSONkeyvalpair(jstr, "saved_waves", recordedWaveArray())
 //	jstr = addJSONkeyvalpair(jstr, "comment", msg, addQuotes = 1)
 //
-//	return jstr
-//end
-
-//function /s getWaveStatus(datname)
-//	string datname
-//	nvar filenum
-//
-//	// create header with corresponding wave name and date
-//	string jstr="", buffer=""
-//
-//	// date/time info
-//	jstr = addJSONkeyvalpair(jstr, "wave_name", datname, addQuotes = 1)
-//	jstr = addJSONkeyvalpair(jstr, "filenum", num2istr(filenum))
-//
-//	// wave info
-//	//check if wave is 1d or 2d
-//	variable dims
-//	if(dimsize($datname, 1)==0)
-//		dims =1
-//	elseif(dimsize($datname, 1)!=0 && dimsize($datname, 2)==0)
-//		dims = 2
-//	else
-//		dims = 3
-//	endif
-//
-//	if (dims==1)
-//		wavestats/Q $datname
-//		buffer = ""
-//		buffer = addJSONkeyvalpair(buffer, "length", num2istr(dimsize($datname,0)))
-//		buffer = addJSONkeyvalpair(buffer, "dx", num2str(dimdelta($datname, 0)))
-//		buffer = addJSONkeyvalpair(buffer, "mean", num2str(V_avg))
-//		buffer = addJSONkeyvalpair(buffer, "standard_dev", num2str(V_sdev))
-//		jstr = addJSONkeyvalpair(jstr, "wave_stats", buffer)
-//	elseif(dims==2)
-//		wavestats/Q $datname
-//		buffer = ""
-//		buffer = addJSONkeyvalpair(buffer, "columns", num2istr(dimsize($datname,0)))
-//		buffer = addJSONkeyvalpair(buffer, "rows", num2istr(dimsize($datname,1)))
-//		buffer = addJSONkeyvalpair(buffer, "dx", num2str(dimdelta($datname, 0)))
-//		buffer = addJSONkeyvalpair(buffer, "dy", num2str(dimdelta($datname, 1)))
-//		buffer = addJSONkeyvalpair(buffer, "mean", num2str(V_avg))
-//		buffer = addJSONkeyvalpair(buffer, "standard_dev", num2str(V_sdev))
-//		jstr = addJSONkeyvalpair(jstr, "wave_stats", buffer)
-//	else
-//		jstr = addJSONkeyvalpair(jstr, "wave_stats", "Wave dimensions > 2. How did you get this far?", addQuotes = 1)
-//	endif
-//
-//	svar sc_x_label, sc_y_label
-//	jstr = addJSONkeyvalpair(jstr, "x_label", sc_x_label, addQuotes = 1)
-//	jstr = addJSONkeyvalpair(jstr, "y_label", sc_y_label, addQuotes = 1)
-//
-//	return jstr
-//end
+end
 
 function saveExp()
 	SaveExperiment /P=data // save current experiment as .pxp
@@ -2179,105 +2127,60 @@ function sc_DeleteBatchFile()
 	endif
 end
 
-function /S getSlackNotice(username, [message, channel, botname, emoji, min_time]) //FIX!
-	// this function will send a notification to Slack
-	// username = your slack username
+function /S getSlackNotice(username, [message, min_time]) //FIX!
+	// this function will send a notification to Slack -- run it as if it were a getInstrStatus function
+	// username = your slack username, notice will be a DM
 	// message = string to include in Slack message
-	// channel = slack channel to post the message in
-	//            if no channel is provided a DM will be sent to username
-	// botname = slack user that will post the message, defaults to @qdotbot
-	// emoji = emoji that will be used as the bots avatar, defaults to :the_horns:
 	// min_time = if time elapsed for this current scan is less than min_time no notification will be sent
 	//					defaults to 60 seconds
-	string username, channel, message, botname, emoji
+	string username, message
 	variable min_time
 	nvar filenum, sweep_t_elapsed, sc_abortsweep
 	svar sc_slack_url
-//	string txt="", buffer="", payload="", out=""
-//
-//	//// check if I need a notification ////
-//	if (paramisdefault(min_time))
-//		min_time = 60.0 // seconds
-//	endif
-//
-//	if(sweep_t_elapsed < min_time)
-//		return addJSONkeyvalpair(out, "notified", "false") // no notification if min_time is not exceeded
-//	endif
-//
-//	if(sc_abortsweep)
-//		return addJSONkeyvalpair(out, "notified", "false") // no notification if sweep was aborted by the user
-//	endif
-//	//// end notification checks ////
-//
-//
-//	//// build notification text ////
-//	if (!paramisdefault(channel))
-//		// message will be sent to public channel
-//		// user who sent it will be mentioned at the beginning of the message
-//		txt += "<@"+username+">\r"
-//	endif
-//
-//	if (!paramisdefault(message) && strlen(message)>0)
-//		txt += RemoveTrailingWhitespace(message) + "\r"
-//	endif
-//
-//	sprintf buffer, "dat%d completed:  %s %s \r", filenum, Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); txt+=buffer
-//	sprintf buffer, "time elapsed:  %.2f s \r", sweep_t_elapsed; txt+=buffer
-//	//// end build txt ////
-//
-//
-//	//// build payload ////
-//	sprintf buffer, "{\"text\": \"%s\"", txt; payload+=buffer //
-//
-//	if (paramisdefault(botname))
-//		botname = "qdotbot"
-//	endif
-//	sprintf buffer, ", \"username\": \"%s\"", botname; payload+=buffer
-//
-//	if (paramisdefault(channel))
-//		sprintf buffer, ", \"channel\": \"@%s\"", username; payload+=buffer
-//	else
-//		sprintf buffer, ", \"channel\": \"#%s\"", channel; payload+=buffer
-//	endif
-//
-//	if (paramisdefault(emoji))
-//		emoji = ":the_horns:"
-//	endif
-//	sprintf buffer, ", \"icon_emoji\": \"%s\"", emoji; payload+=buffer //
-//
-//	payload += "}"
-//	//// end payload ////
-//
-//	URLRequest /DSTR=payload url=sc_slack_url, method=post
-//	if (V_flag == 0)    // No error
-//        if (V_responseCode != 200)  // 200 is the HTTP OK code
-//            print "Slack post failed!"
-//            return addJSONkeyvalpair(out, "notified", "false")
-//        else
-//            return addJSONkeyvalpair(out, "notified", "true")
-//        endif
-//    else
-//        print "HTTP connection error. Slack post not attempted."
-//        return addJSONkeyvalpair(out, "notified", "false")
-//    endif
-end
+	string txt="", buffer="", payload="", out="", botname = "qdotbot", emoji = ":the_horns:"
 
-////////////////////////
-//// test functions ////
-////////////////////////
+	//// check if I need a notification ////
+	if (paramisdefault(min_time))
+		min_time = 60.0 // seconds
+	endif
 
-function sc_testreadtime(numpts, delay) //Units: s
-	variable numpts, delay
+	if(sweep_t_elapsed < min_time)
+		return "slack_notice = false"
+	endif
 
-	InitializeWaves(0, numpts, numpts, x_label="index")
-	variable i=0, ttotal = 0, tstart = datetime
-	do
-		sc_sleep(delay)
-		RecordValues(i, 0, fillnan=0)
-		i+=1
-	while (i<numpts)
-	ttotal = datetime-tstart
-	printf "each RecordValues(...) call takes ~%.1fms \n", ttotal/numpts*1000 - delay*1000
+	if(sc_abortsweep)
+		return "slack_notice = false"
+	endif
+	//// end notification checks ////
 
-	sc_controlwindows("") // kill sweep control windows
+
+	if (!paramisdefault(message) && strlen(message)>0)
+		txt += RemoveTrailingWhitespace(message) + "\r"
+	endif
+
+	sprintf buffer, "dat%d completed:  %s %s \r", filenum, Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); txt+=buffer
+	sprintf buffer, "time elapsed:  %.2f s \r", sweep_t_elapsed; txt+=buffer
+	//// end build txt ////
+
+
+	//// build payload ////
+	sprintf buffer, "{\"text\": \"%s\"", txt; payload+=buffer //
+	sprintf buffer, ", \"username\": \"%s\"", botname; payload+=buffer
+	sprintf buffer, ", \"channel\": \"@%s\"", username; payload+=buffer
+	sprintf buffer, ", \"icon_emoji\": \"%s\"", emoji; payload+=buffer //
+	payload += "}"
+	//// end payload ////
+
+	URLRequest /DSTR=payload url=sc_slack_url, method=post
+	if (V_flag == 0)    // No error
+        if (V_responseCode != 200)  // 200 is the HTTP OK code
+            print "Slack post failed!"
+            return "slack_notice = false"
+        else
+            return "slack_notice = true"
+        endif
+    else
+        print "HTTP connection error. Slack post not attempted."
+        return "slack_notice = false"
+    endif
 end

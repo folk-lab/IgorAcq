@@ -2,101 +2,14 @@
 
 /// this procedure contains all of the functions that
 /// scan controller needs for file I/O and custom formatted string handling
-/// currently that includes -- saving IBW and HDF5 files
-///                            reading/writing/parsing JSON
-///                            loading ini config files
 
 //////////////////////////////
 /// SAVING EXPERIMENT DATA ///
 //////////////////////////////
 
-///// generic /////
-
-//function /S recordedWaveArray()
-//	wave /T sc_RawWaveNames, sc_CalcWaveNames
-//	wave sc_RawRecord, sc_CalcRecord
-//	string swave=""
-//	variable i=0
-//	do
-//		if(strlen(sc_RawWaveNames[i])!=0 && sc_RawRecord[i]==1)
-//			swave += "\""+sc_RawWaveNames[i]+"\", "
-//		endif
-//		i+=1
-//	while(i<numpnts(sc_RawWaveNames))
-//
-//	i=0
-//	do
-//		if(strlen(sc_CalcWaveNames[i])!=0 && sc_CalcRecord[i]==1)
-//			swave += "\""+sc_CalcWaveNames[i]+"\", "
-//		endif
-//		i+=1
-//	while(i<numpnts(sc_CalcWaveNames))
-//
-//	return "["+swave[0,strlen(swave)-3]+"]"
-//end
-
-///// HDF5 /////
-
-// get meta data //
-
-//function /S saveScanComments([msg])
-//	// msg can be any normal string, it will be saved as a JSON string value
-//
-//	string msg
-//	string buffer="", jstr=""
-//	jstr += getExpStatus() // record date, time, wave names, time elapsed...
-//
-//	if (!paramisdefault(msg) && strlen(msg)!=0)
-//		jstr = addJSONkeyvalpair(jstr, "comments", TrimString(msg), addQuotes = 1)
-//	endif
-//
-//	jstr = addJSONkeyvalpair(jstr, "logs", getEquipLogs())
-//
-//	//// save file ////
-//	nvar filenum
-//	string extension, filename
-//	extension = "." + num2istr(unixtime()) + ".winf"
-//	filename =  "dat" + num2istr(filenum) + extension
-//	writeJSONtoFile(jstr, filename, "winfs")
-//
-//	return jstr
-//end
-
-//function /s json2hdf5attributes(jstr, obj_name, h5id)
-//	// writes key/value pairs from jstr as attributes of "obj_name"
-//	// in the hdf5 file or group identified by h5id
-//	string jstr, obj_name
-//	variable h5id
-//
-//	make /FREE /T /N=1 str_attr = ""
-//	make /FREE /N=1 num_attr = 0
-//
-//	// loop over keys
-//	string keys = getJSONkeys(jstr)
-//	variable j = 0, numKeys = ItemsInList(keys, ",")
-//	string currentKey = "", currentVal = ""
-//	string group = ""
-//	for(j=0;j<numKeys;j+=1)
-//		currentKey = StringFromList(j, keys, ",")
-//		if(strsearch(currentKey, ":", 0)==-1)
-//			currentVal = getJSONValue(jstr, currentKey)
-//			if(findJSONtype(currentVal)==0)
-//				num_attr[0] = str2num(currentVal)
-//				HDF5SaveData /A=currentKey num_attr, h5id, obj_name
-//			else
-//				str_attr[0] = currentVal
-//				HDF5SaveData /A=currentKey str_attr, h5id, obj_name
-//			endif
-//		endif
-//	endfor
-//
-//end
-
-// save waves and experiment //.
-
 function initSaveFiles([msg])
-	//// create/open any files needed to save data
-	//// also save any global meta-data you want
+	//// create/open HDF5 files
+
 	string msg
 	if(paramisdefault(msg)) // save meta data
 		msg=""
@@ -117,11 +30,6 @@ function initSaveFiles([msg])
 	if(sc_is2d)
 		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_ydata" , hdf5_id, "y_array"
 	endif
-
-	// Create metadata group
-	variable /G metadata_group_ID
-	HDF5CreateGroup hdf5_id, "metadata", metadata_group_ID
-//	json2hdf5attributes(getExpStatus(msg=msg), "metadata", hdf5_id) // add experiment metadata
 
 	// Create config group
 	svar sc_current_config
@@ -147,9 +55,6 @@ function saveSingleWave(wn)
 		return 0
 	endif
 
-	 // add wave status JSON string as attribute
-	 nvar hdf5_id
-//	 json2hdf5attributes(getWaveStatus(wn), wn, hdf5_id)
 end
 
 function closeSaveFiles()
