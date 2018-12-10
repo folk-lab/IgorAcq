@@ -450,7 +450,7 @@ function sc_loadConfig(configfile)
 	loadbooleanarrayintowave(getTOMLvalue(TOMLstr,"checkboxes.plot:calc"),"sc_CalcPlot")
 	
 	// async checkboxes
-	loadbooleanarrayintowave(getTOMLvalue(TOMLstr,"checkboxes.asybc:async"),"sc_measAsync")
+	loadbooleanarrayintowave(getTOMLvalue(TOMLstr,"checkboxes.async:async"),"sc_measAsync")
 	
 	// print_to_history
 	loadbooleanintovariable(getTOMLvalue(TOMLstr,"checkboxes.history:raw"),"sc_PrintRaw")
