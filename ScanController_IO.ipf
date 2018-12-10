@@ -65,13 +65,6 @@ function closeSaveFiles()
 	sprintf filenumstr, "%d", filenum
 	string /g h5name = "dat"+filenumstr+".h5"
 
-	// close metadata group
-	nvar metadata_group_id
-	HDF5CloseGroup /Z metadata_group_id
-	if (V_flag != 0)
-		Print "HDF5CloseGroup Failed: ", "metadata"
-	endif
-
 	// close config group
 	nvar config_group_id
 	HDF5CloseGroup /Z config_group_id
@@ -279,6 +272,68 @@ function countSqBrackets(str)
 	return bracketCount
 end
 
+function /S escapeQuotes(str)
+	string str
+	
+	variable i=0, escaped=0
+	string output = ""
+	do
+	
+		if(i>strlen(str)-1)
+			break
+		endif
+		
+		// check if the current character is escaped
+		if(i!=0)
+			if( CmpStr(str[i-1], "\\") == 0)
+				escaped = 1
+			else
+				escaped = 0
+			endif
+		endif
+	
+		// escape quotes
+		if( CmpStr(str[i], "\"" ) == 0 && escaped == 0)
+			// this is an unescaped quote
+			str = str[0,i-1] + "\\" + str[i,inf]
+		endif
+		i+=1
+		
+	while(1==1)
+	return str
+end
+
+function /S unescapeQuotes(str)
+	string str
+	
+	variable i=0, escaped=0
+	string output = ""
+	do
+	
+		if(i>strlen(str)-1)
+			break
+		endif
+		
+		// check if the current character is escaped
+		if(i!=0)
+			if( CmpStr(str[i-1], "\\") == 0)
+				escaped = 1
+			else
+				escaped = 0
+			endif
+		endif
+	
+		// escape quotes
+		if( CmpStr(str[i], "\"" ) == 0 && escaped == 1)
+			// this is an unescaped quote
+			str = str[0,i-2] + str[i,inf]
+		endif
+		i+=1
+		
+	while(1==1)
+	return str
+end
+
 function/s removeLiteralQuotes(str)
 	// removes outermost quotes
 	// handles single or triple quotes (TOML standards)
@@ -388,8 +443,10 @@ function LoadTextArrayToWave(array,destwave)
 	
 	make/o/t/n=(itemsinlist(array,",")) $destwave = stringfromlist(p,array,",")
 	wave/t wref = $destwave
+	string buffer = ""
 	for(i=0;i<(itemsinlist(array,","));i+=1)
 		wref[i] = removeLiteralQuotes(wref[i])
+		wref[i] = unescapeQuotes(wref[i])
 	endfor
 end
 
@@ -410,7 +467,8 @@ end
 function LoadTextToString(str,deststring)
 	string str,deststring
 	
-	string/g $deststring = removeLiteralQuotes(str)
+	str = removeLiteralQuotes(str)
+	string/g $deststring = unescapeQuotes(str) 
 end
 
 function LoadNumToVar(numasstr,destvar)
@@ -640,7 +698,8 @@ function/s addTOMLkey(name,value,[str,indent,addQuotes])
 	if(paramisdefault(addquotes))
 		addquotes = 0
 	elseif(addquotes==1)
-		value = "\""+value+"\""
+		// escape quotes in value and wrap value in outer quotes
+		value = "\""+escapeQuotes(value)+"\""
 	endif
 	
 	return str+indent+name+"="+value+"\n"

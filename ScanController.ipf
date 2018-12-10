@@ -363,7 +363,7 @@ function sc_loadConfig(configfile)
 	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.plot:calc"),"sc_CalcPlot")
 
 	// async checkboxes
-	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.asybc:async"),"sc_measAsync")
+	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.async:async"),"sc_measAsync")
 
 	// print_to_history
 	LoadBoolToVar(getTOMLvalue(TOMLstr,"checkboxes.history:raw"),"sc_PrintRaw")
@@ -551,7 +551,7 @@ end
 function sc_updatewindow(action) : ButtonControl
 	string action
 
-//	sc_createconfig()     // write (or overwrite) a config file
+	sc_createconfig()     // write (or overwrite) a config file
 end
 
 function sc_addrow(action) : ButtonControl

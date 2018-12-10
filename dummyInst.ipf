@@ -66,14 +66,9 @@ function setDummy(setpoint, [delay])
 	endif
 end
 
-function /s GetDummyStatus(instrID)
+function /s GetDummyStatus(instrID, message)
 	variable instrID
-//	string  buffer = ""
-//
-//	string id = num2istr(instrID)
-//	buffer = addJSONkeyvalpair(buffer, "id", id)
-//	buffer = addJSONkeyvalpair(buffer, "time", num2str(datetime))
-//
-//	return addJSONkeyvalpair("", "dum"+id, buffer)
-   return "dummy param = value"
+	string message
+
+   return "message = "+message
 end
