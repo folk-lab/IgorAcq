@@ -196,17 +196,17 @@ function/s getJSONvalue(jstr, key)
 	string jstr, key
 	variable offset, key_length
 	string indices
-	
+
 	key_length = itemsinlist(key,":")
-	
+
 	JSONSimple jstr
 	wave/t t_tokentext
 	wave w_tokentype, w_tokensize
-	
+
 	if(key_length==1)
 		// this is the only key with this name
 		// if not, the first key will be returned
-		offset = 0	
+		offset = 0
 		return getJSONkeyoffset(key,offset)
 	else
 		// the key has parents, and there could be multiple keys with this name
@@ -227,7 +227,7 @@ function/s getJSONindices(keys)
 	wave/t t_tokentext
 	wave w_tokentype, w_tokensize, w_tokenparent
 	variable i=0, j=0, index, k=0
-	
+
 	for(i=0;i<itemsinlist(keys,":");i+=1)
 		key = stringfromlist(i,keys,":")
 		if(i==0)
@@ -249,7 +249,7 @@ function/s getJSONindices(keys)
 			endif
 		endfor
 	endfor
-	
+
 	return indices
 end
 
@@ -259,7 +259,7 @@ function/s getJSONkeyoffset(key,offset)
 	wave/t t_tokentext
 	wave w_tokentype, w_tokensize
 	variable i=0
-	
+
 	// find key and check that it is infact a key
 	for(i=offset;i<numpnts(t_tokentext);i+=1)
 		if(cmpstr(t_tokentext[i],key)==0 && w_tokensize[i]>0)
@@ -270,94 +270,61 @@ function/s getJSONkeyoffset(key,offset)
 	return ""
 end
 
-///////////
-/// INI ///
-///////////
+//////////////////
+/// formatting ///
+//////////////////
 
-function /s loadINIconfig(iniFile, path)
-	// read INI file into some useful waves
-	// assumes general INI rules: https://en.wikipedia.org/wiki/INI_file
-	string iniFile, path
-	variable refnum
-	
-	// open setup file
-	// abort if it does not exist
-	open /r/z/p=$(path) refnum as iniFile
-	if(v_flag!=0)
-	    print "[ERROR]: Could not read the setup file! It might not exist."
-	    return ""
-	endif
-
-	// make the waves that will hold the parsed data
-	make/t/o/n=0 ini_text
-	make/o/n=0 ini_type
-	
-	variable i=0, type=0, sectionIdx=0
-	string line="", reg="([a-zA-Z0-9.-_]+)\s*=\s*(.*)", key="", value=""
-	do
-		freadline refnum, line
-		if(strlen(line)==0)
-		    break
-		endif
-	   
-	   type = getINItype(line)
-		// if type=0 then it's a comment or some BS, ignore it!
-		if(type==1) // section
-			sectionIdx = addINIstring(line,type)
-		elseif(type==2) // key/value pair
-			splitstring/E=reg line, key, value
-			addINIstring(key,type)
-			addINIstring(value,type+1)
-		endif
-
-		i+=1
-	while(1)
-	close refnum
-
-end
-
-function getINItype(iniLine)
-	// decide if this line represents a 
-	//  (0) blank/comment
-	//  (1) section heading
-	//  (2) key (really it is a key/value pair)
-	//  (3) not returned here, used in ini_type to represent values
-	string iniLine
-	variable type=0
-	
-	iniLine = TrimString(iniLine)
-	
-	if(cmpstr(iniLine[0],"#")==0 || cmpstr(iniLine[0],";")==0) // comment
-	    return 0
-	elseif(cmpstr(iniLine[0],"[")==0) // section
-	    return 1
-	elseif(strsearch(iniLine, "=",0)>0) // key/value pair
-	    return 2
-	else // blank/comment
-	    return 0
+function/s numToBool(val)
+	variable val
+	if(val==1)
+		return "true"
+	elseif(val==0)
+		return "false"
+	else
+		return ""
 	endif
 end
 
-function addINIstring(str,type)
-	// adds strings to init_text
-	// adds types to ini_type
-	// returns line_num if str is a section heading
-    string str
-    variable type
-    variable line_num=0
-
-    wave/t ini_text
-    wave ini_type
-    // redimension waves
-    line_num = numpnts(ini_text)+1
-    redimension /n=(line_num) ini_text
-    redimension /n=(line_num) ini_type
-
-    // add new value
-    ini_text[line_num-1] = TrimString(str)
-    ini_type[line_num-1] = type
-	
-	if(type==1)
-		return line_num
+function boolToNum(str)
+	string str
+	if(StringMatch(LowerStr(str), "true")==1)
+		// use string match to ignore whitespace
+		return 1
+	elseif(StringMatch(LowerStr(str), "false")==1)
+		return 0
+	else
+		return -1
 	endif
+end
+
+function/s numericWaveToBoolArray(w)
+	// returns a JSON array
+	wave w
+	string list = "["
+	variable i=0
+
+	for(i=0; i<numpnts(w); i+=1)
+		list += numToBool(w[i])+","
+	endfor
+
+	return list[0,strlen(list)-2] + "]"
+end
+
+function/s textWaveToStrArray(w)
+	// returns a JSON array and makes sure quotes and commas are parsed correctly.
+	wave/t w
+	string list, checkStr, escapedStr
+	variable i=0
+
+	wfprintf list, "\"%s\";", w
+	for(i=0;i<itemsinlist(list,";");i+=1)
+		checkStr = stringfromlist(i,list,";")
+		if(countQuotes(checkStr)>2)
+			escapedStr = escapeJSONstr(checkStr)
+			list = removelistitem(i,list,";")
+			list = addlistitem(escapedStr,list,";",i)
+		endif
+	endfor
+	list = replacestring(";",list,",")
+	return "["+list[0,strlen(list)-2]+"]"
 end
