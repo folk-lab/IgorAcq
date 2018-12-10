@@ -2174,7 +2174,7 @@ function sc_FileTransfer()
 		return 1
 
 	else
-		// if there is not server.notify file
+		// if there is not pending_transfer file
 		// don't do anything
 		print "No new files available."
 		return 0
@@ -2193,21 +2193,20 @@ function sc_DeleteBatchFile()
 	endif
 end
 
-//function /S getSlackNotice(username, [message, channel, botname, emoji, min_time]) //FIX!
-//	// this function will send a notification to Slack
-//	// username = your slack username
-//
-//	// message = string to include in Slack message
-//	// channel = slack channel to post the message in
-//	//            if no channel is provided a DM will be sent to username
-//	// botname = slack user that will post the message, defaults to @qdotbot
-//	// emoji = emoji that will be used as the bots avatar, defaults to :the_horns:
-//	// min_time = if time elapsed for this current scan is less than min_time no notification will be sent
-//	//					defaults to 60 seconds
-//	string username, channel, message, botname, emoji
-//	variable min_time
-//	nvar filenum, sweep_t_elapsed, sc_abortsweep
-//	svar sc_slack_url
+function /S getSlackNotice(username, [message, channel, botname, emoji, min_time]) //FIX!
+	// this function will send a notification to Slack
+	// username = your slack username
+	// message = string to include in Slack message
+	// channel = slack channel to post the message in
+	//            if no channel is provided a DM will be sent to username
+	// botname = slack user that will post the message, defaults to @qdotbot
+	// emoji = emoji that will be used as the bots avatar, defaults to :the_horns:
+	// min_time = if time elapsed for this current scan is less than min_time no notification will be sent
+	//					defaults to 60 seconds
+	string username, channel, message, botname, emoji
+	variable min_time
+	nvar filenum, sweep_t_elapsed, sc_abortsweep
+	svar sc_slack_url
 //	string txt="", buffer="", payload="", out=""
 //
 //	//// check if I need a notification ////
@@ -2275,7 +2274,7 @@ end
 //        print "HTTP connection error. Slack post not attempted."
 //        return addJSONkeyvalpair(out, "notified", "false")
 //    endif
-//end
+end
 
 ////////////////////////
 //// test functions ////
