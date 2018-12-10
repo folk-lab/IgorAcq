@@ -19,13 +19,7 @@
 ////// utility functions //////
 ///////////////////////////////
 
-function sc_randomInt()
-	variable from=-1e6, to=1e6
-	variable amp = to - from
-	return floor(from + mod(abs(enoise(100*amp)),amp+1))
-end
-
-function unixtime()
+function unixTime()
 	// returns the current unix time in seconds
 	return DateTime - date2secs(1970,1,1) - date2secs(-1,-1,-1)
 end
@@ -49,87 +43,6 @@ function AppendString(thewave, thestring)
 	string thestring
 	Redimension /N=(numpnts(thewave)+1) thewave
 	thewave[numpnts(thewave)-1] = thestring
-end
-
-Function/t removeStringListDuplicates(theListStr)
-	// credit: http://www.igorexchange.com/node/1071
-	String theListStr
-
-	String retStr = ""
-	variable ii
-	for(ii = 0 ; ii < itemsinlist(theListStr) ; ii+=1)
-		if(whichlistitem(stringfromlist(ii , theListStr), retStr) == -1)
-			retStr = addlistitem(stringfromlist(ii, theListStr), retStr, ";", inf)
-		endif
-	endfor
-	return retStr
-End
-
-function/s searchFullString(string_to_search,substring)
-    // returns
-	string string_to_search, substring
-	string index_list=""
-	variable test, startpoint=0
-
-	do
-		test = strsearch(string_to_search, substring, startpoint)
-		if(test != -1)
-			index_list = index_list+num2istr(test)+","
-			startpoint = test+1
-		endif
-	while(test > -1)
-
-	return index_list
-end
-
-Function/S RemoveLeadingWhitespace(str)
-    String str
-
-    if (strlen(str) == 0)
-        return ""
-    endif
-
-    do
-        String firstChar= str[0]
-        if (IsWhiteSpace(firstChar))
-            str= str[1,inf]
-        else
-            break
-        endif
-    while (strlen(str) > 0)
-
-    return str
-End
-
-Function/S RemoveTrailingWhitespace(str)
-    String str
-
-    if (strlen(str) == 0)
-        return ""
-    endif
-
-    do
-        String lastChar = str[strlen(str) - 1]
-        if (IsWhiteSpace(lastChar))
-            str = str[0, strlen(str) - 2]
-        else
-        	break
-        endif
-    while (strlen(str) > 0)
-    return str
-End
-
-Function IsWhiteSpace(char)
-    String char
-
-    return GrepString(char, "\\s")
-End
-
-function /S ReplaceBullets(str)
-	// replace bullet points with >>> in string
-	string str
-
-	return ReplaceString(U+2022, str, ">>> ")
 end
 
 function /S executeWinCmd(command)
@@ -209,7 +122,7 @@ function /S getExpPath(whichpath, [full])
 	// lmd always gives the path to local_measurement_data
 	// if full==0, the path relative to local_measurement_data is returned in Unix style
 	// if full==1, the full path on the local machine is returned in native style
-	// if full==2, the full path is returned in color-separated igor format
+	// if full==2, the full path is returned in colon-separated igor format
 
 	string whichpath
 	variable full
@@ -288,7 +201,7 @@ end
 
 threadsafe function sc_check_NaNInf(num)
 	variable num
-	
+
 	return numtype(num)
 end
 
@@ -315,7 +228,7 @@ function InitScanController([configFile, srv_push])
 		sc_srv_push = 0
 		print "[WARNING] Only saving local copies of data."
 	endif
-	
+
 	string /g slack_url =  "https://hooks.slack.com/services/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" // url for slack alert
 	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
 	string /g sc_current_config = ""
@@ -375,104 +288,99 @@ end
 /////////////////////////////
 
 function/s sc_createconfig()
+	// create a new config.toml file
+	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts
+	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
+	nvar sc_PrintRaw, sc_PrintCalc, filenum
+	svar sc_LogStr, sc_current_config
+	string configfile
+	string configstr = "", tmpstr = ""
 
-	print "[WARNING] config file support temporarily disabled"
-//	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts
-//	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
-//	nvar sc_PrintRaw, sc_PrintCalc, filenum
-//	svar sc_LogStr, sc_current_config
-//	variable refnum
-//	string configfile
-//	string configstr = "", tmpstr = ""
-//
-//	// wave names
-//	tmpstr = addJSONkeyvalpair(tmpstr, "raw", textwavetostrarray(sc_RawWaveNames))
-//	tmpstr = addJSONkeyvalpair(tmpstr, "calc", textwavetostrarray(sc_CalcWaveNames))
-//	configstr = addJSONkeyvalpair(configstr, "wave_names", tmpstr)
-//
-//	// record checkboxes
-//	tmpstr = ""
-//	tmpstr = addJSONkeyvalpair(tmpstr, "raw", numericwavetoboolarray(sc_RawRecord))
-//	tmpstr = addJSONkeyvalpair(tmpstr, "calc", numericwavetoboolarray(sc_CalcRecord))
-//	configstr = addJSONkeyvalpair(configstr, "record_waves", tmpstr)
-//
-//	// plot checkboxes
-//	tmpstr = ""
-//	tmpstr = addJSONkeyvalpair(tmpstr, "raw",  numericwavetoboolarray(sc_RawPlot))
-//	tmpstr = addJSONkeyvalpair(tmpstr, "calc",  numericwavetoboolarray(sc_CalcPlot))
-//	configstr = addJSONkeyvalpair(configstr, "plot_waves", tmpstr)
-//
-//	// async checkboxes
-//	tmpstr = ""
-//	tmpstr = addJSONkeyvalpair(tmpstr, "raw",  numericwavetoboolarray(sc_measAsync))
-//	configstr = addJSONkeyvalpair(configstr, "meas_async", tmpstr)
-//
-//	// scripts
-//	tmpstr = ""
-//	tmpstr = addJSONkeyvalpair(tmpstr, "raw", textwavetostrarray(sc_RawScripts))
-//	tmpstr = addJSONkeyvalpair(tmpstr, "calc", textwavetostrarray(sc_CalcScripts))
-//	configstr = addJSONkeyvalpair(configstr, "scripts", tmpstr)
-//
-//	// executable string to get logs
-//	configstr = addJSONkeyvalpair(configstr, "log_string", escapeJSONstr(sc_LogStr,notwave=1,double_slash=1))
-//
-//	// print_to_history
-//	tmpstr = ""
-//	tmpstr = addJSONkeyvalpair(tmpstr, "raw", numToBool(sc_PrintRaw))
-//	tmpstr = addJSONkeyvalpair(tmpstr, "calc", numToBool(sc_PrintCalc))
-//	configstr = addJSONkeyvalpair(configstr, "print_to_history", tmpstr)
-//
-//	configstr = addJSONkeyvalpair(configstr, "filenum", num2istr(filenum))
-//
-//	configfile = "sc" + num2istr(unixtime()) + ".config"
-//	sc_current_config = configfile
-//	writeJSONtoFile(configstr, configfile, "config")
+	configfile = "sc" + num2istr(unixtime()) + ".toml"
+	configstr = addTOMLcomment(configfile,str=configstr)
+
+	// wave names
+	configstr = addTOMLblock("waves",str=configstr)
+	configstr = addTOMLkey("raw",textwavetostrarray(sc_RawWaveNames),str=configstr)
+	configstr = addTOMLkey("calc",textwavetostrarray(sc_CalcWaveNames),str=configstr)
+
+	// record checkboxes
+	configstr = addTOMLblock("checkboxes",str=configstr)
+	configstr = addTOMLblock("checkboxes.record",str=configstr,indent="\t")
+	configstr = addTOMLkey("raw",numericwavetoboolarray(sc_RawRecord),str=configstr,indent="\t")
+	configstr = addTOMLkey("calc",numericwavetoboolarray(sc_CalcRecord),str=configstr,indent="\t")
+
+	// plot checkboxes
+	configstr = addTOMLblock("checkboxes.plot",str=configstr,indent="\t")
+	configstr = addTOMLkey("raw",numericwavetoboolarray(sc_RawPlot),str=configstr,indent="\t")
+	configstr = addTOMLkey("calc",numericwavetoboolarray(sc_CalcPlot),str=configstr,indent="\t")
+
+	// async checkboxes
+	configstr = addTOMLblock("checkboxes.async",str=configstr,indent="\t")
+	configstr = addTOMLkey("async",numericwavetoboolarray(sc_measAsync),str=configstr,indent="\t")
+
+	// print_to_history
+	configstr = addTOMLblock("checkboxes.history",str=configstr,indent="\t")
+	configstr = addTOMLkey("raw",numToBool(sc_PrintRaw),str=configstr,indent="\t")
+	configstr = addTOMLkey("calc",numToBool(sc_PrintCalc),str=configstr,indent="\t")
+
+	// scripts
+	configstr = addTOMLblock("scripts",str=configstr)
+	configstr = addTOMLkey("raw",textwavetostrarray(sc_RawScripts),str=configstr)
+	configstr = addTOMLkey("calc",textwavetostrarray(sc_CalcScripts),str=configstr)
+
+	// executable string to get logs
+	configstr = addTOMLkey("logstring",sc_LogStr,str=configstr,indent="\n", addQuotes=1)
+
+	//filenum
+	configstr = addTOMLkey("filenum",num2str(filenum),str=configstr,indent="\n")
+
+	sc_current_config = configfile
+	writetofile(configstr,configfile,"config")
 end
 
 function sc_loadConfig(configfile)
 	string configfile
-	
-	print "[WARNING] config file support temporarily disabled"
-//	string JSONstr, checkStr, textkeys, numkeys, textdestinations, numdestinations
-//	variable i=0,escapePos=-1
-//	nvar sc_PrintRaw, sc_PrintCalc
-//	svar sc_LogStr, sc_current_config, sc_current_config
-//
-//	// load json string from config file
-//	printf "Loading configuration from: %s\n", configfile
-//	sc_current_config = configfile
-//	JSONstr = JSONfromFile("config", configfile)
-//
-//	// read JSON sting. Results will be dumped into: t_tokentext, w_tokensize, w_tokenparent and w_tokentype
-//	JSONSimple JSONstr
-//	wave/t t_tokentext
-//	wave w_tokensize, w_tokenparent, w_tokentype
-//
-//	// distribute JSON values
-//	// load raw wave configuration
-//	// keys are: wavenames:raw, record_waves:raw, plot_waves:raw, meas_async:raw, scripts:raw
-//	textkeys = "wave_names:raw,scripts:raw"
-//	numkeys = "record_waves:raw,plot_waves:raw,meas_async:raw"
-//	textdestinations = "sc_RawWaveNames,sc_RawScripts"
-//	numdestinations = "sc_RawRecord,sc_RawPlot,sc_measAsync"
-//	loadtextJSONfromkeys(textkeys,textdestinations)
-//	loadbooleanJSONfromkeys(numkeys,numdestinations)
-//
-//	// load calc wave configuration
-//	// keys are: wavenames:calc, record_waves:calc, plot_waves:calc, scripts:calc
-//	textkeys = "wave_names:calc,scripts:calc"
-//	numkeys = "record_waves:calc,plot_waves:calc"
-//	textdestinations = "sc_CalcWaveNames,sc_CalcScripts"
-//	numdestinations = "sc_CalcRecord,sc_CalcPlot"
-//	loadtextJSONfromkeys(textkeys,textdestinations)
-//	loadbooleanJSONfromkeys(numkeys,numdestinations)
-//
-//	// load print checkbox settings
-////	sc_PrintRaw = booltonum(stringfromlist(0,extractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="raw"),","))
-////	sc_PrintCalc = booltonum(stringfromlist(0,extractJSONvalues(getJSONkeyindex("print_to_history",t_tokentext),children="calc"),","))
-//
-//	// load log string
-////	sc_LogStr = unescapeJSONstr(stringfromlist(0,extractJSONvalues(getJSONkeyindex("log_string",t_tokentext)),","),notwave=1)
+	string TOMLstr
+	nvar sc_PrintRaw, sc_PrintCalc
+	svar sc_LogStr, sc_current_config, sc_current_config
+
+	// load TOML string from config file
+	printf "Loading configuration from: %s\n", configfile
+	sc_current_config = configfile
+	TOMLstr = readtxtfile(configfile,"config")
+
+	// waves
+	LoadTextArrayToWave(getTOMLvalue(TOMLstr,"waves:raw"),"sc_RawWaveNames")
+	LoadTextArrayToWave(getTOMLvalue(TOMLstr,"waves:calc"),"sc_CalcWaveNames")
+
+	// record checkboxes
+	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.record:raw"),"sc_RawRecord")
+	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.record:calc"),"sc_CalcRecord")
+
+	// plot checkboxes
+	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.plot:raw"),"sc_RawPlot")
+	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.plot:calc"),"sc_CalcPlot")
+
+	// async checkboxes
+	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.async:async"),"sc_measAsync")
+
+	// print_to_history
+	LoadBoolToVar(getTOMLvalue(TOMLstr,"checkboxes.history:raw"),"sc_PrintRaw")
+	LoadBoolToVar(getTOMLvalue(TOMLstr,"checkboxes.history:calc"),"sc_PrintCalc")
+
+	// scripts
+	LoadTextArrayToWave(getTOMLvalue(TOMLstr,"scripts:raw"),"sc_RawScripts")
+	LoadTextArrayToWave(getTOMLvalue(TOMLstr,"scripts:calc"),"sc_CalcScripts")
+
+	// executable string to get logs
+	LoadTextToString(getTOMLvalue(TOMLstr,"logstring"),"sc_Logstr")
+
+	//filenum
+	LoadNumToVar(getTOMLvalue(TOMLstr,"filenum"),"sc_filenum")
+
+	// reload ScanController window
+	sc_rebuildwindow()
 end
 
 /////////////////////
@@ -643,7 +551,7 @@ end
 function sc_updatewindow(action) : ButtonControl
 	string action
 
-//	sc_createconfig()     // write (or overwrite) a config file
+	sc_createconfig()     // write (or overwrite) a config file
 end
 
 function sc_addrow(action) : ButtonControl
@@ -804,6 +712,7 @@ function sc_findAsyncMeasurements()
 	string /g sc_asyncFolders = ""
 	make /o/n=1 /WAVE sc_asyncRefs
 
+
 	for(i=0;i<numpnts(sc_RawScripts);i+=1)
 
 		if ( (sc_RawRecord[i] == 1) || (sc_RawPlot[i] == 1) )
@@ -866,7 +775,6 @@ function sc_findAsyncMeasurements()
 
 	if(instrAsync<2)
 		// no point in doing anyting async is only one instrument is capable of it
-		print "[WARNING] Not using async for only one instrument. It will slow the measurement down."
 		make /o/n=(numpnts(sc_RawScripts)) sc_measAsync = 0
 	endif
 
@@ -940,11 +848,11 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	while (i<numpnts(sc_CalcWaveNames))
 	i=0
 
-	// because VISA tends to drop connections when the 
+	// because VISA tends to drop connections when the
 	// measurement computer is left idle
 	// we may want to add a function here to setup all the instruments
 	print "[WARNING] VISA instrument connections may have expired if your measurement has been idle."
-	
+
 	// The status of the upcoming scan will be set when waves are initialized.
 	if(!paramisdefault(starty) && !paramisdefault(finy) && !paramisdefault(numptsy))
 		sc_is2d = 1
@@ -1170,18 +1078,18 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	while(i<numpnts(sc_CalcWaveNames))
 
 	execute("abortmeasurementwindow()")
-	
+
 	cmd1 = "TileWindows/O=1/A=(3,4) "
 	cmd2 = ""
 	// Tile graphs
 	for(i=0;i<itemsinlist(activegraphs);i=i+1)
 		window_string = stringfromlist(i,activegraphs)
 		cmd1+= window_string +","
-		
+
 		cmd2 = "DoWindow/F " + window_string
 		execute(cmd2)
 	endfor
-	
+
 	cmd1 += "SweepControl"
 	execute(cmd1)
 end
@@ -1605,16 +1513,16 @@ end
 ////  save all data ////
 ////////////////////////
 
-//function /s getEquipLogs()
-//	string buffer = ""
-//	svar sc_LogStr
-//
-//	//// all log strings should be valid JSON objects ////
-//	if (strlen(sc_LogStr)>0)
-//		string command, keylist = "", key = "", sval = ""
-//		string /G sc_log_buffer=""
-//		variable i = 0
-//		for(i=0;i<ItemsInList(sc_logStr, ";");i+=1)
+function /s getEquipLogs()
+	string buffer = ""
+	svar sc_LogStr
+
+	//// all log strings should be TOML blocks ////
+	if (strlen(sc_LogStr)>0)
+		string command, keylist = "", key = "", sval = ""
+		string /G sc_log_buffer=""
+		variable i = 0
+		for(i=0;i<ItemsInList(sc_logStr, ";");i+=1)
 //			command = StringFromList(i, sc_logStr, ";")
 //			Execute/Q/Z "sc_log_buffer="+command
 //			if(strlen(sc_log_buffer)!=0)
@@ -1626,25 +1534,25 @@ end
 //			else
 //				print "[WARNING] command failed to log anything: "+command+"\r"
 //			endif
-//		endfor
-//	endif
-//
-//	return buffer
-//end
+		endfor
+	endif
 
-//function /s getExpStatus([msg])
-//	// returns JSON object full of details about the system and this run
-//	string msg
-//	nvar filenum, sweep_t_elapsed
-//	svar sc_current_config, sc_hostname
-//
-//	if(paramisdefault(msg))
-//		msg=""
-//	endif
-//
-//	// create header with corresponding wave name and date
+	return buffer
+end
+
+function /s getExpStatus([msg])
+	// returns TOML string full of details about the system and this run
+	string msg
+	nvar filenum, sweep_t_elapsed
+	svar sc_current_config, sc_hostname
+
+	if(paramisdefault(msg))
+		msg=""
+	endif
+
+	// create header with corresponding wave name and date
 //	string jstr = "", buffer = ""
-//
+
 //	// information about the machine your working on
 //	buffer = ""
 //	buffer = addJSONkeyvalpair(buffer, "hostname", sc_hostname, addQuotes = 1)
@@ -1652,7 +1560,7 @@ end
 //	buffer = addJSONkeyvalpair(buffer, "OS", StringByKey("OS", sysinfo), addQuotes = 1)
 //	buffer = addJSONkeyvalpair(buffer, "IGOR_VERSION", StringByKey("IGORFILEVERSION", sysinfo), addQuotes = 1)
 //	jstr = addJSONkeyvalpair(jstr, "system_info", buffer)
-//
+
 //	// information about the current experiment
 //	jstr = addJSONkeyvalpair(jstr, "experiment", getExpPath("data")+igorinfo(1)+".pxp", addQuotes = 1)
 //	jstr = addJSONkeyvalpair(jstr, "current_config", sc_current_config, addQuotes = 1)
@@ -1668,59 +1576,7 @@ end
 //	jstr = addJSONkeyvalpair(jstr, "saved_waves", recordedWaveArray())
 //	jstr = addJSONkeyvalpair(jstr, "comment", msg, addQuotes = 1)
 //
-//	return jstr
-//end
-
-//function /s getWaveStatus(datname)
-//	string datname
-//	nvar filenum
-//
-//	// create header with corresponding wave name and date
-//	string jstr="", buffer=""
-//
-//	// date/time info
-//	jstr = addJSONkeyvalpair(jstr, "wave_name", datname, addQuotes = 1)
-//	jstr = addJSONkeyvalpair(jstr, "filenum", num2istr(filenum))
-//
-//	// wave info
-//	//check if wave is 1d or 2d
-//	variable dims
-//	if(dimsize($datname, 1)==0)
-//		dims =1
-//	elseif(dimsize($datname, 1)!=0 && dimsize($datname, 2)==0)
-//		dims = 2
-//	else
-//		dims = 3
-//	endif
-//
-//	if (dims==1)
-//		wavestats/Q $datname
-//		buffer = ""
-//		buffer = addJSONkeyvalpair(buffer, "length", num2istr(dimsize($datname,0)))
-//		buffer = addJSONkeyvalpair(buffer, "dx", num2str(dimdelta($datname, 0)))
-//		buffer = addJSONkeyvalpair(buffer, "mean", num2str(V_avg))
-//		buffer = addJSONkeyvalpair(buffer, "standard_dev", num2str(V_sdev))
-//		jstr = addJSONkeyvalpair(jstr, "wave_stats", buffer)
-//	elseif(dims==2)
-//		wavestats/Q $datname
-//		buffer = ""
-//		buffer = addJSONkeyvalpair(buffer, "columns", num2istr(dimsize($datname,0)))
-//		buffer = addJSONkeyvalpair(buffer, "rows", num2istr(dimsize($datname,1)))
-//		buffer = addJSONkeyvalpair(buffer, "dx", num2str(dimdelta($datname, 0)))
-//		buffer = addJSONkeyvalpair(buffer, "dy", num2str(dimdelta($datname, 1)))
-//		buffer = addJSONkeyvalpair(buffer, "mean", num2str(V_avg))
-//		buffer = addJSONkeyvalpair(buffer, "standard_dev", num2str(V_sdev))
-//		jstr = addJSONkeyvalpair(jstr, "wave_stats", buffer)
-//	else
-//		jstr = addJSONkeyvalpair(jstr, "wave_stats", "Wave dimensions > 2. How did you get this far?", addQuotes = 1)
-//	endif
-//
-//	svar sc_x_label, sc_y_label
-//	jstr = addJSONkeyvalpair(jstr, "x_label", sc_x_label, addQuotes = 1)
-//	jstr = addJSONkeyvalpair(jstr, "y_label", sc_y_label, addQuotes = 1)
-//
-//	return jstr
-//end
+end
 
 function saveExp()
 	SaveExperiment /P=data // save current experiment as .pxp
@@ -1972,7 +1828,7 @@ function SaveFromPXP([history, procedure])
 		do
 			FReadLine /N=(numHistoryBytes-bytes) expRef, buffer
 			bytes+=strlen(buffer)
-			fprintf histRef, "%s", ReplaceBullets(buffer)
+			fprintf histRef, "%s", buffer
 
 			if(datetime-t_start>2.0)
 				// timeout at 2 seconds
@@ -2044,30 +1900,30 @@ function sc_write2batch(fileref, searchStr, localFull)
 
 	variable fileref
 	string searchStr, localFull
-	localFull = TrimString(localFull)
-
-	string lmdpath = getExpPath("lmd", full=1)
-	variable idx = strlen(lmdpath)+1, result=0
-	string srvFull = ""
-
-	string platform = igorinfo(2), localPart = localFull[idx,inf]
-	if(cmpstr(platform,"Windows")==0)
-		localPart = replaceString("\\", LocalPart, "/")
-	endif
-
-	svar sc_hostname, sc_srv_dir
-	sprintf srvFull, "%s/%s/%s" sc_srv_dir, sc_hostname, localPart
-
-	if(strlen(searchStr)==0)
-		// there is no notification file, add this immediately
-		fprintf fileref, "%s,%s\n", localFull, srvFull
-	else
-		// search for localFull in searchStr
-		result = strsearch(searchStr, localFull, 0)
-		if(result==-1)
-			fprintf fileref, "%s,%s\n", localFull, srvFull
-		endif
-	endif
+//	localFull = TrimString(localFull)
+//
+//	string lmdpath = getExpPath("lmd", full=1)
+//	variable idx = strlen(lmdpath)+1, result=0
+//	string srvFull = ""
+//
+//	string platform = igorinfo(2), localPart = localFull[idx,inf]
+//	if(cmpstr(platform,"Windows")==0)
+//		localPart = replaceString("\\", LocalPart, "/")
+//	endif
+//
+//	svar sc_hostname, sc_srv_dir
+//	sprintf srvFull, "%s/%s/%s" sc_srv_dir, sc_hostname, localPart
+//
+//	if(strlen(searchStr)==0)
+//		// there is no notification file, add this immediately
+//		fprintf fileref, "%s,%s\n", localFull, srvFull
+//	else
+//		// search for localFull in searchStr
+//		result = strsearch(searchStr, localFull, 0)
+//		if(result==-1)
+//			fprintf fileref, "%s,%s\n", localFull, srvFull
+//		endif
+//	endif
 
 end
 
@@ -2106,15 +1962,15 @@ function sc_findNewFiles(datnum)
 	if(sc_save_exp == 1)
 		// add experiment file
 		tmpname = datapath+igorinfo(1)+".pxp"
-		sc_write2batch(refnum, notifyText, tmpname)
+//		sc_write2batch(refnum, notifyText, tmpname)
 
 		// add history file
 		tmpname = datapath+igorinfo(1)+".history"
-		sc_write2batch(refnum, notifyText, tmpname)
+//		sc_write2batch(refnum, notifyText, tmpname)
 
 		// add procedure file
 		tmpname = datapath+igorinfo(1)+".ipf"
-		sc_write2batch(refnum, notifyText, tmpname)
+//		sc_write2batch(refnum, notifyText, tmpname)
 
 	endif
 
@@ -2135,7 +1991,7 @@ function sc_findNewFiles(datnum)
 
 		for(j=0;j<ItemsInList(matchList, ";");j+=1)
 			tmpname = datapath+StringFromList(j,matchList, ";")
-			sc_write2batch(refnum, notifyText, tmpname)
+//			sc_write2batch(refnum, notifyText, tmpname)
 		endfor
 	endfor
 
@@ -2193,105 +2049,60 @@ function sc_DeleteBatchFile()
 	endif
 end
 
-function /S getSlackNotice(username, [message, channel, botname, emoji, min_time]) //FIX!
-	// this function will send a notification to Slack
-	// username = your slack username
+function /S getSlackNotice(username, [message, min_time]) //FIX!
+	// this function will send a notification to Slack -- run it as if it were a getInstrStatus function
+	// username = your slack username, notice will be a DM
 	// message = string to include in Slack message
-	// channel = slack channel to post the message in
-	//            if no channel is provided a DM will be sent to username
-	// botname = slack user that will post the message, defaults to @qdotbot
-	// emoji = emoji that will be used as the bots avatar, defaults to :the_horns:
 	// min_time = if time elapsed for this current scan is less than min_time no notification will be sent
 	//					defaults to 60 seconds
-	string username, channel, message, botname, emoji
+	string username, message
 	variable min_time
 	nvar filenum, sweep_t_elapsed, sc_abortsweep
 	svar sc_slack_url
-//	string txt="", buffer="", payload="", out=""
-//
-//	//// check if I need a notification ////
-//	if (paramisdefault(min_time))
-//		min_time = 60.0 // seconds
-//	endif
-//
-//	if(sweep_t_elapsed < min_time)
-//		return addJSONkeyvalpair(out, "notified", "false") // no notification if min_time is not exceeded
-//	endif
-//
-//	if(sc_abortsweep)
-//		return addJSONkeyvalpair(out, "notified", "false") // no notification if sweep was aborted by the user
-//	endif
-//	//// end notification checks ////
-//
-//
-//	//// build notification text ////
-//	if (!paramisdefault(channel))
-//		// message will be sent to public channel
-//		// user who sent it will be mentioned at the beginning of the message
-//		txt += "<@"+username+">\r"
-//	endif
-//
-//	if (!paramisdefault(message) && strlen(message)>0)
-//		txt += RemoveTrailingWhitespace(message) + "\r"
-//	endif
-//
-//	sprintf buffer, "dat%d completed:  %s %s \r", filenum, Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); txt+=buffer
-//	sprintf buffer, "time elapsed:  %.2f s \r", sweep_t_elapsed; txt+=buffer
-//	//// end build txt ////
-//
-//
-//	//// build payload ////
-//	sprintf buffer, "{\"text\": \"%s\"", txt; payload+=buffer //
-//
-//	if (paramisdefault(botname))
-//		botname = "qdotbot"
-//	endif
-//	sprintf buffer, ", \"username\": \"%s\"", botname; payload+=buffer
-//
-//	if (paramisdefault(channel))
-//		sprintf buffer, ", \"channel\": \"@%s\"", username; payload+=buffer
-//	else
-//		sprintf buffer, ", \"channel\": \"#%s\"", channel; payload+=buffer
-//	endif
-//
-//	if (paramisdefault(emoji))
-//		emoji = ":the_horns:"
-//	endif
-//	sprintf buffer, ", \"icon_emoji\": \"%s\"", emoji; payload+=buffer //
-//
-//	payload += "}"
-//	//// end payload ////
-//
-//	URLRequest /DSTR=payload url=sc_slack_url, method=post
-//	if (V_flag == 0)    // No error
-//        if (V_responseCode != 200)  // 200 is the HTTP OK code
-//            print "Slack post failed!"
-//            return addJSONkeyvalpair(out, "notified", "false")
-//        else
-//            return addJSONkeyvalpair(out, "notified", "true")
-//        endif
-//    else
-//        print "HTTP connection error. Slack post not attempted."
-//        return addJSONkeyvalpair(out, "notified", "false")
-//    endif
-end
+	string txt="", buffer="", payload="", out="", botname = "qdotbot", emoji = ":the_horns:"
 
-////////////////////////
-//// test functions ////
-////////////////////////
+	//// check if I need a notification ////
+	if (paramisdefault(min_time))
+		min_time = 60.0 // seconds
+	endif
 
-function sc_testreadtime(numpts, delay) //Units: s
-	variable numpts, delay
+	if(sweep_t_elapsed < min_time)
+		return "slack_notice = false"
+	endif
 
-	InitializeWaves(0, numpts, numpts, x_label="index")
-	variable i=0, ttotal = 0, tstart = datetime
-	do
-		sc_sleep(delay)
-		RecordValues(i, 0, fillnan=0)
-		i+=1
-	while (i<numpts)
-	ttotal = datetime-tstart
-	printf "each RecordValues(...) call takes ~%.1fms \n", ttotal/numpts*1000 - delay*1000
+	if(sc_abortsweep)
+		return "slack_notice = false"
+	endif
+	//// end notification checks ////
 
-	sc_controlwindows("") // kill sweep control windows
+
+	if (!paramisdefault(message) && strlen(message)>0)
+		txt += RemoveTrailingWhitespace(message) + "\r"
+	endif
+
+	sprintf buffer, "dat%d completed:  %s %s \r", filenum, Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); txt+=buffer
+	sprintf buffer, "time elapsed:  %.2f s \r", sweep_t_elapsed; txt+=buffer
+	//// end build txt ////
+
+
+	//// build payload ////
+	sprintf buffer, "{\"text\": \"%s\"", txt; payload+=buffer //
+	sprintf buffer, ", \"username\": \"%s\"", botname; payload+=buffer
+	sprintf buffer, ", \"channel\": \"@%s\"", username; payload+=buffer
+	sprintf buffer, ", \"icon_emoji\": \"%s\"", emoji; payload+=buffer //
+	payload += "}"
+	//// end payload ////
+
+	URLRequest /DSTR=payload url=sc_slack_url, method=post
+	if (V_flag == 0)    // No error
+        if (V_responseCode != 200)  // 200 is the HTTP OK code
+            print "Slack post failed!"
+            return "slack_notice = false"
+        else
+            return "slack_notice = true"
+        endif
+    else
+        print "HTTP connection error. Slack post not attempted."
+        return "slack_notice = false"
+    endif
 end

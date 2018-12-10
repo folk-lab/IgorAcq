@@ -1,102 +1,15 @@
-#pragma rtGlobals=1		// Use modern global access method.
+pragma rtGlobals=1		// Use modern global access method.
 
 /// this procedure contains all of the functions that
 /// scan controller needs for file I/O and custom formatted string handling
-/// currently that includes -- saving IBW and HDF5 files
-///                            reading/writing/parsing JSON
-///                            loading ini config files
 
 //////////////////////////////
 /// SAVING EXPERIMENT DATA ///
 //////////////////////////////
 
-///// generic /////
-
-//function /S recordedWaveArray()
-//	wave /T sc_RawWaveNames, sc_CalcWaveNames
-//	wave sc_RawRecord, sc_CalcRecord
-//	string swave=""
-//	variable i=0
-//	do
-//		if(strlen(sc_RawWaveNames[i])!=0 && sc_RawRecord[i]==1)
-//			swave += "\""+sc_RawWaveNames[i]+"\", "
-//		endif
-//		i+=1
-//	while(i<numpnts(sc_RawWaveNames))
-//
-//	i=0
-//	do
-//		if(strlen(sc_CalcWaveNames[i])!=0 && sc_CalcRecord[i]==1)
-//			swave += "\""+sc_CalcWaveNames[i]+"\", "
-//		endif
-//		i+=1
-//	while(i<numpnts(sc_CalcWaveNames))
-//
-//	return "["+swave[0,strlen(swave)-3]+"]"
-//end
-
-///// HDF5 /////
-
-// get meta data //
-
-//function /S saveScanComments([msg])
-//	// msg can be any normal string, it will be saved as a JSON string value
-//
-//	string msg
-//	string buffer="", jstr=""
-//	jstr += getExpStatus() // record date, time, wave names, time elapsed...
-//
-//	if (!paramisdefault(msg) && strlen(msg)!=0)
-//		jstr = addJSONkeyvalpair(jstr, "comments", TrimString(msg), addQuotes = 1)
-//	endif
-//
-//	jstr = addJSONkeyvalpair(jstr, "logs", getEquipLogs())
-//
-//	//// save file ////
-//	nvar filenum
-//	string extension, filename
-//	extension = "." + num2istr(unixtime()) + ".winf"
-//	filename =  "dat" + num2istr(filenum) + extension
-//	writeJSONtoFile(jstr, filename, "winfs")
-//
-//	return jstr
-//end
-
-//function /s json2hdf5attributes(jstr, obj_name, h5id)
-//	// writes key/value pairs from jstr as attributes of "obj_name"
-//	// in the hdf5 file or group identified by h5id
-//	string jstr, obj_name
-//	variable h5id
-//
-//	make /FREE /T /N=1 str_attr = ""
-//	make /FREE /N=1 num_attr = 0
-//
-//	// loop over keys
-//	string keys = getJSONkeys(jstr)
-//	variable j = 0, numKeys = ItemsInList(keys, ",")
-//	string currentKey = "", currentVal = ""
-//	string group = ""
-//	for(j=0;j<numKeys;j+=1)
-//		currentKey = StringFromList(j, keys, ",")
-//		if(strsearch(currentKey, ":", 0)==-1)
-//			currentVal = getJSONValue(jstr, currentKey)
-//			if(findJSONtype(currentVal)==0)
-//				num_attr[0] = str2num(currentVal)
-//				HDF5SaveData /A=currentKey num_attr, h5id, obj_name
-//			else
-//				str_attr[0] = currentVal
-//				HDF5SaveData /A=currentKey str_attr, h5id, obj_name
-//			endif
-//		endif
-//	endfor
-//
-//end
-
-// save waves and experiment //.
-
 function initSaveFiles([msg])
-	//// create/open any files needed to save data
-	//// also save any global meta-data you want
+	//// create/open HDF5 files
+
 	string msg
 	if(paramisdefault(msg)) // save meta data
 		msg=""
@@ -117,11 +30,6 @@ function initSaveFiles([msg])
 	if(sc_is2d)
 		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_ydata" , hdf5_id, "y_array"
 	endif
-
-	// Create metadata group
-	variable /G metadata_group_ID
-	HDF5CreateGroup hdf5_id, "metadata", metadata_group_ID
-//	json2hdf5attributes(getExpStatus(msg=msg), "metadata", hdf5_id) // add experiment metadata
 
 	// Create config group
 	svar sc_current_config
@@ -147,9 +55,6 @@ function saveSingleWave(wn)
 		return 0
 	endif
 
-	 // add wave status JSON string as attribute
-	 nvar hdf5_id
-//	 json2hdf5attributes(getWaveStatus(wn), wn, hdf5_id)
 end
 
 function closeSaveFiles()
@@ -159,13 +64,6 @@ function closeSaveFiles()
 	string filenumstr = ""
 	sprintf filenumstr, "%d", filenum
 	string /g h5name = "dat"+filenumstr+".h5"
-
-	// close metadata group
-	nvar metadata_group_id
-	HDF5CloseGroup /Z metadata_group_id
-	if (V_flag != 0)
-		Print "HDF5CloseGroup Failed: ", "metadata"
-	endif
 
 	// close config group
 	nvar config_group_id
@@ -270,9 +168,314 @@ function/s getJSONkeyoffset(key,offset)
 	return ""
 end
 
-//////////////////
-/// formatting ///
-//////////////////
+/////////////////////////////////
+/// text formatting utilities ///
+/////////////////////////////////
+
+Function IsWhiteSpace(char)
+    String char
+
+    return GrepString(char, "\\s")
+End
+
+Function/S RemoveLeadingWhitespace(str)
+    String str
+
+    if (strlen(str) == 0)
+        return ""
+    endif
+
+    do
+        String firstChar= str[0]
+        if (IsWhiteSpace(firstChar))
+            str= str[1,inf]
+        else
+            break
+        endif
+    while (strlen(str) > 0)
+
+    return str
+End
+
+Function/S RemoveTrailingWhitespace(str)
+    String str
+
+    if (strlen(str) == 0)
+        return ""
+    endif
+
+    do
+        String lastChar = str[strlen(str) - 1]
+        if (IsWhiteSpace(lastChar))
+            str = str[0, strlen(str) - 2]
+        else
+        	break
+        endif
+    while (strlen(str) > 0)
+    return str
+End
+
+function countQuotes(str)
+	// count how many quotes are in the string
+	// +1 for "
+	// escaped quotes are ignored
+	string str
+	variable quoteCount = 0, i = 0, escaped = 0
+	for(i=0; i<strlen(str); i+=1)
+
+		// check if the current character is escaped
+		if(i!=0)
+			if( CmpStr(str[i-1], "\\") == 0)
+				escaped = 1
+			else
+				escaped = 0
+			endif
+		endif
+
+		// count quotes
+		if( CmpStr(str[i], "\"" ) == 0 && escaped == 0)
+			quoteCount += 1
+		endif
+
+	endfor
+	return quoteCount
+end
+
+function countSqBrackets(str)
+	// count how many brackets are in the string
+	// +1 for ]
+	// -1 for [
+	string str
+	variable bracketCount = 0, i = 0, escaped = 0
+	for(i=0; i<strlen(str); i+=1)
+	
+		// check if the current character is escaped
+		if(i!=0)
+			if( CmpStr(str[i-1], "\\") == 0)
+				escaped = 1
+			else
+				escaped = 0
+			endif
+		endif
+	
+		// count opening brackets
+		if( CmpStr(str[i], "[" ) == 0 && escaped == 0)
+			bracketCount -= 1
+		endif
+		
+		// count closing brackets
+		if( CmpStr(str[i], "]" ) == 0 && escaped == 0)
+			bracketCount += 1
+		endif
+		
+	endfor
+	return bracketCount
+end
+
+function /S escapeQuotes(str)
+	string str
+	
+	variable i=0, escaped=0
+	string output = ""
+	do
+	
+		if(i>strlen(str)-1)
+			break
+		endif
+		
+		// check if the current character is escaped
+		if(i!=0)
+			if( CmpStr(str[i-1], "\\") == 0)
+				escaped = 1
+			else
+				escaped = 0
+			endif
+		endif
+	
+		// escape quotes
+		if( CmpStr(str[i], "\"" ) == 0 && escaped == 0)
+			// this is an unescaped quote
+			str = str[0,i-1] + "\\" + str[i,inf]
+		endif
+		i+=1
+		
+	while(1==1)
+	return str
+end
+
+function /S unescapeQuotes(str)
+	string str
+	
+	variable i=0, escaped=0
+	string output = ""
+	do
+	
+		if(i>strlen(str)-1)
+			break
+		endif
+		
+		// check if the current character is escaped
+		if(i!=0)
+			if( CmpStr(str[i-1], "\\") == 0)
+				escaped = 1
+			else
+				escaped = 0
+			endif
+		endif
+	
+		// escape quotes
+		if( CmpStr(str[i], "\"" ) == 0 && escaped == 1)
+			// this is an unescaped quote
+			str = str[0,i-2] + str[i,inf]
+		endif
+		i+=1
+		
+	while(1==1)
+	return str
+end
+
+function/s removeLiteralQuotes(str)
+	// removes outermost quotes
+	// handles single or triple quotes (TOML standards)
+	// there are about ten different ways to break this
+	string str
+	
+	variable i=0, openQuotes=0
+	for(i=0;i<strlen(str);i+=1)
+		if(CmpStr(str[i],"\"")==0)
+			openQuotes+=1
+		endif
+		
+		if(openQuotes>0 && CmpStr(str[i],"\"")!=0)
+			break
+		endif
+	endfor
+	
+	if(openQuotes==0)
+		print "[ERROR] String not surrounded by quotes. str: "+str
+		return ""
+	elseif(openQuotes==2)
+		openQuotes=1
+	elseif(openQuotes>3)
+		openQuotes=3
+	endif
+	
+	str = str[i,inf]
+	variable j, closeQuotes=0
+	for(j=strlen(str); j>0; j-=1)
+	
+		if(CmpStr(str[j],"\"")==0)
+			closeQuotes+=1
+		endif
+		
+		if(closeQuotes==openQuotes)
+			break
+		endif
+		
+	endfor
+
+	return str[0,j-1]
+end
+
+function/s removeSqBrackets(str)
+	// removes outermost brackets
+	// and whitespace from a string
+	string str
+	
+	variable i=0
+	for(i=0;i<strlen(str);i+=1)
+		if(CmpStr(str[i],"[")==0)
+			break
+		endif
+	endfor
+	
+	if(i==strlen(str)-1)
+		print "[ERROR] String not surrounded by brackets. str: "+str
+		return ""
+	endif
+	
+	str = str[i+1,inf]
+	variable j
+	for(j=strlen(str); j>0; j-=1)
+		if(CmpStr(str[j],"]")==0)
+			break
+		endif
+	endfor
+
+	return str[0,j-1]	
+end
+
+Function/t removeStringListDuplicates(theListStr)
+	// credit: http://www.igorexchange.com/node/1071
+	String theListStr
+
+	String retStr = ""
+	variable ii
+	for(ii = 0 ; ii < itemsinlist(theListStr) ; ii+=1)
+		if(whichlistitem(stringfromlist(ii , theListStr), retStr) == -1)
+			retStr = addlistitem(stringfromlist(ii, theListStr), retStr, ";", inf)
+		endif
+	endfor
+	return retStr
+End
+
+function/s searchFullString(string_to_search,substring)
+	string string_to_search, substring
+	string index_list=""
+	variable test, startpoint=0
+
+	do
+		test = strsearch(string_to_search, substring, startpoint)
+		if(test != -1)
+			index_list = index_list+num2istr(test)+","
+			startpoint = test+1
+		endif
+	while(test > -1)
+
+	return index_list
+end
+
+function LoadTextArrayToWave(array,destwave)
+	string array,destwave
+	variable i=0
+	
+	array = removeSqBrackets(array)
+	
+	make/o/t/n=(itemsinlist(array,",")) $destwave = stringfromlist(p,array,",")
+	wave/t wref = $destwave
+	string buffer = ""
+	for(i=0;i<(itemsinlist(array,","));i+=1)
+		wref[i] = removeLiteralQuotes(wref[i])
+		wref[i] = unescapeQuotes(wref[i])
+	endfor
+end
+
+function LoadBoolArrayToWave(array,destwave)
+	string array,destwave
+
+	array = removeSqBrackets(array)
+
+	make/o/n=(itemsinlist(array,",")) $destwave = booltonum(stringfromlist(p,array,","))
+end
+
+function LoadBoolToVar(boolean,destvar)
+	string boolean,destvar
+
+	variable/g $destvar = booltonum(boolean)
+end
+
+function LoadTextToString(str,deststring)
+	string str,deststring
+	
+	str = removeLiteralQuotes(str)
+	string/g $deststring = unescapeQuotes(str) 
+end
+
+function LoadNumToVar(numasstr,destvar)
+	string numasstr,destvar
+
+	variable/g $destvar = str2num(numasstr)
+end
 
 function/s numToBool(val)
 	variable val
@@ -298,7 +501,7 @@ function boolToNum(str)
 end
 
 function/s numericWaveToBoolArray(w)
-	// returns a JSON array
+	// returns an array
 	wave w
 	string list = "["
 	variable i=0
@@ -311,7 +514,7 @@ function/s numericWaveToBoolArray(w)
 end
 
 function/s textWaveToStrArray(w)
-	// returns a JSON array and makes sure quotes and commas are parsed correctly.
+	// returns an array and makes sure quotes and commas are parsed correctly.
 	wave/t w
 	string list, checkStr, escapedStr
 	variable i=0
@@ -320,11 +523,198 @@ function/s textWaveToStrArray(w)
 	for(i=0;i<itemsinlist(list,";");i+=1)
 		checkStr = stringfromlist(i,list,";")
 		if(countQuotes(checkStr)>2)
-			escapedStr = escapeJSONstr(checkStr)
+			//escapedStr = escapeJSONstr(checkStr)
 			list = removelistitem(i,list,";")
 			list = addlistitem(escapedStr,list,";",i)
 		endif
 	endfor
 	list = replacestring(";",list,",")
 	return "["+list[0,strlen(list)-2]+"]"
+end
+
+///////////////////////
+/// text read/write ///
+///////////////////////
+
+function writeToFile(anyStr,filename,path)
+	// write any string to a file called "filename"
+	// path must be a predefined path
+	string anyStr,filename,path
+	variable refnum=0
+
+	open /z/p=$path refnum as filename
+
+	do
+		if(strlen(anyStr)<500)
+			fprintf refnum, "%s", anyStr
+			break
+		else
+			fprintf refnum, "%s", anyStr[0,499]
+			anyStr = anyStr[500,inf]
+		endif
+	while(1)
+
+	close refnum
+end
+
+function/s readTXTFile(filename, path)
+	// read textfile into string from filename on path
+	string filename,path
+	variable refnum
+	string buffer="", txtstr=""
+
+	open /r/z/p=$path refNum as filename
+	if(V_flag!=0)
+		print "[ERROR]: Could not read file: "+filename
+		return ""
+	endif
+
+	do
+		freadline refnum, buffer // returns \r no matter what was used in the file
+		if(strlen(buffer)==0)
+			break
+		endif
+		txtstr+=buffer
+	while(1)
+	close refnum
+
+	return txtstr
+end
+
+////////////
+/// TOML ///
+////////////
+
+// a quick attempt at writing a TOML parser
+// https://en.wikipedia.org/wiki/TOML
+// https://github.com/toml-lang/toml
+
+// a good amount of the format (nested arrays, tables, single quotes) is not supported
+// general philosophy is that everything written to a .toml is valid TOML
+//     but our parser cannot read all valid TOML because it is complicated and we don't need it
+
+function/s getTOMLvalue(TOMLstr,key)
+	// returns the value associated with key
+	// returns an empty string is key is not valid
+	string TOMLstr,key
+	variable key_length,index,old_index,i=0, val_start, val_end
+	string str
+
+	key_length = itemsinlist(key,":")
+
+	// search TOMLstr for key
+	// record index of first character _after_ key
+	old_index = 0
+	for(i=0;i<key_length;i+=1)
+		str = stringfromlist(i,key,":") 
+		index = strsearch(TOMLstr,str,old_index)
+		
+		if(index==-1 || index<old_index)
+			print "[ERROR] key not found in TOML: "+key
+			return ""
+		endif
+		old_index=index+strlen(str)
+	endfor
+	TOMLstr = TOMLstr[old_index,inf] // everything from the key onward
+										      // look for equal sign next
+	i=0
+	do
+		if(i>strlen(TOMLstr)-1)
+			// end of string. something wasn't formatted right.
+			print "[ERROR] key = value line incorrectly formatted for key: "+key
+			return ""
+		endif
+		
+		if(char2num(TOMLstr[i])==char2num("="))
+			// found the equal sign. great.
+			i+=1
+			break
+		elseif(IsWhiteSpace(TOMLstr[i]))
+			// white space. keep looking.
+			i+=1
+		else
+			// not white space. not an equal sign. bad formatting.
+			print "[ERROR] key = value line incorrectly formatted for key: "+key
+			return ""
+		endif
+	while(1==1)
+	TOMLstr = TOMLstr[i,inf] // everything from the = onward
+							       // look for full value next
+							       
+	i=0
+	do
+		if(i>strlen(TOMLstr)-1)
+			// end of string. something wasn't formatted right.
+			print "[ERROR] key = value line incorrectly formatted for key: "+key
+			return ""
+		endif
+		
+		if(char2num(TOMLstr[i])==char2num("\r"))
+			// line break!
+			if(countSqBrackets(TOMLstr[i,inf])!=0 || mod(countQuotes(TOMLstr[i,inf]),2)!=0)
+				// there are unclosed brackets or quotes
+				// this is a multi line array or string
+				i+=1
+				continue
+			else
+				break
+			endif
+		endif
+		i+=1
+	while(1==1)
+	
+	TOMLstr = removeTrailingWhitespace(TOMLstr[0,i])
+	return removeLeadingWhitespace(TOMLstr)
+end
+
+function/s addTOMLblock(name,[str,indent])
+	string name, str, indent
+	string returnstr=""
+
+	if(!paramisdefault(str))
+		returnstr = str+"\n"
+	endif
+
+	if(paramisdefault(indent))
+		indent = ""
+	endif
+
+	return returnstr+indent+"["+name+"]"+"\n"
+end
+
+function/s addTOMLkey(name,value,[str,indent,addQuotes])
+	string name, value, str, indent
+	variable addquotes
+	string returnstr
+	
+	if(paramisdefault(str))
+		str = ""
+	endif
+	
+	if(paramisdefault(indent))
+		indent = ""
+	endif
+	
+	if(paramisdefault(addquotes))
+		addquotes = 0
+	elseif(addquotes==1)
+		// escape quotes in value and wrap value in outer quotes
+		value = "\""+escapeQuotes(value)+"\""
+	endif
+	
+	return str+indent+name+"="+value+"\n"
+end
+
+function/s addTOMLcomment(comment,[str,indent])
+	string comment, str, indent
+
+	if(paramisdefault(str))
+		str = ""
+	endif
+
+	if(paramisdefault(indent))
+		indent = ""
+	endif
+
+	return str+indent+"# "+comment+"\n"
 end
