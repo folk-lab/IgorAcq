@@ -436,8 +436,13 @@ function sc_loadConfig(configfile)
 	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.plot:calc"),"sc_CalcPlot")
 
 	// async checkboxes
+<<<<<<< HEAD
 	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.asybc:async"),"sc_measAsync")
 
+=======
+	loadbooleanarrayintowave(getTOMLvalue(TOMLstr,"checkboxes.async:async"),"sc_measAsync")
+	
+>>>>>>> c653ee910b467bc96bf9ffc72e821f0e0c245912
 	// print_to_history
 	LoadBoolToVar(getTOMLvalue(TOMLstr,"checkboxes.history:raw"),"sc_PrintRaw")
 	LoadBoolToVar(getTOMLvalue(TOMLstr,"checkboxes.history:calc"),"sc_PrintCalc")
