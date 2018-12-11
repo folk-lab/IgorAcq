@@ -256,7 +256,7 @@ function /S getStrArrayShape(array)
 	
 end
 
-function loadStrArrayToWave(array,destwave)
+function loadStrArray2textWave(array,destwave)
 	// supports 1 and 2d arrays
 	string array,destwave
 	string dims = getStrArrayShape(array), element=""
@@ -349,7 +349,61 @@ function /S getArrayShape(array)
 	
 end
 
-function loadNumArrayToWave(array,destwave)
+function loadBoolArray2wave(array,destwave)
+	// works for int or float since igor doesn't make a distinction
+	string array,destwave
+	string dims = getArrayShape(array), element=""
+	variable i=0, commaLast=0, brackLast=0, ii=0, jj=0, nDims = itemsinlist(dims, ",")
+	
+	if(nDims==1)	
+		make/o/n=(str2num(dims)) $destwave
+	else
+		make/o/n=(str2num(stringfromlist(0,dims,",")), str2num(stringfromlist(1,dims,","))) $destwave
+	endif
+	wave w=$destwave
+
+	for(i=0; i<strlen(array); i+=1)
+		if( CmpStr(array[i], ",")==0 )
+			// comma found, write element, increment ii, clear element
+			commaLast=1 // comma was the last non-whitespace character	
+			if( brackLast==0 )	
+				if(nDims==1)
+					w[ii] = bool2num(element)
+				else
+					w[ii][jj] = bool2num(element)
+				endif
+				ii+=1
+				element="" // clear element
+			endif
+		elseif( CmpStr(array[i], "[")==0 )
+			// open bracket
+		elseif( CmpStr(array[i], "]")==0 )
+			// close bracket, write element?, incrememnt jj
+			if(commaLast==0)
+				// no trailing comma, write element, increment ii, clear element
+				if(nDims==1)
+					w[ii] = bool2num(element)
+				else
+					w[ii][jj] = bool2num(element)
+				endif
+				ii+=1
+				element="" // no trailing comma, new element
+			endif
+			jj+=1
+			brackLast=1
+		else
+			element+=array[i] // doesn't matter if I pick up some whitespace here
+			if( isWhitespace(array[i])==0 )
+				commaLast=0
+				brackLast=0
+			endif
+		endif
+
+	endfor
+
+end
+
+function loadNumArray2wave(array,destwave)
 	// works for int or float since igor doesn't make a distinction
 	string array,destwave
 	string dims = getArrayShape(array), element=""
@@ -403,26 +457,26 @@ function loadNumArrayToWave(array,destwave)
 
 end
 
-function loadBoolToVar(boolean,destvar)
+function loadBool2Var(boolean,destvar)
 	string boolean,destvar
 
-	variable/g $destvar = booltonum(boolean)
+	variable/g $destvar = bool2num(boolean)
 end
 
-function loadStrToString(str,deststring)
+function loadStr2String(str,deststring)
 	string str,deststring
 	
 	str = removeLiteralQuotes(str)
 	string/g $deststring = unescapeQuotes(str) 
 end
 
-function loadNumToVar(numasstr,destvar)
+function loadNum2Var(numasstr,destvar)
 	string numasstr,destvar
 
 	variable/g $destvar = str2num(numasstr)
 end
 
-function/s numToBool(val)
+function/s num2Bool(val)
 	variable val
 	if(val==1)
 		return "true"
@@ -433,7 +487,7 @@ function/s numToBool(val)
 	endif
 end
 
-function boolToNum(str)
+function bool2Num(str)
 	string str
 	str = removeLiteralQuotes(str)
 	if(StringMatch(LowerStr(str), "true")==1)
@@ -446,25 +500,73 @@ function boolToNum(str)
 	endif
 end
 
-function/s numWaveToBoolArray(w)
+function/s wave2BoolArray(w)
 	// returns an array
+	// supports 1d and 2d arrays
 	wave w
-//	string list = "["
-//	variable i=0
-//
-//	for(i=0; i<numpnts(w); i+=1)
-//		list += numToBool(w[i])+","
-//	endfor
-//
-//	return list[0,strlen(list)-2] + "]"
+	string list=""
+
+	// loop over wave
+	variable ii, jj, m = dimsize(w, 1), n = dimsize(w, 0)
+	if(m==0)
+		m=1
+	elseif(m>1)
+		list+="["
+	endif
+	
+	for (ii=0; ii<m; ii+=1)
+		list += "["
+		for(jj=0; jj<n; jj+=1)
+   		list+= num2bool(w[jj][ii])
+		endfor
+		list = list[0,strlen(list)-2]
+		list += "],"
+	endfor   
+	
+	list = list[0,strlen(list)-4] // remove ,\n\t
+	
+	if(m>1)
+		list+="]"
+	endif
+	return list
 end
 
-function/s textWaveToStrArray(w)
+function/s wave2NumArray(w)
+	// returns an array
+	// supports 1d and 2d arrays
+	wave w
+	string list=""
+
+	// loop over wave
+	variable ii, jj, m = dimsize(w, 1), n = dimsize(w, 0)
+	if(m==0)
+		m=1
+	elseif(m>1)
+		list+="["
+	endif
+	
+	for (ii=0; ii<m; ii+=1)
+		list += "["
+		for(jj=0; jj<n; jj+=1)
+   		list+= num2str(w[jj][ii])
+		endfor
+		list = list[0,strlen(list)-2]
+		list += "],"
+	endfor   
+	
+	list = list[0,strlen(list)-4] // remove ,\n\t
+	
+	if(m>1)
+		list+="]"
+	endif
+	return list
+end
+
+function/s textWave2StrArray(w)
 	// returns an array and makes sure quotes and commas are parsed correctly.
 	// supports 1d and 2d arrays
 	wave/t w
 	string list=""
-	variable i=0
 
 	// loop over wave
 	variable ii, jj, m = dimsize(w, 1), n = dimsize(w, 0)
@@ -480,7 +582,7 @@ function/s textWaveToStrArray(w)
    		list+="\""+escapeQuotes(w[jj][ii])+"\","
 		endfor
 		list = list[0,strlen(list)-2]
-		list += "],\n\t"
+		list += "],"
 	endfor   
 	
 	list = list[0,strlen(list)-4] // remove ,\n\t
