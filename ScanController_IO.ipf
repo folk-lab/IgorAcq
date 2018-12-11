@@ -693,52 +693,6 @@ function countQuotes(str)
 	return quoteCount
 end
 
-function countBrackets(str, btype)
-	// count how many brackets are in the string
-	// type is curly ( { ) or square ( [ )
-	// +1 for ]
-	// -1 for [
-	string str, btype
-	string bopen, bclose
-	variable bracketCount = 0, i = 0, escaped = 0
-	
-	strswitch(btype)	// string switch
-	case "square":	// execute if case matches expression
-		bopen="["
-		bclose="]"
-		break
-	case "curly":	// execute if case matches expression
-		bopen="{"
-		bclose="}"
-		break
-	default:
-		abort "Specify bracket type in `countBrackets(...)`"
-	endswitch 
-	for(i=0; i<strlen(str); i+=1)
-	
-		// check if the current character is escaped
-		if(i!=0)
-			if( CmpStr(str[i-1], "\\") == 0)
-				escaped = 1
-			else
-				escaped = 0
-			endif
-		endif
-	
-		// count opening brackets
-		if( CmpStr(str[i], "[" ) == 0 && escaped == 0)
-			bracketCount -= 1
-		endif
-		
-		// count closing brackets
-		if( CmpStr(str[i], "]" ) == 0 && escaped == 0)
-			bracketCount += 1
-		endif
-		
-	endfor
-	return bracketCount
-end
-
 function /S escapeQuotes(str)
 	string str
 	
@@ -848,18 +802,19 @@ function/s removeBrackets(str, btype)
 	// removes outermost brackets and whitespace from a string
 	// btype is curly or square
 	string str, btype
+	string bopen, bclose
 	
 	strswitch(btype)	// string switch
-	case "square":	// execute if case matches expression
-		bopen="["
-		bclose="]"
-		break
-	case "curly":	// execute if case matches expression
-		bopen="{"
-		bclose="}"
-		break
-	default:
-		abort "Specify bracket type in `countBrackets(...)`"
+		case "square":	// execute if case matches expression
+			bopen="["
+			bclose="]"
+			break
+		case "curly":	// execute if case matches expression
+			bopen="{"
+			bclose="}"
+			break
+		default:
+			abort "Specify bracket type in `countBrackets(...)`"
 	endswitch
 	
 	variable i=0
