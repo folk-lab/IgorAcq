@@ -610,14 +610,11 @@ function/s addJSONkeyvalpair(JSONstr,key,value,[addquotes])
 		endif
 	endif
 
-//	if(strlen(JSONstr)==0)
-//		JSONstr = "{"
-//	else
-//		JSONstr = readJSONobject(JSONstr)
-//		JSONstr = JSONstr[0,strlen(JSONstr)-2]+","
-//	endif
+	if(strlen(JSONstr)!=0)
+		JSONstr = removeBrackets(JSONstr, "curly")
+	endif
 
-	return JSONstr+"\""+key+"\":"+value+"}"
+	return "{"+JSONstr+", \""+key+"\":"+value+"}"
 end
 
 /////////////////////////////////
