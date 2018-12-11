@@ -303,47 +303,47 @@ function/s sc_createconfig()
 	string configstr = "", tmpstr = ""
 
 	configfile = "sc" + num2istr(unixtime()) + ".toml"
-	configstr = addTOMLcomment(configfile,str=configstr)
-
-	// wave names
-	configstr = addTOMLblock("waves",str=configstr)
-	configstr = addTOMLkey("raw",TextWaveToStrArray(sc_RawWaveNames),str=configstr)
-	configstr = addTOMLkey("calc",TextWaveToStrArray(sc_CalcWaveNames),str=configstr)
-
-	// record checkboxes
-	configstr = addTOMLblock("checkboxes",str=configstr)
-	configstr = addTOMLblock("checkboxes.record",str=configstr,indent="\t")
-	configstr = addTOMLkey("raw",numWaveToBoolArray(sc_RawRecord),str=configstr,indent="\t")
-	configstr = addTOMLkey("calc",numWaveToBoolArray(sc_CalcRecord),str=configstr,indent="\t")
-
-	// plot checkboxes
-	configstr = addTOMLblock("checkboxes.plot",str=configstr,indent="\t")
-	configstr = addTOMLkey("raw",numWaveToBoolArray(sc_RawPlot),str=configstr,indent="\t")
-	configstr = addTOMLkey("calc",numWaveToBoolArray(sc_CalcPlot),str=configstr,indent="\t")
-
-	// async checkboxes
-	configstr = addTOMLblock("checkboxes.async",str=configstr,indent="\t")
-	configstr = addTOMLkey("async",numWaveToBoolArray(sc_measAsync),str=configstr,indent="\t")
-
-	// print_to_history
-	configstr = addTOMLblock("checkboxes.history",str=configstr,indent="\t")
-	configstr = addTOMLkey("raw",numToBool(sc_PrintRaw),str=configstr,indent="\t")
-	configstr = addTOMLkey("calc",numToBool(sc_PrintCalc),str=configstr,indent="\t")
-
-	// scripts
-	configstr = addTOMLblock("scripts",str=configstr)
-	configstr = addTOMLkey("raw",TextWaveToStrArray(sc_RawScripts),str=configstr)
-	configstr = addTOMLkey("calc",TextWaveToStrArray(sc_CalcScripts),str=configstr)
-
-	// log instrument info
-	configstr = addTOMLblock("instruments",str=configstr)
-	configstr = addTOMLkey("info", textWaveToStrArray(sc_Instr),str=configstr)
-
-	//filenum
-	configstr = addTOMLkey("filenum",num2str(filenum),str=configstr,indent="\n")
-
-	sc_current_config = configfile
-	writetofile(configstr,configfile,"config")
+//	configstr = addTOMLcomment(configfile,str=configstr)
+//
+//	// wave names
+//	configstr = addTOMLblock("waves",str=configstr)
+//	configstr = addTOMLkey("raw",TextWaveToStrArray(sc_RawWaveNames),str=configstr)
+//	configstr = addTOMLkey("calc",TextWaveToStrArray(sc_CalcWaveNames),str=configstr)
+//
+//	// record checkboxes
+//	configstr = addTOMLblock("checkboxes",str=configstr)
+//	configstr = addTOMLblock("checkboxes.record",str=configstr,indent="\t")
+//	configstr = addTOMLkey("raw",numWaveToBoolArray(sc_RawRecord),str=configstr,indent="\t")
+//	configstr = addTOMLkey("calc",numWaveToBoolArray(sc_CalcRecord),str=configstr,indent="\t")
+//
+//	// plot checkboxes
+//	configstr = addTOMLblock("checkboxes.plot",str=configstr,indent="\t")
+//	configstr = addTOMLkey("raw",numWaveToBoolArray(sc_RawPlot),str=configstr,indent="\t")
+//	configstr = addTOMLkey("calc",numWaveToBoolArray(sc_CalcPlot),str=configstr,indent="\t")
+//
+//	// async checkboxes
+//	configstr = addTOMLblock("checkboxes.async",str=configstr,indent="\t")
+//	configstr = addTOMLkey("async",numWaveToBoolArray(sc_measAsync),str=configstr,indent="\t")
+//
+//	// print_to_history
+//	configstr = addTOMLblock("checkboxes.history",str=configstr,indent="\t")
+//	configstr = addTOMLkey("raw",numToBool(sc_PrintRaw),str=configstr,indent="\t")
+//	configstr = addTOMLkey("calc",numToBool(sc_PrintCalc),str=configstr,indent="\t")
+//
+//	// scripts
+//	configstr = addTOMLblock("scripts",str=configstr)
+//	configstr = addTOMLkey("raw",TextWaveToStrArray(sc_RawScripts),str=configstr)
+//	configstr = addTOMLkey("calc",TextWaveToStrArray(sc_CalcScripts),str=configstr)
+//
+//	// log instrument info
+//	configstr = addTOMLblock("instruments",str=configstr)
+//	configstr = addTOMLkey("info", textWaveToStrArray(sc_Instr),str=configstr)
+//
+//	//filenum
+//	configstr = addTOMLkey("filenum",num2str(filenum),str=configstr,indent="\n")
+//
+//	sc_current_config = configfile
+//	writetofile(configstr,configfile,"config")
 end
 
 function sc_loadConfig(configfile)
@@ -355,11 +355,11 @@ function sc_loadConfig(configfile)
 	// load TOML string from config file
 	printf "Loading configuration from: %s\n", configfile
 	sc_current_config = configfile
-	TOMLstr = readtxtfile(configfile,"config")
+//	TOMLstr = readtxtfile(configfile,"config")
 
 	// waves
-	LoadStrArrayToWave(getTOMLvalue(TOMLstr,"waves:raw"),"sc_RawWaveNames")
-	LoadStrArrayToWave(getTOMLvalue(TOMLstr,"waves:calc"),"sc_CalcWaveNames")
+//	LoadStrArrayToWave(getTOMLvalue(TOMLstr,"waves:raw"),"sc_RawWaveNames")
+//	LoadStrArrayToWave(getTOMLvalue(TOMLstr,"waves:calc"),"sc_CalcWaveNames")
 
 	// record checkboxes
 //	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.record:raw"),"sc_RawRecord")
@@ -373,21 +373,21 @@ function sc_loadConfig(configfile)
 //	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.async:async"),"sc_measAsync")
 
 	// print_to_history
-	LoadBoolToVar(getTOMLvalue(TOMLstr,"checkboxes.history:raw"),"sc_PrintRaw")
-	LoadBoolToVar(getTOMLvalue(TOMLstr,"checkboxes.history:calc"),"sc_PrintCalc")
+//	LoadBoolToVar(getTOMLvalue(TOMLstr,"checkboxes.history:raw"),"sc_PrintRaw")
+//	LoadBoolToVar(getTOMLvalue(TOMLstr,"checkboxes.history:calc"),"sc_PrintCalc")
 
 	// scripts
-	LoadStrArrayToWave(getTOMLvalue(TOMLstr,"scripts:raw"),"sc_RawScripts")
-	LoadStrArrayToWave(getTOMLvalue(TOMLstr,"scripts:calc"),"sc_CalcScripts")
+//	LoadStrArrayToWave(getTOMLvalue(TOMLstr,"scripts:raw"),"sc_RawScripts")
+//	LoadStrArrayToWave(getTOMLvalue(TOMLstr,"scripts:calc"),"sc_CalcScripts")
 
 	// executable string to get logs
 //	LoadTextToString(getTOMLvalue(TOMLstr,"logstring"),"sc_Logstr")
 
 	//filenum
-	LoadNumToVar(getTOMLvalue(TOMLstr,"filenum"),"sc_filenum")
+//	LoadNumToVar(getTOMLvalue(TOMLstr,"filenum"),"sc_filenum")
 
 	// reload ScanController window
-	sc_rebuildwindow()
+//	sc_rebuildwindow()
 end
 
 /////////////////////
@@ -2071,11 +2071,11 @@ function /S getSlackNotice(username, [message, min_time]) //FIX!
 	endif
 
 	if(sweep_t_elapsed < min_time)
-		return "slack_notice = false"
+		return "{slack_notice: false}"
 	endif
 
 	if(sc_abortsweep)
-		return "slack_notice = false"
+		return "{slack_notice: false}"
 	endif
 	//// end notification checks ////
 
@@ -2100,13 +2100,13 @@ function /S getSlackNotice(username, [message, min_time]) //FIX!
 	URLRequest /DSTR=payload url=sc_slack_url, method=post
 	if (V_flag == 0)    // No error
         if (V_responseCode != 200)  // 200 is the HTTP OK code
-            print "Slack post failed!"
-            return "slack_notice = false"
+            print "Slack POST failed!"
+            return "{slack_notice: false}"
         else
-            return "slack_notice = true"
+            return "{slack_notice: true}"
         endif
     else
         print "HTTP connection error. Slack post not attempted."
-        return "slack_notice = false"
+        return "{slack_notice: false}"
     endif
 end
