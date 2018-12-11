@@ -294,10 +294,10 @@ end
 /////////////////////////////
 
 function/s sc_createconfig()
-	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts
+	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts, sc_Instr
 	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
 	nvar sc_PrintRaw, sc_PrintCalc, filenum
-	svar sc_LogStr, sc_current_config
+	svar sc_current_config
 	variable refnum
 	string configfile
 	string configstr = "", tmpstr = ""
@@ -305,8 +305,8 @@ function/s sc_createconfig()
 	configfile = "sc" + num2istr(unixtime()) + ".json"
 
 	// wave names
-	tmpstr = addJSONkeyvalpair(tmpstr, "raw", textwavetostrarray(sc_RawWaveNames))
-	tmpstr = addJSONkeyvalpair(tmpstr, "calc", textwavetostrarray(sc_CalcWaveNames))
+	tmpstr = addJSONkeyvalpair(tmpstr, "raw", textWave2StrArray(sc_RawWaveNames))
+	tmpstr = addJSONkeyvalpair(tmpstr, "calc", textWave2StrArray(sc_CalcWaveNames))
 	configstr = addJSONkeyvalpair(configstr, "wave_names", tmpstr)
 
 	// record checkboxes
@@ -328,11 +328,12 @@ function/s sc_createconfig()
 
 	// scripts
 	tmpstr = ""
-	tmpstr = addJSONkeyvalpair(tmpstr, "raw", textwavetostrarray(sc_RawScripts))
-	tmpstr = addJSONkeyvalpair(tmpstr, "calc", textwavetostrarray(sc_CalcScripts))
+	tmpstr = addJSONkeyvalpair(tmpstr, "raw", textWave2StrArray(sc_RawScripts))
+	tmpstr = addJSONkeyvalpair(tmpstr, "calc", textWave2StrArray(sc_CalcScripts))
 	configstr = addJSONkeyvalpair(configstr, "scripts", tmpstr)
 
-	// 
+	// log instrument info
+	configstr = addJSONkeyvalpair(configstr, "instruments", textWave2StrArray(sc_Instr))
 
 	// print_to_history
 	tmpstr = ""
@@ -342,8 +343,9 @@ function/s sc_createconfig()
 
 	configstr = addJSONkeyvalpair(configstr, "filenum", num2istr(filenum))
 
-	sc_current_config = configfile
-	writetofile(configstr, configfile, "config")
+//	sc_current_config = configfile
+//	writetofile(configstr, configfile, "config")
+	return configstr
 end
 
 

@@ -521,17 +521,17 @@ function/s wave2BoolArray(w)
 	for (ii=0; ii<m; ii+=1)
 		list += "["
 		for(jj=0; jj<n; jj+=1)
-   		list+= num2bool(w[jj][ii])
+   		list+= num2bool(w[jj][ii]) + ","
 		endfor
-		list = list[0,strlen(list)-2]
+		list = list[0,strlen(list)-2] // remove comma
 		list += "],"
 	endfor   
 	
-	list = list[0,strlen(list)-4] // remove ,\n\t
-	
+	list = list[0,strlen(list)-2] // remove comma
 	if(m>1)
-		list+="]"
+		list+="]" // add closing bracket in 2d
 	endif
+
 	return list
 end
 
@@ -552,17 +552,17 @@ function/s wave2NumArray(w)
 	for (ii=0; ii<m; ii+=1)
 		list += "["
 		for(jj=0; jj<n; jj+=1)
-   		list+= num2str(w[jj][ii])
+   		list+= num2str(w[jj][ii])+","
 		endfor
-		list = list[0,strlen(list)-2]
+		list = list[0,strlen(list)-2] // remove comma
 		list += "],"
 	endfor   
 	
-	list = list[0,strlen(list)-4] // remove ,\n\t
-	
+	list = list[0,strlen(list)-2] // remove comma
 	if(m>1)
-		list+="]"
+		list+="]" // add closing bracket in 2d
 	endif
+	
 	return list
 end
 
@@ -585,15 +585,15 @@ function/s textWave2StrArray(w)
 		for(jj=0; jj<n; jj+=1)
    		list+="\""+escapeQuotes(w[jj][ii])+"\","
 		endfor
-		list = list[0,strlen(list)-2]
+		list = list[0,strlen(list)-2] // remove comma
 		list += "],"
 	endfor   
 	
-	list = list[0,strlen(list)-4] // remove ,\n\t
-	
+	list = list[0,strlen(list)-2] // remove comma
 	if(m>1)
-		list+="]"
+		list+="]" // add closing bracket in 2d
 	endif
+	
 	return list
 end
 
@@ -611,10 +611,36 @@ function/s addJSONkeyvalpair(JSONstr,key,value,[addquotes])
 	endif
 
 	if(strlen(JSONstr)!=0)
-		JSONstr = removeBrackets(JSONstr, "curly")
+		// remove all starting brackets + whitespace
+		variable i=0
+		do
+			if( (isWhitespace(JSONstr[i])==1) || (CmpStr(JSONstr[i],"{")==0) )
+				i+=1
+			else
+				break
+			endif
+		while(1)
+		
+		// remove single ending bracket + whitespace
+		variable j=strlen(JSONstr)-1
+		do
+			if( (isWhitespace(JSONstr[j])==1) )
+				j-=1
+			elseif( (CmpStr(JSONstr[j],"}")==0) )
+				print "found bracket"
+				j-=1
+				break
+			else
+				print "[ERROR] Bad JSON string in addJSONkeyvalue(...): "+JSONstr
+				break
+			endif
+		while(1)
+		
+		return "{"+JSONstr[i,j]+", \""+key+"\":"+value+"}"
+	else
+		return "{"+JSONstr[i,j]+"\""+key+"\":"+value+"}"
 	endif
 
-	return "{"+JSONstr+", \""+key+"\":"+value+"}"
 end
 
 /////////////////////////////////
