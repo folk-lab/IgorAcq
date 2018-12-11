@@ -278,7 +278,7 @@ function InitScanController([configFile, srv_push])
 				print "Initializing FileNum to 0 since it didn't exist before.\n"
 				variable /g filenum=0
 			else
-				printf "Current FileNum is %d\n", filenum
+				printf "Current filenum is %d\n", filenum
 			endif
 		endif
 	else
@@ -295,7 +295,7 @@ end
 
 function/s sc_createconfig()
 	// create a new config.toml file
-	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts
+	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts, sc_Instr
 	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
 	nvar sc_PrintRaw, sc_PrintCalc, filenum
 	svar sc_current_config
@@ -307,23 +307,23 @@ function/s sc_createconfig()
 
 	// wave names
 	configstr = addTOMLblock("waves",str=configstr)
-	configstr = addTOMLkey("raw",textwavetostrarray(sc_RawWaveNames),str=configstr)
-	configstr = addTOMLkey("calc",textwavetostrarray(sc_CalcWaveNames),str=configstr)
+	configstr = addTOMLkey("raw",TextWaveToStrArray(sc_RawWaveNames),str=configstr)
+	configstr = addTOMLkey("calc",TextWaveToStrArray(sc_CalcWaveNames),str=configstr)
 
 	// record checkboxes
 	configstr = addTOMLblock("checkboxes",str=configstr)
 	configstr = addTOMLblock("checkboxes.record",str=configstr,indent="\t")
-	configstr = addTOMLkey("raw",numericwavetoboolarray(sc_RawRecord),str=configstr,indent="\t")
-	configstr = addTOMLkey("calc",numericwavetoboolarray(sc_CalcRecord),str=configstr,indent="\t")
+	configstr = addTOMLkey("raw",numWaveToBoolArray(sc_RawRecord),str=configstr,indent="\t")
+	configstr = addTOMLkey("calc",numWaveToBoolArray(sc_CalcRecord),str=configstr,indent="\t")
 
 	// plot checkboxes
 	configstr = addTOMLblock("checkboxes.plot",str=configstr,indent="\t")
-	configstr = addTOMLkey("raw",numericwavetoboolarray(sc_RawPlot),str=configstr,indent="\t")
-	configstr = addTOMLkey("calc",numericwavetoboolarray(sc_CalcPlot),str=configstr,indent="\t")
+	configstr = addTOMLkey("raw",numWaveToBoolArray(sc_RawPlot),str=configstr,indent="\t")
+	configstr = addTOMLkey("calc",numWaveToBoolArray(sc_CalcPlot),str=configstr,indent="\t")
 
 	// async checkboxes
 	configstr = addTOMLblock("checkboxes.async",str=configstr,indent="\t")
-	configstr = addTOMLkey("async",numericwavetoboolarray(sc_measAsync),str=configstr,indent="\t")
+	configstr = addTOMLkey("async",numWaveToBoolArray(sc_measAsync),str=configstr,indent="\t")
 
 	// print_to_history
 	configstr = addTOMLblock("checkboxes.history",str=configstr,indent="\t")
@@ -332,11 +332,12 @@ function/s sc_createconfig()
 
 	// scripts
 	configstr = addTOMLblock("scripts",str=configstr)
-	configstr = addTOMLkey("raw",textwavetostrarray(sc_RawScripts),str=configstr)
-	configstr = addTOMLkey("calc",textwavetostrarray(sc_CalcScripts),str=configstr)
+	configstr = addTOMLkey("raw",TextWaveToStrArray(sc_RawScripts),str=configstr)
+	configstr = addTOMLkey("calc",TextWaveToStrArray(sc_CalcScripts),str=configstr)
 
-	// executable string to get logs
-//	configstr = addTOMLkey("logstring",sc_LogStr,str=configstr,indent="\n", addQuotes=1)
+	// log instrument info
+	configstr = addTOMLblock("instruments",str=configstr)
+	configstr = addTOMLkey("info", textWaveToStrArray(sc_Instr),str=configstr)
 
 	//filenum
 	configstr = addTOMLkey("filenum",num2str(filenum),str=configstr,indent="\n")
@@ -357,27 +358,27 @@ function sc_loadConfig(configfile)
 	TOMLstr = readtxtfile(configfile,"config")
 
 	// waves
-	LoadTextArrayToWave(getTOMLvalue(TOMLstr,"waves:raw"),"sc_RawWaveNames")
-	LoadTextArrayToWave(getTOMLvalue(TOMLstr,"waves:calc"),"sc_CalcWaveNames")
+	LoadStrArrayToWave(getTOMLvalue(TOMLstr,"waves:raw"),"sc_RawWaveNames")
+	LoadStrArrayToWave(getTOMLvalue(TOMLstr,"waves:calc"),"sc_CalcWaveNames")
 
 	// record checkboxes
-	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.record:raw"),"sc_RawRecord")
-	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.record:calc"),"sc_CalcRecord")
+//	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.record:raw"),"sc_RawRecord")
+//	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.record:calc"),"sc_CalcRecord")
 
 	// plot checkboxes
-	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.plot:raw"),"sc_RawPlot")
-	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.plot:calc"),"sc_CalcPlot")
+//	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.plot:raw"),"sc_RawPlot")
+//	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.plot:calc"),"sc_CalcPlot")
 
 	// async checkboxes
-	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.async:async"),"sc_measAsync")
+//	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.async:async"),"sc_measAsync")
 
 	// print_to_history
 	LoadBoolToVar(getTOMLvalue(TOMLstr,"checkboxes.history:raw"),"sc_PrintRaw")
 	LoadBoolToVar(getTOMLvalue(TOMLstr,"checkboxes.history:calc"),"sc_PrintCalc")
 
 	// scripts
-	LoadTextArrayToWave(getTOMLvalue(TOMLstr,"scripts:raw"),"sc_RawScripts")
-	LoadTextArrayToWave(getTOMLvalue(TOMLstr,"scripts:calc"),"sc_CalcScripts")
+	LoadStrArrayToWave(getTOMLvalue(TOMLstr,"scripts:raw"),"sc_RawScripts")
+	LoadStrArrayToWave(getTOMLvalue(TOMLstr,"scripts:calc"),"sc_CalcScripts")
 
 	// executable string to get logs
 //	LoadTextToString(getTOMLvalue(TOMLstr,"logstring"),"sc_Logstr")
