@@ -134,6 +134,8 @@ end
 /// JSON  ///
 /////////////
 
+/// read ///
+
 function/s getJSONvalue(jstr, key)
 	// returns the value of the parsed key
 	// function returns can be: object, array, value
@@ -457,34 +459,23 @@ function loadNumArray2wave(array,destwave)
 
 end
 
-function loadBool2Var(boolean,destvar)
+function loadBool2var(boolean,destvar)
 	string boolean,destvar
 
 	variable/g $destvar = bool2num(boolean)
 end
 
-function loadStr2String(str,deststring)
+function loadStr2string(str,deststring)
 	string str,deststring
 	
 	str = removeLiteralQuotes(str)
 	string/g $deststring = unescapeQuotes(str) 
 end
 
-function loadNum2Var(numasstr,destvar)
+function loadNum2var(numasstr,destvar)
 	string numasstr,destvar
 
 	variable/g $destvar = str2num(numasstr)
-end
-
-function/s num2Bool(val)
-	variable val
-	if(val==1)
-		return "true"
-	elseif(val==0)
-		return "false"
-	else
-		return ""
-	endif
 end
 
 function bool2Num(str)
@@ -497,6 +488,19 @@ function bool2Num(str)
 		return 0
 	else
 		return -1
+	endif
+end
+
+/// write ///
+
+function/s num2bool(val)
+	variable val
+	if(val==1)
+		return "true"
+	elseif(val==0)
+		return "false"
+	else
+		return ""
 	endif
 end
 
@@ -593,17 +597,40 @@ function/s textWave2StrArray(w)
 	return list
 end
 
+function/s addJSONkeyvalpair(JSONstr,key,value,[addquotes])
+	// returns a valid JSON string with a new key,value pair added.
+	// if JSONstr is empty, start a new JSON object
+	string JSONstr, key, value
+	variable addquotes
+
+	if(!paramisdefault(addquotes))
+		if(addquotes==1)
+			// escape quotes in value and wrap value in outer quotes
+			value = "\""+escapeQuotes(value)+"\""
+		endif
+	endif
+
+//	if(strlen(JSONstr)==0)
+//		JSONstr = "{"
+//	else
+//		JSONstr = readJSONobject(JSONstr)
+//		JSONstr = JSONstr[0,strlen(JSONstr)-2]+","
+//	endif
+
+	return JSONstr+"\""+key+"\":"+value+"}"
+end
+
 /////////////////////////////////
 /// text formatting utilities ///
 /////////////////////////////////
 
-Function IsWhiteSpace(char)
+Function isWhiteSpace(char)
     String char
 
     return GrepString(char, "\\s")
 End
 
-Function/S RemoveLeadingWhitespace(str)
+Function/S removeLeadingWhitespace(str)
     String str
 
     if (strlen(str) == 0)
@@ -622,7 +649,7 @@ Function/S RemoveLeadingWhitespace(str)
     return str
 End
 
-Function/S RemoveTrailingWhitespace(str)
+function/S removeTrailingWhitespace(str)
     String str
 
     if (strlen(str) == 0)
@@ -666,12 +693,27 @@ function countQuotes(str)
 	return quoteCount
 end
 
-function countSqBrackets(str)
+function countBrackets(str, btype)
 	// count how many brackets are in the string
+	// type is curly ( { ) or square ( [ )
 	// +1 for ]
 	// -1 for [
-	string str
+	string str, btype
+	string bopen, bclose
 	variable bracketCount = 0, i = 0, escaped = 0
+	
+	strswitch(btype)	// string switch
+	case "square":	// execute if case matches expression
+		bopen="["
+		bclose="]"
+		break
+	case "curly":	// execute if case matches expression
+		bopen="{"
+		bclose="}"
+		break
+	default:
+		abort "Specify bracket type in `countBrackets(...)`"
+	endswitch 
 	for(i=0; i<strlen(str); i+=1)
 	
 		// check if the current character is escaped
