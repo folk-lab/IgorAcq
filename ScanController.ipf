@@ -240,7 +240,7 @@ function InitScanController([configFile, srv_push])
 	newpath /C/O/Q config getExpPath("config", full=2) // create/overwrite config path
 	if(paramisdefault(configFile))
 		// look for newest config file
-		string filelist = greplist(indexedfile(config,-1,".config"),"sc")
+		string filelist = greplist(indexedfile(config,-1,".toml"),"sc")
 		if(itemsinlist(filelist)>0)
 			// read content into waves
 			filelist = SortList(filelist, ";", 1+16)
@@ -264,8 +264,14 @@ function InitScanController([configFile, srv_push])
 			// Print variables
 			variable/g sc_PrintRaw = 1,sc_PrintCalc = 1
 
-			// logging string
-			string /g sc_LogStr = "GetSRSStatus(srs1);"
+			// instrument wave
+			variable /g sc_instrLimit = 20 // change this if necessary, seeems fine
+			make /t/o/N=(sc_instrLimit,3) sc_Instr 
+			make /o/N=(sc_instrLimit,3) instrBoxAttr = 2
+
+			sc_Instr[0][0] = "openIPSconnection(\"ips1\", \"ASRL::1\", verbose=1)"
+			sc_Instr[0][1] = "initIPS120(ips1)"
+			sc_Instr[0][2] = "GetIPSStatus(ips1)"
 
 			nvar/z filenum
 			if(!nvar_exists(filenum))
@@ -292,7 +298,7 @@ function/s sc_createconfig()
 	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts
 	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
 	nvar sc_PrintRaw, sc_PrintCalc, filenum
-	svar sc_LogStr, sc_current_config
+	svar sc_current_config
 	string configfile
 	string configstr = "", tmpstr = ""
 
@@ -330,7 +336,7 @@ function/s sc_createconfig()
 	configstr = addTOMLkey("calc",textwavetostrarray(sc_CalcScripts),str=configstr)
 
 	// executable string to get logs
-	configstr = addTOMLkey("logstring",sc_LogStr,str=configstr,indent="\n", addQuotes=1)
+//	configstr = addTOMLkey("logstring",sc_LogStr,str=configstr,indent="\n", addQuotes=1)
 
 	//filenum
 	configstr = addTOMLkey("filenum",num2str(filenum),str=configstr,indent="\n")
@@ -343,7 +349,7 @@ function sc_loadConfig(configfile)
 	string configfile
 	string TOMLstr
 	nvar sc_PrintRaw, sc_PrintCalc
-	svar sc_LogStr, sc_current_config, sc_current_config
+	svar sc_current_config, sc_current_config
 
 	// load TOML string from config file
 	printf "Loading configuration from: %s\n", configfile
@@ -374,7 +380,7 @@ function sc_loadConfig(configfile)
 	LoadTextArrayToWave(getTOMLvalue(TOMLstr,"scripts:calc"),"sc_CalcScripts")
 
 	// executable string to get logs
-	LoadTextToString(getTOMLvalue(TOMLstr,"logstring"),"sc_Logstr")
+//	LoadTextToString(getTOMLvalue(TOMLstr,"logstring"),"sc_Logstr")
 
 	//filenum
 	LoadNumToVar(getTOMLvalue(TOMLstr,"filenum"),"sc_filenum")
@@ -452,7 +458,7 @@ Window ScanController() : Panel
 
 	PauseUpdate; Silent 1		// building window...
 	dowindow /K ScanController
-	NewPanel /W=(10,10,sc_InnerBoxW + 30,200+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing) ) /N=ScanController
+	NewPanel /W=(10,10,sc_InnerBoxW + 30,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+105) /N=ScanController
 	ModifyPanel frameStyle=2
 	ModifyPanel fixedSize=1
 	SetDrawLayer UserBack
@@ -514,24 +520,26 @@ Window ScanController() : Panel
 	button removerowcalc,pos={430,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_removerow,title="Remove Row"
 	checkbox sc_PrintCalcBox, pos={300,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)}, proc=sc_CheckBoxClicked, value=sc_PrintCalc,side=1,title="\Z14Print filenames"
 
-	// box for logging functions
-	variable sc_Loggable
+	// box for instrument configuration
 	SetDrawEnv fsize= 16,fstyle= 1
-	DrawText 13,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25,"Logging Functions (example: getSRSstatus(srs1); getIPSstatus();)"
-	DrawRect 9,120+5+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25,5+sc_InnerBoxW,120+5+sc_InnerBoxH+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25
-	cmd="SetVariable sc_LogStr pos={13, 127+5+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25}, size={sc_InnerBoxW-12, 0}, fsize=14, title=\" \", value=sc_LogStr"
-	execute(cmd)
+	DrawText 13,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+20,"Connect Instrument"
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 225,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+20,"Open GUI"
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 440,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+20,"Log Status"
+	ListBox sc_Instr,pos={9,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25},size={sc_InnerBoxW,(sc_InnerBoxH+sc_InnerBoxSpacing)*3},fsize=14,frame=2,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1, editStyle=1
 
-	// helpful text
-	DrawText 13,170+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing),"Press Update to save changes."
-	DrawText 13,190+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing),"Press ESC to abort the scan and save data, while this window is active"
+	// buttons
+	button connect, pos={10,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_connectInstr,title="Connect Instr"
+	button gui, pos={140,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_openGUIs,title="Open All GUI"
+	button killabout, pos={270,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={140,20},proc=sc_controlwindows,title="Kill Sweep Controls"
+	button killgraphs, pos={420,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_killgraphs,title="Close All Graphs"
+	button updatebutton, pos={550,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={110,20},proc=sc_updatewindow,title="Update"
 
-	// Close all open graphs
-	button killgraphs, pos={420,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={120,20},proc=sc_killgraphs,title="Close All Graphs"
-	button killabout, pos={220,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={190,20},proc=sc_controlwindows,title="Kill Sweep Control Windows"
+// helpful text
+	DrawText 13,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+70,"Press Update to save changes."
+	DrawText 13,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+90,"Press ESC to abort the scan and save data, while this window is active"
 
-	//Update button
-	button updatebutton, pos={550,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_updatewindow,title="Update"
 EndMacro
 
 function sc_killgraphs(action) : Buttoncontrol
@@ -1515,14 +1523,13 @@ end
 
 function /s getEquipLogs()
 	string buffer = ""
-	svar sc_LogStr
 
 	//// all log strings should be TOML blocks ////
-	if (strlen(sc_LogStr)>0)
-		string command, keylist = "", key = "", sval = ""
-		string /G sc_log_buffer=""
-		variable i = 0
-		for(i=0;i<ItemsInList(sc_logStr, ";");i+=1)
+//	if (strlen(sc_LogStr)>0)
+//		string command, keylist = "", key = "", sval = ""
+//		string /G sc_log_buffer=""
+//		variable i = 0
+//		for(i=0;i<ItemsInList(sc_logStr, ";");i+=1)
 //			command = StringFromList(i, sc_logStr, ";")
 //			Execute/Q/Z "sc_log_buffer="+command
 //			if(strlen(sc_log_buffer)!=0)
@@ -1533,9 +1540,9 @@ function /s getEquipLogs()
 //				buffer = addJSONkeyvalpair(buffer, key, sval)
 //			else
 //				print "[WARNING] command failed to log anything: "+command+"\r"
-//			endif
-		endfor
-	endif
+////			endif
+//		endfor
+//	endif
 
 	return buffer
 end
@@ -1625,7 +1632,7 @@ function SaveWaves([msg, save_experiment])
 	string msg
 	variable save_experiment
 	nvar sc_is2d, sc_PrintRaw, sc_PrintCalc, sc_scanstarttime, sc_srv_push
-	svar sc_x_label, sc_y_label, sc_LogStr
+	svar sc_x_label, sc_y_label
 	string filename, wn, logs=""
 	nvar filenum
 	string filenumstr = ""
@@ -1645,10 +1652,6 @@ function SaveWaves([msg, save_experiment])
 
 	variable /g sc_save_exp = save_experiment
 	nvar sc_save_time
-
-	if (strlen(sc_LogStr)!=0)
-		logs = sc_LogStr
-	endif
 
 	KillDataFolder /Z root:async // clean this up for next time
 
@@ -2000,7 +2003,7 @@ function sc_findNewFiles(datnum)
 	if(V_flag==0 && V_isFolder==1)
 		string configpath = getExpPath("config", full=1)
 		string configlist=""
-		configlist = greplist(indexedfile(config,-1,".config"),"sc")
+		configlist = greplist(indexedfile(config,-1,".toml"),"sc")
 	endif
 
 	if(itemsinlist(configlist)>0)
