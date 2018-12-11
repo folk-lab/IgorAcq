@@ -821,48 +821,6 @@ function/s removeLiteralQuotes(str)
 	return str[0,j-1]
 end
 
-function/s removeBrackets(str, btype)
-	// removes outermost brackets and whitespace from a string
-	// btype is curly or square
-	string str, btype
-	string bopen, bclose
-	
-	strswitch(btype)	// string switch
-		case "square":	// execute if case matches expression
-			bopen="["
-			bclose="]"
-			break
-		case "curly":	// execute if case matches expression
-			bopen="{"
-			bclose="}"
-			break
-		default:
-			abort "Specify bracket type in `countBrackets(...)`"
-	endswitch
-	
-	variable i=0
-	for(i=0;i<strlen(str);i+=1)
-		if(CmpStr(str[i],bopen)==0)
-			break
-		endif
-	endfor
-	
-	if(i==strlen(str)-1)
-		print "[ERROR] String not surrounded by brackets. str: "+str
-		return ""
-	endif
-	
-	str = str[i+1,inf]
-	variable j
-	for(j=strlen(str); j>0; j-=1)
-		if(CmpStr(str[j],bclose)==0)
-			break
-		endif
-	endfor
-
-	return str[0,j-1]
-end
-
 function/t removeStringListDuplicates(theListStr)
 	// credit: http://www.igorexchange.com/node/1071
 	String theListStr
