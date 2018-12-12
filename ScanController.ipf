@@ -360,18 +360,18 @@ end
 
 function sc_loadConfig(configfile)
 	string configfile
-	string TOMLstr
+	string jstr
 	nvar sc_PrintRaw, sc_PrintCalc
 	svar sc_current_config, sc_current_config
 
-	// load TOML string from config file
+	// load JSON string from config file
 	printf "Loading configuration from: %s\n", configfile
 	sc_current_config = configfile
-//	TOMLstr = readtxtfile(configfile,"config")
+	jstr = readtxtfile(configfile,"config")
 
 	// waves
-//	LoadStrArrayToWave(getTOMLvalue(TOMLstr,"waves:raw"),"sc_RawWaveNames")
-//	LoadStrArrayToWave(getTOMLvalue(TOMLstr,"waves:calc"),"sc_CalcWaveNames")
+	loadStrArray2textWave(getJSONvalue(jstr,"waves:raw"),"sc_RawWaveNames")
+	loadStrArray2textWave(getJSONvalue(jstr,"waves:calc"),"sc_CalcWaveNames")
 
 	// record checkboxes
 //	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.record:raw"),"sc_RawRecord")
@@ -1548,7 +1548,7 @@ function /s getSweepLogs([msg])
 	// all log strings should be valid JSON objects
 	wave /t sc_Instr
 	variable i=0, j=0, addQuotes=0
-	string command=""
+	string command="", val=""
 	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
 		string /G sc_log_buffer=""
 		command = TrimString(sc_Instr[i][2])
@@ -1559,13 +1559,10 @@ function /s getSweepLogs([msg])
 		if(strlen(sc_log_buffer)!=0)
 			// need to get first key and value from sc_log_buffer
 			JSONSimple sc_log_buffer
-
 			wave/t t_tokentext
 			wave w_tokentype, w_tokensize, w_tokenparent
 	
 			for(i=1;i<numpnts(t_tokentext)-1;i+=1)
-		
-				// print only at single indent level
 				if ( w_tokentype[i]==3 && w_tokensize[i]>0 )
 					if( w_tokenparent[i]==0 )
 						if( w_tokentype[i+1]==3 )
@@ -1573,12 +1570,9 @@ function /s getSweepLogs([msg])
 						else
 							val = t_tokentext[i+1]
 						endif
-						key = "\"" + t_tokentext[i] + "\""
-						output+=(getIndent(indent)+key+": "+val+",\n")
-						jstr = addJSONkeyval(jstr, t_tokentext[i], num2str(sweep_t_elapsed))
+						jstr = addJSONkeyval(jstr, t_tokentext[i], val)
 					endif
 				endif
-				
 			endfor
 
 		else
