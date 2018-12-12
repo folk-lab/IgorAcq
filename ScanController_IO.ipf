@@ -667,21 +667,25 @@ function /s prettyJSONfmt(jstr)
 	variable i=0, indent=1
 	
 	output+="{\n"
-	for(i=1;i<numpnts(t_tokentext);i+=1)
+	for(i=1;i<numpnts(t_tokentext)-1;i+=1)
 
 		// print only at single indent level
 		if ( w_tokentype[i]==3 && w_tokensize[i]>0 )
 			if( w_tokenparent[i]==0 )
 				indent = 1
-				t_tokentext[i]
-				output+=(getIndent(indent)+t_tokentext[i]+": "+t_tokentext[i+1]+",\n")
+				if( w_tokentype[i+1]==3 )
+					val = "\"" + t_tokentext[i+1] + "\""
+				else
+					val = t_tokentext[i+1]
+				endif
+				key = "\"" + t_tokentext[i] + "\""
+				output+=(getIndent(indent)+key+": "+val+",\n")
 			endif
 		endif
 		
 	endfor
-	output+="}\n\n"
 	
-	return output
+	return output[0,strlen(output)-3]+"\n}\n"
 end
 
 /////////////////////////////////

@@ -297,13 +297,22 @@ function/s sc_createconfig()
 	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts, sc_Instr
 	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
 	nvar sc_PrintRaw, sc_PrintCalc, filenum
-	svar sc_current_config
+	svar sc_current_config, sc_hostname
 	variable refnum
 	string configfile
 	string configstr = "", tmpstr = ""
 	
 	configfile = "sc" + num2istr(unixtime()) + ".json"
-	print configfile
+	
+	// information about the measurement computer
+	tmpstr = addJSONkeyval(tmpstr, "hostname", sc_hostname, addQuotes = 1)
+	string sysinfo = igorinfo(3)
+	tmpstr = addJSONkeyval(tmpstr, "OS", StringByKey("OS", sysinfo), addQuotes = 1)
+	tmpstr = addJSONkeyval(tmpstr, "IGOR_VERSION", StringByKey("IGORFILEVERSION", sysinfo), addQuotes = 1)
+	configstr = addJSONkeyval(configstr, "system_info", tmpstr)
+
+	// log instrument info
+	configstr = addJSONkeyval(configstr, "instruments", textWave2StrArray(sc_Instr))
 
 	// wave names
 	tmpstr = addJSONkeyval(tmpstr, "raw", textWave2StrArray(sc_RawWaveNames))
@@ -335,9 +344,6 @@ function/s sc_createconfig()
 	tmpstr = addJSONkeyval(tmpstr, "raw", textWave2StrArray(sc_RawScripts))
 	tmpstr = addJSONkeyval(tmpstr, "calc", textWave2StrArray(sc_CalcScripts))
 	configstr = addJSONkeyval(configstr, "scripts", tmpstr)
-
-	// log instrument info
-	configstr = addJSONkeyval(configstr, "instruments", textWave2StrArray(sc_Instr))
 
 	// print_to_history
 	tmpstr = ""
@@ -1175,11 +1181,6 @@ end
 function sc_checksweepstate()
 	nvar /Z sc_abortsweep, sc_pause, sc_abortnosave
 
-	if (GetKeyState(0) & 32)
-		// If the ESC button is pressed during the scan, save existing data and stop the scan.
-		abort "Measurement aborted by user. Data not saved automatically. Run \"SaveWaves()\" if needed"
-	endif
-
 	if(NVAR_Exists(sc_abortsweep) && sc_abortsweep==1)
 		// If the Abort button is pressed during the scan, save existing data and stop the scan.
 		SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0)
@@ -1528,68 +1529,64 @@ end
 ////  save all data ////
 ////////////////////////
 
-function /s getEquipLogs()
-	string buffer = ""
-
-	//// all log strings should be TOML blocks ////
-//	if (strlen(sc_LogStr)>0)
-//		string command, keylist = "", key = "", sval = ""
-//		string /G sc_log_buffer=""
-//		variable i = 0
-//		for(i=0;i<ItemsInList(sc_logStr, ";");i+=1)
-//			command = StringFromList(i, sc_logStr, ";")
-//			Execute/Q/Z "sc_log_buffer="+command
-//			if(strlen(sc_log_buffer)!=0)
-//				// need to get first key and value from sc_log_buffer
-//				keylist = getJSONkeys(sc_log_buffer)
-//				key = StringFromList(0,keylist, ",")
-//				sval = getJSONvalue(sc_log_buffer, key)
-//				buffer = addJSONkeyvalpair(buffer, key, sval)
-//			else
-//				print "[WARNING] command failed to log anything: "+command+"\r"
-////			endif
-//		endfor
-//	endif
-
-	return buffer
-end
-
-function /s getExpStatus([msg])
-	// returns TOML string full of details about the system and this run
+function /s getSweepLogs([msg])
 	string msg
+	string jstr = ""
 	nvar filenum, sweep_t_elapsed
 	svar sc_current_config, sc_hostname
-
-	if(paramisdefault(msg))
-		msg=""
+	
+	// information about this specific sweep
+	if(!paramisdefault(msg))
+		jstr = addJSONkeyval(jstr, "comment", msg, addQuotes=1)
 	endif
+	jstr = addJSONkeyval(jstr, "filenum", num2istr(filenum))
+	jstr = addJSONkeyval(jstr, "current_config", sc_current_config, addQuotes = 1)
+	jstr = addJSONkeyval(jstr, "time_completed", Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
+	jstr = addJSONkeyval(jstr, "time_elapsed", num2str(sweep_t_elapsed))
+	
+	// instrument logs
+	// all log strings should be valid JSON objects
+	wave /t sc_Instr
+	variable i=0, j=0, addQuotes=0
+	string command=""
+	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
+		string /G sc_log_buffer=""
+		command = TrimString(sc_Instr[i][2])
+		if(strlen(command)>0)
+			print command
+		endif
+		Execute/Q/Z "sc_log_buffer="+command
+		if(strlen(sc_log_buffer)!=0)
+			// need to get first key and value from sc_log_buffer
+			JSONSimple sc_log_buffer
 
-	// create header with corresponding wave name and date
-//	string jstr = "", buffer = ""
+			wave/t t_tokentext
+			wave w_tokentype, w_tokensize, w_tokenparent
+	
+			for(i=1;i<numpnts(t_tokentext)-1;i+=1)
+		
+				// print only at single indent level
+				if ( w_tokentype[i]==3 && w_tokensize[i]>0 )
+					if( w_tokenparent[i]==0 )
+						if( w_tokentype[i+1]==3 )
+							val = "\"" + t_tokentext[i+1] + "\""
+						else
+							val = t_tokentext[i+1]
+						endif
+						key = "\"" + t_tokentext[i] + "\""
+						output+=(getIndent(indent)+key+": "+val+",\n")
+						jstr = addJSONkeyval(jstr, t_tokentext[i], num2str(sweep_t_elapsed))
+					endif
+				endif
+				
+			endfor
 
-//	// information about the machine your working on
-//	buffer = ""
-//	buffer = addJSONkeyvalpair(buffer, "hostname", sc_hostname, addQuotes = 1)
-//	string sysinfo = igorinfo(3)
-//	buffer = addJSONkeyvalpair(buffer, "OS", StringByKey("OS", sysinfo), addQuotes = 1)
-//	buffer = addJSONkeyvalpair(buffer, "IGOR_VERSION", StringByKey("IGORFILEVERSION", sysinfo), addQuotes = 1)
-//	jstr = addJSONkeyvalpair(jstr, "system_info", buffer)
+		else
+			print "[WARNING] command failed to log anything: "+command+"\r"
+		endif
+	endfor
 
-//	// information about the current experiment
-//	jstr = addJSONkeyvalpair(jstr, "experiment", getExpPath("data")+igorinfo(1)+".pxp", addQuotes = 1)
-//	jstr = addJSONkeyvalpair(jstr, "current_config", sc_current_config, addQuotes = 1)
-//	buffer = ""
-//	buffer = addJSONkeyvalpair(buffer, "data", getExpPath("data"), addQuotes = 1)
-//	buffer = addJSONkeyvalpair(buffer, "config", getExpPath("config"), addQuotes = 1)
-//	jstr = addJSONkeyvalpair(jstr, "paths", buffer)
-//
-//	// information about this specific run
-//	jstr = addJSONkeyvalpair(jstr, "filenum", num2istr(filenum))
-//	jstr = addJSONkeyvalpair(jstr, "time_completed", Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
-//	jstr = addJSONkeyvalpair(jstr, "time_elapsed", num2str(sweep_t_elapsed))
-//	jstr = addJSONkeyvalpair(jstr, "saved_waves", recordedWaveArray())
-//	jstr = addJSONkeyvalpair(jstr, "comment", msg, addQuotes = 1)
-//
+	return jstr
 end
 
 function saveExp()
@@ -1910,30 +1907,30 @@ function sc_write2batch(fileref, searchStr, localFull)
 
 	variable fileref
 	string searchStr, localFull
-//	localFull = TrimString(localFull)
-//
-//	string lmdpath = getExpPath("lmd", full=1)
-//	variable idx = strlen(lmdpath)+1, result=0
-//	string srvFull = ""
-//
-//	string platform = igorinfo(2), localPart = localFull[idx,inf]
-//	if(cmpstr(platform,"Windows")==0)
-//		localPart = replaceString("\\", LocalPart, "/")
-//	endif
-//
-//	svar sc_hostname, sc_srv_dir
-//	sprintf srvFull, "%s/%s/%s" sc_srv_dir, sc_hostname, localPart
-//
-//	if(strlen(searchStr)==0)
-//		// there is no notification file, add this immediately
-//		fprintf fileref, "%s,%s\n", localFull, srvFull
-//	else
-//		// search for localFull in searchStr
-//		result = strsearch(searchStr, localFull, 0)
-//		if(result==-1)
-//			fprintf fileref, "%s,%s\n", localFull, srvFull
-//		endif
-//	endif
+	localFull = TrimString(localFull)
+
+	string lmdpath = getExpPath("lmd", full=1)
+	variable idx = strlen(lmdpath)+1, result=0
+	string srvFull = ""
+
+	string platform = igorinfo(2), localPart = localFull[idx,inf]
+	if(cmpstr(platform,"Windows")==0)
+		localPart = replaceString("\\", LocalPart, "/")
+	endif
+
+	svar sc_hostname, sc_srv_dir
+	sprintf srvFull, "%s/%s/%s" sc_srv_dir, sc_hostname, localPart
+
+	if(strlen(searchStr)==0)
+		// there is no notification file, add this immediately
+		fprintf fileref, "%s,%s\n", localFull, srvFull
+	else
+		// search for localFull in searchStr
+		result = strsearch(searchStr, localFull, 0)
+		if(result==-1)
+			fprintf fileref, "%s,%s\n", localFull, srvFull
+		endif
+	endif
 
 end
 
@@ -1948,14 +1945,12 @@ function sc_findNewFiles(datnum)
 	//// create/open batch file ////
 	variable refnum
 	string notifyText = "", buffer
-	getfilefolderinfo /Q/Z/P=data "pending_transfer.lst"
+	getfilefolderinfo /Q/Z/P=data "file_transfer.lst"
 	if(V_isFile==0) // if the file does not exist, create it with header
-		open /A/P=data refNum as "pending_transfer.lst"
-
-		// create/write header, if needed
+		open /A/P=data refNum as "file_transfer.lst"
 
 	else // if the file does exist, open it for appending
-		open /A/P=data refNum as "pending_transfer.lst"
+		open /A/P=data refNum as "file_transfer.lst"
 		FSetPos refNum, 0
 		variable lines = 0
 		do
@@ -1985,7 +1980,7 @@ function sc_findNewFiles(datnum)
 	endif
 
 	// find new data files
-	string extensions = ".h5;.txt;.itx"
+	string extensions = ".h5;"
 	string datstr = "", idxList, matchList
 	variable i, j
 	for(i=0;i<ItemsInList(extensions, ";");i+=1)
@@ -2016,16 +2011,16 @@ function sc_findNewFiles(datnum)
 	if(itemsinlist(configlist)>0)
 		configlist = SortList(configlist, ";", 1+16)
 		tmpname = configpath+StringFromList(0,configlist, ";")
-		sc_write2batch(refnum, notifyText, tmpname)
+//		sc_write2batch(refnum, notifyText, tmpname)
 	endif
 
-	close refnum // close pending_transfer.lst
+	close refnum // close file_transfer.lst
 
 end
 
 function sc_FileTransfer()
 
-	string batchFile = "pending_transfer.lst"
+	string batchFile = "file_transfer.lst"
 	GetFileFolderInfo /Q/Z/P=data batchFile
 	if( V_Flag == 0 && V_isFile ) // file exists
 		string batchFull = "", cmd = "", upload_script
@@ -2052,10 +2047,10 @@ end
 function sc_DeleteBatchFile()
 
 	// delete server.notify
-	deletefile /Z=1 /P=data "pending_transfer.lst"
+	deletefile /Z=1 /P=data "file_transfer.lst"
 
 	if(V_flag!=0)
-		print "Failed to delete 'pending_transfer.lst'"
+		print "Failed to delete 'file_transfer.lst'"
 	endif
 end
 
