@@ -160,6 +160,7 @@ function/s getJSONvalue(jstr, key)
 		// find the indices of the keys parsed
 		indices = getJSONindices(key)
 		if(itemsinlist(indices,",")<key_length)
+			print "[ERROR] Value of JSON key is ambiguous: "+key
 			return ""
 		else
 			return getJSONkeyoffset(stringfromlist(key_length-1,key,":"),str2num(stringfromlist(key_length-1,indices,","))-1)
@@ -214,6 +215,7 @@ function/s getJSONkeyoffset(key,offset)
 		endif
 	endfor
 	// if key is not found, return an empty string
+	print "[ERROR] JSON key not found: "+key
 	return ""
 end
 
