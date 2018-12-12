@@ -1659,12 +1659,10 @@ function SaveWaves([msg, save_experiment])
 		msg=""
 	endif
 
+	nvar sc_save_time
 	if (paramisdefault(save_experiment))
 		save_experiment = 1 // save the experiment by default
 	endif
-
-	variable /g sc_save_exp = save_experiment
-	nvar sc_save_time
 
 	KillDataFolder /Z root:async // clean this up for next time
 
@@ -1730,7 +1728,7 @@ function SaveWaves([msg, save_experiment])
 		while (ii < numpnts(sc_CalcWaveNames))
 	endif
 
-	if(sc_save_exp==1 & (datetime-sc_save_time)>180.0)
+	if(save_experiment==1 & (datetime-sc_save_time)>180.0)
 		// save if sc_save_exp=1
 		// and if more than 3 minutes has elapsed since previous saveExp
 		// if the sweep was aborted sc_save_exp=0 before you get here
@@ -1738,18 +1736,13 @@ function SaveWaves([msg, save_experiment])
 		sc_save_time = datetime
 	endif
 
-	if(sc_srv_push==1)
-		svar sc_srv_url, sc_hostname
-		sc_findNewFiles(filenum)
-		sc_FileTransfer() // this may leave the experiment file open for some time
-						   // make sure to run saveExp before this
-
-	else
-		sc_findNewFiles(filenum)    // get list of new files
-		                            // keeps appending files until
-		                            // server.notify is deleted
-		                            // or srv_push is turned on
-	endif
+	// if server path is defined:
+	//     write a test file
+	//     if it succeeds, 
+	//         sc_copyNewFiles(filenum, save_experiment=save_experiment)
+	//         delete test file
+	//     else 
+					print "[WARNING] Data only saved locally."
 
 	// close HDF5 files and increment filenum
 	if(Rawadd+Calcadd > 0)
@@ -1907,73 +1900,18 @@ function SaveFromPXP([history, procedure])
 	close expRef
 end
 
-
-////////////////////
-////  move data ////
-////////////////////
-
-function sc_write2batch(fileref, searchStr, localFull)
-
-	variable fileref
-	string searchStr, localFull
-	localFull = TrimString(localFull)
-
-	string lmdpath = getExpPath("lmd", full=1)
-	variable idx = strlen(lmdpath)+1, result=0
-	string srvFull = ""
-
-	string platform = igorinfo(2), localPart = localFull[idx,inf]
-	if(cmpstr(platform,"Windows")==0)
-		localPart = replaceString("\\", LocalPart, "/")
-	endif
-
-	svar sc_hostname, sc_srv_dir
-	sprintf srvFull, "%s/%s/%s" sc_srv_dir, sc_hostname, localPart
-
-	if(strlen(searchStr)==0)
-		// there is no notification file, add this immediately
-		fprintf fileref, "%s,%s\n", localFull, srvFull
-	else
-		// search for localFull in searchStr
-		result = strsearch(searchStr, localFull, 0)
-		if(result==-1)
-			fprintf fileref, "%s,%s\n", localFull, srvFull
-		endif
-	endif
-
-end
-
-function sc_findNewFiles(datnum)
+function sc_copyNewFiles(datnum, [save_experiment] )
 	// locate newly created/appended files
-	// add to pending_transfer file
+	// move to server path
 
-	variable datnum // data set to look for
+	variable datnum, save_experiment  // save_experiment=1 to save pxp, history, and procedure
 	variable result = 0
 	string tmpname = ""
-
-	//// create/open batch file ////
-	variable refnum
-	string notifyText = "", buffer
-	getfilefolderinfo /Q/Z/P=data "file_transfer.lst"
-	if(V_isFile==0) // if the file does not exist, create it with header
-		open /A/P=data refNum as "file_transfer.lst"
-
-	else // if the file does exist, open it for appending
-		open /A/P=data refNum as "file_transfer.lst"
-		FSetPos refNum, 0
-		variable lines = 0
-		do
-			FReadLine refNum, buffer
-			notifyText+=buffer
-			lines +=1
-		while(strlen(buffer)>0)
-	endif
 
 	// add experiment/history/procedure files
 	// only if I saved the experiment this run
 	string datapath = getExpPath("data", full=1)
-	nvar sc_save_exp
-	if(sc_save_exp == 1)
+	if(!paramisdefault(save_experiment) && save_experiment == 1)
 		// add experiment file
 		tmpname = datapath+igorinfo(1)+".pxp"
 //		sc_write2batch(refnum, notifyText, tmpname)
@@ -2023,45 +1961,12 @@ function sc_findNewFiles(datnum)
 //		sc_write2batch(refnum, notifyText, tmpname)
 	endif
 
-	close refnum // close file_transfer.lst
-
 end
 
-function sc_FileTransfer()
 
-	string batchFile = "file_transfer.lst"
-	GetFileFolderInfo /Q/Z/P=data batchFile
-	if( V_Flag == 0 && V_isFile ) // file exists
-		string batchFull = "", cmd = "", upload_script
-
-		batchFull = getExpPath("data", full=1) + batchFile
-
-		/// send data here ///
-		print "[WARNING] pushing data to the server is temporarily disabled"
-
-		sc_DeleteBatchFile() // Sent everything possible
-								   // assume users will fix errors manually
-		return 1
-
-	else
-		// if there is not pending_transfer file
-		// don't do anything
-		print "No new files available."
-		return 0
-
-	endif
-
-end
-
-function sc_DeleteBatchFile()
-
-	// delete server.notify
-	deletefile /Z=1 /P=data "file_transfer.lst"
-
-	if(V_flag!=0)
-		print "Failed to delete 'file_transfer.lst'"
-	endif
-end
+//////////////////////////
+/// sweep notification ///
+//////////////////////////
 
 function /S getSlackNotice(username, [message, min_time]) //FIX!
 	// this function will send a notification to Slack -- run it as if it were a getInstrStatus function
