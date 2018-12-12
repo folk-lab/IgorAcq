@@ -31,21 +31,25 @@ function initSaveFiles([msg])
 		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_ydata" , hdf5_id, "y_array"
 	endif
 
-	// Create config group
-	svar sc_current_config
-	variable /G config_group_ID
-	HDF5CreateGroup hdf5_id, "config", config_group_ID
-//	json2hdf5attributes(JSONfromFile("config", sc_current_config), "config", hdf5_id) // add current scancontroller config
-
-	// Create logs group
-	variable /G logs_group_ID
-	HDF5CreateGroup hdf5_id, "logs", logs_group_ID
-//	json2hdf5attributes(getEquipLogs(), "logs", hdf5_id) // add current scancontroller config
+	// Create metadata
+	// save json strings as datasets into that group
+	variable /G meta_group_ID
+	HDF5CreateGroup hdf5_id, "metadata", meta_group_ID
+	
+	killdatafolder /z root:meta // kill it if it exists
+	newdatafolder root:meta     // create an empty version
+	string /g root:meta:sweep_logs = sc_createSweepLogs(msg=msg) // sweep logs string into datafolder
+	string /g root:meta:config = sc_createconfig()               // put confing string into datafolder
+	HDF5SaveGroup /L=4 $("root:meta"), hdf5_id, "metadata"
+	
+	// save config file
+	svar cconfig = root:config:config
+	sc_saveConfig(cconfig) 
 
 end
 
 function saveSingleWave(wn)
-	// wave with name 'filename' as filename.ibw
+	// wave with name 'g1x' as dataset named 'g1x' in hdf5
 	string wn
 	nvar hdf5_id
 
@@ -58,7 +62,7 @@ function saveSingleWave(wn)
 end
 
 function closeSaveFiles()
-	//// close any files that were created for this dataset
+	// close any files that were created for this dataset
 
 	nvar filenum
 	string filenumstr = ""
@@ -66,10 +70,10 @@ function closeSaveFiles()
 	string /g h5name = "dat"+filenumstr+".h5"
 
 	// close config group
-	nvar config_group_id
-	HDF5CloseGroup /Z config_group_id
+	nvar meta_group_id
+	HDF5CloseGroup /Z meta_group_id
 	if (V_flag != 0)
-		Print "HDF5CloseGroup Failed: ", "config"
+		Print "HDF5CloseGroup Failed: ", "metadata"
 	endif
 
 	// close HDF5 file

@@ -329,7 +329,7 @@ end
 //// configuration files ////
 /////////////////////////////
 
-function/s sc_createconfig()
+function/s sc_createConfig()
 	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts, sc_Instr
 	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
 	nvar sc_PrintRaw, sc_PrintCalc, filenum
@@ -337,9 +337,7 @@ function/s sc_createconfig()
 	variable refnum
 	string configfile
 	string configstr = "", tmpstr = ""
-	
-	configfile = "sc" + num2istr(unixtime()) + ".json"
-	
+
 	// information about the measurement computer
 	tmpstr = addJSONkeyval(tmpstr, "hostname", sc_hostname, addQuotes = 1)
 	string sysinfo = igorinfo(3)
@@ -385,9 +383,17 @@ function/s sc_createconfig()
 
 	configstr = addJSONkeyval(configstr, "filenum", num2istr(filenum))
 
-	sc_current_config = configfile
-	writetofile(prettyJSONfmt(configstr), configfile, "config")
+	return configstr
 
+end
+
+function sc_saveConfig(configstr)
+	string configstr
+	svar sc_current_config
+	
+	string filename = "sc" + num2istr(unixtime()) + ".json"
+	writetofile(prettyJSONfmt(configstr), filename, "config")
+	sc_current_config = filename
 end
 
 function sc_loadConfig(configfile)
@@ -603,7 +609,8 @@ end
 function sc_updatewindow(action) : ButtonControl
 	string action
 
-	sc_createconfig()     // write (or overwrite) a config file
+	sc_saveConfig(sc_createconfig())   // write a new config file
+	
 end
 
 function sc_addrow(action) : ButtonControl
@@ -808,6 +815,9 @@ function sc_findAsyncMeasurements()
 						string /g root:async:$(threadFolder):queryFunc = queryFunc // creates string variable queryFunc in root:async:thread
 																                             // that has a value queryFunc="readInstr"
 						sc_asyncFolders += threadFolder + ";"
+	
+	
+	
 					endif
 
 					// fill wave reference(s)
@@ -1534,7 +1544,7 @@ end
 ////  save all data ////
 ////////////////////////
 
-function /s getSweepLogs([msg])
+function /s sc_createSweepLogs([msg])
 	string msg
 	string jstr = ""
 	nvar filenum, sweep_t_elapsed
@@ -1979,7 +1989,7 @@ function sc_findNewFiles(datnum)
 	endif
 
 	// find new data files
-	string extensions = ".h5;"
+	string extensions = ".h5;.hdf5"
 	string datstr = "", idxList, matchList
 	variable i, j
 	for(i=0;i<ItemsInList(extensions, ";");i+=1)
