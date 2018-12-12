@@ -214,7 +214,7 @@ function sc_openInstrConnections()
 	// this is a simple as running through the list defined
 	//     in the scancontroller window
 	wave /T sc_Instr
-	
+
 	variable i=0
 	string command = ""
 	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
@@ -232,7 +232,7 @@ function sc_openInstrGUIs()
 	// this is a simple as running through the list defined
 	//     in the scancontroller window
 	wave /T sc_Instr
-	
+
 	variable i=0
 	string command = ""
 	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
@@ -245,23 +245,19 @@ function sc_openInstrGUIs()
 	endfor
 end
 
-function InitScanController([configFile, srv_push])
+function InitScanController([configFile])
 
 	string configFile // use this to point to a specific old config
-	variable srv_push // send data to qdot-server automatically (0=no, 1=yes)
 
 	GetFileFolderInfo/Z/Q/P=data  // Check if data path is definded
 	if(v_flag != 0 || v_isfolder != 1)
 		abort "Data path not defined!\n"
 	endif
 
-	// srv_push == 1 to send new data to server
-	variable /g sc_srv_push
-	if(paramisdefault(srv_push) || srv_push==1)
-		sc_srv_push = 1
+	GetFileFolderInfo/Z/Q/P=server  // Check if data path is definded
+	if(v_flag != 0 || v_isfolder != 1)
 		print "[WARNING] pushing data to server is temporarily disabled"
 	else
-		sc_srv_push = 0
 		print "[WARNING] Only saving local copies of data."
 	endif
 
@@ -302,7 +298,7 @@ function InitScanController([configFile, srv_push])
 
 			// instrument wave
 			variable /g sc_instrLimit = 20 // change this if necessary, seeems fine
-			make /t/o/N=(sc_instrLimit,3) sc_Instr 
+			make /t/o/N=(sc_instrLimit,3) sc_Instr
 			make /o/N=(sc_instrLimit,3) instrBoxAttr = 2
 
 			sc_Instr[0][0] = "openIPSconnection(\"ips1\", \"ASRL::1\", verbose=1)"
@@ -390,7 +386,7 @@ end
 function sc_saveConfig(configstr)
 	string configstr
 	svar sc_current_config
-	
+
 	string filename = "sc" + num2istr(unixtime()) + ".json"
 	writetofile(prettyJSONfmt(configstr), filename, "config")
 	sc_current_config = filename
@@ -409,7 +405,7 @@ function sc_loadConfig(configfile)
 
 	// instruments
 	loadStrArray2textWave(getJSONvalue(jstr, "instruments"), "sc_Instr")
-	
+
 	// waves
 	loadStrArray2textWave(getJSONvalue(jstr,"wave_names:raw"),"sc_RawWaveNames")
 	loadStrArray2textWave(getJSONvalue(jstr,"wave_names:calc"),"sc_CalcWaveNames")
@@ -610,7 +606,7 @@ function sc_updatewindow(action) : ButtonControl
 	string action
 
 	sc_saveConfig(sc_createconfig())   // write a new config file
-	
+
 end
 
 function sc_addrow(action) : ButtonControl
@@ -815,9 +811,9 @@ function sc_findAsyncMeasurements()
 						string /g root:async:$(threadFolder):queryFunc = queryFunc // creates string variable queryFunc in root:async:thread
 																                             // that has a value queryFunc="readInstr"
 						sc_asyncFolders += threadFolder + ";"
-	
-	
-	
+
+
+
 					endif
 
 					// fill wave reference(s)
@@ -1549,7 +1545,7 @@ function /s sc_createSweepLogs([msg])
 	string jstr = ""
 	nvar filenum, sweep_t_elapsed
 	svar sc_current_config, sc_hostname
-	
+
 	// information about this specific sweep
 	if(!paramisdefault(msg))
 		jstr = addJSONkeyval(jstr, "comment", msg, addQuotes=1)
@@ -1558,7 +1554,7 @@ function /s sc_createSweepLogs([msg])
 	jstr = addJSONkeyval(jstr, "current_config", sc_current_config, addQuotes = 1)
 	jstr = addJSONkeyval(jstr, "time_completed", Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
 	jstr = addJSONkeyval(jstr, "time_elapsed", num2str(sweep_t_elapsed))
-	
+
 	// instrument logs
 	// all log strings should be valid JSON objects
 	wave /t sc_Instr
@@ -1576,7 +1572,7 @@ function /s sc_createSweepLogs([msg])
 			JSONSimple sc_log_buffer
 			wave/t t_tokentext
 			wave w_tokentype, w_tokensize, w_tokenparent
-	
+
 			for(i=1;i<numpnts(t_tokentext)-1;i+=1)
 				if ( w_tokentype[i]==3 && w_tokensize[i]>0 )
 					if( w_tokenparent[i]==0 )
@@ -1641,10 +1637,9 @@ end
 function SaveWaves([msg, save_experiment])
 	// the message will be printed in the history, and will be saved in the HDF file corresponding to this scan
 	// save_experiment=1 to save the experiment file
-	// srv_push=1 to alert qdot-server of new data
 	string msg
 	variable save_experiment
-	nvar sc_is2d, sc_PrintRaw, sc_PrintCalc, sc_scanstarttime, sc_srv_push
+	nvar sc_is2d, sc_PrintRaw, sc_PrintCalc, sc_scanstarttime
 	svar sc_x_label, sc_y_label
 	string filename, wn, logs=""
 	nvar filenum
@@ -1738,10 +1733,10 @@ function SaveWaves([msg, save_experiment])
 
 	// if server path is defined:
 	//     write a test file
-	//     if it succeeds, 
+	//     if it succeeds,
 	//         sc_copyNewFiles(filenum, save_experiment=save_experiment)
 	//         delete test file
-	//     else 
+	//     else
 					print "[WARNING] Data only saved locally."
 
 	// close HDF5 files and increment filenum
