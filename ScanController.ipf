@@ -220,12 +220,14 @@ function sc_openInstrConnections()
 	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
 		command = TrimString(sc_Instr[i][0])
 		if(strlen(command)>0)
-			execute(command)
+			print "execute: "+command
+			execute/Q/Z command
+			print "[ERROR] "+GetErrMessage(V_Flag,2)
 		endif
 	endfor
 end
 
-function sc_openInstrGUI()
+function sc_openInstrGUIs()
 	// open GUIs for instruments
 	// this is a simple as running through the list defined
 	//     in the scancontroller window
@@ -236,7 +238,9 @@ function sc_openInstrGUI()
 	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
 		command = TrimString(sc_Instr[i][1])
 		if(strlen(command)>0)
-			execute(command)
+			print "execute: "+command
+			execute/Q/Z command
+			print "[ERROR] "+GetErrMessage(V_Flag,2)
 		endif
 	endfor
 end
@@ -571,8 +575,8 @@ Window ScanController() : Panel
 	ListBox sc_Instr,pos={9,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25},size={sc_InnerBoxW,(sc_InnerBoxH+sc_InnerBoxSpacing)*3},fsize=14,frame=2,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1, editStyle=1
 
 	// buttons
-	button connect, pos={10,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=OpenAllInstrConnections,title="Connect Instr"
-	button gui, pos={140,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=OpenAllInstrGUI,title="Open All GUI"
+	button connect, pos={10,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_openInstrConnections,title="Connect Instr"
+	button gui, pos={140,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_openInstrGUIs,title="Open All GUI"
 	button killabout, pos={270,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={140,20},proc=sc_controlwindows,title="Kill Sweep Controls"
 	button killgraphs, pos={420,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_killgraphs,title="Close All Graphs"
 	button updatebutton, pos={550,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={110,20},proc=sc_updatewindow,title="Update"
