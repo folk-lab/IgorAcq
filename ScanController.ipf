@@ -209,6 +209,42 @@ end
 //// start scan controller ////
 ///////////////////////////////
 
+function sc_openInstrConnections()
+	// open all VISA connections to instruments
+	// this is a simple as running through the list defined
+	//     in the scancontroller window
+	wave /T sc_Instr
+	
+	variable i=0
+	string command = ""
+	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
+		command = TrimString(sc_Instr[i][0])
+		if(strlen(command)>0)
+			print "execute: "+command
+			execute/Q/Z command
+			print "[ERROR] "+GetErrMessage(V_Flag,2)
+		endif
+	endfor
+end
+
+function sc_openInstrGUIs()
+	// open GUIs for instruments
+	// this is a simple as running through the list defined
+	//     in the scancontroller window
+	wave /T sc_Instr
+	
+	variable i=0
+	string command = ""
+	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
+		command = TrimString(sc_Instr[i][1])
+		if(strlen(command)>0)
+			print "execute: "+command
+			execute/Q/Z command
+			print "[ERROR] "+GetErrMessage(V_Flag,2)
+		endif
+	endfor
+end
+
 function InitScanController([configFile, srv_push])
 
 	string configFile // use this to point to a specific old config
@@ -240,7 +276,7 @@ function InitScanController([configFile, srv_push])
 	newpath /C/O/Q config getExpPath("config", full=2) // create/overwrite config path
 	if(paramisdefault(configFile))
 		// look for newest config file
-		string filelist = greplist(indexedfile(config,-1,".config"),"sc")
+		string filelist = greplist(indexedfile(config,-1,".json"),"sc")
 		if(itemsinlist(filelist)>0)
 			// read content into waves
 			filelist = SortList(filelist, ";", 1+16)
@@ -264,15 +300,21 @@ function InitScanController([configFile, srv_push])
 			// Print variables
 			variable/g sc_PrintRaw = 1,sc_PrintCalc = 1
 
-			// logging string
-			string /g sc_LogStr = "GetSRSStatus(srs1);"
+			// instrument wave
+			variable /g sc_instrLimit = 20 // change this if necessary, seeems fine
+			make /t/o/N=(sc_instrLimit,3) sc_Instr 
+			make /o/N=(sc_instrLimit,3) instrBoxAttr = 2
+
+			sc_Instr[0][0] = "openIPSconnection(\"ips1\", \"ASRL::1\", verbose=1)"
+			sc_Instr[0][1] = "initIPS120(ips1)"
+			sc_Instr[0][2] = "GetIPSStatus(ips1)"
 
 			nvar/z filenum
 			if(!nvar_exists(filenum))
 				print "Initializing FileNum to 0 since it didn't exist before.\n"
 				variable /g filenum=0
 			else
-				printf "Current FileNum is %d\n", filenum
+				printf "Current filenum is %d\n", filenum
 			endif
 		endif
 	else
@@ -288,96 +330,105 @@ end
 /////////////////////////////
 
 function/s sc_createconfig()
-	// create a new config.toml file
-	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts
+	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts, sc_Instr
 	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
 	nvar sc_PrintRaw, sc_PrintCalc, filenum
-	svar sc_LogStr, sc_current_config
+	svar sc_current_config, sc_hostname
+	variable refnum
 	string configfile
 	string configstr = "", tmpstr = ""
+	
+	configfile = "sc" + num2istr(unixtime()) + ".json"
+	
+	// information about the measurement computer
+	tmpstr = addJSONkeyval(tmpstr, "hostname", sc_hostname, addQuotes = 1)
+	string sysinfo = igorinfo(3)
+	tmpstr = addJSONkeyval(tmpstr, "OS", StringByKey("OS", sysinfo), addQuotes = 1)
+	tmpstr = addJSONkeyval(tmpstr, "IGOR_VERSION", StringByKey("IGORFILEVERSION", sysinfo), addQuotes = 1)
+	configstr = addJSONkeyval(configstr, "system_info", tmpstr)
 
-	configfile = "sc" + num2istr(unixtime()) + ".toml"
-	configstr = addTOMLcomment(configfile,str=configstr)
+	// log instrument info
+	configstr = addJSONkeyval(configstr, "instruments", textWave2StrArray(sc_Instr))
 
 	// wave names
-	configstr = addTOMLblock("waves",str=configstr)
-	configstr = addTOMLkey("raw",textwavetostrarray(sc_RawWaveNames),str=configstr)
-	configstr = addTOMLkey("calc",textwavetostrarray(sc_CalcWaveNames),str=configstr)
+	tmpstr = ""
+	tmpstr = addJSONkeyval(tmpstr, "raw", textWave2StrArray(sc_RawWaveNames))
+	tmpstr = addJSONkeyval(tmpstr, "calc", textWave2StrArray(sc_CalcWaveNames))
+	configstr = addJSONkeyval(configstr, "wave_names", tmpstr)
 
 	// record checkboxes
-	configstr = addTOMLblock("checkboxes",str=configstr)
-	configstr = addTOMLblock("checkboxes.record",str=configstr,indent="\t")
-	configstr = addTOMLkey("raw",numericwavetoboolarray(sc_RawRecord),str=configstr,indent="\t")
-	configstr = addTOMLkey("calc",numericwavetoboolarray(sc_CalcRecord),str=configstr,indent="\t")
+	tmpstr = ""
+	tmpstr = addJSONkeyval(tmpstr, "raw", wave2BoolArray(sc_RawRecord))
+	tmpstr = addJSONkeyval(tmpstr, "calc", wave2BoolArray(sc_CalcRecord))
+	configstr = addJSONkeyval(configstr, "record_waves", tmpstr)
 
 	// plot checkboxes
-	configstr = addTOMLblock("checkboxes.plot",str=configstr,indent="\t")
-	configstr = addTOMLkey("raw",numericwavetoboolarray(sc_RawPlot),str=configstr,indent="\t")
-	configstr = addTOMLkey("calc",numericwavetoboolarray(sc_CalcPlot),str=configstr,indent="\t")
+	tmpstr = ""
+	tmpstr = addJSONkeyval(tmpstr, "raw",  wave2BoolArray(sc_RawPlot))
+	tmpstr = addJSONkeyval(tmpstr, "calc",  wave2BoolArray(sc_CalcPlot))
+	configstr = addJSONkeyval(configstr, "plot_waves", tmpstr)
 
 	// async checkboxes
-	configstr = addTOMLblock("checkboxes.async",str=configstr,indent="\t")
-	configstr = addTOMLkey("async",numericwavetoboolarray(sc_measAsync),str=configstr,indent="\t")
-
-	// print_to_history
-	configstr = addTOMLblock("checkboxes.history",str=configstr,indent="\t")
-	configstr = addTOMLkey("raw",numToBool(sc_PrintRaw),str=configstr,indent="\t")
-	configstr = addTOMLkey("calc",numToBool(sc_PrintCalc),str=configstr,indent="\t")
+	configstr = addJSONkeyval(configstr, "meas_async", wave2BoolArray(sc_measAsync))
 
 	// scripts
-	configstr = addTOMLblock("scripts",str=configstr)
-	configstr = addTOMLkey("raw",textwavetostrarray(sc_RawScripts),str=configstr)
-	configstr = addTOMLkey("calc",textwavetostrarray(sc_CalcScripts),str=configstr)
+	tmpstr = ""
+	tmpstr = addJSONkeyval(tmpstr, "raw", textWave2StrArray(sc_RawScripts))
+	tmpstr = addJSONkeyval(tmpstr, "calc", textWave2StrArray(sc_CalcScripts))
+	configstr = addJSONkeyval(configstr, "scripts", tmpstr)
 
-	// executable string to get logs
-	configstr = addTOMLkey("logstring",sc_LogStr,str=configstr,indent="\n", addQuotes=1)
+	// print_to_history
+	tmpstr = ""
+	tmpstr = addJSONkeyval(tmpstr, "raw", num2bool(sc_PrintRaw))
+	tmpstr = addJSONkeyval(tmpstr, "calc", num2bool(sc_PrintCalc))
+	configstr = addJSONkeyval(configstr, "print_to_history", tmpstr)
 
-	//filenum
-	configstr = addTOMLkey("filenum",num2str(filenum),str=configstr,indent="\n")
+	configstr = addJSONkeyval(configstr, "filenum", num2istr(filenum))
 
 	sc_current_config = configfile
-	writetofile(configstr,configfile,"config")
+	writetofile(prettyJSONfmt(configstr), configfile, "config")
+
 end
 
 function sc_loadConfig(configfile)
 	string configfile
-	string TOMLstr
+	string jstr
 	nvar sc_PrintRaw, sc_PrintCalc
-	svar sc_LogStr, sc_current_config, sc_current_config
+	svar sc_current_config, sc_current_config
 
-	// load TOML string from config file
+	// load JSON string from config file
 	printf "Loading configuration from: %s\n", configfile
 	sc_current_config = configfile
-	TOMLstr = readtxtfile(configfile,"config")
+	jstr = readtxtfile(configfile,"config")
 
+	// instruments
+	loadStrArray2textWave(getJSONvalue(jstr, "instruments"), "sc_Instr")
+	
 	// waves
-	LoadTextArrayToWave(getTOMLvalue(TOMLstr,"waves:raw"),"sc_RawWaveNames")
-	LoadTextArrayToWave(getTOMLvalue(TOMLstr,"waves:calc"),"sc_CalcWaveNames")
+	loadStrArray2textWave(getJSONvalue(jstr,"wave_names:raw"),"sc_RawWaveNames")
+	loadStrArray2textWave(getJSONvalue(jstr,"wave_names:calc"),"sc_CalcWaveNames")
 
 	// record checkboxes
-	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.record:raw"),"sc_RawRecord")
-	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.record:calc"),"sc_CalcRecord")
+	loadBoolArray2wave(getJSONvalue(jstr,"record_waves:raw"),"sc_RawRecord")
+	loadBoolArray2wave(getJSONvalue(jstr,"record_waves:calc"),"sc_CalcRecord")
 
 	// plot checkboxes
-	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.plot:raw"),"sc_RawPlot")
-	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.plot:calc"),"sc_CalcPlot")
+	loadBoolArray2wave(getJSONvalue(jstr,"plot_waves:raw"),"sc_RawPlot")
+	loadBoolArray2wave(getJSONvalue(jstr,"plot_waves:calc"),"sc_CalcPlot")
 
 	// async checkboxes
-	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.async:async"),"sc_measAsync")
+	loadBoolArray2wave(getJSONvalue(jstr,"meas_async"),"sc_measAsync")
 
 	// print_to_history
-	LoadBoolToVar(getTOMLvalue(TOMLstr,"checkboxes.history:raw"),"sc_PrintRaw")
-	LoadBoolToVar(getTOMLvalue(TOMLstr,"checkboxes.history:calc"),"sc_PrintCalc")
+	loadBool2var(getJSONvalue(jstr,"print_to_history:raw"),"sc_PrintRaw")
+	loadBool2var(getJSONvalue(jstr,"print_to_history:calc"),"sc_PrintCalc")
 
 	// scripts
-	LoadTextArrayToWave(getTOMLvalue(TOMLstr,"scripts:raw"),"sc_RawScripts")
-	LoadTextArrayToWave(getTOMLvalue(TOMLstr,"scripts:calc"),"sc_CalcScripts")
-
-	// executable string to get logs
-	LoadTextToString(getTOMLvalue(TOMLstr,"logstring"),"sc_Logstr")
+	loadStrArray2textWave(getJSONvalue(jstr,"scripts:raw"),"sc_RawScripts")
+	loadStrArray2textWave(getJSONvalue(jstr,"scripts:calc"),"sc_CalcScripts")
 
 	//filenum
-	LoadNumToVar(getTOMLvalue(TOMLstr,"filenum"),"sc_filenum")
+	loadNum2var(getJSONvalue(jstr,"filenum"),"sc_filenum")
 
 	// reload ScanController window
 	sc_rebuildwindow()
@@ -452,7 +503,7 @@ Window ScanController() : Panel
 
 	PauseUpdate; Silent 1		// building window...
 	dowindow /K ScanController
-	NewPanel /W=(10,10,sc_InnerBoxW + 30,200+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing) ) /N=ScanController
+	NewPanel /W=(10,10,sc_InnerBoxW + 30,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+90) /N=ScanController
 	ModifyPanel frameStyle=2
 	ModifyPanel fixedSize=1
 	SetDrawLayer UserBack
@@ -514,24 +565,25 @@ Window ScanController() : Panel
 	button removerowcalc,pos={430,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_removerow,title="Remove Row"
 	checkbox sc_PrintCalcBox, pos={300,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)}, proc=sc_CheckBoxClicked, value=sc_PrintCalc,side=1,title="\Z14Print filenames"
 
-	// box for logging functions
-	variable sc_Loggable
+	// box for instrument configuration
 	SetDrawEnv fsize= 16,fstyle= 1
-	DrawText 13,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25,"Logging Functions (example: getSRSstatus(srs1); getIPSstatus();)"
-	DrawRect 9,120+5+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25,5+sc_InnerBoxW,120+5+sc_InnerBoxH+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25
-	cmd="SetVariable sc_LogStr pos={13, 127+5+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25}, size={sc_InnerBoxW-12, 0}, fsize=14, title=\" \", value=sc_LogStr"
-	execute(cmd)
+	DrawText 13,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+20,"Connect Instrument"
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 225,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+20,"Open GUI"
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 440,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+20,"Log Status"
+	ListBox sc_Instr,pos={9,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25},size={sc_InnerBoxW,(sc_InnerBoxH+sc_InnerBoxSpacing)*3},fsize=14,frame=2,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1, editStyle=1
 
-	// helpful text
-	DrawText 13,170+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing),"Press Update to save changes."
-	DrawText 13,190+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing),"Press ESC to abort the scan and save data, while this window is active"
+	// buttons
+	button connect, pos={10,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_openInstrConnections,title="Connect Instr"
+	button gui, pos={140,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_openInstrGUIs,title="Open All GUI"
+	button killabout, pos={270,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={140,20},proc=sc_controlwindows,title="Kill Sweep Controls"
+	button killgraphs, pos={420,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_killgraphs,title="Close All Graphs"
+	button updatebutton, pos={550,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={110,20},proc=sc_updatewindow,title="Update"
 
-	// Close all open graphs
-	button killgraphs, pos={420,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={120,20},proc=sc_killgraphs,title="Close All Graphs"
-	button killabout, pos={220,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={190,20},proc=sc_controlwindows,title="Kill Sweep Control Windows"
+// helpful text
+	DrawText 13,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+70,"Press Update to save changes."
 
-	//Update button
-	button updatebutton, pos={550,154+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+1)*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_updatewindow,title="Update"
 EndMacro
 
 function sc_killgraphs(action) : Buttoncontrol
@@ -663,6 +715,10 @@ function sc_CheckboxClicked(ControlName, Value)
 	endif
 end
 
+////////////////////////
+/// Initialize Waves ///
+////////////////////////
+
 function sc_checkAsyncScript(str)
 	// returns -1 if formatting is bad
 	// could be better
@@ -699,6 +755,8 @@ function sc_checkAsyncScript(str)
 end
 
 function sc_findAsyncMeasurements()
+	// go through RawScripts and look for valid async measurements
+	//    wherever the meas_async box is checked in the window
 	nvar sc_is2d
 	wave /t sc_RawScripts, sc_RawWaveNames
 	wave sc_RawRecord, sc_RawPlot, sc_measAsync
@@ -775,6 +833,7 @@ function sc_findAsyncMeasurements()
 
 	if(instrAsync<2)
 		// no point in doing anyting async is only one instrument is capable of it
+		// will uncheck boxes automatically
 		make /o/n=(numpnts(sc_RawScripts)) sc_measAsync = 0
 	endif
 
@@ -934,8 +993,6 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 				cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
 			endif
 		endif
-		// Add "[i]" to calculation scripts if needed
-		sc_CalcScripts[i] = construct_calc_script(sc_CalcScripts[i])
 		i+=1
 	while (i<numpnts(sc_CalcWaveNames))
 
@@ -1159,11 +1216,6 @@ end
 
 function sc_checksweepstate()
 	nvar /Z sc_abortsweep, sc_pause, sc_abortnosave
-
-	if (GetKeyState(0) & 32)
-		// If the ESC button is pressed during the scan, save existing data and stop the scan.
-		abort "Measurement aborted by user. Data not saved automatically. Run \"SaveWaves()\" if needed"
-	endif
 
 	if(NVAR_Exists(sc_abortsweep) && sc_abortsweep==1)
 		// If the Abort button is pressed during the scan, save existing data and stop the scan.
@@ -1478,104 +1530,62 @@ function sc_KillThreads(tgID)
 
 end
 
-function/s construct_calc_script(script)
-	// adds "[i]" to calculation scripts
-	string script
-	string test_wave
-	variable i=0, j=0, strpos, numptsRaw, numptsCalc
-	wave/t sc_RawWaveNames, sc_CalcWaveNames
-
-	numptsRaw = numpnts(sc_RawWaveNames)
-	numptsCalc = numpnts(sc_CalcWaveNames)
-
-	for(i=0;i<numptsRaw+numptsCalc;i+=1)
-		j=0
-		if(i<numptsRaw)
-			test_wave = sc_RawWaveNames[i]
-		else
-			test_wave = sc_CalcWaveNames[i-numptsRaw]
-		endif
-		do
-			strpos = strsearch(script,test_wave,j)
-			if(strpos >= 0 && cmpstr(script[strpos+strlen(test_wave)],"[")==0)
-				//do nothing
-			elseif(strpos >= 0)
-				script[strpos+strlen(test_wave)] = "[i]"
-			endif
-			j=strpos+strlen(test_wave)
-		while(strpos >= 0)
-	endfor
-
-	return script
-end
-
 ////////////////////////
 ////  save all data ////
 ////////////////////////
 
-function /s getEquipLogs()
-	string buffer = ""
-	svar sc_LogStr
-
-	//// all log strings should be TOML blocks ////
-	if (strlen(sc_LogStr)>0)
-		string command, keylist = "", key = "", sval = ""
-		string /G sc_log_buffer=""
-		variable i = 0
-		for(i=0;i<ItemsInList(sc_logStr, ";");i+=1)
-//			command = StringFromList(i, sc_logStr, ";")
-//			Execute/Q/Z "sc_log_buffer="+command
-//			if(strlen(sc_log_buffer)!=0)
-//				// need to get first key and value from sc_log_buffer
-//				keylist = getJSONkeys(sc_log_buffer)
-//				key = StringFromList(0,keylist, ",")
-//				sval = getJSONvalue(sc_log_buffer, key)
-//				buffer = addJSONkeyvalpair(buffer, key, sval)
-//			else
-//				print "[WARNING] command failed to log anything: "+command+"\r"
-//			endif
-		endfor
-	endif
-
-	return buffer
-end
-
-function /s getExpStatus([msg])
-	// returns TOML string full of details about the system and this run
+function /s getSweepLogs([msg])
 	string msg
+	string jstr = ""
 	nvar filenum, sweep_t_elapsed
 	svar sc_current_config, sc_hostname
-
-	if(paramisdefault(msg))
-		msg=""
+	
+	// information about this specific sweep
+	if(!paramisdefault(msg))
+		jstr = addJSONkeyval(jstr, "comment", msg, addQuotes=1)
 	endif
+	jstr = addJSONkeyval(jstr, "filenum", num2istr(filenum))
+	jstr = addJSONkeyval(jstr, "current_config", sc_current_config, addQuotes = 1)
+	jstr = addJSONkeyval(jstr, "time_completed", Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
+	jstr = addJSONkeyval(jstr, "time_elapsed", num2str(sweep_t_elapsed))
+	
+	// instrument logs
+	// all log strings should be valid JSON objects
+	wave /t sc_Instr
+	variable i=0, j=0, addQuotes=0
+	string command="", val=""
+	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
+		string /G sc_log_buffer=""
+		command = TrimString(sc_Instr[i][2])
+		if(strlen(command)>0)
+			print command
+		endif
+		Execute/Q/Z "sc_log_buffer="+command
+		if(strlen(sc_log_buffer)!=0)
+			// need to get first key and value from sc_log_buffer
+			JSONSimple sc_log_buffer
+			wave/t t_tokentext
+			wave w_tokentype, w_tokensize, w_tokenparent
+	
+			for(i=1;i<numpnts(t_tokentext)-1;i+=1)
+				if ( w_tokentype[i]==3 && w_tokensize[i]>0 )
+					if( w_tokenparent[i]==0 )
+						if( w_tokentype[i+1]==3 )
+							val = "\"" + t_tokentext[i+1] + "\""
+						else
+							val = t_tokentext[i+1]
+						endif
+						jstr = addJSONkeyval(jstr, t_tokentext[i], val)
+					endif
+				endif
+			endfor
 
-	// create header with corresponding wave name and date
-//	string jstr = "", buffer = ""
+		else
+			print "[WARNING] command failed to log anything: "+command+"\r"
+		endif
+	endfor
 
-//	// information about the machine your working on
-//	buffer = ""
-//	buffer = addJSONkeyvalpair(buffer, "hostname", sc_hostname, addQuotes = 1)
-//	string sysinfo = igorinfo(3)
-//	buffer = addJSONkeyvalpair(buffer, "OS", StringByKey("OS", sysinfo), addQuotes = 1)
-//	buffer = addJSONkeyvalpair(buffer, "IGOR_VERSION", StringByKey("IGORFILEVERSION", sysinfo), addQuotes = 1)
-//	jstr = addJSONkeyvalpair(jstr, "system_info", buffer)
-
-//	// information about the current experiment
-//	jstr = addJSONkeyvalpair(jstr, "experiment", getExpPath("data")+igorinfo(1)+".pxp", addQuotes = 1)
-//	jstr = addJSONkeyvalpair(jstr, "current_config", sc_current_config, addQuotes = 1)
-//	buffer = ""
-//	buffer = addJSONkeyvalpair(buffer, "data", getExpPath("data"), addQuotes = 1)
-//	buffer = addJSONkeyvalpair(buffer, "config", getExpPath("config"), addQuotes = 1)
-//	jstr = addJSONkeyvalpair(jstr, "paths", buffer)
-//
-//	// information about this specific run
-//	jstr = addJSONkeyvalpair(jstr, "filenum", num2istr(filenum))
-//	jstr = addJSONkeyvalpair(jstr, "time_completed", Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
-//	jstr = addJSONkeyvalpair(jstr, "time_elapsed", num2str(sweep_t_elapsed))
-//	jstr = addJSONkeyvalpair(jstr, "saved_waves", recordedWaveArray())
-//	jstr = addJSONkeyvalpair(jstr, "comment", msg, addQuotes = 1)
-//
+	return jstr
 end
 
 function saveExp()
@@ -1625,7 +1635,7 @@ function SaveWaves([msg, save_experiment])
 	string msg
 	variable save_experiment
 	nvar sc_is2d, sc_PrintRaw, sc_PrintCalc, sc_scanstarttime, sc_srv_push
-	svar sc_x_label, sc_y_label, sc_LogStr
+	svar sc_x_label, sc_y_label
 	string filename, wn, logs=""
 	nvar filenum
 	string filenumstr = ""
@@ -1645,10 +1655,6 @@ function SaveWaves([msg, save_experiment])
 
 	variable /g sc_save_exp = save_experiment
 	nvar sc_save_time
-
-	if (strlen(sc_LogStr)!=0)
-		logs = sc_LogStr
-	endif
 
 	KillDataFolder /Z root:async // clean this up for next time
 
@@ -1900,30 +1906,30 @@ function sc_write2batch(fileref, searchStr, localFull)
 
 	variable fileref
 	string searchStr, localFull
-//	localFull = TrimString(localFull)
-//
-//	string lmdpath = getExpPath("lmd", full=1)
-//	variable idx = strlen(lmdpath)+1, result=0
-//	string srvFull = ""
-//
-//	string platform = igorinfo(2), localPart = localFull[idx,inf]
-//	if(cmpstr(platform,"Windows")==0)
-//		localPart = replaceString("\\", LocalPart, "/")
-//	endif
-//
-//	svar sc_hostname, sc_srv_dir
-//	sprintf srvFull, "%s/%s/%s" sc_srv_dir, sc_hostname, localPart
-//
-//	if(strlen(searchStr)==0)
-//		// there is no notification file, add this immediately
-//		fprintf fileref, "%s,%s\n", localFull, srvFull
-//	else
-//		// search for localFull in searchStr
-//		result = strsearch(searchStr, localFull, 0)
-//		if(result==-1)
-//			fprintf fileref, "%s,%s\n", localFull, srvFull
-//		endif
-//	endif
+	localFull = TrimString(localFull)
+
+	string lmdpath = getExpPath("lmd", full=1)
+	variable idx = strlen(lmdpath)+1, result=0
+	string srvFull = ""
+
+	string platform = igorinfo(2), localPart = localFull[idx,inf]
+	if(cmpstr(platform,"Windows")==0)
+		localPart = replaceString("\\", LocalPart, "/")
+	endif
+
+	svar sc_hostname, sc_srv_dir
+	sprintf srvFull, "%s/%s/%s" sc_srv_dir, sc_hostname, localPart
+
+	if(strlen(searchStr)==0)
+		// there is no notification file, add this immediately
+		fprintf fileref, "%s,%s\n", localFull, srvFull
+	else
+		// search for localFull in searchStr
+		result = strsearch(searchStr, localFull, 0)
+		if(result==-1)
+			fprintf fileref, "%s,%s\n", localFull, srvFull
+		endif
+	endif
 
 end
 
@@ -1938,14 +1944,12 @@ function sc_findNewFiles(datnum)
 	//// create/open batch file ////
 	variable refnum
 	string notifyText = "", buffer
-	getfilefolderinfo /Q/Z/P=data "pending_transfer.lst"
+	getfilefolderinfo /Q/Z/P=data "file_transfer.lst"
 	if(V_isFile==0) // if the file does not exist, create it with header
-		open /A/P=data refNum as "pending_transfer.lst"
-
-		// create/write header, if needed
+		open /A/P=data refNum as "file_transfer.lst"
 
 	else // if the file does exist, open it for appending
-		open /A/P=data refNum as "pending_transfer.lst"
+		open /A/P=data refNum as "file_transfer.lst"
 		FSetPos refNum, 0
 		variable lines = 0
 		do
@@ -1975,7 +1979,7 @@ function sc_findNewFiles(datnum)
 	endif
 
 	// find new data files
-	string extensions = ".h5;.txt;.itx"
+	string extensions = ".h5;"
 	string datstr = "", idxList, matchList
 	variable i, j
 	for(i=0;i<ItemsInList(extensions, ";");i+=1)
@@ -2000,22 +2004,22 @@ function sc_findNewFiles(datnum)
 	if(V_flag==0 && V_isFolder==1)
 		string configpath = getExpPath("config", full=1)
 		string configlist=""
-		configlist = greplist(indexedfile(config,-1,".config"),"sc")
+		configlist = greplist(indexedfile(config,-1,".json"),"sc")
 	endif
 
 	if(itemsinlist(configlist)>0)
 		configlist = SortList(configlist, ";", 1+16)
 		tmpname = configpath+StringFromList(0,configlist, ";")
-		sc_write2batch(refnum, notifyText, tmpname)
+//		sc_write2batch(refnum, notifyText, tmpname)
 	endif
 
-	close refnum // close pending_transfer.lst
+	close refnum // close file_transfer.lst
 
 end
 
 function sc_FileTransfer()
 
-	string batchFile = "pending_transfer.lst"
+	string batchFile = "file_transfer.lst"
 	GetFileFolderInfo /Q/Z/P=data batchFile
 	if( V_Flag == 0 && V_isFile ) // file exists
 		string batchFull = "", cmd = "", upload_script
@@ -2042,10 +2046,10 @@ end
 function sc_DeleteBatchFile()
 
 	// delete server.notify
-	deletefile /Z=1 /P=data "pending_transfer.lst"
+	deletefile /Z=1 /P=data "file_transfer.lst"
 
 	if(V_flag!=0)
-		print "Failed to delete 'pending_transfer.lst'"
+		print "Failed to delete 'file_transfer.lst'"
 	endif
 end
 
@@ -2067,11 +2071,11 @@ function /S getSlackNotice(username, [message, min_time]) //FIX!
 	endif
 
 	if(sweep_t_elapsed < min_time)
-		return "slack_notice = false"
+		return "{slack_notice: false}"
 	endif
 
 	if(sc_abortsweep)
-		return "slack_notice = false"
+		return "{slack_notice: false}"
 	endif
 	//// end notification checks ////
 
@@ -2096,13 +2100,13 @@ function /S getSlackNotice(username, [message, min_time]) //FIX!
 	URLRequest /DSTR=payload url=sc_slack_url, method=post
 	if (V_flag == 0)    // No error
         if (V_responseCode != 200)  // 200 is the HTTP OK code
-            print "Slack post failed!"
-            return "slack_notice = false"
+            print "Slack POST failed!"
+            return "{slack_notice: false}"
         else
-            return "slack_notice = true"
+            return "{slack_notice: true}"
         endif
     else
         print "HTTP connection error. Slack post not attempted."
-        return "slack_notice = false"
+        return "{slack_notice: false}"
     endif
 end

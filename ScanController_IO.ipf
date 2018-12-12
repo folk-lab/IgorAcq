@@ -81,11 +81,60 @@ function closeSaveFiles()
 
 end
 
-/////////////////////////
-/// read JSON strings ///
-/////////////////////////
+///////////////////////
+/// text read/write ///
+///////////////////////
 
-// useful for parsing HTTP responses
+function writeToFile(anyStr,filename,path)
+	// write any string to a file called "filename"
+	// path must be a predefined path
+	string anyStr,filename,path
+	variable refnum=0
+
+	open /z/p=$path refnum as filename
+
+	do
+		if(strlen(anyStr)<500)
+			fprintf refnum, "%s", anyStr
+			break
+		else
+			fprintf refnum, "%s", anyStr[0,499]
+			anyStr = anyStr[500,inf]
+		endif
+	while(1)
+
+	close refnum
+end
+
+function/s readTXTFile(filename, path)
+	// read textfile into string from filename on path
+	string filename,path
+	variable refnum
+	string buffer="", txtstr=""
+
+	open /r/z/p=$path refNum as filename
+	if(V_flag!=0)
+		print "[ERROR]: Could not read file: "+filename
+		return ""
+	endif
+
+	do
+		freadline refnum, buffer // returns \r no matter what was used in the file
+		if(strlen(buffer)==0)
+			break
+		endif
+		txtstr+=buffer
+	while(1)
+	close refnum
+
+	return txtstr
+end
+
+/////////////
+/// JSON  ///
+/////////////
+
+/// read ///
 
 function/s getJSONvalue(jstr, key)
 	// returns the value of the parsed key
@@ -111,6 +160,7 @@ function/s getJSONvalue(jstr, key)
 		// find the indices of the keys parsed
 		indices = getJSONindices(key)
 		if(itemsinlist(indices,",")<key_length)
+			print "[ERROR] Value of JSON key is ambiguous: "+key
 			return ""
 		else
 			return getJSONkeyoffset(stringfromlist(key_length-1,key,":"),str2num(stringfromlist(key_length-1,indices,","))-1)
@@ -165,20 +215,492 @@ function/s getJSONkeyoffset(key,offset)
 		endif
 	endfor
 	// if key is not found, return an empty string
+	print "[ERROR] JSON key not found: "+key
 	return ""
+end
+
+function /S getStrArrayShape(array)
+	// works for arrays of single-quoted strings
+	string array
+	variable openBrack = 0, closeBrack = 0, quoted = 0, elements = 0
+	variable i=0
+	for(i=0; i<strlen(array); i+=1)
+	
+		// check if the current character is escaped
+		if(i!=0)
+			if( (CmpStr(array[i], "\"")==0) && (CmpStr(array[i-1], "\\")!=0 ))
+				//this is an unescaped quote
+				if(quoted==0)
+					quoted = 1
+				elseif(quoted==1)
+					quoted=0
+					elements+=1
+				endif
+			endif
+		endif
+		
+		if( (quoted==0) && (CmpStr(array[i], "[")==0) )
+			openBrack+=1
+		elseif( (quoted==0) && (CmpStr(array[i], "]")==0) )
+			closeBrack+=1
+		endif
+
+	endfor
+	
+	if (openBrack==closeBrack)
+		if(openBrack>1)
+			return num2str(elements/(openBrack-1))+","+num2str(openBrack-1)
+		else
+			return num2str(elements)+","
+		endif
+	else
+		print "[ERROR] array formatting problem: "+array
+		return ""
+	endif
+	
+end
+
+function loadStrArray2textWave(array,destwave)
+	// supports 1 and 2d arrays
+	string array,destwave
+	string dims = getStrArrayShape(array), element=""
+	variable i=0, quoted=0, ii=0, jj=0, nDims = itemsinlist(dims, ",")
+	
+	if(nDims==1)	
+		make/o/t/n=(str2num(dims)) $destwave = ""
+	else
+		make/o/t/n=(str2num(stringfromlist(0,dims,",")), str2num(stringfromlist(1,dims,","))) $destwave = ""
+	endif
+	wave /t w=$destwave
+
+	for(i=0; i<strlen(array); i+=1)
+	
+		// check if the current character is escaped
+		if(i!=0)
+			if( (CmpStr(array[i], "\"")==0) && (CmpStr(array[i-1], "\\")!=0 ))
+				//this is an unescaped quote
+				if(quoted==0)
+					quoted = 1
+				elseif(quoted==1)
+					quoted=0
+					// end quote, add element to wave, increment ii, reset element
+					if(nDims==1)
+						w[ii] = unescapeQuotes(element[1,inf])
+					else
+						w[ii][jj] = unescapeQuotes(element[1,inf])
+					endif
+					element=""
+					ii+=1
+				endif
+			endif
+		endif
+		
+		if( (quoted==0) && (CmpStr(array[i], "[")==0) )
+			// open bracket
+		elseif( (quoted==0) && (CmpStr(array[i], "]")==0) )
+			// close bracket, increment jj, reset ii
+			jj+=1
+			ii=0
+		elseif( (quoted==1) )
+			element+=array[i]
+		endif
+
+	endfor
+
+end
+
+function /S getArrayShape(array)
+	// works for integers, floats, and boolean (true/false or 1/0)
+	string array
+	variable openBrack = 0, closeBrack = 0, elements = 0, commaLast = 0, brackLast = 0
+	variable i=0
+	
+	for(i=0; i<strlen(array); i+=1)
+
+		if( CmpStr(array[i], ",")==0 )
+			// comma found
+			commaLast=1 // comma was the last non-whitespace character
+			if( brackLast==0 )		
+				elements+=1 // closed an element
+			endif
+		elseif( CmpStr(array[i], "[")==0 )
+			openBrack+=1
+		elseif( CmpStr(array[i], "]")==0 )
+			closeBrack+=1
+			if(commaLast==0 && brackLast==0)
+				elements+=1 // no trailing comma, new element
+			endif
+			brackLast=1
+		else
+			if( isWhitespace(array[i])==0 )
+				commaLast=0
+				brackLast=0
+			endif
+		endif
+
+	endfor
+	
+	if (openBrack==closeBrack)
+		if(openBrack>1)
+			return num2str(elements/(openBrack-1))+","+num2str(openBrack-1)
+		else
+			return num2str(elements)+","
+		endif
+	else
+		print "[ERROR] array formatting problem: "+array
+		return ""
+	endif
+	
+end
+
+function loadBoolArray2wave(array,destwave)
+	// works for int or float since igor doesn't make a distinction
+	string array,destwave
+	string dims = getArrayShape(array), element=""
+	variable i=0, commaLast=0, brackLast=0, ii=0, jj=0, nDims = itemsinlist(dims, ",")
+	
+	if(nDims==1)	
+		make/o/n=(str2num(dims)) $destwave
+	else
+		make/o/n=(str2num(stringfromlist(0,dims,",")), str2num(stringfromlist(1,dims,","))) $destwave
+	endif
+	wave w=$destwave
+
+	for(i=0; i<strlen(array); i+=1)
+		if( CmpStr(array[i], ",")==0 )
+			// comma found, write element, increment ii, clear element
+			commaLast=1 // comma was the last non-whitespace character	
+			if( brackLast==0 )	
+				if(nDims==1)
+					w[ii] = bool2num(element)
+				else
+					w[ii][jj] = bool2num(element)
+				endif
+				ii+=1
+				element="" // clear element
+			endif
+		elseif( CmpStr(array[i], "[")==0 )
+			// open bracket
+		elseif( CmpStr(array[i], "]")==0 )
+			// close bracket, write element?, incrememnt jj
+			if(commaLast==0)
+				// no trailing comma, write element, increment ii, clear element
+				if(nDims==1)
+					w[ii] = bool2num(element)
+				else
+					w[ii][jj] = bool2num(element)
+				endif
+				ii+=1
+				element="" // no trailing comma, new element
+			endif
+			jj+=1
+			brackLast=1
+		else
+			element+=array[i] // doesn't matter if I pick up some whitespace here
+			if( isWhitespace(array[i])==0 )
+				commaLast=0
+				brackLast=0
+			endif
+		endif
+
+	endfor
+
+end
+
+function loadNumArray2wave(array,destwave)
+	// works for int or float since igor doesn't make a distinction
+	string array,destwave
+	string dims = getArrayShape(array), element=""
+	variable i=0, commaLast=0, brackLast=0, ii=0, jj=0, nDims = itemsinlist(dims, ",")
+	
+	if(nDims==1)	
+		make/o/n=(str2num(dims)) $destwave
+	else
+		make/o/n=(str2num(stringfromlist(0,dims,",")), str2num(stringfromlist(1,dims,","))) $destwave
+	endif
+	wave w=$destwave
+
+	for(i=0; i<strlen(array); i+=1)
+		if( CmpStr(array[i], ",")==0 )
+			// comma found, write element, increment ii, clear element
+			commaLast=1 // comma was the last non-whitespace character	
+			if( brackLast==0 )	
+				if(nDims==1)
+					w[ii] = str2num(element)
+				else
+					w[ii][jj] = str2num(element)
+				endif
+				ii+=1
+				element="" // clear element
+			endif
+		elseif( CmpStr(array[i], "[")==0 )
+			// open bracket
+		elseif( CmpStr(array[i], "]")==0 )
+			// close bracket, incrememnt jj
+			if(commaLast==0)
+				// no trailing comma, increment ii, write element
+				if(nDims==1)
+					w[ii] = str2num(element)
+				else
+					w[ii][jj] = str2num(element)
+				endif
+				ii+=1
+				element="" // no trailing comma, new element
+			endif
+			jj+=1
+			brackLast=1
+		else
+			element+=array[i] // doesn't matter if I pick up some whitespace here
+			if( isWhitespace(array[i])==0 )
+				commaLast=0
+				brackLast=0
+			endif
+		endif
+
+	endfor
+
+end
+
+function loadBool2var(boolean,destvar)
+	string boolean,destvar
+
+	variable/g $destvar = bool2num(boolean)
+end
+
+function loadStr2string(str,deststring)
+	string str,deststring
+	
+	str = removeLiteralQuotes(str)
+	string/g $deststring = unescapeQuotes(str) 
+end
+
+function loadNum2var(numasstr,destvar)
+	string numasstr,destvar
+
+	variable/g $destvar = str2num(numasstr)
+end
+
+function bool2Num(str)
+	string str
+	str = TrimString(str)
+	if(StringMatch(LowerStr(str), "true")==1)
+		// use string match to ignore whitespace
+		return 1
+	elseif(StringMatch(LowerStr(str), "false")==1)
+		return 0
+	else
+		return -1
+	endif
+end
+
+/// write ///
+
+function/s num2bool(val)
+	variable val
+	if(val==1)
+		return "true"
+	elseif(val==0)
+		return "false"
+	else
+		return ""
+	endif
+end
+
+function/s wave2BoolArray(w)
+	// returns an array
+	// supports 1d and 2d arrays
+	wave w
+	string list=""
+
+	// loop over wave
+	variable ii, jj, m = dimsize(w, 1), n = dimsize(w, 0)
+	if(m==0)
+		m=1
+	elseif(m>1)
+		list+="["
+	endif
+	
+	for (ii=0; ii<m; ii+=1)
+		list += "["
+		for(jj=0; jj<n; jj+=1)
+   		list+= num2bool(w[jj][ii]) + ","
+		endfor
+		list = list[0,strlen(list)-2] // remove comma
+		list += "],"
+	endfor   
+	
+	list = list[0,strlen(list)-2] // remove comma
+	if(m>1)
+		list+="]" // add closing bracket in 2d
+	endif
+
+	return list
+end
+
+function/s wave2NumArray(w)
+	// returns an array
+	// supports 1d and 2d arrays
+	wave w
+	string list=""
+
+	// loop over wave
+	variable ii, jj, m = dimsize(w, 1), n = dimsize(w, 0)
+	if(m==0)
+		m=1
+	elseif(m>1)
+		list+="["
+	endif
+	
+	for (ii=0; ii<m; ii+=1)
+		list += "["
+		for(jj=0; jj<n; jj+=1)
+   		list+= num2str(w[jj][ii])+","
+		endfor
+		list = list[0,strlen(list)-2] // remove comma
+		list += "],"
+	endfor   
+	
+	list = list[0,strlen(list)-2] // remove comma
+	if(m>1)
+		list+="]" // add closing bracket in 2d
+	endif
+	
+	return list
+end
+
+function/s textWave2StrArray(w)
+	// returns an array and makes sure quotes and commas are parsed correctly.
+	// supports 1d and 2d arrays
+	wave/t w
+	string list=""
+
+	// loop over wave
+	variable ii, jj, m = dimsize(w, 1), n = dimsize(w, 0)
+	if(m==0)
+		m=1
+	elseif(m>1)
+		list+="["
+	endif
+	
+	for (ii=0; ii<m; ii+=1)
+		list += "["
+		for(jj=0; jj<n; jj+=1)
+   		list+="\""+escapeQuotes(w[jj][ii])+"\","
+		endfor
+		list = list[0,strlen(list)-2] // remove comma
+		list += "],"
+	endfor   
+	
+	list = list[0,strlen(list)-2] // remove comma
+	if(m>1)
+		list+="]" // add closing bracket in 2d
+	endif
+	
+	return list
+end
+
+function/s addJSONkeyval(JSONstr,key,value,[addquotes])
+	// returns a valid JSON string with a new key,value pair added.
+	// if JSONstr is empty, start a new JSON object
+	string JSONstr, key, value
+	variable addquotes
+
+	if(!paramisdefault(addquotes))
+		if(addquotes==1)
+			// escape quotes in value and wrap value in outer quotes
+			value = "\""+escapeQuotes(value)+"\""
+		endif
+	endif
+
+	if(strlen(JSONstr)!=0)
+		// remove all starting brackets + whitespace
+		variable i=0
+		do
+			if( (isWhitespace(JSONstr[i])==1) || (CmpStr(JSONstr[i],"{")==0) )
+				i+=1
+			else
+				break
+			endif
+		while(1)
+		
+		// remove single ending bracket + whitespace
+		variable j=strlen(JSONstr)-1
+		do
+			if( (isWhitespace(JSONstr[j])==1) )
+				j-=1
+			elseif( (CmpStr(JSONstr[j],"}")==0) )
+				j-=1
+				break
+			else
+				print "[ERROR] Bad JSON string in addJSONkeyvalue(...): "+JSONstr
+				break
+			endif
+		while(1)
+		
+		return "{"+JSONstr[i,j]+", \""+key+"\":"+value+"}"
+	else
+		return "{"+JSONstr[i,j]+"\""+key+"\":"+value+"}"
+	endif
+
+end
+
+function/s getIndent(level)
+	// returning whitespace for formatting strings
+	// level = # of tabs, 1 tab = 4 spaces
+	variable level
+
+	variable i=0
+	string output = ""
+	for(i=0;i<level;i+=1)
+		output += "    "
+	endfor
+
+	return output
+end
+
+function /s prettyJSONfmt(jstr)
+	// this could be much prettier
+	string jstr
+	string output="", key="", val=""
+	
+	JSONSimple jstr
+	wave/t t_tokentext
+	wave w_tokentype, w_tokensize, w_tokenparent
+	variable i=0, indent=1
+	
+	output+="{\n"
+	for(i=1;i<numpnts(t_tokentext)-1;i+=1)
+
+		// print only at single indent level
+		if ( w_tokentype[i]==3 && w_tokensize[i]>0 )
+			if( w_tokenparent[i]==0 )
+				indent = 1
+				if( w_tokentype[i+1]==3 )
+					val = "\"" + t_tokentext[i+1] + "\""
+				else
+					val = t_tokentext[i+1]
+				endif
+				key = "\"" + t_tokentext[i] + "\""
+				output+=(getIndent(indent)+key+": "+val+",\n")
+			endif
+		endif
+		
+	endfor
+	
+	return output[0,strlen(output)-3]+"\n}\n"
 end
 
 /////////////////////////////////
 /// text formatting utilities ///
 /////////////////////////////////
 
-Function IsWhiteSpace(char)
+Function isWhiteSpace(char)
     String char
 
     return GrepString(char, "\\s")
 End
 
-Function/S RemoveLeadingWhitespace(str)
+Function/S removeLeadingWhitespace(str)
     String str
 
     if (strlen(str) == 0)
@@ -197,7 +719,7 @@ Function/S RemoveLeadingWhitespace(str)
     return str
 End
 
-Function/S RemoveTrailingWhitespace(str)
+function/S removeTrailingWhitespace(str)
     String str
 
     if (strlen(str) == 0)
@@ -239,37 +761,6 @@ function countQuotes(str)
 
 	endfor
 	return quoteCount
-end
-
-function countSqBrackets(str)
-	// count how many brackets are in the string
-	// +1 for ]
-	// -1 for [
-	string str
-	variable bracketCount = 0, i = 0, escaped = 0
-	for(i=0; i<strlen(str); i+=1)
-	
-		// check if the current character is escaped
-		if(i!=0)
-			if( CmpStr(str[i-1], "\\") == 0)
-				escaped = 1
-			else
-				escaped = 0
-			endif
-		endif
-	
-		// count opening brackets
-		if( CmpStr(str[i], "[" ) == 0 && escaped == 0)
-			bracketCount -= 1
-		endif
-		
-		// count closing brackets
-		if( CmpStr(str[i], "]" ) == 0 && escaped == 0)
-			bracketCount += 1
-		endif
-		
-	endfor
-	return bracketCount
 end
 
 function /S escapeQuotes(str)
@@ -335,9 +826,8 @@ function /S unescapeQuotes(str)
 end
 
 function/s removeLiteralQuotes(str)
-	// removes outermost quotes
-	// handles single or triple quotes (TOML standards)
-	// there are about ten different ways to break this
+	// removes single outermost quotes
+	// double quotes only
 	string str
 	
 	variable i=0, openQuotes=0
@@ -377,35 +867,7 @@ function/s removeLiteralQuotes(str)
 	return str[0,j-1]
 end
 
-function/s removeSqBrackets(str)
-	// removes outermost brackets
-	// and whitespace from a string
-	string str
-	
-	variable i=0
-	for(i=0;i<strlen(str);i+=1)
-		if(CmpStr(str[i],"[")==0)
-			break
-		endif
-	endfor
-	
-	if(i==strlen(str)-1)
-		print "[ERROR] String not surrounded by brackets. str: "+str
-		return ""
-	endif
-	
-	str = str[i+1,inf]
-	variable j
-	for(j=strlen(str); j>0; j-=1)
-		if(CmpStr(str[j],"]")==0)
-			break
-		endif
-	endfor
-
-	return str[0,j-1]	
-end
-
-Function/t removeStringListDuplicates(theListStr)
+function/t removeStringListDuplicates(theListStr)
 	// credit: http://www.igorexchange.com/node/1071
 	String theListStr
 
@@ -433,288 +895,4 @@ function/s searchFullString(string_to_search,substring)
 	while(test > -1)
 
 	return index_list
-end
-
-function LoadTextArrayToWave(array,destwave)
-	string array,destwave
-	variable i=0
-	
-	array = removeSqBrackets(array)
-	
-	make/o/t/n=(itemsinlist(array,",")) $destwave = stringfromlist(p,array,",")
-	wave/t wref = $destwave
-	string buffer = ""
-	for(i=0;i<(itemsinlist(array,","));i+=1)
-		wref[i] = removeLiteralQuotes(wref[i])
-		wref[i] = unescapeQuotes(wref[i])
-	endfor
-end
-
-function LoadBoolArrayToWave(array,destwave)
-	string array,destwave
-
-	array = removeSqBrackets(array)
-
-	make/o/n=(itemsinlist(array,",")) $destwave = booltonum(stringfromlist(p,array,","))
-end
-
-function LoadBoolToVar(boolean,destvar)
-	string boolean,destvar
-
-	variable/g $destvar = booltonum(boolean)
-end
-
-function LoadTextToString(str,deststring)
-	string str,deststring
-	
-	str = removeLiteralQuotes(str)
-	string/g $deststring = unescapeQuotes(str) 
-end
-
-function LoadNumToVar(numasstr,destvar)
-	string numasstr,destvar
-
-	variable/g $destvar = str2num(numasstr)
-end
-
-function/s numToBool(val)
-	variable val
-	if(val==1)
-		return "true"
-	elseif(val==0)
-		return "false"
-	else
-		return ""
-	endif
-end
-
-function boolToNum(str)
-	string str
-	if(StringMatch(LowerStr(str), "true")==1)
-		// use string match to ignore whitespace
-		return 1
-	elseif(StringMatch(LowerStr(str), "false")==1)
-		return 0
-	else
-		return -1
-	endif
-end
-
-function/s numericWaveToBoolArray(w)
-	// returns an array
-	wave w
-	string list = "["
-	variable i=0
-
-	for(i=0; i<numpnts(w); i+=1)
-		list += numToBool(w[i])+","
-	endfor
-
-	return list[0,strlen(list)-2] + "]"
-end
-
-function/s textWaveToStrArray(w)
-	// returns an array and makes sure quotes and commas are parsed correctly.
-	wave/t w
-	string list, checkStr, escapedStr
-	variable i=0
-
-	wfprintf list, "\"%s\";", w
-	for(i=0;i<itemsinlist(list,";");i+=1)
-		checkStr = stringfromlist(i,list,";")
-		if(countQuotes(checkStr)>2)
-			//escapedStr = escapeJSONstr(checkStr)
-			list = removelistitem(i,list,";")
-			list = addlistitem(escapedStr,list,";",i)
-		endif
-	endfor
-	list = replacestring(";",list,",")
-	return "["+list[0,strlen(list)-2]+"]"
-end
-
-///////////////////////
-/// text read/write ///
-///////////////////////
-
-function writeToFile(anyStr,filename,path)
-	// write any string to a file called "filename"
-	// path must be a predefined path
-	string anyStr,filename,path
-	variable refnum=0
-
-	open /z/p=$path refnum as filename
-
-	do
-		if(strlen(anyStr)<500)
-			fprintf refnum, "%s", anyStr
-			break
-		else
-			fprintf refnum, "%s", anyStr[0,499]
-			anyStr = anyStr[500,inf]
-		endif
-	while(1)
-
-	close refnum
-end
-
-function/s readTXTFile(filename, path)
-	// read textfile into string from filename on path
-	string filename,path
-	variable refnum
-	string buffer="", txtstr=""
-
-	open /r/z/p=$path refNum as filename
-	if(V_flag!=0)
-		print "[ERROR]: Could not read file: "+filename
-		return ""
-	endif
-
-	do
-		freadline refnum, buffer // returns \r no matter what was used in the file
-		if(strlen(buffer)==0)
-			break
-		endif
-		txtstr+=buffer
-	while(1)
-	close refnum
-
-	return txtstr
-end
-
-////////////
-/// TOML ///
-////////////
-
-// a quick attempt at writing a TOML parser
-// https://en.wikipedia.org/wiki/TOML
-// https://github.com/toml-lang/toml
-
-// a good amount of the format (nested arrays, tables, single quotes) is not supported
-// general philosophy is that everything written to a .toml is valid TOML
-//     but our parser cannot read all valid TOML because it is complicated and we don't need it
-
-function/s getTOMLvalue(TOMLstr,key)
-	// returns the value associated with key
-	// returns an empty string is key is not valid
-	string TOMLstr,key
-	variable key_length,index,old_index,i=0, val_start, val_end
-	string str
-
-	key_length = itemsinlist(key,":")
-
-	// search TOMLstr for key
-	// record index of first character _after_ key
-	old_index = 0
-	for(i=0;i<key_length;i+=1)
-		str = stringfromlist(i,key,":") 
-		index = strsearch(TOMLstr,str,old_index)
-		
-		if(index==-1 || index<old_index)
-			print "[ERROR] key not found in TOML: "+key
-			return ""
-		endif
-		old_index=index+strlen(str)
-	endfor
-	TOMLstr = TOMLstr[old_index,inf] // everything from the key onward
-										      // look for equal sign next
-	i=0
-	do
-		if(i>strlen(TOMLstr)-1)
-			// end of string. something wasn't formatted right.
-			print "[ERROR] key = value line incorrectly formatted for key: "+key
-			return ""
-		endif
-		
-		if(char2num(TOMLstr[i])==char2num("="))
-			// found the equal sign. great.
-			i+=1
-			break
-		elseif(IsWhiteSpace(TOMLstr[i]))
-			// white space. keep looking.
-			i+=1
-		else
-			// not white space. not an equal sign. bad formatting.
-			print "[ERROR] key = value line incorrectly formatted for key: "+key
-			return ""
-		endif
-	while(1==1)
-	TOMLstr = TOMLstr[i,inf] // everything from the = onward
-							       // look for full value next
-							       
-	i=0
-	do
-		if(i>strlen(TOMLstr)-1)
-			// end of string. something wasn't formatted right.
-			print "[ERROR] key = value line incorrectly formatted for key: "+key
-			return ""
-		endif
-		
-		if(char2num(TOMLstr[i])==char2num("\r"))
-			// line break!
-			if(countSqBrackets(TOMLstr[i,inf])!=0 || mod(countQuotes(TOMLstr[i,inf]),2)!=0)
-				// there are unclosed brackets or quotes
-				// this is a multi line array or string
-				i+=1
-				continue
-			else
-				break
-			endif
-		endif
-		i+=1
-	while(1==1)
-	
-	TOMLstr = removeTrailingWhitespace(TOMLstr[0,i])
-	return removeLeadingWhitespace(TOMLstr)
-end
-
-function/s addTOMLblock(name,[str,indent])
-	string name, str, indent
-	string returnstr=""
-
-	if(!paramisdefault(str))
-		returnstr = str+"\n"
-	endif
-
-	if(paramisdefault(indent))
-		indent = ""
-	endif
-
-	return returnstr+indent+"["+name+"]"+"\n"
-end
-
-function/s addTOMLkey(name,value,[str,indent,addQuotes])
-	string name, value, str, indent
-	variable addquotes
-	string returnstr
-	
-	if(paramisdefault(str))
-		str = ""
-	endif
-	
-	if(paramisdefault(indent))
-		indent = ""
-	endif
-	
-	if(paramisdefault(addquotes))
-		addquotes = 0
-	elseif(addquotes==1)
-		// escape quotes in value and wrap value in outer quotes
-		value = "\""+escapeQuotes(value)+"\""
-	endif
-	
-	return str+indent+name+"="+value+"\n"
-end
-
-function/s addTOMLcomment(comment,[str,indent])
-	string comment, str, indent
-
-	if(paramisdefault(str))
-		str = ""
-	endif
-
-	if(paramisdefault(indent))
-		indent = ""
-	endif
-
-	return str+indent+"# "+comment+"\n"
 end
