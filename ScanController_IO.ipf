@@ -35,16 +35,16 @@ function initSaveFiles([msg])
 	// save json strings as datasets into that group
 	variable /G meta_group_ID
 	HDF5CreateGroup hdf5_id, "metadata", meta_group_ID
-	
+
 	killdatafolder /z root:meta // kill it if it exists
 	newdatafolder root:meta     // create an empty version
-	string /g root:meta:sweep_logs = sc_createSweepLogs(msg=msg) // sweep logs string into datafolder
-	string /g root:meta:config = sc_createconfig()               // put confing string into datafolder
+	string /g root:meta:sweep_logs = prettyJSONfmt(sc_createSweepLogs(msg=msg))
+	string /g root:meta:config = prettyJSONfmt(sc_createconfig())
 	HDF5SaveGroup /L=4 $("root:meta"), hdf5_id, "metadata"
-	
+
 	// save config file
 	svar cconfig = root:config:config
-	sc_saveConfig(cconfig) 
+	sc_saveConfig(cconfig)
 
 end
 
@@ -229,7 +229,7 @@ function /S getStrArrayShape(array)
 	variable openBrack = 0, closeBrack = 0, quoted = 0, elements = 0
 	variable i=0
 	for(i=0; i<strlen(array); i+=1)
-	
+
 		// check if the current character is escaped
 		if(i!=0)
 			if( (CmpStr(array[i], "\"")==0) && (CmpStr(array[i-1], "\\")!=0 ))
@@ -242,7 +242,7 @@ function /S getStrArrayShape(array)
 				endif
 			endif
 		endif
-		
+
 		if( (quoted==0) && (CmpStr(array[i], "[")==0) )
 			openBrack+=1
 		elseif( (quoted==0) && (CmpStr(array[i], "]")==0) )
@@ -250,7 +250,7 @@ function /S getStrArrayShape(array)
 		endif
 
 	endfor
-	
+
 	if (openBrack==closeBrack)
 		if(openBrack>1)
 			return num2str(elements/(openBrack-1))+","+num2str(openBrack-1)
@@ -261,7 +261,7 @@ function /S getStrArrayShape(array)
 		print "[ERROR] array formatting problem: "+array
 		return ""
 	endif
-	
+
 end
 
 function loadStrArray2textWave(array,destwave)
@@ -269,8 +269,8 @@ function loadStrArray2textWave(array,destwave)
 	string array,destwave
 	string dims = getStrArrayShape(array), element=""
 	variable i=0, quoted=0, ii=0, jj=0, nDims = itemsinlist(dims, ",")
-	
-	if(nDims==1)	
+
+	if(nDims==1)
 		make/o/t/n=(str2num(dims)) $destwave = ""
 	else
 		make/o/t/n=(str2num(stringfromlist(0,dims,",")), str2num(stringfromlist(1,dims,","))) $destwave = ""
@@ -278,7 +278,7 @@ function loadStrArray2textWave(array,destwave)
 	wave /t w=$destwave
 
 	for(i=0; i<strlen(array); i+=1)
-	
+
 		// check if the current character is escaped
 		if(i!=0)
 			if( (CmpStr(array[i], "\"")==0) && (CmpStr(array[i-1], "\\")!=0 ))
@@ -298,7 +298,7 @@ function loadStrArray2textWave(array,destwave)
 				endif
 			endif
 		endif
-		
+
 		if( (quoted==0) && (CmpStr(array[i], "[")==0) )
 			// open bracket
 		elseif( (quoted==0) && (CmpStr(array[i], "]")==0) )
@@ -318,13 +318,13 @@ function /S getArrayShape(array)
 	string array
 	variable openBrack = 0, closeBrack = 0, elements = 0, commaLast = 0, brackLast = 0
 	variable i=0
-	
+
 	for(i=0; i<strlen(array); i+=1)
 
 		if( CmpStr(array[i], ",")==0 )
 			// comma found
 			commaLast=1 // comma was the last non-whitespace character
-			if( brackLast==0 )		
+			if( brackLast==0 )
 				elements+=1 // closed an element
 			endif
 		elseif( CmpStr(array[i], "[")==0 )
@@ -343,7 +343,7 @@ function /S getArrayShape(array)
 		endif
 
 	endfor
-	
+
 	if (openBrack==closeBrack)
 		if(openBrack>1)
 			return num2str(elements/(openBrack-1))+","+num2str(openBrack-1)
@@ -354,7 +354,7 @@ function /S getArrayShape(array)
 		print "[ERROR] array formatting problem: "+array
 		return ""
 	endif
-	
+
 end
 
 function loadBoolArray2wave(array,destwave)
@@ -362,8 +362,8 @@ function loadBoolArray2wave(array,destwave)
 	string array,destwave
 	string dims = getArrayShape(array), element=""
 	variable i=0, commaLast=0, brackLast=0, ii=0, jj=0, nDims = itemsinlist(dims, ",")
-	
-	if(nDims==1)	
+
+	if(nDims==1)
 		make/o/n=(str2num(dims)) $destwave
 	else
 		make/o/n=(str2num(stringfromlist(0,dims,",")), str2num(stringfromlist(1,dims,","))) $destwave
@@ -373,8 +373,8 @@ function loadBoolArray2wave(array,destwave)
 	for(i=0; i<strlen(array); i+=1)
 		if( CmpStr(array[i], ",")==0 )
 			// comma found, write element, increment ii, clear element
-			commaLast=1 // comma was the last non-whitespace character	
-			if( brackLast==0 )	
+			commaLast=1 // comma was the last non-whitespace character
+			if( brackLast==0 )
 				if(nDims==1)
 					w[ii] = bool2num(element)
 				else
@@ -416,8 +416,8 @@ function loadNumArray2wave(array,destwave)
 	string array,destwave
 	string dims = getArrayShape(array), element=""
 	variable i=0, commaLast=0, brackLast=0, ii=0, jj=0, nDims = itemsinlist(dims, ",")
-	
-	if(nDims==1)	
+
+	if(nDims==1)
 		make/o/n=(str2num(dims)) $destwave
 	else
 		make/o/n=(str2num(stringfromlist(0,dims,",")), str2num(stringfromlist(1,dims,","))) $destwave
@@ -427,8 +427,8 @@ function loadNumArray2wave(array,destwave)
 	for(i=0; i<strlen(array); i+=1)
 		if( CmpStr(array[i], ",")==0 )
 			// comma found, write element, increment ii, clear element
-			commaLast=1 // comma was the last non-whitespace character	
-			if( brackLast==0 )	
+			commaLast=1 // comma was the last non-whitespace character
+			if( brackLast==0 )
 				if(nDims==1)
 					w[ii] = str2num(element)
 				else
@@ -473,9 +473,9 @@ end
 
 function loadStr2string(str,deststring)
 	string str,deststring
-	
+
 	str = removeLiteralQuotes(str)
-	string/g $deststring = unescapeQuotes(str) 
+	string/g $deststring = unescapeQuotes(str)
 end
 
 function loadNum2var(numasstr,destvar)
@@ -523,7 +523,7 @@ function/s wave2BoolArray(w)
 	elseif(m>1)
 		list+="["
 	endif
-	
+
 	for (ii=0; ii<m; ii+=1)
 		list += "["
 		for(jj=0; jj<n; jj+=1)
@@ -531,8 +531,8 @@ function/s wave2BoolArray(w)
 		endfor
 		list = list[0,strlen(list)-2] // remove comma
 		list += "],"
-	endfor   
-	
+	endfor
+
 	list = list[0,strlen(list)-2] // remove comma
 	if(m>1)
 		list+="]" // add closing bracket in 2d
@@ -554,7 +554,7 @@ function/s wave2NumArray(w)
 	elseif(m>1)
 		list+="["
 	endif
-	
+
 	for (ii=0; ii<m; ii+=1)
 		list += "["
 		for(jj=0; jj<n; jj+=1)
@@ -562,13 +562,13 @@ function/s wave2NumArray(w)
 		endfor
 		list = list[0,strlen(list)-2] // remove comma
 		list += "],"
-	endfor   
-	
+	endfor
+
 	list = list[0,strlen(list)-2] // remove comma
 	if(m>1)
 		list+="]" // add closing bracket in 2d
 	endif
-	
+
 	return list
 end
 
@@ -585,7 +585,7 @@ function/s textWave2StrArray(w)
 	elseif(m>1)
 		list+="["
 	endif
-	
+
 	for (ii=0; ii<m; ii+=1)
 		list += "["
 		for(jj=0; jj<n; jj+=1)
@@ -593,13 +593,13 @@ function/s textWave2StrArray(w)
 		endfor
 		list = list[0,strlen(list)-2] // remove comma
 		list += "],"
-	endfor   
-	
+	endfor
+
 	list = list[0,strlen(list)-2] // remove comma
 	if(m>1)
 		list+="]" // add closing bracket in 2d
 	endif
-	
+
 	return list
 end
 
@@ -626,7 +626,7 @@ function/s addJSONkeyval(JSONstr,key,value,[addquotes])
 				break
 			endif
 		while(1)
-		
+
 		// remove single ending bracket + whitespace
 		variable j=strlen(JSONstr)-1
 		do
@@ -640,7 +640,7 @@ function/s addJSONkeyval(JSONstr,key,value,[addquotes])
 				break
 			endif
 		while(1)
-		
+
 		return "{"+JSONstr[i,j]+", \""+key+"\":"+value+"}"
 	else
 		return "{"+JSONstr[i,j]+"\""+key+"\":"+value+"}"
@@ -666,12 +666,12 @@ function /s prettyJSONfmt(jstr)
 	// this could be much prettier
 	string jstr
 	string output="", key="", val=""
-	
+
 	JSONSimple jstr
 	wave/t t_tokentext
 	wave w_tokentype, w_tokensize, w_tokenparent
 	variable i=0, indent=1
-	
+
 	output+="{\n"
 	for(i=1;i<numpnts(t_tokentext)-1;i+=1)
 
@@ -688,9 +688,9 @@ function /s prettyJSONfmt(jstr)
 				output+=(getIndent(indent)+key+": "+val+",\n")
 			endif
 		endif
-		
+
 	endfor
-	
+
 	return output[0,strlen(output)-3]+"\n}\n"
 end
 
@@ -769,15 +769,15 @@ end
 
 function /S escapeQuotes(str)
 	string str
-	
+
 	variable i=0, escaped=0
 	string output = ""
 	do
-	
+
 		if(i>strlen(str)-1)
 			break
 		endif
-		
+
 		// check if the current character is escaped
 		if(i!=0)
 			if( CmpStr(str[i-1], "\\") == 0)
@@ -786,29 +786,29 @@ function /S escapeQuotes(str)
 				escaped = 0
 			endif
 		endif
-	
+
 		// escape quotes
 		if( CmpStr(str[i], "\"" ) == 0 && escaped == 0)
 			// this is an unescaped quote
 			str = str[0,i-1] + "\\" + str[i,inf]
 		endif
 		i+=1
-		
+
 	while(1==1)
 	return str
 end
 
 function /S unescapeQuotes(str)
 	string str
-	
+
 	variable i=0, escaped=0
 	string output = ""
 	do
-	
+
 		if(i>strlen(str)-1)
 			break
 		endif
-		
+
 		// check if the current character is escaped
 		if(i!=0)
 			if( CmpStr(str[i-1], "\\") == 0)
@@ -817,14 +817,14 @@ function /S unescapeQuotes(str)
 				escaped = 0
 			endif
 		endif
-	
+
 		// escape quotes
 		if( CmpStr(str[i], "\"" ) == 0 && escaped == 1)
 			// this is an unescaped quote
 			str = str[0,i-2] + str[i,inf]
 		endif
 		i+=1
-		
+
 	while(1==1)
 	return str
 end
@@ -833,18 +833,18 @@ function/s removeLiteralQuotes(str)
 	// removes single outermost quotes
 	// double quotes only
 	string str
-	
+
 	variable i=0, openQuotes=0
 	for(i=0;i<strlen(str);i+=1)
 		if(CmpStr(str[i],"\"")==0)
 			openQuotes+=1
 		endif
-		
+
 		if(openQuotes>0 && CmpStr(str[i],"\"")!=0)
 			break
 		endif
 	endfor
-	
+
 	if(openQuotes==0)
 		print "[ERROR] String not surrounded by quotes. str: "+str
 		return ""
@@ -853,19 +853,19 @@ function/s removeLiteralQuotes(str)
 	elseif(openQuotes>3)
 		openQuotes=3
 	endif
-	
+
 	str = str[i,inf]
 	variable j, closeQuotes=0
 	for(j=strlen(str); j>0; j-=1)
-	
+
 		if(CmpStr(str[j],"\"")==0)
 			closeQuotes+=1
 		endif
-		
+
 		if(closeQuotes==openQuotes)
 			break
 		endif
-		
+
 	endfor
 
 	return str[0,j-1]
