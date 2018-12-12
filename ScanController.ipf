@@ -263,7 +263,6 @@ function InitScanController([configFile])
 
 	string /g slack_url =  "https://hooks.slack.com/services/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" // url for slack alert
 	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
-	string /g sc_current_config = ""
 
 	string /g sc_hostname = getHostName() // get machine name
 
@@ -329,7 +328,7 @@ function/s sc_createConfig()
 	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts, sc_Instr
 	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
 	nvar sc_PrintRaw, sc_PrintCalc, filenum
-	svar sc_current_config, sc_hostname
+	svar sc_hostname
 	variable refnum
 	string configfile
 	string configstr = "", tmpstr = ""
@@ -396,7 +395,7 @@ function sc_loadConfig(configfile)
 	string configfile
 	string jstr
 	nvar sc_PrintRaw, sc_PrintCalc
-	svar sc_current_config, sc_current_config
+	svar sc_current_config
 
 	// load JSON string from config file
 	printf "Loading configuration from: %s\n", configfile
