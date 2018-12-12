@@ -644,21 +644,46 @@ end
 
 function/s getIndent(level)
 	// returning whitespace for formatting strings
+	// level = # of tabs, 1 tab = 4 spaces
 	variable level
 
 	variable i=0
 	string output = ""
 	for(i=0;i<level;i+=1)
-		output += "  "
+		output += "    "
 	endfor
 
 	return output
 end
 
 function /s prettyJSONfmt(jstr)
+	// this is a placeholder for later
 	string jstr
 	
-	return jstr
+	JSONSimple jstr
+	wave/t t_tokentext
+	wave w_tokentype, w_tokensize, w_tokenparent
+	variable i=0, indent=1
+	
+	printf "{\n"
+	for(i=1;i<numpnts(t_tokentext);i+=1)
+//		print i, w_tokentype[i], w_tokensize[i], w_tokenparent[i], t_tokentext[i]
+
+		// print keys
+		if ( w_tokentype[i]==3 && w_tokensize[i]>0 )
+			if( w_tokenparent[i]==0 )
+				indent = 1
+				printf "%s%s: ", getIndent(indent), t_tokentext[i]
+			else
+				indent +=1
+				printf "%s%s: ", getIndent(indent), t_tokentext[i]
+			endif
+		endif
+		
+	endfor
+	printf "\n}"
+	
+//	return jstr
 end
 
 /////////////////////////////////
