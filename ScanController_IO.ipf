@@ -658,29 +658,30 @@ end
 
 function /s prettyJSONfmt(jstr)
 	// this could be much prettier
-	// but i need to stop right now
 	string jstr
+	string output="", key="", val=""
 	
 	JSONSimple jstr
 	wave/t t_tokentext
 	wave w_tokentype, w_tokensize, w_tokenparent
 	variable i=0, indent=1
 	
-	printf "{\n"
+	output+="{\n"
 	for(i=1;i<numpnts(t_tokentext);i+=1)
 
-		// print keys
+		// print only at single indent level
 		if ( w_tokentype[i]==3 && w_tokensize[i]>0 )
 			if( w_tokenparent[i]==0 )
 				indent = 1
-				printf "%s%s: %s,\n", getIndent(indent), t_tokentext[i], t_tokentext[i+1]
+				t_tokentext[i]
+				output+=(getIndent(indent)+t_tokentext[i]+": "+t_tokentext[i+1]+",\n")
 			endif
 		endif
 		
 	endfor
-	printf "}\n\n"
+	output+="}\n\n"
 	
-//	return jstr
+	return output
 end
 
 /////////////////////////////////

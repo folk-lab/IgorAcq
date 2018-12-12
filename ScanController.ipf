@@ -303,6 +303,7 @@ function/s sc_createconfig()
 	string configstr = "", tmpstr = ""
 	
 	configfile = "sc" + num2istr(unixtime()) + ".json"
+	print configfile
 
 	// wave names
 	tmpstr = addJSONkeyval(tmpstr, "raw", textWave2StrArray(sc_RawWaveNames))
@@ -347,8 +348,8 @@ function/s sc_createconfig()
 	configstr = addJSONkeyval(configstr, "filenum", num2istr(filenum))
 
 	sc_current_config = configfile
-	writetofile(configstr, configfile, "config")
-	return configstr
+	writetofile(prettyJSONfmt(configstr), configfile, "config")
+
 end
 
 function sc_loadConfig(configfile)
