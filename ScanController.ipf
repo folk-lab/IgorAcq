@@ -236,16 +236,16 @@ function InitScanController([configFile, srv_push])
 	string /g sc_hostname = getHostName() // get machine name
 
 	// deal with config file
-	string /g sc_current_config = ""
-	newpath /C/O/Q config getExpPath("config", full=2) // create/overwrite config path
-	if(paramisdefault(configFile))
-		// look for newest config file
-		string filelist = greplist(indexedfile(config,-1,".json"),"sc")
-		if(itemsinlist(filelist)>0)
-			// read content into waves
-			filelist = SortList(filelist, ";", 1+16)
-			sc_loadConfig(StringFromList(0,filelist, ";"))
-		else
+//	string /g sc_current_config = ""
+//	newpath /C/O/Q config getExpPath("config", full=2) // create/overwrite config path
+//	if(paramisdefault(configFile))
+//		// look for newest config file
+//		string filelist = greplist(indexedfile(config,-1,".json"),"sc")
+//		if(itemsinlist(filelist)>0)
+//			// read content into waves
+//			filelist = SortList(filelist, ";", 1+16)
+//			sc_loadConfig(StringFromList(0,filelist, ";"))
+//		else
 			// if there are no config files, use defaults
 			// These arrays should have the same size. Their indeces correspond to each other.
 			make/t/o sc_RawWaveNames = {"g1x", "g1y"} // Wave names to be created and saved
@@ -280,10 +280,10 @@ function InitScanController([configFile, srv_push])
 			else
 				printf "Current filenum is %d\n", filenum
 			endif
-		endif
-	else
-		sc_loadconfig(configFile)
-	endif
+//		endif
+//	else
+//		sc_loadconfig(configFile)
+//	endif
 
 	sc_rebuildwindow()
 
@@ -334,9 +334,6 @@ function/s sc_createconfig()
 
 	// async checkboxes
 	configstr = addJSONkeyval(configstr, "meas_async", wave2BoolArray(sc_measAsync))
-	
-	// user
-	configstr = addJSONkeyval(configstr, "user", "nik", addQuotes=1)
 
 	// scripts
 	tmpstr = ""
@@ -373,7 +370,7 @@ function sc_loadConfig(configfile)
 	
 	// waves
 	loadStrArray2textWave(getJSONvalue(jstr,"wave_names:raw"),"sc_RawWaveNames")
-	loadStrArray2textWave(getJSONvalue(jstr,"wave_neames:calc"),"sc_CalcWaveNames")
+	loadStrArray2textWave(getJSONvalue(jstr,"wave_names:calc"),"sc_CalcWaveNames")
 
 	// record checkboxes
 	loadBoolArray2wave(getJSONvalue(jstr,"record_waves:raw"),"sc_RawRecord")
@@ -384,7 +381,7 @@ function sc_loadConfig(configfile)
 	loadBoolArray2wave(getJSONvalue(jstr,"plot_waves:calc"),"sc_CalcPlot")
 
 	// async checkboxes
-	loadBoolArray2wave(getJSONvalue(jstr,"meas_async:async"),"sc_measAsync")
+	loadBoolArray2wave(getJSONvalue(jstr,"meas_async"),"sc_measAsync")
 
 	// print_to_history
 	loadBool2var(getJSONvalue(jstr,"print_to_history:raw"),"sc_PrintRaw")

@@ -480,7 +480,7 @@ end
 
 function bool2Num(str)
 	string str
-	str = removeLiteralQuotes(str)
+	str = TrimString(str)
 	if(StringMatch(LowerStr(str), "true")==1)
 		// use string match to ignore whitespace
 		return 1
