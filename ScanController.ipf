@@ -209,6 +209,38 @@ end
 //// start scan controller ////
 ///////////////////////////////
 
+function sc_openInstrConnections()
+	// open all VISA connections to instruments
+	// this is a simple as running through the list defined
+	//     in the scancontroller window
+	wave /T sc_Instr
+	
+	variable i=0
+	string command = ""
+	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
+		command = TrimString(sc_Instr[i][0])
+		if(strlen(command)>0)
+			execute(command)
+		endif
+	endfor
+end
+
+function sc_openInstrGUI()
+	// open GUIs for instruments
+	// this is a simple as running through the list defined
+	//     in the scancontroller window
+	wave /T sc_Instr
+	
+	variable i=0
+	string command = ""
+	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
+		command = TrimString(sc_Instr[i][1])
+		if(strlen(command)>0)
+			execute(command)
+		endif
+	endfor
+end
+
 function InitScanController([configFile, srv_push])
 
 	string configFile // use this to point to a specific old config
@@ -236,16 +268,16 @@ function InitScanController([configFile, srv_push])
 	string /g sc_hostname = getHostName() // get machine name
 
 	// deal with config file
-//	string /g sc_current_config = ""
-//	newpath /C/O/Q config getExpPath("config", full=2) // create/overwrite config path
-//	if(paramisdefault(configFile))
-//		// look for newest config file
-//		string filelist = greplist(indexedfile(config,-1,".json"),"sc")
-//		if(itemsinlist(filelist)>0)
-//			// read content into waves
-//			filelist = SortList(filelist, ";", 1+16)
-//			sc_loadConfig(StringFromList(0,filelist, ";"))
-//		else
+	string /g sc_current_config = ""
+	newpath /C/O/Q config getExpPath("config", full=2) // create/overwrite config path
+	if(paramisdefault(configFile))
+		// look for newest config file
+		string filelist = greplist(indexedfile(config,-1,".json"),"sc")
+		if(itemsinlist(filelist)>0)
+			// read content into waves
+			filelist = SortList(filelist, ";", 1+16)
+			sc_loadConfig(StringFromList(0,filelist, ";"))
+		else
 			// if there are no config files, use defaults
 			// These arrays should have the same size. Their indeces correspond to each other.
 			make/t/o sc_RawWaveNames = {"g1x", "g1y"} // Wave names to be created and saved
@@ -280,10 +312,10 @@ function InitScanController([configFile, srv_push])
 			else
 				printf "Current filenum is %d\n", filenum
 			endif
-//		endif
-//	else
-//		sc_loadconfig(configFile)
-//	endif
+		endif
+	else
+		sc_loadconfig(configFile)
+	endif
 
 	sc_rebuildwindow()
 
@@ -539,8 +571,8 @@ Window ScanController() : Panel
 	ListBox sc_Instr,pos={9,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25},size={sc_InnerBoxW,(sc_InnerBoxH+sc_InnerBoxSpacing)*3},fsize=14,frame=2,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1, editStyle=1
 
 	// buttons
-	button connect, pos={10,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_connectInstr,title="Connect Instr"
-	button gui, pos={140,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_openGUIs,title="Open All GUI"
+	button connect, pos={10,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=OpenAllInstrConnections,title="Connect Instr"
+	button gui, pos={140,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=OpenAllInstrGUI,title="Open All GUI"
 	button killabout, pos={270,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={140,20},proc=sc_controlwindows,title="Kill Sweep Controls"
 	button killgraphs, pos={420,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_killgraphs,title="Close All Graphs"
 	button updatebutton, pos={550,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={110,20},proc=sc_updatewindow,title="Update"
@@ -679,6 +711,10 @@ function sc_CheckboxClicked(ControlName, Value)
 	endif
 end
 
+////////////////////////
+/// Initialize Waves ///
+////////////////////////
+
 function sc_checkAsyncScript(str)
 	// returns -1 if formatting is bad
 	// could be better
@@ -715,6 +751,8 @@ function sc_checkAsyncScript(str)
 end
 
 function sc_findAsyncMeasurements()
+	// go through RawScripts and look for valid async measurements
+	//    wherever the meas_async box is checked in the window
 	nvar sc_is2d
 	wave /t sc_RawScripts, sc_RawWaveNames
 	wave sc_RawRecord, sc_RawPlot, sc_measAsync
@@ -791,6 +829,7 @@ function sc_findAsyncMeasurements()
 
 	if(instrAsync<2)
 		// no point in doing anyting async is only one instrument is capable of it
+		// will uncheck boxes automatically
 		make /o/n=(numpnts(sc_RawScripts)) sc_measAsync = 0
 	endif
 
@@ -950,8 +989,6 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 				cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
 			endif
 		endif
-		// Add "[i]" to calculation scripts if needed
-		sc_CalcScripts[i] = construct_calc_script(sc_CalcScripts[i])
 		i+=1
 	while (i<numpnts(sc_CalcWaveNames))
 
@@ -1487,37 +1524,6 @@ function sc_KillThreads(tgID)
 		printf "ThreadGroupRelease failed. No fatal errors, will continue.\r"
 	endif
 
-end
-
-function/s construct_calc_script(script)
-	// adds "[i]" to calculation scripts
-	string script
-	string test_wave
-	variable i=0, j=0, strpos, numptsRaw, numptsCalc
-	wave/t sc_RawWaveNames, sc_CalcWaveNames
-
-	numptsRaw = numpnts(sc_RawWaveNames)
-	numptsCalc = numpnts(sc_CalcWaveNames)
-
-	for(i=0;i<numptsRaw+numptsCalc;i+=1)
-		j=0
-		if(i<numptsRaw)
-			test_wave = sc_RawWaveNames[i]
-		else
-			test_wave = sc_CalcWaveNames[i-numptsRaw]
-		endif
-		do
-			strpos = strsearch(script,test_wave,j)
-			if(strpos >= 0 && cmpstr(script[strpos+strlen(test_wave)],"[")==0)
-				//do nothing
-			elseif(strpos >= 0)
-				script[strpos+strlen(test_wave)] = "[i]"
-			endif
-			j=strpos+strlen(test_wave)
-		while(strpos >= 0)
-	endfor
-
-	return script
 end
 
 ////////////////////////
