@@ -657,7 +657,8 @@ function/s getIndent(level)
 end
 
 function /s prettyJSONfmt(jstr)
-	// this is a placeholder for later
+	// this could be much prettier
+	// but i need to stop right now
 	string jstr
 	
 	JSONSimple jstr
@@ -667,21 +668,17 @@ function /s prettyJSONfmt(jstr)
 	
 	printf "{\n"
 	for(i=1;i<numpnts(t_tokentext);i+=1)
-//		print i, w_tokentype[i], w_tokensize[i], w_tokenparent[i], t_tokentext[i]
 
 		// print keys
 		if ( w_tokentype[i]==3 && w_tokensize[i]>0 )
 			if( w_tokenparent[i]==0 )
 				indent = 1
-				printf "%s%s: ", getIndent(indent), t_tokentext[i]
-			else
-				indent +=1
-				printf "%s%s: ", getIndent(indent), t_tokentext[i]
+				printf "%s%s: %s,\n", getIndent(indent), t_tokentext[i], t_tokentext[i+1]
 			endif
 		endif
 		
 	endfor
-	printf "\n}"
+	printf "}\n\n"
 	
 //	return jstr
 end

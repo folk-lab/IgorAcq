@@ -327,7 +327,7 @@ function/s sc_createconfig()
 	configstr = addJSONkeyval(configstr, "meas_async", tmpstr)
 	
 	// user
-	configstr = addJSONkeyval(configstr, "user", "nik")
+	configstr = addJSONkeyval(configstr, "user", "nik", addQuotes=1)
 
 	// scripts
 	tmpstr = ""
