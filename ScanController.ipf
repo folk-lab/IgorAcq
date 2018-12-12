@@ -305,101 +305,50 @@ function/s sc_createconfig()
 	configfile = "sc" + num2istr(unixtime()) + ".json"
 
 	// wave names
-	tmpstr = addJSONkeyvalpair(tmpstr, "raw", textWave2StrArray(sc_RawWaveNames))
-	tmpstr = addJSONkeyvalpair(tmpstr, "calc", textWave2StrArray(sc_CalcWaveNames))
-	configstr = addJSONkeyvalpair(configstr, "wave_names", tmpstr)
+	tmpstr = addJSONkeyval(tmpstr, "raw", textWave2StrArray(sc_RawWaveNames))
+	tmpstr = addJSONkeyval(tmpstr, "calc", textWave2StrArray(sc_CalcWaveNames))
+	configstr = addJSONkeyval(configstr, "wave_names", tmpstr)
 
 	// record checkboxes
 	tmpstr = ""
-	tmpstr = addJSONkeyvalpair(tmpstr, "raw", wave2BoolArray(sc_RawRecord))
-	tmpstr = addJSONkeyvalpair(tmpstr, "calc", wave2BoolArray(sc_CalcRecord))
-	configstr = addJSONkeyvalpair(configstr, "record_waves", tmpstr)
+	tmpstr = addJSONkeyval(tmpstr, "raw", wave2BoolArray(sc_RawRecord))
+	tmpstr = addJSONkeyval(tmpstr, "calc", wave2BoolArray(sc_CalcRecord))
+	configstr = addJSONkeyval(configstr, "record_waves", tmpstr)
 
 	// plot checkboxes
 	tmpstr = ""
-	tmpstr = addJSONkeyvalpair(tmpstr, "raw",  wave2BoolArray(sc_RawPlot))
-	tmpstr = addJSONkeyvalpair(tmpstr, "calc",  wave2BoolArray(sc_CalcPlot))
-	configstr = addJSONkeyvalpair(configstr, "plot_waves", tmpstr)
+	tmpstr = addJSONkeyval(tmpstr, "raw",  wave2BoolArray(sc_RawPlot))
+	tmpstr = addJSONkeyval(tmpstr, "calc",  wave2BoolArray(sc_CalcPlot))
+	configstr = addJSONkeyval(configstr, "plot_waves", tmpstr)
 
 	// async checkboxes
 	tmpstr = ""
-	tmpstr = addJSONkeyvalpair(tmpstr, "raw",  wave2BoolArray(sc_measAsync))
-	configstr = addJSONkeyvalpair(configstr, "meas_async", tmpstr)
+	tmpstr = addJSONkeyval(tmpstr, "raw",  wave2BoolArray(sc_measAsync))
+	configstr = addJSONkeyval(configstr, "meas_async", tmpstr)
+	
+	// user
+	configstr = addJSONkeyval(configstr, "user", "nik")
 
 	// scripts
 	tmpstr = ""
-	tmpstr = addJSONkeyvalpair(tmpstr, "raw", textWave2StrArray(sc_RawScripts))
-	tmpstr = addJSONkeyvalpair(tmpstr, "calc", textWave2StrArray(sc_CalcScripts))
-	configstr = addJSONkeyvalpair(configstr, "scripts", tmpstr)
+	tmpstr = addJSONkeyval(tmpstr, "raw", textWave2StrArray(sc_RawScripts))
+	tmpstr = addJSONkeyval(tmpstr, "calc", textWave2StrArray(sc_CalcScripts))
+	configstr = addJSONkeyval(configstr, "scripts", tmpstr)
 
 	// log instrument info
-	configstr = addJSONkeyvalpair(configstr, "instruments", textWave2StrArray(sc_Instr))
+	configstr = addJSONkeyval(configstr, "instruments", textWave2StrArray(sc_Instr))
 
 	// print_to_history
 	tmpstr = ""
-	tmpstr = addJSONkeyvalpair(tmpstr, "raw", num2bool(sc_PrintRaw))
-	tmpstr = addJSONkeyvalpair(tmpstr, "calc", num2bool(sc_PrintCalc))
-	configstr = addJSONkeyvalpair(configstr, "print_to_history", tmpstr)
+	tmpstr = addJSONkeyval(tmpstr, "raw", num2bool(sc_PrintRaw))
+	tmpstr = addJSONkeyval(tmpstr, "calc", num2bool(sc_PrintCalc))
+	configstr = addJSONkeyval(configstr, "print_to_history", tmpstr)
 
-	configstr = addJSONkeyvalpair(configstr, "filenum", num2istr(filenum))
+	configstr = addJSONkeyval(configstr, "filenum", num2istr(filenum))
 
-//	sc_current_config = configfile
-//	writetofile(configstr, configfile, "config")
+	sc_current_config = configfile
+	writetofile(configstr, configfile, "config")
 	return configstr
-end
-
-
-//function/s sc_createconfig()
-//	// create a new config.toml file
-//	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts, sc_Instr
-//	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
-//	nvar sc_PrintRaw, sc_PrintCalc, filenum
-//	svar sc_current_config
-//	string configfile
-//	string configstr = "", tmpstr = ""
-//
-//	configfile = "sc" + num2istr(unixtime()) + ".toml"
-//	configstr = addTOMLcomment(configfile,str=configstr)
-//
-//	// wave names
-//	configstr = addTOMLblock("waves",str=configstr)
-//	configstr = addTOMLkey("raw",TextWaveToStrArray(sc_RawWaveNames),str=configstr)
-//	configstr = addTOMLkey("calc",TextWaveToStrArray(sc_CalcWaveNames),str=configstr)
-//
-//	// record checkboxes
-//	configstr = addTOMLblock("checkboxes",str=configstr)
-//	configstr = addTOMLblock("checkboxes.record",str=configstr,indent="\t")
-//	configstr = addTOMLkey("raw",numWaveToBoolArray(sc_RawRecord),str=configstr,indent="\t")
-//	configstr = addTOMLkey("calc",numWaveToBoolArray(sc_CalcRecord),str=configstr,indent="\t")
-//
-//	// plot checkboxes
-//	configstr = addTOMLblock("checkboxes.plot",str=configstr,indent="\t")
-//	configstr = addTOMLkey("raw",numWaveToBoolArray(sc_RawPlot),str=configstr,indent="\t")
-//	configstr = addTOMLkey("calc",numWaveToBoolArray(sc_CalcPlot),str=configstr,indent="\t")
-//
-//	// async checkboxes
-//	configstr = addTOMLblock("checkboxes.async",str=configstr,indent="\t")
-//	configstr = addTOMLkey("async",numWaveToBoolArray(sc_measAsync),str=configstr,indent="\t")
-//
-//	// print_to_history
-//	configstr = addTOMLblock("checkboxes.history",str=configstr,indent="\t")
-//	configstr = addTOMLkey("raw",numToBool(sc_PrintRaw),str=configstr,indent="\t")
-//	configstr = addTOMLkey("calc",numToBool(sc_PrintCalc),str=configstr,indent="\t")
-//
-//	// scripts
-//	configstr = addTOMLblock("scripts",str=configstr)
-//	configstr = addTOMLkey("raw",TextWaveToStrArray(sc_RawScripts),str=configstr)
-//	configstr = addTOMLkey("calc",TextWaveToStrArray(sc_CalcScripts),str=configstr)
-//
-//	// log instrument info
-//	configstr = addTOMLblock("instruments",str=configstr)
-//	configstr = addTOMLkey("info", textWaveToStrArray(sc_Instr),str=configstr)
-//
-//	//filenum
-//	configstr = addTOMLkey("filenum",num2str(filenum),str=configstr,indent="\n")
-//
-//	sc_current_config = configfile
-//	writetofile(configstr,configfile,"config")
 end
 
 function sc_loadConfig(configfile)

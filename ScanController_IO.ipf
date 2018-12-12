@@ -597,7 +597,7 @@ function/s textWave2StrArray(w)
 	return list
 end
 
-function/s addJSONkeyvalpair(JSONstr,key,value,[addquotes])
+function/s addJSONkeyval(JSONstr,key,value,[addquotes])
 	// returns a valid JSON string with a new key,value pair added.
 	// if JSONstr is empty, start a new JSON object
 	string JSONstr, key, value
@@ -627,7 +627,6 @@ function/s addJSONkeyvalpair(JSONstr,key,value,[addquotes])
 			if( (isWhitespace(JSONstr[j])==1) )
 				j-=1
 			elseif( (CmpStr(JSONstr[j],"}")==0) )
-				print "found bracket"
 				j-=1
 				break
 			else
@@ -641,6 +640,25 @@ function/s addJSONkeyvalpair(JSONstr,key,value,[addquotes])
 		return "{"+JSONstr[i,j]+"\""+key+"\":"+value+"}"
 	endif
 
+end
+
+function/s getIndent(level)
+	// returning whitespace for formatting strings
+	variable level
+
+	variable i=0
+	string output = ""
+	for(i=0;i<level;i+=1)
+		output += "  "
+	endfor
+
+	return output
+end
+
+function /s prettyJSONfmt(jstr)
+	string jstr
+	
+	return jstr
 end
 
 /////////////////////////////////
@@ -779,9 +797,8 @@ function /S unescapeQuotes(str)
 end
 
 function/s removeLiteralQuotes(str)
-	// removes outermost quotes
-	// handles single or triple quotes (TOML standards)
-	// there are about ten different ways to break this
+	// removes single outermost quotes
+	// double quotes only
 	string str
 	
 	variable i=0, openQuotes=0
