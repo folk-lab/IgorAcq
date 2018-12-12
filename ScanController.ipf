@@ -240,7 +240,7 @@ function InitScanController([configFile, srv_push])
 	newpath /C/O/Q config getExpPath("config", full=2) // create/overwrite config path
 	if(paramisdefault(configFile))
 		// look for newest config file
-		string filelist = greplist(indexedfile(config,-1,".toml"),"sc")
+		string filelist = greplist(indexedfile(config,-1,".json"),"sc")
 		if(itemsinlist(filelist)>0)
 			// read content into waves
 			filelist = SortList(filelist, ";", 1+16)
@@ -315,6 +315,7 @@ function/s sc_createconfig()
 	configstr = addJSONkeyval(configstr, "instruments", textWave2StrArray(sc_Instr))
 
 	// wave names
+	tmpstr = ""
 	tmpstr = addJSONkeyval(tmpstr, "raw", textWave2StrArray(sc_RawWaveNames))
 	tmpstr = addJSONkeyval(tmpstr, "calc", textWave2StrArray(sc_CalcWaveNames))
 	configstr = addJSONkeyval(configstr, "wave_names", tmpstr)
@@ -332,9 +333,7 @@ function/s sc_createconfig()
 	configstr = addJSONkeyval(configstr, "plot_waves", tmpstr)
 
 	// async checkboxes
-	tmpstr = ""
-	tmpstr = addJSONkeyval(tmpstr, "raw",  wave2BoolArray(sc_measAsync))
-	configstr = addJSONkeyval(configstr, "meas_async", tmpstr)
+	configstr = addJSONkeyval(configstr, "meas_async", wave2BoolArray(sc_measAsync))
 	
 	// user
 	configstr = addJSONkeyval(configstr, "user", "nik", addQuotes=1)
@@ -369,37 +368,37 @@ function sc_loadConfig(configfile)
 	sc_current_config = configfile
 	jstr = readtxtfile(configfile,"config")
 
+	// instruments
+	loadStrArray2textWave(getJSONvalue(jstr, "instruments"), "sc_Instr")
+	
 	// waves
-	loadStrArray2textWave(getJSONvalue(jstr,"waves:raw"),"sc_RawWaveNames")
-	loadStrArray2textWave(getJSONvalue(jstr,"waves:calc"),"sc_CalcWaveNames")
+	loadStrArray2textWave(getJSONvalue(jstr,"wave_names:raw"),"sc_RawWaveNames")
+	loadStrArray2textWave(getJSONvalue(jstr,"wave_neames:calc"),"sc_CalcWaveNames")
 
 	// record checkboxes
-//	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.record:raw"),"sc_RawRecord")
-//	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.record:calc"),"sc_CalcRecord")
+	loadBoolArray2wave(getJSONvalue(jstr,"record_waves:raw"),"sc_RawRecord")
+	loadBoolArray2wave(getJSONvalue(jstr,"record_waves:calc"),"sc_CalcRecord")
 
 	// plot checkboxes
-//	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.plot:raw"),"sc_RawPlot")
-//	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.plot:calc"),"sc_CalcPlot")
+	loadBoolArray2wave(getJSONvalue(jstr,"plot_waves:raw"),"sc_RawPlot")
+	loadBoolArray2wave(getJSONvalue(jstr,"plot_waves:calc"),"sc_CalcPlot")
 
 	// async checkboxes
-//	LoadBoolArrayToWave(getTOMLvalue(TOMLstr,"checkboxes.async:async"),"sc_measAsync")
+	loadBoolArray2wave(getJSONvalue(jstr,"meas_async:async"),"sc_measAsync")
 
 	// print_to_history
-//	LoadBoolToVar(getTOMLvalue(TOMLstr,"checkboxes.history:raw"),"sc_PrintRaw")
-//	LoadBoolToVar(getTOMLvalue(TOMLstr,"checkboxes.history:calc"),"sc_PrintCalc")
+	loadBool2var(getJSONvalue(jstr,"print_to_history:raw"),"sc_PrintRaw")
+	loadBool2var(getJSONvalue(jstr,"print_to_history:calc"),"sc_PrintCalc")
 
 	// scripts
-//	LoadStrArrayToWave(getTOMLvalue(TOMLstr,"scripts:raw"),"sc_RawScripts")
-//	LoadStrArrayToWave(getTOMLvalue(TOMLstr,"scripts:calc"),"sc_CalcScripts")
-
-	// executable string to get logs
-//	LoadTextToString(getTOMLvalue(TOMLstr,"logstring"),"sc_Logstr")
+	loadStrArray2textWave(getJSONvalue(jstr,"scripts:raw"),"sc_RawScripts")
+	loadStrArray2textWave(getJSONvalue(jstr,"scripts:calc"),"sc_CalcScripts")
 
 	//filenum
-//	LoadNumToVar(getTOMLvalue(TOMLstr,"filenum"),"sc_filenum")
+	loadNum2var(getJSONvalue(jstr,"filenum"),"sc_filenum")
 
 	// reload ScanController window
-//	sc_rebuildwindow()
+	sc_rebuildwindow()
 end
 
 /////////////////////
@@ -1999,7 +1998,7 @@ function sc_findNewFiles(datnum)
 	if(V_flag==0 && V_isFolder==1)
 		string configpath = getExpPath("config", full=1)
 		string configlist=""
-		configlist = greplist(indexedfile(config,-1,".toml"),"sc")
+		configlist = greplist(indexedfile(config,-1,".json"),"sc")
 	endif
 
 	if(itemsinlist(configlist)>0)
