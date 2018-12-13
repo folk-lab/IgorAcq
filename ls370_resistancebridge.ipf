@@ -76,23 +76,23 @@ end
 //// Get Functions ////
 //////////////////////
 
-function getLS370temp(instrID, plate, [max_age]) // Units: K
+function getLS370temp(instrID, plate, [max_age_s]) // Units: K
 	// returns the temperature of the selected "plate".
 	// avaliable plates on BF systems: mc (mixing chamber), still, magnet, 4K, 50K
 	// avaliable plates on IGH systems: mc (mixing chamber), cold plate, still, 1K, sorb
-	// max_age determines how old a reading can be (in sec), before I demand a new one
+	// max_age_s determines how old a reading can be (in sec), before I demand a new one
 	// from the server
-	// max_age=0 always requests a new reading
+	// max_age_s=0 always requests a new reading
 	string instrID
 	string plate
-	variable max_age
+	variable max_age_s
 	svar ls_system, bfchannellookup, ighchannellookup
 	variable channel_idx, channel
 	string command
 	svar ls_token
 
-	if(paramisdefault(max_age))
-		max_age = 120
+	if(paramisdefault(max_age_s))
+		max_age_s = 120
 	endif
 
 	strswitch(ls_system)
@@ -118,30 +118,30 @@ function getLS370temp(instrID, plate, [max_age]) // Units: K
 			break
 	endswitch
 
-	sprintf command, "get-channel-data/%d?max_age=%d&_at_=%s", channel, max_age, ls_token
+	sprintf command, "get-channel-data/%d?max_age_s=%d&_at_=%s", channel, max_age_s, ls_token
 
 	string result = sendLS370(instrID,command,"get",keys="data:temperature")
 	return str2num(result)
 end
 
-function getLS370heaterpower(instrID,heater, [max_age]) // Units: mW
+function getLS370heaterpower(instrID,heater, [max_age_s]) // Units: mW
 	// returns the power of the selected heater.
 	// avaliable heaters on BF systems: still (analog 2), mc
 	// avaliable heaters on IGH systems: sorb (analog 1), still (analog 2), mc
-	// max_age determines how old a reading can be (in sec), before a new is demanded
+	// max_age_s determines how old a reading can be (in sec), before a new is demanded
 	// from the server
-	// max_age=0 always requests a new reading
+	// max_age_s=0 always requests a new reading
 	string instrID
 	string heater
-	variable max_age
+	variable max_age_s
 	svar ls_system, bfheaterlookup, ighheaterlookup
 	variable heater_idx, channel
 	string command
 	svar ls_token
 
-	if(paramisdefault(max_age))
+	if(paramisdefault(max_age_s))
 		//return GetHeaterPowerDB(heater)
-		max_age = 120
+		max_age_s = 120
 	endif
 
 	strswitch(ls_system)
@@ -168,9 +168,9 @@ function getLS370heaterpower(instrID,heater, [max_age]) // Units: mW
 	endswitch
 
 	if(channel > 0)
-		sprintf command, "get-analog-data/%d?max_age=%d&_at_=%s", channel, max_age, ls_token
+		sprintf command, "get-analog-data/%d?max_age_s=%d&_at_=%s", channel, max_age_s, ls_token
 	else
-		sprintf command, "get-heater-data?max_age=%d&_at_=%s", max_age, ls_token
+		sprintf command, "get-heater-data?max_age_s=%d&_at_=%s", max_age_s, ls_token
 	endif
 
 	return str2num(sendLS370(instrID,command,"get", keys="power_mw"))
@@ -1022,13 +1022,13 @@ end
 ///// Status /////
 //////////////////
 
-function/s getLS370status(instrID, [max_age])
+function/s getLS370status(instrID, [max_age_s])
 	// FIX pressure readings
 	// returns JSON string with current status
 	string instrID
-	variable max_age
-	if(paramisdefault(max_age))
-		max_age=120
+	variable max_age_s
+	if(paramisdefault(max_age_s))
+		max_age_s=120
 	endif
 
 //	svar ls_system, ighgaugelookup
@@ -1037,22 +1037,22 @@ function/s getLS370status(instrID, [max_age])
 //
 //	strswitch(ls_system)
 //		case "bfsmall":
-//			buffer = addJSONkeyvalpair(buffer,"MC K",num2str(getLS370temp(instrID, "mc", max_age=max_age)))
-//			buffer = addJSONkeyvalpair(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age=max_age)))
-//			buffer = addJSONkeyvalpair(buffer,"4K Plate K",num2str(getLS370temp(instrID, "4K", max_age=max_age)))
-//			buffer = addJSONkeyvalpair(buffer,"Magnet K",num2str(getLS370temp(instrID, "magnet", max_age=max_age)))
-//			buffer = addJSONkeyvalpair(buffer,"50K Plate K",num2str(getLS370temp(instrID, "50K", max_age=max_age)))
+//			buffer = addJSONkeyvalpair(buffer,"MC K",num2str(getLS370temp(instrID, "mc", max_age_s=max_age_s)))
+//			buffer = addJSONkeyvalpair(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age_s=max_age_s)))
+//			buffer = addJSONkeyvalpair(buffer,"4K Plate K",num2str(getLS370temp(instrID, "4K", max_age_s=max_age_s)))
+//			buffer = addJSONkeyvalpair(buffer,"Magnet K",num2str(getLS370temp(instrID, "magnet", max_age_s=max_age_s)))
+//			buffer = addJSONkeyvalpair(buffer,"50K Plate K",num2str(getLS370temp(instrID, "50K", max_age_s=max_age_s)))
 ////			for(i=1;i<7;i+=1)
 ////				gauge = "P"+num2istr(i)
 ////				buffer = addJSONkeyvalpair(buffer,gauge,num2str(GetPressureDB(instrID,gauge)))
 ////			endfor
 //			return addJSONkeyvalpair("","BF Small",buffer)
 //		case "igh":
-//			buffer = addJSONkeyvalpair(buffer,"MC K",num2str(getLS370temp(instrID, "mc", max_age=max_age)))
-//			buffer = addJSONkeyvalpair(buffer,"Cold Plate K",num2str(getLS370temp(instrID, "cold plate", max_age=max_age)))
-//			buffer = addJSONkeyvalpair(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age=max_age)))
-//			buffer = addJSONkeyvalpair(buffer,"1K Pot K",num2str(getLS370temp(instrID, "1K", max_age=max_age)))
-//			buffer = addJSONkeyvalpair(buffer,"Sorb K",num2str(getLS370temp(instrID, "sorb", max_age=max_age)))
+//			buffer = addJSONkeyvalpair(buffer,"MC K",num2str(getLS370temp(instrID, "mc", max_age_s=max_age_s)))
+//			buffer = addJSONkeyvalpair(buffer,"Cold Plate K",num2str(getLS370temp(instrID, "cold plate", max_age_s=max_age_s)))
+//			buffer = addJSONkeyvalpair(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age_s=max_age_s)))
+//			buffer = addJSONkeyvalpair(buffer,"1K Pot K",num2str(getLS370temp(instrID, "1K", max_age_s=max_age_s)))
+//			buffer = addJSONkeyvalpair(buffer,"Sorb K",num2str(getLS370temp(instrID, "sorb", max_age_s=max_age_s)))
 ////			for(i=1;i<6;i+=1)
 ////				gauge = stringfromlist(i,ighgaugelookup)
 ////				buffer = addJSONkeyvalpair(buffer,"P"+num2istr(i),num2str(GetPressureDB(instrID,gauge)))
