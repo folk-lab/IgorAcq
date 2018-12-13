@@ -209,10 +209,11 @@ end
 //// start scan controller ////
 ///////////////////////////////
 
-function sc_openInstrConnections()
+function sc_openInstrConnections(print_cmd)
 	// open all VISA connections to instruments
 	// this is a simple as running through the list defined
 	//     in the scancontroller window
+	variable print_cmd
 	wave /T sc_Instr
 
 	variable i=0
@@ -220,9 +221,13 @@ function sc_openInstrConnections()
 	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
 		command = TrimString(sc_Instr[i][0])
 		if(strlen(command)>0)
-			print "execute: "+command
+			if(print_cmd==1)
+				print ">>> "+command
+			endif
 			execute/Q/Z command
-			print "[ERROR] "+GetErrMessage(V_Flag,2)
+			if(V_flag!=0)
+				print "[ERROR] "+GetErrMessage(V_Flag,2)
+			endif
 		endif
 	endfor
 end
@@ -261,6 +266,7 @@ function InitScanController([configFile])
 		print "[WARNING] Only saving local copies of data."
 	endif
 
+	string /g sc_colormap = "VioletOrangeYellow"
 	string /g slack_url =  "https://hooks.slack.com/services/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" // url for slack alert
 	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
 
@@ -576,7 +582,7 @@ Window ScanController() : Panel
 	ListBox sc_Instr,pos={9,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25},size={sc_InnerBoxW,(sc_InnerBoxH+sc_InnerBoxSpacing)*3},fsize=14,frame=2,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1, editStyle=1
 
 	// buttons
-	button connect, pos={10,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_openInstrConnections,title="Connect Instr"
+	button connect, pos={10,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_OpenInstrButton,title="Connect Instr"
 	button gui, pos={140,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_openInstrGUIs,title="Open All GUI"
 	button killabout, pos={270,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={140,20},proc=sc_controlwindows,title="Kill Sweep Controls"
 	button killgraphs, pos={420,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_killgraphs,title="Close All Graphs"
@@ -586,6 +592,11 @@ Window ScanController() : Panel
 	DrawText 13,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+70,"Press Update to save changes."
 
 EndMacro
+
+function sc_OpenInstrButton(action) : Buttoncontrol
+	string action
+	sc_openInstrConnections(1)
+end
 
 function sc_killgraphs(action) : Buttoncontrol
 	string action
@@ -915,7 +926,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	// because VISA tends to drop connections when the
 	// measurement computer is left idle
 	// we may want to add a function here to setup all the instruments
-	print "[WARNING] VISA instrument connections may have expired if your measurement has been idle."
+	sc_OpenInstrConnections(0)
 
 	// The status of the upcoming scan will be set when waves are initialized.
 	if(!paramisdefault(starty) && !paramisdefault(finy) && !paramisdefault(numptsy))
