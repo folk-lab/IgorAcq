@@ -319,19 +319,20 @@ end
 
 function listGPIBinstr()
 	// find all gpib address with an active device
-	variable status, findlist=0, instrcnt=0, i=0
+	variable findlist=0, instrcnt=0, i=0
 	string instrDesc="", instrtype, instrname, error, summary
 	variable instrID
 
 	// open resource manager
-	nvar /z globalRM
-	if(!nvar_exists(globalRM))
-		openResourceManager()
-		nvar globalRM
+	variable localRM
+	variable status = viOpenDefaultRM(localRM) // open local copy of resource manager
+	if(status < 0)
+		VISAerrormsg("[ERROR]: problem opening resource manager", localRM, status)
+		abort
 	endif
 
 	// print list of serial ports/instruments
-	status = viFindRsrc(globalRM,"GPIB?*INSTR",findlist,instrcnt,instrDesc)
+	status = viFindRsrc(localRM,"GPIB?*INSTR",findlist,instrcnt,instrDesc)
 	if(status < 0)
 		VISAerrormsg("listGPIBAddress -- OpenDefaultRM:", instrID, status)
 		return 0

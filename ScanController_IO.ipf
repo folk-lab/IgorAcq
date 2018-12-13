@@ -70,11 +70,11 @@ function closeSaveFiles()
 	string /g h5name = "dat"+filenumstr+".h5"
 
 	// close metadata
-//	nvar meta_group_id
-//	HDF5CloseGroup /Z meta_group_id
-//	if (V_flag != 0)
-//		Print "HDF5CloseGroup Failed: ", "metadata"
-//	endif
+	nvar meta_group_id
+	HDF5CloseGroup /Z meta_group_id
+	if (V_flag != 0)
+		Print "HDF5CloseGroup Failed: ", "metadata"
+	endif
 
 	// close HDF5 file
 	nvar hdf5_id
