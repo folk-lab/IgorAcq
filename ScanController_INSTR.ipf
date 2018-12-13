@@ -273,7 +273,8 @@ function/s postHTTP(instrID,cmd,payload,headers)
 	string instrID, cmd, payload, headers
 	string response=""
 
-	URLRequest /TIME=10.0 /DSTR=payload url=instrID+cmd, method=post, headers=headers
+	print instrID+cmd, payload
+	URLRequest /TIME=15.0 /DSTR=payload url=instrID+cmd, method=post, headers=headers
 
 	if (V_flag == 0)    // No error
 		response = S_serverResponse // response is a JSON string
@@ -295,6 +296,7 @@ function/s getHTTP(instrID,cmd,headers)
 	string instrID, cmd, headers
 	string response, error
 
+//	print instrID+cmd
 	URLRequest /TIME=15.0 url=instrID+cmd, method=get, headers=headers
 
 	if (V_flag == 0)    // No error

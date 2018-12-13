@@ -328,25 +328,26 @@ end
 //// Set Functions ////
 //////////////////////
 
-function setLS370tempcontrolmode(instrID,mode) // Units: No units
+function setLS370tempcontrolmode(instrID, mode) // Units: No units
 	// sets the temperature control mode
 	// avaliable options are: off (4), PID (1) and Open loop (3)
 	string instrID
 	variable mode
-//	nvar pid_mode, pid_led, mcheater_led, mcheater_set, temp_set
-//	svar ls_system, bfchannellookup, ighchannellookup
-//	variable channel, interval, maxcurrent
-//
+	
+	nvar pid_mode, pid_led, mcheater_led, mcheater_set, temp_set
+	svar ls_system, bfchannellookup, ighchannellookup
+	
+	variable interval, maxcurrent, channel
+
 //	strswitch(ls_system)
 //		case "bfsmall":
-//			channel = whichlistitem("mc",bfchannellookup,";")
-//			channel = str2num(stringfromlist(channel+5,bfchannellookup,";"))
+//			
 //			break
 //		case "igh":
-//			channel = whichlistitem("mc",ighchannellookup,";")
-//			channel = str2num(stringfromlist(channel+5,ighchannellookup,";"))
+//
 //			break
 //		case "bfbig":
+//		
 //			break
 //	endswitch
 //
@@ -381,7 +382,7 @@ function setLS370tempcontrolmode(instrID,mode) // Units: No units
 //	else
 //		abort "Choose between: PID (1), Open loop (3) and off (4)"
 //	endif
-//	pid_mode = mode
+	pid_mode = mode
 end
 
 function setLS370PIDcontrol(instrID,channel,setpoint,maxcurrent) //Units: mK, mA
@@ -605,7 +606,7 @@ function toggleLS370magnetheater(instrID,onoff)
 	string command,payload,cmd
 	svar ls_token
 
-	if(cmpstr(ls_system,"igh") == 0)
+	if(cmpstr(ls_system,"bfsmall") != 0)
 		abort "No heater installed on this system!"
 	endif
 
