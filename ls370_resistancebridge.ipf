@@ -18,15 +18,16 @@
 /// LS37X specific COMM ///
 ///////////////////////////
 
-function openLS370connection(instrID, http_address, [verbose, gui])
+function openLS370connection(instrID, http_address, system, [verbose])
 	// open/test a connection to the LS37X RPi interface written by Ovi
 	//      the whole thing _should_ work for LS370 and LS372
 	// instrID is the name of the global variable that will be used for communication
 	// http_address is exactly what it sounds like
+	// system is the name of the cryostat you are working on: bfsmall, igh, bfbig
 	// verbose=0 will not print any information about the connection
-	// gui=1 will open the Igor GUI for the LS370
-	string instrID, http_address
-	variable verbose, gui
+
+	string instrID, http_address, system
+	variable verbose
 	
 	if(paramisdefault(verbose))
 		verbose=1
@@ -34,43 +35,69 @@ function openLS370connection(instrID, http_address, [verbose, gui])
 		verbose=0
 	endif
 	
-	if(paramisdefault(gui))
-		gui=0
-	elseif(gui!=0)
-		gui=1
-	endif
-	
 	string comm = ""
 	sprintf comm, "name=LS370,instrID=%s,url=%s" instrID, http_address
 	string options = ""
-	openHTTPinstr(comm, options=options, verbose=verbose)
 	
-	if(gui==1)
-		svar localID = $instrID
-		initLS370(localID)
-	else
-		setLS370system() // Set the correct system!
-		createLS370globals() // Create the needed global variables for the GUI
-	endif
+	openHTTPinstr(comm, options=options, verbose=verbose)
+	setLS370system(system)
+	createLS370Gobals()
+	
 end
 
 ////////////////////////////
 //// Initiate Lakeshore ////
 ////////////////////////////
 
-function initLS370(instrID)
-	// opens 
-	string instrID
-	string /g ls370_url = instrID // set global variable for GUI
+function setLS370system(system)
+	// opens a control window and ask user to pick the correct system.
+	// this is important, because it sets the correct url for the selected RPi.
+	// if the wrong url is selected, you risk fucking up others experiment!!!
+	string system
+	string /g ls_system
+	string /g ls_token
 
-	setLS370system() // Set the correct system!
-	createLS370globals() // Create the needed global variables for the GUI
-	// Build main control window
-	dowindow/k Lakeshore
-	execute("lakeshore_window()")
-	// Update current values
-	updateLS370GUI(instrID)
+	string /g ls_system="", ls_token=""
+	strswitch(system)
+		case "bfsmall":
+			ls_system = "bfsmall"
+			ls_token = "72597639"
+			string/g bfchannellookup = "mc;still;magnet;4K;50K;6;5;4;2;1"
+			string/g bfheaterlookup = "mc;still;0;2"
+			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,350,1201,1800,10000}}
+			break
+		case "igh":
+			ls_system = "igh"
+			ls_token = ""
+			string/g ighchannellookup = "mc;cold plate;still;1K;sorb;3;6;5;2;1"
+			string/g ighheaterlookup = "mc;still;sorb;0;2;1"
+			string/g ighgaugelookup = "P1;P2;G1;G2;G3"
+			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,350,1201,1800,10000}}
+			break
+		case "bfbig":
+			ls_system = "bfbig"
+			ls_token = ""
+			print "No support for bfbig yet!"
+			break
+		default:
+			abort "[ERROR] Please choose a supported LS370 system: [bfsmall, igh, bfbig]"
+	endswitch
+
 end
+
+//function initLS370(instrID)
+//	// opens 
+//	string instrID
+//	string /g ls370_url = instrID // set global variable for GUI
+//
+//	setLS370system() // Set the correct system!
+//	createLS370globals() // Create the needed global variables for the GUI
+//	// Build main control window
+//	dowindow/k Lakeshore
+//	execute("lakeshore_window()")
+//	// Update current values
+//	updateLS370GUI(instrID)
+//end
 
 ///////////////////////
 //// Get Functions ////
@@ -269,8 +296,6 @@ end
 
 //// Get Functions - Directly from data base ////
 
-// NOT implimented yet!
-
 //function getLS370tempDB(instrID,plate) // Units: mK
 //	// returns the temperature of the selected "plate".
 //	// avaliable plates on BF systems: mc (mixing chamber), still, magnet, 4K, 50K
@@ -308,55 +333,55 @@ function setLS370tempcontrolmode(instrID,mode) // Units: No units
 	// avaliable options are: off (4), PID (1) and Open loop (3)
 	string instrID
 	variable mode
-	nvar pid_mode, pid_led, mcheater_led, mcheater_set, temp_set
-	svar ls_system, bfchannellookup, ighchannellookup
-	variable channel, interval, maxcurrent
-
-	strswitch(ls_system)
-		case "bfsmall":
-			channel = whichlistitem("mc",bfchannellookup,";")
-			channel = str2num(stringfromlist(channel+5,bfchannellookup,";"))
-			break
-		case "igh":
-			channel = whichlistitem("mc",ighchannellookup,";")
-			channel = str2num(stringfromlist(channel+5,ighchannellookup,";"))
-			break
-		case "bfbig":
-			break
-	endswitch
-
-	if(mode == 1)
-		pid_led = 1
-		mcheater_led = 1
-		PopupMenu mcheater, mode=1
-		SetVariable mcheaterset, disable=2
-		PopupMenu tempcontrol, mode=1
-		interval = 10
-		maxcurrent = estimateheaterrangeLS370(temp_set)
-		setLS370PIDcontrol(instrID,channel,temp_set,maxcurrent)
-		setLS370exclusivereader(instrID,channel,interval)
-	elseif(mode == 3)
-		pid_led = 0
-		mcheater_led = 1
-		PopupMenu mcheater, mode=1
-		SetVariable mcheaterset, disable=0
-		resetLS370exclusivereader(instrID)
-		sc_sleep(0.5)
-		setLS370cmode(instrID,mode)
-	elseif(mode == 4)
-		pid_led = 0
-		mcheater_led = 0
-		PopupMenu mcheater, mode=2, disable=0
-		SetVariable mcheaterset, disable=0
-		resetLS370exclusivereader(instrID)
-		sc_sleep(0.5)
-		setLS370cmode(instrID,mode)
-		sc_sleep(0.5)
-		turnoffLS370MCheater(instrID)
-	else
-		abort "Choose between: PID (1), Open loop (3) and off (4)"
-	endif
-	pid_mode = mode
+//	nvar pid_mode, pid_led, mcheater_led, mcheater_set, temp_set
+//	svar ls_system, bfchannellookup, ighchannellookup
+//	variable channel, interval, maxcurrent
+//
+//	strswitch(ls_system)
+//		case "bfsmall":
+//			channel = whichlistitem("mc",bfchannellookup,";")
+//			channel = str2num(stringfromlist(channel+5,bfchannellookup,";"))
+//			break
+//		case "igh":
+//			channel = whichlistitem("mc",ighchannellookup,";")
+//			channel = str2num(stringfromlist(channel+5,ighchannellookup,";"))
+//			break
+//		case "bfbig":
+//			break
+//	endswitch
+//
+//	if(mode == 1)
+//		pid_led = 1
+//		mcheater_led = 1
+//		PopupMenu mcheater, mode=1
+//		SetVariable mcheaterset, disable=2
+//		PopupMenu tempcontrol, mode=1
+//		interval = 10
+//		maxcurrent = estimateheaterrangeLS370(temp_set)
+//		setLS370PIDcontrol(instrID,channel,temp_set,maxcurrent)
+//		setLS370exclusivereader(instrID,channel,interval)
+//	elseif(mode == 3)
+//		pid_led = 0
+//		mcheater_led = 1
+//		PopupMenu mcheater, mode=1
+//		SetVariable mcheaterset, disable=0
+//		resetLS370exclusivereader(instrID)
+//		sc_sleep(0.5)
+//		setLS370cmode(instrID,mode)
+//	elseif(mode == 4)
+//		pid_led = 0
+//		mcheater_led = 0
+//		PopupMenu mcheater, mode=2, disable=0
+//		SetVariable mcheaterset, disable=0
+//		resetLS370exclusivereader(instrID)
+//		sc_sleep(0.5)
+//		setLS370cmode(instrID,mode)
+//		sc_sleep(0.5)
+//		turnoffLS370MCheater(instrID)
+//	else
+//		abort "Choose between: PID (1), Open loop (3) and off (4)"
+//	endif
+//	pid_mode = mode
 end
 
 function setLS370PIDcontrol(instrID,channel,setpoint,maxcurrent) //Units: mK, mA
@@ -391,16 +416,23 @@ function setLS370cmode(instrID,mode)
 	sendLS370(instrID,command,"post", payload=payload)
 end
 
-function setLS370exclusivereader(instrID,channel,interval) // interval units: ms
-	string instrID
-	variable channel,interval
+function setLS370exclusivereader(instrID,channel,[interval]) 
+	// BF small channels: [bfsmall_still_heater, bfsmall_mc_heater, bfsmall_50K, bfsmall_4K, bfsmall_magnet, bfsmall_still, bfsmall_mc]
+	// interval units: ms
+	string instrID, channel
+	variable interval
 	string command, payload
 	svar ls_token
 
+	if(paramisdefault(interval))
+		interval=1000
+	endif
+	
 	sprintf command, "set-exclusive-reader?_at_=%s", ls_token
-	sprintf payload, "{\"channel_label\": \"ch.%s\", \"interval_ms\": \"%s\"}", num2str(channel), num2str(interval)
+	sprintf payload, "{\"channel_label\":\"%s\",\"interval_ms\":%d}", channel, interval
 
-//	postHTTP(instrID,command,payload,post)
+	sendLS370(instrID,command,"post",payload=payload)
+
 end
 
 function resetLS370exclusivereader(instrID)
@@ -411,7 +443,8 @@ function resetLS370exclusivereader(instrID)
 	sprintf command, "reset-exclusive-reader?_at_=%s", ls_token
 	payload = "{}"
 
-//	postHTTP(instrID,command,payload,headers)
+	
+	sendLS370(instrID,command,"post",payload=payload)
 end
 
 
@@ -644,27 +677,8 @@ function updateLS370GUI(instrID)
 	getLS370heaterpower(instrID,"still")
 end
 
-function setLS370system()
-	// opens a control window and ask user to pick the correct system.
-	// this is important, because it sets the correct url for the selected RPi.
-	// if the wrong url is selected, you risk fucking up others experiment!!!
-	string /g ls_system
-	string /g ls_token
-
-	execute("AskUserSystem()")
-	PauseForUser AskUserSystem
-end
-
-function createLS370globals()
+function createLS370Gobals()
 	// Create the needed global variables for driver
-
-	// Create lookup tables
-	string/g bfchannellookup = "mc;still;magnet;4K;50K;6;5;4;2;1"
-	string/g ighchannellookup = "mc;cold plate;still;1K;sorb;3;6;5;2;1"
-	string/g bfheaterlookup = "mc;still;0;2"
-	string/g ighheaterlookup = "mc;still;sorb;0;2;1"
-	string/g ighgaugelookup = "P1;P2;G1;G2;G3"
-	make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,350,1201,1800,10000}} // mA,mK
 
 	// Create variables for control window
 	variable/g pid_led = 0
@@ -703,7 +717,7 @@ function/s sendLS370(instrID,cmd,method,[payload, keys])
 	string instrID, cmd, keys, method, payload
 	string response
 	
-	string headers = "Content-Type: application/json"
+	string headers = "accept: application/json"
 	if(cmpstr(method,"get")==0)
 		response = getHTTP(instrID,cmd,headers)
 	elseif(cmpstr(method,"post")==0 && !paramisdefault(payload))
@@ -724,299 +738,274 @@ function/s sendLS370(instrID,cmd,method,[payload, keys])
 
 end
 
-// function/s queryLS370DB(instrID,query_url)
-// 	string instrID
-// 	string query_url
-// 	string headers,url,response
-//
-// 	headers = "Content-Type: application/x-www-form-urlencoded"
-// 	sprintf url, "http://qdot-server.phas.ubc.ca:8086/query? --data_urlencode \"db=test\" --data_urlencode \"%s\"", query_url
-//
-//
-// 	URLRequest /TIME=5.0 url=url, method=get, headers=headers
-//
-// 	if (V_flag == 0)    // No error
-// 		if (V_responseCode != 200)  // 200 is the HTTP OK code
-// 		    print "Reading failed!"
-// 		    return num2str(-1.0)
-// 		else
-// 		    response = S_serverResponse
-// 		    print response
-// 		endif
-//    else
-//         print "HTTP connection error."
-//         return num2str(-1.0)
-//    endif
-// end
-
 /////////////////////////
 //// Control Windows ////
 ////////////////////////
 
 //// Main control window ////
 
-window lakeshore_window() : Panel
-	PauseUpdate; Silent 1 // building window
-	if(cmpstr(ls_system,"bfsmall") == 0 || cmpstr(ls_system,"bfbig") == 0)
-		NewPanel /W=(0,0,380,325) /N=Lakeshore
-	else
-		NewPanel /W=(0,0,380,350) /N=Lakeshore
-	endif
-	ModifyPanel frameStyle=2
-	SetDrawLayer UserBack
-	SetDrawEnv fsize= 25,fstyle= 1
-	DrawText 80, 45,"Lakeshore (LS370)" // headline
+//window lakeshore_window() : Panel
+//	PauseUpdate; Silent 1 // building window
+//	if(cmpstr(ls_system,"bfsmall") == 0 || cmpstr(ls_system,"bfbig") == 0)
+//		NewPanel /W=(0,0,380,325) /N=Lakeshore
+//	else
+//		NewPanel /W=(0,0,380,350) /N=Lakeshore
+//	endif
+//	ModifyPanel frameStyle=2
+//	SetDrawLayer UserBack
+//	SetDrawEnv fsize= 25,fstyle= 1
+//	DrawText 80, 45,"Lakeshore (LS370)" // headline
+//
+//	// PID settings
+//	PopupMenu tempcontrol, pos={20,50},size={250,50},mode=2,title="\\Z16Temperature Control:",value=("On;Off"), proc=tempcontrol_control
+//	ValDisplay pidled, pos={310,50}, size={53,25}, mode=2,value=pid_led, zerocolor=(65535,0,0), limits={0,1,-1}, highcolor=(65535,0,0),lowcolor=(0,65535,0),barmisc={0,0},title="\\Z14PID"
+//	SetVariable tempset, pos={20,80},size={300,50},value=temp_set,title="\\Z16Temperature Setpoint (mK):",limits={0,300000,0},proc=tempset_control
+//	SetVariable P, pos={20,110},size={70,50},value=p_value,title="\\Z16P:",limits={0.001,1000,0}
+//	SetVariable I, pos={100,110},size={67,50},value=i_value,title="\\Z16I:",limits={0,10000,0}
+//	SetVariable D, pos={177,110},size={70,50},value=d_value,title="\\Z16D:",limits={0,2500,0}
+//	Button PIDUpdate, pos={257,110},size={100,20},title="\\Z14Update PID",proc=pid_control
+//	DrawLine 10,140,370,140
+//
+//	// MC heater settings
+//	PopupMenu mcheater, pos={20,150},size={250,50},mode=2,title="\\Z16MC Heater:",value=("On;Off"), proc=mcheater_control
+//	ValDisplay mcheaterled, pos={300,150}, size={65,20}, mode=2,value=mcheater_led, zerocolor=(65535,0,0), limits={0,1,-1}, highcolor=(65535,0,0),lowcolor=(0,65535,0),barmisc={0,0},title="\\Z10MC\rHeater"
+//	SetVariable mcheaterset, pos={20,180},size={250,50},value=mcheater_set,title="\\Z16Heater Setpoint (mW):",limits={0,1000,0},proc=mcheaterset_control
+//	DrawLine 10,210,370,210
+//	// Still heater settings
+//	PopupMenu stillheater, pos={20,220},size={250,50},mode=2,title="\\Z16Still Heater:",value=("On;Off"), proc=stillheater_control
+//	ValDisplay stillheaterled, pos={300,220}, size={65,20}, mode=2,value=stillheater_led, zerocolor=(65535,0,0), limits={0,1,-1}, highcolor=(65535,0,0),lowcolor=(0,65535,0),barmisc={0,0},title="\\Z10Still\rHeater"
+//	SetVariable stillheaterset, pos={20,250},size={250,50},value=stillheater_set,title="\\Z16Heater Setpoint (mW):",limits={0,1000,0},proc=stillheaterset_control
+//	DrawLine 10,280,370,280
+//	if(cmpstr(ls_system,"bfsmall") == 0 || cmpstr(ls_system,"bfbig") == 0)
+//			// Magnet heater settings
+//			PopupMenu magnetheater, pos={20,290},size={250,50},mode=2,title="\\Z16Magnet Heater:",value=("On;Off"), proc=magnetheater_control
+//			ValDisplay magnetheaterled, pos={297,290}, size={68,20}, mode=2,value=magnetheater_led, zerocolor=(65535,0,0), limits={0,1,-1}, highcolor=(65535,0,0),lowcolor=(0,65535,0),barmisc={0,0},title="\\Z10Magnet\rHeater"
+//	else
+//		if(cmpstr(ls_system,"igh") == 0)
+//			// Sorb heater settings
+//			PopupMenu sorbheater, pos={20,290},size={250,50},mode=2,title="\\Z16Sorb Heater:",value=("On;Off"), proc=sorbheater_control
+//			ValDisplay sorbheaterled, pos={300,290}, size={65,20}, mode=2,value=sorbheater_led, zerocolor=(65535,0,0), limits={0,1,-1}, highcolor=(65535,0,0),lowcolor=(0,65535,0),barmisc={0,0},title="\\Z10Sorb\rHeater"
+//			SetVariable sorbheaterset, pos={20,320},size={250,50},value=sorbheater_set,title="\\Z16Heater Setpoint (mW):",limits={0,1000,0},proc=sorbheaterset_control
+//		else
+//			abort "System not selected!"
+//		endif
+//	endif
+//endmacro
 
-	// PID settings
-	PopupMenu tempcontrol, pos={20,50},size={250,50},mode=2,title="\\Z16Temperature Control:",value=("On;Off"), proc=tempcontrol_control
-	ValDisplay pidled, pos={310,50}, size={53,25}, mode=2,value=pid_led, zerocolor=(65535,0,0), limits={0,1,-1}, highcolor=(65535,0,0),lowcolor=(0,65535,0),barmisc={0,0},title="\\Z14PID"
-	SetVariable tempset, pos={20,80},size={300,50},value=temp_set,title="\\Z16Temperature Setpoint (mK):",limits={0,300000,0},proc=tempset_control
-	SetVariable P, pos={20,110},size={70,50},value=p_value,title="\\Z16P:",limits={0.001,1000,0}
-	SetVariable I, pos={100,110},size={67,50},value=i_value,title="\\Z16I:",limits={0,10000,0}
-	SetVariable D, pos={177,110},size={70,50},value=d_value,title="\\Z16D:",limits={0,2500,0}
-	Button PIDUpdate, pos={257,110},size={100,20},title="\\Z14Update PID",proc=pid_control
-	DrawLine 10,140,370,140
+//function tempcontrol_control(action,popnum,popstr) : PopupMenuControl
+//	string action
+//	variable popnum
+//	string popstr
+//	variable mode
+//	nvar pid_led, mcheater_led, pid_mode
+//   svar ls370_url
+//
+//	strswitch(popstr)
+//		case "On":
+//			pid_led = 1
+//			mcheater_led = 1
+//			PopupMenu mcheater, mode=1, disable=2
+//			SetVariable mcheaterset, disable=2
+//			mode = 1
+//			break
+//		case "Off":
+//			pid_led = 0
+//			mcheater_led = 0
+//			PopupMenu mcheater, mode=2, disable=0
+//			SetVariable mcheaterset, disable=0
+//			mode = 4
+//			break
+//	endswitch
+//	setLS370tempcontrolmode(ls370_url,mode)
+//	pid_mode = mode
+//end
 
-	// MC heater settings
-	PopupMenu mcheater, pos={20,150},size={250,50},mode=2,title="\\Z16MC Heater:",value=("On;Off"), proc=mcheater_control
-	ValDisplay mcheaterled, pos={300,150}, size={65,20}, mode=2,value=mcheater_led, zerocolor=(65535,0,0), limits={0,1,-1}, highcolor=(65535,0,0),lowcolor=(0,65535,0),barmisc={0,0},title="\\Z10MC\rHeater"
-	SetVariable mcheaterset, pos={20,180},size={250,50},value=mcheater_set,title="\\Z16Heater Setpoint (mW):",limits={0,1000,0},proc=mcheaterset_control
-	DrawLine 10,210,370,210
-	// Still heater settings
-	PopupMenu stillheater, pos={20,220},size={250,50},mode=2,title="\\Z16Still Heater:",value=("On;Off"), proc=stillheater_control
-	ValDisplay stillheaterled, pos={300,220}, size={65,20}, mode=2,value=stillheater_led, zerocolor=(65535,0,0), limits={0,1,-1}, highcolor=(65535,0,0),lowcolor=(0,65535,0),barmisc={0,0},title="\\Z10Still\rHeater"
-	SetVariable stillheaterset, pos={20,250},size={250,50},value=stillheater_set,title="\\Z16Heater Setpoint (mW):",limits={0,1000,0},proc=stillheaterset_control
-	DrawLine 10,280,370,280
-	if(cmpstr(ls_system,"bfsmall") == 0 || cmpstr(ls_system,"bfbig") == 0)
-			// Magnet heater settings
-			PopupMenu magnetheater, pos={20,290},size={250,50},mode=2,title="\\Z16Magnet Heater:",value=("On;Off"), proc=magnetheater_control
-			ValDisplay magnetheaterled, pos={297,290}, size={68,20}, mode=2,value=magnetheater_led, zerocolor=(65535,0,0), limits={0,1,-1}, highcolor=(65535,0,0),lowcolor=(0,65535,0),barmisc={0,0},title="\\Z10Magnet\rHeater"
-	else
-		if(cmpstr(ls_system,"igh") == 0)
-			// Sorb heater settings
-			PopupMenu sorbheater, pos={20,290},size={250,50},mode=2,title="\\Z16Sorb Heater:",value=("On;Off"), proc=sorbheater_control
-			ValDisplay sorbheaterled, pos={300,290}, size={65,20}, mode=2,value=sorbheater_led, zerocolor=(65535,0,0), limits={0,1,-1}, highcolor=(65535,0,0),lowcolor=(0,65535,0),barmisc={0,0},title="\\Z10Sorb\rHeater"
-			SetVariable sorbheaterset, pos={20,320},size={250,50},value=sorbheater_set,title="\\Z16Heater Setpoint (mW):",limits={0,1000,0},proc=sorbheaterset_control
-		else
-			abort "System not selected!"
-		endif
-	endif
-endmacro
+//function tempset_control(action,varnum,varstr,varname) : SetVariableControl
+//	string action
+//	variable varnum
+//	string varstr, varname
+//	svar ls370_url
+//
+//	setLS370PIDtemp(ls370_url,varnum) // mK
+//end
+//
+//function pid_control(action) : ButtonControl
+//	string action
+//	nvar p_value,i_value,d_value
+//	svar ls370_url
+//
+//	setLS370PIDparameters(ls370_url,p_value,i_value,d_value)
+//end
 
-function tempcontrol_control(action,popnum,popstr) : PopupMenuControl
-	string action
-	variable popnum
-	string popstr
-	variable mode
-	nvar pid_led, mcheater_led, pid_mode
-   svar ls370_url
+//function mcheater_control(action,popnum,popstr) : PopupMenuControl
+//	string action
+//	variable popnum
+//	string popstr
+//	nvar mcheater_led, mcheater_set
+//	svar ls370_url
+//	
+//	strswitch(popstr)
+//		case "On":
+//			mcheater_led = 1
+//			setLS370tempcontrolmode(ls370_url,3) // set to "open loop"
+//			sc_sleep(0.5)
+//			setLS370heaterpower(ls370_url,"mc",mcheater_set) //mW
+//			break
+//		case "Off":
+//			mcheater_led = 0
+//			turnoffLS370MCheater(ls370_url)
+//			break
+//	endswitch
+//end
 
-	strswitch(popstr)
-		case "On":
-			pid_led = 1
-			mcheater_led = 1
-			PopupMenu mcheater, mode=1, disable=2
-			SetVariable mcheaterset, disable=2
-			mode = 1
-			break
-		case "Off":
-			pid_led = 0
-			mcheater_led = 0
-			PopupMenu mcheater, mode=2, disable=0
-			SetVariable mcheaterset, disable=0
-			mode = 4
-			break
-	endswitch
-	setLS370tempcontrolmode(ls370_url,mode)
-	pid_mode = mode
-end
+//function mcheaterset_control(action,varnum,varstr,varname) : SetVariableControl
+//	string action
+//	variable varnum
+//	string varstr, varname
+//	nvar mcheater_led, pid_mode
+//	svar ls370_url
+//
+//	setLS370heaterpower(ls370_url,"mc",varnum)
+//	if(varnum > 0)
+//		mcheater_led = 1
+//		pid_mode = 3
+//		PopupMenu mcheater, mode=1
+//	else
+//		mcheater_led = 0
+//		pid_mode = 4
+//		PopupMenu mcheater, mode=0
+//	endif
+//end
 
-function tempset_control(action,varnum,varstr,varname) : SetVariableControl
-	string action
-	variable varnum
-	string varstr, varname
-	svar ls370_url
+//function stillheater_control(action,popnum,popstr) : PopupMenuControl
+//	string action
+//	variable popnum
+//	string popstr
+//	nvar stillheater_led, stillheater_set
+//	svar ls370_url
+//
+//	strswitch(popstr)
+//		case "On":
+//			stillheater_led = 1
+//			setLS370heaterpower(ls370_url,"still",stillheater_set) //mW
+//			break
+//		case "Off":
+//			stillheater_led = 0
+//			setLS370heaterpower(ls370_url,"still",0) //mW
+//			break
+//	endswitch
+//end
 
-	setLS370PIDtemp(ls370_url,varnum) // mK
-end
+//function stillheaterset_control(action,varnum,varstr,varname) : SetVariableControl
+//	string action
+//	variable varnum
+//	string varstr, varname
+//	nvar stillheater_led
+//	svar ls370_url
+//
+//	setLS370heaterpower(ls370_url,"still",varnum) //mW
+//	if(varnum > 0)
+//		stillheater_led = 1
+//		PopupMenu stillheater, mode=1
+//	else
+//		stillheater_led = 0
+//		PopupMenu stillheater, mode=0
+//	endif
+//end
 
-function pid_control(action) : ButtonControl
-	string action
-	nvar p_value,i_value,d_value
-	svar ls370_url
+//function magnetheater_control(action,popnum,popstr) : PopupMenuControl
+//	string action
+//	variable popnum
+//	string popstr
+//	nvar magnetheater_led
+//	svar ls370_url
+//
+//	strswitch(popstr)
+//		case "On":
+//			magnetheater_led = 1
+//			toggleLS370magnetheater(ls370_url,"on")
+//			break
+//		case "Off":
+//			magnetheater_led = 0
+//			toggleLS370magnetheater(ls370_url,"off")
+//			break
+//	endswitch
+//end
 
-	setLS370PIDparameters(ls370_url,p_value,i_value,d_value)
-end
+//function sorbheater_control(action,popnum,popstr) : PopupMenuControl
+//	string action
+//	variable popnum
+//	string popstr
+//	nvar sorbheater_led, sorbheater_set
+//	svar ls370_url
+//
+//	strswitch(popstr)
+//		case "On":
+//			sorbheater_led = 1
+//			setLS370heaterpower(ls370_url,"sorb",sorbheater_set) //mW
+//			break
+//		case "Off":
+//			sorbheater_led = 0
+//			setLS370heaterpower(ls370_url,"sorb",0) //mW
+//			break
+//	endswitch
+//end
 
-function mcheater_control(action,popnum,popstr) : PopupMenuControl
-	string action
-	variable popnum
-	string popstr
-	nvar mcheater_led, mcheater_set
-	svar ls370_url
-	
-	strswitch(popstr)
-		case "On":
-			mcheater_led = 1
-			setLS370tempcontrolmode(ls370_url,3) // set to "open loop"
-			sc_sleep(0.5)
-			setLS370heaterpower(ls370_url,"mc",mcheater_set) //mW
-			break
-		case "Off":
-			mcheater_led = 0
-			turnoffLS370MCheater(ls370_url)
-			break
-	endswitch
-end
-
-function mcheaterset_control(action,varnum,varstr,varname) : SetVariableControl
-	string action
-	variable varnum
-	string varstr, varname
-	nvar mcheater_led, pid_mode
-	svar ls370_url
-
-	setLS370heaterpower(ls370_url,"mc",varnum)
-	if(varnum > 0)
-		mcheater_led = 1
-		pid_mode = 3
-		PopupMenu mcheater, mode=1
-	else
-		mcheater_led = 0
-		pid_mode = 4
-		PopupMenu mcheater, mode=0
-	endif
-end
-
-function stillheater_control(action,popnum,popstr) : PopupMenuControl
-	string action
-	variable popnum
-	string popstr
-	nvar stillheater_led, stillheater_set
-	svar ls370_url
-
-	strswitch(popstr)
-		case "On":
-			stillheater_led = 1
-			setLS370heaterpower(ls370_url,"still",stillheater_set) //mW
-			break
-		case "Off":
-			stillheater_led = 0
-			setLS370heaterpower(ls370_url,"still",0) //mW
-			break
-	endswitch
-end
-
-function stillheaterset_control(action,varnum,varstr,varname) : SetVariableControl
-	string action
-	variable varnum
-	string varstr, varname
-	nvar stillheater_led
-	svar ls370_url
-
-	setLS370heaterpower(ls370_url,"still",varnum) //mW
-	if(varnum > 0)
-		stillheater_led = 1
-		PopupMenu stillheater, mode=1
-	else
-		stillheater_led = 0
-		PopupMenu stillheater, mode=0
-	endif
-end
-
-function magnetheater_control(action,popnum,popstr) : PopupMenuControl
-	string action
-	variable popnum
-	string popstr
-	nvar magnetheater_led
-	svar ls370_url
-
-	strswitch(popstr)
-		case "On":
-			magnetheater_led = 1
-			toggleLS370magnetheater(ls370_url,"on")
-			break
-		case "Off":
-			magnetheater_led = 0
-			toggleLS370magnetheater(ls370_url,"off")
-			break
-	endswitch
-end
-
-function sorbheater_control(action,popnum,popstr) : PopupMenuControl
-	string action
-	variable popnum
-	string popstr
-	nvar sorbheater_led, sorbheater_set
-	svar ls370_url
-
-	strswitch(popstr)
-		case "On":
-			sorbheater_led = 1
-			setLS370heaterpower(ls370_url,"sorb",sorbheater_set) //mW
-			break
-		case "Off":
-			sorbheater_led = 0
-			setLS370heaterpower(ls370_url,"sorb",0) //mW
-			break
-	endswitch
-end
-
-function sorbheaterset_control(action,varnum,varstr,varname) : SetVariableControl
-	string action
-	variable varnum
-	string varstr, varname
-	nvar sorbheater_led
-	svar ls370_url
-
-	setLS370heaterpower(ls370_url,"sorb",varnum) //mW
-	if(varnum > 0)
-		sorbheater_led = 1
-		PopupMenu sorbheater, mode=1
-	else
-		sorbheater_led = 0
-		PopupMenu sorbheater, mode=0
-	endif
-end
+//function sorbheaterset_control(action,varnum,varstr,varname) : SetVariableControl
+//	string action
+//	variable varnum
+//	string varstr, varname
+//	nvar sorbheater_led
+//	svar ls370_url
+//
+//	setLS370heaterpower(ls370_url,"sorb",varnum) //mW
+//	if(varnum > 0)
+//		sorbheater_led = 1
+//		PopupMenu sorbheater, mode=1
+//	else
+//		sorbheater_led = 0
+//		PopupMenu sorbheater, mode=0
+//	endif
+//end
 
 //// System set control wondow ////
 
-window AskUserSystem() : Panel
-	PauseUpdate; Silent 1 // building window
-	NewPanel /W=(100,100,400,200) // window size
-	ModifyPanel frameStyle=2
-	SetDrawLayer UserBack
-	SetDrawEnv fsize= 25,fstyle= 1
-	DrawText 40, 40,"Initialize Lakeshore" // Headline
-	PopupMenu SelectSystem, pos={60,60},size={250,50},mode=4,title="\\Z16Select System:",value=("Blue Fors #1;IGH;Blue Fors #2"), proc=selectsystem_control
-endmacro
-
-function selectsystem_control(action,popnum,popstr) : PopupMenuControl
-	string action
-	variable popnum
-	string popstr
-	svar ls_system, ls_token
-
-	strswitch(popstr)
-		case "Blue Fors #1":
-			ls_system = "bfsmall"
-			ls_token = "72597639"
-			dowindow/k AskUserSystem
-			break
-		case "IGH":
-			ls_system = "igh"
-			ls_token = ""
-			dowindow/k AskUserSystem
-			break
-		case "Blue Fors #2":
-			ls_system = "bfbig"
-			ls_token = ""
-			print "No support for BF#2 yet!"
-			dowindow/k AskUserSystem
-			execute("AskUserSystem()")
-			break
-	endswitch
-end
+//window AskUserSystem() : Panel
+//	PauseUpdate; Silent 1 // building window
+//	NewPanel /W=(100,100,400,200) // window size
+//	ModifyPanel frameStyle=2
+//	SetDrawLayer UserBack
+//	SetDrawEnv fsize= 25,fstyle= 1
+//	DrawText 40, 40,"Initialize Lakeshore" // Headline
+//	PopupMenu SelectSystem, pos={60,60},size={250,50},mode=4,title="\\Z16Select System:",value=("Blue Fors #1;IGH;Blue Fors #2"), proc=selectsystem_control
+//endmacro
+//
+//function selectsystem_control(action,popnum,popstr) : PopupMenuControl
+//	string action
+//	variable popnum
+//	string popstr
+//	svar ls_system, ls_token
+//
+//	strswitch(popstr)
+//		case "Blue Fors #1":
+//			ls_system = "bfsmall"
+//			ls_token = "72597639"
+//			dowindow/k AskUserSystem
+//			break
+//		case "IGH":
+//			ls_system = "igh"
+//			ls_token = ""
+//			dowindow/k AskUserSystem
+//			break
+//		case "Blue Fors #2":
+//			ls_system = "bfbig"
+//			ls_token = ""
+//			print "No support for BF#2 yet!"
+//			dowindow/k AskUserSystem
+//			execute("AskUserSystem()")
+//			break
+//	endswitch
+//end
 
 //////////////////
 ///// Status /////
@@ -1031,32 +1020,32 @@ function/s getLS370status(instrID, [max_age_s])
 		max_age_s=120
 	endif
 
-//	svar ls_system, ighgaugelookup
-//	string  buffer="", gauge=""
-//	variable i=0
-//
-//	strswitch(ls_system)
-//		case "bfsmall":
-//			buffer = addJSONkeyvalpair(buffer,"MC K",num2str(getLS370temp(instrID, "mc", max_age_s=max_age_s)))
-//			buffer = addJSONkeyvalpair(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age_s=max_age_s)))
-//			buffer = addJSONkeyvalpair(buffer,"4K Plate K",num2str(getLS370temp(instrID, "4K", max_age_s=max_age_s)))
-//			buffer = addJSONkeyvalpair(buffer,"Magnet K",num2str(getLS370temp(instrID, "magnet", max_age_s=max_age_s)))
-//			buffer = addJSONkeyvalpair(buffer,"50K Plate K",num2str(getLS370temp(instrID, "50K", max_age_s=max_age_s)))
-////			for(i=1;i<7;i+=1)
-////				gauge = "P"+num2istr(i)
-////				buffer = addJSONkeyvalpair(buffer,gauge,num2str(GetPressureDB(instrID,gauge)))
-////			endfor
-//			return addJSONkeyvalpair("","BF Small",buffer)
-//		case "igh":
-//			buffer = addJSONkeyvalpair(buffer,"MC K",num2str(getLS370temp(instrID, "mc", max_age_s=max_age_s)))
-//			buffer = addJSONkeyvalpair(buffer,"Cold Plate K",num2str(getLS370temp(instrID, "cold plate", max_age_s=max_age_s)))
-//			buffer = addJSONkeyvalpair(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age_s=max_age_s)))
-//			buffer = addJSONkeyvalpair(buffer,"1K Pot K",num2str(getLS370temp(instrID, "1K", max_age_s=max_age_s)))
-//			buffer = addJSONkeyvalpair(buffer,"Sorb K",num2str(getLS370temp(instrID, "sorb", max_age_s=max_age_s)))
-////			for(i=1;i<6;i+=1)
-////				gauge = stringfromlist(i,ighgaugelookup)
-////				buffer = addJSONkeyvalpair(buffer,"P"+num2istr(i),num2str(GetPressureDB(instrID,gauge)))
-////			endfor
-//			return addJSONkeyvalpair("","IGH",buffer)
-//	endswitch
+	svar ls_system, ighgaugelookup
+	string  buffer="", gauge=""
+	variable i=0
+
+	strswitch(ls_system)
+		case "bfsmall":
+			buffer = addJSONkeyval(buffer,"MC K",num2str(getLS370temp(instrID, "mc", max_age_s=max_age_s)))
+			buffer = addJSONkeyval(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age_s=max_age_s)))
+			buffer = addJSONkeyval(buffer,"4K Plate K",num2str(getLS370temp(instrID, "4K", max_age_s=max_age_s)))
+			buffer = addJSONkeyval(buffer,"Magnet K",num2str(getLS370temp(instrID, "magnet", max_age_s=max_age_s)))
+			buffer = addJSONkeyval(buffer,"50K Plate K",num2str(getLS370temp(instrID, "50K", max_age_s=max_age_s)))
+//			for(i=1;i<7;i+=1)
+//				gauge = "P"+num2istr(i)
+//				buffer = addJSONkeyval(buffer,gauge,num2str(GetPressureDB(instrID,gauge)))
+//			endfor
+			return addJSONkeyval("","BF Small",buffer)
+		case "igh":
+			buffer = addJSONkeyval(buffer,"MC K",num2str(getLS370temp(instrID, "mc", max_age_s=max_age_s)))
+			buffer = addJSONkeyval(buffer,"Cold Plate K",num2str(getLS370temp(instrID, "cold plate", max_age_s=max_age_s)))
+			buffer = addJSONkeyval(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age_s=max_age_s)))
+			buffer = addJSONkeyval(buffer,"1K Pot K",num2str(getLS370temp(instrID, "1K", max_age_s=max_age_s)))
+			buffer = addJSONkeyval(buffer,"Sorb K",num2str(getLS370temp(instrID, "sorb", max_age_s=max_age_s)))
+//			for(i=1;i<6;i+=1)
+//				gauge = stringfromlist(i,ighgaugelookup)
+//				buffer = addJSONkeyval(buffer,"P"+num2istr(i),num2str(GetPressureDB(instrID,gauge)))
+//			endfor
+			return addJSONkeyval("","IGH",buffer)
+	endswitch
 end

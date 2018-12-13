@@ -271,14 +271,17 @@ end
 
 function/s postHTTP(instrID,cmd,payload,headers)
 	string instrID, cmd, payload, headers
-	string response, error
+	string response=""
 
-	URLRequest /TIME=5.0 /DSTR=payload url=instrID+cmd, method=post, headers=headers
+	URLRequest /TIME=10.0 /DSTR=payload url=instrID+cmd, method=post, headers=headers
 
 	if (V_flag == 0)    // No error
 		response = S_serverResponse // response is a JSON string
 		if (V_responseCode != 200)  // 200 is the HTTP OK code
-		   printf error, "[ERROR]: %s\r", getJSONvalue(response, "error")
+			print "[ERROR] HTTP response code " + num2str(V_responseCode)
+			if(strlen(response)>0)
+		   	printf "[MESSAGE] %s\r", getJSONvalue(response, "error")
+		   endif
 		   return ""
 		else
 			return response
