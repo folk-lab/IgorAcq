@@ -1380,7 +1380,7 @@ function RecordValues(i, j, [readvstime, fillnan])
 				sprintf cmd, "%s = %s", "sc_tmpVal", script
 				Execute/Q/Z cmd
 				if(V_flag!=0)
-					print "[ERROR] in RecordValues: "+GetErrMessage(V_Flag,2)
+					print "[ERROR] in RecordValues (raw): "+GetErrMessage(V_Flag,2)
 				endif
 			else
 				sc_tmpval = NaN
@@ -1416,7 +1416,7 @@ function RecordValues(i, j, [readvstime, fillnan])
 				sprintf cmd, "%s = %s", "sc_tmpVal", script
 				Execute/Q/Z cmd
 				if(V_flag!=0)
-					print "[ERROR] in RecordValues: "+GetErrMessage(V_Flag,2)
+					print "[ERROR] in RecordValues (calc): "+GetErrMessage(V_Flag,2)
 				endif
 			elseif(fillnan == 1)
 				sc_tmpval = NaN

@@ -36,14 +36,14 @@ function initSaveFiles([msg])
 	variable /G meta_group_ID
 	HDF5CreateGroup hdf5_id, "metadata", meta_group_ID
 
-	killdatafolder /z root:meta // kill it if it exists
-	newdatafolder root:meta     // create an empty version
+//	killdatafolder /z root:meta // kill it if it exists
+//	newdatafolder root:meta     // create an empty version
 	string /g root:meta:sweep_logs = prettyJSONfmt(sc_createSweepLogs(msg=msg))
 	string /g root:meta:config = prettyJSONfmt(sc_createconfig())
 	HDF5SaveGroup /L=4 $("root:meta"), hdf5_id, "metadata"
 
 	// save config file
-	svar cconfig = root:config:config
+	svar cconfig = root:meta:config
 	sc_saveConfig(cconfig)
 
 end
@@ -69,12 +69,12 @@ function closeSaveFiles()
 	sprintf filenumstr, "%d", filenum
 	string /g h5name = "dat"+filenumstr+".h5"
 
-	// close config group
-	nvar meta_group_id
-	HDF5CloseGroup /Z meta_group_id
-	if (V_flag != 0)
-		Print "HDF5CloseGroup Failed: ", "metadata"
-	endif
+	// close metadata
+//	nvar meta_group_id
+//	HDF5CloseGroup /Z meta_group_id
+//	if (V_flag != 0)
+//		Print "HDF5CloseGroup Failed: ", "metadata"
+//	endif
 
 	// close HDF5 file
 	nvar hdf5_id
