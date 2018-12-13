@@ -308,12 +308,12 @@ function/s GetSRSStatus(instrID)
 	string gpib = num2istr(getAddressGPIB(instrID))
 	buffer = addJSONkeyval(buffer, "gpib_address", gpib)
 
-	buffer = addJSONkeyval(buffer, "amplitude V", num2str(GetSRSAmplitude(instrID)))
-	buffer = addJSONkeyval(buffer, "time_const ms", num2str(GetSRSTimeConst(instrID)*1000))
-	buffer = addJSONkeyval(buffer, "frequency Hz", num2str(GetSRSFrequency(instrID)))
-	buffer = addJSONkeyval(buffer, "phase deg", num2str(GetSRSPhase(instrID)))
-	buffer = addJSONkeyval(buffer, "sensitivity V", num2str(GetSRSSensitivity(instrID)))
-	buffer = addJSONkeyval(buffer, "harmonic", num2str(GetSRSHarmonic(instrID)))
+	buffer = addJSONkeyval(buffer, "amplitude V", num2numStr(GetSRSAmplitude(instrID)))
+	buffer = addJSONkeyval(buffer, "time_const ms", num2numStr(GetSRSTimeConst(instrID)*1000))
+	buffer = addJSONkeyval(buffer, "frequency Hz", num2numStr(GetSRSFrequency(instrID)))
+	buffer = addJSONkeyval(buffer, "phase deg", num2numStr(GetSRSPhase(instrID)))
+	buffer = addJSONkeyval(buffer, "sensitivity V", num2numStr(GetSRSSensitivity(instrID)))
+	buffer = addJSONkeyval(buffer, "harmonic", num2numStr(GetSRSHarmonic(instrID)))
 
 	return addJSONkeyval("", "SRS_"+gpib, buffer)
 end

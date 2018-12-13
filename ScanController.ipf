@@ -226,7 +226,7 @@ function sc_openInstrConnections(print_cmd)
 			endif
 			execute/Q/Z command
 			if(V_flag!=0)
-				print "[ERROR] "+GetErrMessage(V_Flag,2)
+				print "[ERROR] in sc_openInstrConnections: "+GetErrMessage(V_Flag,2)
 			endif
 		endif
 	endfor
@@ -1378,7 +1378,10 @@ function RecordValues(i, j, [readvstime, fillnan])
 			if(fillnan == 0)
 				script = TrimString(sc_RawScripts[ii])
 				sprintf cmd, "%s = %s", "sc_tmpVal", script
-				execute(cmd)
+				Execute/Q/Z cmd
+				if(V_flag!=0)
+					print "[ERROR] in RecordValues: "+GetErrMessage(V_Flag,2)
+				endif
 			else
 				sc_tmpval = NaN
 			endif
@@ -1411,9 +1414,12 @@ function RecordValues(i, j, [readvstime, fillnan])
 				// Allow the use of the keyword '[i]' in calculated fields where i is the inner loop's current index
 				script = ReplaceString("[i]", script, "["+num2istr(innerindex)+"]")
 				sprintf cmd, "%s = %s", "sc_tmpVal", script
-				execute(cmd)
+				Execute/Q/Z cmd
+				if(V_flag!=0)
+					print "[ERROR] in RecordValues: "+GetErrMessage(V_Flag,2)
+				endif
 			elseif(fillnan == 1)
-				sc_tmpval = nan
+				sc_tmpval = NaN
 			endif
 			wref1d[innerindex] = sc_tmpval
 
@@ -1563,41 +1569,45 @@ function /s sc_createSweepLogs([msg])
 	jstr = addJSONkeyval(jstr, "filenum", num2istr(filenum))
 	jstr = addJSONkeyval(jstr, "current_config", sc_current_config, addQuotes = 1)
 	jstr = addJSONkeyval(jstr, "time_completed", Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
-	jstr = addJSONkeyval(jstr, "time_elapsed", num2str(sweep_t_elapsed))
+	jstr = addJSONkeyval(jstr, "time_elapsed", num2numStr(sweep_t_elapsed))
 
 	// instrument logs
 	// all log strings should be valid JSON objects
 	wave /t sc_Instr
 	variable i=0, j=0, addQuotes=0
 	string command="", val=""
+	string /G sc_log_buffer=""
 	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
-		string /G sc_log_buffer=""
+		sc_log_buffer=""
 		command = TrimString(sc_Instr[i][2])
 		if(strlen(command)>0)
-			print command
-		endif
-		Execute/Q/Z "sc_log_buffer="+command
-		if(strlen(sc_log_buffer)!=0)
-			// need to get first key and value from sc_log_buffer
-			JSONSimple sc_log_buffer
-			wave/t t_tokentext
-			wave w_tokentype, w_tokensize, w_tokenparent
-
-			for(i=1;i<numpnts(t_tokentext)-1;i+=1)
-				if ( w_tokentype[i]==3 && w_tokensize[i]>0 )
-					if( w_tokenparent[i]==0 )
-						if( w_tokentype[i+1]==3 )
-							val = "\"" + t_tokentext[i+1] + "\""
-						else
-							val = t_tokentext[i+1]
+			Execute/Q/Z "sc_log_buffer="+command
+			if(V_flag!=0)
+				print "[ERROR] in sc_createSweepLogs: "+GetErrMessage(V_Flag,2)
+			endif
+			if(strlen(sc_log_buffer)!=0)
+				// need to get first key and value from sc_log_buffer
+				JSONSimple sc_log_buffer
+				wave/t t_tokentext
+				wave w_tokentype, w_tokensize, w_tokenparent
+	
+				for(j=1;j<numpnts(t_tokentext)-1;j+=1)
+					if ( w_tokentype[j]==3 && w_tokensize[j]>0 )
+						if( w_tokenparent[j]==0 )
+							if( w_tokentype[j+1]==3 )
+								val = "\"" + t_tokentext[j+1] + "\""
+							else
+								val = t_tokentext[j+1]
+							endif
+							jstr = addJSONkeyval(jstr, t_tokentext[j], val)
+							break
 						endif
-						jstr = addJSONkeyval(jstr, t_tokentext[i], val)
 					endif
-				endif
-			endfor
-
-		else
-			print "[WARNING] command failed to log anything: "+command+"\r"
+				endfor
+				
+			else
+				print "[WARNING] command failed to log anything: "+command+"\r"
+			endif
 		endif
 	endfor
 

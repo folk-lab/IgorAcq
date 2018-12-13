@@ -499,6 +499,15 @@ end
 
 /// write ///
 
+function/s num2numStr(val)
+	variable val
+	if(numtype(val)!=0)
+		return "null"
+	else
+		return num2str(val)
+	endif
+end
+
 function/s num2bool(val)
 	variable val
 	if(val==1)
