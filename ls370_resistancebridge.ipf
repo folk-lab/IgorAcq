@@ -1018,7 +1018,7 @@ function/s getLS370status(instrID, [max_age_s])
 	string instrID
 	variable max_age_s
 	if(paramisdefault(max_age_s))
-		max_age_s=120
+		max_age_s=300
 	endif
 
 	svar ls_system, ighgaugelookup

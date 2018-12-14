@@ -121,8 +121,9 @@ function /S getExpPath(whichpath, [full])
 	// whichpath determines which path will be returned (data, config)
 	// lmd always gives the path to local_measurement_data
 	// if full==0, the path relative to local_measurement_data is returned in Unix style
-	// if full==1, the full path on the local machine is returned in native style
-	// if full==2, the full path is returned in colon-separated igor format
+	// if full==1, the path relative to local_measurement_data is returned in colon-separated igor style
+	// if full==2, the full path on the local machine is returned in native style
+	// if full==3, the full path is returned in colon-separated igor format
 
 	string whichpath
 	variable full
@@ -153,11 +154,12 @@ function /S getExpPath(whichpath, [full])
 			// returns path to local_measurement_data on local machine
 			// always assumes you want the full path
 			if(full==2)
-				return temp1+temp2+":"
-			else // full=0 or 1
 				return ParseFilePath(5, temp1+temp2+":", separatorStr, 0, 0)
+			elseif(full==3)
+				return temp1+temp2+":"
+			else
+				return ""
 			endif
-			break
 		case "sc":
 			// returns full path to the directory where ScanController lives
 			// always assumes you want the full path
@@ -165,37 +167,41 @@ function /S getExpPath(whichpath, [full])
 			variable pathLen = itemsinlist(sc_dir, ":")-1
 			sc_dir = RemoveListItem(pathLen, sc_dir, ":")
 			if(full==2)
+				return ParseFilePath(5, sc_dir, separatorStr, 0, 0)
+			elseif(full==3)
 				return sc_dir
 			else // full=0 or 1
-				return ParseFilePath(5, sc_dir, separatorStr, 0, 0)
+				return ""
 			endif
 		case "data":
 			// returns path to data relative to local_measurement_data
 			if(full==0)
 				return ReplaceString(":", temp3[1,inf], "/")
 			elseif(full==1)
-				return ParseFilePath(5, temp1+temp2+temp3, separatorStr, 0, 0)
+				return temp3[1,inf]
 			elseif(full==2)
+				return ParseFilePath(5, temp1+temp2+temp3, separatorStr, 0, 0)
+			elseif(full==3)
 				return S_path
 			else
 				return ""
 			endif
-			break
 		case "config":
 			if(full==0)
 				return ReplaceString(":", temp3[1,inf], "/")+"config/"
 			elseif(full==1)
+				return temp3[1,inf]+"config:"
+			elseif(full==2)
 				if(cmpstr(platform,"Windows")==0)
 					return ParseFilePath(5, temp1+temp2+temp3+"config:", separatorStr, 0, 0)
 				else
 					return ParseFilePath(5, temp1+temp2+temp3, separatorStr, 0, 0)+"config/"
 				endif
-			elseif(full==2)
+			elseif(full==3)
 				return S_path+"config:"
 			else
 				return ""
 			endif
-			break
 	endswitch
 end
 
@@ -250,6 +256,25 @@ function sc_openInstrGUIs()
 	endfor
 end
 
+function sc_checkBackup()
+	// the path `server` should point to /measurement-data
+	//     which has been mounted as a network drive on your measurement computer
+	// if it is, backups will be created in an appropriate directory
+	//      qdot-server.phas.ubc.ca/measurement-data/<hostname>/<username>/<exp>
+	svar sc_hostname
+
+	GetFileFolderInfo/Z/Q/P=server  // Check if data path is definded
+	if(v_flag != 0 || v_isfolder != 1)
+		print "[WARNING] Only saving local copies of data. See sc_checkBackup()."
+		return 0
+	else
+		string sp = S_path
+		newpath /C/O/Q backup_data sp+sc_hostname+":"+getExpPath("data", full=1)
+		newpath /C/O/Q backup_config sp+sc_hostname+":"+getExpPath("config", full=1)
+		return 1
+	endif
+end
+
 function InitScanController([configFile])
 
 	string configFile // use this to point to a specific old config
@@ -259,22 +284,18 @@ function InitScanController([configFile])
 		abort "Data path not defined!\n"
 	endif
 
-	GetFileFolderInfo/Z/Q/P=server  // Check if data path is definded
-	if(v_flag != 0 || v_isfolder != 1)
-		print "[WARNING] pushing data to server is temporarily disabled"
-	else
-		print "[WARNING] Only saving local copies of data."
-	endif
-
 	string /g sc_colormap = "VioletOrangeYellow"
 	string /g slack_url =  "https://hooks.slack.com/services/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" // url for slack alert
 	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
 
 	string /g sc_hostname = getHostName() // get machine name
 
+	// check if a path is defined to backup data
+	sc_checkBackup()
+
 	// deal with config file
 	string /g sc_current_config = ""
-	newpath /C/O/Q config getExpPath("config", full=2) // create/overwrite config path
+	newpath /C/O/Q config getExpPath("config", full=3) // create/overwrite config path
 	if(paramisdefault(configFile))
 		// look for newest config file
 		string filelist = greplist(indexedfile(config,-1,".json"),"sc")
@@ -1751,13 +1772,11 @@ function SaveWaves([msg, save_experiment])
 		sc_save_time = datetime
 	endif
 
-	// if server path is defined:
-	//     write a test file
-	//     if it succeeds,
-	//         sc_copyNewFiles(filenum, save_experiment=save_experiment)
-	//         delete test file
-	//     else
-					print "[WARNING] Data only saved locally."
+	// check if a path is defined to backup data
+	if(sc_checkBackup())
+		// copy data to server mount point
+		
+	endif
 
 	// close HDF5 files and increment filenum
 	if(Rawadd+Calcadd > 0)
@@ -1923,22 +1942,40 @@ function sc_copyNewFiles(datnum, [save_experiment] )
 	variable result = 0
 	string tmpname = ""
 
+	variable path_missing = 0
+	pathinfo data
+	path_missing+=V_flag
+	string original_data = S_path
+	pathinfo config
+	path_missing+=V_flag
+	string original_config = S_path
+	pathinfo backup_data
+	path_missing+=V_flag
+	string copy_data = S_path
+	pathinfo backup_config
+	path_missing+=V_flag
+	string copy_config = S_path
+	if(path_missing<4)
+		print path_missing
+		print "[ERROR] A path is missing. Data not backed up to server."
+	endif
+
 	// add experiment/history/procedure files
 	// only if I saved the experiment this run
 	string datapath = getExpPath("data", full=1)
 	if(!paramisdefault(save_experiment) && save_experiment == 1)
 		// add experiment file
-		tmpname = datapath+igorinfo(1)+".pxp"
-//		sc_write2batch(refnum, notifyText, tmpname)
+		tmpname = igorinfo(1)+".pxp"
+		CopyFile /Z=1 (original_data + tmpname) as (copy_data + tmpname)
 
 		// add history file
-		tmpname = datapath+igorinfo(1)+".history"
-//		sc_write2batch(refnum, notifyText, tmpname)
+		tmpname = igorinfo(1)+".history"
+		CopyFile /Z=1 (original_data + tmpname) as (copy_data + tmpname)
 
 		// add procedure file
-		tmpname = datapath+igorinfo(1)+".ipf"
-//		sc_write2batch(refnum, notifyText, tmpname)
-
+		tmpname = igorinfo(1)+".ipf"
+		CopyFile /Z=1 (original_data + tmpname) as (copy_data + tmpname)
+		
 	endif
 
 	// find new data files
@@ -1957,23 +1994,23 @@ function sc_copyNewFiles(datnum, [save_experiment] )
 		endif
 
 		for(j=0;j<ItemsInList(matchList, ";");j+=1)
-			tmpname = datapath+StringFromList(j,matchList, ";")
-//			sc_write2batch(refnum, notifyText, tmpname)
+			tmpname = StringFromList(j,matchList, ";")
+		CopyFile /Z=1 (original_data + tmpname) as (copy_data + tmpname)
 		endfor
 	endfor
 
 	// add the most recent scan controller config file
+	string configlist="", configpath=""
 	getfilefolderinfo /Q/Z/P=config // check if config folder exists before looking for files
 	if(V_flag==0 && V_isFolder==1)
-		string configpath = getExpPath("config", full=1)
-		string configlist=""
+		configpath = getExpPath("config", full=1)
 		configlist = greplist(indexedfile(config,-1,".json"),"sc")
 	endif
 
 	if(itemsinlist(configlist)>0)
 		configlist = SortList(configlist, ";", 1+16)
-		tmpname = configpath+StringFromList(0,configlist, ";")
-//		sc_write2batch(refnum, notifyText, tmpname)
+		tmpname = StringFromList(0,configlist, ";")
+		CopyFile /Z=1 (original_config + tmpname) as (copy_config + tmpname)
 	endif
 
 end
