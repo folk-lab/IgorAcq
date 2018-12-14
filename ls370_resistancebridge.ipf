@@ -467,7 +467,7 @@ function setLS370PIDtemp(instrID,temp) // Units: mK
 	sprintf payload, "{\"command\": \"SETP %g\"}", temp/1000
 	sprintf command, "command?_at_=%s", ls_token
 
-//	postHTTP(instrID,command,payload,headers)
+	sendLS370(instrID,command,"post",payload=payload)
 	temp_set = temp
 end
 
@@ -588,9 +588,9 @@ function turnoffLS370MCheater(instrID)
 	pid_led = 0
 	mcheater_led = 0
 	pid_mode = 4
-	PopupMenu mcheater, mode=2, disable=0, win=Lakeshore
-	SetVariable mcheaterset, disable=0, win=Lakeshore
-	PopupMenu tempcontrol, mode=2, win=Lakeshore
+//	PopupMenu mcheater, mode=2, disable=0, win=Lakeshore
+//	SetVariable mcheaterset, disable=0, win=Lakeshore
+//	PopupMenu tempcontrol, mode=2, win=Lakeshore
 end
 
 function toggleLS370magnetheater(instrID,onoff)
@@ -648,7 +648,6 @@ function estimateheaterrangeLS370(temp) // Units: mK
 	make/o/n=8 mintempabs
 	make/o/n=8 mintemp
 	variable maxcurrent
-
 
 	heatervalues = mcheatertemp_lookup[p][1]
 	mintempabs = abs(heatervalues-temp)

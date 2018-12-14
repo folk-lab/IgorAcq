@@ -133,7 +133,6 @@ function /S getExpPath(whichpath, [full])
 	endif
 
 	pathinfo data // get path info
-
 	if(V_flag == 0) // check if path is defined
 		abort "data path is not defined!\n"
 	endif
@@ -1942,6 +1941,7 @@ function sc_copyNewFiles(datnum, [save_experiment] )
 	variable result = 0
 	string tmpname = ""
 
+	// get some 
 	variable path_missing = 0
 	pathinfo data
 	path_missing+=V_flag
@@ -2014,7 +2014,6 @@ function sc_copyNewFiles(datnum, [save_experiment] )
 	endif
 
 end
-
 
 //////////////////////////
 /// sweep notification ///
