@@ -1578,15 +1578,20 @@ end
 
 function /s sc_createSweepLogs([msg])
 	string msg
-	string jstr = ""
+	string jstr = "", buffer = ""
 	nvar filenum, sweep_t_elapsed
-	svar sc_current_config, sc_hostname
+	svar sc_current_config, sc_hostname, sc_x_label, sc_y_label
 
 	// information about this specific sweep
 	if(!paramisdefault(msg))
 		jstr = addJSONkeyval(jstr, "comment", msg, addQuotes=1)
 	endif
 	jstr = addJSONkeyval(jstr, "filenum", num2istr(filenum))
+	
+	buffer = addJSONkeyval(buffer, "x", sc_x_label, addQuotes=1)
+	buffer = addJSONkeyval(buffer, "y", sc_y_label, addQuotes=1)
+	jstr = addJSONkeyval(jstr, "axis_labels", buffer)
+	
 	jstr = addJSONkeyval(jstr, "current_config", sc_current_config, addQuotes = 1)
 	jstr = addJSONkeyval(jstr, "time_completed", Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
 	jstr = addJSONkeyval(jstr, "time_elapsed", num2numStr(sweep_t_elapsed))
@@ -1774,7 +1779,7 @@ function SaveWaves([msg, save_experiment])
 	// check if a path is defined to backup data
 	if(sc_checkBackup())
 		// copy data to server mount point
-		
+		sc_copyNewFiles(filenum, save_experiment=save_experiment )
 	endif
 
 	// close HDF5 files and increment filenum
