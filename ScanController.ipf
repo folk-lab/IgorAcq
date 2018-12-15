@@ -2000,7 +2000,7 @@ function sc_copyNewFiles(datnum, [save_experiment] )
 
 		for(j=0;j<ItemsInList(matchList, ";");j+=1)
 			tmpname = StringFromList(j,matchList, ";")
-		CopyFile /Z=1 (original_data + tmpname) as (copy_data + tmpname)
+			CopyFile /Z=1 (original_data + tmpname) as (copy_data + tmpname)
 		endfor
 	endfor
 
