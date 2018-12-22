@@ -64,6 +64,27 @@ function  setup34401Adcvolts(instrID, range, linecycles)
 	writeInstr(instrID,"volt:dc:nplc "+num2str(linecycles)+"\r\n")
 end
 
+function  setup34401Aacvolts(instrID, range, linecycles)
+	// setup dmm to take dc voltage readings
+	Variable instrID, range, linecycles
+	// Ranges: 0.1, 1, 10, 100, 1000V
+	// Linecycles: 0.02, 0.2, 1, 10, 100 (60Hz cycles)
+
+	// autozero off (set in this function) with 1NPLC gives 5.5 digits of resolution
+	// according to the manual
+	// this is a pretty good default and makes the read time comparable to an srs830
+
+	writeInstr(instrID,"*RST\r\n")
+	sc_sleep(0.05)
+	writeInstr(instrID,"*CLS\r\n")
+	sc_sleep(0.05)
+	writeInstr(instrID,"conf:volt:ac "+num2str(range)+"\r\n")
+	sc_sleep(0.05)
+	writeInstr(instrID,"zero:auto off\r\n")
+	sc_sleep(0.05)
+	writeInstr(instrID,"volt:dc:nplc "+num2str(linecycles)+"\r\n")
+end
+
 /////////////////////
 //// Utility ///////
 ///////////////////
@@ -156,23 +177,23 @@ end
 
 function/s get34401AStatus(instrID)
 	variable instrID
-//	string  buffer = ""
-//
-//	string gpib = num2istr(getAddressGPIB(instrID))
-//	buffer = addJSONkeyvalpair(buffer, "gpib_address", gpib)
-//
-//	// get configuration
-//	string config = TrimString(check34401Aconfig(instrID))
-//	variable i=0
-//	do
-//		if(CmpStr(config[i], "+")==0 || CmpStr(config[i], "-")==0)
-//			break
-//		endif
-//		i+=1
-//	while(i<strlen(config))
-//	buffer = addJSONkeyvalpair(buffer, "units", TrimString(config[1,i-1]), addQuotes=1)
-//	buffer = addJSONkeyvalpair(buffer, "range", StringFromList(0, config[i,strlen(config)-2],","))
-//	buffer = addJSONkeyvalpair(buffer, "resolution", StringFromList(1, config[i,strlen(config)-2],","))
-//
-//	return addJSONkeyvalpair("", "HP34401A_"+gpib, buffer)
+	string  buffer = ""
+
+	string gpib = num2istr(getAddressGPIB(instrID))
+	buffer = addJSONkeyval(buffer, "gpib_address", gpib)
+
+	// get configuration
+	string config = TrimString(check34401Aconfig(instrID))
+	variable i=0
+	do
+		if(CmpStr(config[i], "+")==0 || CmpStr(config[i], "-")==0)
+			break
+		endif
+		i+=1
+	while(i<strlen(config))
+	buffer = addJSONkeyval(buffer, "units", TrimString(config[1,i-1]), addQuotes=1)
+	buffer = addJSONkeyval(buffer, "range", StringFromList(0, config[i,strlen(config)-2],","))
+	buffer = addJSONkeyval(buffer, "resolution", StringFromList(1, config[i,strlen(config)-2],","))
+
+	return addJSONkeyval("", "HP34401A_"+gpib, buffer)
 end
