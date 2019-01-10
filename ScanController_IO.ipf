@@ -36,8 +36,8 @@ function initSaveFiles([msg])
 	variable /G meta_group_ID
 	HDF5CreateGroup hdf5_id, "metadata", meta_group_ID
 
-//	killdatafolder /z root:meta // kill it if it exists
-//	newdatafolder root:meta     // create an empty version
+	killdatafolder /z root:meta // kill it if it exists
+	newdatafolder root:meta     // create an empty version
 	string /g root:meta:sweep_logs = prettyJSONfmt(sc_createSweepLogs(msg=msg))
 	string /g root:meta:config = prettyJSONfmt(sc_createconfig())
 	HDF5SaveGroup /L=4 $("root:meta"), hdf5_id, "metadata"

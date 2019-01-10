@@ -237,10 +237,11 @@ function sc_openInstrConnections(print_cmd)
 	endfor
 end
 
-function sc_openInstrGUIs()
+function sc_openInstrGUIs(print_cmd)
 	// open GUIs for instruments
 	// this is a simple as running through the list defined
 	//     in the scancontroller window
+	variable print_cmd
 	wave /T sc_Instr
 
 	variable i=0
@@ -248,9 +249,13 @@ function sc_openInstrGUIs()
 	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
 		command = TrimString(sc_Instr[i][1])
 		if(strlen(command)>0)
-			print "execute: "+command
+			if(print_cmd==1)
+				print ">>> "+command
+			endif
 			execute/Q/Z command
-			print "[ERROR] "+GetErrMessage(V_Flag,2)
+			if(V_flag!=0)
+				print "[ERROR] in sc_openInstrGUIs: "+GetErrMessage(V_Flag,2)
+			endif
 		endif
 	endfor
 end
@@ -603,7 +608,7 @@ Window ScanController() : Panel
 
 	// buttons
 	button connect, pos={10,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_OpenInstrButton,title="Connect Instr"
-	button gui, pos={140,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_openInstrGUIs,title="Open All GUI"
+	button gui, pos={140,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_OpenGUIButton,title="Open All GUI"
 	button killabout, pos={270,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={140,20},proc=sc_controlwindows,title="Kill Sweep Controls"
 	button killgraphs, pos={420,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_killgraphs,title="Close All Graphs"
 	button updatebutton, pos={550,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={110,20},proc=sc_updatewindow,title="Update"
@@ -616,6 +621,11 @@ EndMacro
 function sc_OpenInstrButton(action) : Buttoncontrol
 	string action
 	sc_openInstrConnections(1)
+end
+
+function sc_OpenGUIButton(action) : Buttoncontrol
+	string action
+	sc_openInstrGUIs(1)
 end
 
 function sc_killgraphs(action) : Buttoncontrol
