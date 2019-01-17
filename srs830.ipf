@@ -215,8 +215,7 @@ function SetSRSTimeConst(instrID,timeConst) // Units: s
 
 	// transform to integer
 	make/o mintime = abs(srs_tc_lookup-timeConst)
-	findvalue/v=(wavemin(minstime)) mintime
-
+	findvalue/v=(wavemin(mintime)) mintime
 	writeInstr(instrID, "OFLT "+num2istr(v_value)+"\n")
 end
 

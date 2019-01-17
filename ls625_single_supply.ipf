@@ -11,11 +11,19 @@
 //// Lakeshore 625 COMM ////
 ////////////////////////////
 
-function openLS625connection(instrID, visa_address, [verbose])
+function openLS625connection(instrVarName, visa_address, amps_per_tesla, max_field, max_ramprate, [verbose])
 	// instrID is the name of the global variable that will be used for communication
 	// visa_address is the VISA address string, i.e. ASRL1::INSTR
-	string instrID, visa_address
-	variable verbose
+	
+	/////   amps_per_tesla, max_field, max_ramprate /////
+	/////        in A/T, mT, mT/min
+	// LD50 (AMI vector):
+	//    x -- 55.4939, 1000, 154.287
+	//    y -- 55.2181, 1000, 155.058
+	//    z -- 9.95025, 6000, 1159.57
+	
+	string instrVarName, visa_address
+	variable amps_per_tesla, max_field, max_ramprate, verbose
 	
 	if(paramisdefault(verbose))
 		verbose=1
@@ -31,38 +39,59 @@ function openLS625connection(instrID, visa_address, [verbose])
 	endif
 	
 	string comm = ""
-	sprintf comm, "name=LS625,instrID=%s,visa_address=%s" instrID, visa_address
+	sprintf comm, "name=LS625,instrID=%s,visa_address=%s" instrVarName, visa_address
+//	string options = "baudrate=57600,databits=7,stopbits=1,parity=1,test_query=*IDN?"
 	string options = "baudrate=57600,databits=7,stopbits=1,parity=1"
+
 	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
+
+	nvar localID = $(instrVarName)
+	
+	svar/z ls625_names
+	if(!svar_exists(ls625_names))
+		string /g ls625_names = AddListItem(instrVarName, "")
+		string /g ls625_visaIDs =AddListItem(num2istr(localID), "")
+	else
+		svar ls625_visaIDs
+		variable idx = WhichListItem(instrVarName, ls625_names) // lookup name
+		if(idx>-1)
+			// found an instrument with that name
+			// replace the visaID value in the other list
+			ls625_visaIDs = RemoveListItem(idx, ls625_visaIDs)
+			ls625_visaIDs = AddListItem(num2istr(localID), ls625_visaIDs, ";", idx)
+		else
+			// this is a new variable name
+			// add additional entries to both lists
+			ls625_names = AddListItem(instrVarName, ls625_names)
+			ls625_visaIDs = AddListItem(num2istr(localID), ls625_visaIDs)
+		endif
+	endif
+	
+	variable /g $("amps_per_tesla_"+instrVarName) = amps_per_tesla
+	variable /g $("max_field_"+instrVarName) = max_field
+	variable /g $("max_ramprate_"+instrVarName) = max_ramprate
+
 end
 
-///////////////////////
-/// Initiate Magnet ///
-///////////////////////
-
-function initLS625zOnly(instrIDz)
-
-	variable instrIDz
-
-	// local copies of the serial port addresses
-	string/g instrDescZ = getResourceAddress(instrIDz)
-
-	variable/g ampsperteslaz=9.950// A/T
-	variable/g maxfieldz=6000 // mT
-	variable/g maxrampratez=300 // mT/min
-
-	setLS625rate(instrIDz,100)
+function /s ls625_lookupVarName(instrID)
+	variable instrID
 	
+	svar ls625_names, ls625_visaIDs
+	variable idx = WhichListItem(num2istr(instrID), ls625_visaIDs)
+	if(idx>-1)
+		return StringFromList(idx, ls625_names)
+	else
+		abort "[ERROR]: Could not find global variables matching ls625 instrument name"
+	endif
+		
 end
 
 ////////////////////////
 //// Get functions ////
 ///////////////////////
 
-function getLS625current(instrID) // Units: A
+threadsafe function getLS625current(instrID) // Units: A
 	variable instrID
-	nvar ampsperteslaz
-	wave/t outputvalstr
 	variable current
 
 	current = str2num(queryInstr(instrID,"RDGI?\r\n", read_term = "\r\n"))
@@ -70,29 +99,20 @@ function getLS625current(instrID) // Units: A
 	return current
 end
 
-
 function getLS625field(instrID) // Units: mT
 	variable instrID
-	nvar ampsperteslaz
+	nvar apt = $("amps_per_tesla_"+ls625_lookupVarName(instrID))
 	variable field, current
 	
 	current = getLS625current(instrID)
-	field = Round_Number(current/ampsperteslaz*1000,5)
+	field = Round_Number(current/apt*1000,5)
 
 	return field
 end
 
-function getL625allfield(instrIDx,instrIDz) // Units: mT
-	variable instrIDx,instrIDz
-	make/n=2/o fieldwave
-
-	fieldwave[0] = getLS625field(instrIDx)
-	fieldwave[1] = getLS625field(instrIDz)
-end
-
 function getLS625rate(instrID) // Units: mT/min
 	variable instrID
-	nvar ampsperteslax,ampsperteslaz
+	nvar apt = $("amps_per_tesla_"+ls625_lookupVarName(instrID))
 	wave/t sweepratevalstr
 	variable rampratefield, currentramprate
 	svar instrDescX,instrDescZ
@@ -100,26 +120,9 @@ function getLS625rate(instrID) // Units: mT/min
 	string l625 = getResourceAddress(instrID)
 
 	currentramprate = str2num(queryInstr(instrID,"RATE?\r\n", read_term = "\r\n")) // A/s
-	// Update control window
-	if(cmpstr(l625,instrDescX)==0)
-		rampratefield = Round_Number(currentramprate/ampsperteslax*60*1000,5)
-		sweepratevalstr[0][1] = num2str(rampratefield)
-	elseif(cmpstr(l625,instrDescZ)==0)
-		rampratefield = Round_Number(currentramprate/ampsperteslaz*60*1000,5)
-		sweepratevalstr[1][1] = num2str(rampratefield)
-	else
-		abort "Couldn't determine which axis to address"
-	endif
+	rampratefield = Round_Number(currentramprate/apt*60*1000,5)
 
 	return rampratefield
-end
-
-function getLS625allrate(instrIDx,instrIDz)
-	variable instrIDx,instrIDz
-	make/o/n=2 sweepratewave
-
-	sweepratewave[0] = getLS625rate(instrIDx)
-	sweepratewave[1] = getLS625rate(instrIDz)
 end
 
 ////////////////////////
@@ -129,7 +132,8 @@ end
 function setLS625current(instrID,output) // Units: A
 	variable instrID,output
 	string cmd
-	nvar maxfieldz,ampsperteslaz
+	nvar maxf = $("max_field_"+ls625_lookupVarName(instrID))
+	nvar apt = $("amps_per_tesla_"+ls625_lookupVarName(instrID))
 	
 	// check for NAN and INF
 	if(sc_check_naninf(output) != 0)
@@ -137,8 +141,8 @@ function setLS625current(instrID,output) // Units: A
 	endif
 
 
-	if (abs(output) > maxfieldz*ampsperteslaz/1000)
-		print "Max current is "+num2str(maxfieldz*ampsperteslaz/1000)+" A"
+	if (abs(output) > maxf*apt/1000)
+		print "Max current is "+num2str(maxf*apt/1000)+" A"
 	else
 		cmd = "SETI "+num2str(output)
 		writeInstr(instrID, cmd+"\r\n")
@@ -148,15 +152,16 @@ end
 
 function setLS625field(instrID,output) // Units: mT
 	variable instrID, output
-	nvar maxfieldz,ampsperteslaz
+	nvar maxf = $("max_field_"+ls625_lookupVarName(instrID))
+	nvar apt = $("amps_per_tesla_"+ls625_lookupVarName(instrID))
 	variable round_amps
 	string cmd
 
-	if (abs(output) > maxfieldz)
-		print "Max field is "+num2str(maxfieldz)+" mT"
+	if (abs(output) > maxf)
+		print "Max field is "+num2str(maxf)+" mT"
 		return 0
 	else
-		round_amps = Round_Number(output*ampsperteslaz/1000,5)
+		round_amps = Round_Number(output*apt/1000,5)
 		setLS625current(instrID,round_amps)
 		return 1
 	endif
@@ -174,7 +179,8 @@ end
 
 function setLS625rate(instrID,output) // Units: mT/min
 	variable instrID, output
-	nvar maxrampratez,ampsperteslaz
+	nvar maxrr = $("max_ramprate_"+ls625_lookupVarName(instrID))
+	nvar apt = $("amps_per_tesla_"+ls625_lookupVarName(instrID))
 	variable ramprate_amps
 	string cmd
 	
@@ -184,11 +190,11 @@ function setLS625rate(instrID,output) // Units: mT/min
 	endif
 
 
-	if (output < 0 || output > maxrampratez)
-		print "Max sweep rate is "+num2str(maxrampratez)+" mT/min"
+	if (output < 0 || output > maxrr)
+		print "Max sweep rate is "+num2str(maxrr)+" mT/min"
 		return 0
 	else
-		ramprate_amps = Round_Number(output*(ampsperteslaz/(1000*60)),5) // A/s
+		ramprate_amps = Round_Number(output*(apt/(1000*60)),5) // A/s
 		cmd = "RATE "+num2str(ramprate_amps)
 		writeInstr(instrID,cmd+"\r\n")
 		return 1
