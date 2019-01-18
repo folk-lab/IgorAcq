@@ -87,13 +87,18 @@ function /S executeWinCmd(command)
 
 end
 
-function/S executeMacCmd(command)
+function/S executeMacCmd(command, [asAdmin])
 	// http://www.igorexchange.com/node/938
 	string command
+	variable asAdmin
+
+	if (ParamIsDefault(asAdmin))
+		asAdmin = 0
+	endif
 
 	string cmd
 	sprintf cmd, "do shell script \"%s\"", command
-	ExecuteScriptText /Z /UNQ /W=5.0 cmd
+	ExecuteScriptText /UNQ /Z /W=5.0 cmd
 
 	return S_value
 end
@@ -1969,26 +1974,20 @@ function SaveFromPXP([history, procedure])
 	close expRef
 end
 
-function /S sc_copySingleFile(original_path, copy_path)
+function /S sc_copySingleFile(original_path, new_path, filename)
 	// custom copy file function because the Igor version seems to lead to 
 	// weird corruption problems when copying from a local machine 
 	// to a mounted server drive
 	// this assumes that all the necessary paths already exist
 	
-	string original_path, copy_path
-	string cmd, result
-		
-	string platform = igorinfo(2)
-	strswitch(platform)
-		case "Macintosh":
-			sprintf cmd, "cp -X %s %s", original_path, copy_path
-			return executeMacCmd(cmd)
-		case "Windows":
-			sprintf cmd, "copy /-y /b %s %s", original_path, copy_path
-			return executeWinCmd(cmd)
-		default:
-			abort "Here? "+platform
-	endswitch
+	string original_path, new_path, filename
+	
+	string ext = ParseFilePath(4, filename, ":", 0, 0) // might need this
+	string platform = igorinfo(2) 						      // might need this
+	string op = getExpPath(original_path, full=3)
+	string np = getExpPath(new_path, full=3)
+	
+	CopyFile /Z=1 (op + filename) as (np + filename)
 	
 end
 
@@ -2001,41 +2000,30 @@ function sc_copyNewFiles(datnum, [save_experiment] )
 	string tmpname = ""
 
 	// try to figure out if a path that is needed is missing
-	variable path_missing = 0
-	pathinfo data
-	path_missing+=V_flag
-	pathinfo config
-	path_missing+=V_flag
-	pathinfo backup_data
-	path_missing+=V_flag
-	pathinfo backup_config
-	path_missing+=V_flag
-	if(path_missing<4)
-		print path_missing
-		print "[ERROR] A path is missing. Data not backed up to server."
-	endif
-
-	// setup directories
-	string original_data = getExpPath("data", full=2)
-	string original_config = getExpPath("config", full=2)
-	string copy_data = getExpPath("backup_data", full=2)
-	string copy_config = getExpPath("backup_config", full=2)
+	make /O/T sc_data_paths = {"data", "config", "backup_data", "backup_config"}
+	variable path_missing = 0, k=0
+	for(k=0;k<numpnts(sc_data_paths);k+=1)
+		pathinfo $(sc_data_paths[k])
+		if(V_flag==0)
+			abort "[ERROR] A path is missing. Data not backed up to server."
+		endif
+	endfor
 	
 	// add experiment/history/procedure files
 	// only if I saved the experiment this run
-	string datapath = getExpPath("data", full=1)
 	if(!paramisdefault(save_experiment) && save_experiment == 1)
+	
 		// add experiment file
 		tmpname = igorinfo(1)+".pxp"
-		print sc_copySingleFile( (original_data + tmpname), (copy_data + tmpname) )
+		sc_copySingleFile("data","backup_data",tmpname)
 
 		// add history file
 		tmpname = igorinfo(1)+".history"
-		print sc_copySingleFile( (original_data + tmpname), (copy_data + tmpname) )
+		sc_copySingleFile("data","backup_data",tmpname)
 
 		// add procedure file
 		tmpname = igorinfo(1)+".ipf"
-		print sc_copySingleFile( (original_data + tmpname), (copy_data + tmpname) )
+		sc_copySingleFile("data","backup_data",tmpname)
 		
 	endif
 
@@ -2056,7 +2044,7 @@ function sc_copyNewFiles(datnum, [save_experiment] )
 
 		for(j=0;j<ItemsInList(matchList, ";");j+=1)
 			tmpname = StringFromList(j,matchList, ";")
-			sc_copySingleFile( (original_data + tmpname), (copy_data + tmpname) )
+			sc_copySingleFile("data","backup_data",tmpname)
 		endfor
 	endfor
 
@@ -2071,7 +2059,7 @@ function sc_copyNewFiles(datnum, [save_experiment] )
 	if(itemsinlist(configlist)>0)
 		configlist = SortList(configlist, ";", 1+16)
 		tmpname = StringFromList(0,configlist, ";")
-		print sc_copySingleFile( (original_config + tmpname), (copy_config + tmpname) )
+		sc_copySingleFile("config", "backup_config", tmpname )
 	endif
 
 	print "Copied new files to: " + getExpPath("backup_data", full=2)

@@ -32,19 +32,24 @@ function initSaveFiles([msg])
 	endif
 
 	// Create metadata
-	// save json strings as datasets into that group
+	// this just creates one big JSON string attribute for the group
+	// its... fine
 	variable /G meta_group_ID
 	HDF5CreateGroup hdf5_id, "metadata", meta_group_ID
 
-	killdatafolder /z root:meta // kill it if it exists
-	newdatafolder root:meta     // create an empty version
-	string /g root:meta:sweep_logs = prettyJSONfmt(sc_createSweepLogs(msg=msg))
-	string /g root:meta:config = prettyJSONfmt(sc_createconfig())
-	HDF5SaveGroup /L=4 $("root:meta"), hdf5_id, "metadata"
+	make /FREE /T /N=1 cconfig = prettyJSONfmt(prettyJSONfmt(sc_createconfig()))
+	make /FREE /T /N=1 sweep_logs = prettyJSONfmt(sc_createSweepLogs(msg=msg))
+	
+	HDF5SaveData /A="sweep_logs" sweep_logs, hdf5_id, "metadata"
+	HDF5SaveData /A="sc_config" cconfig, hdf5_id, "metadata"
 
-	// save config file
-	svar cconfig = root:meta:config
-	sc_saveConfig(cconfig)
+	HDF5CloseGroup /Z meta_group_id
+	if (V_flag != 0)
+		Print "HDF5CloseGroup Failed: ", "metadata"
+	endif
+
+	// may as well save this config file, since we already have it
+	sc_saveConfig(cconfig[0])
 
 end
 
@@ -68,13 +73,6 @@ function closeSaveFiles()
 	string filenumstr = ""
 	sprintf filenumstr, "%d", filenum
 	string /g h5name = "dat"+filenumstr+".h5"
-
-	// close metadata
-	nvar meta_group_id
-	HDF5CloseGroup /Z meta_group_id
-	if (V_flag != 0)
-		Print "HDF5CloseGroup Failed: ", "metadata"
-	endif
 
 	// close HDF5 file
 	nvar hdf5_id
