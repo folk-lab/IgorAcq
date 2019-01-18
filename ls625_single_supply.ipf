@@ -5,7 +5,7 @@
 // Procedure written by Christian Olsen 2017-03-15
 // Updated to VISA by Christian Olsen, 2018-05-xx
 // Both axes are powered by Lakeshore 625 power supplies.
-
+// Nik -- Rewritten without window to handle an arbitrary number of LS controllers connected to the same system 01-XX-2019
 
 ////////////////////////////
 //// Lakeshore 625 COMM ////

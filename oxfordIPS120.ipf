@@ -3,7 +3,7 @@
 //	Currents are returned in amps, while field values are return in mT
 //	Procedure written by Christian Olsen 2016-01-26
 // Updated to use VISA/async Nik/Christian 05-XX-2018
-// Rewritten without window to handle an arbitrary number of IPS controllers connected to the same system
+// Nik -- Rewritten without window to handle an arbitrary number of IPS controllers connected to the same system 01-XX-2019
 
 /////////////////////////
 /// IPS specific COMM ///
