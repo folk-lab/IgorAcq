@@ -11,9 +11,10 @@
 //// Lakeshore 625 COMM ////
 ////////////////////////////
 
-function openLS625connection(instrVarName, visa_address, amps_per_tesla, max_field, max_ramprate, [verbose])
+function openLS625connection(instrVarName, visa_address, amps_per_tesla, max_field, max_ramprate, [verbose, hold])
 	// instrID is the name of the global variable that will be used for communication
 	// visa_address is the VISA address string, i.e. ASRL1::INSTR
+	// hold is not used here, it is included to match the IPS driver
 	
 	/////   amps_per_tesla, max_field, max_ramprate /////
 	/////        in A/T, mT, mT/min
@@ -23,7 +24,7 @@ function openLS625connection(instrVarName, visa_address, amps_per_tesla, max_fie
 	//    z -- 9.95025, 6000, 1159.57
 	
 	string instrVarName, visa_address
-	variable amps_per_tesla, max_field, max_ramprate, verbose
+	variable amps_per_tesla, max_field, max_ramprate, verbose, hold
 	
 	if(paramisdefault(verbose))
 		verbose=1
@@ -105,7 +106,7 @@ function getLS625field(instrID) // Units: mT
 	variable field, current
 	
 	current = getLS625current(instrID)
-	field = Round_Number(current/apt*1000,5)
+	field = roundNum(current/apt*1000,5)
 
 	return field
 end
@@ -120,9 +121,24 @@ function getLS625rate(instrID) // Units: mT/min
 	string l625 = getResourceAddress(instrID)
 
 	currentramprate = str2num(queryInstr(instrID,"RATE?\r\n", read_term = "\r\n")) // A/s
-	rampratefield = Round_Number(currentramprate/apt*60*1000,5)
+	rampratefield = roundNum(currentramprate/apt*60*1000,5)
 
 	return rampratefield
+end
+
+function getLS625rampStatus(instrID)
+	variable instrID
+	string response
+	variable ramping
+
+	response = queryInstr(instrID,"OPST?\r\n",read_term = "\r\n")
+	if(str2num(response) == 6)
+		ramping = 0
+	else
+		ramping = 1
+	endif
+
+	return ramping
 end
 
 ////////////////////////
@@ -161,20 +177,20 @@ function setLS625field(instrID,output) // Units: mT
 		print "Max field is "+num2str(maxf)+" mT"
 		return 0
 	else
-		round_amps = Round_Number(output*apt/1000,5)
+		round_amps = roundNum(output*apt/1000,5)
 		setLS625current(instrID,round_amps)
 		return 1
 	endif
 end
 
-function setLS625fieldwait(instrID,output)
+function setLS625fieldWait(instrID,output)
 	variable instrID, output
 
 	setLS625field(instrID,output)
 	do
 		sc_sleep(0.1)
 		getLS625field(instrID)
-	while(checkLS625ramp(instrID))
+	while(getLS625rampStatus(instrID))
 end
 
 function setLS625rate(instrID,output) // Units: mT/min
@@ -194,48 +210,12 @@ function setLS625rate(instrID,output) // Units: mT/min
 		print "Max sweep rate is "+num2str(maxrr)+" mT/min"
 		return 0
 	else
-		ramprate_amps = Round_Number(output*(apt/(1000*60)),5) // A/s
+		ramprate_amps = roundNum(output*(apt/(1000*60)),5) // A/s
 		cmd = "RATE "+num2str(ramprate_amps)
 		writeInstr(instrID,cmd+"\r\n")
 		return 1
 	endif
 	
-end
-
-///////////////////
-//// Utilities ////
-///////////////////
-
-function Round_Number(number,decimalplace) //for integer pass 0 as decimalplace
-	variable number, decimalplace
-	variable multiplier
-	multiplier = 10^decimalplace
-	return round(number*multiplier)/multiplier
-end
-
-function RoundtoZero(input)
-	variable input
-
-	if(abs(input) < 1e-03)
-		input=0
-	endif
-
-	return input
-end
-
-function checkLS625ramp(instrID)
-	variable instrID
-	string response
-	variable ramping
-
-	response = queryInstr(instrID,"OPST?\r\n",read_term = "\r\n")
-	if(str2num(response) == 6)
-		ramping = 0
-	else
-		ramping = 1
-	endif
-
-	return ramping
 end
 
 //////////////////
