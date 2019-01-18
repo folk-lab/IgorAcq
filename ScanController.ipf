@@ -67,7 +67,7 @@ function /S executeWinCmd(command)
 	Close batRef
 
 	// execute batch file with output directed to logFile
-	ExecuteScriptText /B "\"" + batchFull + "\""
+	ExecuteScriptText /Z /W=5.0 /B "\"" + batchFull + "\""
 
 	string outputLine, result = ""
 	variable logRef
@@ -93,7 +93,7 @@ function/S executeMacCmd(command)
 
 	string cmd
 	sprintf cmd, "do shell script \"%s\"", command
-	ExecuteScriptText /UNQ cmd
+	ExecuteScriptText /Z /UNQ /W=5.0 cmd
 
 	return S_value
 end
@@ -159,19 +159,6 @@ function /S getExpPath(whichpath, [full])
 			else
 				return ""
 			endif
-		case "sc":
-			// returns full path to the directory where ScanController lives
-			// always assumes you want the full path
-			string sc_dir = FunctionPath("getExpPath")
-			variable pathLen = itemsinlist(sc_dir, ":")-1
-			sc_dir = RemoveListItem(pathLen, sc_dir, ":")
-			if(full==2)
-				return ParseFilePath(5, sc_dir, separatorStr, 0, 0)
-			elseif(full==3)
-				return sc_dir
-			else // full=0 or 1
-				return ""
-			endif
 		case "data":
 			// returns path to data relative to local_measurement_data
 			if(full==0)
@@ -199,6 +186,38 @@ function /S getExpPath(whichpath, [full])
 			elseif(full==3)
 				return S_path+"config:"
 			else
+				return ""
+			endif
+		case "backup_data":
+			// returns full path to the backup-data directory
+			// always assumes you want the full path
+			
+			pathinfo backup_data // get path info
+			if(V_flag == 0) // check if path is defined
+				abort "backup_data path is not defined!\n"
+			endif
+			
+			if(full==2)
+				return ParseFilePath(5, S_path, separatorStr, 0, 0)
+			elseif(full==3)
+				return S_path
+			else // full=0 or 1
+				return ""
+			endif
+		case "backup_config":
+			// returns full path to the backup-data directory
+			// always assumes you want the full path
+			
+			pathinfo backup_config // get path info
+			if(V_flag == 0) // check if path is defined
+				abort "backup_config path is not defined!\n"
+			endif
+			
+			if(full==2)
+				return ParseFilePath(5, S_path, separatorStr, 0, 0)
+			elseif(full==3)
+				return S_path
+			else // full=0 or 1
 				return ""
 			endif
 	endswitch
@@ -275,6 +294,10 @@ function sc_checkBackup()
 		string sp = S_path
 		newpath /C/O/Q backup_data sp+sc_hostname+":"+getExpPath("data", full=1)
 		newpath /C/O/Q backup_config sp+sc_hostname+":"+getExpPath("config", full=1)
+		
+		// make sure these directory trees exist
+		// ....
+		
 		return 1
 	endif
 end
@@ -1948,6 +1971,29 @@ function SaveFromPXP([history, procedure])
 	close expRef
 end
 
+function /S sc_copySingleFile(original_path, copy_path)
+	// custom copy file function because the Igor version seems to lead to 
+	// weird corruption problems when copying from a local machine 
+	// to a mounted server drive
+	// this assumes that all the necessary paths already exist
+	
+	string original_path, copy_path
+	string cmd, result
+		
+	string platform = igorinfo(2)
+	strswitch(platform)
+		case "Macintosh":
+			sprintf cmd, "cp -X %s %s", original_path, copy_path
+			return executeMacCmd(cmd)
+		case "Windows":
+			sprintf cmd, "copy /-y /b %s %s", original_path, copy_path
+			return executeWinCmd(cmd)
+		default:
+			abort "Here? "+platform
+	endswitch
+	
+end
+
 function sc_copyNewFiles(datnum, [save_experiment] )
 	// locate newly created/appended files
 	// move to server path
@@ -1956,40 +2002,42 @@ function sc_copyNewFiles(datnum, [save_experiment] )
 	variable result = 0
 	string tmpname = ""
 
-	// get some 
+	// try to figure out if a path that is needed is missing
 	variable path_missing = 0
 	pathinfo data
 	path_missing+=V_flag
-	string original_data = S_path
 	pathinfo config
 	path_missing+=V_flag
-	string original_config = S_path
 	pathinfo backup_data
 	path_missing+=V_flag
-	string copy_data = S_path
 	pathinfo backup_config
 	path_missing+=V_flag
-	string copy_config = S_path
 	if(path_missing<4)
 		print path_missing
 		print "[ERROR] A path is missing. Data not backed up to server."
 	endif
 
+	// setup directories
+	string original_data = getExpPath("data", full=2)
+	string original_config = getExpPath("config", full=2)
+	string copy_data = getExpPath("backup_data", full=2)
+	string copy_config = getExpPath("backup_config", full=2)
+	
 	// add experiment/history/procedure files
 	// only if I saved the experiment this run
 	string datapath = getExpPath("data", full=1)
 	if(!paramisdefault(save_experiment) && save_experiment == 1)
 		// add experiment file
 		tmpname = igorinfo(1)+".pxp"
-		CopyFile /Z=1 (original_data + tmpname) as (copy_data + tmpname)
+		print sc_copySingleFile( (original_data + tmpname), (copy_data + tmpname) )
 
 		// add history file
 		tmpname = igorinfo(1)+".history"
-		CopyFile /Z=1 (original_data + tmpname) as (copy_data + tmpname)
+		print sc_copySingleFile( (original_data + tmpname), (copy_data + tmpname) )
 
 		// add procedure file
 		tmpname = igorinfo(1)+".ipf"
-		CopyFile /Z=1 (original_data + tmpname) as (copy_data + tmpname)
+		print sc_copySingleFile( (original_data + tmpname), (copy_data + tmpname) )
 		
 	endif
 
@@ -2010,7 +2058,7 @@ function sc_copyNewFiles(datnum, [save_experiment] )
 
 		for(j=0;j<ItemsInList(matchList, ";");j+=1)
 			tmpname = StringFromList(j,matchList, ";")
-			CopyFile /Z=1 (original_data + tmpname) as (copy_data + tmpname)
+			sc_copySingleFile( (original_data + tmpname), (copy_data + tmpname) )
 		endfor
 	endfor
 
@@ -2025,9 +2073,10 @@ function sc_copyNewFiles(datnum, [save_experiment] )
 	if(itemsinlist(configlist)>0)
 		configlist = SortList(configlist, ";", 1+16)
 		tmpname = StringFromList(0,configlist, ";")
-		CopyFile /Z=1 (original_config + tmpname) as (copy_config + tmpname)
+		print sc_copySingleFile( (original_config + tmpname), (copy_config + tmpname) )
 	endif
 
+	print "Copied new files to: " + getExpPath("backup_data", full=2)
 end
 
 //////////////////////////
