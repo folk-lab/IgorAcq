@@ -291,12 +291,10 @@ function sc_checkBackup()
 		print "[WARNING] Only saving local copies of data. See sc_checkBackup()."
 		return 0
 	else
+		// this should also create the path if it does not exist
 		string sp = S_path
 		newpath /C/O/Q backup_data sp+sc_hostname+":"+getExpPath("data", full=1)
 		newpath /C/O/Q backup_config sp+sc_hostname+":"+getExpPath("config", full=1)
-		
-		// make sure these directory trees exist
-		// ....
 		
 		return 1
 	endif
