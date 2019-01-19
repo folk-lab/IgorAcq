@@ -2077,7 +2077,7 @@ end
 /// sweep notification ///
 //////////////////////////
 
-function /S getSlackNotice(username, [message, min_time]) //FIX!
+function /S getSlackNotice(username, [message, min_time]) 
 	// this function will send a notification to Slack -- run it as if it were a getInstrStatus function
 	// username = your slack username, notice will be a DM
 	// message = string to include in Slack message
@@ -2086,7 +2086,7 @@ function /S getSlackNotice(username, [message, min_time]) //FIX!
 	string username, message
 	variable min_time
 	nvar filenum, sweep_t_elapsed, sc_abortsweep
-	svar sc_slack_url
+	string sc_slack_url = "https://hooks.slack.com/services/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"
 	string txt="", buffer="", payload="", out="", botname = "qdotbot", emoji = ":the_horns:"
 
 	//// check if I need a notification ////
@@ -2111,7 +2111,6 @@ function /S getSlackNotice(username, [message, min_time]) //FIX!
 	sprintf buffer, "dat%d completed:  %s %s \r", filenum, Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); txt+=buffer
 	sprintf buffer, "time elapsed:  %.2f s \r", sweep_t_elapsed; txt+=buffer
 	//// end build txt ////
-
 
 	//// build payload ////
 	sprintf buffer, "{\"text\": \"%s\"", txt; payload+=buffer //
