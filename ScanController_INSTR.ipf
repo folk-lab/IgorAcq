@@ -77,6 +77,14 @@ function openVISAinstr(mandatory, [options, localRM, verbose])
 	string var_name = StringByKey("instrID", mandatory, "=", ",")
 	string instrDesc = StringByKey("visa_address", mandatory, "=", ",")
 	
+	// check if a global variable with var_name exists
+	// if it does, close that VISA connection
+	// this will prevent the experiment from hitting the 500 instrument limit
+	nvar /z existingID = $(var_name)
+	if(nvar_exists(existingID))
+		closeVISAInstr(existingID, verbose=verbose)
+	endif
+	
 	variable instrID, status
 	string error
 	status = viOpen(localRM,instrDesc,0,0,instrID)
@@ -118,18 +126,26 @@ function openVISAinstr(mandatory, [options, localRM, verbose])
 	
 end
 
-function closeVISAInstr(instrID)
-	variable instrID
-	string error
+function closeVISAInstr(instrID, [verbose])
+	variable instrID, verbose
+	
+	if(paramisdefault(verbose))
+		verbose=1
+	elseif(verbose!=1)
+		verbose=0
+	endif
 
 	variable status = viClose(instrID)
 	if (status < 0)
-		VISAerrormsg("closeInstr() -- viClose", instrID, status)
-		abort
+		if( verbose == 1)
+			VISAerrormsg("closeInstr() -- viClose", instrID, status)
+		endif
 	else
-		printf "%s", instrID
+		if (verbose ==1 )
+			printf "closed VISA session ID: %d \n", instrID
+		endif
 	endif
-
+	return status
 end
 
 function closeAllVISA()

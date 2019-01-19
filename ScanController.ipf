@@ -67,7 +67,7 @@ function /S executeWinCmd(command)
 	Close batRef
 
 	// execute batch file with output directed to logFile
-	ExecuteScriptText /B "\"" + batchFull + "\""
+	ExecuteScriptText /Z /W=5.0 /B "\"" + batchFull + "\""
 
 	string outputLine, result = ""
 	variable logRef
@@ -93,7 +93,7 @@ function/S executeMacCmd(command)
 
 	string cmd
 	sprintf cmd, "do shell script \"%s\"", command
-	ExecuteScriptText /UNQ cmd
+	ExecuteScriptText /UNQ /Z /W=5.0 cmd
 
 	return S_value
 end
@@ -159,19 +159,6 @@ function /S getExpPath(whichpath, [full])
 			else
 				return ""
 			endif
-		case "sc":
-			// returns full path to the directory where ScanController lives
-			// always assumes you want the full path
-			string sc_dir = FunctionPath("getExpPath")
-			variable pathLen = itemsinlist(sc_dir, ":")-1
-			sc_dir = RemoveListItem(pathLen, sc_dir, ":")
-			if(full==2)
-				return ParseFilePath(5, sc_dir, separatorStr, 0, 0)
-			elseif(full==3)
-				return sc_dir
-			else // full=0 or 1
-				return ""
-			endif
 		case "data":
 			// returns path to data relative to local_measurement_data
 			if(full==0)
@@ -199,6 +186,38 @@ function /S getExpPath(whichpath, [full])
 			elseif(full==3)
 				return S_path+"config:"
 			else
+				return ""
+			endif
+		case "backup_data":
+			// returns full path to the backup-data directory
+			// always assumes you want the full path
+			
+			pathinfo backup_data // get path info
+			if(V_flag == 0) // check if path is defined
+				abort "backup_data path is not defined!\n"
+			endif
+			
+			if(full==2)
+				return ParseFilePath(5, S_path, separatorStr, 0, 0)
+			elseif(full==3)
+				return S_path
+			else // full=0 or 1
+				return ""
+			endif
+		case "backup_config":
+			// returns full path to the backup-data directory
+			// always assumes you want the full path
+			
+			pathinfo backup_config // get path info
+			if(V_flag == 0) // check if path is defined
+				abort "backup_config path is not defined!\n"
+			endif
+			
+			if(full==2)
+				return ParseFilePath(5, S_path, separatorStr, 0, 0)
+			elseif(full==3)
+				return S_path
+			else // full=0 or 1
 				return ""
 			endif
 	endswitch
@@ -237,10 +256,11 @@ function sc_openInstrConnections(print_cmd)
 	endfor
 end
 
-function sc_openInstrGUIs()
+function sc_openInstrGUIs(print_cmd)
 	// open GUIs for instruments
 	// this is a simple as running through the list defined
 	//     in the scancontroller window
+	variable print_cmd
 	wave /T sc_Instr
 
 	variable i=0
@@ -248,9 +268,13 @@ function sc_openInstrGUIs()
 	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
 		command = TrimString(sc_Instr[i][1])
 		if(strlen(command)>0)
-			print "execute: "+command
+			if(print_cmd==1)
+				print ">>> "+command
+			endif
 			execute/Q/Z command
-			print "[ERROR] "+GetErrMessage(V_Flag,2)
+			if(V_flag!=0)
+				print "[ERROR] in sc_openInstrGUIs: "+GetErrMessage(V_Flag,2)
+			endif
 		endif
 	endfor
 end
@@ -267,9 +291,11 @@ function sc_checkBackup()
 		print "[WARNING] Only saving local copies of data. See sc_checkBackup()."
 		return 0
 	else
+		// this should also create the path if it does not exist
 		string sp = S_path
 		newpath /C/O/Q backup_data sp+sc_hostname+":"+getExpPath("data", full=1)
 		newpath /C/O/Q backup_config sp+sc_hostname+":"+getExpPath("config", full=1)
+		
 		return 1
 	endif
 end
@@ -603,7 +629,7 @@ Window ScanController() : Panel
 
 	// buttons
 	button connect, pos={10,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_OpenInstrButton,title="Connect Instr"
-	button gui, pos={140,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_openInstrGUIs,title="Open All GUI"
+	button gui, pos={140,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_OpenGUIButton,title="Open All GUI"
 	button killabout, pos={270,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={140,20},proc=sc_controlwindows,title="Kill Sweep Controls"
 	button killgraphs, pos={420,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_killgraphs,title="Close All Graphs"
 	button updatebutton, pos={550,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={110,20},proc=sc_updatewindow,title="Update"
@@ -616,6 +642,11 @@ EndMacro
 function sc_OpenInstrButton(action) : Buttoncontrol
 	string action
 	sc_openInstrConnections(1)
+end
+
+function sc_OpenGUIButton(action) : Buttoncontrol
+	string action
+	sc_openInstrGUIs(1)
 end
 
 function sc_killgraphs(action) : Buttoncontrol
@@ -1766,6 +1797,7 @@ function SaveWaves([msg, save_experiment])
 			endif
 			ii+=1
 		while (ii < numpnts(sc_CalcWaveNames))
+		closeSaveFiles()
 	endif
 
 	if(save_experiment==1 & (datetime-sc_save_time)>180.0)
@@ -1781,10 +1813,9 @@ function SaveWaves([msg, save_experiment])
 		// copy data to server mount point
 		sc_copyNewFiles(filenum, save_experiment=save_experiment )
 	endif
-
-	// close HDF5 files and increment filenum
+	
+	// increment filenum
 	if(Rawadd+Calcadd > 0)
-		closeSaveFiles()
 		filenum+=1
 	endif
 
@@ -1938,53 +1969,71 @@ function SaveFromPXP([history, procedure])
 	close expRef
 end
 
-function sc_copyNewFiles(datnum, [save_experiment] )
-	// locate newly created/appended files
-	// move to server path
-
-	variable datnum, save_experiment  // save_experiment=1 to save pxp, history, and procedure
-	variable result = 0
-	string tmpname = ""
-
-	// get some 
-	variable path_missing = 0
-	pathinfo data
-	path_missing+=V_flag
-	string original_data = S_path
-	pathinfo config
-	path_missing+=V_flag
-	string original_config = S_path
-	pathinfo backup_data
-	path_missing+=V_flag
-	string copy_data = S_path
-	pathinfo backup_config
-	path_missing+=V_flag
-	string copy_config = S_path
-	if(path_missing<4)
-		print path_missing
-		print "[ERROR] A path is missing. Data not backed up to server."
+function /S sc_copySingleFile(original_path, new_path, filename)
+	// custom copy file function because the Igor version seems to lead to 
+	// weird corruption problems when copying from a local machine 
+	// to a mounted server drive
+	// this assumes that all the necessary paths already exist
+	
+	string original_path, new_path, filename
+	string op="", np=""
+	
+	if( cmpstr(igorinfo(2) ,"Macintosh")==0 )
+		// using rsync if the machine is a mac
+		//   should speed things up a little bit by not copying full files
+		op = getExpPath(original_path, full=2)
+		np = getExpPath(new_path, full=2)
+		
+		string cmd = ""
+		sprintf cmd, "rsync -a %s %s", op+filename, np
+		executeMacCmd(cmd)
+	else
+		// probably can use rsync here on newer windows machines
+		//   do not currently have one to test
+		op = getExpPath(original_path, full=3)
+		np = getExpPath(new_path, full=3)
+		CopyFile /Z=1 (op+filename) as (np+filename)
 	endif
+	
+end
 
+function sc_copyNewFiles(datnum, [save_experiment, verbose] )
+	// locate newly created/appended files and move to backup directory 
+
+	variable datnum, save_experiment, verbose  // save_experiment=1 to save pxp, history, and procedure
+	variable result = 0
+	string tmpname = ""	
+
+	// try to figure out if a path that is needed is missing
+	make /O/T sc_data_paths = {"data", "config", "backup_data", "backup_config"}
+	variable path_missing = 0, k=0
+	for(k=0;k<numpnts(sc_data_paths);k+=1)
+		pathinfo $(sc_data_paths[k])
+		if(V_flag==0)
+			abort "[ERROR] A path is missing. Data not backed up to server."
+		endif
+	endfor
+	
 	// add experiment/history/procedure files
 	// only if I saved the experiment this run
-	string datapath = getExpPath("data", full=1)
 	if(!paramisdefault(save_experiment) && save_experiment == 1)
+	
 		// add experiment file
 		tmpname = igorinfo(1)+".pxp"
-		CopyFile /Z=1 (original_data + tmpname) as (copy_data + tmpname)
+		sc_copySingleFile("data","backup_data",tmpname)
 
 		// add history file
 		tmpname = igorinfo(1)+".history"
-		CopyFile /Z=1 (original_data + tmpname) as (copy_data + tmpname)
+		sc_copySingleFile("data","backup_data",tmpname)
 
 		// add procedure file
 		tmpname = igorinfo(1)+".ipf"
-		CopyFile /Z=1 (original_data + tmpname) as (copy_data + tmpname)
+		sc_copySingleFile("data","backup_data",tmpname)
 		
 	endif
 
 	// find new data files
-	string extensions = ".h5;.hdf5"
+	string extensions = ".h5;"
 	string datstr = "", idxList, matchList
 	variable i, j
 	for(i=0;i<ItemsInList(extensions, ";");i+=1)
@@ -2000,9 +2049,9 @@ function sc_copyNewFiles(datnum, [save_experiment] )
 
 		for(j=0;j<ItemsInList(matchList, ";");j+=1)
 			tmpname = StringFromList(j,matchList, ";")
-			print (original_data + tmpname), (copy_data+tmpname)
-			CopyFile /Z=1 (original_data + tmpname) as (copy_data + tmpname)
+			sc_copySingleFile("data","backup_data",tmpname)
 		endfor
+		
 	endfor
 
 	// add the most recent scan controller config file
@@ -2016,16 +2065,19 @@ function sc_copyNewFiles(datnum, [save_experiment] )
 	if(itemsinlist(configlist)>0)
 		configlist = SortList(configlist, ";", 1+16)
 		tmpname = StringFromList(0,configlist, ";")
-		CopyFile /Z=1 (original_config + tmpname) as (copy_config + tmpname)
+		sc_copySingleFile("config", "backup_config", tmpname )
 	endif
 
+	if(!paramisdefault(verbose) && verbose == 1)
+		print "Copied new files to: " + getExpPath("backup_data", full=2)
+	endif
 end
 
 //////////////////////////
 /// sweep notification ///
 //////////////////////////
 
-function /S getSlackNotice(username, [message, min_time]) //FIX!
+function /S getSlackNotice(username, [message, min_time]) 
 	// this function will send a notification to Slack -- run it as if it were a getInstrStatus function
 	// username = your slack username, notice will be a DM
 	// message = string to include in Slack message
@@ -2034,7 +2086,7 @@ function /S getSlackNotice(username, [message, min_time]) //FIX!
 	string username, message
 	variable min_time
 	nvar filenum, sweep_t_elapsed, sc_abortsweep
-	svar sc_slack_url
+	string sc_slack_url = "https://hooks.slack.com/services/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"
 	string txt="", buffer="", payload="", out="", botname = "qdotbot", emoji = ":the_horns:"
 
 	//// check if I need a notification ////
@@ -2059,7 +2111,6 @@ function /S getSlackNotice(username, [message, min_time]) //FIX!
 	sprintf buffer, "dat%d completed:  %s %s \r", filenum, Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); txt+=buffer
 	sprintf buffer, "time elapsed:  %.2f s \r", sweep_t_elapsed; txt+=buffer
 	//// end build txt ////
-
 
 	//// build payload ////
 	sprintf buffer, "{\"text\": \"%s\"", txt; payload+=buffer //
