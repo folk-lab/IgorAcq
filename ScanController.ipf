@@ -87,14 +87,9 @@ function /S executeWinCmd(command)
 
 end
 
-function/S executeMacCmd(command, [asAdmin])
+function/S executeMacCmd(command)
 	// http://www.igorexchange.com/node/938
 	string command
-	variable asAdmin
-
-	if (ParamIsDefault(asAdmin))
-		asAdmin = 0
-	endif
 
 	string cmd
 	sprintf cmd, "do shell script \"%s\"", command
@@ -1802,6 +1797,7 @@ function SaveWaves([msg, save_experiment])
 			endif
 			ii+=1
 		while (ii < numpnts(sc_CalcWaveNames))
+		closeSaveFiles()
 	endif
 
 	if(save_experiment==1 & (datetime-sc_save_time)>180.0)
@@ -1817,10 +1813,9 @@ function SaveWaves([msg, save_experiment])
 		// copy data to server mount point
 		sc_copyNewFiles(filenum, save_experiment=save_experiment )
 	endif
-
-	// close HDF5 files and increment filenum
+	
+	// increment filenum
 	if(Rawadd+Calcadd > 0)
-		closeSaveFiles()
 		filenum+=1
 	endif
 
@@ -1981,23 +1976,33 @@ function /S sc_copySingleFile(original_path, new_path, filename)
 	// this assumes that all the necessary paths already exist
 	
 	string original_path, new_path, filename
+	string op="", np=""
 	
-	string ext = ParseFilePath(4, filename, ":", 0, 0) // might need this
-	string platform = igorinfo(2) 						      // might need this
-	string op = getExpPath(original_path, full=3)
-	string np = getExpPath(new_path, full=3)
-	
-	CopyFile /Z=1 (op + filename) as (np + filename)
+	if( cmpstr(igorinfo(2) ,"Macintosh")==0 )
+		// using rsync if the machine is a mac
+		//   should speed things up a little bit by not copying full files
+		op = getExpPath(original_path, full=2)
+		np = getExpPath(new_path, full=2)
+		
+		string cmd = ""
+		sprintf cmd, "rsync -a %s %s", op+filename, np
+		executeMacCmd(cmd)
+	else
+		// probably can use rsync here on newer windows machines
+		//   do not currently have one to test
+		op = getExpPath(original_path, full=3)
+		np = getExpPath(new_path, full=3)
+		CopyFile /Z=1 (op+filename) as (np+filename)
+	endif
 	
 end
 
-function sc_copyNewFiles(datnum, [save_experiment] )
-	// locate newly created/appended files
-	// move to server path
+function sc_copyNewFiles(datnum, [save_experiment, verbose] )
+	// locate newly created/appended files and move to backup directory 
 
-	variable datnum, save_experiment  // save_experiment=1 to save pxp, history, and procedure
+	variable datnum, save_experiment, verbose  // save_experiment=1 to save pxp, history, and procedure
 	variable result = 0
-	string tmpname = ""
+	string tmpname = ""	
 
 	// try to figure out if a path that is needed is missing
 	make /O/T sc_data_paths = {"data", "config", "backup_data", "backup_config"}
@@ -2028,7 +2033,7 @@ function sc_copyNewFiles(datnum, [save_experiment] )
 	endif
 
 	// find new data files
-	string extensions = ".h5;.hdf5"
+	string extensions = ".h5;"
 	string datstr = "", idxList, matchList
 	variable i, j
 	for(i=0;i<ItemsInList(extensions, ";");i+=1)
@@ -2046,6 +2051,7 @@ function sc_copyNewFiles(datnum, [save_experiment] )
 			tmpname = StringFromList(j,matchList, ";")
 			sc_copySingleFile("data","backup_data",tmpname)
 		endfor
+		
 	endfor
 
 	// add the most recent scan controller config file
@@ -2062,7 +2068,9 @@ function sc_copyNewFiles(datnum, [save_experiment] )
 		sc_copySingleFile("config", "backup_config", tmpname )
 	endif
 
-	print "Copied new files to: " + getExpPath("backup_data", full=2)
+	if(!paramisdefault(verbose) && verbose == 1)
+		print "Copied new files to: " + getExpPath("backup_data", full=2)
+	endif
 end
 
 //////////////////////////
