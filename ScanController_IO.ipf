@@ -37,7 +37,7 @@ function initSaveFiles([msg])
 	variable /G meta_group_ID
 	HDF5CreateGroup hdf5_id, "metadata", meta_group_ID
 
-	make /FREE /T /N=1 cconfig = prettyJSONfmt(prettyJSONfmt(sc_createconfig()))
+	make /FREE /T /N=1 cconfig = prettyJSONfmt(sc_createconfig())
 	make /FREE /T /N=1 sweep_logs = prettyJSONfmt(sc_createSweepLogs(msg=msg))
 	
 	HDF5SaveData /A="sweep_logs" sweep_logs, hdf5_id, "metadata"
@@ -91,9 +91,13 @@ function writeToFile(anyStr,filename,path)
 	// write any string to a file called "filename"
 	// path must be a predefined path
 	string anyStr,filename,path
-	variable refnum=0
+	variable refnum
 
-	open /z/p=$path refnum as filename
+	open /z/p=$(path) refnum as filename
+	if(V_flag!=0)
+		print "[ERROR] File could not be opened in writeToFile: "+filename
+		return 0
+	endif
 
 	do
 		if(strlen(anyStr)<500)
@@ -106,6 +110,7 @@ function writeToFile(anyStr,filename,path)
 	while(1)
 
 	close refnum
+	return 1
 end
 
 function/s readTXTFile(filename, path)
