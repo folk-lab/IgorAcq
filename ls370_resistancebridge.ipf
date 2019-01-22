@@ -1,4 +1,4 @@
-﻿#pragma TextEncoding = "UTF-8"
+#pragma TextEncoding = "UTF-8"
 #pragma rtGlobals=1		// Use modern global access method
 
 // Driver for controling a Dilution fridge, via a LakeShore 370 controller and an intermidiate server
@@ -193,7 +193,7 @@ function getLS370heaterpower(instrID,heater, [max_age_s]) // Units: mW
 		case "bfbig":
 			break
 	endswitch
-
+  
 	if(channel > 0)
 		sprintf command, "get-analog-data/%d?max_age_s=%d&_at_=%s", channel, max_age_s, ls_token
 	else
@@ -251,6 +251,7 @@ function/s getLS370PIDparameters(instrID) // Units: No units
 	sprintf command, "command?_at_=%s", ls_token
 
 	pid = sendLS370(instrID,command,"post", keys="v", payload=payload)
+
 	p_value = str2num(stringfromlist(0,pid[1,inf],","))
 	i_value = str2num(stringfromlist(1,pid[1,inf],","))
 	d_value = str2num(stringfromlist(2,pid[1,inf],","))
@@ -290,7 +291,9 @@ function getLS370controlmode(instrID) // Units: No units
 	else
 		print "Control mode not in supported modes, turning off heater!"
 		sc_sleep(0.5)
+
 		setLS370tempcontrolmode(instrID,4)
+
 	endif
 end
 
@@ -502,6 +505,7 @@ function setLS370PIDparameters(instrID,p,i,d) // Units: No units
 		sprintf payload, "{\"command\": \"%s\"}", cmd
 		sprintf command, "command?_at_=%s", ls_token
 		sendLS370(instrID,command,"post", payload=payload)
+
 		p_value = p
 		i_value = i
 		d_value = d
@@ -648,7 +652,7 @@ function estimateheaterrangeLS370(temp) // Units: mK
 	make/o/n=8 mintempabs
 	make/o/n=8 mintemp
 	variable maxcurrent
-
+  
 	heatervalues = mcheatertemp_lookup[p][1]
 	mintempabs = abs(heatervalues-temp)
 	mintemp = heatervalues-temp
@@ -679,8 +683,6 @@ end
 
 function createLS370Gobals()
 	// Create the needed global variables for driver
-
-	// Create variables for control window
 	variable/g pid_led = 0
 	variable/g mcheater_led = 0
 	variable/g stillheater_led = 0
@@ -735,7 +737,6 @@ function/s sendLS370(instrID,cmd,method,[payload, keys])
 	else
 		return ""
 	endif
-
 end
 
 /////////////////////////
