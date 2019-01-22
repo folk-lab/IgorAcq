@@ -107,3 +107,20 @@ function makecolorful([rev, nlines])	//nlines = # of lines share the same color
 	while(index<=num)
 	legend
 end
+
+
+
+function fits(data2d, coef)
+	wave data2d, coef
+	variable g0, Vw, V0, i=0
+	
+	make /o/n=(dimsize(data2d,1)) results
+
+	do
+		FuncFit CBpeak coef data2d[][i]
+		results[i]=coef[1]
+		i+=1
+	while (i<dimsize(data2d,1))
+	
+//	FuncFit CBpeak coef 
+end
