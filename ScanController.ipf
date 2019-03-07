@@ -50,7 +50,7 @@ function /S executeWinCmd(command)
 	// if logFile is selected, put output there
 	// otherwise, return output
 	string command
-	string dataPath = getExpPath("data", full=1)
+	string dataPath = getExpPath("data", full=2)
 
 	// open batch file to store command
 	variable batRef
@@ -82,7 +82,7 @@ function /S executeWinCmd(command)
 	Close logRef
 
 	DeleteFile /P=data /Z=1 batchFile // delete batch file
-	DeleteFile /P=data /Z=1 logFile // delete batch file
+	DeleteFile /P=data /Z=1 logFile   // delete batch file
 	return result
 
 end
