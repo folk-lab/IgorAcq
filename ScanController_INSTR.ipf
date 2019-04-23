@@ -83,6 +83,7 @@ function openVISAinstr(mandatory, [options, localRM, verbose])
 	nvar /z existingID = $(var_name)
 	if(nvar_exists(existingID))
 		closeVISAInstr(existingID, verbose=verbose)
+		killvariables $var_name
 	endif
 	
 	variable instrID, status
@@ -91,7 +92,7 @@ function openVISAinstr(mandatory, [options, localRM, verbose])
 	if (status < 0)
 		VISAerrormsg("openInstr() -- viOpen", localRM, status)
 		abort
-	else
+	else 
 		variable /g $var_name = instrID
 		if(verbose)
 			printf "%s (%s) connected as %s\r", name, instrDesc, var_name
