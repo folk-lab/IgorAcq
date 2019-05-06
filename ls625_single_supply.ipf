@@ -4,8 +4,12 @@
 // Driver communicates over serial.
 // Procedure written by Christian Olsen 2017-03-15
 // Updated to VISA by Christian Olsen, 2018-05-xx
-// Both axes are powered by Lakeshore 625 power supplies.
-// Nik -- Rewritten without window to handle an arbitrary number of LS controllers connected to the same system 01-XX-2019
+// Nik -- Rewritten without window to handle an arbitrary number of 
+//         LS controllers connected to the same system 01-XX-2019
+
+// If you want to write a vector magnet driver, use this procedure to provide
+//   communiction with the magnet supplies, write another procedure 
+//   to handle GUI/axes/angles...
 
 ////////////////////////////
 //// Lakeshore 625 COMM ////
@@ -41,8 +45,7 @@ function openLS625connection(instrVarName, visa_address, amps_per_tesla, max_fie
 	
 	string comm = ""
 	sprintf comm, "name=LS625,instrID=%s,visa_address=%s" instrVarName, visa_address
-//	string options = "baudrate=57600,databits=7,stopbits=1,parity=1,test_query=*IDN?"
-	string options = "baudrate=57600,databits=7,stopbits=1,parity=1"
+	string options = "baudrate=57600,databits=7,stopbits=1,parity=1,test_query=*IDN?"
 
 	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
 
@@ -117,8 +120,6 @@ function getLS625rate(instrID) // Units: mT/min
 	wave/t sweepratevalstr
 	variable rampratefield, currentramprate
 	svar instrDescX,instrDescZ
-
-	string l625 = getResourceAddress(instrID)
 
 	currentramprate = str2num(queryInstr(instrID,"RATE?\r\n", read_term = "\r\n")) // A/s
 	rampratefield = roundNum(currentramprate/apt*60*1000,5)
@@ -222,19 +223,13 @@ end
 //// Logging /////
 //////////////////
 
-function/s GetLS625Status(instrIDx,instrIDz)
-	variable instrIDx,instrIDz
-	string buffer = "", subbuffer = ""
+function/s GetLS625Status(instrID)
+	variable instrID
+	string buffer = ""
 
-	subbuffer = ""
-	subbuffer = addJSONkeyval(subbuffer, "x", num2str(getLS625field(instrIDx)))
-	subbuffer = addJSONkeyval(subbuffer, "z", num2str(getLS625field(instrIDz)))
-	buffer = addJSONkeyval(buffer, "field mT", subbuffer)
+	buffer = addJSONkeyval(buffer, "variable name", ls625_lookupVarName(instrID), addquotes=1)
+	buffer = addJSONkeyval(buffer, "field mT", num2str(getLS625field(instrID)))
+	buffer = addJSONkeyval(buffer, "rate mT/min", num2str(getLS625rate(instrID)))
 
-	subbuffer = ""
-	subbuffer = addJSONkeyval(subbuffer, "x", num2str(getLS625rate(instrIDx)))
-	subbuffer = addJSONkeyval(subbuffer, "z", num2str(getLS625rate(instrIDz)))
-	buffer = addJSONkeyval(buffer, "rate mT/min", subbuffer)
-
-	return addJSONkeyval("", "Two Axis Magnet", buffer)
+	return addJSONkeyval("", "LS625 Magnet Supply", buffer)
 end

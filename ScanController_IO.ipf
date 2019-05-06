@@ -27,8 +27,11 @@ function initSaveFiles([msg])
 	// save x and y arrays
 	nvar sc_is2d
 	HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_xdata" , hdf5_id, "x_array"
-	if(sc_is2d)
+	if(sc_is2d == 1)
 		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_ydata" , hdf5_id, "y_array"
+	elseif(sc_is2d == 2)
+		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_ydata" , hdf5_id, "y_array"
+		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_linestart", hdf5_id, "linestart"
 	endif
 
 	// Create metadata

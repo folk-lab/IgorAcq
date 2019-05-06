@@ -219,7 +219,7 @@ function SetSRSTimeConst(instrID,timeConst) // Units: s
 	writeInstr(instrID, "OFLT "+num2istr(v_value)+"\n")
 end
 
-function SetSRSPhase(instrID,phase) // Units: AU
+function SetSRSPhase(instrID,phase) // Units: deg
 	variable instrID, phase
 	
 	// check for NAN and INF
