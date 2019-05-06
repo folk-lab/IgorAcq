@@ -1085,7 +1085,6 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	// Find all open plots
 	graphlist = winlist("*",";","WIN:1")
 	j=0				
-	//for (i=0;i<round(strlen(graphlist)/6);i=i+1)  //Tim:TODO:Remove: is /6 because you're assuming graph** and it's roughly 6 characters? why not itemsinlist(graphlist)?
 	for (i=0;i<itemsinlist(graphlist);i=i+1) 
 		index = strsearch(graphlist,";",j)			
 		graphname = graphlist[j,index-1]
@@ -1398,7 +1397,7 @@ function RecordValues(i, j, [readvstime, fillnan])
 		outerindex = i // meaningless
 	endif
 
-	// Set readvstime to 0 if it's not defined //Tim: default is 0 anyway?
+	// Set readvstime to 0 if it's not defined
 	if(paramisdefault(readvstime))
 		readvstime=0
 	endif
@@ -1542,138 +1541,6 @@ function RecordValues(i, j, [readvstime, fillnan])
 	// check abort/pause status
 	sc_checksweepstate()
 end
-//function RecordValues(i, j, [readvstime, fillnan])
-//	// In a 1d scan, i is the index of the loop. j will be ignored.
-//	// In a 2d scan, i is the index of the outer (slow) loop, and j is the index of the inner (fast) loop.
-//
-//	// readvstime works only in 1d and rescales (grows) the wave at each index
-//
-//	// fillnan=1 skips any read or calculation functions entirely and fills point [i,j] with nan
-//
-//	variable i, j, readvstime, fillnan
-//	nvar sc_is2d, sc_startx, sc_finx, sc_numptsx, sc_starty, sc_finy, sc_numptsy
-//	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts
-//	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
-//	nvar sc_abortsweep, sc_pause, sc_scanstarttime
-//	variable ii = 0
-//
-//	//// setup all sorts of logic so we can store values correctly ////
-//
-//	variable innerindex, outerindex
-//	if (sc_is2d)
-//		// 2d
-//		innerindex = j
-//		outerindex = i
-//	else
-//		// 1d
-//		innerindex = i
-//		outerindex = i // meaningless
-//	endif
-//
-//	// Set readvstime to 0 if it's not defined
-//	if(paramisdefault(readvstime))
-//		readvstime=0
-//	endif
-//
-//	if(innerindex==0 && outerindex==0)
-//		variable/g sc_rvt = readvstime // needed for rescaling in SaveWaves()
-//	endif
-//
-//	if(readvstime==1 && sc_is2d)
-//		abort "NOT IMPLEMENTED: Read vs Time is currently only supported for 1D sweeps."
-//	endif
-//
-//	//// fill NaNs? ////
-//
-//	if(paramisdefault(fillnan))
-//		fillnan = 0 // defaults to 0
-//	elseif(fillnan==1)
-//		fillnan = 1 // again, obvious
-//	else
-//		fillnan=0   // if something other than 1
-//					//     assume default
-//	endif
-//
-//	//// Setup and run async data collection ////
-//	wave sc_measAsync
-//	if( (sum(sc_measAsync) > 1) && (fillnan==0) )
-//		variable tgID = sc_ManageThreads(innerindex, outerindex, readvstime) // start threads, wait, collect data
-//		sc_KillThreads(tgID) // Terminate threads
-//	endif
-//
-//	//// Read sync data ( or fill NaN) ////
-//	variable /g sc_tmpVal
-//	string script = "", cmd = ""
-//	ii=0
-//	do
-//		if ((sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1) && sc_measAsync[ii]==0)
-//			wave wref1d = $sc_RawWaveNames[ii]
-//
-//			// Redimension waves if readvstime is set to 1
-//			if (readvstime == 1)
-//				redimension /n=(innerindex+1) wref1d
-//				setscale/I x 0,  datetime - sc_scanstarttime, wref1d
-//			endif
-//
-//			if(fillnan == 0)
-//				script = TrimString(sc_RawScripts[ii])
-//				sprintf cmd, "%s = %s", "sc_tmpVal", script
-//				Execute/Q/Z cmd
-//				if(V_flag!=0)
-//					print "[ERROR] in RecordValues (raw): "+GetErrMessage(V_Flag,2)
-//				endif
-//			else
-//				sc_tmpval = NaN
-//			endif
-//			wref1d[innerindex] = sc_tmpval
-//
-//			if (sc_is2d)
-//				// 2D Wave
-//				wave wref2d = $sc_RawWaveNames[ii] + "2d"
-//				wref2d[innerindex][outerindex] = wref1d[innerindex]
-//			endif
-//		endif
-//		ii+=1
-//	while (ii < numpnts(sc_RawWaveNames))
-//
-//	//// Calculate interpreted numbers and store them in calculated waves ////
-//	ii=0
-//	cmd = ""
-//	do
-//		if ( (sc_CalcRecord[ii] == 1) || (sc_CalcPlot[ii] == 1) )
-//			wave wref1d = $sc_CalcWaveNames[ii] // this is the 1D wave I am filling
-//
-//			// Redimension waves if readvstimeis set to 1
-//			if (readvstime == 1)
-//				redimension /n=(innerindex+1) wref1d
-//				setscale/I x 0, datetime - sc_scanstarttime, wref1d
-//			endif
-//
-//			if(fillnan == 0)
-//				script = TrimString(sc_CalcScripts[ii])
-//				// Allow the use of the keyword '[i]' in calculated fields where i is the inner loop's current index
-//				script = ReplaceString("[i]", script, "["+num2istr(innerindex)+"]")
-//				sprintf cmd, "%s = %s", "sc_tmpVal", script
-//				Execute/Q/Z cmd
-//				if(V_flag!=0)
-//					print "[ERROR] in RecordValues (calc): "+GetErrMessage(V_Flag,2)
-//				endif
-//			elseif(fillnan == 1)
-//				sc_tmpval = NaN
-//			endif
-//			wref1d[innerindex] = sc_tmpval
-//
-//			if (sc_is2d)
-//				wave wref2d = $sc_CalcWaveNames[ii] + "2d"
-//				wref2d[innerindex][outerindex] = wref1d[innerindex]
-//			endif
-//		endif
-//		ii+=1
-//	while (ii < numpnts(sc_CalcWaveNames))
-//
-//	// check abort/pause status
-//	sc_checksweepstate()
-//end
 
 ///////////////////////
 /// ASYNC handling ///
