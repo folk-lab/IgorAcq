@@ -72,11 +72,11 @@ function InitBabyDACs(instrID, boards, ranges, [custom])
 	bdCheckForOldInit(custom) // Will update the user window to the last known values.
 
 	// open window
-	killwindow BabyDACWindow
+	killwindow /Z BabyDACWindow
 	execute("BabyDACWindow()")
 
 	if(custom)
-		killwindow CustomDACWindow
+		killwindow /Z CustomDACWindow
 		execute("CustomDACWindow()")
 	endif
 end

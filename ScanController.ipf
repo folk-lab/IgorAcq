@@ -50,7 +50,7 @@ function /S executeWinCmd(command)
 	// if logFile is selected, put output there
 	// otherwise, return output
 	string command
-	string dataPath = getExpPath("data", full=1)
+	string dataPath = getExpPath("data", full=2)
 
 	// open batch file to store command
 	variable batRef
@@ -82,7 +82,7 @@ function /S executeWinCmd(command)
 	Close logRef
 
 	DeleteFile /P=data /Z=1 batchFile // delete batch file
-	DeleteFile /P=data /Z=1 logFile // delete batch file
+	DeleteFile /P=data /Z=1 logFile   // delete batch file
 	return result
 
 end
@@ -925,8 +925,8 @@ function sc_findAsyncMeasurements()
 
 end
 
-function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_label])
-	variable start, fin, numpts, starty, finy, numptsy
+function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_label, linecut]) //linecut = 0,1 for false, true
+	variable start, fin, numpts, starty, finy, numptsy, linecut
 	string x_label, y_label
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
 	wave /T sc_RawWaveNames, sc_CalcWaveNames, sc_RawScripts, sc_CalcScripts
@@ -1000,6 +1000,11 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 			print "[WARNING]: Your start and end values are the same!"
 		endif
 	endif
+	if(linecut == 1) //Tim:To make linecuts work with RecordValues
+		sc_is2d = 2
+		make/O/n=(numptsy) sc_linestart = NaN 						//To store first xvalue of each line of data
+		cmd = "setscale/I x " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + "sc_linestart"; execute(cmd)
+	endif
 
 	if(paramisdefault(x_label) || stringmatch(x_label,""))
 		sc_x_label=""
@@ -1018,7 +1023,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	cmd = "make /o/n=(" + num2istr(sc_numptsx) + ") " + "sc_xdata" + "=NaN"; execute(cmd)
 	cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + "sc_xdata"; execute(cmd)
 	cmd = "sc_xdata" +" = x"; execute(cmd)
-	if(sc_is2d)
+	if(sc_is2d != 0)
 		cmd = "make /o/n=(" + num2istr(sc_numptsy) + ") " + "sc_ydata" + "=NaN"; execute(cmd)
 		cmd = "setscale/I x " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", \"\", " + "sc_ydata"; execute(cmd)
 		cmd = "sc_ydata" +" = x"; execute(cmd)
@@ -1032,12 +1037,18 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 			execute(cmd)
 			cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn
 			execute(cmd)
-			if(sc_is2d)
+			if(sc_is2d == 1)
 				// In case this is a 2D measurement
 				wn2d = wn + "2d"
 				cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd)
 				cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn2d; execute(cmd)
 				cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
+			elseif(sc_is2d ==2)
+				// In case this is a 2D line cut measurement
+				wn2d = sc_RawWaveNames[i]+"2d"
+				cmd = "make /o/n=(1, " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd) //Makes 1 by y wave, x is redimensioned in recordline
+				cmd = "setscale /P x, 0, " + num2str((sc_finx-sc_startx)/sc_numptsx) + "," + wn2d; execute(cmd) //sets x scale starting from 0 but with delta correct	
+				cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)//Useful to see if top and bottom of scan are filled with NaNs
 			endif
 		endif
 		i+=1
@@ -1052,11 +1063,17 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 			execute(cmd)
 			cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn
 			execute(cmd)
-			if(sc_is2d)
+			if(sc_is2d == 1)
 				// In case this is a 2D measurement
 				wn2d = wn + "2d"
 				cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd)
 				cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn2d; execute(cmd)
+				cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
+			elseif(sc_is2d == 2)
+				// In case this is a 2D line cut measurement
+				wn2d = sc_CalcWaveNames[i]+"2d"
+				cmd = "make /o/n=(1, " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd) //Same as for Raw (see above)	
+				cmd = "setscale /P x, 0, " + num2str((sc_finx-sc_startx)/sc_numptsx) + "," + wn2d; execute(cmd) //sets x scale starting from 0 but with delta correct		
 				cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
 			endif
 		endif
@@ -1067,9 +1084,9 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 
 	// Find all open plots
 	graphlist = winlist("*",";","WIN:1")
-	j=0
-	for (i=0;i<round(strlen(graphlist)/6);i=i+1)
-		index = strsearch(graphlist,";",j)
+	j=0				
+	for (i=0;i<itemsinlist(graphlist);i=i+1) 
+		index = strsearch(graphlist,";",j)			
 		graphname = graphlist[j,index-1]
 		setaxis/w=$graphname /a
 		getwindow $graphname wtitle
@@ -1217,7 +1234,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	cmd1 += "SweepControl"
 	execute(cmd1)
 end
-
+ 
 function sc_controlwindows(action)
 	string action
 	string openaboutwindows
@@ -1352,7 +1369,6 @@ end
 /////////////////////////////
 ////  read/record funcs  ////
 /////////////////////////////
-
 function RecordValues(i, j, [readvstime, fillnan])
 	// In a 1d scan, i is the index of the loop. j will be ignored.
 	// In a 2d scan, i is the index of the outer (slow) loop, and j is the index of the inner (fast) loop.
@@ -1371,7 +1387,7 @@ function RecordValues(i, j, [readvstime, fillnan])
 	//// setup all sorts of logic so we can store values correctly ////
 
 	variable innerindex, outerindex
-	if (sc_is2d)
+	if (sc_is2d == 1 || sc_is2d == 2) //1 is normal 2D, 2 is Line2D
 		// 2d
 		innerindex = j
 		outerindex = i
@@ -1407,13 +1423,15 @@ function RecordValues(i, j, [readvstime, fillnan])
 
 	//// Setup and run async data collection ////
 	wave sc_measAsync
-	if( (sum(sc_measAsync) > 1) && (fillnan==0) )
+	if( (sum(sc_measAsync) > 1) && (fillnan==0) && (sc_is2d != 2)) //Tim:TODO: Make async work for Line cut
 		variable tgID = sc_ManageThreads(innerindex, outerindex, readvstime) // start threads, wait, collect data
 		sc_KillThreads(tgID) // Terminate threads
 	endif
 
 	//// Read sync data ( or fill NaN) ////
 	variable /g sc_tmpVal
+	variable dx			//For 2Dline
+	wave sc_linestart, sc_xdata 	//For 2Dline  
 	string script = "", cmd = ""
 	ii=0
 	do
@@ -1438,11 +1456,29 @@ function RecordValues(i, j, [readvstime, fillnan])
 			endif
 			wref1d[innerindex] = sc_tmpval
 
-			if (sc_is2d)
+			if (sc_is2d == 1)
 				// 2D Wave
 				wave wref2d = $sc_RawWaveNames[ii] + "2d"
 				wref2d[innerindex][outerindex] = wref1d[innerindex]
+			elseif (sc_is2d == 2 && fillnan == 0)
+				//2D line wave
+				FindValue/V=0/T=(inf) wref1D 	//Finds the first non NaN and stores position in V_value (V=value, T=tolerance)
+				if(innerindex == V_value)		//records the x value of the first notNaN for all line2D graphs  
+					sc_linestart[outerindex] = sc_xdata[innerindex]
+				endif
+				wave wref2d = $sc_RawWaveNames[ii] + "2d"
+				if(dimsize(wref2d, 0)-1 < innerindex-V_value) //Does 2D line wave need larger x range?
+					dx = dimdelta(wref2d, 0) 																//saves delta x of original to put back in
+					make/o/n=(dimsize(wref2d,0)+1, dimsize(wref2d,1)) temp2Dwave = NaN 			//Make new larger wave 	
+					temp2Dwave[0,dimsize(wref2d,0)-1][0,dimsize(wref2d,1)-1] = wref2d[p][q] 	//copy over old values with NaNs everywhere else
+					duplicate/O temp2Dwave wref2d															//Put back into old wave
+					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + nameofwave(wref2d); execute(cmd) //Sets Y scale again
+					cmd = "setscale /P x, 0, " + num2str(dx) + ", " + nameofwave(wref2d); execute(cmd) //Sets x scale again (starts at 0 but with correct delta)
+					killwaves temp2Dwave																	//Clear mess
+				endif	
+				wref2d[innerindex-(V_value)][outerindex] = wref1d[innerindex] 	//Using V_value from FindValue a few lines up
 			endif
+			
 		endif
 		ii+=1
 	while (ii < numpnts(sc_RawWaveNames))
@@ -1474,9 +1510,29 @@ function RecordValues(i, j, [readvstime, fillnan])
 			endif
 			wref1d[innerindex] = sc_tmpval
 
-			if (sc_is2d)
+			if (sc_is2d == 1)
 				wave wref2d = $sc_CalcWaveNames[ii] + "2d"
 				wref2d[innerindex][outerindex] = wref1d[innerindex]
+			elseif (sc_is2d == 2 && fillnan == 0)
+				//2D line wave
+				FindValue/V=0/T=(inf) wref1D 	//Finds the first non NaN and stores position in V_value (V=value, T=tolerance)
+				
+				if(innerindex == V_value)		//records the x value of the first notNaN for all line2D graphs  
+					sc_linestart[outerindex] = sc_xdata[innerindex]
+				endif
+				wave wref2d = $sc_CalcWaveNames[ii] + "2d"
+				if(dimsize(wref2d, 0)-1 < innerindex-V_value && v_value != -1) //Does 2D line wave need larger x range?
+					dx = dimdelta(wref2d, 0)
+					make/o/n=(dimsize(wref2d,0)+1, dimsize(wref2d,1)) temp2Dwave = NaN 			//Make new larger wave 	
+					temp2Dwave[0,dimsize(wref2d,0)-1][0,dimsize(wref2d,1)-1] = wref2d[p][q] 	//copy over old values with NaNs everywhere else
+					duplicate/O temp2Dwave wref2d															//Put back into old wave
+					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + nameofwave(wref2d); execute(cmd) //Sets Y scale again
+					cmd = "setscale /P x, 0, " + num2str(dx) + ", " + nameofwave(wref2d); execute(cmd) //Sets x scale again (starts at 0 but with correct delta)
+					killwaves temp2Dwave																	//Clear mess
+				endif
+				if (v_value != -1 && V_value < innerindex) //don't fill a NaN or if V_value is actually from previous line of data (because it will try index out of range)
+					wref2d[innerindex-(V_value)][outerindex] = wref1d[innerindex] 	//Using V_value from FindValue a few lines up 	
+				endif
 			endif
 		endif
 		ii+=1
@@ -1761,7 +1817,12 @@ function SaveWaves([msg, save_experiment])
 		// Open up HDF5 files
 	 	// Save scan controller meta data in this function as well
 		initSaveFiles(msg=msg)
-
+		if(sc_is2d == 2) //If 2D linecut then need to save starting x values for each row of data
+			wave sc_linestart
+			filename = "dat" + filenumstr + "linestart"
+			duplicate sc_linestart $filename
+			savesinglewave("sc_linestart")
+		endif
 		// save raw data waves
 		ii=0
 		do
@@ -2077,7 +2138,12 @@ end
 /// sweep notification ///
 //////////////////////////
 
+
+//tim.child = U8W2V6QK0 
 function /S getSlackNotice(username, [message, min_time]) 
+	// Usernames no longer work for new users since 2017. See https://api.slack.com/changelog/2017-09-the-one-about-usernames
+	// Can use member ID instead
+	
 	// this function will send a notification to Slack -- run it as if it were a getInstrStatus function
 	// username = your slack username, notice will be a DM
 	// message = string to include in Slack message
@@ -2101,6 +2167,7 @@ function /S getSlackNotice(username, [message, min_time])
 	if(sc_abortsweep)
 		return "{slack_notice: false}"
 	endif
+	
 	//// end notification checks ////
 
 
@@ -2109,7 +2176,7 @@ function /S getSlackNotice(username, [message, min_time])
 	endif
 
 	sprintf buffer, "dat%d completed:  %s %s \r", filenum, Secs2Date(DateTime, 1), Secs2Time(DateTime, 3); txt+=buffer
-	sprintf buffer, "time elapsed:  %.2f s \r", sweep_t_elapsed; txt+=buffer
+	sprintf buffer, "time elapsed:  %.2f mins \r", sweep_t_elapsed/60; txt+=buffer
 	//// end build txt ////
 
 	//// build payload ////
@@ -2133,3 +2200,5 @@ function /S getSlackNotice(username, [message, min_time])
         return "{slack_notice: false}"
     endif
 end
+
+

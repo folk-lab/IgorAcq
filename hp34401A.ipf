@@ -168,7 +168,12 @@ threadsafe function read34401A(instrID)
 	string response
 
 	response = queryInstr(instrID,"READ?\r\n",read_term="\r\n")
-	return str2num(response)
+	variable reading = str2num(response)
+	if(reading > 2^64)
+		return NaN
+	else
+		return reading
+	endif
 end
 
 /////////////////////////
