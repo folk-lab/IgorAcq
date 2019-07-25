@@ -93,9 +93,22 @@ function/S executeMacCmd(command)
 
 	string cmd
 	sprintf cmd, "do shell script \"%s\"", command
-	ExecuteScriptText /UNQ /Z /W=5.0 cmd
+	ExecuteScriptText /UNQ /Z cmd
 
 	return S_value
+end
+
+function/S WinRsyncCopy(source, dest, [options])
+//This function does work, but it's not actually very useful as it the big pxp file can't be incrementally saved. May be useful at a later date?
+	string options, source, dest		//source and dest require "/" between folders and files
+	if (paramisdefault(options))
+		options = "-a" //archive mode
+	endif
+	string command = "", cmd = ""
+	sprintf command, "%s \"/cygdrive/%s\" \"/cygdrive/%s\"", options, source, dest //Need to add this to beginning of filepath for rsync on windows
+	sprintf cmd, "\"\Program Files (x86)\\DeltaCopy\\rsync.exe\" %s", command // Need to tell it where rsync is installed
+	ExecuteScriptText/B/Z cmd
+	return S_value //Returns result from command line
 end
 
 function /S getHostName()
@@ -1097,6 +1110,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	endfor
 
 	//Initialize plots for raw data waves
+	nvar filenum
 	i=0
 	do
 		if (sc_RawPlot[i] == 1 && cmpstr(sc_RawWaveNames[i], ""))
@@ -1108,6 +1122,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 					graphopen = 1
 					activegraphs+= stringfromlist(j,graphnumlist)+";"
 					Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
+					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 				endif
 				if(sc_is2d)
 					if(stringmatch(wn+"2d",stringfromlist(j,graphtitle)))
@@ -1115,6 +1130,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 						activegraphs+= stringfromlist(j,graphnumlist)+";"
 						Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
 						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 					endif
 				endif
 			endfor
@@ -1123,6 +1139,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 				display $wn
 				setwindow kwTopWin, enablehiresdraw=3
 				Label bottom, sc_x_label
+				TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 				activegraphs+= winname(0,1)+";"
 			elseif(graphopen)
 				if(sc_is2d)
@@ -1134,6 +1151,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 					colorscale /c/n=$sc_ColorMap /e/a=rc
 					Label left, sc_y_label
 					Label bottom, sc_x_label
+					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 					activegraphs+= winname(0,1)+";"
 				endif
 			else
@@ -1141,6 +1159,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 				display $wn
 				setwindow kwTopWin, enablehiresdraw=3
 				Label bottom, sc_x_label
+				TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 				activegraphs+= winname(0,1)+";"
 				if(sc_is2d)
 					display
@@ -1150,6 +1169,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 					colorscale /c/n=$sc_ColorMap /e/a=rc
 					Label left, sc_y_label
 					Label bottom, sc_x_label
+					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 					activegraphs+= winname(0,1)+";"
 				endif
 			endif
@@ -1169,6 +1189,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 					graphopen = 1
 					activegraphs+= stringfromlist(j,graphnumlist)+";"
 					Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
+					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 				endif
 				if(sc_is2d)
 					if(stringmatch(wn+"2d",stringfromlist(j,graphtitle)))
@@ -1176,6 +1197,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 						activegraphs+= stringfromlist(j,graphnumlist)+";"
 						Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
 						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 					endif
 				endif
 			endfor
@@ -1184,6 +1206,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 				display $wn
 				setwindow kwTopWin, enablehiresdraw=3
 				Label bottom, sc_x_label
+				TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 				activegraphs+= winname(0,1)+";"
 			elseif(graphopen)
 				if(sc_is2d)
@@ -1195,6 +1218,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 					colorscale /c/n=$sc_ColorMap /e/a=rc
 					Label left, sc_y_label
 					Label bottom, sc_x_label
+					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 					activegraphs+= winname(0,1)+";"
 				endif
 			else
@@ -1202,6 +1226,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 				display $wn
 				setwindow kwTopWin, enablehiresdraw=3
 				Label bottom, sc_x_label
+				TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT "Dat="+num2str(filenum)
 				activegraphs+= winname(0,1)+";"
 				if(sc_is2d)
 					display
@@ -1211,6 +1236,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 					colorscale /c/n=$sc_ColorMap /e/a=rc
 					Label left, sc_y_label
 					Label bottom, sc_x_label
+					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 					activegraphs+= winname(0,1)+";"
 				endif
 			endif
@@ -1422,17 +1448,41 @@ function RecordValues(i, j, [readvstime, fillnan])
 	endif
 
 	//// Setup and run async data collection ////
+	string cmd = ""
+	if (sc_is2d == 2) //for 2dline
+		variable dx 
+		wave sc_linestart, sc_xdata
+		ii=0
+		do // Need to record a dx before it is overwritten in async measurement
+			if(sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
+				wave wref2d = $sc_RawWaveNames[ii] + "2d"
+				dx = dimdelta(wref2d, 0)
+				break //Only need to get dx from first valid wave
+			endif 	
+			ii+=1
+		while (ii < numpnts(sc_RawWaveNames))
+	endif
+	
 	wave sc_measAsync
-	if( (sum(sc_measAsync) > 1) && (fillnan==0) && (sc_is2d != 2)) //Tim:TODO: Make async work for Line cut
+	if((sum(sc_measAsync) > 1) && (fillnan==0))
 		variable tgID = sc_ManageThreads(innerindex, outerindex, readvstime) // start threads, wait, collect data
 		sc_KillThreads(tgID) // Terminate threads
+		if (sc_is2d == 2)  //For 2dline because can't execute() in threadsafe
+			ii=0
+			do 					// This is just to rescale the waves incase dimsize has changed
+				if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)					
+					wave wref2d = $sc_RawWaveNames[ii] + "2d" 
+					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + nameofwave(wref2d); execute(cmd) //Sets Y scale again
+					cmd = "setscale /P x, 0, " + num2str(dx) + ", " + nameofwave(wref2d); execute(cmd) //rescales x axis with dx from before async measurement
+				endif
+				ii+=1
+			while (ii < numpnts(sc_RawWaveNames))
+		endif		
 	endif
 
 	//// Read sync data ( or fill NaN) ////
-	variable /g sc_tmpVal
-	variable dx			//For 2Dline
-	wave sc_linestart, sc_xdata 	//For 2Dline  
-	string script = "", cmd = ""
+	variable /g sc_tmpVal 
+	string script = ""
 	ii=0
 	do
 		if ((sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1) && sc_measAsync[ii]==0)
@@ -1513,6 +1563,7 @@ function RecordValues(i, j, [readvstime, fillnan])
 			if (sc_is2d == 1)
 				wave wref2d = $sc_CalcWaveNames[ii] + "2d"
 				wref2d[innerindex][outerindex] = wref1d[innerindex]
+				
 			elseif (sc_is2d == 2 && fillnan == 0)
 				//2D line wave
 				FindValue/V=0/T=(inf) wref1D 	//Finds the first non NaN and stores position in V_value (V=value, T=tolerance)
@@ -1627,9 +1678,26 @@ threadsafe function sc_Worker(refWave, innerindex, outerindex, folderIndex, is2d
 
 			wref1d[innerindex] = val
 
-			if(is2d)
+			if(is2d==1)
 				wave wref2d = refWave[2*str2num(StringFromList(i, wavIdx, ";"))+1]
 				wref2d[innerindex][outerindex] = val
+			elseif(is2d==2)
+				wave wref2d = refWave[2*str2num(StringFromList(i, wavIdx, ";"))+1]
+				nvar sc_starty, sc_finy
+				FindValue/V=0/T=(inf) wref1D 	//Finds the first non NaN and stores position in V_value (V=value, T=tolerance)	
+				if(innerindex == V_value)		//records the x value of the first notNaN for all line2D graphs  
+					wave sc_linestart, sc_xdata
+					sc_linestart[outerindex] = sc_xdata[innerindex]
+				endif
+				if(dimsize(wref2d, 0)-1 < innerindex-V_value && v_value != -1) //Does 2D line wave need larger x range?
+					make/o/n=(dimsize(wref2d,0)+1, dimsize(wref2d,1)) temp2Dwave = NaN 			//Make new larger wave 	
+					temp2Dwave[0,dimsize(wref2d,0)-1][0,dimsize(wref2d,1)-1] = wref2d[p][q] 	//copy over old values with NaNs everywhere else
+					duplicate/O temp2Dwave wref2d															//Put back into old wave
+					killwaves temp2Dwave																	//Clear mess
+				endif
+				if (v_value != -1 && V_value < innerindex) //don't fill a NaN or if V_value is actually from previous line of data (because it will try index out of range)
+					wref2d[innerindex-(V_value)][outerindex] = wref1d[innerindex] 	//Using V_value from FindValue a few lines up 	
+				endif
 			endif
 
 		endfor
@@ -2038,25 +2106,32 @@ function /S sc_copySingleFile(original_path, new_path, filename)
 	
 	string original_path, new_path, filename
 	string op="", np=""
-	
+	string cmd = ""
 	if( cmpstr(igorinfo(2) ,"Macintosh")==0 )
 		// using rsync if the machine is a mac
 		//   should speed things up a little bit by not copying full files
 		op = getExpPath(original_path, full=2)
-		np = getExpPath(new_path, full=2)
-		
-		string cmd = ""
+		np = getExpPath(new_path, full=2)		
 		sprintf cmd, "rsync -a %s %s", op+filename, np
 		executeMacCmd(cmd)
 	else
-		// probably can use rsync here on newer windows machines
-		//   do not currently have one to test
+		// For windows DeltaCopy needs to be installed first, and the formatting for rsync is slightly different
+		// Almost but not quite implemented. 
 		op = getExpPath(original_path, full=3)
 		np = getExpPath(new_path, full=3)
-		CopyFile /Z=1 (op+filename) as (np+filename)
+		CopyFile/O /Z=1 (op+filename) as (np+filename)
 	endif
 	
 end
+
+Function /S GetpxpCopyTime()
+    NVAR/Z sc_pxpcopytime  //SDFR SetDataFolderReference
+    if(!NVAR_Exists(sc_pxpcopytime))
+        variable/g sc_pxpcopytime = 0   // zVKS = VariableKeyString (z so at bottom of data folder)
+    endif
+
+    return "sc_pxpcopytime"
+End
 
 function sc_copyNewFiles(datnum, [save_experiment, verbose] )
 	// locate newly created/appended files and move to backup directory 
@@ -2078,11 +2153,14 @@ function sc_copyNewFiles(datnum, [save_experiment, verbose] )
 	// add experiment/history/procedure files
 	// only if I saved the experiment this run
 	if(!paramisdefault(save_experiment) && save_experiment == 1)
-	
+		
 		// add experiment file
-		tmpname = igorinfo(1)+".pxp"
-		sc_copySingleFile("data","backup_data",tmpname)
-
+		Nvar sc_pxpcopytime = $GetpxpCopyTime() //gets NVAR from function to prevent error if it doesn't exist
+		if ((datetime - sc_pxpcopytime) > 24*60*60) //only copy pxp once every 24 hours
+			tmpname = igorinfo(1)+".pxp"
+			sc_copySingleFile("data","backup_data",tmpname)
+			sc_pxpcopytime = datetime
+		endif
 		// add history file
 		tmpname = igorinfo(1)+".history"
 		sc_copySingleFile("data","backup_data",tmpname)
@@ -2152,7 +2230,8 @@ function /S getSlackNotice(username, [message, min_time])
 	string username, message
 	variable min_time
 	nvar filenum, sweep_t_elapsed, sc_abortsweep
-	string sc_slack_url = "https://hooks.slack.com/services/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"
+//	string sc_slack_url = "https://hooks.slack.com/services/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"
+	string sc_slack_url = 	"https://hooks.slack.com/services/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"  //Tim webhook
 	string txt="", buffer="", payload="", out="", botname = "qdotbot", emoji = ":the_horns:"
 
 	//// check if I need a notification ////
