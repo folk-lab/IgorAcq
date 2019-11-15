@@ -2218,6 +2218,7 @@ end
 
 
 //tim.child = U8W2V6QK0 
+//owen.sheekey = UFTMDFVTR
 function /S getSlackNotice(username, [message, min_time]) 
 	// Usernames no longer work for new users since 2017. See https://api.slack.com/changelog/2017-09-the-one-about-usernames
 	// Can use member ID instead

@@ -6,6 +6,23 @@ pragma rtGlobals=1		// Use modern global access method.
 //////////////////////////////
 /// SAVING EXPERIMENT DATA ///
 //////////////////////////////
+function manualsave(wn)
+	string wn
+// Open HDF5 file
+	nvar filenum
+	string filenumstr = ""
+	sprintf filenumstr, "%d", filenum
+	string /g h5name = "dat"+filenumstr+".h5"
+	printf "Saving %s \r", h5name
+	variable /g hdf5_id
+	duplicate EvsF $"Dat"+filenumstr+wn
+	HDF5CreateFile /P=data hdf5_id as h5name
+	
+	saveSingleWave(wn)
+	closeSaveFiles()
+	filenum+=1
+	
+end
 
 function initSaveFiles([msg])
 	//// create/open HDF5 files
