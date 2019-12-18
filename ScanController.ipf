@@ -745,6 +745,7 @@ function sc_CheckboxClicked(ControlName, Value)
 	string indexstring
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot, sc_measAsync
 	nvar sc_PrintRaw, sc_PrintCalc
+	nvar/z sc_Printfadc, sc_Saverawfadc // FastDAC specific
 	variable index
 	string expr
 	if (stringmatch(ControlName,"sc_RawRecordCheckBox*"))
@@ -776,6 +777,10 @@ function sc_CheckboxClicked(ControlName, Value)
 		sc_PrintRaw = value
 	elseif(stringmatch(ControlName,"sc_PrintCalcBox"))
 		sc_PrintCalc = value
+	elseif(stringmatch(ControlName,"sc_PrintfadcBox")) // FastDAC window
+		sc_Printfadc = value
+	elseif(stringmatch(ControlName,"sc_SavefadcBox")) // FastDAC window
+		sc_Saverawfadc = value
 	endif
 end
 
@@ -925,53 +930,67 @@ function sc_findAsyncMeasurements()
 
 end
 
-function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_label, linecut]) //linecut = 0,1 for false, true
-	variable start, fin, numpts, starty, finy, numptsy, linecut
+function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_label, linecut, fastdac]) //linecut = 0,1 for false, true
+	variable start, fin, numpts, starty, finy, numptsy, linecut, fastdac
 	string x_label, y_label
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
-	wave /T sc_RawWaveNames, sc_CalcWaveNames, sc_RawScripts, sc_CalcScripts
+	wave/t sc_RawWaveNames, sc_CalcWaveNames, sc_RawScripts, sc_CalcScripts
 	variable i=0, j=0
 	string cmd = "", wn = "", wn2d="", s, script = "", script0 = "", script1 = ""
-	string /g sc_x_label, sc_y_label
-	variable /g sc_is2d, sc_scanstarttime = datetime
-	variable /g sc_startx, sc_finx, sc_numptsx, sc_starty, sc_finy, sc_numptsy
+	string/g sc_x_label, sc_y_label
+	variable/g sc_is2d, sc_scanstarttime = datetime
+	variable/g sc_startx, sc_finx, sc_numptsx, sc_starty, sc_finy, sc_numptsy
 	variable/g sc_abortsweep=0, sc_pause=0, sc_abortnosave=0
 	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, activegraphs="", cmd1="",window_string=""
 	string cmd2=""
 	variable index, graphopen, graphopen2d
 	svar sc_colormap
-
-	//do some sanity checks on wave names: they should not start or end with numbers.
-	do
-
-		if (sc_RawRecord[i])
-			s = sc_RawWaveNames[i]
-			if (!((char2num(s[0]) >= 97 && char2num(s[0]) <= 122) || (char2num(s[0]) >= 65 && char2num(s[0]) <= 90)))
-				print "The first character of a wave name should be an alphabet a-z A-Z. The problematic wave name is " + s;
-				abort
+	variable/g fastdac_init = 0
+	
+	if(paramisdefault(fastdac))
+		fastdac = 0
+		fastdac_init = 0
+	elseif(fastdac > 1)
+		// set fastdac = 1 if you want to use the fastdac!
+		print("[WARNING] \"InitializeWaves\": Pass fastdac = 1! Setting it to 0.")
+		fastdac = 0
+		fastdac_init = 0
+	elseif(fastdac == 1)
+		fastdac_init = 1
+	endif
+	
+	if(fastdac == 0)
+		//do some sanity checks on wave names: they should not start or end with numbers.
+		do
+			if (sc_RawRecord[i])
+				s = sc_RawWaveNames[i]
+				if (!((char2num(s[0]) >= 97 && char2num(s[0]) <= 122) || (char2num(s[0]) >= 65 && char2num(s[0]) <= 90)))
+					print "The first character of a wave name should be an alphabet a-z A-Z. The problematic wave name is " + s;
+					abort
+				endif
+				if (!((char2num(s[strlen(s)-1]) >= 97 && char2num(s[strlen(s)-1]) <= 122) || (char2num(s[strlen(s)-1]) >= 65 && char2num(s[strlen(s)-1]) <= 90)))
+					print "The last character of a wave name should be an alphabet a-z A-Z. The problematic wave name is " + s;
+					abort
+				endif
 			endif
-			if (!((char2num(s[strlen(s)-1]) >= 97 && char2num(s[strlen(s)-1]) <= 122) || (char2num(s[strlen(s)-1]) >= 65 && char2num(s[strlen(s)-1]) <= 90)))
-				print "The last character of a wave name should be an alphabet a-z A-Z. The problematic wave name is " + s;
-				abort
+			i+=1
+		while (i<numpnts(sc_RawWaveNames))
+		i=0
+		do
+			if (sc_CalcRecord[i])
+				s = sc_CalcWaveNames[i]
+				if (!((char2num(s[0]) >= 97 && char2num(s[0]) <= 122) || (char2num(s[0]) >= 65 && char2num(s[0]) <= 90)))
+					print "The first character of a wave name should be an alphabet a-z A-Z. The problematic wave name is " + s;
+					abort
+				endif
+				if (!((char2num(s[strlen(s)-1]) >= 97 && char2num(s[strlen(s)-1]) <= 122) || (char2num(s[strlen(s)-1]) >= 65 && char2num(s[strlen(s)-1]) <= 90)))
+					print "The last character of a wave name should be an alphabet a-z A-Z. The problematic wave name is " + s;
+					abort
+				endif
 			endif
-		endif
-		i+=1
-	while (i<numpnts(sc_RawWaveNames))
-	i=0
-	do
-		if (sc_CalcRecord[i])
-			s = sc_CalcWaveNames[i]
-			if (!((char2num(s[0]) >= 97 && char2num(s[0]) <= 122) || (char2num(s[0]) >= 65 && char2num(s[0]) <= 90)))
-				print "The first character of a wave name should be an alphabet a-z A-Z. The problematic wave name is " + s;
-				abort
-			endif
-			if (!((char2num(s[strlen(s)-1]) >= 97 && char2num(s[strlen(s)-1]) <= 122) || (char2num(s[strlen(s)-1]) >= 65 && char2num(s[strlen(s)-1]) <= 90)))
-				print "The last character of a wave name should be an alphabet a-z A-Z. The problematic wave name is " + s;
-				abort
-			endif
-		endif
-		i+=1
-	while (i<numpnts(sc_CalcWaveNames))
+			i+=1
+		while (i<numpnts(sc_CalcWaveNames))
+	endif
 	i=0
 
 	// because VISA tends to drop connections when the
@@ -1000,7 +1019,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 			print "[WARNING]: Your start and end values are the same!"
 		endif
 	endif
-	if(linecut == 1) //Tim:To make linecuts work with RecordValues
+	if(linecut == 1 && fastdac == 0) //Tim:To make linecuts work with RecordValues
 		sc_is2d = 2
 		make/O/n=(numptsy) sc_linestart = NaN 						//To store first xvalue of each line of data
 		cmd = "setscale/I x " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + "sc_linestart"; execute(cmd)
@@ -1029,59 +1048,97 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		cmd = "sc_ydata" +" = x"; execute(cmd)
 	endif
 
-	// Initialize waves for raw data
-	do
-		if (sc_RawRecord[i] == 1 && cmpstr(sc_RawWaveNames[i], "") || sc_RawPlot[i] == 1 && cmpstr(sc_RawWaveNames[i], ""))
-			wn = sc_RawWaveNames[i]
-			cmd = "make /o/n=(" + num2istr(sc_numptsx) + ") " + wn + "=NaN"
-			execute(cmd)
-			cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn
-			execute(cmd)
-			if(sc_is2d == 1)
-				// In case this is a 2D measurement
-				wn2d = wn + "2d"
-				cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd)
-				cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn2d; execute(cmd)
-				cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
-			elseif(sc_is2d ==2)
-				// In case this is a 2D line cut measurement
-				wn2d = sc_RawWaveNames[i]+"2d"
-				cmd = "make /o/n=(1, " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd) //Makes 1 by y wave, x is redimensioned in recordline
-				cmd = "setscale /P x, 0, " + num2str((sc_finx-sc_startx)/sc_numptsx) + "," + wn2d; execute(cmd) //sets x scale starting from 0 but with delta correct	
-				cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)//Useful to see if top and bottom of scan are filled with NaNs
+	if(fastdac == 0)
+		// Initialize waves for raw data
+		do
+			if (sc_RawRecord[i] == 1 && cmpstr(sc_RawWaveNames[i], "") || sc_RawPlot[i] == 1 && cmpstr(sc_RawWaveNames[i], ""))
+				wn = sc_RawWaveNames[i]
+				cmd = "make /o/n=(" + num2istr(sc_numptsx) + ") " + wn + "=NaN"
+				execute(cmd)
+				cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn
+				execute(cmd)
+				if(sc_is2d == 1)
+					// In case this is a 2D measurement
+					wn2d = wn + "2d"
+					cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd)
+					cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn2d; execute(cmd)
+					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
+				elseif(sc_is2d ==2)
+					// In case this is a 2D line cut measurement
+					wn2d = sc_RawWaveNames[i]+"2d"
+					cmd = "make /o/n=(1, " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd) //Makes 1 by y wave, x is redimensioned in recordline
+					cmd = "setscale /P x, 0, " + num2str((sc_finx-sc_startx)/sc_numptsx) + "," + wn2d; execute(cmd) //sets x scale starting from 0 but with delta correct	
+					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)//Useful to see if top and bottom of scan are filled with NaNs
+				endif
 			endif
-		endif
-		i+=1
-	while (i<numpnts(sc_RawWaveNames))
-
-	// Initialize waves for calculated data
-	i=0
-	do
-		if (sc_CalcRecord[i] == 1 && cmpstr(sc_CalcWaveNames[i], "") || sc_CalcPlot[i] == 1 && cmpstr(sc_CalcWaveNames[i], ""))
-			wn = sc_CalcWaveNames[i]
-			cmd = "make /o/n=(" + num2istr(sc_numptsx) + ") " + wn + "=NaN"
-			execute(cmd)
-			cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn
-			execute(cmd)
-			if(sc_is2d == 1)
-				// In case this is a 2D measurement
-				wn2d = wn + "2d"
-				cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd)
-				cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn2d; execute(cmd)
-				cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
-			elseif(sc_is2d == 2)
-				// In case this is a 2D line cut measurement
-				wn2d = sc_CalcWaveNames[i]+"2d"
-				cmd = "make /o/n=(1, " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd) //Same as for Raw (see above)	
-				cmd = "setscale /P x, 0, " + num2str((sc_finx-sc_startx)/sc_numptsx) + "," + wn2d; execute(cmd) //sets x scale starting from 0 but with delta correct		
-				cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
+			i+=1
+		while (i<numpnts(sc_RawWaveNames))
+	
+		// Initialize waves for calculated data
+		i=0
+		do
+			if (sc_CalcRecord[i] == 1 && cmpstr(sc_CalcWaveNames[i], "") || sc_CalcPlot[i] == 1 && cmpstr(sc_CalcWaveNames[i], ""))
+				wn = sc_CalcWaveNames[i]
+				cmd = "make /o/n=(" + num2istr(sc_numptsx) + ") " + wn + "=NaN"
+				execute(cmd)
+				cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn
+				execute(cmd)
+				if(sc_is2d == 1)
+					// In case this is a 2D measurement
+					wn2d = wn + "2d"
+					cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd)
+					cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn2d; execute(cmd)
+					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
+				elseif(sc_is2d == 2)
+					// In case this is a 2D line cut measurement
+					wn2d = sc_CalcWaveNames[i]+"2d"
+					cmd = "make /o/n=(1, " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd) //Same as for Raw (see above)	
+					cmd = "setscale /P x, 0, " + num2str((sc_finx-sc_startx)/sc_numptsx) + "," + wn2d; execute(cmd) //sets x scale starting from 0 but with delta correct		
+					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
+				endif
 			endif
-		endif
-		i+=1
-	while (i<numpnts(sc_CalcWaveNames))
-
-	sc_findAsyncMeasurements()
-
+			i+=1
+		while (i<numpnts(sc_CalcWaveNames))
+	
+		sc_findAsyncMeasurements()
+		
+	elseif(fastdac == 1)
+		// create waves for fastdac
+		wave/t fadcvalstr
+		wave fadcattr
+		nvar sc_saveadcbox
+		string wn_raw = "", wn_raw2d = ""
+		i=0
+		do
+			if(fadcattr[i][2] == 48) // checkbox checked
+				wn = fadcvalstr[i][3]
+				cmd = "make/o/n=(" + num2istr(sc_numptsx) + ") " + wn + "=NaN"
+				execute(cmd)
+				cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn
+				execute(cmd)
+				
+				wn_raw = "ADC"+num2istr(i+1)
+				cmd = "make/o/n=(" + num2istr(sc_numptsx) + ") " + wn_raw + "=NaN"
+				execute(cmd)
+				cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn_raw
+				execute(cmd)
+				
+				if(sc_is2d == 1)
+					// In case this is a 2D measurement
+					wn2d = wn + "2d"
+					cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd)
+					cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn2d; execute(cmd)
+					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
+					
+					wn_raw2d = wn_raw + "2d"
+					cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn_raw2d + "=NaN"; execute(cmd)
+					cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn_raw2d; execute(cmd)
+					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn_raw2d; execute(cmd)
+				endif
+			endif
+		while(i<dimsize(fadcvalstr,0))
+	endif
+	
 	// Find all open plots
 	graphlist = winlist("*",";","WIN:1")
 	j=0				
@@ -1095,129 +1152,191 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		graphnumlist+= graphnum+";"
 		j=index+1
 	endfor
-
-	//Initialize plots for raw data waves
-	i=0
-	do
-		if (sc_RawPlot[i] == 1 && cmpstr(sc_RawWaveNames[i], ""))
-			wn = sc_RawWaveNames[i]
-			graphopen = 0
-			graphopen2d = 0
-			for(j=0;j<ItemsInList(graphtitle);j=j+1)
-				if(stringmatch(wn,stringfromlist(j,graphtitle)))
-					graphopen = 1
-					activegraphs+= stringfromlist(j,graphnumlist)+";"
-					Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
-				endif
-				if(sc_is2d)
-					if(stringmatch(wn+"2d",stringfromlist(j,graphtitle)))
-						graphopen2d = 1
+	
+	if(fastdac == 0)
+		//Initialize plots for raw data waves
+		i=0
+		do
+			if (sc_RawPlot[i] == 1 && cmpstr(sc_RawWaveNames[i], ""))
+				wn = sc_RawWaveNames[i]
+				graphopen = 0
+				graphopen2d = 0
+				for(j=0;j<ItemsInList(graphtitle);j=j+1)
+					if(stringmatch(wn,stringfromlist(j,graphtitle)))
+						graphopen = 1
 						activegraphs+= stringfromlist(j,graphnumlist)+";"
 						Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
-						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+					endif
+					if(sc_is2d)
+						if(stringmatch(wn+"2d",stringfromlist(j,graphtitle)))
+							graphopen2d = 1
+							activegraphs+= stringfromlist(j,graphnumlist)+";"
+							Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
+							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+						endif
+					endif
+				endfor
+				if(graphopen && graphopen2d)
+				elseif(graphopen2d)
+					display $wn
+					setwindow kwTopWin, enablehiresdraw=3
+					Label bottom, sc_x_label
+					activegraphs+= winname(0,1)+";"
+				elseif(graphopen)
+					if(sc_is2d)
+						wn2d = wn + "2d"
+						display
+						setwindow kwTopWin, enablehiresdraw=3
+						appendimage $wn2d
+						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
+						colorscale /c/n=$sc_ColorMap /e/a=rc
+						Label left, sc_y_label
+						Label bottom, sc_x_label
+						activegraphs+= winname(0,1)+";"
+					endif
+				else
+					wn2d = wn + "2d"
+					display $wn
+					setwindow kwTopWin, enablehiresdraw=3
+					Label bottom, sc_x_label
+					activegraphs+= winname(0,1)+";"
+					if(sc_is2d)
+						display
+						setwindow kwTopWin, enablehiresdraw=3
+						appendimage $wn2d
+						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
+						colorscale /c/n=$sc_ColorMap /e/a=rc
+						Label left, sc_y_label
+						Label bottom, sc_x_label
+						activegraphs+= winname(0,1)+";"
 					endif
 				endif
-			endfor
-			if(graphopen && graphopen2d)
-			elseif(graphopen2d)
-				display $wn
-				setwindow kwTopWin, enablehiresdraw=3
-				Label bottom, sc_x_label
-				activegraphs+= winname(0,1)+";"
-			elseif(graphopen)
-				if(sc_is2d)
-					wn2d = wn + "2d"
-					display
-					setwindow kwTopWin, enablehiresdraw=3
-					appendimage $wn2d
-					modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
-					colorscale /c/n=$sc_ColorMap /e/a=rc
-					Label left, sc_y_label
-					Label bottom, sc_x_label
-					activegraphs+= winname(0,1)+";"
-				endif
-			else
-				wn2d = wn + "2d"
-				display $wn
-				setwindow kwTopWin, enablehiresdraw=3
-				Label bottom, sc_x_label
-				activegraphs+= winname(0,1)+";"
-				if(sc_is2d)
-					display
-					setwindow kwTopWin, enablehiresdraw=3
-					appendimage $wn2d
-					modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
-					colorscale /c/n=$sc_ColorMap /e/a=rc
-					Label left, sc_y_label
-					Label bottom, sc_x_label
-					activegraphs+= winname(0,1)+";"
-				endif
 			endif
-		endif
-		i+= 1
-	while(i<numpnts(sc_RawWaveNames))
-
-	//Initialize plots for calculated data waves
-	i=0
-	do
-		if (sc_CalcPlot[i] == 1 && cmpstr(sc_CalcWaveNames[i], ""))
-			wn = sc_CalcWaveNames[i]
-			graphopen = 0
-			graphopen2d = 0
-			for(j=0;j<ItemsInList(graphtitle);j=j+1)
-				if(stringmatch(wn,stringfromlist(j,graphtitle)))
-					graphopen = 1
-					activegraphs+= stringfromlist(j,graphnumlist)+";"
-					Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
-				endif
-				if(sc_is2d)
-					if(stringmatch(wn+"2d",stringfromlist(j,graphtitle)))
-						graphopen2d = 1
+			i+= 1
+		while(i<numpnts(sc_RawWaveNames))
+	
+		//Initialize plots for calculated data waves
+		i=0
+		do
+			if (sc_CalcPlot[i] == 1 && cmpstr(sc_CalcWaveNames[i], ""))
+				wn = sc_CalcWaveNames[i]
+				graphopen = 0
+				graphopen2d = 0
+				for(j=0;j<ItemsInList(graphtitle);j=j+1)
+					if(stringmatch(wn,stringfromlist(j,graphtitle)))
+						graphopen = 1
 						activegraphs+= stringfromlist(j,graphnumlist)+";"
 						Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
-						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+					endif
+					if(sc_is2d)
+						if(stringmatch(wn+"2d",stringfromlist(j,graphtitle)))
+							graphopen2d = 1
+							activegraphs+= stringfromlist(j,graphnumlist)+";"
+							Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
+							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+						endif
+					endif
+				endfor
+				if(graphopen && graphopen2d)
+				elseif(graphopen2d)
+					display $wn
+					setwindow kwTopWin, enablehiresdraw=3
+					Label bottom, sc_x_label
+					activegraphs+= winname(0,1)+";"
+				elseif(graphopen)
+					if(sc_is2d)
+						wn2d = wn + "2d"
+						display
+						setwindow kwTopWin, enablehiresdraw=3
+						appendimage $wn2d
+						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
+						colorscale /c/n=$sc_ColorMap /e/a=rc
+						Label left, sc_y_label
+						Label bottom, sc_x_label
+						activegraphs+= winname(0,1)+";"
+					endif
+				else
+					wn2d = wn + "2d"
+					display $wn
+					setwindow kwTopWin, enablehiresdraw=3
+					Label bottom, sc_x_label
+					activegraphs+= winname(0,1)+";"
+					if(sc_is2d)
+						display
+						setwindow kwTopWin, enablehiresdraw=3
+						appendimage $wn2d
+						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
+						colorscale /c/n=$sc_ColorMap /e/a=rc
+						Label left, sc_y_label
+						Label bottom, sc_x_label
+						activegraphs+= winname(0,1)+";"
 					endif
 				endif
-			endfor
-			if(graphopen && graphopen2d)
-			elseif(graphopen2d)
-				display $wn
-				setwindow kwTopWin, enablehiresdraw=3
-				Label bottom, sc_x_label
-				activegraphs+= winname(0,1)+";"
-			elseif(graphopen)
-				if(sc_is2d)
+			endif
+			i+= 1
+		while(i<numpnts(sc_CalcWaveNames))
+	elseif(fastdac == 1)
+		// open plots for fastdac
+		i=0
+		do
+			if(fadcattr[i][2] == 48)
+				wn = fadcvalstr[i][3]
+				graphopen = 0
+				graphopen2d = 0
+				for(j=0;j<ItemsInList(graphtitle);j=j+1)
+					if(stringmatch(wn,stringfromlist(j,graphtitle)))
+						graphopen = 1
+						activegraphs+= stringfromlist(j,graphnumlist)+";"
+						Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
+					endif
+					if(sc_is2d)
+						if(stringmatch(wn+"2d",stringfromlist(j,graphtitle)))
+							graphopen2d = 1
+							activegraphs+= stringfromlist(j,graphnumlist)+";"
+							Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
+							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+						endif
+					endif
+				endfor
+				if(graphopen && graphopen2d)
+				elseif(graphopen2d)
+					display $wn
+					setwindow kwTopWin, enablehiresdraw=3
+					Label bottom, sc_x_label
+					activegraphs+= winname(0,1)+";"
+				elseif(graphopen)
+					if(sc_is2d)
+						wn2d = wn + "2d"
+						display
+						setwindow kwTopWin, enablehiresdraw=3
+						appendimage $wn2d
+						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
+						colorscale /c/n=$sc_ColorMap /e/a=rc
+						Label left, sc_y_label
+						Label bottom, sc_x_label
+						activegraphs+= winname(0,1)+";"
+					endif
+				else
 					wn2d = wn + "2d"
-					display
+					display $wn
 					setwindow kwTopWin, enablehiresdraw=3
-					appendimage $wn2d
-					modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
-					colorscale /c/n=$sc_ColorMap /e/a=rc
-					Label left, sc_y_label
 					Label bottom, sc_x_label
 					activegraphs+= winname(0,1)+";"
-				endif
-			else
-				wn2d = wn + "2d"
-				display $wn
-				setwindow kwTopWin, enablehiresdraw=3
-				Label bottom, sc_x_label
-				activegraphs+= winname(0,1)+";"
-				if(sc_is2d)
-					display
-					setwindow kwTopWin, enablehiresdraw=3
-					appendimage $wn2d
-					modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
-					colorscale /c/n=$sc_ColorMap /e/a=rc
-					Label left, sc_y_label
-					Label bottom, sc_x_label
-					activegraphs+= winname(0,1)+";"
+					if(sc_is2d)
+						display
+						setwindow kwTopWin, enablehiresdraw=3
+						appendimage $wn2d
+						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
+						colorscale /c/n=$sc_ColorMap /e/a=rc
+						Label left, sc_y_label
+						Label bottom, sc_x_label
+						activegraphs+= winname(0,1)+";"
+					endif
 				endif
 			endif
-		endif
-		i+= 1
-	while(i<numpnts(sc_CalcWaveNames))
-
+			i+= 1
+		while(i<dimsize(fadcvalstr,0))
+	endif
 	execute("abortmeasurementwindow()")
 
 	cmd1 = "TileWindows/O=1/A=(3,4) "
@@ -1345,11 +1464,26 @@ function sc_sleep(delay)
 	variable delay
 	delay = delay*1e6 // convert to microseconds
 	variable start_time = stopMStimer(-2) // start the timer immediately
+	nvar sc_abortsweep, sc_pause
 
 	doupdate // do this just once during the sleep function
 
 	do
-		sc_checksweepstate()
+		try
+			sc_checksweepstate()
+		catch
+			variable err = GetRTError(1)
+			string errMessage = GetErrMessage(err)
+		
+			// reset sweep control parameters if igor about button is used
+			if(v_abortcode == -1)
+				sc_abortsweep = 0
+				sc_pause = 0
+			endif
+			
+			//silent abort
+			abortonvalue 1,10
+		endtry
 	while(stopMStimer(-2)-start_time < delay)
 
 end
@@ -1539,7 +1673,20 @@ function RecordValues(i, j, [readvstime, fillnan])
 	while (ii < numpnts(sc_CalcWaveNames))
 
 	// check abort/pause status
-	sc_checksweepstate()
+	try
+		sc_checksweepstate()
+	catch
+		variable err = GetRTError(1)
+		
+		// reset sweep control parameters if igor about button is used
+		if(v_abortcode == -1)
+			sc_abortsweep = 0
+			sc_pause = 0
+		endif
+		
+		//silent abort
+		abortonvalue 1,10 
+	endtry
 end
 
 ///////////////////////

@@ -58,7 +58,7 @@ function InitBabyDACs(instrID, boards, ranges, [custom])
 
 	variable instrID, custom
 	string boards, ranges
-	string /g bd_controller_addr = getResourceAddress(instrID) // for use by window functions
+//	string /g bd_controller_addr = getResourceAddress(instrID) // for use by window functions
 	variable /g bd_ramprate = 200 // default ramprate
 
 	if(paramisdefault(custom))
@@ -1034,29 +1034,36 @@ function update_BabyDAC(action) : ButtonControl
 	openBabyDACconnection("bd_window_resource", bd_controller_addr, verbose=0)
 	nvar bd_window_resource
 
-	strswitch(action)
-		case "ramp":
-			for(i=0;i<16;i+=1)
-				if(str2num(dacvalstr[i][1]) != str2num(old_dacvalstr[i][1]))
-					output = str2num(dacvalstr[i][1])
-					check = rampOutputBD(bd_window_resource, i,output)
-					if(check == 1)
-						old_dacvalstr[i][1] = dacvalstr[i][1]
-					else
-						dacvalstr[i][1] = old_dacvalstr[i][1]
+	try
+		strswitch(action)
+			case "ramp":
+				for(i=0;i<16;i+=1)
+					if(str2num(dacvalstr[i][1]) != str2num(old_dacvalstr[i][1]))
+						output = str2num(dacvalstr[i][1])
+						check = rampOutputBD(bd_window_resource, i,output)
+						if(check == 1)
+							old_dacvalstr[i][1] = dacvalstr[i][1]
+						else
+							dacvalstr[i][1] = old_dacvalstr[i][1]
+						endif
 					endif
-				endif
-			endfor
-			break
-		case "rampallzero":
-			for(i=0;i<16;i+=1)
-				check = RampOutputBD(bd_window_resource, i, 0)
-				if(check==1)
-					old_dacvalstr[i][1] = dacvalstr[i][1]
-				endif
-			endfor
-			break
-	endswitch
+				endfor
+				break
+			case "rampallzero":
+				for(i=0;i<16;i+=1)
+					check = RampOutputBD(bd_window_resource, i, 0)
+					if(check==1)
+						old_dacvalstr[i][1] = dacvalstr[i][1]
+					endif
+				endfor
+				break
+		endswitch
+	catch
+		// reset error flag, so code below try block will run
+		// this makes sure the VISA resource is closed and the
+		// custom window is updated
+		variable err = GetRTError(1)
+	endtry
 
 	viClose(bd_window_resource) // close VISA resource
 
