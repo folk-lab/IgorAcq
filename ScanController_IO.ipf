@@ -623,6 +623,11 @@ function/s addJSONkeyval(JSONstr,key,value,[addquotes])
 	// if JSONstr is empty, start a new JSON object
 	string JSONstr, key, value
 	variable addquotes
+	
+	// check value, can't be an empty string
+	if(strlen(value)==0)
+		value = "null"
+	endif
 
 	if(!paramisdefault(addquotes))
 		if(addquotes==1)
@@ -630,12 +635,12 @@ function/s addJSONkeyval(JSONstr,key,value,[addquotes])
 			value = "\""+escapeQuotes(value)+"\""
 		endif
 	endif
-
+	
 	if(strlen(JSONstr)!=0)
-		// remove all starting brackets + whitespace
+		// remove all starting brackets, whitespace or plus signs
 		variable i=0
 		do
-			if( (isWhitespace(JSONstr[i])==1) || (CmpStr(JSONstr[i],"{")==0) )
+			if((isWhitespace(JSONstr[i])==1) || (CmpStr(JSONstr[i],"{")==0) || (CmpStr(JSONstr[i],"+")==0))
 				i+=1
 			else
 				break
@@ -645,9 +650,9 @@ function/s addJSONkeyval(JSONstr,key,value,[addquotes])
 		// remove single ending bracket + whitespace
 		variable j=strlen(JSONstr)-1
 		do
-			if( (isWhitespace(JSONstr[j])==1) )
+			if((isWhitespace(JSONstr[j])==1))
 				j-=1
-			elseif( (CmpStr(JSONstr[j],"}")==0) )
+			elseif((CmpStr(JSONstr[j],"}")==0))
 				j-=1
 				break
 			else
@@ -703,7 +708,6 @@ function /s prettyJSONfmt(jstr)
 				output+=(getIndent(indent)+key+": "+val+",\n")
 			endif
 		endif
-
 	endfor
 
 	return output[0,strlen(output)-3]+"\n}\n"
@@ -809,7 +813,7 @@ function /S escapeQuotes(str)
 		endif
 		i+=1
 
-	while(1==1)
+	while(1)
 	return str
 end
 

@@ -16,7 +16,7 @@ function openBabyDACconnection(instrID, visa_address, [verbose])
 	// visa_address is the VISA address string, i.e. ASRL1::INSTR
 	string instrID, visa_address
 	variable verbose
-	
+		
 	if(paramisdefault(verbose))
 		verbose=1
 	elseif(verbose!=1)
@@ -35,6 +35,7 @@ function openBabyDACconnection(instrID, visa_address, [verbose])
 	string options = "baudrate=57600,databits=8,stopbits=1,parity=0"
 	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
 	
+	return status
 end
 
 /////////////////////////////////
@@ -1031,7 +1032,7 @@ function update_BabyDAC(action) : ButtonControl
 
 	// open temporary connection to babyDAC
 	svar bd_controller_addr
-	openBabyDACconnection("bd_window_resource", bd_controller_addr, verbose=0)
+	variable viRM = openBabyDACconnection("bd_window_resource", bd_controller_addr, verbose=0)
 	nvar bd_window_resource
 
 	try
@@ -1066,6 +1067,7 @@ function update_BabyDAC(action) : ButtonControl
 	endtry
 
 	viClose(bd_window_resource) // close VISA resource
+	viClose(viRM) // close Resource Manager session
 
 	if(bd_num_custom > 0)
 		bdCalcCustomValues()

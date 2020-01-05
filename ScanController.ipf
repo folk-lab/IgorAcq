@@ -367,6 +367,16 @@ function InitScanController([configFile])
 	else
 		sc_loadconfig(configFile)
 	endif
+	
+	// close all VISA sessions and create wave to hold
+	// all Resource Manager sessions, so that they can
+	// be closed at each call InitializeWaves()
+	killVISA()
+	wave/z viRm
+	if(waveexists(viRm))
+		killwaves viRM
+	endif
+	make /n=0 viRM
 
 	sc_rebuildwindow()
 
@@ -950,13 +960,13 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	if(paramisdefault(fastdac))
 		fastdac = 0
 		fastdac_init = 0
-	elseif(fastdac > 1)
+	elseif(fastdac == 1)
+		fastdac_init = 1
+	else
 		// set fastdac = 1 if you want to use the fastdac!
 		print("[WARNING] \"InitializeWaves\": Pass fastdac = 1! Setting it to 0.")
 		fastdac = 0
 		fastdac_init = 0
-	elseif(fastdac == 1)
-		fastdac_init = 1
 	endif
 	
 	if(fastdac == 0)
@@ -993,9 +1003,11 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	endif
 	i=0
 
-	// because VISA tends to drop connections when the
-	// measurement computer is left idle
-	// we may want to add a function here to setup all the instruments
+	// Close all Resource Manager sessions
+	// and then reopen all instruemnt connections.
+	// VISA tents to drop the connections after being
+	// idle for a while.
+	killVISA()
 	sc_OpenInstrConnections(0)
 
 	// The status of the upcoming scan will be set when waves are initialized.
@@ -1019,6 +1031,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 			print "[WARNING]: Your start and end values are the same!"
 		endif
 	endif
+	
 	if(linecut == 1 && fastdac == 0) //Tim:To make linecuts work with RecordValues
 		sc_is2d = 2
 		make/O/n=(numptsy) sc_linestart = NaN 						//To store first xvalue of each line of data
@@ -1063,7 +1076,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 					cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd)
 					cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn2d; execute(cmd)
 					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
-				elseif(sc_is2d ==2)
+				elseif(sc_is2d == 2)
 					// In case this is a 2D line cut measurement
 					wn2d = sc_RawWaveNames[i]+"2d"
 					cmd = "make /o/n=(1, " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd) //Makes 1 by y wave, x is redimensioned in recordline
@@ -1106,7 +1119,6 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		// create waves for fastdac
 		wave/t fadcvalstr
 		wave fadcattr
-		nvar sc_saveadcbox
 		string wn_raw = "", wn_raw2d = ""
 		i=0
 		do
@@ -1117,7 +1129,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 				cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn
 				execute(cmd)
 				
-				wn_raw = "ADC"+num2istr(i+1)
+				wn_raw = "ADC"+num2istr(i)
 				cmd = "make/o/n=(" + num2istr(sc_numptsx) + ") " + wn_raw + "=NaN"
 				execute(cmd)
 				cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn_raw
@@ -1390,9 +1402,11 @@ function stopsweep(action) : Buttoncontrol
 	strswitch(action)
 		case "stopsweep":
 			sc_abortsweep = 1
+			print "[SCAN] Scan will abort and the incomplete dataset will be saved."
 			break
 		case "stopsweepnosave":
 			sc_abortnosave = 1
+			print "[SCAN] Scan will abort and dataset will not be saved."
 			break
 	endswitch
 end
@@ -1403,7 +1417,7 @@ function pausesweep(action) : Buttoncontrol
 
 	Button pausesweep,proc=resumesweep,title="Resume"
 	sc_pause=1
-	print "Sweep paused by user"
+	print "[SCAN] Scan paused by user."
 end
 
 function resumesweep(action) : Buttoncontrol
@@ -1551,8 +1565,7 @@ function RecordValues(i, j, [readvstime, fillnan])
 	elseif(fillnan==1)
 		fillnan = 1 // again, obvious
 	else
-		fillnan=0   // if something other than 1
-					//     assume default
+		fillnan=0   // if something other than 1, assume default
 	endif
 
 	//// Setup and run async data collection ////
@@ -1583,7 +1596,7 @@ function RecordValues(i, j, [readvstime, fillnan])
 				sprintf cmd, "%s = %s", "sc_tmpVal", script
 				Execute/Q/Z cmd
 				if(V_flag!=0)
-					print "[ERROR] in RecordValues (raw): "+GetErrMessage(V_Flag,2)
+					print "[ERROR] \"RecordValues\": Using "+script+" raises an error: "+GetErrMessage(V_Flag,2)
 				endif
 			else
 				sc_tmpval = NaN
@@ -1913,11 +1926,12 @@ function sc_update_xdata()
 	sc_xdata = x  // set wave data equal to x scaling
 end
 
-function SaveWaves([msg, save_experiment])
+function SaveWaves([msg,save_experiment,fastdac])
 	// the message will be printed in the history, and will be saved in the HDF file corresponding to this scan
 	// save_experiment=1 to save the experiment file
 	string msg
-	variable save_experiment
+	variable save_experiment, fastdac
+	string his_str
 	nvar sc_is2d, sc_PrintRaw, sc_PrintCalc, sc_scanstarttime
 	svar sc_x_label, sc_y_label
 	string filename, wn, logs=""
@@ -1926,6 +1940,7 @@ function SaveWaves([msg, save_experiment])
 	sprintf filenumstr, "%d", filenum
 	wave /t sc_RawWaveNames, sc_CalcWaveNames
 	wave sc_RawRecord, sc_CalcRecord
+	variable filecount = 0
 
 	if (!paramisdefault(msg))
 		print msg
@@ -1933,81 +1948,156 @@ function SaveWaves([msg, save_experiment])
 		msg=""
 	endif
 
+	if(paramisdefault(fastdac))
+		fastdac = 0
+	elseif(fastdac > 1)
+		fastdac = 0
+		print("[WARNING] \"SaveWaves\": Pass fastdac = 1! Setting it to 0.")
+	endif
+	
+	// compare to earlier call of InitializeWaves
+	nvar fastdac_init
+	if(fastdac > fastdac_init)
+		print("[ERROR] \"SaveWaves\": Trying to save fastDAC files, but they weren't initialized by \"InitializeWaves\"")
+		abort
+	elseif(fastdac < fastdac_init)
+		print("[ERROR] \"SaveWaves\": Trying to save non-fastDAC files, but they weren't initialized by \"InitializeWaves\"")
+		abort	
+	endif
+	
 	nvar sc_save_time
 	if (paramisdefault(save_experiment))
 		save_experiment = 1 // save the experiment by default
 	endif
+		
 
-	KillDataFolder /Z root:async // clean this up for next time
+	KillDataFolder/z root:async // clean this up for next time
 
 	// save timing variables
 	variable /g sweep_t_elapsed = datetime-sc_scanstarttime
 	printf "Time elapsed: %.2f s \r", sweep_t_elapsed
 
-	dowindow /k SweepControl // kill scan control window
+	dowindow/k SweepControl // kill scan control window
 
 	// count up the number of data files to save
 	variable ii=0
-	variable Rawadd = sum(sc_RawRecord)
-	variable Calcadd = sum(sc_CalcRecord)
-
-	if(Rawadd+Calcadd > 0)
-		// there is data to save!
-		// save it and increment the filenumber
-		printf "saving all dat%d files...\r", filenum
-
-		nvar sc_rvt
-   	if(sc_rvt==1)
-   		sc_update_xdata() // update xdata wave
-		endif
-
-		// Open up HDF5 files
-	 	// Save scan controller meta data in this function as well
-		initSaveFiles(msg=msg)
-		if(sc_is2d == 2) //If 2D linecut then need to save starting x values for each row of data
-			wave sc_linestart
-			filename = "dat" + filenumstr + "linestart"
-			duplicate sc_linestart $filename
-			savesinglewave("sc_linestart")
-		endif
-		// save raw data waves
-		ii=0
-		do
-			if (sc_RawRecord[ii] == 1)
-				wn = sc_RawWaveNames[ii]
-				if (sc_is2d)
-					wn += "2d"
-				endif
-				filename =  "dat" + filenumstr + wn
-				duplicate $wn $filename // filename is a new wavename and will become <filename.xxx>
-				if(sc_PrintRaw == 1)
-					print filename
-				endif
-				saveSingleWave(wn)
+	if(fastdac == 0)
+		// normal non-fastdac files
+		variable Rawadd = sum(sc_RawRecord)
+		variable Calcadd = sum(sc_CalcRecord)
+	
+		if(Rawadd+Calcadd > 0)
+			// there is data to save!
+			// save it and increment the filenumber
+			printf "saving all dat%d files...\r", filenum
+	
+			nvar sc_rvt
+	   		if(sc_rvt==1)
+	   			sc_update_xdata() // update xdata wave
 			endif
-			ii+=1
-		while (ii < numpnts(sc_RawWaveNames))
-
-		//save calculated data waves
-		ii=0
-		do
-			if (sc_CalcRecord[ii] == 1)
-				wn = sc_CalcWaveNames[ii]
-				if (sc_is2d)
-					wn += "2d"
-				endif
-				filename =  "dat" + filenumstr + wn
-				duplicate $wn $filename
-				if(sc_PrintCalc == 1)
-					print filename
-				endif
-				saveSingleWave(wn)
+	
+			// Open up HDF5 files
+		 	// Save scan controller meta data in this function as well
+			initSaveFiles(msg=msg)
+			if(sc_is2d == 2) //If 2D linecut then need to save starting x values for each row of data
+				wave sc_linestart
+				filename = "dat" + filenumstr + "linestart"
+				duplicate sc_linestart $filename
+				savesinglewave("sc_linestart")
 			endif
-			ii+=1
-		while (ii < numpnts(sc_CalcWaveNames))
-		closeSaveFiles()
+			// save raw data waves
+			ii=0
+			do
+				if (sc_RawRecord[ii] == 1)
+					wn = sc_RawWaveNames[ii]
+					if (sc_is2d)
+						wn += "2d"
+					endif
+					filename =  "dat" + filenumstr + wn
+					duplicate $wn $filename // filename is a new wavename and will become <filename.xxx>
+					if(sc_PrintRaw == 1)
+						print filename
+					endif
+					saveSingleWave(wn)
+				endif
+				ii+=1
+			while (ii < numpnts(sc_RawWaveNames))
+	
+			//save calculated data waves
+			ii=0
+			do
+				if (sc_CalcRecord[ii] == 1)
+					wn = sc_CalcWaveNames[ii]
+					if (sc_is2d)
+						wn += "2d"
+					endif
+					filename =  "dat" + filenumstr + wn
+					duplicate $wn $filename
+					if(sc_PrintCalc == 1)
+						print filename
+					endif
+					saveSingleWave(wn)
+				endif
+				ii+=1
+			while (ii < numpnts(sc_CalcWaveNames))
+			closeSaveFiles()
+		endif
+	elseif(fastdac == 1)
+		wave/t fadcvalstr
+		wave fadcattr
+		string wn_raw = ""
+		nvar sc_Printfadc
+		nvar sc_Saverawfadc
+		
+		do
+			if(fadcattr[ii][2] == 48)
+				filecount += 1
+			endif
+		while(dimsize(fadcattr,0))
+		
+		if(filecount > 0)
+			// there is data to save!
+			// save it and increment the filenumber
+			printf "saving all dat%d files...\r", filenum
+			
+			// Open up HDF5 files
+			// Save scan controller meta data in this function as well
+			initSaveFiles(msg=msg)
+			
+			// look for waves to save
+			ii=0
+			do
+				if(fadcattr[ii][2] == 48) //checkbox checked
+					wn = fadcvalstr[ii][3]
+					if(sc_is2d)
+						wn += "2d"
+					endif
+					filename = "dat"+filenumstr+wn
+					duplicate $wn $filename
+					if(sc_Printfadc)
+						print filename
+					endif
+					saveSingleWave(wn)
+					
+					if(sc_Saverawfadc)
+						wn_raw = "ADC"+num2istr(ii)
+						if(sc_is2d)
+							wn_raw += "2d"
+						endif
+						filename = "dat"+filenumstr+wn_raw
+						duplicate $wn_raw $filename
+						if(sc_Printfadc)
+							print filename
+						endif
+						saveSingleWave(wn_raw)
+					endif
+				endif
+				ii+=1
+			while(ii<dimsize(fadcattr,0))
+			closeSaveFiles()
+		endif
 	endif
-
+	
 	if(save_experiment==1 & (datetime-sc_save_time)>180.0)
 		// save if sc_save_exp=1
 		// and if more than 3 minutes has elapsed since previous saveExp
@@ -2019,14 +2109,60 @@ function SaveWaves([msg, save_experiment])
 	// check if a path is defined to backup data
 	if(sc_checkBackup())
 		// copy data to server mount point
-		sc_copyNewFiles(filenum, save_experiment=save_experiment )
-	endif
-	
-	// increment filenum
-	if(Rawadd+Calcadd > 0)
-		filenum+=1
+		sc_copyNewFiles(filenum, save_experiment=save_experiment)
 	endif
 
+	sc_saveFuncCall(getrtstackinfo(2))
+	
+	// increment filenum
+	if(Rawadd+Calcadd > 0 || filecount > 0)
+		filenum+=1
+	endif
+end
+
+function sc_saveFuncCall(funcname)
+	string funcname
+	
+	nvar sc_is2d, sc_startx, sc_starty, sc_finx, sc_starty, sc_finy, sc_numptsx, sc_numptsy
+	nvar filenum
+	svar sc_x_label, sc_y_label
+	
+	// create JSON string
+	string buffer = ""
+	
+	buffer = addJSONkeyval(buffer,"Filenum",num2istr(filenum))
+	buffer = addJSONkeyval(buffer,"Function Name",funcname,addquotes=1)
+	if(sc_is2d == 0)
+		buffer = addJSONkeyval(buffer,"Sweep parameter/label",sc_x_label,addquotes=1)
+		buffer = addJSONkeyval(buffer,"Starting value",num2str(sc_startx))
+		buffer = addJSONkeyval(buffer,"Ending value",num2str(sc_finx))
+		buffer = addJSONkeyval(buffer,"Number of points",num2istr(sc_numptsx))
+	else
+		buffer = addJSONkeyval(buffer,"Sweep parameter/label (x)",sc_x_label,addquotes=1)
+		buffer = addJSONkeyval(buffer,"Starting value (x)",num2str(sc_startx))
+		buffer = addJSONkeyval(buffer,"Ending value (x)",num2str(sc_finx))
+		buffer = addJSONkeyval(buffer,"Number of points (x)",num2istr(sc_numptsx))
+		buffer = addJSONkeyval(buffer,"Sweep parameter/label (y)",sc_y_label,addquotes=1)
+		buffer = addJSONkeyval(buffer,"Starting value (y)",num2str(sc_starty))
+		buffer = addJSONkeyval(buffer,"Ending value (y)",num2str(sc_finy))
+		buffer = addJSONkeyval(buffer,"Number of points (y)",num2istr(sc_numptsy))
+	endif
+	
+	buffer = prettyJSONfmt(buffer)
+	
+	// open function call history file (or create it)
+	variable hisfile
+	open /z/a/p=config hisfile as "FunctionCallHistory.txt"
+	
+	if(v_flag != 0)
+		print "[WARNING] \"saveFuncCall\": Could not open FunctionCallHistory.txt"
+		return 0
+	endif
+	
+	fprintf hisfile, buffer
+	fprintf hisfile, "------------------------------------\r\r"
+	
+	close hisfile
 end
 
 function SaveFromPXP([history, procedure])

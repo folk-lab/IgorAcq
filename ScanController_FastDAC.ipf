@@ -36,6 +36,88 @@ function openFastDACconnection(instrID, visa_address, [verbose])
 	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
 end
 
+function fdacRecordValues(instrID,j,rampCh,start,fin,numpts,[ramprate])
+	// RecordValues for FastDAC's. This function should replace RecordValues in scan functions.
+	// j is outer scan index, if it's 1D scan just set j=0.
+	// rampCh is a comma seperated string containing the channels that should be ramped.
+	variable instrID, j
+	string rampCh, start, fin
+	variable numpts, ramprate
+	nvar sc_is2d, sc_startx, sc_starty, sc_finx, sc_starty, sc_finy, sc_numptsx, sc_numptsy
+	nvar sc_abortsweep, sc_pause, sc_scanstarttime
+	wave/t fadcvalstr
+	wave fadcattr
+	
+	if(paramisdefault(ramprate))
+		ramprate = 500
+	endif
+	
+	// compare to earlier call of InitializeWaves
+	nvar fastdac_init
+	if(fastdac_init != 1)
+		print("[ERROR] \"RecordValues\": Trying to record fastDACs, but they weren't initialized by \"InitializeWaves\"")
+		abort
+	endif
+	
+	// check that dac and adc channels are all on the same device.
+	// This is only nessesary because we don't currently have hardware triggers!
+	// When (if) we get hardware triggers on the fastdacs, this function call should
+	// be replaced by a function that sorts DAC and ADC channels based on which device
+	// they belong to.
+	variable dev = 0
+	dev = sc_checkfdacDevice(rampCh)
+	
+	// move DAC channels to starting point
+	variable i=0
+	for(i=0;i<itemsinlist(rampCh,",");i+=1)
+		rampOutputfdac(instrID,str2num(stringfromlist(i,rampCh,",")),str2num(stringfromlist(i,start,",")),ramprate=ramprate)
+	endfor
+	
+	// build command and start ramp
+end
+
+function sc_checkfdacDevice(rampCh)
+	string rampCh
+	wave fadcattr
+	wave/t fadcvalstr
+	
+	// check that all DAC channels are on the same device
+	variable numDacCh = itemsinlist(rampCh,","),i=0,v=0,dev_dac=0
+	for(i=0;i<numDacCh;i+=1)
+		v += floor(str2num(stringfromlist(i,rampCh,","))/8)
+	endfor
+	if(mod(v,numDacCh) > 0)
+		print "[ERROR] \"sc_checkfdacDevice\": All DAC channels must be on the same device!"
+		abort
+	else
+		dev_dac = floor(str2num(stringfromlist(0,rampCh,","))/8)
+	endif
+	
+	// check that all adc channels are on the same device
+	variable q = 0, numAdcCh = 0, h = 0, dev_adc = 0
+	for(i=0;i<dimsize(fadcattr,0);i+=1)
+		if(fadcattr[i][2] == 48)
+			q += floor(str2num(fadcvalstr[i][0])/4)
+			numAdcCh += 1
+			h = i
+		endif
+	endfor
+	if(mod(q,numAdcCh) > 0)
+		print "[ERROR] \"sc_checkfdacDevice\": All ADC channels must be on the same device!"
+		abort
+	else
+		dev_adc = floor(str2num(fadcvalstr[h][0])/4)
+	endif
+	
+	// check that DAC and ADC channels are on the same device
+	if(dev_dac != dev_adc)
+		print "[ERROR] \"sc_checkfdacDevice\": DAC & ADC channels must be on the same device!"
+		abort
+	else
+		return dev_dac
+	endif
+end
+
 function setfadcSpeed(instrID,speed)
 	// speed should be a number between 1-3.
 	// slow=1, fast=2 and fastest=3
@@ -199,111 +281,53 @@ end
 function resolvefdacChannel(instrID,channel)
 	variable instrID, channel
 	
-	// check that channel is real
-	if(channel > 7 || channel < 0)
-		print "[ERROR] \"resolvefdacChannel\": Channel must be integer between 0-7"
+	// check that channel actually belongs to device
+	// with instrID
+	string err = ""
+	nvar num_fdac
+	variable fdacNum = floor(channel/8)
+	if(fdacNum > num_fdac)
+		sprintf err, "[ERROR] \"resolvefadcChannel\": Only %d fdac's initialized.", num_fdac
+		print err
 		abort
 	endif
 	
-	nvar num_fdacs
+	string fdacstr = ""
+	printf fdacstr, "fdac%d_idn", fdacNum
+	svar fdac_idn = $fdacstr
 	string idn = queryInstr(instrID, "*IDN?\r\n", read_term="\r\n")
-	switch(num_fdacs)
-		case 1:
-			svar fdac1_idn
-			if(stringmatch(fdac1_idn,idn))
-				return channel
-			endif
-			break
-		case 2:
-			svar fdac1_idn,fdac2_idn
-			if(stringmatch(fdac2_idn,idn))
-				return channel+8
-			elseif(stringmatch(fdac1_idn,idn))
-				return channel
-			endif
-			break
-		case 3:
-			svar fdac1_idn,fdac2_idn, fdac3_idn
-			if(stringmatch(fdac3_idn,idn))
-				return channel+16
-			elseif(stringmatch(fdac2_idn,idn))
-				return channel+8
-			elseif(stringmatch(fdac1_idn,idn))
-				return channel
-			endif
-			break
-		case 4:
-			svar fdac1_idn,fdac2_idn, fdac3_idn, fdac4_idn
-			if(stringmatch(fdac4_idn,idn))
-				return channel+24
-			elseif(stringmatch(fdac3_idn,idn))
-				return channel+16
-			elseif(stringmatch(fdac2_idn,idn))
-				return channel+8
-			elseif(stringmatch(fdac1_idn,idn))
-				return channel
-			endif
-			break
-	endswitch
+	if(cmpstr(idn,fdac_idn) != 0)
+		print "[ERROR] \"resolvefadcChannel\": Device ids don't match!"
+		abort
+	endif
 	
-	// Bad instr resolve
-	print "[ERROR] \"resolvefdacChannel\": Couldn't resolve instrument. VISA connection likely corrupted"
-	abort	
+	return mod(channel,8)
 end
 
 function resolvefadcChannel(instrID,channel)
 	variable instrID, channel
 	
-	// check that channel is real
-	if(channel > 3 || channel < 0)
-		print "[ERROR] \"resolvefadcChannel\": Channel must be integer between 0-3"
+	// check that channel actually belongs to device
+	// with instrID
+	string err = ""
+	nvar num_fdac
+	variable fdacNum = floor(channel/4)
+	if(fdacNum > num_fdac)
+		sprintf err, "[ERROR] \"resolvefadcChannel\": Only %d fdac's initialized.", num_fdac
+		print err
 		abort
 	endif
 	
-	nvar num_fdacs
+	string fdacstr = ""
+	printf fdacstr, "fdac%d_idn", fdacNum
+	svar fdac_idn = $fdacstr
 	string idn = queryInstr(instrID, "*IDN?\r\n", read_term="\r\n")
-	switch(num_fdacs)
-		case 1:
-			svar fdac1_idn
-			if(stringmatch(fdac1_idn,idn))
-				return channel
-			endif
-			break
-		case 2:
-			svar fdac1_idn,fdac2_idn
-			if(stringmatch(fdac2_idn,idn))
-				return channel+4
-			elseif(stringmatch(fdac1_idn,idn))
-				return channel
-			endif
-			break
-		case 3:
-			svar fdac1_idn,fdac2_idn, fdac3_idn
-			if(stringmatch(fdac3_idn,idn))
-				return channel+8
-			elseif(stringmatch(fdac2_idn,idn))
-				return channel+4
-			elseif(stringmatch(fdac1_idn,idn))
-				return channel
-			endif
-			break
-		case 4:
-			svar fdac1_idn,fdac2_idn, fdac3_idn, fdac4_idn
-			if(stringmatch(fdac4_idn,idn))
-				return channel+12
-			elseif(stringmatch(fdac3_idn,idn))
-				return channel+8
-			elseif(stringmatch(fdac2_idn,idn))
-				return channel+4
-			elseif(stringmatch(fdac1_idn,idn))
-				return channel
-			endif
-			break
-	endswitch
+	if(cmpstr(idn,fdac_idn) != 0)
+		print "[ERROR] \"resolvefadcChannel\": Device ids don't match!"
+		abort
+	endif
 	
-	// Bad instr resolve
-	print "[ERROR] \"resolvefadcChannel\": Couldn't resolve instrument. VISA connection likely corrupted"
-	abort	
+	return mod(channel,4)
 end
 
 function initFastDAC(instrID,[instrID2,instrID3,instrID4])
@@ -572,7 +596,7 @@ function update_fdac(action) : ButtonControl
 	for(i=0;i<num_fdac;i+=1)
 		sprintf tempaddrstr, "fdac%d_adrr", i+1
 		svar tempaddr = $tempaddrstr
-		tempnamestr = tempaddrstr[0,4]
+		tempnamestr = "fdac_window_resource"
 		openFastDACconnection(tempnamestr, tempaddr, verbose=0)
 		nvar tempname = $tempnamestr
 		try
@@ -615,7 +639,7 @@ function update_fadc(action) : ButtonControl
 	for(i=0;i<num_fdac;i+=1)
 		sprintf tempaddrstr, "fdac%d_adrr", i+1
 		svar tempaddr = $tempaddrstr
-		tempnamestr = tempaddrstr[0,4]
+		tempnamestr = "fdac_window_resource"
 		openFastDACconnection(tempnamestr, tempaddr, verbose=0)
 		nvar tempname = $tempnamestr
 		try
