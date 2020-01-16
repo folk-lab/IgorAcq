@@ -7,15 +7,17 @@
 // The Fast DAC extention will open a seperate "Fast DAC window" that holds all the information
 // nessesary to run a Fast DAC measurement. Any "normal" measurements should still be set up in 
 // the standard ScanController window.
-// It is the users job to add the fastdac=1 flag to initWaves(), RecordValues() and SaveWaves()!
+// It is the users job to add the fastdac=1 flag to initWaves() and SaveWaves()
 //
 // Written by Christian Olsen, 2019-11-xx
 
-function openFastDACconnection(instrID, visa_address, [verbose])
+function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh])
 	// instrID is the name of the global variable that will be used for communication
 	// visa_address is the VISA address string, i.e. ASRL1::INSTR
+	// Most FastDAC communication relies on the info in "fdackeys". Pass numDACCh and
+	// numADCCh to fill info into "fdackeys"
 	string instrID, visa_address
-	variable verbose
+	variable verbose, numDACCh, numADCCh
 	
 	if(paramisdefault(verbose))
 		verbose=1
@@ -34,15 +36,54 @@ function openFastDACconnection(instrID, visa_address, [verbose])
 	sprintf comm, "name=FastDAC,instrID=%s,visa_address=%s" instrID, visa_address
 	string options = "baudrate=57600,databits=8,stopbits=1,parity=0"
 	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
+	
+	// fill info into "fdackeys"
+	if(!paramisdefault(numDACCh) && !paramisdefault(numADCCh))
+		sc_fillfdacKeys(instrID,visa_address,numDACCh,numADCCh)
+	endif
 end
 
-function fdacRecordValues(instrID,j,rampCh,start,fin,numpts,[ramprate])
+function sc_fillfdacKeys(instrID,visa_address,numDACCh,numADCCh)
+	string instrID, visa_address
+	variable numDACCh, numADCCh
+	
+	variable numDevices
+	svar fdackeys
+	if(!svar_exists(fdackeys))
+		string/g fdackeys = ""
+		numDevices = 0
+	else
+		numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
+	endif
+	
+	variable i=0, deviceNum=numDevices+1
+	for(i=0;i<4;i+=1)
+		if(cmpstr(instrID,stringbykey("name"+num2istr(i+1),fdackeys,":",","))==0)
+			deviceNum = i+1
+			break
+		endif
+	endfor
+	
+	fdackeys = replacenumberbykey("numDevices",fdackeys,deviceNum,":",",")
+	fdackeys = replacestringbykey("name"+num2istr(deviceNum),fdackeys,instrID,":",",")
+	fdackeys = replacestringbykey("visa"+num2istr(deviceNum),fdackeys,visa_address,":",",")
+	fdackeys = replacenumberbykey("numDACCh"+num2istr(deviceNum),fdackeys,numDACCh,":",",")
+	fdackeys = replacenumberbykey("numADCCh"+num2istr(deviceNum),fdackeys,numADCCh,":",",")
+	fdackeys = sortlist(fdackeys,",")
+end
+
+function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcutoff,numAverage,notch])
 	// RecordValues for FastDAC's. This function should replace RecordValues in scan functions.
-	// j is outer scan index, if it's 1D scan just set j=0.
+	// j is outer scan index, if it's a 1D scan just set j=0.
 	// rampCh is a comma seperated string containing the channels that should be ramped.
-	variable instrID, j
+	// Data processing:
+	// 		- RCcutoff set the lowpass cutoff frequency
+	//		- average set the number of points to average
+	//		- nocth sets the notch frequencie, as a comma seperated list (width is fixed at 5Hz)
+	variable instrID, rowNum
 	string rampCh, start, fin
-	variable numpts, ramprate
+	variable numpts, ramprate, RCcutoff, numAverage
+	string notch
 	nvar sc_is2d, sc_startx, sc_starty, sc_finx, sc_starty, sc_finy, sc_numptsx, sc_numptsy
 	nvar sc_abortsweep, sc_pause, sc_scanstarttime
 	wave/t fadcvalstr
@@ -59,66 +100,289 @@ function fdacRecordValues(instrID,j,rampCh,start,fin,numpts,[ramprate])
 		abort
 	endif
 	
-	// check that dac and adc channels are all on the same device.
-	// This is only nessesary because we don't currently have hardware triggers!
+	// Everything below has to be changed if we get hardware triggers!
+	// Check that dac and adc channels are all on the same device and sort lists
+	// of DAC and ADC channels for scan.
 	// When (if) we get hardware triggers on the fastdacs, this function call should
 	// be replaced by a function that sorts DAC and ADC channels based on which device
 	// they belong to.
-	variable dev = 0
-	dev = sc_checkfdacDevice(rampCh)
+	
+	variable dev_adc=0
+	dev_adc = sc_fdacSortChannels(rampCh,start,fin)
+	struct fdacChLists scanList
 	
 	// move DAC channels to starting point
 	variable i=0
-	for(i=0;i<itemsinlist(rampCh,",");i+=1)
-		rampOutputfdac(instrID,str2num(stringfromlist(i,rampCh,",")),str2num(stringfromlist(i,start,",")),ramprate=ramprate)
+	for(i=0;i<itemsinlist(scanList.daclist,",");i+=1)
+		rampOutputfdac(instrID,str2num(stringfromlist(i,scanList.daclist,",")),str2num(stringfromlist(i,scanList.startVal,",")),ramprate=ramprate)
 	endfor
 	
 	// build command and start ramp
+	// for now we only have to send one command to one device.
+	string cmd = ""
+	sprintf cmd, "BUFFERRAMP %s,%s,%s,%s ...\r", scanList.daclist, scanList.startVal, scanList.finVal, scanlist.adclist //FIX
+	writeInstr(instrID,cmd)
+	
+	// read returned values
+	variable totalByteReturn = itemsinlist(scanList.adclist,",")*numpts,read_chunk=0
+	if(totalByteReturn > 500)
+		read_chunk = 500
+	else
+		read_chunk = totalByteReturn
+	endif
+	
+	// make temp wave to hold incomming data chunks
+	// and distribute to data waves
+	string buffer = ""
+	variable bytes_read = 0
+	do
+		buffer = readInstr(instrID,read_bytes=read_chunk)
+		// add data to rawwaves and datawaves
+		sc_distribute_data(buffer,scanList.adclist,read_chunk,rowNum,bytes_read)
+		bytes_read += read_chunk
+	while(totalByteReturn-bytes_read > read_chunk)
+	// do one last read if any data left to read
+	variable bytes_left = totalByteReturn-bytes_read
+	if(bytes_left > 0) 
+		buffer = readInstr(instrID,read_bytes=bytes_left)
+		sc_distribute_data(buffer,scanList.adclist,read_chunk,rowNum,bytes_read)
+	endif
+	
+	// read sweeptime
+	variable sweeptime = 0
+	buffer = readInstr(instrID,read_bytes=10) // FIX read_bytes
+	sweeptime = str2num(buffer)
+	
+	/////////////////////////
+	//// Post processing ////
+	/////////////////////////
+	
+	variable samplingFreq=0
+	samplingFreq = getfadcSpeed(instrID)
+	
+	string warn = ""
+	variable doLowpass=0,cutoff_frac=0
+	if(!paramisdefault(RCcutoff))
+		// add lowpass filter
+		doLowpass = 1
+		cutoff_frac = RCcutoff/samplingFreq
+		if(cutoff_frac > 0.5)
+			print("[WARNING] \"fdacRecordValues\": RC cutoff frequency must be lower than half the sampling frequency!")
+			sprintf warn, "Setting it to %.2f", 0.5*samplingFreq
+			print(warn)
+			cutoff_frac = 0.5
+		endif
+	endif
+	
+	variable doNotch=0,numNotch=0
+	string notch_fracList = ""
+	if(!paramisdefault(notch))
+		// add notch filter(s)
+		doNotch = 1
+		numNotch = itemsinlist(notch,",")
+		for(i=0;i<numNotch;i+=1)
+			notch_fracList = addlistitem(num2str(str2num(stringfromlist(i,notch,","))/samplingFreq),notch_fracList,",",itemsinlist(notch_fracList))
+		endfor
+	endif
+	
+	variable doAverage=0
+	if(!paramisdefault(numAverage))
+		// do averaging
+		doAverage = 1
+	endif
+	
+	// setup FIR (Finite Impluse Response) filter(s)
+	variable FIRcoefs=0
+	if(numpts < 101)
+		FIRcoefs = numpts
+	else
+		FIRcoefs = 101
+	endif
+	
+	string coef = "", coefList = ""
+	variable j=0
+	if(doLowpass == 1 && doNotch == 1)
+		for(j=0;j<numNotch;j+=1)
+			coef = "coefs"+num2istr(j)
+			make/o/d/n=0 $coef
+			if(j==0)
+				// add RC filter in first round
+				filterfir/lo={cutoff_frac,cutoff_frac,FIRcoefs}/nmf={str2num(stringfromlist(j,notch_fraclist,",")),10.0/samplingFreq,1.0e-12,2}/coef $coef
+				coefList = addlistitem(coef,coefList,",",itemsinlist(coefList))
+			else
+				// make an aditional filter per extra notch
+				filterfir/nmf={str2num(stringfromlist(j,notch_fraclist,",")),10.0/samplingFreq,1.0e-12,2}/coef $coef
+				coefList = addlistitem(coef,coefList,",",itemsinlist(coefList))
+			endif
+		endfor
+	elseif(doLowpass == 1 && doNOtch == 0)
+		coef = "coefs"+num2istr(0)
+		make/o/d/n=0 $coef
+		// add RC filter in first round
+		filterfir/lo={cutoff_frac,cutoff_frac,FIRcoefs}/coef $coef
+		coefList = addlistitem(coef,coefList,",",itemsinlist(coefList))
+	elseif(doNotch == 1 && doLowpass == 0)
+		for(j=0;j<numNotch;j+=1)
+			coef = "coefs"+num2istr(j)
+			make/o/d/n=0 $coef
+			filterfir/nmf={str2num(stringfromlist(j,notch_fraclist,",")),10.0/samplingFreq,1.0e-12,2}/coef $coef
+			coefList = addlistitem(coef,coefList,",",itemsinlist(coefList))
+		endfor
+	endif
+	
+	// apply filters
+	if(doLowpass == 1 || doNotch == 1)
+		sc_applyfilters(coefList,scanList.adclist,doLowpass,doNotch,cutoff_frac,samplingFreq,FIRcoefs,notch_fraclist)
+	endif
+	
+	// average datawaves
+	if(doAverage == 1)
+		sc_averageDataWaves(numAverage)
+	endif
+	
+	return sweeptime
 end
 
-function sc_checkfdacDevice(rampCh)
-	string rampCh
-	wave fadcattr
+function sc_applyfilters(coefList,adcList,doLowpass,doNotch,cutoff_frac,samplingFreq,FIRcoefs,notch_fraclist)
+	string coefList, adcList
+	variable doLowpass, doNotch, cutoff_frac, samplingFreq, FIRcoefs
+	string notch_fraclist
 	wave/t fadcvalstr
 	
-	// check that all DAC channels are on the same device
-	variable numDacCh = itemsinlist(rampCh,","),i=0,v=0,dev_dac=0
-	for(i=0;i<numDacCh;i+=1)
-		v += floor(str2num(stringfromlist(i,rampCh,","))/8)
+	variable i=0,j=0
+	for(i=0;i<itemsinlist(adcList,",");i+=1)
+		wave datawave = $fadcvalstr[str2num(stringfromlist(i,adcList,","))][3]
+		for(j=0;j<itemsinlist(coefList,",");j+=1)
+			wave coefs = $stringfromlist(j,coefList,",")
+			if(doLowpass == 1 && j == 0)
+				filterfir/lo={cutoff_frac,cutoff_frac,FIRcoefs}/nmf={str2num(stringfromlist(j,notch_fraclist,",")),10.0/samplingFreq,1.0e-12,2}/coef=coefs datawave
+			else
+				filterfir/nmf={str2num(stringfromlist(j,notch_fraclist,",")),10.0/samplingFreq,1.0e-12,2}/coef=coefs datawave
+			endif
+		endfor
 	endfor
-	if(mod(v,numDacCh) > 0)
-		print "[ERROR] \"sc_checkfdacDevice\": All DAC channels must be on the same device!"
-		abort
-	else
-		dev_dac = floor(str2num(stringfromlist(0,rampCh,","))/8)
-	endif
-	
-	// check that all adc channels are on the same device
-	variable q = 0, numAdcCh = 0, h = 0, dev_adc = 0
-	for(i=0;i<dimsize(fadcattr,0);i+=1)
-		if(fadcattr[i][2] == 48)
-			q += floor(str2num(fadcvalstr[i][0])/4)
-			numAdcCh += 1
-			h = i
-		endif
-	endfor
-	if(mod(q,numAdcCh) > 0)
-		print "[ERROR] \"sc_checkfdacDevice\": All ADC channels must be on the same device!"
-		abort
-	else
-		dev_adc = floor(str2num(fadcvalstr[h][0])/4)
-	endif
-	
-	// check that DAC and ADC channels are on the same device
-	if(dev_dac != dev_adc)
-		print "[ERROR] \"sc_checkfdacDevice\": DAC & ADC channels must be on the same device!"
-		abort
-	else
-		return dev_dac
-	endif
 end
 
-function setfadcSpeed(instrID,speed)
+function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart)
+	string buffer, adcList
+	variable bytes, rowNum, colNumStart
+	wave/t fadcvalstr
+	
+	variable i=0, j=0, numADCCh = itemsinlist(adcList,","), adcIndex=0, dataPoint=0
+	// load data into raw wave
+	for(i=0;i<numADCCh;i+=1)
+		adcIndex = str2num(stringfromlist(i,adcList,","))
+		wave rawwave = $"ADC"+num2istr(str2num(stringfromlist(i,adcList,",")))
+		for(j=0;j<bytes;j+=1)
+			dataPoint = str2num(stringfromlist(i+j*numADCCh,buffer,","))
+			rawwave[colNumStart+j][rowNum] = dataPoint
+		endfor
+	endfor
+	
+	// load calculated data into datawave
+	string script="", cmd=""
+	for(i=0;i<numADCCh;i+=1)
+		adcIndex = str2num(stringfromlist(i,adcList,","))
+		wave datawave = $fadcvalstr[adcIndex][3]
+		script = trimstring(fadcvalstr[adcIndex][4])
+		sprintf cmd, "datawave = %s", script
+		execute/q/z cmd
+		if(v_flag!=0)
+			print "[WARNING] \"sc_distribute_data\": Wave calculation falied! Error: "+GetErrMessage(V_Flag,2)
+		endif
+	endfor
+end
+
+function sc_averageDataWaves(numAverage)
+	variable numAverage
+	
+end
+
+function sc_fdacSortChannels(rampCh,start,fin)
+	string rampCh, start, fin
+	wave fadcattr
+	wave/t fadcvalstr
+	svar fdacKeys
+	struct fdacChLists s
+	
+	// check that all DAC channels are on the same device
+	variable numRampCh = itemsinlist(rampCh,","),i=0,j=0,dev_dac=0,dacCh=0,startCh=0
+	variable numDevices = str2num(stringbykey("numDevices",fdacKeys,":",",")),numDACCh=0
+	for(i=0;i<numRampCh;i+=1)
+		dacCh = str2num(stringfromlist(i,rampCh,","))
+		startCh = 0
+		for(j=0;j<numDevices;j+=1)
+			numDACCh = str2num(stringbykey("numDACCh"+num2istr(j),fdacKeys,":",","))
+			if(startCh+numDACCh-1 >= dacCh)
+				// this is the device
+				if(i > 0 && dev_dac != j)
+					print "[ERROR] \"sc_checkfdacDevice\": All DAC channels must be on the same device!"
+					abort
+				else
+					dev_dac = j
+					break
+				endif
+			endif
+			startCh += numDACCh
+		endfor
+	endfor
+	
+	// check that all adc channels are on the same device
+	variable q=0,numReadCh=0,h=0,dev_adc=0,adcCh=0,numADCCh=0
+	string  adcList = ""
+	for(i=0;i<dimsize(fadcattr,0);i+=1)
+		if(fadcattr[i][2] == 48)
+			adcCh = str2num(fadcvalstr[i][0])
+			startCh = 0
+			for(j=0;j<numDevices;j+=1)
+				numADCCh = str2num(stringbykey("numADCCh"+num2istr(j),fdacKeys,":",","))
+				if(startCh+numADCCh-1 >= adcCh)
+					// this is the device
+					if(i > 0 && dev_adc != j)
+						print "[ERROR] \"sc_checkfdacDevice\": All ADC channels must be on the same device!"
+						abort
+					elseif(j != dev_dac)
+						print "[ERROR] \"sc_checkfdacDevice\": DAC & ADC channels must be on the same device!"
+						abort
+					else
+						dev_adc = j
+						adcList = addlistitem(num2istr(adcCh),adcList,",",itemsinlist(adcList,","))
+						break
+					endif
+				endif
+				startCh += numADCCh
+			endfor
+		endif
+	endfor
+	
+	// add result to structure
+	s.daclist = rampCh
+	s.adclist = adcList
+	s.startVal = start
+	s.finVal = fin
+	
+	return dev_adc
+end
+
+// structure to hold DAC and ADC channels to be used in fdac scan.
+structure fdacChLists
+		string dacList
+		string adcList
+		string startVal
+		string finVal
+endstructure
+
+function getfadcSpeed(instrID)
+	variable instrID
+	
+	string response="",cmd=""
+	
+	cmd = "ADD REAL COMMAND"
+	response = queryInstr(instrID,cmd,read_term="\r\n")
+	return str2num(response)
+end
+
+function setfadcSpeed(instrID,speed) //FIX
 	// speed should be a number between 1-3.
 	// slow=1, fast=2 and fastest=3
 	variable instrID, speed
@@ -135,7 +399,7 @@ function setfadcSpeed(instrID,speed)
 	// check respose
 	// not sure what to expect!
 	if(1)
-		// do nothing
+		// update window
 	else
 		string err
 		sprintf err, "[ERROR] \"setfadcSpeed\": Bad response! %s", response
@@ -161,37 +425,52 @@ end
 function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	// ramps a channel to the voltage specified by "output".
 	// ramp is controlled locally on DAC controller.
+	// channel must be the channel set by the GUI.
 	variable instrID, channel, output, ramprate
 	wave/t fdacvalstr, old_fdacvalstr
+	svar fdackeys
 	
 	if(paramIsDefault(ramprate))
 		ramprate = 500
 	endif
 	
-	variable fdacCh = resolvefdacChannel(instrID,channel)
-	// check if specified channel is real
-	if(channel > 7 || channel < 0)
-		print "[ERROR] \"rampOutputfdac\": Channel must be integer between 0-7"
-		resetfdacwindow(fdacCh)
-		abort
-	endif
+	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
+	variable i=0, devchannel = 0, startCh = 0, numDACCh = 0
+	string deviceName = "", err = ""
+	for(i=0;i<numDevices;i+=1)
+		numDACCh =  str2num(stringbykey("numADCCh"+num2istr(i+1),fdackeys,":",","))
+		if(startCh+numDACCh-1 >= channel)
+			// this is the device, now check that instrID is pointing at the same device
+			deviceName = stringbykey("name"+num2istr(i+1),fdackeys,":",",")
+			nvar visa_handle = $deviceName
+			if(visa_handle == instrID)
+				devchannel = startCh+numDACCh-channel
+				break
+			else
+				sprintf err, "[ERROR] \"rampOutputfdac\": channel %d is not present on device %s", channel, deviceName
+				print(err)
+				resetfdacwindow(channel)
+				abort
+			endif
+		endif
+		startCh += numDACCh
+	endfor
 	
 	// check that output is within hardware limit
 	nvar fdac_limit
 	if(abs(output) > fdac_limit)
-		string err
-		sprintf err, "[ERROR] \"rampOutputfdac\": Output voltage on channel %d outside hardware limit", fdacCh
+		sprintf err, "[ERROR] \"rampOutputfdac\": Output voltage on channel %d outside hardware limit", channel
 		print err
-		resetfdacwindow(fdacCh)
+		resetfdacwindow(channel)
 		abort
 	endif
 	
 	// check that output is within software limit
 	// overwrite output to software limit and warn user
-	if(abs(output) > str2num(fdacvalstr[fdacCh][2]))
-		output = sign(output)*str2num(fdacvalstr[fdacCh][2])
+	if(abs(output) > str2num(fdacvalstr[channel][2]))
+		output = sign(output)*str2num(fdacvalstr[channel][2])
 		string warn
-		sprintf warn, "[WARNING] \"rampOutputfdac\": Output voltage must be within limit. Setting channel %d to %.3fmV", fdacCh, output
+		sprintf warn, "[WARNING] \"rampOutputfdac\": Output voltage must be within limit. Setting channel %d to %.3fmV", channel, output
 		print warn
 	endif
 	
@@ -204,16 +483,16 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	// not sure what to expect!
 	if(1)
 		// good response
-		if(abs(str2num(response)-str2num(old_fdacvalstr[fdacCh][1]))<0.1)
+		if(abs(str2num(response)-str2num(old_fdacvalstr[channel][1]))<0.1)
 			// no discrepancy
 		else
-			sprintf warn, "[WARNING] \"rampOutputfdac\": Actual output of channel %d is different than expected", fdacCh
+			sprintf warn, "[WARNING] \"rampOutputfdac\": Actual output of channel %d is different than expected", channel
 			print warn
 		endif
 	else
 		sprintf err, "[ERROR] \"rampOutputfdac\": Bad response! %s", response
 		print err
-		resetfdacwindow(fdacCh)
+		resetfdacwindow(channel)
 		abort
 	endif
 	
@@ -227,7 +506,7 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 		// not a good response
 		sprintf err, "[ERROR] \"rampOutputfdac\": Bad response! %s", response
 		print err
-		resetfdacwindow(fdacCh)
+		resetfdacwindow(channel)
 		abort
 	endif
 	
@@ -238,26 +517,42 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	// check respose
 	// not sure what to expect! if good update window
 	if(1)
-		fdacvalstr[fdacCh][1] = num2str(output)
-		updatefdacWindow(fdacCh)
+		fdacvalstr[channel][1] = num2str(output)
+		updatefdacWindow(channel)
 	else
 		sprintf err, "[ERROR] \"rampOutputfdac\": Bad response! %s", response
 		print err
-		resetfdacwindow(fdacCh)
+		resetfdacwindow(channel)
 		abort
 	endif
 end
 
 function readfadcChannel(instrID,channel) // Units: mV
+	// channel must be the channel number given by the GUI!
 	variable instrID, channel
 	wave/t fadcvalstr
+	svar fdackeys
 	
-	variable fadcCh = resolvefadcChannel(instrID,channel)
-	// check that channel is real
-	if(channel > 3 || channel < 0)
-		print "[ERROR] \"readfadcChannel\": Channel must be integer between 0-3"
-		abort
-	endif
+	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
+	variable i=0, devchannel = 0, startCh = 0, numADCCh = 0
+	string deviceName = "", err = ""
+	for(i=0;i<numDevices;i+=1)
+		numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),fdackeys,":",","))
+		if(startCh+numADCCh-1 >= channel)
+			// this is the device, now check that instrID is pointing at the same device
+			deviceName = stringbykey("name"+num2istr(i+1),fdackeys,":",",")
+			nvar visa_handle = $deviceName
+			if(visa_handle == instrID)
+				devchannel = startCh+numADCCh-channel
+				break
+			else
+				sprintf err, "[ERROR] \"readfdacChannel\": channel %d is not present on device %s", channel, deviceName
+				print(err)
+				abort
+			endif
+		endif
+		startCh =+ numADCCh
+	endfor
 	
 	// query ADC
 	string cmd = "ADD REAL COMMAND!"
@@ -268,170 +563,82 @@ function readfadcChannel(instrID,channel) // Units: mV
 	// not sure what to expect!
 	if(1) 
 		// good response, update window
-		fadcvalstr[fadcCh][1] = response
+		fadcvalstr[channel][1] = response
 		return str2num(response)
 	else
-		string err
 		sprintf err, "[ERROR] \"readfadcChannel\": Bad response! %s", response
 		print err
 		abort
 	endif
 end
 
-function resolvefdacChannel(instrID,channel)
-	variable instrID, channel
-	
-	// check that channel actually belongs to device
-	// with instrID
-	string err = ""
-	nvar num_fdac
-	variable fdacNum = floor(channel/8)
-	if(fdacNum > num_fdac)
-		sprintf err, "[ERROR] \"resolvefadcChannel\": Only %d fdac's initialized.", num_fdac
-		print err
+function initFastDAC()
+	// use the key:value list "fdackeys" to figure out the correct number of
+	// DAC/ADC channels to use. "fdackeys" is created when calling "openFastDACconnection".
+	svar fdackeys
+	if(!svar_exists(fdackeys))
+		print("[ERROR] \"initFastDAC\": No devices found!")
 		abort
 	endif
-	
-	string fdacstr = ""
-	printf fdacstr, "fdac%d_idn", fdacNum
-	svar fdac_idn = $fdacstr
-	string idn = queryInstr(instrID, "*IDN?\r\n", read_term="\r\n")
-	if(cmpstr(idn,fdac_idn) != 0)
-		print "[ERROR] \"resolvefadcChannel\": Device ids don't match!"
-		abort
-	endif
-	
-	return mod(channel,8)
-end
-
-function resolvefadcChannel(instrID,channel)
-	variable instrID, channel
-	
-	// check that channel actually belongs to device
-	// with instrID
-	string err = ""
-	nvar num_fdac
-	variable fdacNum = floor(channel/4)
-	if(fdacNum > num_fdac)
-		sprintf err, "[ERROR] \"resolvefadcChannel\": Only %d fdac's initialized.", num_fdac
-		print err
-		abort
-	endif
-	
-	string fdacstr = ""
-	printf fdacstr, "fdac%d_idn", fdacNum
-	svar fdac_idn = $fdacstr
-	string idn = queryInstr(instrID, "*IDN?\r\n", read_term="\r\n")
-	if(cmpstr(idn,fdac_idn) != 0)
-		print "[ERROR] \"resolvefadcChannel\": Device ids don't match!"
-		abort
-	endif
-	
-	return mod(channel,4)
-end
-
-function initFastDAC(instrID,[instrID2,instrID3,instrID4])
-	variable instrID,instrID2,instrID3,instrID4
 	
 	// hardware limit (mV)
 	variable/g fdac_limit = 5000
 	
-	variable num_fdac = 0
-	if(paramisDefault(instrID2) && paramisDefault(instrID3) && paramisDefault(instrID4))
-		num_fdac = 1
-		//string/g fdac1_idn = queryInstr(instrID, "*IDN?\r\n", read_term="\r\n")
-		//string/g fdac1_addr = getResourceAddress(instrID)
-	elseif(!paramisDefault(instrID2) && paramisDefault(instrID3) && paramisDefault(instrID4))
-		num_fdac = 2
-		//string/g fdac1_idn = queryInstr(instrID, "*IDN?\r\n", read_term="\r\n")
-		//string/g fdac1_addr = getResourceAddress(instrID)
-		//string/g fdac2_idn = queryInstr(instrID2, "*IDN?\r\n", read_term="\r\n")
-		//string/g fdac2_addr = getResourceAddress(instrID2)
-	elseif(!paramisDefault(instrID2) && !paramisDefault(instrID3) && paramisDefault(instrID4))
-		num_fdac = 3
-		//string/g fdac1_idn = queryInstr(instrID, "*IDN?\r\n", read_term="\r\n")
-		//string/g fdac1_addr = getResourceAddress(instrID)
-		//string/g fdac2_idn = queryInstr(instrID2, "*IDN?\r\n", read_term="\r\n")
-		//string/g fdac2_addr = getResourceAddress(instrID2)
-		//string/g fdac3_idn = queryInstr(instrID3, "*IDN?\r\n", read_term="\r\n")
-		//string/g fdac3_addr = getResourceAddress(instrID3)
-	elseif(!paramisDefault(instrID2) && !paramisDefault(instrID3) && !paramisDefault(instrID4))
-		num_fdac = 4
-		//string/g fdac1_idn = queryInstr(instrID, "*IDN?\r\n", read_term="\r\n")
-		//string/g fdac1_addr = getResourceAddress(instrID)
-		//string/g fdac2_idn = queryInstr(instrID2, "*IDN?\r\n", read_term="\r\n")
-		//string/g fdac2_addr = getResourceAddress(instrID2)
-		//string/g fdac3_idn = queryInstr(instrID3, "*IDN?\r\n", read_term="\r\n")
-		//string/g fdac3_addr = getResourceAddress(instrID3)
-		//string/g fdac4_idn = queryInstr(instrID4, "*IDN?\r\n", read_term="\r\n")
-		//string/g fdac4_addr = getResourceAddress(instrID4)
-	else
-		print "[ERROR] \"initFastDAC\": Define instrID's in order."
-		abort
-	endif
+	variable i=0, numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
+	variable numDACCh=0, numADCCh=0
+	for(i=0;i<numDevices+1;i+=1)
+		if(cmpstr(stringbykey("name"+num2istr(i+1),fdackeys,":",","),"")!=0)
+			numDACCh += str2num(stringbykey("numDACCh"+num2istr(i+1),fdackeys,":",","))
+			numADCCh += str2num(stringbykey("numADCCh"+num2istr(i+1),fdackeys,":",","))
+		endif
+	endfor
 	
 	// create waves to hold control info
-	fdacCheckForOldInit(num_fdac)
+	fdacCheckForOldInit(numDACCh,numADCCh)
 	
-	variable/g num_fdacs = num_fdac
+	variable/g num_fdacs = 0
 	
 	// create GUI window
 	string cmd = ""
 	killwindow/z ScanControllerFastDAC
-	sprintf cmd, "FastDACWindow(%d)", num_fdac
+	sprintf cmd, "FastDACWindow()"
 	execute(cmd)
-	fdacSetGUIinteraction(num_fdac)
+	fdacSetGUIinteraction(numDevices)
 end
 
-function fdacCheckForOldInit(num_fdac)
-	variable num_fdac
+function fdacCheckForOldInit(numDACCh,numADCCh)
+	variable numDACCh, numADCCh
 	
 	variable response
 	wave/z fdacvalstr
 	wave/z old_fdacvalstr
 	if(waveexists(fdacvalstr) && waveexists(old_fdacvalstr))
-		response = fdacAskUser(num_fdac)
+		response = fdacAskUser(numDACCh)
 		if(response == 1)
 			// Init at old values
 			print "[FastDAC] Init to old values"
 		elseif(response == -1)
 			// Init to default values
-			fdacCreateControlWaves(num_fdac)
+			fdacCreateControlWaves(numDACCh,numADCCh)
 			print "[FastDAC] Init to default values"
 		else
-			print "[Warning] \"fdacCheckForOldInit\" Bad user input - Init to default values"
-			fdacCreateControlWaves(num_fdac)
+			print "[Warning] \"fdacCheckForOldInit\": Bad user input - Init to default values"
+			fdacCreateControlWaves(numDACCh,numADCCh)
 		endif
 	else
 		// Init to default values
-		fdacCreateControlWaves(num_fdac)
+		fdacCreateControlWaves(numDACCh,numADCCh)
 	endif
 end
 
-function fdacAskUser(num_fdac)
-	variable num_fdac
-	nvar oldnum = num_fdacs
+function fdacAskUser(numDACCh)
+	variable numDACCh
 	wave/t fdacvalstr
 	
-	make/o/t fdacext = {"0","0","0","0","0","0","0","0"}
 	// can only init to old settings if the same
-	// number of FastDACs are used
-	if(oldnum == num_fdac)
-		switch(num_fdac)
-			case 1:
-				duplicate/o fdacext, fdacdefaultinit
-				break
-			case 2:
-				concatenate/o/np=0 {fdacext,fdacext}, fdacdefaultinit
-				break
-			case 3:
-				concatenate/o/np=0 {fdacext,fdacext,fdacext}, fdacdefaultinit
-				break
-			case 4:
-				concatenate/o/np=0 {fdacext,fdacext,fdacext,fdacext}, fdacdefaultinit
-				break
-		endswitch
-
+	// number of DAC channels are used
+	if(dimsize(fdacvalstr,0) == numDACCh)
+		make/o/t/n=(numDACCh) fdacdefaultinit
 		duplicate/o/rmd=[][1] fdacvalstr ,fdacvalsinit
 		concatenate/o {fdacdefaultinit,fdacvalsinit}, fdacinit
 		execute("fdacInitWindow()")
@@ -475,12 +682,8 @@ function fdacAskUserUpdate(action) : ButtonControl
 			break
 	endswitch
 end
-	
-end
 
-window FastDACWindow(num_fdac) : Panel
-	variable num_fdac
-	
+window FastDACWindow() : Panel
 	PauseUpdate; Silent 1 // pause everything else, while building the window
 	NewPanel/w=(0,0,790,570)/n=ScanControllerFastDAC // window size
 	ModifyPanel/w=ScanControllerFastDAC framestyle=2, fixedsize=1
@@ -522,10 +725,12 @@ window FastDACWindow(num_fdac) : Panel
 	button updatefadc,pos={325,265},size={90,20},proc=update_fadc,title="Update ADC"
 	checkbox sc_PrintfadcBox,pos={425,265},proc=sc_CheckBoxClicked,value=sc_Printfadc,side=1,title="\Z14Print filenames "
 	checkbox sc_SavefadcBox,pos={545,265},proc=sc_CheckBoxClicked,value=sc_Saverawfadc,side=1,title="\Z14Save raw data "
-	popupMenu fadcSetting1,pos={335,310},proc=update_fadcSpeed,mode=1,title="\Z14ADC1 communication",size={100,20},value="Slow;Fast;Fastest"
-	popupMenu fadcSetting2,pos={560,310},proc=update_fadcSpeed,mode=1,title="\Z14ADC2 communication",size={100,20},value="Slow;Fast;Fastest"
-	popupMenu fadcSetting3,pos={335,350},proc=update_fadcSpeed,mode=1,title="\Z14ADC3 communication",size={100,20},value="Slow;Fast;Fastest"
-	popupMenu fadcSetting4,pos={560,350},proc=update_fadcSpeed,mode=1,title="\Z14ADC4 communication",size={100,20},value="Slow;Fast;Fastest"
+	popupMenu fadcSetting1,pos={380,300},proc=update_fadcSpeed,mode=1,title="\Z14ADC1 speed",size={100,20},value="Slow;Fast;Fastest"
+	popupMenu fadcSetting2,pos={580,300},proc=update_fadcSpeed,mode=1,title="\Z14ADC2 speed",size={100,20},value="Slow;Fast;Fastest"
+	popupMenu fadcSetting3,pos={380,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC3 speed",size={100,20},value="Slow;Fast;Fastest"
+	popupMenu fadcSetting4,pos={580,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC4 speed",size={100,20},value="Slow;Fast;Fastest"
+	popupMenu fadcSetting5,pos={380,360},proc=update_fadcSpeed,mode=1,title="\Z14ADC5 speed",size={100,20},value="Slow;Fast;Fastest"
+	popupMenu fadcSetting6,pos={580,360},proc=update_fadcSpeed,mode=1,title="\Z14ADC6 speed",size={100,20},value="Slow;Fast;Fastest"
 	
 	// identical to ScanController window
 	// all function calls are to ScanController functions
@@ -583,289 +788,169 @@ function update_fadcSpeed(s) : PopupMenuControl
 	endif
 end
 
-function update_fdac(action) : ButtonControl
+function update_fdac(action) : ButtonControl //FIX
 	string action
-	nvar num_fdac
+	svar fdackeys
 	wave/t fdacvalstr
 	wave/t old_fdacvalstr
 	
 	// open temporary connection to FastDACs
 	// and update values if needed
-	variable i=0,j=0,output
-	string tempaddrstr, tempnamestr
-	for(i=0;i<num_fdac;i+=1)
-		sprintf tempaddrstr, "fdac%d_adrr", i+1
-		svar tempaddr = $tempaddrstr
-		tempnamestr = "fdac_window_resource"
-		openFastDACconnection(tempnamestr, tempaddr, verbose=0)
-		nvar tempname = $tempnamestr
-		try
-			strswitch(action)
-				case "ramp":
-					for(j=0;j<8;j+=1)
-						if(str2num(fdacvalstr[8*i+j][1]) != str2num(old_fdacvalstr[8*i+j][1]))
-							output = str2num(fdacvalstr[8*i+j][1])
-							rampOutputfdac(tempname,j,output,ramprate=500)
-						endif
-					endfor
-					break
-				case "rampallzero":
-					for(j=0;j<8;j+=1)
-						rampOutputfdac(tempname,j,0,ramprate=500)
-					endfor
-					break
-			endswitch
-		catch
-			// reset error code, so VISA connection can be closed!
-			variable err = GetRTError(1)
+	variable i=0,j=0,output = 0, numDACCh = 0, startCh = 0
+	string visa_address = "", tempnamestr = "fdac_window_resource"
+	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
+	for(i=0;i<numDevices;i+=1)
+		numDACCh = str2num(stringbykey("numDACCh"+num2istr(i+1),fdackeys,":",","))
+		if(numDACCh > 0)
+			visa_address = stringbykey("visa"+num2istr(i+1),fdackeys,":",",")
+			openFastDACconnection(tempnamestr, visa_address, verbose=0)
+			nvar tempname = $tempnamestr
+			try
+				strswitch(action)
+					case "ramp":
+						for(j=0;j<numDACCh;j+=1)
+							output = str2num(fdacvalstr[startCh+j][1])
+							if(output != str2num(old_fdacvalstr[startCh+j][1]))
+								rampOutputfdac(tempname,j,output,ramprate=500)
+							endif
+						endfor
+						break
+					case "rampallzero":
+						for(j=0;j<numDACCh;j+=1)
+							rampOutputfdac(tempname,j,0,ramprate=500)
+						endfor
+						break
+				endswitch
+			catch
+				// reset error code, so VISA connection can be closed!
+				variable err = GetRTError(1)
+				
+				viClose(tempname)
+				// silent abort
+				abortonvalue 1,10
+			endtry
 			
+			// close temp visa connection
 			viClose(tempname)
-			// silent abort
-			abortonvalue 1,10
-		endtry
-		
-		// close temp visa connection
-		viClose(tempname)
+		endif
+		startCh =+ numDACCh
 	endfor
 end
 
 function update_fadc(action) : ButtonControl
 	string action
-	nvar num_fdac
+	svar fdackeys
 	variable i=0, j=0
 	
-	string tempaddrstr, tempnamestr
-	variable input
-	for(i=0;i<num_fdac;i+=1)
-		sprintf tempaddrstr, "fdac%d_adrr", i+1
-		svar tempaddr = $tempaddrstr
-		tempnamestr = "fdac_window_resource"
-		openFastDACconnection(tempnamestr, tempaddr, verbose=0)
-		nvar tempname = $tempnamestr
-		try
-			for(j=0;j<4;j+=1)
-				input = readfadcChannel(tempname,j)
-			endfor
-		catch
-			// reset error
-			variable err = GetRTError(1)
+	string visa_address = "", tempnamestr = "fdac_window_resource"
+	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
+	variable numADCCh = 0, startCh = 0
+	for(i=0;i<numDevices;i+=1)
+		numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),fdackeys,":",","))
+		if(numADCCh > 0)
+			visa_address = stringbykey("visa"+num2istr(i+1),fdackeys,":",",")
+			openFastDACconnection(tempnamestr, visa_address, verbose=0)
+			nvar tempname = $tempnamestr
+			try
+				for(j=0;j<numADCCh;j+=1)
+					readfadcChannel(tempname,startCh+j)
+				endfor
+			catch
+				// reset error
+				variable err = GetRTError(1)
+				
+				viClose(tempname)
+				// silent abort
+				abortonvalue 1,10
+			endtry
 			
+			// close temp visa connection
 			viClose(tempname)
-			// silent abort
-			abortonvalue 1,10
-		endtry
-		
-		// close temp visa connection
-		viClose(tempname)
+		endif
+		startCh += numADCCh
 	endfor
 end
 
-function fdacCreateControlWaves(num_fdac)
-	variable num_fdac
-	
-	// extention waves used when more than two fastDACs are connected.
-	make/o/t extfdacCh1 = {"16","17","18","19","20","21","22","23"}
-	make/o/t extfdacCh2 = {"24","25","26","27","28","29","30","31"}
-	make/o/t extfdacval = {"0","0","0","0","0","0","0","0"}
-	make/o/t extfdaclimit = {"5000","5000","5000","5000","5000","5000","5000","5000"}
-	make/o/t extfdaclabel = {"Label","Label","Label","Label","Label","Label","Label","Label"}
-	make/o extfdacattr0 = {0,0,0,0,0,0,0,0}
-	make/o extfdacattr2 = {2,2,2,2,2,2,2,2}
-	
-	make/o/t extfadcCh1 = {"8","9","10","11"}
-	make/o/t extfadcCh2 = {"12","13","14","15"}
-	make/o/t extfadcval = {"0","0","0","0"}
-	make/o/t extfadcempty = {"","","",""}
-	make/o/t extfadcones = {"1","1","1","1"}
-	make/o extfadcattr0 = {0,0,0,0}
-	make/o extfadcattr2 = {2,2,2,2}
-	make/o extfadcattr32 = {32,32,32,32}
+function fdacCreateControlWaves(numDACCh,numADCCh)
+	variable numDACCh,numADCCh
 	
 	// create waves for DAC part
-	make/o/t tempfdac1 = {"0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15"}
-	make/o/t tempfdac2 = {"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}
-	make/o/t tempfdac3 = {"5000","5000","5000","5000","5000","5000","5000","5000","5000","5000","5000","5000","5000","5000","5000","5000"}
-	make/o/t tempfdac4 = {"Label","Label","Label","Label","Label","Label","Label","Label","Label","Label","Label","Label","Label","Label","Label","Label"}
-	make/o tempfdacattr1 = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
-	make/o tempfdacattr2 = {2,2,2,2,2,2,2,2,0,0,0,0,0,0,0,0}
-	make/o tempfdacattr3 = {2,2,2,2,2,2,2,2,0,0,0,0,0,0,0,0}
-	make/o tempfdacattr4 = {2,2,2,2,2,2,2,2,0,0,0,0,0,0,0,0}
+	make/o/t/n=(numADCCh) fdacval0 = "0"
+	make/o/t/n=(numDACCh) fdacval1 = "0"
+	make/o/t/n=(numDACCh) fdacval2 = "5000"
+	make/o/t/n=(numDACCh) fdacval3 = "Label"
+	variable i=0
+	for(i=0;i<numDACCh;i+=1)
+		fdacval0[i] = num2istr(i)
+	endfor
+	concatenate/o {fdacval0,fdacval1,fdacval2,fdacval3}, fdacvalstr
+	make/o/n=(numDACCh) fdacattr0 = 0
+	make/o/n=(numDACCh) fdacattr1 = 2
+	concatenate/o {fdacattr0,fdacattr1,fdacattr1,fdacattr1}, fdacattr
 	
-	// create waves for ADC part
-	make/o/t tempfadc1 = {"0","1","2","3","4","5","6","7"}
-	make/o/t tempfadc2 = {"0","0","0","0","0","0","0","0"}
-	make/o/t tempfadc3 = {"","","","","","","",""}
-	make/o/t tempfadc4 = {"","","","","","","",""}
-	make/o/t tempfadc5 = {"1","1","1","1","1","1","1","1"}
-	make/o tempfadcattr1 = {0,0,0,0,0,0,0,0}
-	make/o tempfadcattr2 = {0,0,0,0,0,0,0,0}
-	make/o tempfadcattr3 = {32,32,32,32,0,0,0,0}
-	make/o tempfadcattr4 = {2,2,2,2,0,0,0,0}
-	make/o tempfadcattr5 = {2,2,2,2,0,0,0,0}
+	//create waves for ADC part
+	make/o/t/n=(numADCCh) fadcval0 = "0"
+	make/o/t/n=(numADCCh) fadcval1 = "0"
+	make/o/t/n=(numADCCh) fadcval2 = ""
+	make/o/t/n=(numADCCh) fadcval3 = ""
+	make/o/t/n=(numADCCh) fadcval4 = ""
+	for(i=0;i<numADCCh;i+=1)
+		fadcval0[i] = num2istr(i)
+		fadcval2[i] = "wave"+num2istr(i)
+		fadcval4[i] = "ADC"+num2istr(i)
+	endfor
+	concatenate/o {fadcval0,fadcval1,fadcval2,fadcval3}, fadcvalstr
+	make/o/n=(numADCCh) fadcattr0 = 0
+	make/o/n=(numADCCh) fadcattr1 = 2
+	make/o/n=(numADCCh) fadcattr2 = 32
+	concatenate/o {fadcattr0,fadcattr0,fadcattr2,fadcattr1,fadcattr1}, fadcattr
 	
-	switch(num_fdac)
-		case 1:
-			// do nothing
-			
-			duplicate/o tempfdac1, fdac1
-			duplicate/o tempfdac2, fdac2
-			duplicate/o tempfdac3, fdac3
-			duplicate/o tempfdac4, fdac4
-			duplicate/o tempfdacattr1, fdacattr1
-			duplicate/o tempfdacattr2, fdacattr2
-			duplicate/o tempfdacattr3, fdacattr3
-			duplicate/o tempfdacattr4, fdacattr4
-			
-			duplicate/o tempfadc1, fadc1
-			duplicate/o tempfadc2, fadc2
-			duplicate/o tempfadc3, fadc3
-			duplicate/o tempfadc4, fadc4
-			duplicate/o tempfadc5, fadc5
-			duplicate/o tempfadcattr1, fadcattr1
-			duplicate/o tempfadcattr2, fadcattr2
-			duplicate/o tempfadcattr3, fadcattr3
-			duplicate/o tempfadcattr4, fadcattr4
-			duplicate/o tempfadcattr5, fadcattr5
-			break
-		case 2:
-			// extent to 2 fastDACs
-			tempfdacattr2 = {2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2}
-			tempfdacattr3 = {2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2}
-			tempfdacattr4 = {2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2}
-			
-			tempfadcattr3 = {32,32,32,32,32,32,32,32}
-			tempfadcattr4 = {2,2,2,2,2,2,2,2}
-			tempfadcattr5 = {2,2,2,2,2,2,2,2}
-			
-			duplicate/o tempfdac1, fdac1
-			duplicate/o tempfdac2, fdac2
-			duplicate/o tempfdac3, fdac3
-			duplicate/o tempfdac4, fdac4
-			duplicate/o tempfdacattr1, fdacattr1
-			duplicate/o tempfdacattr2, fdacattr2
-			duplicate/o tempfdacattr3, fdacattr3
-			duplicate/o tempfdacattr4, fdacattr4
-			
-			duplicate/o tempfadc1, fadc1
-			duplicate/o tempfadc2, fadc2
-			duplicate/o tempfadc3, fadc3
-			duplicate/o tempfadc4, fadc4
-			duplicate/o tempfadc5, fadc5
-			duplicate/o tempfadcattr1, fadcattr1
-			duplicate/o tempfadcattr2, fadcattr2
-			duplicate/o tempfadcattr3, fadcattr3
-			duplicate/o tempfadcattr4, fadcattr4
-			duplicate/o tempfadcattr5, fadcattr5
-			break
-		case 3:
-			// extent to 3 fastDACs
-			tempfdacattr2 = {2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2}
-			tempfdacattr3 = {2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2}
-			tempfdacattr4 = {2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2}
-			
-			tempfadcattr3 = {32,32,32,32,32,32,32,32}
-			tempfadcattr4 = {2,2,2,2,2,2,2,2}
-			tempfadcattr5 = {2,2,2,2,2,2,2,2}
-			
-			concatenate/o/np=0 {tempfdac1,extfdacCh1}, fdac1
-			concatenate/o/np=0 {tempfdac2,extfdacval}, fdac2
-			concatenate/o/np=0 {tempfdac3,extfdaclimit}, fdac3
-			concatenate/o/np=0 {tempfdac4,extfdaclabel}, fdac4
-			concatenate/o/np=0 {tempfdacattr1,extfdacattr0}, fdacattr1
-			concatenate/o/np=0 {tempfdacattr2,extfdacattr2}, fdacattr2
-			concatenate/o/np=0 {tempfdacattr3,extfdacattr2}, fdacattr3
-			concatenate/o/np=0 {tempfdacattr4,extfdacattr2}, fdacattr4
-			
-			concatenate/o/np=0 {tempfadc1,extfadcCh1}, fadc1
-			concatenate/o/np=0 {tempfadc2,extfadcval}, fadc2
-			concatenate/o/np=0 {tempfadc3,extfadcempty}, fadc3
-			concatenate/o/np=0 {tempfadc4,extfadcempty}, fadc4
-			concatenate/o/np=0 {tempfadc5,extfadcones}, fadc5
-			concatenate/o/np=0 {tempfadcattr1,extfadcattr0}, fadcattr1
-			concatenate/o/np=0 {tempfadcattr2,extfadcattr0}, fadcattr2
-			concatenate/o/np=0 {tempfadcattr3,extfadcattr32}, fadcattr3
-			concatenate/o/np=0 {tempfadcattr4,extfadcattr2}, fadcattr4
-			concatenate/o/np=0 {tempfadcattr5,extfadcattr2}, fadcattr5
-			break
-		case 4:
-			// extent to 4 fastDACs
-			tempfdacattr2 = {2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2}
-			tempfdacattr3 = {2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2}
-			tempfdacattr4 = {2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2}
-			
-			tempfadcattr3 = {32,32,32,32,32,32,32,32}
-			tempfadcattr4 = {2,2,2,2,2,2,2,2}
-			tempfadcattr5 = {2,2,2,2,2,2,2,2}
-			
-			concatenate/o/np=0 {tempfdac1,extfdacCh1,extfdacCh2}, fdac1
-			concatenate/o/np=0 {tempfdac2,extfdacval,extfdacval}, fdac2
-			concatenate/o/np=0 {tempfdac3,extfdaclimit,extfdaclimit}, fdac3
-			concatenate/o/np=0 {tempfdac4,extfdaclabel,extfdaclabel}, fdac4
-			concatenate/o/np=0 {tempfdacattr1,extfdacattr0,extfdacattr0}, fdacattr1
-			concatenate/o/np=0 {tempfdacattr2,extfdacattr2,extfdacattr2}, fdacattr2
-			concatenate/o/np=0 {tempfdacattr3,extfdacattr2,extfdacattr2}, fdacattr3
-			concatenate/o/np=0 {tempfdacattr4,extfdacattr2,extfdacattr2}, fdacattr4
-			
-			concatenate/o/np=0 {tempfadc1,extfadcCh1,extfadcCh2}, fadc1
-			concatenate/o/np=0 {tempfadc2,extfadcval,extfadcval}, fadc2
-			concatenate/o/np=0 {tempfadc3,extfadcempty,extfadcempty}, fadc3
-			concatenate/o/np=0 {tempfadc4,extfadcempty,extfadcempty}, fadc4
-			concatenate/o/np=0 {tempfadc5,extfadcones,extfadcones}, fadc5
-			concatenate/o/np=0 {tempfadcattr1,extfadcattr0,extfadcattr0}, fadcattr1
-			concatenate/o/np=0 {tempfadcattr2,extfadcattr0,extfadcattr0}, fadcattr2
-			concatenate/o/np=0 {tempfadcattr3,extfadcattr32,extfadcattr32}, fadcattr3
-			concatenate/o/np=0 {tempfadcattr4,extfadcattr2,extfadcattr2}, fadcattr4
-			concatenate/o/np=0 {tempfadcattr5,extfadcattr2,extfadcattr2}, fadcattr5
-			break
-		default:
-			// error
-			print "[ERROR] \"fdacCreateControlWaves\": Driver only supports up to 4 FastDACs!"
-			abort
-			break
-	endswitch
-	concatenate/o {fdac1,fdac2,fdac3,fdac4}, fdacvalstr
-	duplicate/o/rmd=[][1] fdacvalstr, old_fdacvalstr
-	concatenate/o {fdacattr1,fdacattr2,fdacattr3,fdacattr4}, fdacattr
-	concatenate/o {fadc1,fadc2,fadc3,fadc4,fadc5}, fadcvalstr
-	concatenate/o {fadcattr1,fadcattr2,fadcattr3,fadcattr4,fadcattr5}, fadcattr
-	
+
 	variable/g sc_printfadc = 0
 	variable/g sc_saverawfadc = 0
-	
+
 	// clean up
-	killwaves/z tempfdac1,tempfdac2,tempfdac3,tempfdac4
-	killwaves/z tempfdacattr1,tempfdacattr2,tempfdacattr3,tempfdacattr4
-	killwaves/z tempfadc1,tempfadc2,tempfadc3,tempfadc4,tempfadc5
-	killwaves/z tempfadcattr1,tempfadcattr2,tempfadcattr3,tempfadcattr4,tempfadcattr5
-	killwaves/z fdac1,fdac2,fdac3,fdac4
-	killwaves/z fdacattr1,fdacattr2,fdacattr3,fdacattr4
-	killwaves/z fadc1,fadc2,fadc3,fadc4,fadc5
-	killwaves/z fadcattr1,fadcattr2,fadcattr3,fadcattr4,fadcattr5
+	killwaves fdacval0,fdacval1,fdacval2,fdacval3
+	killwaves fdacattr0,fdacattr1
+	killwaves fadcval0,fadcval1,fadcval2,fadcval3,fadcval4
+	killwaves fadcattr0,fadcattr1,fadcattr2
 end
 
-function fdacSetGUIinteraction(num_fdac)
-	variable num_fdac
+function fdacSetGUIinteraction(numDevices)
+	variable numDevices
 	
 	// edit interaction mode popup menus if nessesary
-	switch(num_fdac)
+	switch(numDevices)
 		case 1:
 			popupMenu fadcSetting2, disable=2
 			popupMenu fadcSetting3, disable=2
 			popupMenu fadcSetting4, disable=2
+			popupMenu fadcSetting5, disable=2
+			popupMenu fadcSetting6, disable=2
 			break
 		case 2:
 			popupMenu fadcSetting3, disable=2
 			popupMenu fadcSetting4, disable=2
+			popupMenu fadcSetting4, disable=2
+			popupMenu fadcSetting5, disable=2
+			popupMenu fadcSetting6, disable=2
 			break
 		case 3:
 			popupMenu fadcSetting4, disable=2
+			popupMenu fadcSetting5, disable=2
+			popupMenu fadcSetting6, disable=2
 			break
 		case 4:
-			// do nothing
+			popupMenu fadcSetting5, disable=2
+			popupMenu fadcSetting6, disable=2
+			break
+		case 5:
+			popupMenu fadcSetting6, disable=2
 			break
 		default:
-			// error
-			print "[ERROR] \"fdacSetGUIinteraction\": Driver only supports up to 4 FastDACs!"
-			abort
+			if(numDevices > 6)
+				print("[WARNINIG] \"FastDAC GUI\": More than 6 devices are hooked up.")
+				print("Call \"setfadcSpeed\" to set the speeds of the devices not displayed in the GUI.")
+			endif
 	endswitch
 end
