@@ -120,11 +120,12 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	// build command and start ramp
 	// for now we only have to send one command to one device.
 	string cmd = ""
-	sprintf cmd, "BUFFERRAMP %s,%s,%s,%s ...\r", scanList.daclist, scanList.startVal, scanList.finVal, scanlist.adclist //FIX
+	// OPERATION, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF STEPS, DELAY (MICROSECONDS), #READINGS TO AVG
+	sprintf cmd, "BUFFERRAMP %s,%s,%s,%s\r", scanList.daclist, scanlist.adclist, scanList.startVal, scanList.finVal, numpts, 1,1 //FIXME
 	writeInstr(instrID,cmd)
 	
 	// read returned values
-	variable totalByteReturn = itemsinlist(scanList.adclist,",")*numpts,read_chunk=0
+	variable totalByteReturn = itemsinlist(scanList.adclist,",")*2*numpts,read_chunk=0
 	if(totalByteReturn > 500)
 		read_chunk = 500
 	else
@@ -136,7 +137,11 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	string buffer = ""
 	variable bytes_read = 0
 	do
-		buffer = readInstr(instrID,read_bytes=read_chunk)
+		buffer = readInstr(instrID,read_bytes=read_chunk, fdac_flag=1)
+		// If failed, abort
+		if (cmpstr(buffer, "NaN") == 0)
+			abort
+		endif
 		// add data to rawwaves and datawaves
 		sc_distribute_data(buffer,scanList.adclist,read_chunk,rowNum,bytes_read)
 		bytes_read += read_chunk
@@ -144,7 +149,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	// do one last read if any data left to read
 	variable bytes_left = totalByteReturn-bytes_read
 	if(bytes_left > 0) 
-		buffer = readInstr(instrID,read_bytes=bytes_left)
+		buffer = readInstr(instrID,read_bytes=bytes_left,fdac_flag=1)
 		sc_distribute_data(buffer,scanList.adclist,read_chunk,rowNum,bytes_read)
 	endif
 	
@@ -237,7 +242,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	
 	// average datawaves
 	if(doAverage == 1)
-		sc_averageDataWaves(numAverage)
+		sc_averageDataWaves(numAverage,scanList.adcList)
 	endif
 	
 	return sweeptime
@@ -267,35 +272,91 @@ function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart)
 	string buffer, adcList
 	variable bytes, rowNum, colNumStart
 	wave/t fadcvalstr
+	nvar sc_is2d
 	
-	variable i=0, j=0, numADCCh = itemsinlist(adcList,","), adcIndex=0, dataPoint=0
+	variable i=0, j=0, k=0, numADCCh = itemsinlist(adcList,","), adcIndex=0, dataPoint=0
+	string wave1d = "", wave2d = "", s1, s2
 	// load data into raw wave
 	for(i=0;i<numADCCh;i+=1)
 		adcIndex = str2num(stringfromlist(i,adcList,","))
-		wave rawwave = $"ADC"+num2istr(str2num(stringfromlist(i,adcList,",")))
-		for(j=0;j<bytes;j+=1)
-			dataPoint = str2num(stringfromlist(i+j*numADCCh,buffer,","))
-			rawwave[colNumStart+j][rowNum] = dataPoint
-		endfor
+		wave1d = "ADC"+num2istr(str2num(stringfromlist(i,adcList,",")))
+		wave rawwave = $wave1d
+		k = 0
+		for(j=0;j<bytes;j+=numADCCh*2)
+		// Just editing this
+			s1 = buffer[j + (i*2)]
+			s2 = buffer[j + (i*2) + 1]
+			// dataPoint = str2num(stringfromlist(i+j*numADCCh,buffer,","))
+			datapoint = fdacChar2Num(s1, s2)
+			rawwave[colNumStart+k] = dataPoint
+			k += 1
+		endfor 
+		if(sc_is2d)
+			wave2d = wave1d+"_2d"
+			wave rawwave2d = $wave2d
+			rawwave2d[][rowNum] = rawwave[p]
+		endif
 	endfor
 	
 	// load calculated data into datawave
 	string script="", cmd=""
 	for(i=0;i<numADCCh;i+=1)
 		adcIndex = str2num(stringfromlist(i,adcList,","))
-		wave datawave = $fadcvalstr[adcIndex][3]
+		wave1d = fadcvalstr[adcIndex][3]
+		wave datawave = $wave1d
 		script = trimstring(fadcvalstr[adcIndex][4])
 		sprintf cmd, "datawave = %s", script
 		execute/q/z cmd
 		if(v_flag!=0)
 			print "[WARNING] \"sc_distribute_data\": Wave calculation falied! Error: "+GetErrMessage(V_Flag,2)
 		endif
+		if(sc_is2d)
+			wave2d = wave1d+"_2d"
+			wave datawave2d = $wave2d
+			datawave2d[][rowNum] = datawave[p]
+		endif
 	endfor
 end
 
-function sc_averageDataWaves(numAverage)
+function sc_averageDataWaves(numAverage,adcList)
 	variable numAverage
+	string adcList
+	wave/t fadcvalstr
+	nvar sc_is2d
 	
+	variable i=0,j=0,k=0,newsize=0,adcIndex=0,numADCCh=itemsinlist(adcList,","),h=numAverage-1
+	string wave1d="",wave2d="",newname1d="",newname2d=""
+	for(i=0;i<numADCCh;i+=1)
+		adcIndex = str2num(stringfromlist(i,adcList,","))
+		wave1d = fadcvalstr[adcIndex][3]
+		wave datawave = $wave1d
+		newsize = floor(dimsize(datawave,0)/numAverage)
+		// rename original waves
+		newname1d = "temp_"+wave1d
+		killwaves/z $newname1d
+		rename datawave, newname1d
+		// make new wave with old name
+		make/o/n=(newsize) $wave1d
+		wave newdatawave = $wave1d
+		for(j=0;j<newsize;j+=1)
+			newdatawave[j] = mean($newname1d,j+j*h,j+h+j*h)
+		endfor
+		if(sc_is2d)
+			wave2d = wave1d+"_2d"
+			wave datawave2d = $wave2d
+			newname2d = "temp_"+wave2d
+			killwaves/z $newname2d
+			rename datawave2d, newname2d
+			// make new wave with old name
+			make/o/n=(newsize,dimsize($newname2d,1)) $wave2d
+			wave newdatawave2d = $wave2d
+			for(k=0;k<dimsize(newdatawave2d,1);k+=1)
+				for(j=0;j<newsize;j+=1)
+					newdatawave2d[j][k] = mean($newname2d,j+j*h,j+h+j*h)
+				endfor
+			endfor
+		endif
+	endfor
 end
 
 function sc_fdacSortChannels(rampCh,start,fin)
@@ -953,4 +1014,41 @@ function fdacSetGUIinteraction(numDevices)
 				print("Call \"setfadcSpeed\" to set the speeds of the devices not displayed in the GUI.")
 			endif
 	endswitch
+end
+
+// Given two strings of length 1
+//  - c1 (higher order) and
+//  - c2 lower order
+// Calculate effective FastDac value
+// @optparams minVal, maxVal (units mV)
+
+function fdacChar2Num(c1, c2, [minVal, maxVal])
+	string c1, c2
+	variable minVal, maxVal
+	// Set default values for minVal & maxVal
+	if(paramisdefault(minVal))
+		minVal = -10000
+	endif
+	
+	if(paramisdefault(maxVal))
+		maxVal = 10000
+	endif
+	// Check params for violation
+	if(strlen(c1) != 1 || strlen(c2) != 1)
+		print "[ERROR] strlen violation -- strings passed to fastDacChar2Num must be length 1"
+		return 0
+	endif
+	variable b1, b2
+	// Calculate byte values
+	b1 = char2num(c1[0])
+	b2 = char2num(c2[0])
+	// Convert to unsigned
+	if (b1 < 0)
+		b1 += 256
+	elseif (b2 < 0)
+		b2 += 256
+	endif
+	// Return calculated FastDac value
+	return ((b1*2^8 + b2)*(maxVal-minVal)/(2^16 - 1))-minVal
+	
 end
