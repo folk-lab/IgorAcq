@@ -1067,7 +1067,7 @@ function update_BabyDAC(action) : ButtonControl
 	endtry
 
 	viClose(bd_window_resource) // close VISA resource
-	viClose(viRM) // close Resource Manager session
+//	viClose(viRM) // close Resource Manager session
 
 	if(bd_num_custom > 0)
 		bdCalcCustomValues()

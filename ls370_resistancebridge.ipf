@@ -56,12 +56,15 @@ function setLS370system(system)
 	string system
 	string /g ls_system
 	string /g ls_token
+	string /g lcmi_auth_token
 
 	string /g ls_system="", ls_token=""
 	strswitch(system)
 		case "bfsmall":
 			ls_system = "bfsmall"
-			ls_token = "72597639"
+//			ls_token = "72597639"
+			ls_token = "LD"
+			lcmi_auth_token = "igor"
 			string/g bfchannellookup = "mc;still;magnet;4K;50K;6;5;4;2;1"
 			string/g bfheaterlookup = "mc;still;0;2"
 			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,350,1201,1800,10000}}
@@ -147,7 +150,7 @@ function getLS370temp(instrID, plate, [max_age_s]) // Units: K
 
 	sprintf command, "get-channel-data/%d?max_age_s=%d&_at_=%s", channel, max_age_s, ls_token
 
-	string result = sendLS370(instrID,command,"get",keys="data:temperature")
+	string result = sendLS370(instrID,command,"get",keys="data:record:temperature_k")
 	return str2num(result)
 end
 
@@ -718,8 +721,8 @@ function/s sendLS370(instrID,cmd,method,[payload, keys])
 	//      if no keys are provided, an empty string is returned
 	string instrID, cmd, keys, method, payload
 	string response
-	
-	string headers = "accept: application/json"
+	svar lcmi_auth_token
+	string headers = "accept: application/json\rlcmi-auth-token: "+lcmi_auth_token
 	if(cmpstr(method,"get")==0)
 		response = getHTTP(instrID,cmd,headers)
 	elseif(cmpstr(method,"post")==0 && !paramisdefault(payload))

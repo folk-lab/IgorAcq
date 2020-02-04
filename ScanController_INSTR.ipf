@@ -198,7 +198,7 @@ function openHTTPinstr(mandatory, [options, verbose])
 		if(strlen(cmd)>0)
 			
 			// do something here with that command
-			string response = ""
+			string response = "Not Implemented"
 			
 			if(verbose)
 				printf "\t-- %s responded with: %s\r", name, response
@@ -314,7 +314,7 @@ function/s getHTTP(instrID,cmd,headers)
 	string response, error
 
 //	print instrID+cmd
-	URLRequest /TIME=15.0 url=instrID+cmd, method=get, headers=headers
+	URLRequest /TIME=20.0 url=instrID+cmd, method=get, headers=headers
 
 	if (V_flag == 0)    // No error
 		response = S_serverResponse // response is a JSON string
