@@ -529,6 +529,7 @@ end
 
 function readfadcChannel(instrID,channel) // Units: mV
 	// channel must be the channel number given by the GUI!
+	// instrID not used, only here to maintain same format
 	variable instrID, channel
 	wave/t fadcvalstr
 	svar fdackeys
@@ -541,27 +542,26 @@ function readfadcChannel(instrID,channel) // Units: mV
 		if(startCh+numADCCh-1 >= channel)
 			// this is the device, now check that instrID is pointing at the same device
 			deviceName = stringbykey("name"+num2istr(i+1),fdackeys,":",",")
+
 			nvar visa_handle = $deviceName
-			if(visa_handle == instrID)
-				devchannel = startCh+numADCCh-channel
+			if(numtype(visa_handle) == 0)
+				devchannel = channel-startCh  //The actual channel number on the specific board
 				break
 			else
-				sprintf err, "[ERROR] \"readfdacChannel\": channel %d is not present on device %s", channel, deviceName
+				sprintf err, "[ERROR] \"readfdacChannel\": device %s is not connected (must be connected with its own name)", deviceName
 				print(err)
 				abort
-			endif
+			endif			
 		endif
 		startCh =+ numADCCh
 	endfor
 	
 	// query ADC
-	string cmd = "ADD REAL COMMAND!"
+	string cmd = "GET_ADC," + num2str(devchannel)
 	string response
 	response = queryInstr(instrID, cmd+"\r\n", read_term="\r\n")
-	
-	// check response
-	// not sure what to expect!
-	if(1) 
+
+	if(	numtype(str2num(response)) == 0) 
 		// good response, update window
 		fadcvalstr[channel][1] = response
 		return str2num(response)
@@ -875,7 +875,7 @@ function fdacCreateControlWaves(numDACCh,numADCCh)
 	variable numDACCh,numADCCh
 	
 	// create waves for DAC part
-	make/o/t/n=(numADCCh) fdacval0 = "0"
+	make/o/t/n=(numDACCh) fdacval0 = "0"
 	make/o/t/n=(numDACCh) fdacval1 = "0"
 	make/o/t/n=(numDACCh) fdacval2 = "5000"
 	make/o/t/n=(numDACCh) fdacval3 = "Label"
