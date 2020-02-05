@@ -426,6 +426,7 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	// ramps a channel to the voltage specified by "output".
 	// ramp is controlled locally on DAC controller.
 	// channel must be the channel set by the GUI.
+	// instrID not used, only here to maintain same format
 	variable instrID, channel, output, ramprate
 	wave/t fdacvalstr, old_fdacvalstr
 	svar fdackeys
@@ -443,13 +444,12 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 			// this is the device, now check that instrID is pointing at the same device
 			deviceName = stringbykey("name"+num2istr(i+1),fdackeys,":",",")
 			nvar visa_handle = $deviceName
-			if(visa_handle == instrID)
-				devchannel = startCh+numDACCh-channel
+			if(numtype(visa_handle) == 0)
+				devchannel = channel-startCh  //The actual channel number on the specific board
 				break
 			else
-				sprintf err, "[ERROR] \"rampOutputfdac\": channel %d is not present on device %s", channel, deviceName
+				sprintf err, "[ERROR] \"readfdacChannel\": device %s is not connected (must be connected with its own name)", deviceName
 				print(err)
-				resetfdacwindow(channel)
 				abort
 			endif
 		endif
@@ -475,6 +475,7 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	endif
 	
 	// read current dac output and compare to window
+	print "Ramp command not implemented yet"
 	string cmd = "ADD REAL COMMAND!"
 	string response
 	response = queryInstr(instrID, cmd+"\r\n", read_term="\r\n")
@@ -560,7 +561,7 @@ function readfadcChannel(instrID,channel) // Units: mV
 	string cmd = "GET_ADC," + num2str(devchannel)
 	string response
 	response = queryInstr(instrID, cmd+"\r\n", read_term="\r\n")
-
+	response = remove_rn(response)
 	if(	numtype(str2num(response)) == 0) 
 		// good response, update window
 		fadcvalstr[channel][1] = response
@@ -953,4 +954,12 @@ function fdacSetGUIinteraction(numDevices)
 				print("Call \"setfadcSpeed\" to set the speeds of the devices not displayed in the GUI.")
 			endif
 	endswitch
+end
+
+
+function/t remove_rn(str)
+	string str
+	str = removeleadingwhitespace(str)
+	str = removetrailingwhitespace(str)
+	return str
 end
