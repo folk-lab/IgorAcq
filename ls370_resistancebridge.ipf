@@ -54,21 +54,18 @@ function setLS370system(system)
 	// this is important, because it sets the correct url for the selected RPi.
 	// if the wrong url is selected, you risk fucking up others experiment!!!
 	string system
-	string /g ls_system
-	string /g ls_token
-
-	string /g ls_system="", ls_token=""
+	string /g ls_system="", ls_label=""
 	strswitch(system)
 		case "bfsmall":
 			ls_system = "bfsmall"
-			ls_token = "72597639"
+			ls_label = "LD"
 			string/g bfchannellookup = "mc;still;magnet;4K;50K;6;5;4;2;1"
 			string/g bfheaterlookup = "mc;still;0;2"
 			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,350,1201,1800,10000}}
 			break
 		case "igh":
 			ls_system = "igh"
-			ls_token = ""
+			ls_label = ""
 			string/g ighchannellookup = "mc;cold plate;still;1K;sorb;3;6;5;2;1"
 			string/g ighheaterlookup = "mc;still;sorb;0;2;1"
 			string/g ighgaugelookup = "P1;P2;G1;G2;G3"
@@ -76,7 +73,7 @@ function setLS370system(system)
 			break
 		case "bfbig":
 			ls_system = "bfbig"
-			ls_token = ""
+			ls_label = ""
 			print "No support for bfbig yet!"
 			break
 		default:
@@ -116,7 +113,7 @@ function getLS370temp(instrID, plate, [max_age_s]) // Units: K
 	svar ls_system, bfchannellookup, ighchannellookup
 	variable channel_idx, channel
 	string command
-	svar ls_token
+	svar ls_label
 
 	if(paramisdefault(max_age_s))
 		max_age_s = 120
@@ -145,9 +142,9 @@ function getLS370temp(instrID, plate, [max_age_s]) // Units: K
 			break
 	endswitch
 
-	sprintf command, "get-channel-data/%d?max_age_s=%d&_at_=%s", channel, max_age_s, ls_token
+	sprintf command, "get-channel-data/%d?controller_label=%s", channel, ls_label
 
-	string result = sendLS370(instrID,command,"get",keys="data:temperature")
+	string result = sendLS370(instrID,command,"get",keys="data:record:temperature_k")
 	return str2num(result)
 end
 
@@ -164,7 +161,7 @@ function getLS370heaterpower(instrID,heater, [max_age_s]) // Units: mW
 	svar ls_system, bfheaterlookup, ighheaterlookup
 	variable heater_idx, channel
 	string command
-	svar ls_token
+	svar ls_label
 
 	if(paramisdefault(max_age_s))
 		//return GetHeaterPowerDB(heater)
@@ -195,9 +192,9 @@ function getLS370heaterpower(instrID,heater, [max_age_s]) // Units: mW
 	endswitch
   
 	if(channel > 0)
-		sprintf command, "get-analog-data/%d?max_age_s=%d&_at_=%s", channel, max_age_s, ls_token
+		sprintf command, "get-analog-data/%d?controller_label=%s", channel, ls_label
 	else
-		sprintf command, "get-heater-data?max_age_s=%d&_at_=%s", max_age_s, ls_token
+		sprintf command, "get-heater-data?controller_label=%s", ls_label
 	endif
 
 	return str2num(sendLS370(instrID,command,"get", keys="power_mw"))
@@ -210,11 +207,11 @@ function getLS370PIDtemp(instrID) // Units: mK
 	string instrID
 	variable temp
 	string payload, command
-	svar ls_token
+	svar ls_label
 	nvar temp_set
 
 	payload = "{\"command\": \"SETP?\"}"
-	sprintf command, "command?_at_=%s", ls_token
+	sprintf command, "command?controller_label=%s", ls_label
 	
 	string test = sendLS370(instrID,command,"post", keys="v", payload=payload)
 	temp = str2num(test[1,inf])*1000
@@ -228,10 +225,10 @@ function/s getLS370heaterrange(instrID) // Units: AU
 	string instrID
 	variable range
 	string command,payload,response
-	svar ls_token
+	svar ls_label
 
 	sprintf payload, "{\"command\": \"HTRRNG?\"}", range
-	sprintf command, "command?_at_=%s", ls_token
+	sprintf command, "command?controller_label=%s", ls_label
 
 	response = sendLS370(instrID,command,"post", keys="v", payload=payload)
 	return response[1,inf]
@@ -245,10 +242,10 @@ function/s getLS370PIDparameters(instrID) // Units: No units
 	string instrID
 	nvar p_value,i_value,d_value
 	string payload, pid, command
-	svar ls_token
+	svar ls_label
 	
 	payload = "{\"command\": \"PID?\"}"
-	sprintf command, "command?_at_=%s", ls_token
+	sprintf command, "command?controller_label=%s", ls_label
 
 	pid = sendLS370(instrID,command,"post", keys="v", payload=payload)
 
@@ -265,10 +262,10 @@ function getLS370controlmode(instrID) // Units: No units
 	string instrID
 	nvar pid_mode, pid_led, mcheater_led
 	string payload, command,response
-	svar ls_token
+	svar ls_label
 
 	payload = "{\"command\": \"CMODE?\"}"
-	sprintf command, "command?_at_=%s", ls_token
+	sprintf command, "command?controller_label=%s", ls_label
 
 	response = sendLS370(instrID,command,"post", keys="v", payload=payload)
 	pid_mode = str2num(response[1,inf])
@@ -392,7 +389,7 @@ function setLS370PIDcontrol(instrID,channel,setpoint,maxcurrent) //Units: mK, mA
 	string instrID
 	variable channel, setpoint, maxcurrent
 	string payload, command
-	svar ls_token
+	svar ls_label
 	nvar temp_set
 	
 	// check for NAN and INF
@@ -401,7 +398,7 @@ function setLS370PIDcontrol(instrID,channel,setpoint,maxcurrent) //Units: mK, mA
 	endif
 
 	sprintf payload, "{\"channel\": %d, \"set_point\": %g, \"max_current_ma\": %g, \"max_heater_level\": %s}", channel, setpoint/1000, maxcurrent, "8"
-	sprintf command, "set-temperature-control-parameters?_at_=%s", ls_token
+	sprintf command, "set-temperature-control-parameters?controller_label=%s", ls_label
 
 	sendLS370(instrID,command,"post",payload=payload)
 	temp_set = setpoint
@@ -412,10 +409,10 @@ function setLS370cmode(instrID,mode)
 	string instrID
 	variable mode
 	string payload, command
-	svar ls_token
+	svar ls_label
 
 	sprintf payload, "{\"command\": \"CMODE %d\"}", mode
-	sprintf command, "command?_at_=%s", ls_token
+	sprintf command, "command?controller_label=%s", ls_label
 
 	sendLS370(instrID,command,"post", payload=payload)
 end
@@ -426,13 +423,13 @@ function setLS370exclusivereader(instrID,channel,[interval])
 	string instrID, channel
 	variable interval
 	string command, payload
-	svar ls_token
+	svar ls_label
 
 	if(paramisdefault(interval))
 		interval=1000
 	endif
 	
-	sprintf command, "set-exclusive-reader?_at_=%s", ls_token
+	sprintf command, "set-exclusive-reader?controller_label=%s", ls_label
 	sprintf payload, "{\"channel_label\":\"%s\",\"interval_ms\":%d}", channel, interval
 
 	sendLS370(instrID,command,"post",payload=payload)
@@ -442,9 +439,9 @@ end
 function resetLS370exclusivereader(instrID)
 	string instrID
 	string command, payload
-	svar ls_token
+	svar ls_label
 
-	sprintf command, "reset-exclusive-reader?_at_=%s", ls_token
+	sprintf command, "reset-exclusive-reader?controller_label=%s", ls_label
 	payload = "{}"
 
 	
@@ -457,7 +454,7 @@ function setLS370PIDtemp(instrID,temp) // Units: mK
 	string instrID
 	variable temp
 	string command,payload
-	svar ls_token
+	svar ls_label
 	variable interval=10 //ms
 	nvar temp_set
 	svar bfchannellookup, ighchannellookup
@@ -468,7 +465,7 @@ function setLS370PIDtemp(instrID,temp) // Units: mK
 	endif
 	
 	sprintf payload, "{\"command\": \"SETP %g\"}", temp/1000
-	sprintf command, "command?_at_=%s", ls_token
+	sprintf command, "command?controller_label=%s", ls_label
 
 	sendLS370(instrID,command,"post",payload=payload)
 	temp_set = temp
@@ -478,10 +475,10 @@ function setLS370heaterrange(instrID,range) // Units: AU
 	// range must be a number between 0 and 8
 	string instrID,range
 	string command,payload
-	svar ls_token
+	svar ls_label
 
 	sprintf payload, "{\"command\": \"HTRRNG %d\"}", range
-	sprintf command, "command?_at_=%s", ls_token
+	sprintf command, "command?controller_label=%s", ls_label
 
 	sendLS370(instrID,command,"post", payload=payload)
 end
@@ -493,7 +490,7 @@ function setLS370PIDparameters(instrID,p,i,d) // Units: No units
 	variable p,i,d
 	nvar p_value,i_value,d_value
 	string command,payload,cmd
-	svar ls_token
+	svar ls_label
 	
 	// check for NAN and INF
 	if(sc_check_naninf(p) != 0 || sc_check_naninf(i) != 0 || sc_check_naninf(d) != 0)
@@ -503,7 +500,7 @@ function setLS370PIDparameters(instrID,p,i,d) // Units: No units
 	if(0.001 <= p && p <= 1000 && 0 <= i && i <= 10000 && 0 <= d && d <= 2500)
 		sprintf cmd,"PID %s,%s,%s", num2str(p), num2str(i), num2str(d)
 		sprintf payload, "{\"command\": \"%s\"}", cmd
-		sprintf command, "command?_at_=%s", ls_token
+		sprintf command, "command?controller_label=%s", ls_label
 		sendLS370(instrID,command,"post", payload=payload)
 
 		p_value = p
@@ -525,7 +522,7 @@ function setLS370heaterpower(instrID,heater,output) //Units: mW
 	nvar mcheater_set, stillheater_set, sorbheater_set, stillheater_led
 	variable channel, heater_idx
 	string command, payload
-	svar ls_token
+	svar ls_label
 	
 	// check for NAN and INF
 	if(sc_check_naninf(output) != 0)
@@ -557,7 +554,7 @@ function setLS370heaterpower(instrID,heater,output) //Units: mW
 
 	if(channel > 0)
 		sprintf payload, "{\"analog_channel\":%d, \"power_mw\":%d}", channel, output
-		sprintf command, "set-analog-output-power?_at_=%s", ls_token
+		sprintf command, "set-analog-output-power?controller_label=%s", ls_label
 		if(channel > 1)
 			stillheater_set = output
 			if(output>0)
@@ -570,7 +567,7 @@ function setLS370heaterpower(instrID,heater,output) //Units: mW
 		endif
 	else
 		sprintf payload, "{\"power_mw\":%d}", output
-		sprintf command, "set-heater-power?_at_=%s", ls_token
+		sprintf command, "set-heater-power?controller_label=%s", ls_label
 		mcheater_set = output
 	endif
 
@@ -583,10 +580,10 @@ function turnoffLS370MCheater(instrID)
 	// and therefore it is a good practise to always use it.
 	string instrID
 	string command, payload
-	svar ls_token
+	svar ls_label
 	nvar pid_led, mcheater_led, pid_mode
 
-	sprintf command, "turn-heater-off?_at_=%s", ls_token
+	sprintf command, "turn-heater-off?controller_label=%s", ls_label
 	payload = "{}"
 	sendLS370(instrID,command,"post", payload=payload)
 	pid_led = 0
@@ -608,7 +605,7 @@ function toggleLS370magnetheater(instrID,onoff)
 	nvar magnetheater_led
 	svar ls_system
 	string command,payload,cmd
-	svar ls_token
+	svar ls_label
 
 	if(cmpstr(ls_system,"bfsmall") != 0)
 		abort "No heater installed on this system!"
@@ -633,7 +630,7 @@ function toggleLS370magnetheater(instrID,onoff)
 
 	sprintf cmd, "ANALOG 1,1,2,1,1,100.0,0.0,%g", output
 	sprintf payload, "{\"command\":%s}", cmd
-	sprintf command, "command?_at_=%s", ls_token
+	sprintf command, "command?controller_label=%s", ls_label
 
 	sendLS370(instrID,command,"post", payload=payload)
 end
@@ -718,8 +715,8 @@ function/s sendLS370(instrID,cmd,method,[payload, keys])
 	//      if no keys are provided, an empty string is returned
 	string instrID, cmd, keys, method, payload
 	string response
-	
-	string headers = "accept: application/json"
+		
+	string headers = "accept: application/json\rlcmi-auth-token: igor"
 	if(cmpstr(method,"get")==0)
 		response = getHTTP(instrID,cmd,headers)
 	elseif(cmpstr(method,"post")==0 && !paramisdefault(payload))
@@ -1019,11 +1016,17 @@ function/s getLS370status(instrID, [max_age_s])
 	variable max_age_s
 	if(paramisdefault(max_age_s))
 		max_age_s=300
+	else
+		//TODO: Implement max_age_s from SQL query
+		print "max_age_s doesn't work and needs to be implemented differently (4th Feb 2020)"
 	endif
 
 	svar ls_system, ighgaugelookup
 	string  buffer="", gauge=""
 	variable i=0
+	
+	
+	
 
 	strswitch(ls_system)
 		case "bfsmall":
