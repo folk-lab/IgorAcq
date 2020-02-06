@@ -418,8 +418,8 @@ end
 function updatefdacWindow(fdacCh)
 	variable fdacCh
 	wave/t fdacvalstr, old_fdacvalstr
-	 
-	old_fdacvalstr[fdacCh] = fdacvalstr[fdacCh][1]
+	print "Not implemented" 
+	
 end
 
 function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
@@ -481,14 +481,18 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	// read current dac output and compare to window
 	string cmd = ""
 	response = ""
-	sprintf cmd, "GET_DAC,", channel, output, ramprate 
+	sprintf cmd, "GET_DAC,%d", channel
 	response = queryInstr(instrID, cmd+"\r\n", read_term="\r\n")
 	response = remove_rn(response)
 	variable initial = str2num(response)*1000  // Fastdac returns value in Volts not mV
 	if(numtype(initial) == 0)
 		// good response
-		
-		print "TODO:Compare to old_fdvalue string which currently doesn't exist"
+		if(abs(initial-str2num(old_fdacvalstr[channel]))<0.5)
+			// no discrepancy
+		else
+			sprintf warn, "[WARNING] \"rampOutputfdac\": Actual output of channel %d is different than expected", channel
+			print warn
+		endif
 	else
 		sprintf err, "[ERROR] \"rampOutputfdac\": Bad response in GET_DAC!"
 		print err
@@ -504,7 +508,9 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	response = queryInstr(instrID, cmd+"\r\n", read_term="\r\n", delay=abs(output-initial)/ramprate) //Delay the expected amount of time
 	response = remove_rn(response)
 	if(cmpstr(response, "RAMP_FINISHED") == 0)
-		// good response
+		// good response so update values in strings
+		fdacvalstr[channel][1] = num2str(output)
+		old_fdacvalstr[channel] = fdacvalstr[channel][1]
 	else
 		sprintf err, "[ERROR] \"rampOutputfdac\": Bad response! %s", response
 		print err
@@ -778,7 +784,7 @@ function update_fadcSpeed(s) : PopupMenuControl
 	endif
 end
 
-function update_fdac(action) : ButtonControl //FIX
+function update_fdac(action) : ButtonControl
 	string action
 	svar fdackeys
 	nvar fd_ramprate
@@ -801,12 +807,12 @@ function update_fdac(action) : ButtonControl //FIX
 					case "fdacramp":
 						for(j=0;j<numDACCh;j+=1)
 							output = str2num(fdacvalstr[startCh+j][1])
-							if(output != str2num(old_fdacvalstr[startCh+j][1]))
+							if(output != str2num(old_fdacvalstr[startCh+j]))
 								rampOutputfdac(tempname,j,output,ramprate=fd_ramprate)
 							endif
 						endfor
 						break
-					case "rampallzero":
+					case "fdacrampzero":
 						for(j=0;j<numDACCh;j+=1)
 							rampOutputfdac(tempname,j,0,ramprate=fd_ramprate)
 						endfor
