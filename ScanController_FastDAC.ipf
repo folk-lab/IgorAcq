@@ -90,7 +90,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	wave fadcattr
 	
 	if(paramisdefault(ramprate))
-		ramprate = 500
+		ramprate = 1000
 	endif
 	
 	// compare to earlier call of InitializeWaves
@@ -430,14 +430,15 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	variable instrID, channel, output, ramprate
 	wave/t fdacvalstr, old_fdacvalstr
 	svar fdackeys
+	nvar fd_ramprate
 	
 	if(paramIsDefault(ramprate))
-		ramprate = 500
+		ramprate = fd_ramprate
 	endif
 	
 	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
 	variable i=0, devchannel = 0, startCh = 0, numDACCh = 0
-	string deviceName = "", err = ""
+	string deviceName = "", err = "", response= ""
 	for(i=0;i<numDevices;i+=1)
 		numDACCh =  str2num(stringbykey("numADCCh"+num2istr(i+1),fdackeys,":",","))
 		if(startCh+numDACCh-1 >= channel)
@@ -446,6 +447,7 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 			nvar visa_handle = $deviceName
 			
 			response = queryInstr(visa_handle, "*RDY?\r\n", read_term="\r\n")  //Check the fastdac responds at visa_handle
+			response = remove_rn(response)
 			if(cmpstr(response, "READY") == 0)
 				devchannel = channel-startCh  //The actual channel number on the specific board
 				break
@@ -477,13 +479,29 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	endif
 	
 	// read current dac output and compare to window
-
-
 	string cmd = ""
-	string response
+	response = ""
+	sprintf cmd, "GET_DAC,", channel, output, ramprate 
+	response = queryInstr(instrID, cmd+"\r\n", read_term="\r\n")
+	response = remove_rn(response)
+	variable initial = str2num(response)*1000  // Fastdac returns value in Volts not mV
+	if(numtype(initial) == 0)
+		// good response
+		
+		print "TODO:Compare to old_fdvalue string which currently doesn't exist"
+	else
+		sprintf err, "[ERROR] \"rampOutputfdac\": Bad response in GET_DAC!"
+		print err
+		resetfdacwindow(channel)
+		abort
+	endif
+	
+	
+	// Ramp the fastdac
+	cmd = ""
+	response = ""
 	sprintf cmd, "RAMP_SMART,%d,%.4f,%.3f", channel, output, ramprate 
-	print cmd
-	response = queryInstr(instrID, cmd+"\r\n", read_term="\r\n", delay=)
+	response = queryInstr(instrID, cmd+"\r\n", read_term="\r\n", delay=abs(output-initial)/ramprate) //Delay the expected amount of time
 	response = remove_rn(response)
 	if(cmpstr(response, "RAMP_FINISHED") == 0)
 		// good response
@@ -504,7 +522,7 @@ function readfadcChannel(instrID,channel) // Units: mV
 	
 	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
 	variable i=0, devchannel = 0, startCh = 0, numADCCh = 0
-	string deviceName = "", err = ""
+	string deviceName = "", err = "", response = ""
 	for(i=0;i<numDevices;i+=1)
 		numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),fdackeys,":",","))
 		if(startCh+numADCCh-1 >= channel)
@@ -514,6 +532,7 @@ function readfadcChannel(instrID,channel) // Units: mV
 			nvar visa_handle = $deviceName
 			
 			response = queryInstr(visa_handle, "*RDY?\r\n", read_term="\r\n")  //Check the fastdac responds at visa_handle
+			response = remove_rn(response)
 			if(cmpstr(response, "READY") == 0)
 				devchannel = channel-startCh  //The actual channel number on the specific board
 				break
@@ -528,7 +547,7 @@ function readfadcChannel(instrID,channel) // Units: mV
 	
 	// query ADC
 	string cmd = "GET_ADC," + num2str(devchannel)
-	string response
+	response = ""
 	response = queryInstr(instrID, cmd+"\r\n", read_term="\r\n")
 	response = remove_rn(response)
 	if(	numtype(str2num(response)) == 0) 
@@ -552,7 +571,8 @@ function initFastDAC()
 	endif
 	
 	// hardware limit (mV)
-	variable/g fdac_limit = 5000
+	variable/g fdac_limit = 10000
+	variable/g fd_ramprate = 1000
 	
 	variable i=0, numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
 	variable numDACCh=0, numADCCh=0
@@ -761,6 +781,7 @@ end
 function update_fdac(action) : ButtonControl //FIX
 	string action
 	svar fdackeys
+	nvar fd_ramprate
 	wave/t fdacvalstr
 	wave/t old_fdacvalstr
 	
@@ -777,17 +798,17 @@ function update_fdac(action) : ButtonControl //FIX
 			nvar tempname = $tempnamestr
 			try
 				strswitch(action)
-					case "ramp":
+					case "fdacramp":
 						for(j=0;j<numDACCh;j+=1)
 							output = str2num(fdacvalstr[startCh+j][1])
 							if(output != str2num(old_fdacvalstr[startCh+j][1]))
-								rampOutputfdac(tempname,j,output,ramprate=500)
+								rampOutputfdac(tempname,j,output,ramprate=fd_ramprate)
 							endif
 						endfor
 						break
 					case "rampallzero":
 						for(j=0;j<numDACCh;j+=1)
-							rampOutputfdac(tempname,j,0,ramprate=500)
+							rampOutputfdac(tempname,j,0,ramprate=fd_ramprate)
 						endfor
 						break
 				endswitch
@@ -847,7 +868,7 @@ function fdacCreateControlWaves(numDACCh,numADCCh)
 	// create waves for DAC part
 	make/o/t/n=(numDACCh) fdacval0 = "0"
 	make/o/t/n=(numDACCh) fdacval1 = "0"
-	make/o/t/n=(numDACCh) fdacval2 = "5000"
+	make/o/t/n=(numDACCh) fdacval2 = "10000"
 	make/o/t/n=(numDACCh) fdacval3 = "Label"
 	variable i=0
 	for(i=0;i<numDACCh;i+=1)
@@ -857,6 +878,8 @@ function fdacCreateControlWaves(numDACCh,numADCCh)
 	make/o/n=(numDACCh) fdacattr0 = 0
 	make/o/n=(numDACCh) fdacattr1 = 2
 	concatenate/o {fdacattr0,fdacattr1,fdacattr1,fdacattr1}, fdacattr
+	
+	make/t/o/n=(numDACCh) old_fdacvalstr = "0"
 	
 	//create waves for ADC part
 	make/o/t/n=(numADCCh) fadcval0 = "0"
