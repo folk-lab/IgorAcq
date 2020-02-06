@@ -41,6 +41,8 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 	if(!paramisdefault(numDACCh) && !paramisdefault(numADCCh))
 		sc_fillfdacKeys(instrID,visa_address,numDACCh,numADCCh)
 	endif
+	
+	return localRM
 end
 
 function sc_fillfdacKeys(instrID,visa_address,numDACCh,numADCCh)
@@ -126,8 +128,9 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	
 	// read returned values
 	variable totalByteReturn = itemsinlist(scanList.adclist,",")*2*numpts,read_chunk=0
-	if(totalByteReturn > 500)
-		read_chunk = 500
+	variable chunksize = itemsinlist(scanList.adclist,",")*2*30
+	if(totalByteReturn > chunksize)
+		read_chunk = chunksize
 	else
 		read_chunk = totalByteReturn
 	endif
@@ -857,14 +860,14 @@ function update_fdac(action) : ButtonControl //FIX
 	
 	// open temporary connection to FastDACs
 	// and update values if needed
-	variable i=0,j=0,output = 0, numDACCh = 0, startCh = 0
+	variable i=0,j=0,output = 0, numDACCh = 0, startCh = 0, viRM = 0
 	string visa_address = "", tempnamestr = "fdac_window_resource"
 	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
 	for(i=0;i<numDevices;i+=1)
 		numDACCh = str2num(stringbykey("numDACCh"+num2istr(i+1),fdackeys,":",","))
 		if(numDACCh > 0)
 			visa_address = stringbykey("visa"+num2istr(i+1),fdackeys,":",",")
-			openFastDACconnection(tempnamestr, visa_address, verbose=0)
+			viRM = openFastDACconnection(tempnamestr, visa_address, verbose=0)
 			nvar tempname = $tempnamestr
 			try
 				strswitch(action)
@@ -887,12 +890,14 @@ function update_fdac(action) : ButtonControl //FIX
 				variable err = GetRTError(1)
 				
 				viClose(tempname)
+				viClose(viRM)
 				// silent abort
 				abortonvalue 1,10
 			endtry
 			
 			// close temp visa connection
 			viClose(tempname)
+			viClose(viRM)
 		endif
 		startCh =+ numDACCh
 	endfor
@@ -905,12 +910,12 @@ function update_fadc(action) : ButtonControl
 	
 	string visa_address = "", tempnamestr = "fdac_window_resource"
 	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
-	variable numADCCh = 0, startCh = 0
+	variable numADCCh = 0, startCh = 0, viRm = 0
 	for(i=0;i<numDevices;i+=1)
 		numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),fdackeys,":",","))
 		if(numADCCh > 0)
 			visa_address = stringbykey("visa"+num2istr(i+1),fdackeys,":",",")
-			openFastDACconnection(tempnamestr, visa_address, verbose=0)
+			viRm = openFastDACconnection(tempnamestr, visa_address, verbose=0)
 			nvar tempname = $tempnamestr
 			try
 				for(j=0;j<numADCCh;j+=1)
@@ -921,12 +926,14 @@ function update_fadc(action) : ButtonControl
 				variable err = GetRTError(1)
 				
 				viClose(tempname)
+				viClose(viRM)
 				// silent abort
 				abortonvalue 1,10
 			endtry
 			
 			// close temp visa connection
 			viClose(tempname)
+			viClose(viRM)
 		endif
 		startCh += numADCCh
 	endfor
