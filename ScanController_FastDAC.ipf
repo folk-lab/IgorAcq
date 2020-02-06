@@ -422,6 +422,20 @@ function updatefdacWindow(fdacCh)
 	
 end
 
+function check_fastdac_connected(instrID)
+/// Returns 1 if connected, 0 if not
+	variable instrID
+	
+	string response
+	response = queryInstr(instrID, "*RDY?\r\n", read_term="\r\n")  //Check the fastdac responds at visa_handle
+	response = remove_rn(response)
+	if(cmpstr(response, "READY") == 0)
+		return 1
+	else
+		return 0
+	endif
+end
+	
 function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	// ramps a channel to the voltage specified by "output".
 	// ramp is controlled locally on DAC controller.
@@ -445,14 +459,17 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 			// this is the device, now check that instrID is pointing at the same device
 			deviceName = stringbykey("name"+num2istr(i+1),fdackeys,":",",")
 			nvar visa_handle = $deviceName
-			
-			response = queryInstr(visa_handle, "*RDY?\r\n", read_term="\r\n")  //Check the fastdac responds at visa_handle
-			response = remove_rn(response)
-			if(cmpstr(response, "READY") == 0)
+			if (check_fastdac_connected(visa_handle) == 1)
 				devchannel = channel-startCh  //The actual channel number on the specific board
 				break
 			else
-				sprintf err, "[ERROR] \"readfdacChannel\": device %s is not connected (must be connected with its own name)", deviceName
+				sc_openInstrConnections(0)  // Try running Connect Instr
+			nvar visa_handle = $deviceName
+				if (check_fastdac_connected(visa_handle) == 1)  //Is it connected now?
+					devchannel = channel-startCh  //The actual channel number on the specific board
+					break
+				endif			
+				sprintf err, "[ERROR] \"rampOutputfdac\": device %s is not connected (must be connected with its own name)", deviceName
 				print(err)
 				abort
 			endif
@@ -536,13 +553,16 @@ function readfadcChannel(instrID,channel) // Units: mV
 			deviceName = stringbykey("name"+num2istr(i+1),fdackeys,":",",")
 
 			nvar visa_handle = $deviceName
-			
-			response = queryInstr(visa_handle, "*RDY?\r\n", read_term="\r\n")  //Check the fastdac responds at visa_handle
-			response = remove_rn(response)
-			if(cmpstr(response, "READY") == 0)
+			if (check_fastdac_connected(visa_handle) == 1)
 				devchannel = channel-startCh  //The actual channel number on the specific board
 				break
 			else
+				sc_openInstrConnections(0)  // Try running Connect Instr
+				nvar visa_handle = $deviceName
+				if (check_fastdac_connected(visa_handle) == 1)  //Is it connected now?
+					devchannel = channel-startCh  //The actual channel number on the specific board
+					break
+				endif			
 				sprintf err, "[ERROR] \"readfdacChannel\": device %s is not connected (must be connected with its own name)", deviceName
 				print(err)
 				abort
