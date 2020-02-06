@@ -444,7 +444,9 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 			// this is the device, now check that instrID is pointing at the same device
 			deviceName = stringbykey("name"+num2istr(i+1),fdackeys,":",",")
 			nvar visa_handle = $deviceName
-			if(numtype(visa_handle) == 0)
+			
+			response = queryInstr(visa_handle, "*RDY?\r\n", read_term="\r\n")  //Check the fastdac responds at visa_handle
+			if(cmpstr(response, "READY") == 0)
 				devchannel = channel-startCh  //The actual channel number on the specific board
 				break
 			else
@@ -475,51 +477,16 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	endif
 	
 	// read current dac output and compare to window
-	print "Ramp command not implemented yet"
-	string cmd = "ADD REAL COMMAND!"
+
+
+	string cmd = ""
 	string response
-	response = queryInstr(instrID, cmd+"\r\n", read_term="\r\n")
-	
-	// check response
-	// not sure what to expect!
-	if(1)
+	sprintf cmd, "RAMP_SMART,%d,%.4f,%.3f", channel, output, ramprate 
+	print cmd
+	response = queryInstr(instrID, cmd+"\r\n", read_term="\r\n", delay=)
+	response = remove_rn(response)
+	if(cmpstr(response, "RAMP_FINISHED") == 0)
 		// good response
-		if(abs(str2num(response)-str2num(old_fdacvalstr[channel][1]))<0.1)
-			// no discrepancy
-		else
-			sprintf warn, "[WARNING] \"rampOutputfdac\": Actual output of channel %d is different than expected", channel
-			print warn
-		endif
-	else
-		sprintf err, "[ERROR] \"rampOutputfdac\": Bad response! %s", response
-		print err
-		resetfdacwindow(channel)
-		abort
-	endif
-	
-	// set ramprate
-	cmd = "ADD REAL COMMAND!"
-	response = queryInstr(instrID, cmd+"\r\n", read_term="\r\n")
-	
-	// check respose
-	// not sure what to expect!
-	if(1) 
-		// not a good response
-		sprintf err, "[ERROR] \"rampOutputfdac\": Bad response! %s", response
-		print err
-		resetfdacwindow(channel)
-		abort
-	endif
-	
-	// ramp channel to output
-	cmd = "ADD REAL COMMAND!"
-	response = queryInstr(instrID, cmd+"\r\n", read_term="\r\n")
-	
-	// check respose
-	// not sure what to expect! if good update window
-	if(1)
-		fdacvalstr[channel][1] = num2str(output)
-		updatefdacWindow(channel)
 	else
 		sprintf err, "[ERROR] \"rampOutputfdac\": Bad response! %s", response
 		print err
@@ -545,7 +512,9 @@ function readfadcChannel(instrID,channel) // Units: mV
 			deviceName = stringbykey("name"+num2istr(i+1),fdackeys,":",",")
 
 			nvar visa_handle = $deviceName
-			if(numtype(visa_handle) == 0)
+			
+			response = queryInstr(visa_handle, "*RDY?\r\n", read_term="\r\n")  //Check the fastdac responds at visa_handle
+			if(cmpstr(response, "READY") == 0)
 				devchannel = channel-startCh  //The actual channel number on the specific board
 				break
 			else
