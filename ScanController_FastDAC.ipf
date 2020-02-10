@@ -116,12 +116,19 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	scanList.startVal = start
 	scanList.finVal = fin
 	
+	variable startlen = itemsinlist(scanList.startVal, ",")
+	variable finlen = itemsinlist(scanList.finVal, ",")
+	variable daclen = itemsinlist(scanlist.daclist, ",")
+	if ((startlen != finlen) || (startlen != daclen))
+		printf "Starvals has %d items, Finvals has %d items, Daclist has %d items", startlen, finlen, daclen
+		abort "[ERROR]\"fdacRecordValues\": Must have same number of DAC channels, Start values, and Fin values"
+	endif
+	
 	// move DAC channels to starting point
 	variable i=0
 	for(i=0;i<itemsinlist(scanList.daclist,",");i+=1)
 		rampOutputfdac(instrID,str2num(stringfromlist(i,scanList.daclist,",")),str2num(stringfromlist(i,scanList.startVal,",")),ramprate=ramprate)
 	endfor
-	print scanList.startVal
 	// build command and start ramp
 	// for now we only have to send one command to one device.
 	string cmd = "", dacs, adcs
@@ -129,7 +136,27 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	dacs = replacestring(" ", dacs, "")
 	adcs = replacestring(",", scanList.adclist, "") //INT_RAMP requires e.g. "023" for DACs 0,2,3
 	adcs = replacestring(" ", adcs, "")
-	sprintf cmd, "INT_RAMP,%s,%s,%s,%s\r", scanList.daclist, scanList.adclist, scanList.startVal, scanList.finVal
+	
+	if (rownum == 0)
+		variable r, highramprate = 0, ch
+		for (i=0;i<itemsinlist(scanList.startval,",");i++)
+			r = abs(str2num(stringfromlist(i, scanlist.finval, ","))-str2num(stringfromlist(i, scanlist.startval, ",")))*(getfadcspeed(instrID)/numpts) //abs(fin-start)*(freq/numpts)
+			if (r>highramprate)  //If fastest ramprate yet
+				highramprate = r
+				ch = str2num(stringfromlist(i, scanlist.daclist, ","))  //fastest channel
+			endif
+		endfor
+			
+		if (highramprate > 10000)
+			string question
+			sprintf question, "Do you really want to ramp FastDAC ch%d faster than 10000mV/s?", ch
+			if (ask_user(question) == 2)
+				abort "Phew, ramprate was going to be too high, but scan was aborted"
+			endif
+		endif
+	endif
+	
+	sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, scanList.startVal, scanList.finVal, numpts
 	writeInstr(instrID,cmd)
 	
 	// read returned values
@@ -252,6 +279,16 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	return sweeptime
 end
 
+function ask_user(question, [type])
+	//type = 0,1,2 for OK, Yes/No, Yes/No/Cancel returns are V_flag = 1: Yes, 2: No, 3: Cancel
+	string question
+	variable type
+	type = paramisdefault(type) ? 1 : type
+	doalert type, question
+	return V_flag
+end
+
+
 function sc_applyfilters(coefList,adcList,doLowpass,doNotch,cutoff_frac,samplingFreq,FIRcoefs,notch_fraclist)
 	string coefList, adcList
 	variable doLowpass, doNotch, cutoff_frac, samplingFreq, FIRcoefs
@@ -293,8 +330,13 @@ function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart)
 		adcIndex = str2num(stringfromlist(i,adcList,","))
 		wave datawave = $fadcvalstr[adcIndex][3]
 		script = trimstring(fadcvalstr[adcIndex][4])
-		sprintf cmd, "datawave = %s", script
-		execute/q/z cmd
+		if (strlen(script)>0)  
+			sprintf cmd, "datawave = %s", script
+			execute/q/z cmd
+		else
+			sprintf cmd, "datawave = ADC%d", adcIndex
+			execute/q/z cmd
+		endif
 		if(v_flag!=0)
 			print "[WARNING] \"sc_distribute_data\": Wave calculation falied! Error: "+GetErrMessage(V_Flag,2)
 		endif
@@ -933,10 +975,10 @@ function fdacCreateControlWaves(numDACCh,numADCCh)
 	variable numDACCh,numADCCh
 	
 	// create waves for DAC part
-	make/o/t/n=(numDACCh) fdacval0 = "0"
-	make/o/t/n=(numDACCh) fdacval1 = "0"
-	make/o/t/n=(numDACCh) fdacval2 = "10000"
-	make/o/t/n=(numDACCh) fdacval3 = "Label"
+	make/o/t/n=(numDACCh) fdacval0 = ""  		// Channel
+	make/o/t/n=(numDACCh) fdacval1 = "0"  		// Output/mV
+	make/o/t/n=(numDACCh) fdacval2 = "10000"  // Limit/mV
+	make/o/t/n=(numDACCh) fdacval3 = "Label"  // Label
 	variable i=0
 	for(i=0;i<numDACCh;i+=1)
 		fdacval0[i] = num2istr(i)
@@ -949,15 +991,14 @@ function fdacCreateControlWaves(numDACCh,numADCCh)
 	make/t/o/n=(numDACCh) old_fdacvalstr = "0"
 	
 	//create waves for ADC part
-	make/o/t/n=(numADCCh) fadcval0 = "0"
-	make/o/t/n=(numADCCh) fadcval1 = "0"
-	make/o/t/n=(numADCCh) fadcval2 = ""
-	make/o/t/n=(numADCCh) fadcval3 = ""
-	make/o/t/n=(numADCCh) fadcval4 = ""
+	make/o/t/n=(numADCCh) fadcval0 = ""		// Channel
+	make/o/t/n=(numADCCh) fadcval1 = ""		// Input
+	make/o/t/n=(numADCCh) fadcval2 = ""		// Record
+	make/o/t/n=(numADCCh) fadcval3 = ""		// Calc Wave Name
+	make/o/t/n=(numADCCh) fadcval4 = ""		// Calc Script (Raw wave is ADC#)
 	for(i=0;i<numADCCh;i+=1)
 		fadcval0[i] = num2istr(i)
 		fadcval3[i] = "wave"+num2istr(i)
-		fadcval4[i] = "ADC"+num2istr(i)
 	endfor
 	concatenate/o {fadcval0,fadcval1,fadcval2,fadcval3,fadcval4}, fadcvalstr
 	make/o/n=(numADCCh) fadcattr0 = 0

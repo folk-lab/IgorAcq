@@ -1124,7 +1124,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		i=0
 		do
 			if(fadcattr[i][2] == 48) // checkbox checked
-				sc_fastadc += fadcvalstr[i][0]+","  //Add adc_channel to list being recorded
+				sc_fastadc = addlistitem(fadcvalstr[i][0], sc_fastadc, ",", inf)  //Add adc_channel to list being recorded (inf to add at end)
 				wn = fadcvalstr[i][3]
 				cmd = "make/o/n=(" + num2istr(sc_numptsx) + ") " + wn + "=NaN"
 				execute(cmd)
@@ -1152,6 +1152,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 			endif
 			i++
 		while(i<dimsize(fadcvalstr,0))
+		sc_fastadc = sc_fastadc[0,strlen(sc_fastadc)-2]  // To chop off trailing comma
 	endif
 	
 	// Find all open plots
