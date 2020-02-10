@@ -76,6 +76,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	// RecordValues for FastDAC's. This function should replace RecordValues in scan functions.
 	// j is outer scan index, if it's a 1D scan just set j=0.
 	// rampCh is a comma seperated string containing the channels that should be ramped.
+	// start/fin are comma separated strings which should have same length as rampCh
 	// Data processing:
 	// 		- RCcutoff set the lowpass cutoff frequency
 	//		- average set the number of points to average
@@ -106,25 +107,33 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	// When (if) we get hardware triggers on the fastdacs, this function call should
 	// be replaced by a function that sorts DAC and ADC channels based on which device
 	// they belong to.
-	
+	svar sc_fastadc
 	variable dev_adc=0
 	dev_adc = sc_fdacSortChannels(rampCh,start,fin)
 	struct fdacChLists scanList
+	scanList.daclist = rampCh
+	scanList.adclist = sc_fastadc
+	scanList.startVal = start
+	scanList.finVal = fin
 	
 	// move DAC channels to starting point
 	variable i=0
 	for(i=0;i<itemsinlist(scanList.daclist,",");i+=1)
 		rampOutputfdac(instrID,str2num(stringfromlist(i,scanList.daclist,",")),str2num(stringfromlist(i,scanList.startVal,",")),ramprate=ramprate)
 	endfor
-	
+	print scanList.startVal
 	// build command and start ramp
 	// for now we only have to send one command to one device.
-	string cmd = ""
-	sprintf cmd, "BUFFERRAMP %s,%s,%s,%s ...\r", scanList.daclist, scanList.startVal, scanList.finVal, scanlist.adclist //FIX
+	string cmd = "", dacs, adcs
+	dacs = replacestring(",", scanList.daclist, "") //INT_RAMP requires e.g. "023" for DACs 0,2,3
+	dacs = replacestring(" ", dacs, "")
+	adcs = replacestring(",", scanList.adclist, "") //INT_RAMP requires e.g. "023" for DACs 0,2,3
+	adcs = replacestring(" ", adcs, "")
+	sprintf cmd, "INT_RAMP,%s,%s,%s,%s\r", scanList.daclist, scanList.adclist, scanList.startVal, scanList.finVal
 	writeInstr(instrID,cmd)
 	
 	// read returned values
-	variable totalByteReturn = itemsinlist(scanList.adclist,",")*numpts,read_chunk=0
+	variable totalByteReturn = itemsInList(scanList.adclist, ",")*numpts, read_chunk=0
 	if(totalByteReturn > 500)
 		read_chunk = 500
 	else
@@ -267,7 +276,6 @@ function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart)
 	string buffer, adcList
 	variable bytes, rowNum, colNumStart
 	wave/t fadcvalstr
-	
 	variable i=0, j=0, numADCCh = itemsinlist(adcList,","), adcIndex=0, dataPoint=0
 	// load data into raw wave
 	for(i=0;i<numADCCh;i+=1)
@@ -373,39 +381,51 @@ structure fdacChLists
 endstructure
 
 function getfadcSpeed(instrID)
+	// Returns speed in Hz (but arduino thinks in microseconds)
 	variable instrID
 	
-	string response="",cmd=""
+	string response="", compare="", cmd=""
 	
-	cmd = "ADD REAL COMMAND"
-	response = queryInstr(instrID,cmd,read_term="\r\n")
-	return str2num(response)
+	cmd = "READ_CONVERT_TIME"
+	response = remove_rn(queryInstr(instrID,cmd+",0\r",read_term="\r\n"))  // Get conversion time for channel 0 (should be same for all channels)
+	if (numtype(str2num(response)) != 0)
+		abort "[ERROR] \"getfadcSpeed\": device is not connected"
+	endif
+	variable i
+	for(i=1;i<4;i+=1)
+		compare = remove_rn(queryInstr(instrID,cmd+","+num2str(i)+"\r",read_term="\r\n"))
+		if (cmpstr(compare, response) != 0) // Ensure ADC channels all have same conversion time
+			print "WARNING: ADC channels have different conversion times!!!"
+		endif
+	endfor
+	variable speed = 1/(str2num(response)*1e-6)  // Convert to Hz
+	return speed
 end
 
-function setfadcSpeed(instrID,speed) //FIX
-	// speed should be a number between 1-3.
-	// slow=1, fast=2 and fastest=3
+function setfadcSpeed(instrID,speed)
+	// speed should be a number between 1-4.
+	// slowest=1, medium=2, fast=3 and fastest=4
 	variable instrID, speed
-	
+	make/n=3/o/free speeds = {372, 2008, 6060, 12195}  //These can be changed, but readfadcSpeed after to check exact frequency
 	// check formatting of speed
-	if(speed < 0 || speed > 3)
-		print "[ERROR] \"setfadcSpeeed\": Speed must be integer between 1-3"
+	if(speed < 0 || speed > 4)
+		print "[ERROR] \"setfadcSpeeed\": Speed must be integer between 1-4"
 		abort
 	endif
 	
-	string cmd = "ADD REAL COMMAND!"
-	string response = queryInstr(instrID, cmd+"\r\n", read_term="\r\n")
+	string cmd = ""
+	string response = ""
+	variable i
+	for (i=0;i<4;i++)
+		sprintf cmd, "CONVERT_TIME,%d,%d\r", i, 1/(speeds[speed-1]*1e-6)  // Convert from Hz to microseconds
+		response = queryInstr(instrID, cmd, read_term="\r\n")  //Set all channels at same time (generally good practise otherwise can't read from them at the same time)
+		if (numtype(str2num(response) != 0))
+			abort "[ERROR] \"setfadcSpeeed\": Bad response = " + response
+		endif
+	endfor
+	//TODO:
+	//updatewindow
 	
-	// check respose
-	// not sure what to expect!
-	if(1)
-		// update window
-	else
-		string err
-		sprintf err, "[ERROR] \"setfadcSpeed\": Bad response! %s", response
-		print err
-		abort
-	endif
 end
 
 function resetfdacwindow(fdacCh)
@@ -420,6 +440,23 @@ function updatefdacWindow(fdacCh)
 	wave/t fdacvalstr, old_fdacvalstr
 	print "Not implemented" 
 	
+end
+
+
+function fastdac_connected(deviceName)
+	string deviceName
+	nvar instrID = $deviceName
+	if (check_fastdac_connected(instrID))
+		return 1
+	else
+		sc_openinstrconnections(0)
+		nvar instrID = $deviceName
+		if (check_fastdac_connected(instrID))
+			return 1
+		else
+			return 0
+		endif
+	endif
 end
 
 function check_fastdac_connected(instrID)
@@ -454,21 +491,14 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	variable i=0, devchannel = 0, startCh = 0, numDACCh = 0
 	string deviceName = "", err = "", response= ""
 	for(i=0;i<numDevices;i+=1)
-		numDACCh =  str2num(stringbykey("numADCCh"+num2istr(i+1),fdackeys,":",","))
+		numDACCh =  str2num(stringbykey("numDACCh"+num2istr(i+1),fdackeys,":",","))
 		if(startCh+numDACCh-1 >= channel)
 			// this is the device, now check that instrID is pointing at the same device
 			deviceName = stringbykey("name"+num2istr(i+1),fdackeys,":",",")
-			nvar visa_handle = $deviceName
-			if (check_fastdac_connected(visa_handle) == 1)
+			if(fastdac_connected(deviceName))
+				nvar visa_handle = $deviceName
 				devchannel = channel-startCh  //The actual channel number on the specific board
-				break
-			else
-				sc_openInstrConnections(0)  // Try running Connect Instr
-			nvar visa_handle = $deviceName
-				if (check_fastdac_connected(visa_handle) == 1)  //Is it connected now?
-					devchannel = channel-startCh  //The actual channel number on the specific board
-					break
-				endif			
+			else		
 				sprintf err, "[ERROR] \"rampOutputfdac\": device %s is not connected (must be connected with its own name)", deviceName
 				print(err)
 				abort
@@ -499,7 +529,7 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	string cmd = ""
 	response = ""
 	sprintf cmd, "GET_DAC,%d", channel
-	response = queryInstr(instrID, cmd+"\r\n", read_term="\r\n")
+	response = queryInstr(visa_handle, cmd+"\r\n", read_term="\r\n")
 	response = remove_rn(response)
 	variable initial = str2num(response)*1000  // Fastdac returns value in Volts not mV
 	if(numtype(initial) == 0)
@@ -522,7 +552,17 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	cmd = ""
 	response = ""
 	sprintf cmd, "RAMP_SMART,%d,%.4f,%.3f", channel, output, ramprate 
-	response = queryInstr(instrID, cmd+"\r\n", read_term="\r\n", delay=abs(output-initial)/ramprate) //Delay the expected amount of time
+	variable delay = abs(output-initial)/ramprate
+	writeinstr(visa_handle, cmd+"\r\n")//Delay the expected amount of time
+	if (delay > 2)
+		string msg
+		sprintf msg, "Waiting for fastdac Ch%d to ramp to %dmV", channel, output
+		sleep/S/C=6/Q/M=msg delay
+	else
+		sleep/s delay
+	endif
+	response = readInstr(visa_handle, read_term = "\r\n")
+//	response = queryInstr(visa_handle, cmd+"\r\n", read_term="\r\n", delay=abs(output-initial)/ramprate) //Delay the expected amount of time
 	response = remove_rn(response)
 	if(cmpstr(response, "RAMP_FINISHED") == 0)
 		// good response so update values in strings
@@ -551,18 +591,10 @@ function readfadcChannel(instrID,channel) // Units: mV
 		if(startCh+numADCCh-1 >= channel)
 			// this is the device, now check that instrID is pointing at the same device
 			deviceName = stringbykey("name"+num2istr(i+1),fdackeys,":",",")
-
-			nvar visa_handle = $deviceName
-			if (check_fastdac_connected(visa_handle) == 1)
-				devchannel = channel-startCh  //The actual channel number on the specific board
-				break
-			else
-				sc_openInstrConnections(0)  // Try running Connect Instr
+			if(fastdac_connected(deviceName))
 				nvar visa_handle = $deviceName
-				if (check_fastdac_connected(visa_handle) == 1)  //Is it connected now?
-					devchannel = channel-startCh  //The actual channel number on the specific board
-					break
-				endif			
+				devchannel = channel-startCh  //The actual channel number on the specific board
+			else				
 				sprintf err, "[ERROR] \"readfdacChannel\": device %s is not connected (must be connected with its own name)", deviceName
 				print(err)
 				abort
@@ -574,7 +606,7 @@ function readfadcChannel(instrID,channel) // Units: mV
 	// query ADC
 	string cmd = "GET_ADC," + num2str(devchannel)
 	response = ""
-	response = queryInstr(instrID, cmd+"\r\n", read_term="\r\n")
+	response = queryInstr(visa_handle, cmd+"\r\n", read_term="\r\n")
 	response = remove_rn(response)
 	if(	numtype(str2num(response)) == 0) 
 		// good response, update window
@@ -729,7 +761,7 @@ window FastDACWindow() : Panel
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 330, 70, "Ch"
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 370, 70, "Input (mV)"
+	DrawText 390, 70, "Input (mV)"
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 480, 70, "Record"
 	SetDrawEnv fsize=14, fstyle=1
@@ -741,12 +773,12 @@ window FastDACWindow() : Panel
 	button updatefadc,pos={325,265},size={90,20},proc=update_fadc,title="Update ADC"
 	checkbox sc_PrintfadcBox,pos={425,265},proc=sc_CheckBoxClicked,value=sc_Printfadc,side=1,title="\Z14Print filenames "
 	checkbox sc_SavefadcBox,pos={545,265},proc=sc_CheckBoxClicked,value=sc_Saverawfadc,side=1,title="\Z14Save raw data "
-	popupMenu fadcSetting1,pos={380,300},proc=update_fadcSpeed,mode=1,title="\Z14ADC1 speed",size={100,20},value="Slow;Fast;Fastest"
-	popupMenu fadcSetting2,pos={580,300},proc=update_fadcSpeed,mode=1,title="\Z14ADC2 speed",size={100,20},value="Slow;Fast;Fastest"
-	popupMenu fadcSetting3,pos={380,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC3 speed",size={100,20},value="Slow;Fast;Fastest"
-	popupMenu fadcSetting4,pos={580,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC4 speed",size={100,20},value="Slow;Fast;Fastest"
-	popupMenu fadcSetting5,pos={380,360},proc=update_fadcSpeed,mode=1,title="\Z14ADC5 speed",size={100,20},value="Slow;Fast;Fastest"
-	popupMenu fadcSetting6,pos={580,360},proc=update_fadcSpeed,mode=1,title="\Z14ADC6 speed",size={100,20},value="Slow;Fast;Fastest"
+	popupMenu fadcSetting1,pos={380,300},proc=update_fadcSpeed,mode=1,title="\Z14ADC1 speed",size={100,20},value="Slow;Medium;Fast;Fastest"
+	popupMenu fadcSetting2,pos={580,300},proc=update_fadcSpeed,mode=1,title="\Z14ADC2 speed",size={100,20},value="Slow;Medium;Fast;Fastest"
+	popupMenu fadcSetting3,pos={380,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC3 speed",size={100,20},value="Slow;Medium;Fast;Fastest"
+	popupMenu fadcSetting4,pos={580,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC4 speed",size={100,20},value="Slow;Medium;Fast;Fastest"
+	popupMenu fadcSetting5,pos={380,360},proc=update_fadcSpeed,mode=1,title="\Z14ADC5 speed",size={100,20},value="Slow;Medium;Fast;Fastest"
+	popupMenu fadcSetting6,pos={580,360},proc=update_fadcSpeed,mode=1,title="\Z14ADC6 speed",size={100,20},value="Slow;Medium;Fast;Fastest"
 	
 	// identical to ScanController window
 	// all function calls are to ScanController functions
@@ -773,29 +805,38 @@ endmacro
 	// set update speed for ADCs
 function update_fadcSpeed(s) : PopupMenuControl
 	struct wmpopupaction &s
-	
-	variable instrID
+	variable num
 	if(s.eventcode == 2)
 		// a menu item has been selected
 		strswitch(s.ctrlname)
 			case "fadcSetting1":
-				nvar fdac1_addr
-				instrID = fdac1_addr
+				num = 1
 				break
 			case "fadcSetting2":
-				nvar fdac2_addr
-				instrID = fdac2_addr
+				num = 2
 				break
 			case "fadcSetting3":
-				nvar fdac3_addr
-				instrID = fdac3_addr
+				num = 3
 				break
 			case "fadcSetting4":
-				nvar fdac4_addr
-				instrID = fdac4_addr
+				num = 4
+				break
+			case "fadcSetting5":
+				num = 5
+				break
+			case "fadcSetting6":
+				num = 6
 				break
 		endswitch
 		
+		svar fdackeys
+		string deviceName
+		deviceName = stringbykey("name"+num2istr(num),fdackeys,":",",")
+		if(fastdac_connected(deviceName))
+			nvar instrID = $deviceName
+		else
+			abort "[ERROR]\"update_fadcSpeed\": Device not connected"
+		endif
 		setfadcSpeed(instrID,s.popnum)
 		return 0
 	else
@@ -915,10 +956,10 @@ function fdacCreateControlWaves(numDACCh,numADCCh)
 	make/o/t/n=(numADCCh) fadcval4 = ""
 	for(i=0;i<numADCCh;i+=1)
 		fadcval0[i] = num2istr(i)
-		fadcval2[i] = "wave"+num2istr(i)
+		fadcval3[i] = "wave"+num2istr(i)
 		fadcval4[i] = "ADC"+num2istr(i)
 	endfor
-	concatenate/o {fadcval0,fadcval1,fadcval2,fadcval3}, fadcvalstr
+	concatenate/o {fadcval0,fadcval1,fadcval2,fadcval3,fadcval4}, fadcvalstr
 	make/o/n=(numADCCh) fadcattr0 = 0
 	make/o/n=(numADCCh) fadcattr1 = 2
 	make/o/n=(numADCCh) fadcattr2 = 32
