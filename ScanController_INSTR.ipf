@@ -235,9 +235,10 @@ threadsafe function writeInstr(instrID, cmd)
 
 end
 
-threadsafe function/s readInstr(instrID, [read_term, read_bytes])
+threadsafe function/s readInstr(instrID, [read_term, read_bytes, fdac_flag])
 	// generic error checking read function
-	variable instrID, read_bytes
+	// fdac_flag only ticked when reading long binary data from fdac
+	variable instrID, read_bytes, fdac_flag
 	string read_term
 
     if(!paramisdefault(read_term))
@@ -251,20 +252,35 @@ threadsafe function/s readInstr(instrID, [read_term, read_bytes])
         // specified by the interface being used
         visaSetReadTermEnable(instrID, 0)
     endif
+    
+    if(!paramIsDefault(fdac_flag))
+    	 visaSetSerialEndIn(instrID, 0)
+   	 else
+   	    fdac_flag = 0
+   	 	 visaSetSerialEndIn(instrID, 2)
+    endif
 
     if(paramisdefault(read_bytes))
         read_bytes = 1024
     endif
 
-    string buffer
+    string buffer, err
     variable return_count
     variable status = viRead(instrID, buffer, read_bytes, return_count)
     if (status)
         VISAerrormsg("readInstr() -- viRead", instrID, status)
     	return "NaN" // abort not supported in threads (v7)
-	endif
+	 endif
+	 if(fdac_flag)
+	 	if(read_bytes != return_count)
+	 		sprintf err, "[ERROR] Returned bytes: %d. Expeted bytes: %d", return_count, read_bytes
+	 		print err
+	 		return "Nan"
+	 	endif
+	 endif
+	 
 
-	return buffer
+	 return buffer
 end
 
 threadsafe function/s queryInstr(instrID, cmd, [read_term, delay])
@@ -577,6 +593,12 @@ function visaSetSerialEndOut(instrID, out)
 	variable instrID, out
 
 	variable status = viSetAttribute(instrID, VI_ATTR_ASRL_END_OUT, out)
+	return status
+end
+
+threadsafe function visaSetSerialEndIn(instrID, in)
+	variable instrID, in
+	variable status = viSetAttribute(instrID, VI_ATTR_ASRL_END_IN, in)
 	return status
 end
 
