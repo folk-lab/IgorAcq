@@ -160,6 +160,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	endif
 
 	sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, scanList.startVal, scanList.finVal, numpts
+	print cmd
 	writeInstr(instrID,cmd)
 
 	// read returned values
@@ -178,8 +179,9 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	variable bytes_read = 0
 	do
 		buffer = readInstr(instrID,read_bytes=read_chunk, fdac_flag=1)
-		// If failed, abort
-		if (cmpstr(buffer, "NaN") == 0)
+//		buffer = remove_rn(buffer)
+		if (cmpstr(buffer, "NaN") == 0) // If failed, abort
+      		clear_buffer(instrID) // Try empty out whatever crap is left in buffer
 			abort
 		endif
 		// add data to rawwaves and datawaves
@@ -496,13 +498,13 @@ function getfadcSpeed(instrID)
 	string response="", compare="", cmd=""
 
 	cmd = "READ_CONVERT_TIME"
-	response = remove_rn(queryInstr(instrID,cmd+",0\r",read_term="\r\n"))  // Get conversion time for channel 0 (should be same for all channels)
+	response = remove_rn(queryInstr(instrID,cmd+",0\r",read_term="\n"))  // Get conversion time for channel 0 (should be same for all channels)
 	if (numtype(str2num(response)) != 0)
 		abort "[ERROR] \"getfadcSpeed\": device is not connected"
 	endif
 	variable i
 	for(i=1;i<4;i+=1)
-		compare = remove_rn(queryInstr(instrID,cmd+","+num2str(i)+"\r",read_term="\r\n"))
+		compare = remove_rn(queryInstr(instrID,cmd+","+num2str(i)+"\r",read_term="\n"))
 		if (cmpstr(compare, response) != 0) // Ensure ADC channels all have same conversion time
 			print "WARNING: ADC channels have different conversion times!!!"
 		endif
@@ -527,7 +529,7 @@ function setfadcSpeed(instrID,speed)
 	variable i
 	for (i=0;i<4;i++)
 		sprintf cmd, "CONVERT_TIME,%d,%d\r", i, 1/(speeds[speed-1]*1e-6)  // Convert from Hz to microseconds
-		response = queryInstr(instrID, cmd, read_term="\r\n")  //Set all channels at same time (generally good practise otherwise can't read from them at the same time)
+		response = queryInstr(instrID, cmd, read_term="\n")  //Set all channels at same time (generally good practise otherwise can't read from them at the same time)
 		if (numtype(str2num(response) != 0))
 			abort "[ERROR] \"setfadcSpeeed\": Bad response = " + response
 		endif
@@ -573,7 +575,7 @@ function check_fastdac_connected(instrID)
 	variable instrID
 
 	string response
-	response = queryInstr(instrID, "*RDY?\r\n", read_term="\r\n")  //Check the fastdac responds at visa_handle
+	response = queryInstr(instrID, "*RDY?\r\n", read_term="\n")  //Check the fastdac responds at visa_handle
 	response = remove_rn(response)
 	if(cmpstr(response, "READY") == 0)
 		return 1
@@ -638,7 +640,7 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	string cmd = ""
 	response = ""
 	sprintf cmd, "GET_DAC,%d", channel
-	response = queryInstr(visa_handle, cmd+"\r\n", read_term="\r\n")
+	response = queryInstr(visa_handle, cmd+"\r", read_term="\n")
 	response = remove_rn(response)
 	variable initial = str2num(response)*1000  // Fastdac returns value in Volts not mV
 	if(numtype(initial) == 0)
@@ -662,7 +664,7 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	response = ""
 	sprintf cmd, "RAMP_SMART,%d,%.4f,%.3f", channel, output, ramprate
 	variable delay = abs(output-initial)/ramprate
-	writeinstr(visa_handle, cmd+"\r\n")//Delay the expected amount of time
+	writeinstr(visa_handle, cmd+"\r")//Delay the expected amount of time
 	if (delay > 2)
 		string msg
 		sprintf msg, "Waiting for fastdac Ch%d to ramp to %dmV", channel, output
@@ -670,8 +672,8 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	else
 		sleep/s delay
 	endif
-	response = readInstr(visa_handle, read_term = "\r\n")
-//	response = queryInstr(visa_handle, cmd+"\r\n", read_term="\r\n", delay=abs(output-initial)/ramprate) //Delay the expected amount of time
+	response = readInstr(visa_handle, read_term = "\n")
+//	response = queryInstr(visa_handle, cmd+"\r", read_term="\n", delay=abs(output-initial)/ramprate) //Delay the expected amount of time
 	response = remove_rn(response)
 	if(cmpstr(response, "RAMP_FINISHED") == 0)
 		// good response so update values in strings
@@ -715,7 +717,7 @@ function readfadcChannel(instrID,channel) // Units: mV
 	// query ADC
 	string cmd = "GET_ADC," + num2str(devchannel)
 	response = ""
-	response = queryInstr(visa_handle, cmd+"\r\n", read_term="\r\n")
+	response = queryInstr(visa_handle, cmd+"\r", read_term="\n")
 	response = remove_rn(response)
 	if(	numtype(str2num(response)) == 0)
 		// good response, update window
@@ -1129,8 +1131,9 @@ end
 
 function/t remove_rn(str)
 	string str
-	str = removeleadingwhitespace(str)
-	str = removetrailingwhitespace(str)
+//	str = removeleadingwhitespace(str)
+//	str = removetrailingwhitespace(str)
+	str = str[0,strlen(str)-3]  // To chop off last two characters (\r\n)
 	return str
 end
 
@@ -1170,4 +1173,16 @@ function fdacChar2Num(c1, c2, [minVal, maxVal])
 	// Return calculated FastDac value
 	return ((b1*2^8 + b2)*(maxVal-minVal)/(2^16 - 1))-minVal
 
+end
+
+
+function clear_buffer(instrID)
+	variable instrID
+	variable count = 1
+	string buffer
+	do 
+		viRead(instrID, buffer, 20000, count)
+	while (count != 0)
+//	readinstr(instrID, read_bytes=20000)
+	return count
 end
