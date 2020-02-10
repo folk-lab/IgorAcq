@@ -1182,6 +1182,8 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		j=index+1
 	endfor
 
+	nvar filenum
+
 	if(fastdac == 0)
 		//Initialize plots for raw data waves
 		i=0
@@ -1240,13 +1242,13 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 						colorscale /c/n=$sc_ColorMap /e/a=rc
 						Label left, sc_y_label
 						Label bottom, sc_x_label
+						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 						activegraphs+= winname(0,1)+";"
 					endif
 				endif
 			endif
-		endif
 		i+= 1
-	while(i<numpnts(sc_RawWaveNames))
+		while(i<numpnts(sc_RawWaveNames))
 
 	//Initialize plots for calculated data waves
 	i=0
@@ -1287,20 +1289,30 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 					Label bottom, sc_x_label
 					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 					activegraphs+= winname(0,1)+";"
-					if(sc_is2d)
-						display
-						setwindow kwTopWin, enablehiresdraw=3
-						appendimage $wn2d
-						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
-						colorscale /c/n=$sc_ColorMap /e/a=rc
-						Label left, sc_y_label
-						Label bottom, sc_x_label
-						activegraphs+= winname(0,1)+";"
-					endif
+				endif
+			else
+				wn2d = wn + "2d"
+				display $wn
+				setwindow kwTopWin, enablehiresdraw=3
+				Label bottom, sc_x_label
+				TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
+				activegraphs+= winname(0,1)+";"
+				if(sc_is2d)
+					display
+					setwindow kwTopWin, enablehiresdraw=3
+					appendimage $wn2d
+					modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
+					colorscale /c/n=$sc_ColorMap /e/a=rc
+					Label left, sc_y_label
+					Label bottom, sc_x_label
+					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
+					activegraphs+= winname(0,1)+";"
 				endif
 			endif
-			i+= 1
-		while(i<numpnts(sc_CalcWaveNames))
+		endif
+		i+= 1
+	while(i<numpnts(sc_CalcWaveNames))
+	
 	elseif(fastdac == 1)
 		// open plots for fastdac
 		i=0
