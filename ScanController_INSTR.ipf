@@ -267,8 +267,9 @@ threadsafe function/s readInstr(instrID, [read_term, read_bytes, fdac_flag])
     string buffer, err
     variable return_count
     variable status = viRead(instrID, buffer, read_bytes, return_count)
-    if (status)
-        VISAerrormsg("readInstr() -- viRead", instrID, status)
+    if (status != 0 && status != 0x3fff0006) // num returned == num expected status
+    	print status
+    	VISAerrormsg("readInstr() -- viRead", instrID, status)
     	return "NaN" // abort not supported in threads (v7)
 	 endif
 	 if(fdac_flag)
