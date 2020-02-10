@@ -35,7 +35,7 @@ function openBabyDACconnection(instrID, visa_address, [verbose])
 	string options = "baudrate=57600,databits=8,stopbits=1,parity=0"
 	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
 	
-	return status
+	return localRM
 end
 
 /////////////////////////////////

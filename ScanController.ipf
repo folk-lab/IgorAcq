@@ -1119,10 +1119,12 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		// create waves for fastdac
 		wave/t fadcvalstr
 		wave fadcattr
+		string/g sc_fastadc = ""
 		string wn_raw = "", wn_raw2d = ""
 		i=0
 		do
 			if(fadcattr[i][2] == 48) // checkbox checked
+				sc_fastadc = addlistitem(fadcvalstr[i][0], sc_fastadc, ",", inf)  //Add adc_channel to list being recorded (inf to add at end)
 				wn = fadcvalstr[i][3]
 				cmd = "make/o/n=(" + num2istr(sc_numptsx) + ") " + wn + "=NaN"
 				execute(cmd)
@@ -1148,7 +1150,9 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn_raw2d; execute(cmd)
 				endif
 			endif
+			i++
 		while(i<dimsize(fadcvalstr,0))
+		sc_fastadc = sc_fastadc[0,strlen(sc_fastadc)-2]  // To chop off trailing comma
 	endif
 	
 	// Find all open plots
