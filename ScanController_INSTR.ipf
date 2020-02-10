@@ -56,17 +56,17 @@ function openVISAinstr(mandatory, [options, localRM, verbose])
 	string options   //  options: "test_query= ,baudrate= ,stopbits= ,databits= ,parity= ,timeout= "
 
 	variable localRM, verbose
-	
+
 	if(paramisdefault(options))
 		options=""
 	endif
-	
+
 	if(paramisdefault(verbose))
 		verbose=1
 	elseif(verbose!=1)
 		verbose=0
 	endif
-	
+
 	if(paramisdefault(localRM))
 		nvar globalRM
 		localRM = globalRM
@@ -76,7 +76,7 @@ function openVISAinstr(mandatory, [options, localRM, verbose])
 	string name = StringByKey("name", mandatory, "=", ",")
 	string var_name = StringByKey("instrID", mandatory, "=", ",")
 	string instrDesc = StringByKey("visa_address", mandatory, "=", ",")
-	
+
 	// check if a global variable with var_name exists
 	// if it does, close that VISA connection
 	// this will prevent the experiment from hitting the 500 instrument limit
@@ -85,14 +85,14 @@ function openVISAinstr(mandatory, [options, localRM, verbose])
 		closeVISAInstr(existingID, verbose=verbose)
 		killvariables $var_name
 	endif
-	
+
 	variable instrID, status
 	string error
 	status = viOpen(localRM,instrDesc,0,0,instrID)
 	if (status < 0)
 		VISAerrormsg("openInstr() -- viOpen", localRM, status)
 		abort
-	else 
+	else
 		variable /g $var_name = instrID
 		if(verbose)
 			printf "%s (%s) connected as %s\r", name, instrDesc, var_name
@@ -101,16 +101,16 @@ function openVISAinstr(mandatory, [options, localRM, verbose])
 
 	// look for optional parameters and set them
 	if(strlen(options)!=0)
-	
+
 		setVISAoptions(instrID,options)
-	
+
 		// run test query
 		string cmd
 		cmd = StringByKey("test_query",options,"=", ",")
 		if(strlen(cmd)>0)
-		
+
 			string response = queryInstr(instrID, cmd+"\r\n") // throw a bunch of write term characters at it
-			
+
 			if(cmpstr(TrimString(response), "NaN")==0)
 				abort
 			endif
@@ -122,14 +122,14 @@ function openVISAinstr(mandatory, [options, localRM, verbose])
 				printf "\t-- No test\r"
 			endif
 		endif
-		
+
 	endif
-	
+
 end
 
 function closeVISAInstr(instrID, [verbose])
 	variable instrID, verbose
-	
+
 	if(paramisdefault(verbose))
 		verbose=1
 	elseif(verbose!=1)
@@ -173,13 +173,13 @@ function openHTTPinstr(mandatory, [options, verbose])
 	if(paramisdefault(options))
 		options=""
 	endif
-	
+
 	if(paramisdefault(verbose))
 		verbose=1
 	elseif(verbose!=1)
 		verbose=0
 	endif
-	
+
 	// create global variable
 	string name = StringByKey("name", mandatory, "=", ",")
 	string url = StringByKey("url", mandatory, "=", ",")
@@ -191,15 +191,15 @@ function openHTTPinstr(mandatory, [options, verbose])
 	endif
 
 	if(strlen(options)>0)
-	
+
 		// run test query
 		string cmd
 		cmd = StringByKey("test_ping",options,"=", ",")
 		if(strlen(cmd)>0)
-			
+
 			// do something here with that command
 			string response = "Not Implemented"
-			
+
 			if(verbose)
 				printf "\t-- %s responded with: %s\r", name, response
 			endif
@@ -252,7 +252,7 @@ threadsafe function/s readInstr(instrID, [read_term, read_bytes, fdac_flag])
         // specified by the interface being used
         visaSetReadTermEnable(instrID, 0)
     endif
-    
+
     if(!paramIsDefault(fdac_flag))
     	 visaSetSerialEndIn(instrID, 0)
    	 else
@@ -279,7 +279,7 @@ threadsafe function/s readInstr(instrID, [read_term, read_bytes, fdac_flag])
 	 		return "Nan"
 	 	endif
 	 endif
-	 
+
 
 	 return buffer
 end
@@ -331,8 +331,10 @@ function/s getHTTP(instrID,cmd,headers)
 	string response, error
 
 //	print instrID+cmd
-	URLRequest /TIME=20.0 url=instrID+cmd, method=get, headers=headers
 
+	URLRequest/z /TIME=25.0 url=instrID+cmd, method=get, headers=headers
+
+	
 	if (V_flag == 0)    // No error
 		response = S_serverResponse // response is a JSON string
 		if (V_responseCode != 200)  // 200 is the HTTP OK code
@@ -484,16 +486,16 @@ function setVISAoptions(instrID,options)
 	variable i=0
 	string keyval="", reg="(.*)=(.*)", key="", value=""
 	for(i=0;i<ItemsInList(options, ",");i+=1)
-		
+
 		// get key/value from list
 		keyval = StringFromList(i, options, ",")
 		splitstring/E=reg keyval, key, value
 		value = TrimString(value)
-		
+
 		if(strlen(value)==0)
 			continue // if there is no value, move on
 		endif
-		
+
 		strswitch(key)
 			case "baudrate":
 			    status = visaSetBaudRate(instrID, str2num(value))
@@ -511,11 +513,11 @@ function setVISAoptions(instrID,options)
 			    status = visaSetTimeout(instrID, str2num(value))
 			    continue
 		endswitch
-		
+
 		if(status<0)
 			VISAerrormsg("viSetAttribute", instrID, status)
 		endif
-		
+
 	endfor
 end
 
@@ -580,9 +582,9 @@ function visaSetStopBits(instrID, bits)
 	elseif(bits == 	2)
 		stopbits = 20
 	endif
-	
+
 	variable status = viSetAttribute(instrID, VI_ATTR_ASRL_STOP_BITS, bits)
-	
+
 	return status
 end
 

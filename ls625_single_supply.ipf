@@ -134,9 +134,9 @@ function getLS625rampStatus(instrID)
 
 	response = queryInstr(instrID,"OPST?\r\n",read_term = "\r\n")
 	if(str2num(response) == 6)
-		ramping = 0
+		ramping = 0  //Ramping
 	else
-		ramping = 1
+		ramping = 1  //Not Ramping
 	endif
 
 	return ramping

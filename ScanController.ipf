@@ -93,9 +93,22 @@ function/S executeMacCmd(command)
 
 	string cmd
 	sprintf cmd, "do shell script \"%s\"", command
-	ExecuteScriptText /UNQ /Z /W=5.0 cmd
+	ExecuteScriptText /UNQ /Z cmd
 
 	return S_value
+end
+
+function/S WinRsyncCopy(source, dest, [options])
+//This function does work, but it's not actually very useful as it the big pxp file can't be incrementally saved. May be useful at a later date?
+	string options, source, dest		//source and dest require "/" between folders and files
+	if (paramisdefault(options))
+		options = "-a" //archive mode
+	endif
+	string command = "", cmd = ""
+	sprintf command, "%s \"/cygdrive/%s\" \"/cygdrive/%s\"", options, source, dest //Need to add this to beginning of filepath for rsync on windows
+	sprintf cmd, "\"\Program Files (x86)\\DeltaCopy\\rsync.exe\" %s", command // Need to tell it where rsync is installed
+	ExecuteScriptText/B/Z cmd
+	return S_value //Returns result from command line
 end
 
 function /S getHostName()
@@ -191,12 +204,12 @@ function /S getExpPath(whichpath, [full])
 		case "backup_data":
 			// returns full path to the backup-data directory
 			// always assumes you want the full path
-			
+
 			pathinfo backup_data // get path info
 			if(V_flag == 0) // check if path is defined
 				abort "backup_data path is not defined!\n"
 			endif
-			
+
 			if(full==2)
 				return ParseFilePath(5, S_path, separatorStr, 0, 0)
 			elseif(full==3)
@@ -207,12 +220,12 @@ function /S getExpPath(whichpath, [full])
 		case "backup_config":
 			// returns full path to the backup-data directory
 			// always assumes you want the full path
-			
+
 			pathinfo backup_config // get path info
 			if(V_flag == 0) // check if path is defined
 				abort "backup_config path is not defined!\n"
 			endif
-			
+
 			if(full==2)
 				return ParseFilePath(5, S_path, separatorStr, 0, 0)
 			elseif(full==3)
@@ -295,7 +308,7 @@ function sc_checkBackup()
 		string sp = S_path
 		newpath /C/O/Q backup_data sp+sc_hostname+":"+getExpPath("data", full=1)
 		newpath /C/O/Q backup_config sp+sc_hostname+":"+getExpPath("config", full=1)
-		
+
 		return 1
 	endif
 end
@@ -367,7 +380,7 @@ function InitScanController([configFile])
 	else
 		sc_loadconfig(configFile)
 	endif
-	
+
 	// close all VISA sessions and create wave to hold
 	// all Resource Manager sessions, so that they can
 	// be closed at each call InitializeWaves()
@@ -956,7 +969,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	variable index, graphopen, graphopen2d
 	svar sc_colormap
 	variable/g fastdac_init = 0
-	
+
 	if(paramisdefault(fastdac))
 		fastdac = 0
 		fastdac_init = 0
@@ -968,7 +981,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		fastdac = 0
 		fastdac_init = 0
 	endif
-	
+
 	if(fastdac == 0)
 		//do some sanity checks on wave names: they should not start or end with numbers.
 		do
@@ -1031,7 +1044,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 			print "[WARNING]: Your start and end values are the same!"
 		endif
 	endif
-	
+
 	if(linecut == 1 && fastdac == 0) //Tim:To make linecuts work with RecordValues
 		sc_is2d = 2
 		make/O/n=(numptsy) sc_linestart = NaN 						//To store first xvalue of each line of data
@@ -1080,13 +1093,13 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 					// In case this is a 2D line cut measurement
 					wn2d = sc_RawWaveNames[i]+"2d"
 					cmd = "make /o/n=(1, " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd) //Makes 1 by y wave, x is redimensioned in recordline
-					cmd = "setscale /P x, 0, " + num2str((sc_finx-sc_startx)/sc_numptsx) + "," + wn2d; execute(cmd) //sets x scale starting from 0 but with delta correct	
+					cmd = "setscale /P x, 0, " + num2str((sc_finx-sc_startx)/sc_numptsx) + "," + wn2d; execute(cmd) //sets x scale starting from 0 but with delta correct
 					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)//Useful to see if top and bottom of scan are filled with NaNs
 				endif
 			endif
 			i+=1
 		while (i<numpnts(sc_RawWaveNames))
-	
+
 		// Initialize waves for calculated data
 		i=0
 		do
@@ -1105,16 +1118,16 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 				elseif(sc_is2d == 2)
 					// In case this is a 2D line cut measurement
 					wn2d = sc_CalcWaveNames[i]+"2d"
-					cmd = "make /o/n=(1, " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd) //Same as for Raw (see above)	
-					cmd = "setscale /P x, 0, " + num2str((sc_finx-sc_startx)/sc_numptsx) + "," + wn2d; execute(cmd) //sets x scale starting from 0 but with delta correct		
+					cmd = "make /o/n=(1, " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd) //Same as for Raw (see above)
+					cmd = "setscale /P x, 0, " + num2str((sc_finx-sc_startx)/sc_numptsx) + "," + wn2d; execute(cmd) //sets x scale starting from 0 but with delta correct
 					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
 				endif
 			endif
 			i+=1
 		while (i<numpnts(sc_CalcWaveNames))
-	
+
 		sc_findAsyncMeasurements()
-		
+
 	elseif(fastdac == 1)
 		// create waves for fastdac
 		wave/t fadcvalstr
@@ -1130,20 +1143,20 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 				execute(cmd)
 				cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn
 				execute(cmd)
-				
+
 				wn_raw = "ADC"+num2istr(i)
 				cmd = "make/o/n=(" + num2istr(sc_numptsx) + ") " + wn_raw + "=NaN"
 				execute(cmd)
 				cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn_raw
 				execute(cmd)
-				
+
 				if(sc_is2d == 1)
 					// In case this is a 2D measurement
 					wn2d = wn + "2d"
 					cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd)
 					cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn2d; execute(cmd)
 					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
-					
+
 					wn_raw2d = wn_raw + "2d"
 					cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn_raw2d + "=NaN"; execute(cmd)
 					cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn_raw2d; execute(cmd)
@@ -1154,12 +1167,12 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		while(i<dimsize(fadcvalstr,0))
 		sc_fastadc = sc_fastadc[0,strlen(sc_fastadc)-2]  // To chop off trailing comma
 	endif
-	
+
 	// Find all open plots
 	graphlist = winlist("*",";","WIN:1")
-	j=0				
-	for (i=0;i<itemsinlist(graphlist);i=i+1) 
-		index = strsearch(graphlist,";",j)			
+	j=0
+	for (i=0;i<itemsinlist(graphlist);i=i+1)
+		index = strsearch(graphlist,";",j)
 		graphname = graphlist[j,index-1]
 		setaxis/w=$graphname /a
 		getwindow $graphname wtitle
@@ -1168,7 +1181,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		graphnumlist+= graphnum+";"
 		j=index+1
 	endfor
-	
+
 	if(fastdac == 0)
 		//Initialize plots for raw data waves
 		i=0
@@ -1197,6 +1210,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 					display $wn
 					setwindow kwTopWin, enablehiresdraw=3
 					Label bottom, sc_x_label
+					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 					activegraphs+= winname(0,1)+";"
 				elseif(graphopen)
 					if(sc_is2d)
@@ -1208,6 +1222,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 						colorscale /c/n=$sc_ColorMap /e/a=rc
 						Label left, sc_y_label
 						Label bottom, sc_x_label
+						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 						activegraphs+= winname(0,1)+";"
 					endif
 				else
@@ -1215,6 +1230,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 					display $wn
 					setwindow kwTopWin, enablehiresdraw=3
 					Label bottom, sc_x_label
+					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 					activegraphs+= winname(0,1)+";"
 					if(sc_is2d)
 						display
@@ -1228,54 +1244,48 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 					endif
 				endif
 			endif
-			i+= 1
-		while(i<numpnts(sc_RawWaveNames))
-	
-		//Initialize plots for calculated data waves
-		i=0
-		do
-			if (sc_CalcPlot[i] == 1 && cmpstr(sc_CalcWaveNames[i], ""))
-				wn = sc_CalcWaveNames[i]
-				graphopen = 0
-				graphopen2d = 0
-				for(j=0;j<ItemsInList(graphtitle);j=j+1)
-					if(stringmatch(wn,stringfromlist(j,graphtitle)))
-						graphopen = 1
+		endif
+		i+= 1
+	while(i<numpnts(sc_RawWaveNames))
+
+	//Initialize plots for calculated data waves
+	i=0
+	do
+		if (sc_CalcPlot[i] == 1 && cmpstr(sc_CalcWaveNames[i], ""))
+			wn = sc_CalcWaveNames[i]
+			graphopen = 0
+			graphopen2d = 0
+			for(j=0;j<ItemsInList(graphtitle);j=j+1)
+				if(stringmatch(wn,stringfromlist(j,graphtitle)))
+					graphopen = 1
+					activegraphs+= stringfromlist(j,graphnumlist)+";"
+					Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
+					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
+				endif
+				if(sc_is2d)
+					if(stringmatch(wn+"2d",stringfromlist(j,graphtitle)))
+						graphopen2d = 1
 						activegraphs+= stringfromlist(j,graphnumlist)+";"
 						Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
+						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 					endif
-					if(sc_is2d)
-						if(stringmatch(wn+"2d",stringfromlist(j,graphtitle)))
-							graphopen2d = 1
-							activegraphs+= stringfromlist(j,graphnumlist)+";"
-							Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
-							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
-						endif
-					endif
-				endfor
-				if(graphopen && graphopen2d)
-				elseif(graphopen2d)
-					display $wn
-					setwindow kwTopWin, enablehiresdraw=3
-					Label bottom, sc_x_label
-					activegraphs+= winname(0,1)+";"
-				elseif(graphopen)
-					if(sc_is2d)
-						wn2d = wn + "2d"
-						display
-						setwindow kwTopWin, enablehiresdraw=3
-						appendimage $wn2d
-						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
-						colorscale /c/n=$sc_ColorMap /e/a=rc
-						Label left, sc_y_label
-						Label bottom, sc_x_label
-						activegraphs+= winname(0,1)+";"
-					endif
-				else
+				endif
+			endfor
+			if(graphopen && graphopen2d)
+			elseif(graphopen2d)
+				display $wn
+				setwindow kwTopWin, enablehiresdraw=3
+				Label bottom, sc_x_label
+				TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
+				activegraphs+= winname(0,1)+";"
+			elseif(graphopen)
+				if(sc_is2d)
 					wn2d = wn + "2d"
 					display $wn
 					setwindow kwTopWin, enablehiresdraw=3
 					Label bottom, sc_x_label
+					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 					activegraphs+= winname(0,1)+";"
 					if(sc_is2d)
 						display
@@ -1319,6 +1329,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 					display $wn
 					setwindow kwTopWin, enablehiresdraw=3
 					Label bottom, sc_x_label
+					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 					activegraphs+= winname(0,1)+";"
 				elseif(graphopen)
 					if(sc_is2d)
@@ -1369,7 +1380,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	cmd1 += "SweepControl"
 	execute(cmd1)
 end
- 
+
 function sc_controlwindows(action)
 	string action
 	string openaboutwindows
@@ -1492,13 +1503,13 @@ function sc_sleep(delay)
 		catch
 			variable err = GetRTError(1)
 			string errMessage = GetErrMessage(err)
-		
+
 			// reset sweep control parameters if igor about button is used
 			if(v_abortcode == -1)
 				sc_abortsweep = 0
 				sc_pause = 0
 			endif
-			
+
 			//silent abort
 			abortonvalue 1,10
 		endtry
@@ -1573,17 +1584,41 @@ function RecordValues(i, j, [readvstime, fillnan])
 	endif
 
 	//// Setup and run async data collection ////
+	string cmd = ""
+	if (sc_is2d == 2) //for 2dline
+		variable dx
+		wave sc_linestart, sc_xdata
+		ii=0
+		do // Need to record a dx before it is overwritten in async measurement
+			if(sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
+				wave wref2d = $sc_RawWaveNames[ii] + "2d"
+				dx = dimdelta(wref2d, 0)
+				break //Only need to get dx from first valid wave
+			endif
+			ii+=1
+		while (ii < numpnts(sc_RawWaveNames))
+	endif
+
 	wave sc_measAsync
-	if( (sum(sc_measAsync) > 1) && (fillnan==0) && (sc_is2d != 2)) //Tim:TODO: Make async work for Line cut
+	if((sum(sc_measAsync) > 1) && (fillnan==0))
 		variable tgID = sc_ManageThreads(innerindex, outerindex, readvstime) // start threads, wait, collect data
 		sc_KillThreads(tgID) // Terminate threads
+		if (sc_is2d == 2)  //For 2dline because can't execute() in threadsafe
+			ii=0
+			do 					// This is just to rescale the waves incase dimsize has changed
+				if (sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1)
+					wave wref2d = $sc_RawWaveNames[ii] + "2d"
+					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + nameofwave(wref2d); execute(cmd) //Sets Y scale again
+					cmd = "setscale /P x, 0, " + num2str(dx) + ", " + nameofwave(wref2d); execute(cmd) //rescales x axis with dx from before async measurement
+				endif
+				ii+=1
+			while (ii < numpnts(sc_RawWaveNames))
+		endif
 	endif
 
 	//// Read sync data ( or fill NaN) ////
 	variable /g sc_tmpVal
-	variable dx			//For 2Dline
-	wave sc_linestart, sc_xdata 	//For 2Dline  
-	string script = "", cmd = ""
+	string script = ""
 	ii=0
 	do
 		if ((sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1) && sc_measAsync[ii]==0)
@@ -1614,22 +1649,22 @@ function RecordValues(i, j, [readvstime, fillnan])
 			elseif (sc_is2d == 2 && fillnan == 0)
 				//2D line wave
 				FindValue/V=0/T=(inf) wref1D 	//Finds the first non NaN and stores position in V_value (V=value, T=tolerance)
-				if(innerindex == V_value)		//records the x value of the first notNaN for all line2D graphs  
+				if(innerindex == V_value)		//records the x value of the first notNaN for all line2D graphs
 					sc_linestart[outerindex] = sc_xdata[innerindex]
 				endif
 				wave wref2d = $sc_RawWaveNames[ii] + "2d"
 				if(dimsize(wref2d, 0)-1 < innerindex-V_value) //Does 2D line wave need larger x range?
 					dx = dimdelta(wref2d, 0) 																//saves delta x of original to put back in
-					make/o/n=(dimsize(wref2d,0)+1, dimsize(wref2d,1)) temp2Dwave = NaN 			//Make new larger wave 	
+					make/o/n=(dimsize(wref2d,0)+1, dimsize(wref2d,1)) temp2Dwave = NaN 			//Make new larger wave
 					temp2Dwave[0,dimsize(wref2d,0)-1][0,dimsize(wref2d,1)-1] = wref2d[p][q] 	//copy over old values with NaNs everywhere else
 					duplicate/O temp2Dwave wref2d															//Put back into old wave
 					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + nameofwave(wref2d); execute(cmd) //Sets Y scale again
 					cmd = "setscale /P x, 0, " + num2str(dx) + ", " + nameofwave(wref2d); execute(cmd) //Sets x scale again (starts at 0 but with correct delta)
 					killwaves temp2Dwave																	//Clear mess
-				endif	
+				endif
 				wref2d[innerindex-(V_value)][outerindex] = wref1d[innerindex] 	//Using V_value from FindValue a few lines up
 			endif
-			
+
 		endif
 		ii+=1
 	while (ii < numpnts(sc_RawWaveNames))
@@ -1664,17 +1699,18 @@ function RecordValues(i, j, [readvstime, fillnan])
 			if (sc_is2d == 1)
 				wave wref2d = $sc_CalcWaveNames[ii] + "2d"
 				wref2d[innerindex][outerindex] = wref1d[innerindex]
+
 			elseif (sc_is2d == 2 && fillnan == 0)
 				//2D line wave
 				FindValue/V=0/T=(inf) wref1D 	//Finds the first non NaN and stores position in V_value (V=value, T=tolerance)
-				
-				if(innerindex == V_value)		//records the x value of the first notNaN for all line2D graphs  
+
+				if(innerindex == V_value)		//records the x value of the first notNaN for all line2D graphs
 					sc_linestart[outerindex] = sc_xdata[innerindex]
 				endif
 				wave wref2d = $sc_CalcWaveNames[ii] + "2d"
 				if(dimsize(wref2d, 0)-1 < innerindex-V_value && v_value != -1) //Does 2D line wave need larger x range?
 					dx = dimdelta(wref2d, 0)
-					make/o/n=(dimsize(wref2d,0)+1, dimsize(wref2d,1)) temp2Dwave = NaN 			//Make new larger wave 	
+					make/o/n=(dimsize(wref2d,0)+1, dimsize(wref2d,1)) temp2Dwave = NaN 			//Make new larger wave
 					temp2Dwave[0,dimsize(wref2d,0)-1][0,dimsize(wref2d,1)-1] = wref2d[p][q] 	//copy over old values with NaNs everywhere else
 					duplicate/O temp2Dwave wref2d															//Put back into old wave
 					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + nameofwave(wref2d); execute(cmd) //Sets Y scale again
@@ -1682,7 +1718,7 @@ function RecordValues(i, j, [readvstime, fillnan])
 					killwaves temp2Dwave																	//Clear mess
 				endif
 				if (v_value != -1 && V_value < innerindex) //don't fill a NaN or if V_value is actually from previous line of data (because it will try index out of range)
-					wref2d[innerindex-(V_value)][outerindex] = wref1d[innerindex] 	//Using V_value from FindValue a few lines up 	
+					wref2d[innerindex-(V_value)][outerindex] = wref1d[innerindex] 	//Using V_value from FindValue a few lines up
 				endif
 			endif
 		endif
@@ -1694,15 +1730,15 @@ function RecordValues(i, j, [readvstime, fillnan])
 		sc_checksweepstate()
 	catch
 		variable err = GetRTError(1)
-		
+
 		// reset sweep control parameters if igor about button is used
 		if(v_abortcode == -1)
 			sc_abortsweep = 0
 			sc_pause = 0
 		endif
-		
+
 		//silent abort
-		abortonvalue 1,10 
+		abortonvalue 1,10
 	endtry
 end
 
@@ -1791,9 +1827,26 @@ threadsafe function sc_Worker(refWave, innerindex, outerindex, folderIndex, is2d
 
 			wref1d[innerindex] = val
 
-			if(is2d)
+			if(is2d==1)
 				wave wref2d = refWave[2*str2num(StringFromList(i, wavIdx, ";"))+1]
 				wref2d[innerindex][outerindex] = val
+			elseif(is2d==2)
+				wave wref2d = refWave[2*str2num(StringFromList(i, wavIdx, ";"))+1]
+				nvar sc_starty, sc_finy
+				FindValue/V=0/T=(inf) wref1D 	//Finds the first non NaN and stores position in V_value (V=value, T=tolerance)
+				if(innerindex == V_value)		//records the x value of the first notNaN for all line2D graphs
+					wave sc_linestart, sc_xdata
+					sc_linestart[outerindex] = sc_xdata[innerindex]
+				endif
+				if(dimsize(wref2d, 0)-1 < innerindex-V_value && v_value != -1) //Does 2D line wave need larger x range?
+					make/o/n=(dimsize(wref2d,0)+1, dimsize(wref2d,1)) temp2Dwave = NaN 			//Make new larger wave
+					temp2Dwave[0,dimsize(wref2d,0)-1][0,dimsize(wref2d,1)-1] = wref2d[p][q] 	//copy over old values with NaNs everywhere else
+					duplicate/O temp2Dwave wref2d															//Put back into old wave
+					killwaves temp2Dwave																	//Clear mess
+				endif
+				if (v_value != -1 && V_value < innerindex) //don't fill a NaN or if V_value is actually from previous line of data (because it will try index out of range)
+					wref2d[innerindex-(V_value)][outerindex] = wref1d[innerindex] 	//Using V_value from FindValue a few lines up
+				endif
 			endif
 
 		endfor
@@ -1838,11 +1891,11 @@ function /s sc_createSweepLogs([msg])
 		jstr = addJSONkeyval(jstr, "comment", msg, addQuotes=1)
 	endif
 	jstr = addJSONkeyval(jstr, "filenum", num2istr(filenum))
-	
+
 	buffer = addJSONkeyval(buffer, "x", sc_x_label, addQuotes=1)
 	buffer = addJSONkeyval(buffer, "y", sc_y_label, addQuotes=1)
 	jstr = addJSONkeyval(jstr, "axis_labels", buffer)
-	
+
 	jstr = addJSONkeyval(jstr, "current_config", sc_current_config, addQuotes = 1)
 	jstr = addJSONkeyval(jstr, "time_completed", Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
 	jstr = addJSONkeyval(jstr, "time_elapsed", num2numStr(sweep_t_elapsed))
@@ -1866,7 +1919,7 @@ function /s sc_createSweepLogs([msg])
 				JSONSimple sc_log_buffer
 				wave/t t_tokentext
 				wave w_tokentype, w_tokensize, w_tokenparent
-	
+
 				for(j=1;j<numpnts(t_tokentext)-1;j+=1)
 					if ( w_tokentype[j]==3 && w_tokensize[j]>0 )
 						if( w_tokenparent[j]==0 )
@@ -1880,7 +1933,7 @@ function /s sc_createSweepLogs([msg])
 						endif
 					endif
 				endfor
-				
+
 			else
 				print "[WARNING] command failed to log anything: "+command+"\r"
 			endif
@@ -1958,7 +2011,7 @@ function SaveWaves([msg,save_experiment,fastdac])
 		fastdac = 0
 		print("[WARNING] \"SaveWaves\": Pass fastdac = 1! Setting it to 0.")
 	endif
-	
+
 	// compare to earlier call of InitializeWaves
 	nvar fastdac_init
 	if(fastdac > fastdac_init)
@@ -1966,14 +2019,14 @@ function SaveWaves([msg,save_experiment,fastdac])
 		abort
 	elseif(fastdac < fastdac_init)
 		print("[ERROR] \"SaveWaves\": Trying to save non-fastDAC files, but they weren't initialized by \"InitializeWaves\"")
-		abort	
+		abort
 	endif
-	
+
 	nvar sc_save_time
 	if (paramisdefault(save_experiment))
 		save_experiment = 1 // save the experiment by default
 	endif
-		
+
 
 	KillDataFolder/z root:async // clean this up for next time
 
@@ -1989,17 +2042,17 @@ function SaveWaves([msg,save_experiment,fastdac])
 		// normal non-fastdac files
 		variable Rawadd = sum(sc_RawRecord)
 		variable Calcadd = sum(sc_CalcRecord)
-	
+
 		if(Rawadd+Calcadd > 0)
 			// there is data to save!
 			// save it and increment the filenumber
 			printf "saving all dat%d files...\r", filenum
-	
+
 			nvar sc_rvt
 	   		if(sc_rvt==1)
 	   			sc_update_xdata() // update xdata wave
 			endif
-	
+
 			// Open up HDF5 files
 		 	// Save scan controller meta data in this function as well
 			initSaveFiles(msg=msg)
@@ -2026,7 +2079,7 @@ function SaveWaves([msg,save_experiment,fastdac])
 				endif
 				ii+=1
 			while (ii < numpnts(sc_RawWaveNames))
-	
+
 			//save calculated data waves
 			ii=0
 			do
@@ -2052,22 +2105,22 @@ function SaveWaves([msg,save_experiment,fastdac])
 		string wn_raw = ""
 		nvar sc_Printfadc
 		nvar sc_Saverawfadc
-		
+
 		do
 			if(fadcattr[ii][2] == 48)
 				filecount += 1
 			endif
 		while(dimsize(fadcattr,0))
-		
+
 		if(filecount > 0)
 			// there is data to save!
 			// save it and increment the filenumber
 			printf "saving all dat%d files...\r", filenum
-			
+
 			// Open up HDF5 files
 			// Save scan controller meta data in this function as well
 			initSaveFiles(msg=msg)
-			
+
 			// look for waves to save
 			ii=0
 			do
@@ -2082,7 +2135,7 @@ function SaveWaves([msg,save_experiment,fastdac])
 						print filename
 					endif
 					saveSingleWave(wn)
-					
+
 					if(sc_Saverawfadc)
 						wn_raw = "ADC"+num2istr(ii)
 						if(sc_is2d)
@@ -2101,7 +2154,7 @@ function SaveWaves([msg,save_experiment,fastdac])
 			closeSaveFiles()
 		endif
 	endif
-	
+
 	if(save_experiment==1 & (datetime-sc_save_time)>180.0)
 		// save if sc_save_exp=1
 		// and if more than 3 minutes has elapsed since previous saveExp
@@ -2117,7 +2170,7 @@ function SaveWaves([msg,save_experiment,fastdac])
 	endif
 
 	sc_saveFuncCall(getrtstackinfo(2))
-	
+
 	// increment filenum
 	if(Rawadd+Calcadd > 0 || filecount > 0)
 		filenum+=1
@@ -2126,14 +2179,14 @@ end
 
 function sc_saveFuncCall(funcname)
 	string funcname
-	
+
 	nvar sc_is2d, sc_startx, sc_starty, sc_finx, sc_starty, sc_finy, sc_numptsx, sc_numptsy
 	nvar filenum
 	svar sc_x_label, sc_y_label
-	
+
 	// create JSON string
 	string buffer = ""
-	
+
 	buffer = addJSONkeyval(buffer,"Filenum",num2istr(filenum))
 	buffer = addJSONkeyval(buffer,"Function Name",funcname,addquotes=1)
 	if(sc_is2d == 0)
@@ -2151,21 +2204,21 @@ function sc_saveFuncCall(funcname)
 		buffer = addJSONkeyval(buffer,"Ending value (y)",num2str(sc_finy))
 		buffer = addJSONkeyval(buffer,"Number of points (y)",num2istr(sc_numptsy))
 	endif
-	
+
 	buffer = prettyJSONfmt(buffer)
-	
+
 	// open function call history file (or create it)
 	variable hisfile
 	open /z/a/p=config hisfile as "FunctionCallHistory.txt"
-	
+
 	if(v_flag != 0)
 		print "[WARNING] \"saveFuncCall\": Could not open FunctionCallHistory.txt"
 		return 0
 	endif
-	
+
 	fprintf hisfile, buffer
 	fprintf hisfile, "------------------------------------\r\r"
-	
+
 	close hisfile
 end
 
@@ -2318,39 +2371,46 @@ function SaveFromPXP([history, procedure])
 end
 
 function /S sc_copySingleFile(original_path, new_path, filename)
-	// custom copy file function because the Igor version seems to lead to 
-	// weird corruption problems when copying from a local machine 
+	// custom copy file function because the Igor version seems to lead to
+	// weird corruption problems when copying from a local machine
 	// to a mounted server drive
 	// this assumes that all the necessary paths already exist
-	
+
 	string original_path, new_path, filename
 	string op="", np=""
-	
+	string cmd = ""
 	if( cmpstr(igorinfo(2) ,"Macintosh")==0 )
 		// using rsync if the machine is a mac
 		//   should speed things up a little bit by not copying full files
 		op = getExpPath(original_path, full=2)
 		np = getExpPath(new_path, full=2)
-		
-		string cmd = ""
 		sprintf cmd, "rsync -a %s %s", op+filename, np
 		executeMacCmd(cmd)
 	else
-		// probably can use rsync here on newer windows machines
-		//   do not currently have one to test
+		// For windows DeltaCopy needs to be installed first, and the formatting for rsync is slightly different
+		// Almost but not quite implemented.
 		op = getExpPath(original_path, full=3)
 		np = getExpPath(new_path, full=3)
-		CopyFile /Z=1 (op+filename) as (np+filename)
+		CopyFile/O /Z=1 (op+filename) as (np+filename)
 	endif
-	
+
 end
 
+Function /S GetpxpCopyTime()
+    NVAR/Z sc_pxpcopytime  //SDFR SetDataFolderReference
+    if(!NVAR_Exists(sc_pxpcopytime))
+        variable/g sc_pxpcopytime = 0   // zVKS = VariableKeyString (z so at bottom of data folder)
+    endif
+
+    return "sc_pxpcopytime"
+End
+
 function sc_copyNewFiles(datnum, [save_experiment, verbose] )
-	// locate newly created/appended files and move to backup directory 
+	// locate newly created/appended files and move to backup directory
 
 	variable datnum, save_experiment, verbose  // save_experiment=1 to save pxp, history, and procedure
 	variable result = 0
-	string tmpname = ""	
+	string tmpname = ""
 
 	// try to figure out if a path that is needed is missing
 	make /O/T sc_data_paths = {"data", "config", "backup_data", "backup_config"}
@@ -2361,15 +2421,18 @@ function sc_copyNewFiles(datnum, [save_experiment, verbose] )
 			abort "[ERROR] A path is missing. Data not backed up to server."
 		endif
 	endfor
-	
+
 	// add experiment/history/procedure files
 	// only if I saved the experiment this run
 	if(!paramisdefault(save_experiment) && save_experiment == 1)
-	
-		// add experiment file
-		tmpname = igorinfo(1)+".pxp"
-		sc_copySingleFile("data","backup_data",tmpname)
 
+		// add experiment file
+		Nvar sc_pxpcopytime = $GetpxpCopyTime() //gets NVAR from function to prevent error if it doesn't exist
+		if ((datetime - sc_pxpcopytime) > 24*60*60) //only copy pxp once every 24 hours
+			tmpname = igorinfo(1)+".pxp"
+			sc_copySingleFile("data","backup_data",tmpname)
+			sc_pxpcopytime = datetime
+		endif
 		// add history file
 		tmpname = igorinfo(1)+".history"
 		sc_copySingleFile("data","backup_data",tmpname)
@@ -2377,7 +2440,7 @@ function sc_copyNewFiles(datnum, [save_experiment, verbose] )
 		// add procedure file
 		tmpname = igorinfo(1)+".ipf"
 		sc_copySingleFile("data","backup_data",tmpname)
-		
+
 	endif
 
 	// find new data files
@@ -2399,7 +2462,7 @@ function sc_copyNewFiles(datnum, [save_experiment, verbose] )
 			tmpname = StringFromList(j,matchList, ";")
 			sc_copySingleFile("data","backup_data",tmpname)
 		endfor
-		
+
 	endfor
 
 	// add the most recent scan controller config file
@@ -2426,11 +2489,12 @@ end
 //////////////////////////
 
 
-//tim.child = U8W2V6QK0 
-function /S getSlackNotice(username, [message, min_time]) 
+//tim.child = U8W2V6QK0
+//owen.sheekey = UFTMDFVTR
+function /S getSlackNotice(username, [message, min_time])
 	// Usernames no longer work for new users since 2017. See https://api.slack.com/changelog/2017-09-the-one-about-usernames
 	// Can use member ID instead
-	
+
 	// this function will send a notification to Slack -- run it as if it were a getInstrStatus function
 	// username = your slack username, notice will be a DM
 	// message = string to include in Slack message
@@ -2439,7 +2503,8 @@ function /S getSlackNotice(username, [message, min_time])
 	string username, message
 	variable min_time
 	nvar filenum, sweep_t_elapsed, sc_abortsweep
-	string sc_slack_url = "https://hooks.slack.com/services/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"
+//	string sc_slack_url = "https://hooks.slack.com/services/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"
+	string sc_slack_url = 	"https://hooks.slack.com/services/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"  //Tim webhook
 	string txt="", buffer="", payload="", out="", botname = "qdotbot", emoji = ":the_horns:"
 
 	//// check if I need a notification ////
@@ -2454,7 +2519,7 @@ function /S getSlackNotice(username, [message, min_time])
 	if(sc_abortsweep)
 		return "{slack_notice: false}"
 	endif
-	
+
 	//// end notification checks ////
 
 
@@ -2487,5 +2552,3 @@ function /S getSlackNotice(username, [message, min_time])
         return "{slack_notice: false}"
     endif
 end
-
-
