@@ -160,12 +160,12 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	endif
 
 	sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, scanList.startVal, scanList.finVal, numpts
-	print cmd
 	writeInstr(instrID,cmd)
 
 	// read returned values
 	variable totalByteReturn = itemsInList(scanList.adclist, ",")*numpts*2, read_chunk=0
-	variable chunksize = itemsinlist(scanList.adclist,",")*2*30
+//	variable chunksize = itemsinlist(scanList.adclist,",")*2*30
+	variable chunksize = 512
 	if(totalByteReturn > chunksize)
 		read_chunk = chunksize
 
@@ -176,7 +176,8 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	// make temp wave to hold incomming data chunks
 	// and distribute to data waves
 	string buffer = ""
-	variable bytes_read = 0
+	variable bytes_read = 0, numadc = itemsInList(scanList.adclist, ",")
+	i = 0
 	do
 		buffer = readInstr(instrID,read_bytes=read_chunk, binary=1)
 		if (cmpstr(buffer, "NaN") == 0) // If failed, abort
@@ -184,14 +185,18 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 			abort
 		endif
 		// add data to rawwaves and datawaves
-		sc_distribute_data(buffer,scanList.adclist,read_chunk,rowNum,bytes_read/2)
+		sc_distribute_data(buffer,scanList.adclist,read_chunk,rowNum,bytes_read/(2*numadc))
 		bytes_read += read_chunk
+		if (mod(i,10) == 0) //Slows down fastdac if updating faster
+			doupdate
+		endif
+		i++
 	while(totalByteReturn-bytes_read > read_chunk)
 	// do one last read if any data left to read
 	variable bytes_left = totalByteReturn-bytes_read
 	if(bytes_left > 0)
 		buffer = readInstr(instrID,read_bytes=bytes_left,binary=1)
-		sc_distribute_data(buffer,scanList.adclist,bytes_left,rowNum,bytes_read/2)
+		sc_distribute_data(buffer,scanList.adclist,bytes_left,rowNum,bytes_read/(2*numadc))
 	endif
 	
 	buffer = remove_rn(readInstr(instrID, binary=0, read_term="\n"))
@@ -336,7 +341,6 @@ function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart)
 	wave/t fadcvalstr
 
 	nvar sc_is2d
-
 	variable i=0, j=0, k=0, numADCCh = itemsinlist(adcList,","), adcIndex=0, dataPoint=0
 	string wave1d = "", wave2d = "", s1, s2
 	// load data into raw wave
@@ -383,7 +387,7 @@ function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart)
 			wave datawave2d = $wave2d
 			datawave2d[][rowNum] = datawave[p]
 		endif
-	endfor
+	endfor	
 end
 
 function sc_averageDataWaves(numAverage,adcList)
@@ -655,7 +659,7 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	variable initial = str2num(response)*1000  // Fastdac returns value in Volts not mV
 	if(numtype(initial) == 0)
 		// good response
-		if(abs(initial-str2num(old_fdacvalstr[channel]))<0.5)
+		if(abs(initial-str2num(old_fdacvalstr[channel]))<10)
 			// no discrepancy
 		else
 			sprintf warn, "[WARNING] \"rampOutputfdac\": Actual output of channel %d is different than expected", channel
@@ -731,8 +735,8 @@ function readfadcChannel(instrID,channel) // Units: mV
 	response = remove_rn(response)
 	if(	numtype(str2num(response)) == 0)
 		// good response, update window
-		fadcvalstr[channel][1] = response
-		return str2num(response)
+		fadcvalstr[channel][1] = num2str(str2num(response)*1000)  // converting from V to mV
+		return str2num(response)*1000
 	else
 		sprintf err, "[ERROR] \"readfadcChannel\": Bad response! %s", response
 		print err

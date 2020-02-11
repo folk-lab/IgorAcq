@@ -1388,9 +1388,9 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		cmd2 = "DoWindow/F " + window_string
 		execute(cmd2)
 	endfor
-
 	cmd1 += "SweepControl"
 	execute(cmd1)
+	doupdate
 end
 
 function sc_controlwindows(action)
@@ -2117,12 +2117,13 @@ function SaveWaves([msg,save_experiment,fastdac])
 		string wn_raw = ""
 		nvar sc_Printfadc
 		nvar sc_Saverawfadc
-
+		ii = 0
 		do
 			if(fadcattr[ii][2] == 48)
 				filecount += 1
 			endif
-		while(dimsize(fadcattr,0))
+			ii++
+		while(ii < dimsize(fadcattr,0))
 
 		if(filecount > 0)
 			// there is data to save!
