@@ -78,7 +78,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	// RecordValues for FastDAC's. This function should replace RecordValues in scan functions.
 	// j is outer scan index, if it's a 1D scan just set j=0.
 	// rampCh is a comma seperated string containing the channels that should be ramped.
-	// start/fin are comma separated strings which should have same length as rampCh
+	// start/fin are comma separated strings which should have same length as rampCh (and ARE in mV)
 	// Data processing:
 	// 		- RCcutoff set the lowpass cutoff frequency
 	//		- average set the number of points to average
