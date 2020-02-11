@@ -160,11 +160,10 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	endif
 
 	sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, scanList.startVal, scanList.finVal, numpts
-	print cmd
 	writeInstr(instrID,cmd)
 
 	// read returned values
-	variable totalByteReturn = itemsInList(scanList.adclist, ",")*numpts, read_chunk=0
+	variable totalByteReturn = itemsInList(scanList.adclist, ",")*numpts*2, read_chunk=0
 	variable chunksize = itemsinlist(scanList.adclist,",")*2*30
 	if(totalByteReturn > chunksize)
 		read_chunk = chunksize
@@ -178,28 +177,38 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	string buffer = ""
 	variable bytes_read = 0
 	do
-		buffer = readInstr(instrID,read_bytes=read_chunk, fdac_flag=1)
-//		buffer = remove_rn(buffer)
+		buffer = readInstr(instrID,read_bytes=read_chunk, binary=1)
 		if (cmpstr(buffer, "NaN") == 0) // If failed, abort
       		clear_buffer(instrID) // Try empty out whatever crap is left in buffer
 			abort
 		endif
 		// add data to rawwaves and datawaves
-		sc_distribute_data(buffer,scanList.adclist,read_chunk,rowNum,bytes_read)
+		sc_distribute_data(buffer,scanList.adclist,read_chunk,rowNum,bytes_read/2)
 		bytes_read += read_chunk
 	while(totalByteReturn-bytes_read > read_chunk)
 	// do one last read if any data left to read
 	variable bytes_left = totalByteReturn-bytes_read
 	if(bytes_left > 0)
-		buffer = readInstr(instrID,read_bytes=bytes_left,fdac_flag=1)
-		sc_distribute_data(buffer,scanList.adclist,read_chunk,rowNum,bytes_read)
+		buffer = readInstr(instrID,read_bytes=bytes_left,binary=1)
+		sc_distribute_data(buffer,scanList.adclist,bytes_left,rowNum,bytes_read/2)
 	endif
-
-	// read sweeptime
-	variable sweeptime = 0
-	buffer = readInstr(instrID,read_bytes=10) // FIX read_bytes
-	sweeptime = str2num(buffer)
-
+	
+	buffer = remove_rn(readInstr(instrID, binary=0, read_term="\n"))
+	if (cmpstr(buffer, "RAMP_FINISHED") != 0)
+		printf "[WARNING]: \"fdacRecordValues\" - End of data was \"%s\" instead of \"RAMP_FINISHED\"", buffer
+	else //Update values
+		wave/t fdacvalstr, old_fdacvalstr
+		variable channel, output
+		for (i=0;i<itemsinlist(scanList.daclist, ",");i++)		
+			channel = str2num(stringfromList(i, scanList.daclist, ","))
+			output = str2num(stringfromList(i, scanList.finVal, ","))
+			fdacvalstr[channel][1] = num2str(output)
+			old_fdacvalstr[channel] = fdacvalstr[channel][1]
+		endfor
+	endif
+	
+	
+	
 	/////////////////////////
 	//// Post processing ////
 	/////////////////////////
@@ -287,7 +296,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 		sc_averageDataWaves(numAverage,scanList.adcList)
 	endif
 
-	return sweeptime
+	return 0
 end
 
 function ask_user(question, [type])
@@ -357,13 +366,14 @@ function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart)
 		adcIndex = str2num(stringfromlist(i,adcList,","))
 		wave1d = fadcvalstr[adcIndex][3]
 		wave datawave = $wave1d
+		wave1d = "ADC"+num2istr(str2num(stringfromlist(i,adcList,",")))
+		wave rawwave = $wave1d
 		script = trimstring(fadcvalstr[adcIndex][4])
 		if (strlen(script)>0)
 			sprintf cmd, "datawave = %s", script
 			execute/q/z cmd
 		else
-			sprintf cmd, "datawave = ADC%d", adcIndex
-			execute/q/z cmd
+			datawave = rawwave
 		endif
 		if(v_flag!=0)
 			print "[WARNING] \"sc_distribute_data\": Wave calculation falied! Error: "+GetErrMessage(V_Flag,2)
@@ -1171,7 +1181,7 @@ function fdacChar2Num(c1, c2, [minVal, maxVal])
 		b2 += 256
 	endif
 	// Return calculated FastDac value
-	return ((b1*2^8 + b2)*(maxVal-minVal)/(2^16 - 1))-minVal
+	return ((b1*2^8 + b2)*(maxVal-minVal)/(2^16 - 1))+minVal
 
 end
 

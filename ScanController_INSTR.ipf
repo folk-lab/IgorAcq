@@ -235,17 +235,17 @@ threadsafe function writeInstr(instrID, cmd)
 
 end
 
-threadsafe function/s readInstr(instrID, [read_term, read_bytes, fdac_flag])
+threadsafe function/s readInstr(instrID, [read_term, read_bytes, binary])
 	// generic error checking read function
-	// fdac_flag only ticked when reading long binary data from fdac
-	variable instrID, read_bytes, fdac_flag
+	// binary only ticked when reading long binary data from fdac
+	variable instrID, read_bytes, binary
 	string read_term
 
     if(!paramisdefault(read_term))
         // here we are going to make sure to use a
         // read termination character read_term
-        visaSetReadTerm(instrID, read_term)
         visaSetReadTermEnable(instrID, 1)
+        visaSetReadTerm(instrID, read_term)
 
     else
         // in this case it will read until some END signal
@@ -253,11 +253,11 @@ threadsafe function/s readInstr(instrID, [read_term, read_bytes, fdac_flag])
         visaSetReadTermEnable(instrID, 0)
     endif
 
-    if(!paramIsDefault(fdac_flag))
-    	 visaSetSerialEndIn(instrID, 0)
-   	 else
-   	    fdac_flag = 0
-   	 	 visaSetSerialEndIn(instrID, 2)
+    if(binary != 0)
+    	visaSetReadTermEnable(instrID, 0) // Set no term character 
+    	visaSetSerialEndIn(instrID, 0) // Sets term character read mode - read until num_bytes
+   	 else 
+   	 	 visaSetSerialEndIn(instrID, 2) // Read until term_char
     endif
 
     if(paramisdefault(read_bytes))
@@ -268,18 +268,19 @@ threadsafe function/s readInstr(instrID, [read_term, read_bytes, fdac_flag])
     variable return_count
     variable status = viRead(instrID, buffer, read_bytes, return_count)
     if (status != 0 && status != 0x3fff0006) // num returned == num expected status
-    	print status
     	VISAerrormsg("readInstr() -- viRead", instrID, status)
     	return "NaN" // abort not supported in threads (v7)
 	 endif
-	 if(fdac_flag)
+	 if(binary)
 	 	if(read_bytes != return_count)
 	 		sprintf err, "[ERROR] Returned bytes: %d. Expeted bytes: %d", return_count, read_bytes
 	 		print err
-	 		return "Nan"
+	 		return "NaN"
 	 	endif
 	 endif
-
+	if(!paramIsDefault(binary)) // Reset back to default state otherwise strange things happen
+    	 visaSetSerialEndIn(instrID, 2)
+   	endif
 
 	 return buffer
 end
