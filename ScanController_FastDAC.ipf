@@ -160,6 +160,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	endif
 
 	sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, scanList.startVal, scanList.finVal, numpts
+	print cmd
 	writeInstr(instrID,cmd)
 
 	// read returned values
@@ -345,7 +346,6 @@ function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart)
 		wave rawwave = $wave1d
 		k = 0
 		for(j=0;j<bytes;j+=numADCCh*2)
-		// Just editing this
 			s1 = buffer[j + (i*2)]
 			s2 = buffer[j + (i*2) + 1]
 			// dataPoint = str2num(stringfromlist(i+j*numADCCh,buffer,","))
@@ -1174,10 +1174,12 @@ function fdacChar2Num(c1, c2, [minVal, maxVal])
 	// Calculate byte values
 	b1 = char2num(c1[0])
 	b2 = char2num(c2[0])
+	
 	// Convert to unsigned
 	if (b1 < 0)
 		b1 += 256
-	elseif (b2 < 0)
+	endif
+	if (b2 < 0)
 		b2 += 256
 	endif
 	// Return calculated FastDac value
