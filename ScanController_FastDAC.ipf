@@ -74,7 +74,7 @@ function sc_fillfdacKeys(instrID,visa_address,numDACCh,numADCCh)
 	fdackeys = sortlist(fdackeys,",")
 end
 
-function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcutoff,numAverage,notch, ignore_negative]) //TIM: "ignore_negative" is a temporary protection against ramping to positive voltages
+function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcutoff,numAverage,notch, ignore_positive]) //TIM: "ignore_positive" is a temporary protection against ramping to positive voltages
 	// RecordValues for FastDAC's. This function should replace RecordValues in scan functions.
 	// j is outer scan index, if it's a 1D scan just set j=0.
 	// rampCh is a comma seperated string containing the channels that should be ramped.
@@ -83,7 +83,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	// 		- RCcutoff set the lowpass cutoff frequency
 	//		- average set the number of points to average
 	//		- nocth sets the notch frequencie, as a comma seperated list (width is fixed at 5Hz)
-	variable instrID, rowNum, ignore_negative
+	variable instrID, rowNum, ignore_positive
 	string rampCh, start, fin
 	variable numpts, ramprate, RCcutoff, numAverage
 	string notch
@@ -159,11 +159,21 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 		endif
 	endif
 
-	if (ignore_negative != 1)
-		for(i=0; i<daclen; i++)
-			
+
+	/////////////// TEMPORARY 11/2/2020 TIM
+	if (ignore_positive != 1)
+		string rampvals
+		variable val
+		rampvals = addlistitem(scanList.startval, scanList.finval, ",")
+		for(i=0; i<daclen*2; i++)
+			val = str2num(stringfromlist(i, rampvals, ","))
+			if (val > 100)
+				dowindow/k SweepControl
+				abort "INT_RAMP was going to ramp > 100mV without ignore_positive flag set"
+			endif
 		endfor
 	endif
+	////////////////////////
 	
 	sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, scanList.startVal, scanList.finVal, numpts
 	writeInstr(instrID,cmd)
@@ -226,11 +236,11 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	/////////////////////////
 
 	variable samplingFreq=0
-	samplingFreq = getfadcSpeed(instrID)
+	samplingFreq = getfadcSpeed(instrID)/itemsinlist(scanList.adclist, ",")
 
 	string warn = ""
 	variable doLowpass=0,cutoff_frac=0
-	if(!paramisdefault(RCcutoff))
+	if(RCcutoff!=0)
 		// add lowpass filter
 		doLowpass = 1
 		cutoff_frac = RCcutoff/samplingFreq
@@ -244,7 +254,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 
 	variable doNotch=0,numNotch=0
 	string notch_fracList = ""
-	if(!paramisdefault(notch))
+	if(cmpstr(notch, "") != 0)
 		// add notch filter(s)
 		doNotch = 1
 		numNotch = itemsinlist(notch,",")
@@ -254,7 +264,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	endif
 
 	variable doAverage=0
-	if(!paramisdefault(numAverage))
+	if(numAverage != 0)
 		// do averaging
 		doAverage = 1
 	endif
@@ -372,24 +382,26 @@ function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart)
 
 	// load calculated data into datawave
 	string script="", cmd=""
+	string calcwn1d = "", rawwn1d = ""
 	for(i=0;i<numADCCh;i+=1)
 		adcIndex = str2num(stringfromlist(i,adcList,","))
-		wave1d = fadcvalstr[adcIndex][3]
-		wave datawave = $wave1d
-		wave1d = "ADC"+num2istr(str2num(stringfromlist(i,adcList,",")))
-		wave rawwave = $wave1d
+		calcwn1d = fadcvalstr[adcIndex][3]
+		rawwn1d = "ADC"+num2istr(str2num(stringfromlist(i,adcList,",")))
 		script = trimstring(fadcvalstr[adcIndex][4])
 		if (strlen(script)>0)
-			sprintf cmd, "datawave = %s", script
+			variable multiplier
+			sprintf cmd, "%s = %s*%s", calcwn1d, rawwn1d, script
 			execute/q/z cmd
 		else
-			datawave = rawwave
+			sprintf cmd, "%s = %s", calcwn1d, rawwn1d
+			execute/q/z cmd
 		endif
 		if(v_flag!=0)
 			print "[WARNING] \"sc_distribute_data\": Wave calculation falied! Error: "+GetErrMessage(V_Flag,2)
 		endif
 		if(sc_is2d)
-			wave2d = wave1d+"_2d"
+			wave datawave = $calcwn1d
+			wave2d = calcwn1d+"_2d"
 			wave datawave2d = $wave2d
 			datawave2d[][rowNum] = datawave[p]
 		endif
@@ -604,12 +616,12 @@ function check_fastdac_connected(instrID)
 	endif
 end
 
-function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
+function rampOutputfdac(instrID,channel,output,[ramprate, ignore_positive]) // Units: mV, mV/s
 	// ramps a channel to the voltage specified by "output".
 	// ramp is controlled locally on DAC controller.
 	// channel must be the channel set by the GUI.
 	// instrID not used, only here to maintain same format
-	variable instrID, channel, output, ramprate
+	variable instrID, channel, output, ramprate, ignore_positive
 	wave/t fdacvalstr, old_fdacvalstr
 	svar fdackeys
 	nvar fd_ramprate
@@ -617,6 +629,15 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	if(paramIsDefault(ramprate))
 		ramprate = fd_ramprate
 	endif
+
+	///////////////// TEMPORARY 11/2/2020 TIM
+	if(ignore_positive != 1)
+		if (output > 100)
+			resetfdacwindow(channel)
+			abort "\"RampOutputFdac\": Trying to ramp > 100mV without ignore_positive flag set"
+		endif
+	endif
+	////////////////////////////////
 
 	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
 	variable i=0, devchannel = 0, startCh = 0, numDACCh = 0
@@ -741,7 +762,7 @@ function readfadcChannel(instrID,channel) // Units: mV
 	response = remove_rn(response)
 	if(	numtype(str2num(response)) == 0)
 		// good response, update window
-		fadcvalstr[channel][1] = num2str(str2num(response)*1000)  // converting from V to mV
+		fadcvalstr[channel][1] = num2str(str2num(response)) // in Volts not mV
 		return str2num(response)*1000
 	else
 		sprintf err, "[ERROR] \"readfadcChannel\": Bad response! %s", response
@@ -892,7 +913,7 @@ window FastDACWindow() : Panel
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 330, 70, "Ch"
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 390, 70, "Input (mV)"
+	DrawText 390, 70, "Input (V)"
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 480, 70, "Record"
 	SetDrawEnv fsize=14, fstyle=1
@@ -1162,18 +1183,19 @@ end
 //  - c1 (higher order) and
 //  - c2 lower order
 // Calculate effective FastDac value
-// @optparams minVal, maxVal (units mV)
+// @optparams minVal, maxVal (units V)
 
 function fdacChar2Num(c1, c2, [minVal, maxVal])
+	// converts byts to Volts (not mV) because most measurements are in V.
 	string c1, c2
 	variable minVal, maxVal
 	// Set default values for minVal & maxVal
 	if(paramisdefault(minVal))
-		minVal = -10000
+		minVal = -10
 	endif
 
 	if(paramisdefault(maxVal))
-		maxVal = 10000
+		maxVal = 10
 	endif
 	// Check params for violation
 	if(strlen(c1) != 1 || strlen(c2) != 1)
@@ -1193,7 +1215,7 @@ function fdacChar2Num(c1, c2, [minVal, maxVal])
 		b2 += 256
 	endif
 	// Return calculated FastDac value
-	return ((b1*2^8 + b2)*(maxVal-minVal)/(2^16 - 1))+minVal
+	return (((b1*2^8 + b2)*(maxVal-minVal)/(2^16 - 1))+minVal) 
 
 end
 
@@ -1227,7 +1249,9 @@ function/s getfdacStatus(instrID)
 			buffer = addJSONkeyval(buffer, "CH"+fdacvalstr[i][0]+"name", "\""+fdacvalstr[i][3]+"\"")
 		endif
 	endfor
-
+	
+	variable samplingfreq = getfadcspeed(instrID)
+	buffer = addJSONkeyval(buffer, "SamplingFreq", num2str(samplingfreq))
 	buffer = addJSONkeyval(buffer, "fdacKeys", "\""+fdackeys+"\"")  // TODO: Make this nicer, this is temporary way to get all data into json
 
 	nvar hdf5_id
