@@ -198,23 +198,23 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 		buffer = readInstr(instrID,read_bytes=bytes_left,binary=1)
 		sc_distribute_data(buffer,scanList.adclist,bytes_left,rowNum,bytes_read/(2*numadc))
 	endif
-	
+
 	buffer = remove_rn(readInstr(instrID, binary=0, read_term="\n"))
 	if (cmpstr(buffer, "RAMP_FINISHED") != 0)
 		printf "[WARNING]: \"fdacRecordValues\" - End of data was \"%s\" instead of \"RAMP_FINISHED\"", buffer
 	else //Update values
 		wave/t fdacvalstr, old_fdacvalstr
 		variable channel, output
-		for (i=0;i<itemsinlist(scanList.daclist, ",");i++)		
+		for (i=0;i<itemsinlist(scanList.daclist, ",");i++)
 			channel = str2num(stringfromList(i, scanList.daclist, ","))
 			output = str2num(stringfromList(i, scanList.finVal, ","))
 			fdacvalstr[channel][1] = num2str(output)
 			old_fdacvalstr[channel] = fdacvalstr[channel][1]
 		endfor
 	endif
-	
-	
-	
+
+
+
 	/////////////////////////
 	//// Post processing ////
 	/////////////////////////
@@ -387,7 +387,7 @@ function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart)
 			wave datawave2d = $wave2d
 			datawave2d[][rowNum] = datawave[p]
 		endif
-	endfor	
+	endfor
 end
 
 function sc_averageDataWaves(numAverage,adcList)
@@ -659,7 +659,7 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	variable initial = str2num(response)*1000  // Fastdac returns value in Volts not mV
 	if(numtype(initial) == 0)
 		// good response
-		if(abs(initial-str2num(old_fdacvalstr[channel]))<10)
+		if(abs(initial-str2num(old_fdacvalstr[channel]))<1)
 			// no discrepancy
 		else
 			sprintf warn, "[WARNING] \"rampOutputfdac\": Actual output of channel %d is different than expected", channel
@@ -1178,7 +1178,7 @@ function fdacChar2Num(c1, c2, [minVal, maxVal])
 	// Calculate byte values
 	b1 = char2num(c1[0])
 	b2 = char2num(c2[0])
-	
+
 	// Convert to unsigned
 	if (b1 < 0)
 		b1 += 256
@@ -1196,9 +1196,36 @@ function clear_buffer(instrID)
 	variable instrID
 	variable count = 1
 	string buffer
-	do 
+	do
 		viRead(instrID, buffer, 20000, count)
 	while (count != 0)
 //	readinstr(instrID, read_bytes=20000)
 	return count
+end
+
+
+function/s getfdacStatus(instrID)
+	variable instrID
+	wave /t fdacvalstr = fdacvalstr
+	svar fdackeys
+
+	variable numdacs = dimsize(fdacvalstr, 0)
+	variable i=0
+	string buffer = ""
+	for(i=0;i<numdacs;i+=1)
+		buffer = addJSONkeyval(buffer, "CH"+fdacvalstr[i][0], fdacvalstr[i][1])
+	endfor
+
+	for(i=0;i<numdacs;i+=1)
+		if (cmpstr(fdacvalstr[i][3], "")!=0)
+			buffer = addJSONkeyval(buffer, "CH"+fdacvalstr[i][0]+"name", "\""+fdacvalstr[i][3]+"\"")
+		endif
+	endfor
+
+	buffer = addJSONkeyval(buffer, "fdacKeys", "\""+fdackeys+"\"")  // TODO: Make this nicer, this is temporary way to get all data into json
+
+	nvar hdf5_id
+	HDF5SaveData /IGOR=-1 /WRIT=1 /Z fdacvalstr , hdf5_id//Saving full fdacvalstr text wave so it can easily be loaded from hdf5 later
+
+	return addJSONkeyval("", "FastDAC", buffer)
 end
