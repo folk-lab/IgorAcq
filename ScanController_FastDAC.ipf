@@ -74,7 +74,7 @@ function sc_fillfdacKeys(instrID,visa_address,numDACCh,numADCCh)
 	fdackeys = sortlist(fdackeys,",")
 end
 
-function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcutoff,numAverage,notch])
+function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcutoff,numAverage,notch, ignore_negative]) //TIM: "ignore_negative" is a temporary protection against ramping to positive voltages
 	// RecordValues for FastDAC's. This function should replace RecordValues in scan functions.
 	// j is outer scan index, if it's a 1D scan just set j=0.
 	// rampCh is a comma seperated string containing the channels that should be ramped.
@@ -83,7 +83,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	// 		- RCcutoff set the lowpass cutoff frequency
 	//		- average set the number of points to average
 	//		- nocth sets the notch frequencie, as a comma seperated list (width is fixed at 5Hz)
-	variable instrID, rowNum
+	variable instrID, rowNum, ignore_negative
 	string rampCh, start, fin
 	variable numpts, ramprate, RCcutoff, numAverage
 	string notch
@@ -159,6 +159,12 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 		endif
 	endif
 
+	if (ignore_negative != 1)
+		for(i=0; i<daclen; i++)
+			
+		endfor
+	endif
+	
 	sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, scanList.startVal, scanList.finVal, numpts
 	writeInstr(instrID,cmd)
 
@@ -1065,7 +1071,7 @@ function fdacCreateControlWaves(numDACCh,numADCCh)
 	make/o/t/n=(numDACCh) fdacval0 = ""  		// Channel
 	make/o/t/n=(numDACCh) fdacval1 = "0"  		// Output/mV
 	make/o/t/n=(numDACCh) fdacval2 = "10000"  // Limit/mV
-	make/o/t/n=(numDACCh) fdacval3 = "Label"  // Label
+	make/o/t/n=(numDACCh) fdacval3 = ""  		// Label
 	variable i=0
 	for(i=0;i<numDACCh;i+=1)
 		fdacval0[i] = num2istr(i)
