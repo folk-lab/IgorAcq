@@ -1196,8 +1196,11 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 					if(stringmatch(wn,stringfromlist(j,graphtitle)))
 						graphopen = 1
 						activegraphs+= stringfromlist(j,graphnumlist)+";"
-						Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
-						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+						Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label	
+						if(sc_is2d == 0)
+							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label  // Can add something like current /nA as y_label for 1D only... if 2D sc_y_label will be for 2D plot
+						endif
+						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)					
 					endif
 					if(sc_is2d)
 						if(stringmatch(wn+"2d",stringfromlist(j,graphtitle)))
@@ -1205,17 +1208,21 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 							activegraphs+= stringfromlist(j,graphnumlist)+";"
 							Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
 							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+							TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)	
 						endif
 					endif
 				endfor
-				if(graphopen && graphopen2d)
-				elseif(graphopen2d)
+				if(graphopen && graphopen2d) //If both open do nothing
+				elseif(graphopen2d) //If only 2D is open then open 1D
 					display $wn
 					setwindow kwTopWin, enablehiresdraw=3
 					Label bottom, sc_x_label
+					if(sc_is2d == 0)
+						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+					endif
 					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 					activegraphs+= winname(0,1)+";"
-				elseif(graphopen)
+				elseif(graphopen) // If only 1D is open then open 2D
 					if(sc_is2d)
 						wn2d = wn + "2d"
 						display
@@ -1228,11 +1235,14 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 						activegraphs+= winname(0,1)+";"
 					endif
-				else
+				else // Open Both
 					wn2d = wn + "2d"
 					display $wn
 					setwindow kwTopWin, enablehiresdraw=3
 					Label bottom, sc_x_label
+					if(sc_is2d == 0)
+						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+					endif
 					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 					activegraphs+= winname(0,1)+";"
 					if(sc_is2d)
@@ -1263,7 +1273,9 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 						graphopen = 1
 						activegraphs+= stringfromlist(j,graphnumlist)+";"
 						Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
-						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+						if(sc_is2d == 0)
+							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label 
+						endif
 						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 					endif
 					if(sc_is2d)
@@ -1277,13 +1289,16 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 					endif
 				endfor
 				if(graphopen && graphopen2d)
-				elseif(graphopen2d)
+				elseif(graphopen2d) // If only 2D open then open 1D
 					display $wn
 					setwindow kwTopWin, enablehiresdraw=3
 					Label bottom, sc_x_label
+					if(sc_is2d == 0)
+						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+					endif
 					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 					activegraphs+= winname(0,1)+";"
-				elseif(graphopen)
+				elseif(graphopen) // If only 1D is open then open 2D
 					if(sc_is2d)
 						wn2d = wn + "2d"
 						display $wn
@@ -1292,11 +1307,14 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 						activegraphs+= winname(0,1)+";"
 					endif
-				else
+				else // open both
 					wn2d = wn + "2d"
 					display $wn
 					setwindow kwTopWin, enablehiresdraw=3
 					Label bottom, sc_x_label
+					if(sc_is2d == 0)
+						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+					endif
 					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 					activegraphs+= winname(0,1)+";"
 					if(sc_is2d)
@@ -1328,7 +1346,10 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 						graphopen = 1
 						activegraphs+= stringfromlist(j,graphnumlist)+";"
 						Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
-						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+						if(sc_is2d == 0)
+							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+						endif
+						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 					endif
 					if(sc_is2d)
 						if(stringmatch(wn+"_2d",stringfromlist(j,graphtitle)))
@@ -1336,17 +1357,21 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 							activegraphs+= stringfromlist(j,graphnumlist)+";"
 							Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
 							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+							TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 						endif
 					endif
 				endfor
 				if(graphopen && graphopen2d)
-				elseif(graphopen2d)
+				elseif(graphopen2d)  // If only 2D open then open 1D
 					display $wn
 					setwindow kwTopWin, enablehiresdraw=3
 					Label bottom, sc_x_label
+					if(sc_is2d == 0)
+						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+					endif
 					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 					activegraphs+= winname(0,1)+";"
-				elseif(graphopen)
+				elseif(graphopen) // If only 1D is open then open 2D
 					if(sc_is2d)
 						wn2d = wn + "_2d"
 						display
@@ -1356,13 +1381,18 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 						colorscale /c/n=$sc_ColorMap /e/a=rc
 						Label left, sc_y_label
 						Label bottom, sc_x_label
+						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 						activegraphs+= winname(0,1)+";"
 					endif
-				else
+				else // open both
 					wn2d = wn + "_2d"
 					display $wn
 					setwindow kwTopWin, enablehiresdraw=3
 					Label bottom, sc_x_label
+					if(sc_is2d == 0)
+						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+					endif
+					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 					activegraphs+= winname(0,1)+";"
 					if(sc_is2d)
 						display
@@ -1372,6 +1402,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 						colorscale /c/n=$sc_ColorMap /e/a=rc
 						Label left, sc_y_label
 						Label bottom, sc_x_label
+						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat="+num2str(filenum)
 						activegraphs+= winname(0,1)+";"
 					endif
 				endif
@@ -1746,7 +1777,7 @@ function RecordValues(i, j, [readvstime, fillnan])
 	catch
 		variable err = GetRTError(1)
 
-		// reset sweep control parameters if igor about button is used
+		// reset sweep control parameters if igor abort button is used
 		if(v_abortcode == -1)
 			sc_abortsweep = 0
 			sc_pause = 0
@@ -2143,7 +2174,7 @@ function SaveWaves([msg,save_experiment,fastdac])
 				if(fadcattr[ii][2] == 48) //checkbox checked
 					wn = fadcvalstr[ii][3]
 					if(sc_is2d)
-						wn += "2d"
+						wn += "_2d"
 					endif
 					filename = "dat"+filenumstr+wn
 					duplicate $wn $filename
@@ -2155,7 +2186,7 @@ function SaveWaves([msg,save_experiment,fastdac])
 					if(sc_Saverawfadc)
 						wn_raw = "ADC"+num2istr(ii)
 						if(sc_is2d)
-							wn_raw += "2d"
+							wn_raw += "_2d"
 						endif
 						filename = "dat"+filenumstr+wn_raw
 						duplicate $wn_raw $filename
