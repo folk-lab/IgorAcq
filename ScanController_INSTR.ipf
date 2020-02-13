@@ -256,6 +256,7 @@ threadsafe function/s readInstr(instrID, [read_term, read_bytes, binary])
     if(binary != 0)
     	visaSetReadTermEnable(instrID, 0) // Set no term character 
     	visaSetSerialEndIn(instrID, 0) // Sets term character read mode - read until num_bytes
+    	visaSetTimeout(instrID, 1000) // Make sure timeout isn't too short
    	 else 
    	 	 visaSetSerialEndIn(instrID, 2) // Read until term_char
     endif
@@ -542,7 +543,7 @@ threadsafe function visaSetReadTermEnable(instrID, enable)
 	return status
 end
 
-function visaSetTimeout(instrID, timeout) // timeout value in ms
+threadsafe function visaSetTimeout(instrID, timeout) // timeout value in ms
 	variable instrID, timeout
 	variable status
 	status = viSetAttribute(instrID, VI_ATTR_TMO_VALUE, timeout)

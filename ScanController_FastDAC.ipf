@@ -74,7 +74,7 @@ function sc_fillfdacKeys(instrID,visa_address,numDACCh,numADCCh)
 	fdackeys = sortlist(fdackeys,",")
 end
 
-function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcutoff,numAverage,notch, ignore_positive]) //TIM: "ignore_positive" is a temporary protection against ramping to positive voltages
+function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcutoff,numAverage,notch,delay,ignore_positive]) //TIM: "ignore_positive" is a temporary protection against ramping to positive voltages
 	// RecordValues for FastDAC's. This function should replace RecordValues in scan functions.
 	// j is outer scan index, if it's a 1D scan just set j=0.
 	// rampCh is a comma seperated string containing the channels that should be ramped.
@@ -83,7 +83,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	// 		- RCcutoff set the lowpass cutoff frequency
 	//		- average set the number of points to average
 	//		- nocth sets the notch frequencie, as a comma seperated list (width is fixed at 5Hz)
-	variable instrID, rowNum, ignore_positive
+	variable instrID, rowNum, ignore_positive, delay
 	string rampCh, start, fin
 	variable numpts, ramprate, RCcutoff, numAverage
 	string notch
@@ -91,11 +91,10 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	nvar sc_abortsweep, sc_pause, sc_scanstarttime
 	wave/t fadcvalstr
 	wave fadcattr
-
+	nvar sc_abortsweep, sc_pause
 	if(paramisdefault(ramprate))
 		ramprate = 1000
 	endif
-
 	// compare to earlier call of InitializeWaves
 	nvar fastdac_init
 	if(fastdac_init != 1)
@@ -131,6 +130,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	for(i=0;i<itemsinlist(scanList.daclist,",");i+=1)
 		rampOutputfdac(instrID,str2num(stringfromlist(i,scanList.daclist,",")),str2num(stringfromlist(i,scanList.startVal,",")),ramprate=ramprate)
 	endfor
+	sleep/s delay
 	// build command and start ramp
 	// for now we only have to send one command to one device.
 
@@ -171,13 +171,26 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 				dowindow/k SweepControl
 				abort "INT_RAMP was going to ramp > 100mV without ignore_positive flag set"
 			endif
+			if (val < -3000)
+				dowindow/k SweepControl
+				abort "INT_RAMP was going to ramp < -3000mV without ignore_positive flag set"
+			endif
 		endfor
 	endif
 	////////////////////////
 	
+	
+	variable update_loop_val // Can call doupdate more often if sampling frequency is low enough
+	if (getfadcspeed(instrID) < 1000)
+		update_loop_val = 1
+	elseif (getfadcspeed(instrID) < 3000)
+		update_loop_val = 3
+	else
+		update_loop_val = 10
+	endif
+	
 	sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, scanList.startVal, scanList.finVal, numpts
 	writeInstr(instrID,cmd)
-
 	// read returned values
 	variable totalByteReturn = itemsInList(scanList.adclist, ",")*numpts*2, read_chunk=0
 //	variable chunksize = itemsinlist(scanList.adclist,",")*2*30
@@ -203,8 +216,22 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 		// add data to rawwaves and datawaves
 		sc_distribute_data(buffer,scanList.adclist,read_chunk,rowNum,bytes_read/(2*numadc))
 		bytes_read += read_chunk
-		if (mod(i,10) == 0) //Slows down fastdac if updating faster
+		if (mod(i,update_loop_val) == 0) //Slows down fastdac if calling update on every loop with high sampling rate (about 15ms per doupdate)
 			doupdate
+			// check abort/pause status
+			try
+				sc_checksweepstate()
+			catch
+				variable err = GetRTError(1)
+				// reset sweep control parameters if igor abort button is used
+				if(v_abortcode == -1)
+					sc_abortsweep = 0
+					sc_pause = 0
+				endif
+				clear_buffer(instrID) // Try to leave the fastdac in a useable state
+				//silent abort
+				abortonvalue 1,10
+			endtry
 		endif
 		i++
 	while(totalByteReturn-bytes_read > read_chunk)
@@ -317,7 +344,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	if(doAverage == 1)
 		sc_averageDataWaves(numAverage,scanList.adcList)
 	endif
-
+	doupdate //Update Graphs
 	return 0
 end
 
@@ -1224,10 +1251,17 @@ function clear_buffer(instrID)
 	variable instrID
 	variable count = 1
 	string buffer
+	variable highcount = 1
+	visaSetSerialEndIn(instrID, 2)
+   visaSetReadTermEnable(instrID, 0)
+   visasettimeout(instrID, 100)
 	do
-		viRead(instrID, buffer, 20000, count)
+		viRead(instrID, buffer, 100, count)
+		if (count == 0)
+			viRead(instrID, buffer, 100, count) // Sometimes need to do a second one if an endline was hit
+		endif
 	while (count != 0)
-//	readinstr(instrID, read_bytes=20000)
+	visasettimeout(instrID, 1000)
 	return count
 end
 
