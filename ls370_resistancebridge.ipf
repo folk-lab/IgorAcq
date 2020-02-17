@@ -398,12 +398,15 @@ function setLS370PIDcontrol(instrID,channel,setpoint,maxcurrent) //Units: mK, mA
 		abort "trying to set setpoint to NaN or Inf"
 	endif
 
-	sprintf payload, "{\"channel\": %d, \"set_point\": %g, \"max_current_ma\": %g, \"max_heater_level\": %s}", channel, setpoint/1000, maxcurrent, "8"
-	sprintf command, "set-temperature-control-parameters?controller_label=%s", ls_label
-
-	sendLS370(instrID,command,"post",payload=payload)
+	sprintf payload, "{\"PID\":[%d,%d,%d], \"channel\": %d, \"ctrl_label\":\"%s\", \"delay\": \"%d\", \"filter\":\"%s\",  \"max_current_ma\": %g, \"max_heater_level\": \"%s\", \"set_point\": %g, \"units\":%d}", 	10, 5, 0, channel, ls_label, 1, "Off", maxcurrent, "8", setpoint/1000, 1
+	sprintf command, "set-temperature-control-parameters"
+	sendLS370(instrID,command,"put",payload=payload)
 	temp_set = setpoint
 end
+
+
+
+
 
 function setLS370cmode(instrID,mode)
 	//PID: 1, open loop: 3, off: 4
@@ -419,35 +422,38 @@ function setLS370cmode(instrID,mode)
 end
 
 function setLS370exclusivereader(instrID,channel,[interval])
-	// BF small channels: [bfsmall_still_heater, bfsmall_mc_heater, bfsmall_50K, bfsmall_4K, bfsmall_magnet, bfsmall_still, bfsmall_mc]
-	// interval units: ms
+	// BF small channels: [ld_mc_heater, ld_still_heater, ld_50k, ld_4k, ld_magnet, ld_still, ld_mc]
+	// interval units: s
 	string instrID, channel
 	variable interval
 	string command, payload
 	svar ls_label
 
 	if(paramisdefault(interval))
-		interval=1000
+		interval=5
 	endif
 
-	sprintf command, "set-exclusive-reader?controller_label=%s", ls_label
-	sprintf payload, "{\"channel_label\":\"%s\",\"interval_ms\":%d}", channel, interval
+	sprintf command, "set-exclusive-reader"
+	sprintf payload, "{\"channel_label\":\"%s\", \"ctrl_label\": \"%s\",\"interval_s\":%d}", channel, ls_label, interval
 
-	sendLS370(instrID,command,"post",payload=payload)
+	sendLS370(instrID,command,"put",payload=payload)
 
 end
+
 
 function resetLS370exclusivereader(instrID)
 	string instrID
 	string command, payload
 	svar ls_label
 
-	sprintf command, "reset-exclusive-reader?controller_label=%s", ls_label
+	sprintf command, "reset-exclusive-reader/%s", ls_label
 	payload = "{}"
 
 
 	sendLS370(instrID,command,"post",payload=payload)
 end
+
+
 
 
 function setLS370PIDtemp(instrID,temp) // Units: mK
@@ -575,8 +581,8 @@ function setLS370heaterpower(instrID,heater,output) //Units: mW
 	sendLS370(instrID,command,"post", payload=payload)
 end
 
-function turnoffLS370MCheater(instrID)
-	// turns off MC heater.
+function turnoffLS370heater(instrID)
+	// turns off all heaters.
 	// this function can seem unnecessary, but is in some cases need
 	// and therefore it is a good practise to always use it.
 	string instrID
@@ -584,7 +590,7 @@ function turnoffLS370MCheater(instrID)
 	svar ls_label
 	nvar pid_led, mcheater_led, pid_mode
 
-	sprintf command, "turn-heater-off?controller_label=%s", ls_label
+	sprintf command, "turn-heater-off"
 	payload = "{}"
 	sendLS370(instrID,command,"post", payload=payload)
 	pid_led = 0
@@ -722,6 +728,8 @@ function/s sendLS370(instrID,cmd,method,[payload, keys])
 		response = getHTTP(instrID,cmd,headers)
 	elseif(cmpstr(method,"post")==0 && !paramisdefault(payload))
 		response = postHTTP(instrID,cmd,payload,headers)
+	elseif(cmpstr(method,"put")==0 && !paramisdefault(payload))
+		response = putHTTP(instrID,cmd,payload,headers)
 	else
 		abort "Not a supported method or you forgot to add a payload."
 	endif
