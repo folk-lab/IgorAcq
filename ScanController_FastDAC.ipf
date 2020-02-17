@@ -755,7 +755,7 @@ function rampOutputfdac(instrID,channel,output,[ramprate, ignore_positive]) // U
 	endif
 end
 
-function readfadcChannel(instrID,channel) // Units: mV
+function readfadcChannel(instrID,channel) // Units: V
 	// channel must be the channel number given by the GUI!
 	// instrID not used, only here to maintain same format
 	variable instrID, channel
@@ -790,7 +790,7 @@ function readfadcChannel(instrID,channel) // Units: mV
 	if(	numtype(str2num(response)) == 0)
 		// good response, update window
 		fadcvalstr[channel][1] = num2str(str2num(response)) // in Volts not mV
-		return str2num(response)*1000
+		return str2num(response)
 	else
 		sprintf err, "[ERROR] \"readfadcChannel\": Bad response! %s", response
 		print err
