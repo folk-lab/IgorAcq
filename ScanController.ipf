@@ -502,8 +502,11 @@ end
 /////////////////////
 
 function sc_rebuildwindow()
+	string cmd=""
+	getwindow/z ScanController wsizeRM
 	dowindow /k ScanController
-	execute("ScanController()")
+	sprintf cmd, "ScanController(%f,%f,%f,%f)", v_left,v_right,v_top,v_bottom
+	execute(cmd)
 end
 
 // In order to enable or disable a wave
@@ -551,7 +554,8 @@ function ChangeScanControllerItemStatus(wn, ison)
 	execute("doupdate")
 end
 
-Window ScanController() : Panel
+Window ScanController(v_left,v_right,v_top,v_bottom) : Panel
+	variable v_left,v_right,v_top,v_bottom
 	variable sc_InnerBoxW = 660, sc_InnerBoxH = 32, sc_InnerBoxSpacing = 2
 
 	if (numpnts(sc_RawWaveNames) != numpnts(sc_RawRecord) ||  numpnts(sc_RawWaveNames) != numpnts(sc_RawScripts))
@@ -567,6 +571,9 @@ Window ScanController() : Panel
 	PauseUpdate; Silent 1		// building window...
 	dowindow /K ScanController
 	NewPanel /W=(10,10,sc_InnerBoxW + 30,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+90) /N=ScanController
+	if(v_left+v_right+v_top+v_bottom > 0)
+		MoveWindow/w=ScanController v_left,v_top,V_right,v_bottom
+	endif
 	ModifyPanel frameStyle=2
 	ModifyPanel fixedSize=1
 	SetDrawLayer UserBack

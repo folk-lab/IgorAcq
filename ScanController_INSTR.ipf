@@ -291,7 +291,7 @@ threadsafe function/s queryInstr(instrID, cmd, [read_term, delay])
 
 	writeInstr(instrID, cmd)
 	if(!paramisdefault(delay))
-		sleep /S delay
+		sleep/s delay
 	endif
     if(paramisdefault(read_term))
         response = readInstr(instrID)
@@ -301,6 +301,58 @@ threadsafe function/s queryInstr(instrID, cmd, [read_term, delay])
 
 	return response
 end
+
+function/s queryInstrProgress(instrID, cmd, delay, delaymsg, [read_term])
+	variable instrID, delay
+	string cmd, delaymsg, read_term
+	
+	writeInstr(instrID, cmd)
+	
+	sc_progressbarDelay(delay,delaymsg)
+	
+	string response = ""
+	if(paramisdefault(read_term))
+        response = readInstr(instrID)
+    else
+        response = readInstr(instrID, read_term = read_term)
+    endif
+
+	return response
+end
+
+function sc_progressbarDelay(delay,delaymsg)
+	variable delay
+	string delaymsg
+	
+	variable/g progress = 0
+	string/g progressStr = delaymsg
+	execute("progressBar()")
+	
+	delay = delay*1e6
+	variable start_time = stopMStimer(-2)
+	do
+		doupdate/w=progressBar
+		progress = (stopMStimer(-2)-start_time)/delay*100 // progress in procent
+		
+	while(stopMStimer(-2)-start_time < delay)
+	dowindow/k ProgressBar
+end
+
+window progressBar() : Panel
+	PauseUpdate; Silent 1       // building window...
+	NewPanel /W=(267+400,122+400,480+400,200+400)/N=ProgressBar
+	SetDrawLayer UserBack
+	SetDrawEnv fsize= 14
+	DrawText 72,23, "Progress ..."
+	ValDisplay valdispProgress,pos={8,28},size={200,15},mode=3,frame=2
+	ValDisplay valdispProgress,limits={0,100,0},barmisc={0,0},bodyWidth=200
+	ValDisplay valdispProgress,value=progress
+	SetDrawEnv fsize= 14
+	variable msglength = strlen(progressStr)
+	if(msglength > 0)
+		DrawText 102-msglength*3,65, progressStr
+	endif
+endmacro
 
 function/s postHTTP(instrID,cmd,payload,headers)
 	string instrID, cmd, payload, headers

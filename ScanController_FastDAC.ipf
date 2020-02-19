@@ -92,7 +92,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	wave fadcattr
 	
 	if(paramisdefault(ramprate))
-		ramprate = 500
+		ramprate = 1000
 	endif
 	
 	// compare to earlier call of InitializeWaves
@@ -135,8 +135,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 		read_chunk = totalByteReturn
 	endif
 	
-	// make temp wave to hold incomming data chunks
-	// and distribute to data waves
+	// hold incomming data chunks in string and distribute to data waves
 	string buffer = ""
 	variable bytes_read = 0
 	do
@@ -223,7 +222,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 				coefList = addlistitem(coef,coefList,",",itemsinlist(coefList))
 			endif
 		endfor
-	elseif(doLowpass == 1 && doNOtch == 0)
+	elseif(doLowpass == 1 && doNotch == 0)
 		coef = "coefs"+num2istr(0)
 		make/o/d/n=0 $coef
 		// add RC filter in first round
@@ -240,26 +239,49 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	
 	// apply filters
 	if(doLowpass == 1 || doNotch == 1)
-		sc_applyfilters(coefList,scanList.adclist,doLowpass,doNotch,cutoff_frac,samplingFreq,FIRcoefs,notch_fraclist)
+		sc_applyfilters(coefList,scanList.adclist,doLowpass,doNotch,cutoff_frac,samplingFreq,FIRcoefs,notch_fraclist,rowNum)
 	endif
 	
 	// average datawaves
+	variable lastRow = sc_lastrow(rowNum)
 	if(doAverage == 1)
-		sc_averageDataWaves(numAverage,scanList.adcList)
+		sc_averageDataWaves(numAverage,scanList.adcList,lastRow,rowNum)
 	endif
 	
 	return sweeptime
 end
 
-function sc_applyfilters(coefList,adcList,doLowpass,doNotch,cutoff_frac,samplingFreq,FIRcoefs,notch_fraclist)
-	string coefList, adcList
-	variable doLowpass, doNotch, cutoff_frac, samplingFreq, FIRcoefs
-	string notch_fraclist
-	wave/t fadcvalstr
+function sc_lastrow(rowNum)
+	variable rowNum
 	
+	nvar sc_is2d, sc_numptsy
+	variable check = 0
+	if(sc_is2d)
+		check = sc_numptsy-1
+	else
+		check = sc_numptsy
+	endif
+	
+	if(rowNum != check)
+		return 0
+	elseif(rowNum == check)
+		return 1
+	else
+		return 0
+	endif
+end
+
+function sc_applyfilters(coefList,adcList,doLowpass,doNotch,cutoff_frac,samplingFreq,FIRcoefs,notch_fraclist,rowNum)
+	string coefList, adcList, notch_fraclist
+	variable doLowpass, doNotch, cutoff_frac, samplingFreq, FIRcoefs, rowNum
+	wave/t fadcvalstr
+	nvar sc_is2d
+	
+	string wave1d = "", wave2d = ""
 	variable i=0,j=0
 	for(i=0;i<itemsinlist(adcList,",");i+=1)
-		wave datawave = $fadcvalstr[str2num(stringfromlist(i,adcList,","))][3]
+		wave1d = fadcvalstr[str2num(stringfromlist(i,adcList,","))][3]
+		wave datawave = $wave1d
 		for(j=0;j<itemsinlist(coefList,",");j+=1)
 			wave coefs = $stringfromlist(j,coefList,",")
 			if(doLowpass == 1 && j == 0)
@@ -268,6 +290,11 @@ function sc_applyfilters(coefList,adcList,doLowpass,doNotch,cutoff_frac,sampling
 				filterfir/nmf={str2num(stringfromlist(j,notch_fraclist,",")),10.0/samplingFreq,1.0e-12,2}/coef=coefs datawave
 			endif
 		endfor
+		if(sc_is2d)
+			wave2d = wave1d+"_2d"
+			wave datawave2d = $wave2d
+			datawave2d[][rowNum] = datawave[p]
+		endif
 	endfor
 end
 
@@ -321,45 +348,120 @@ function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart)
 	endfor
 end
 
-function sc_averageDataWaves(numAverage,adcList)
-	variable numAverage
+function sc_averageDataWaves(numAverage,adcList,lastRow,rowNum)
+	variable numAverage, lastRow, rowNum
 	string adcList
 	wave/t fadcvalstr
-	nvar sc_is2d
+	nvar sc_is2d, sc_startx, sc_finx, sc_starty, sc_finy
 	
 	variable i=0,j=0,k=0,newsize=0,adcIndex=0,numADCCh=itemsinlist(adcList,","),h=numAverage-1
-	string wave1d="",wave2d="",newname1d="",newname2d=""
+	string wave1d="",wave2d="",avg1d="",avg2d="",graph="",avggraph=""
 	for(i=0;i<numADCCh;i+=1)
 		adcIndex = str2num(stringfromlist(i,adcList,","))
 		wave1d = fadcvalstr[adcIndex][3]
 		wave datawave = $wave1d
 		newsize = floor(dimsize(datawave,0)/numAverage)
-		// rename original waves
-		newname1d = "temp_"+wave1d
-		killwaves/z $newname1d
-		rename datawave, newname1d
-		// make new wave with old name
-		make/o/n=(newsize) $wave1d
-		wave newdatawave = $wave1d
-		for(j=0;j<newsize;j+=1)
-			newdatawave[j] = mean($newname1d,j+j*h,j+h+j*h)
-		endfor
-		if(sc_is2d)
-			wave2d = wave1d+"_2d"
-			wave datawave2d = $wave2d
-			newname2d = "temp_"+wave2d
-			killwaves/z $newname2d
-			rename datawave2d, newname2d
-			// make new wave with old name
-			make/o/n=(newsize,dimsize($newname2d,1)) $wave2d
-			wave newdatawave2d = $wave2d
-			for(k=0;k<dimsize(newdatawave2d,1);k+=1)
-				for(j=0;j<newsize;j+=1)
-					newdatawave2d[j][k] = mean($newname2d,j+j*h,j+h+j*h)
-				endfor
+		avg1d = "avg_"+wave1d
+		// check if waves are plotted on the same graph
+		string key="", graphlist = sc_samegraph(wave1d,avg1d)
+		if(str2num(stringbykey("result",graphlist,":",",")) > 1)
+			// more than one graph have both waves plotted
+			// we need to close one. Let's hope we close the correct one!
+			graphlist = removebykey("result",graphlist,":",",")
+			for(i=0;i<itemsinlist(graphlist,",")-1;i+=1)
+				key = "graph"+num2istr(i)
+				killwindow/z $stringbykey(key,graphlist,":",",")
+				graphlist = removebykey(key,graphlist,":",",")
 			endfor
 		endif
+		if(lastRow)
+			duplicate/o datawave, $avg1d
+			make/o/n=(newsize) $wave1d = nan
+			wave newdatawave = $wave1d
+			setscale/i x, sc_startx, sc_finx, newdatawave
+			// average datawave into avgdatawave
+			for(j=0;j<newsize;j+=1)
+				newdatawave[j] = mean($avg1d,j+j*h,j+h+j*h)
+			endfor
+			if(sc_is2d)
+				nvar sc_numptsy
+				// flip colors of traces in 1d graph
+				graph = stringfromlist(0,sc_findgraphs(wave1d),",")
+				modifygraph/w=$graph rgb($wave1d)=(0,0,65535), rgb($avg1d)=(65535,0,0)
+				// average 2d data
+				avg2d = "tempwave2d"
+				wave2d = wave1d+"_2d"
+				duplicate/o $wave2d, $avg2d
+				make/o/n=(newsize,sc_numptsy) $wave2d = nan
+				wave datawave2d = $wave2d
+				setscale/i x, sc_startx, sc_finx, datawave2d
+				setscale/i y, sc_starty, sc_finy, datawave2d
+				for(k=0;k<sc_numptsy;k+=1)
+					duplicate/o/rmd=[][k,k] $avg2d, tempwave
+					for(j=0;j<newsize;j+=1)
+						datawave2d[j][k] = mean(tempwave,j+j*h,j+h+j*h)
+					endfor
+				endfor
+			endif
+		else
+			make/o/n=(newsize) $avg1d
+			setscale/i x, sc_startx, sc_finx, $avg1d
+			wave avgdatawave = $avg1d
+			// average datawave into avgdatawave
+			for(j=0;j<newsize;j+=1)
+				avgdatawave[j] = mean(datawave,j+j*h,j+h+j*h)
+			endfor
+			if(rowNum == 0)
+				// plot on top of datawave
+				graphlist = sc_findgraphs(wave1d)
+				graph = stringfromlist(itemsinlist(graphlist,",")-1,graphlist,",")
+				appendtograph/w=$graph/c=(0,0,65535) avgdatawave
+			endif
+		endif
 	endfor
+end
+
+function/s sc_samegraph(wave1,wave2)
+	string wave1,wave2
+	
+	string graphs1="",graphs2=""
+	graphs1 = sc_findgraphs(wave1)
+	graphs2 = sc_findgraphs(wave2)
+	
+	variable graphLen1 = itemsinlist(graphs1,","), graphLen2 = itemsinlist(graphs2,","), result=0, i=0, j=0
+	string testitem="",graphlist="", graphitem=""
+	graphlist=addlistItem("result:0",graphlist,",",0)
+	if(graphLen1 > 0 && graphLen2 > 0)
+		for(i=0;i<graphLen1;i+=1)
+			testitem = stringfromlist(i,graphs1,",")
+			for(j=0;j<graphLen2;j+=1)
+				if(cmpstr(testitem,stringfromlist(j,graphs2,",")) == 0)
+					result += 1
+					graphlist = replaceStringbykey("result",graphlist,num2istr(result),":",",")
+					sprintf graphitem, "graph%d:%s",result-1,testitem
+					graphlist = addlistitem(graphitem,graphlist,",",result)
+				endif
+			endfor
+		endfor
+	endif 
+	
+	return graphlist
+end
+
+function/s sc_findgraphs(inputwave)
+	string inputwave
+	string opengraphs = winlist("*",",","WIN:1"), waveslist = "", graphlist = "", graphname = ""
+	variable i=0, j=0
+	for(i=0;i<itemsinlist(opengraphs,",");i+=1)
+		sprintf graphname, "WIN:%s", stringfromlist(i,opengraphs,",")
+		waveslist = wavelist("*",",",graphname)
+		for(j=0;j<itemsinlist(waveslist,",");j+=1)
+			if(cmpstr(inputwave,stringfromlist(j,waveslist,",")) == 0)
+				graphlist = addlistItem(stringfromlist(i,opengraphs,","),graphlist,",")
+			endif
+		endfor
+	endfor
+	return graphlist
 end
 
 function sc_fdacSortChannels(rampCh,start,fin)
@@ -437,39 +539,73 @@ structure fdacChLists
 endstructure
 
 function getfadcSpeed(instrID)
+	// Returns speed in Hz (but arduino thinks in microseconds)
 	variable instrID
+
+	string response="", compare="", cmd=""
+
+	cmd = "READ_CONVERT_TIME"
+	response = queryInstr(instrID,cmd+",0\r",read_term="\r\n")  // Get conversion time for channel 0 (should be same for all channels)
+	if(numtype(str2num(response)) != 0)
+		abort "[ERROR] \"getfadcSpeed\": device is not connected"
+	endif
 	
-	string response="",cmd=""
+	svar fdackeys
+	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",",")), i=0, numADCCh = 0
+	string instrAddress = getResourceAddress(instrID), deviceAddress = ""
+	for(i=0;i<numDevices;i+=1)
+		deviceAddress = stringbykey("visa"+num2istr(i+1),fdackeys,":",",")
+		if(cmpstr(deviceAddress,instrAddress) == 0)
+			numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),fdackeys,":",","))
+			break
+		endif
+	endfor
+	for(i=1;i<numADCCh-1;i+=1)
+		compare = queryInstr(instrID,cmd+","+num2str(i)+"\r",read_term="\r\n")
+		if(numtype(str2num(compare)) != 0)
+			abort "[ERROR] \"getfadcSpeed\": device is not connected"
+		elseif(str2num(compare) != str2num(response)) // Ensure ADC channels all have same conversion time
+			print "[WARNING] \"getfadcSpeed\": ADC channels 0 & "+num2istr(i)+" have different conversion times!"
+		endif
+	endfor
 	
-	cmd = "ADD REAL COMMAND"
-	response = queryInstr(instrID,cmd,read_term="\r\n")
-	return str2num(response)
+	return 1.0/(str2num(response)*1.0e-6) // return value in Hz
 end
 
-function setfadcSpeed(instrID,speed) //FIX
-	// speed should be a number between 1-3.
-	// slow=1, fast=2 and fastest=3
+function setfadcSpeed(instrID,speed)
+	// speed should be a number between 1-4.
+	// slowest=1, slow=2, fast=3 and fastest=4
 	variable instrID, speed
+	string speeds = "1:372,2:2008,3:6060,4:12195"
 	
 	// check formatting of speed
-	if(speed < 0 || speed > 3)
-		print "[ERROR] \"setfadcSpeeed\": Speed must be integer between 1-3"
+	if(speed < 0 || speed > 4)
+		print "[ERROR] \"setfadcSpeed\": Speed must be integer between 1-4"
 		abort
 	endif
 	
-	string cmd = "ADD REAL COMMAND!"
-	string response = queryInstr(instrID, cmd+"\r\n", read_term="\r\n")
+	svar fdackeys
+	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",",")), i=0, numADCCh = 0, numDevice = 0
+	string instrAddress = getResourceAddress(instrID), deviceAddress = "", cmd = "", response = ""
+	for(i=0;i<numDevices;i+=1)
+		deviceAddress = stringbykey("visa"+num2istr(i+1),fdackeys,":",",")
+		if(cmpstr(deviceAddress,instrAddress) == 0)
+			numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),fdackeys,":",","))
+			numDevice = i+1
+			break
+		endif
+	endfor
+	for(i=0;i<numADCCh;i+=1)
+		sprintf cmd, "CONVERT_TIME,%d,%d\r", i, 1.0/(str2num(stringbykey(num2istr(speed),speeds,":",","))*1.0e-6)  // Convert from Hz to microseconds
+		response = queryInstr(instrID, cmd, read_term="\r\n")  //Set all channels at same time (generally good practise otherwise can't read from them at the same time)
+		if(numtype(str2num(response) != 0))
+			abort "[ERROR] \"setfadcSpeed\": Bad response = " + response
+		endif
+	endfor
 	
-	// check respose
-	// not sure what to expect!
-	if(1)
-		// update window
-	else
-		string err
-		sprintf err, "[ERROR] \"setfadcSpeed\": Bad response! %s", response
-		print err
-		abort
-	endif
+	// update window
+	string adcSpeedMenu = "fadcSetting"+num2istr(numDevice)
+	popupMenu $adcSpeedMenu,mode=speed
 end
 
 function resetfdacwindow(fdacCh)
@@ -500,18 +636,17 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	
 	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
 	variable i=0, devchannel = 0, startCh = 0, numDACCh = 0
-	string deviceName = "", err = ""
+	string deviceAddress = "", err = "", instrAddress = getResourceAddress(instrID)
 	for(i=0;i<numDevices;i+=1)
 		numDACCh =  str2num(stringbykey("numADCCh"+num2istr(i+1),fdackeys,":",","))
 		if(startCh+numDACCh-1 >= channel)
 			// this is the device, now check that instrID is pointing at the same device
-			deviceName = stringbykey("name"+num2istr(i+1),fdackeys,":",",")
-			nvar visa_handle = $deviceName
-			if(visa_handle == instrID)
+			deviceAddress = stringbykey("visa"+num2istr(i+1),fdackeys,":",",")
+			if(cmpstr(deviceAddress,instrAddress) == 0)
 				devchannel = startCh+numDACCh-channel
 				break
 			else
-				sprintf err, "[ERROR] \"rampOutputfdac\": channel %d is not present on device %s", channel, deviceName
+				sprintf err, "[ERROR] \"rampOutputfdac\": channel %d is not present on devic with address %s", channel, instrAddress
 				print(err)
 				resetfdacwindow(channel)
 				abort
@@ -539,19 +674,22 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	endif
 	
 	// read current dac output and compare to window
-	string cmd = "ADD REAL COMMAND!"
-	string response
-	response = queryInstr(instrID, cmd+"\r\n", read_term="\r\n")
+	string cmd = "", response = ""
+	sprintf cmd, "GET_DAC,%d", devchannel
+	response = queryInstr(instrID, cmd+"\r", read_term="\n") // response in Volts
+	variable currentOutput = str2num(response)
 	
 	// check response
-	// not sure what to expect!
-	if(1)
+	if(numtype(currentOutput) == 0)
+		currentOutput = currentOutput*1000 // change units to mV
 		// good response
-		if(abs(str2num(response)-str2num(old_fdacvalstr[channel][1]))<0.1)
-			// no discrepancy
+		if(abs(currentOutput-str2num(old_fdacvalstr[channel][1]))<0.4)
+			// no discrepancy. Min step size is 20000mV/(2^16-1) = 0.305 mV
 		else
 			sprintf warn, "[WARNING] \"rampOutputfdac\": Actual output of channel %d is different than expected", channel
 			print warn
+			old_fdacvalstr[channel][1] = num2str(currentOutput)
+			updatefdacwindow(channel)
 		endif
 	else
 		sprintf err, "[ERROR] \"rampOutputfdac\": Bad response! %s", response
@@ -560,27 +698,19 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 		abort
 	endif
 	
-	// set ramprate
-	cmd = "ADD REAL COMMAND!"
-	response = queryInstr(instrID, cmd+"\r\n", read_term="\r\n")
-	
-	// check respose
-	// not sure what to expect!
-	if(1) 
-		// not a good response
-		sprintf err, "[ERROR] \"rampOutputfdac\": Bad response! %s", response
-		print err
-		resetfdacwindow(channel)
-		abort
+	// ramp channel to output
+	variable delay = abs(output-currentOutput)/ramprate
+	sprintf cmd, "RAMP_SMART,%d,%.4f,%.3f", devchannel, output, ramprate
+	if(delay > 2)
+		string delaymsg = ""
+		sprintf delaymsg, "Waiting for fastdac Ch%d to ramp to %dmV", channel, output
+		response = queryInstrProgress(instrID, cmd+"\r", delay, delaymsg, read_term="\r\n")
+	else
+		response = queryInstr(instrID, cmd+"\r", read_term="\r\n", delay=delay)
 	endif
 	
-	// ramp channel to output
-	cmd = "ADD REAL COMMAND!"
-	response = queryInstr(instrID, cmd+"\r\n", read_term="\r\n")
-	
 	// check respose
-	// not sure what to expect! if good update window
-	if(1)
+	if(cmpstr(response, "RAMP_FINISHED") == 0)
 		fdacvalstr[channel][1] = num2str(output)
 		updatefdacWindow(channel)
 	else
@@ -591,7 +721,7 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	endif
 end
 
-function readfadcChannel(instrID,channel) // Units: mV
+function getfadcChannel(instrID,channel) // Units: mV
 	// channel must be the channel number given by the GUI!
 	variable instrID, channel
 	wave/t fadcvalstr
@@ -599,18 +729,17 @@ function readfadcChannel(instrID,channel) // Units: mV
 	
 	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
 	variable i=0, devchannel = 0, startCh = 0, numADCCh = 0
-	string deviceName = "", err = ""
+	string visa_address = "", err = "", instr_address = getResourceAddress(instrID)
 	for(i=0;i<numDevices;i+=1)
 		numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),fdackeys,":",","))
 		if(startCh+numADCCh-1 >= channel)
 			// this is the device, now check that instrID is pointing at the same device
-			deviceName = stringbykey("name"+num2istr(i+1),fdackeys,":",",")
-			nvar visa_handle = $deviceName
-			if(visa_handle == instrID)
-				devchannel = startCh+numADCCh-channel
+			visa_address = stringbykey("visa"+num2istr(i+1),fdackeys,":",",")
+			if(cmpstr(visa_address, instr_address) == 0)
+				devchannel = channel-startCh
 				break
 			else
-				sprintf err, "[ERROR] \"readfdacChannel\": channel %d is not present on device %s", channel, deviceName
+				sprintf err, "[ERROR] \"getfdacChannel\": channel %d is not present on device on with address %s", channel, instr_address
 				print(err)
 				abort
 			endif
@@ -619,18 +748,18 @@ function readfadcChannel(instrID,channel) // Units: mV
 	endfor
 	
 	// query ADC
-	string cmd = "ADD REAL COMMAND!"
+	string cmd = ""
+	sprintf cmd, "GET_ADC,%d", devchannel
 	string response
-	response = queryInstr(instrID, cmd+"\r\n", read_term="\r\n")
+	response = queryInstr(instrID, cmd+"\r", read_term="\r\n")
 	
 	// check response
-	// not sure what to expect!
-	if(1) 
+	if(numtype(str2num(response)) == 0) 
 		// good response, update window
-		fadcvalstr[channel][1] = response
-		return str2num(response)
+		fadcvalstr[channel][1] = num2str(str2num(response)*1000)
+		return str2num(response)*1000
 	else
-		sprintf err, "[ERROR] \"readfadcChannel\": Bad response! %s", response
+		sprintf err, "[ERROR] \"getfadcChannel\": Bad response = %s", response
 		print err
 		abort
 	endif
@@ -664,8 +793,10 @@ function initFastDAC()
 	
 	// create GUI window
 	string cmd = ""
+	//variable winsize_l,winsize_r,winsize_t,winsize_b
+	getwindow/z ScanControllerFastDAC wsizeRM
 	killwindow/z ScanControllerFastDAC
-	sprintf cmd, "FastDACWindow()"
+	sprintf cmd, "FastDACWindow(%f,%f,%f,%f)", v_left, v_right, v_top, v_bottom
 	execute(cmd)
 	fdacSetGUIinteraction(numDevices)
 end
@@ -747,19 +878,23 @@ function fdacAskUserUpdate(action) : ButtonControl
 	endswitch
 end
 
-window FastDACWindow() : Panel
+window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
+	variable v_left,v_right,v_top,v_bottom
 	PauseUpdate; Silent 1 // pause everything else, while building the window
 	NewPanel/w=(0,0,790,570)/n=ScanControllerFastDAC // window size
+	if(v_left+v_right+v_top+v_bottom > 0)
+		MoveWindow/w=ScanControllerFastDAC v_left,v_top,V_right,v_bottom
+	endif
 	ModifyPanel/w=ScanControllerFastDAC framestyle=2, fixedsize=1
 	SetDrawLayer userback
 	SetDrawEnv fsize=25, fstyle=1
-	DrawText 130, 45, "DAC"
+	DrawText 160, 45, "DAC"
 	SetDrawEnv fsize=25, fstyle=1
-	DrawText 516, 45, "ADC"
-	DrawLine 315,15,315,385
+	DrawText 546, 45, "ADC"
+	DrawLine 385,15,385,385
 	DrawLine 10,385,780,385
 	SetDrawEnv dash=7
-	Drawline 325,295,780,295
+	Drawline 395,295,780,295
 	// DAC, 12 channels shown
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 15, 70, "Ch"
@@ -769,32 +904,34 @@ window FastDACWindow() : Panel
 	DrawText 140, 70, "Limit (mV)"
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 213, 70, "Label"
-	ListBox fdaclist,pos={10,75},size={290,270},fsize=14,frame=2,widths={35,90,75,70}
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 285, 70, "Ramprate\r   (mV/s)"
+	ListBox fdaclist,pos={10,75},size={360,270},fsize=14,frame=2,widths={35,90,75,70}
 	ListBox fdaclist,listwave=root:fdacvalstr,selwave=root:fdacattr,mode=1
-	Button fdacramp,pos={50,354},size={65,20},proc=update_fdac,title="Ramp"
-	Button fdacrampzero,pos={170,354},size={90,20},proc=update_fdac,title="Ramp all 0"
+	Button fdacramp,pos={80,354},size={65,20},proc=update_fdac,title="Ramp"
+	Button fdacrampzero,pos={200,354},size={90,20},proc=update_fdac,title="Ramp all 0"
 	// ADC, 8 channels shown
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 330, 70, "Ch"
+	DrawText 405, 70, "Ch"
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 370, 70, "Input (mV)"
+	DrawText 435, 70, "Input (mV)"
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 480, 70, "Record"
+	DrawText 515, 70, "Record"
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 540, 70, "Wave Name"
+	DrawText 575, 70, "Wave Name"
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 650, 70, "Calc Function"
-	ListBox fadclist,pos={325,75},size={450,180},fsize=14,frame=2,widths={35,90,45,90,90}
+	DrawText 665, 70, "Calc Function"
+	ListBox fadclist,pos={400,75},size={385,180},fsize=14,frame=2,widths={25,65,45,80,80}
 	ListBox fadclist,listwave=root:fadcvalstr,selwave=root:fadcattr,mode=1
-	button updatefadc,pos={325,265},size={90,20},proc=update_fadc,title="Update ADC"
-	checkbox sc_PrintfadcBox,pos={425,265},proc=sc_CheckBoxClicked,value=sc_Printfadc,side=1,title="\Z14Print filenames "
-	checkbox sc_SavefadcBox,pos={545,265},proc=sc_CheckBoxClicked,value=sc_Saverawfadc,side=1,title="\Z14Save raw data "
-	popupMenu fadcSetting1,pos={380,300},proc=update_fadcSpeed,mode=1,title="\Z14ADC1 speed",size={100,20},value="Slow;Fast;Fastest"
-	popupMenu fadcSetting2,pos={580,300},proc=update_fadcSpeed,mode=1,title="\Z14ADC2 speed",size={100,20},value="Slow;Fast;Fastest"
-	popupMenu fadcSetting3,pos={380,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC3 speed",size={100,20},value="Slow;Fast;Fastest"
-	popupMenu fadcSetting4,pos={580,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC4 speed",size={100,20},value="Slow;Fast;Fastest"
-	popupMenu fadcSetting5,pos={380,360},proc=update_fadcSpeed,mode=1,title="\Z14ADC5 speed",size={100,20},value="Slow;Fast;Fastest"
-	popupMenu fadcSetting6,pos={580,360},proc=update_fadcSpeed,mode=1,title="\Z14ADC6 speed",size={100,20},value="Slow;Fast;Fastest"
+	button updatefadc,pos={400,265},size={90,20},proc=update_fadc,title="Update ADC"
+	checkbox sc_PrintfadcBox,pos={500,265},proc=sc_CheckBoxClicked,value=sc_Printfadc,side=1,title="\Z14Print filenames "
+	checkbox sc_SavefadcBox,pos={620,265},proc=sc_CheckBoxClicked,value=sc_Saverawfadc,side=1,title="\Z14Save raw data "
+	popupMenu fadcSetting1,pos={420,300},proc=update_fadcSpeed,mode=1,title="\Z14ADC1 speed",size={100,20},value="Slowest;Slow;Fast;Fastest"
+	popupMenu fadcSetting2,pos={620,300},proc=update_fadcSpeed,mode=1,title="\Z14ADC2 speed",size={100,20},value="Slowest;Slow;Fast;Fastest"
+	popupMenu fadcSetting3,pos={420,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC3 speed",size={100,20},value="Slowest;Slow;Fast;Fastest"
+	popupMenu fadcSetting4,pos={620,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC4 speed",size={100,20},value="Slowest;Slow;Fast;Fastest"
+	popupMenu fadcSetting5,pos={420,360},proc=update_fadcSpeed,mode=1,title="\Z14ADC5 speed",size={100,20},value="Slowest;Slow;Fast;Fastest"
+	popupMenu fadcSetting6,pos={620,360},proc=update_fadcSpeed,mode=1,title="\Z14ADC6 speed",size={100,20},value="Slowest;Slow;Fast;Fastest"
 	
 	// identical to ScanController window
 	// all function calls are to ScanController functions
@@ -822,29 +959,50 @@ endmacro
 function update_fadcSpeed(s) : PopupMenuControl
 	struct wmpopupaction &s
 	
-	variable instrID
+	string visa_address = ""
+	svar fdackeys
 	if(s.eventcode == 2)
 		// a menu item has been selected
 		strswitch(s.ctrlname)
 			case "fadcSetting1":
-				nvar fdac1_addr
-				instrID = fdac1_addr
+				visa_address = stringbykey("visa1",fdackeys,":",",")
 				break
 			case "fadcSetting2":
-				nvar fdac2_addr
-				instrID = fdac2_addr
+				visa_address = stringbykey("visa2",fdackeys,":",",")
 				break
 			case "fadcSetting3":
-				nvar fdac3_addr
-				instrID = fdac3_addr
+				visa_address = stringbykey("visa3",fdackeys,":",",")
 				break
 			case "fadcSetting4":
-				nvar fdac4_addr
-				instrID = fdac4_addr
+				visa_address = stringbykey("visa4",fdackeys,":",",")
+				break
+			case "fadcSetting5":
+				visa_address = stringbykey("visa5",fdackeys,":",",")
+				break
+			case "fadcSetting6":
+				visa_address = stringbykey("visa6",fdackeys,":",",")
 				break
 		endswitch
 		
-		setfadcSpeed(instrID,s.popnum)
+		string tempnamestr = "fdac_window_resource"
+		try
+			variable viRM = openFastDACconnection(tempnamestr, visa_address, verbose=0)
+			nvar tempname = $tempnamestr
+		
+			setfadcSpeed(tempname,s.popnum)
+		catch
+			// reset error code, so VISA connection can be closed!
+			variable err = GetRTError(1)
+				
+			viClose(tempname)
+			viClose(viRM)
+			// silent abort
+			abortonvalue 1,10
+		endtry
+			
+			// close temp visa connection
+			viClose(tempname)
+			viClose(viRM)
 		return 0
 	else
 		// do nothing
@@ -919,7 +1077,7 @@ function update_fadc(action) : ButtonControl
 			nvar tempname = $tempnamestr
 			try
 				for(j=0;j<numADCCh;j+=1)
-					readfadcChannel(tempname,startCh+j)
+					getfadcChannel(tempname,startCh+j)
 				endfor
 			catch
 				// reset error
@@ -945,16 +1103,17 @@ function fdacCreateControlWaves(numDACCh,numADCCh)
 	// create waves for DAC part
 	make/o/t/n=(numADCCh) fdacval0 = "0"
 	make/o/t/n=(numDACCh) fdacval1 = "0"
-	make/o/t/n=(numDACCh) fdacval2 = "5000"
+	make/o/t/n=(numDACCh) fdacval2 = "10000"
 	make/o/t/n=(numDACCh) fdacval3 = "Label"
+	make/o/t/n=(numDACCh) fdacval4 = "1000"
 	variable i=0
 	for(i=0;i<numDACCh;i+=1)
 		fdacval0[i] = num2istr(i)
 	endfor
-	concatenate/o {fdacval0,fdacval1,fdacval2,fdacval3}, fdacvalstr
+	concatenate/o {fdacval0,fdacval1,fdacval2,fdacval3,fdacval4}, fdacvalstr
 	make/o/n=(numDACCh) fdacattr0 = 0
 	make/o/n=(numDACCh) fdacattr1 = 2
-	concatenate/o {fdacattr0,fdacattr1,fdacattr1,fdacattr1}, fdacattr
+	concatenate/o {fdacattr0,fdacattr1,fdacattr1,fdacattr1,fdacattr1}, fdacattr
 	
 	//create waves for ADC part
 	make/o/t/n=(numADCCh) fadcval0 = "0"
@@ -964,10 +1123,10 @@ function fdacCreateControlWaves(numDACCh,numADCCh)
 	make/o/t/n=(numADCCh) fadcval4 = ""
 	for(i=0;i<numADCCh;i+=1)
 		fadcval0[i] = num2istr(i)
-		fadcval2[i] = "wave"+num2istr(i)
+		fadcval3[i] = "wave"+num2istr(i)
 		fadcval4[i] = "ADC"+num2istr(i)
 	endfor
-	concatenate/o {fadcval0,fadcval1,fadcval2,fadcval3}, fadcvalstr
+	concatenate/o {fadcval0,fadcval1,fadcval2,fadcval3,fadcval4}, fadcvalstr
 	make/o/n=(numADCCh) fadcattr0 = 0
 	make/o/n=(numADCCh) fadcattr1 = 2
 	make/o/n=(numADCCh) fadcattr2 = 32
@@ -978,7 +1137,7 @@ function fdacCreateControlWaves(numDACCh,numADCCh)
 	variable/g sc_saverawfadc = 0
 
 	// clean up
-	killwaves fdacval0,fdacval1,fdacval2,fdacval3
+	killwaves fdacval0,fdacval1,fdacval2,fdacval3,fdacval4
 	killwaves fdacattr0,fdacattr1
 	killwaves fadcval0,fadcval1,fadcval2,fadcval3,fadcval4
 	killwaves fadcattr0,fadcattr1,fadcattr2
