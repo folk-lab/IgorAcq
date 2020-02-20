@@ -207,33 +207,23 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	endif
 	
 	string coef = "", coefList = ""
-	variable j=0
-	if(doLowpass == 1 && doNotch == 1)
-		for(j=0;j<numNotch;j+=1)
-			coef = "coefs"+num2istr(j)
-			make/o/d/n=0 $coef
-			if(j==0)
-				// add RC filter in first round
-				filterfir/lo={cutoff_frac,cutoff_frac,FIRcoefs}/nmf={str2num(stringfromlist(j,notch_fraclist,",")),10.0/samplingFreq,1.0e-12,2}/coef $coef
-				coefList = addlistitem(coef,coefList,",",itemsinlist(coefList))
-			else
-				// make an aditional filter per extra notch
-				filterfir/nmf={str2num(stringfromlist(j,notch_fraclist,",")),10.0/samplingFreq,1.0e-12,2}/coef $coef
-				coefList = addlistitem(coef,coefList,",",itemsinlist(coefList))
-			endif
-		endfor
-	elseif(doLowpass == 1 && doNotch == 0)
-		coef = "coefs"+num2istr(0)
+	variable j=0,numfilter=0
+	// add RC filter
+	if(doLowpass == 1)
+		coef = "coefs"+num2istr(numfilter)
 		make/o/d/n=0 $coef
-		// add RC filter in first round
 		filterfir/lo={cutoff_frac,cutoff_frac,FIRcoefs}/coef $coef
 		coefList = addlistitem(coef,coefList,",",itemsinlist(coefList))
-	elseif(doNotch == 1 && doLowpass == 0)
+		numfilter += 1
+	endif
+	// add notch filter(s)
+	if(doNotch == 1)
 		for(j=0;j<numNotch;j+=1)
-			coef = "coefs"+num2istr(j)
+			coef = "coefs"+num2istr(numfilter)
 			make/o/d/n=0 $coef
-			filterfir/nmf={str2num(stringfromlist(j,notch_fraclist,",")),10.0/samplingFreq,1.0e-12,2}/coef $coef
+			filterfir/nmf={str2num(stringfromlist(j,notch_fraclist,",")),15.0/samplingFreq,1.0e-8,1}/coef $coef
 			coefList = addlistitem(coef,coefList,",",itemsinlist(coefList))
+			numfilter += 1
 		endfor
 	endif
 	
@@ -277,17 +267,41 @@ function sc_applyfilters(coefList,adcList,doLowpass,doNotch,cutoff_frac,sampling
 	wave/t fadcvalstr
 	nvar sc_is2d
 	
-	string wave1d = "", wave2d = ""
-	variable i=0,j=0
+	string wave1d = "", wave2d = "", errmes=""
+	variable i=0,j=0,err=0
 	for(i=0;i<itemsinlist(adcList,",");i+=1)
 		wave1d = fadcvalstr[str2num(stringfromlist(i,adcList,","))][3]
 		wave datawave = $wave1d
 		for(j=0;j<itemsinlist(coefList,",");j+=1)
 			wave coefs = $stringfromlist(j,coefList,",")
 			if(doLowpass == 1 && j == 0)
-				filterfir/lo={cutoff_frac,cutoff_frac,FIRcoefs}/nmf={str2num(stringfromlist(j,notch_fraclist,",")),10.0/samplingFreq,1.0e-12,2}/coef=coefs datawave
-			else
-				filterfir/nmf={str2num(stringfromlist(j,notch_fraclist,",")),10.0/samplingFreq,1.0e-12,2}/coef=coefs datawave
+				filterfir/lo={cutoff_frac,cutoff_frac,FIRcoefs}/coef=coefs datawave
+			elseif(doNotch == 1)
+				try
+					filterfir/nmf={str2num(stringfromlist(j,notch_fraclist,",")),15.0/samplingFreq,1.0e-8,1}/coef=coefs datawave
+					abortonrte
+				catch
+					err = getrTError(1)
+					if(dimsize(coefs,0) > 2.0*dimsize(datawave,0))
+						// nothing we can do. Don't apply filter!
+						sprintf errmes, "[WARNING] \"sc_applyfilters\": Notch filter at %.1f Hz not applied. Length of datawave is too short!",str2num(stringfromlist(j,notch_fraclist,","))*samplingFreq
+						print errmes
+					else
+						// try increasing the filter width to 30Hz
+						try
+							make/o/d/n=0 coefs2
+							filterfir/nmf={str2num(stringfromlist(j,notch_fraclist,",")),30.0/samplingFreq,1.0e-8,1}/coef coefs2, datawave
+							abortonrte
+							sprintf errmes, "[WARNING] \"sc_applyfilters\": Notch filter at %.1f Hz applied with a filter width of 30Hz.", str2num(stringfromlist(j,notch_fraclist,","))*samplingFreq
+							print errmes
+						catch
+							err = getrTError(1)
+							// didn't work
+							sprintf errmes, "[WARNING] \"sc_applyfilters\": Notch filter at %.1f Hz not applied. Increasing filter width to 30 Hz wasn't enough.", str2num(stringfromlist(j,notch_fraclist,","))*samplingFreq
+							print errmes
+						endtry
+					endif
+				endtry
 			endif
 		endfor
 		if(sc_is2d)
