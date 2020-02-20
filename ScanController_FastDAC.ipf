@@ -292,13 +292,17 @@ function sc_applyfilters(coefList,adcList,doLowpass,doNotch,cutoff_frac,sampling
 							make/o/d/n=0 coefs2
 							filterfir/nmf={str2num(stringfromlist(j,notch_fraclist,",")),30.0/samplingFreq,1.0e-8,1}/coef coefs2, datawave
 							abortonrte
-							sprintf errmes, "[WARNING] \"sc_applyfilters\": Notch filter at %.1f Hz applied with a filter width of 30Hz.", str2num(stringfromlist(j,notch_fraclist,","))*samplingFreq
-							print errmes
+							if(rowNum == 0)
+								sprintf errmes, "[WARNING] \"sc_applyfilters\": Notch filter at %.1f Hz applied with a filter width of 30Hz.", str2num(stringfromlist(j,notch_fraclist,","))*samplingFreq
+								print errmes
+							endif
 						catch
 							err = getrTError(1)
 							// didn't work
-							sprintf errmes, "[WARNING] \"sc_applyfilters\": Notch filter at %.1f Hz not applied. Increasing filter width to 30 Hz wasn't enough.", str2num(stringfromlist(j,notch_fraclist,","))*samplingFreq
-							print errmes
+							if(rowNum == 0)
+								sprintf errmes, "[WARNING] \"sc_applyfilters\": Notch filter at %.1f Hz not applied. Increasing filter width to 30 Hz wasn't enough.", str2num(stringfromlist(j,notch_fraclist,","))*samplingFreq
+								print errmes
+							endif
 						endtry
 					endif
 				endtry
