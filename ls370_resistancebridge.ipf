@@ -398,7 +398,8 @@ function setLS370PIDcontrol(instrID,channel,setpoint,maxcurrent) //Units: mK, mA
 		abort "trying to set setpoint to NaN or Inf"
 	endif
 
-	sprintf payload, "{\"PID\":[%d,%d,%d], \"channel\": %d, \"ctrl_label\":\"%s\", \"delay\": \"%d\", \"filter\":\"%s\",  \"max_current_ma\": %g, \"max_heater_level\": \"%s\", \"set_point\": %g, \"units\":%d}", 	10, 5, 0, channel, ls_label, 1, "Off", maxcurrent, "8", setpoint/1000, 1
+	sprintf payload, "{\"PID\":[%d,%d,%d], \"channel\": %d, \"ctrl_label\":\"%s\", \"delay\": %d, \"filter\":\"%s\",  \"max_current_ma\": %g, \"max_heater_level\": %d, \"setpoint\": %g, \"setpoint_units\":\"%s\", \"heater_output_display_type\":\"%s\"}", 	\
+							10, 10, 0, channel, ls_label, 1, "off", maxcurrent, 8, setpoint/1000, "kelvin", "current"
 	sprintf command, "set-temperature-control-parameters"
 	sendLS370(instrID,command,"put",payload=payload)
 	temp_set = setpoint
@@ -435,7 +436,7 @@ function setLS370exclusivereader(instrID,channel,[interval])
 
 	sprintf command, "set-exclusive-reader"
 	sprintf payload, "{\"channel_label\":\"%s\", \"ctrl_label\": \"%s\",\"interval_s\":%d}", channel, ls_label, interval
-
+	print payload
 	sendLS370(instrID,command,"put",payload=payload)
 
 end
@@ -723,13 +724,17 @@ function/s sendLS370(instrID,cmd,method,[payload, keys])
 	string instrID, cmd, keys, method, payload
 	string response
 
+//	print "SendLS370 temporarily disabled"
 	string headers = "accept: application/json\rlcmi-auth-token: igor"
 	if(cmpstr(method,"get")==0)
 		response = getHTTP(instrID,cmd,headers)
+//		print response
 	elseif(cmpstr(method,"post")==0 && !paramisdefault(payload))
 		response = postHTTP(instrID,cmd,payload,headers)
+//		print response
 	elseif(cmpstr(method,"put")==0 && !paramisdefault(payload))
 		response = putHTTP(instrID,cmd,payload,headers)
+//		print response
 	else
 		abort "Not a supported method or you forgot to add a payload."
 	endif
@@ -1040,10 +1045,15 @@ function/s getLS370status(instrID, [max_age_s])
 	strswitch(ls_system)
 		case "bfsmall":
 			buffer = addJSONkeyval(buffer,"MC K",num2str(getLS370temp(instrID, "mc", max_age_s=max_age_s)))
-			buffer = addJSONkeyval(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age_s=max_age_s)))
-			buffer = addJSONkeyval(buffer,"4K Plate K",num2str(getLS370temp(instrID, "4K", max_age_s=max_age_s)))
-			buffer = addJSONkeyval(buffer,"Magnet K",num2str(getLS370temp(instrID, "magnet", max_age_s=max_age_s)))
-			buffer = addJSONkeyval(buffer,"50K Plate K",num2str(getLS370temp(instrID, "50K", max_age_s=max_age_s)))
+//			buffer = addJSONkeyval(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age_s=max_age_s)))
+//			buffer = addJSONkeyval(buffer,"4K Plate K",num2str(getLS370temp(instrID, "4K", max_age_s=max_age_s)))
+//			buffer = addJSONkeyval(buffer,"Magnet K",num2str(getLS370temp(instrID, "magnet", max_age_s=max_age_s)))
+//			buffer = addJSONkeyval(buffer,"50K Plate K",num2str(getLS370temp(instrID, "50K", max_age_s=max_age_s)))
+//			buffer = addJSONkeyval(buffer,"MC K","0.1")
+			buffer = addJSONkeyval(buffer,"Still K","0.7")
+			buffer = addJSONkeyval(buffer,"4K Plate K","4")
+			buffer = addJSONkeyval(buffer,"Magnet K","4")
+			buffer = addJSONkeyval(buffer,"50K Plate K","50")
 //			for(i=1;i<7;i+=1)
 //				gauge = "P"+num2istr(i)
 //				buffer = addJSONkeyval(buffer,gauge,num2str(GetPressureDB(instrID,gauge)))
