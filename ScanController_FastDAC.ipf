@@ -95,6 +95,9 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	if(paramisdefault(ramprate))
 		ramprate = 1000
 	endif
+	if(paramisdefault(notch))
+		notch = ""
+	endif
 	// compare to earlier call of InitializeWaves
 	nvar fastdac_init
 	if(fastdac_init != 1)
@@ -193,8 +196,8 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	writeInstr(instrID,cmd)
 	// read returned values
 	variable totalByteReturn = itemsInList(scanList.adclist, ",")*numpts*2, read_chunk=0
-//	variable chunksize = itemsinlist(scanList.adclist,",")*2*30
-	variable chunksize = 512
+	variable chunksize = itemsinlist(scanList.adclist,",")*2*100
+//	variable chunksize = 512
 	if(totalByteReturn > chunksize)
 		read_chunk = chunksize
 
@@ -320,7 +323,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 				coefList = addlistitem(coef,coefList,",",itemsinlist(coefList))
 			endif
 		endfor
-	elseif(doLowpass == 1 && doNOtch == 0)
+	elseif(doLowpass == 1 && doNotch == 0)
 		coef = "coefs"+num2istr(0)
 		make/o/d/n=0 $coef
 		// add RC filter in first round
@@ -337,7 +340,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 
 	// apply filters
 	if(doLowpass == 1 || doNotch == 1)
-		sc_applyfilters(coefList,scanList.adclist,doLowpass,doNotch,cutoff_frac,samplingFreq,FIRcoefs,notch_fraclist)
+		sc_applyfilters(coefList,scanList.adclist,doLowpass,doNotch,cutoff_frac,samplingFreq,FIRcoefs,notch_fraclist,rowNum)
 	endif
 
 	// average datawaves
@@ -357,26 +360,34 @@ function ask_user(question, [type])
 	return V_flag
 end
 
-
-function sc_applyfilters(coefList,adcList,doLowpass,doNotch,cutoff_frac,samplingFreq,FIRcoefs,notch_fraclist)
-	string coefList, adcList
-	variable doLowpass, doNotch, cutoff_frac, samplingFreq, FIRcoefs
-	string notch_fraclist
+function sc_applyfilters(coefList,adcList,doLowpass,doNotch,cutoff_frac,samplingFreq,FIRcoefs,notch_fraclist,rowNum)
+	string coefList, adcList, notch_fraclist
+	variable doLowpass, doNotch, cutoff_frac, samplingFreq, FIRcoefs, rowNum
 	wave/t fadcvalstr
-
+	nvar sc_is2d
+	string wave1d = "", wave2d = ""
 	variable i=0,j=0
 	for(i=0;i<itemsinlist(adcList,",");i+=1)
-		wave datawave = $fadcvalstr[str2num(stringfromlist(i,adcList,","))][3]
+		wave1d = fadcvalstr[str2num(stringfromlist(i,adcList,","))][3]
+		wave datawave = $wave1d
 		for(j=0;j<itemsinlist(coefList,",");j+=1)
 			wave coefs = $stringfromlist(j,coefList,",")
-			if(doLowpass == 1 && j == 0)
+			if(doLowpass == 1 && j == 0 && doNotch == 1) // low pass and notch
 				filterfir/lo={cutoff_frac,cutoff_frac,FIRcoefs}/nmf={str2num(stringfromlist(j,notch_fraclist,",")),10.0/samplingFreq,1.0e-12,2}/coef=coefs datawave
-			else
+			elseif (doLowpass == 1 && j == 0 ) // Only low pass
+				filterfir/lo={cutoff_frac,cutoff_frac,FIRcoefs}/coef=coefs datawave			
+			else // Only notch
 				filterfir/nmf={str2num(stringfromlist(j,notch_fraclist,",")),10.0/samplingFreq,1.0e-12,2}/coef=coefs datawave
 			endif
 		endfor
+		if(sc_is2d)
+			wave2d = wave1d+"_2d"
+			wave datawave2d = $wave2d
+			datawave2d[][rowNum] = datawave[p]
+		endif
 	endfor
 end
+
 
 function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart)
 	string buffer, adcList
@@ -450,8 +461,11 @@ function sc_averageDataWaves(numAverage,adcList)
 		newsize = floor(dimsize(datawave,0)/numAverage)
 		// rename original waves
 		newname1d = "temp_"+wave1d
+		
 		killwaves/z $newname1d
-		rename datawave, newname1d
+		rename datawave, $newname1d // IGOR thinks newname1d exists already even though it doesn't...
+//		duplicate/o/free datawave, tempwave1d
+
 		// make new wave with old name
 		make/o/n=(newsize) $wave1d
 		wave newdatawave = $wave1d
@@ -462,8 +476,11 @@ function sc_averageDataWaves(numAverage,adcList)
 			wave2d = wave1d+"_2d"
 			wave datawave2d = $wave2d
 			newname2d = "temp_"+wave2d
+			
 			killwaves/z $newname2d
-			rename datawave2d, newname2d
+			rename datawave2d, $newname2d  
+//			duplicate/o/free datawave, tempwave2d
+
 			// make new wave with old name
 			make/o/n=(newsize,dimsize($newname2d,1)) $wave2d
 			wave newdatawave2d = $wave2d
