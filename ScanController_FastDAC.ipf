@@ -219,7 +219,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 		// add data to rawwaves and datawaves
 		sc_distribute_data(buffer,scanList.adclist,read_chunk,rowNum,bytes_read/(2*numadc))
 		bytes_read += read_chunk
-		if (mod(i,update_loop_val) == 0) //Slows down fastdac if calling update on every loop with high sampling rate (about 15ms per doupdate)
+		if (mod(i,update_loop_val*5) == 0) //Slows down fastdac if calling update on every loop with high sampling rate (about 15ms per doupdate)
 			doupdate
 			// check abort/pause status
 			try

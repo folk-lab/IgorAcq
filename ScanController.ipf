@@ -1150,7 +1150,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 				cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn_raw
 				execute(cmd)
 
-				if(sc_is2d == 1)
+				if(sc_is2d > 0)  // Should work for linecut too I think?
 					// In case this is a 2D measurement
 					wn2d = wn + "_2d"
 					cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd)
@@ -2167,7 +2167,12 @@ function SaveWaves([msg,save_experiment,fastdac])
 			// Open up HDF5 files
 			// Save scan controller meta data in this function as well
 			initSaveFiles(msg=msg)
-
+			if(sc_is2d == 2) //If 2D linecut then need to save starting x values for each row of data
+				wave sc_linestart
+				filename = "dat" + filenumstr + "linestart"
+				duplicate sc_linestart $filename
+				savesinglewave("sc_linestart")
+			endif
 			// look for waves to save
 			ii=0
 			do
