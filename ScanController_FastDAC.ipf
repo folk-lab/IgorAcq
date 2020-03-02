@@ -219,10 +219,11 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 		// add data to rawwaves and datawaves
 		sc_distribute_data(buffer,scanList.adclist,read_chunk,rowNum,bytes_read/(2*numadc))
 		bytes_read += read_chunk
-		if (mod(i,update_loop_val*5) == 0) //Slows down fastdac if calling update on every loop with high sampling rate (about 15ms per doupdate)
+		if (mod(i+1,update_loop_val*25) == 0) //Slows down fastdac if calling update on every loop with high sampling rate (about 15ms per doupdate)
 			doupdate
 			// check abort/pause status
 			try
+				sc_sleep(0.05)
 				sc_checksweepstate()
 			catch
 				variable err = GetRTError(1)
@@ -348,6 +349,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 		sc_averageDataWaves(numAverage,scanList.adcList)
 	endif
 	doupdate //Update Graphs
+	sc_sleep(0.05)
 	return 0
 end
 
