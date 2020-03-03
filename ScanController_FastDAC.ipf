@@ -232,6 +232,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 					sc_abortsweep = 0
 					sc_pause = 0
 				endif
+				stop_fdac(instrID)
 				clear_buffer(instrID) // Try to leave the fastdac in a useable state
 				//silent abort
 				abortonvalue 1,10
@@ -1263,6 +1264,14 @@ function fdacChar2Num(c1, c2, [minVal, maxVal])
 	// Return calculated FastDac value
 	return (((b1*2^8 + b2)*(maxVal-minVal)/(2^16 - 1))+minVal) 
 
+end
+
+
+function stop_fdac(instrID)
+	variable instrID
+	string cmd, response
+	cmd = "STOP"
+	response = remove_rn(queryInstr(instrID,cmd+"\r",read_term="\n")) // Tells fastdac to stop ramp
 end
 
 
