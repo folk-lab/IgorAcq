@@ -346,6 +346,9 @@ function InitScanController([configFile])
 
 			// Print variables
 			variable/g sc_PrintRaw = 1,sc_PrintCalc = 1
+			
+			// Clean up volatile memory
+			variable/g sc_cleanup = 0
 
 			// instrument wave
 			variable /g sc_instrLimit = 20 // change this if necessary, seeems fine
@@ -376,10 +379,9 @@ function InitScanController([configFile])
 	if(waveexists(viRm))
 		killwaves viRM
 	endif
-	make /n=0 viRM
+	make/n=0 viRM
 
 	sc_rebuildwindow()
-
 end
 
 /////////////////////////////
@@ -389,7 +391,7 @@ end
 function/s sc_createConfig()
 	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts, sc_Instr
 	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
-	nvar sc_PrintRaw, sc_PrintCalc, filenum
+	nvar sc_PrintRaw, sc_PrintCalc, filenum, sc_cleanup
 	svar sc_hostname
 	variable refnum
 	string configfile
@@ -439,9 +441,10 @@ function/s sc_createConfig()
 	configstr = addJSONkeyval(configstr, "print_to_history", tmpstr)
 
 	configstr = addJSONkeyval(configstr, "filenum", num2istr(filenum))
+	
+	configstr = addJSONkeyval(configstr, "cleanup", num2istr(sc_cleanup))
 
 	return configstr
-
 end
 
 function sc_saveConfig(configstr)
@@ -491,7 +494,10 @@ function sc_loadConfig(configfile)
 	loadStrArray2textWave(getJSONvalue(jstr,"scripts:calc"),"sc_CalcScripts")
 
 	//filenum
-	loadNum2var(getJSONvalue(jstr,"filenum"),"sc_filenum")
+	loadNum2var(getJSONvalue(jstr,"filenum"),"filenum")
+	
+	//cleanup
+	loadNum2var(getJSONvalue(jstr,"cleanup"),"sc_cleanup")
 
 	// reload ScanController window
 	sc_rebuildwindow()
@@ -956,7 +962,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	string cmd = "", wn = "", wn2d="", s, script = "", script0 = "", script1 = ""
 	string/g sc_x_label, sc_y_label
 	variable/g sc_is2d, sc_scanstarttime = datetime
-	variable/g sc_startx, sc_finx, sc_numptsx, sc_starty, sc_finy, sc_numptsy
+	variable/g sc_startx=0, sc_finx=0, sc_numptsx=0, sc_starty=0, sc_finy=0, sc_numptsy=0
 	variable/g sc_abortsweep=0, sc_pause=0, sc_abortnosave=0
 	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, activegraphs="", cmd1="",window_string=""
 	string cmd2=""
@@ -1155,6 +1161,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn_raw2d; execute(cmd)
 				endif
 			endif
+			i+=1
 		while(i<dimsize(fadcvalstr,0))
 	endif
 	
@@ -1438,12 +1445,19 @@ end
 
 
 
-function sc_checksweepstate()
+function sc_checksweepstate([fastdac])
+	variable fastdac
 	nvar /Z sc_abortsweep, sc_pause, sc_abortnosave
+	
+	if(paramisdefault(fastdac))
+		fastdac = 0
+	else
+		fastdac = 1
+	endif
 
 	if(NVAR_Exists(sc_abortsweep) && sc_abortsweep==1)
 		// If the Abort button is pressed during the scan, save existing data and stop the scan.
-		SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0)
+		SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0, fastdac=fastdac)
 		dowindow /k SweepControl
 		sc_abortsweep=0
 		sc_abortnosave=0
@@ -1460,7 +1474,7 @@ function sc_checksweepstate()
 		// Pause sweep if button is pressed
 		do
 			if(sc_abortsweep)
-				SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0)
+				SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0,fastdac=fastdac)
 				dowindow /k SweepControl
 				sc_abortsweep=0
 				sc_abortnosave=0
@@ -1474,9 +1488,7 @@ function sc_checksweepstate()
 				abort "Measurement aborted by user. Data NOT saved!"
 			endif
 		while(sc_pause)
-
 	endif
-
 end
 
 function sc_sleep(delay)
@@ -2056,11 +2068,13 @@ function SaveWaves([msg,save_experiment,fastdac])
 		nvar sc_Printfadc
 		nvar sc_Saverawfadc
 		
+		ii=0
 		do
 			if(fadcattr[ii][2] == 48)
 				filecount += 1
 			endif
-		while(dimsize(fadcattr,0))
+			ii+=1
+		while(ii<dimsize(fadcattr,0))
 		
 		if(filecount > 0)
 			// there is data to save!
@@ -2119,11 +2133,35 @@ function SaveWaves([msg,save_experiment,fastdac])
 		sc_copyNewFiles(filenum, save_experiment=save_experiment)
 	endif
 
+	// add info about scan to the scan history file in /config
 	sc_saveFuncCall(getrtstackinfo(2))
+	
+	// delete waves old waves, so only the newest 500 scans are stored in volatile memory
+	// turn on by setting sc_cleanup = 1
+	nvar sc_cleanup
+	if(sc_cleanup == 1)
+		sc_cleanVolatileMemory()
+	endif
 	
 	// increment filenum
 	if(Rawadd+Calcadd > 0 || filecount > 0)
 		filenum+=1
+	endif
+end
+
+function sc_cleanVolatileMemory()
+	// delete old waves, so only the newest 500 scans are stored in volatile memory
+	nvar filenum
+	
+	variable cleandat = 0, i=0
+	string deletelist="",waves=""
+	if(filenum > 500)
+		cleandat = filenum-500
+		sprintf waves, "dat%d*", cleandat 
+		deletelist = wavelist(waves,",","")
+		for(i=0;i<itemsinlist(deletelist,",");i+=1)
+			killwaves/z $stringfromlist(i,deletelist,",")
+		endfor
 	endif
 end
 

@@ -267,7 +267,7 @@ threadsafe function/s readInstr(instrID, [read_term, read_bytes, fdac_flag])
     string buffer, err
     variable return_count
     variable status = viRead(instrID, buffer, read_bytes, return_count)
-    if (status)
+    if(status != 0 && status != 0x3fff0006) // 0x3fff0006 means read_bytes = return_count (NOT AN ERROR).
         VISAerrormsg("readInstr() -- viRead", instrID, status)
     	return "NaN" // abort not supported in threads (v7)
 	 endif
@@ -320,40 +320,6 @@ function/s queryInstrProgress(instrID, cmd, delay, delaymsg, [read_term])
 	return response
 end
 
-function sc_progressbarDelay(delay,delaymsg)
-	variable delay
-	string delaymsg
-	
-	variable/g progress = 0
-	string/g progressStr = delaymsg
-	execute("progressBar()")
-	
-	delay = delay*1e6
-	variable start_time = stopMStimer(-2)
-	do
-		doupdate/w=progressBar
-		progress = (stopMStimer(-2)-start_time)/delay*100 // progress in procent
-		
-	while(stopMStimer(-2)-start_time < delay)
-	dowindow/k ProgressBar
-end
-
-window progressBar() : Panel
-	PauseUpdate; Silent 1       // building window...
-	NewPanel /W=(267+400,122+400,480+400,200+400)/N=ProgressBar
-	SetDrawLayer UserBack
-	SetDrawEnv fsize= 14
-	DrawText 72,23, "Progress ..."
-	ValDisplay valdispProgress,pos={8,28},size={200,15},mode=3,frame=2
-	ValDisplay valdispProgress,limits={0,100,0},barmisc={0,0},bodyWidth=200
-	ValDisplay valdispProgress,value=progress
-	SetDrawEnv fsize= 14
-	variable msglength = strlen(progressStr)
-	if(msglength > 0)
-		DrawText 102-msglength*3,65, progressStr
-	endif
-endmacro
-
 function/s postHTTP(instrID,cmd,payload,headers)
 	string instrID, cmd, payload, headers
 	string response=""
@@ -397,6 +363,55 @@ function/s getHTTP(instrID,cmd,headers)
 		return ""
    endif
 end
+
+//// Util ////
+
+function/s sc_stripTermination(visaString,termChar)
+	string visaString, termChar
+	
+	string regex = "(.*)"+termChar, value=""
+	splitstring/e=regex visaString, value
+	
+	return value
+end
+
+function sc_progressbarDelay(delay,delaymsg)
+	variable delay
+	string delaymsg
+	
+	variable/g progress = 0
+	string/g progressStr = delaymsg
+	execute("progressBar()")
+	
+	delay = delay*1e6
+	variable start_time = stopMStimer(-2)
+	do
+		doupdate/w=progressBar
+		progress = (stopMStimer(-2)-start_time)/delay*100 // progress in procent
+		
+	while(stopMStimer(-2)-start_time < delay)
+	dowindow/k ProgressBar
+end
+
+window progressBar() : Panel
+	PauseUpdate; Silent 1       // building window...
+	NewPanel /W=(267+400,122+400,480+400,200+400)/N=ProgressBar
+	SetDrawLayer UserBack
+	SetDrawEnv fsize= 14
+	DrawText 72,23, "Progress ..."
+	ValDisplay valdispProgress,pos={8,28},size={200,15},mode=3,frame=2
+	ValDisplay valdispProgress,limits={0,100,0},barmisc={0,0},bodyWidth=200
+	ValDisplay valdispProgress,value=progress
+	SetDrawEnv fsize= 14
+	variable msglength = strlen(progressStr), doubleline = strsearch(progressStr,"\n",0)
+	if(msglength > 0)
+		if(doubleline < 0)
+			DrawText 102-msglength*3,65, progressStr
+		else
+			DrawText 90-(msglength-doubleline)*3,77, progressStr
+		endif
+	endif
+endmacro
 
 ////////////
 /// GPIB ///
