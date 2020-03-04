@@ -205,7 +205,6 @@ function setfadcSpeed(instrID,speed,[loadCalibration]) // Units: Hz
 	// set the ADC speed in Hz
 	// set loadCalibration=1 to load save calibration
 	variable instrID, speed, loadCalibration
-	svar fadcSpeeds
 	
 	if(paramisdefault(loadCalibration))
 		loadCalibration = 0
@@ -239,15 +238,24 @@ function setfadcSpeed(instrID,speed,[loadCalibration]) // Units: Hz
 		endif
 	endfor
 	
+	speed = roundNum(1.0/str2num(response)*1.0e-6,0)
+	
 	if(loadCalibration)
-		loadfADCCalibration(numDevice,roundNum(1.0/(str2num(response)*1.0e-6),0))
+		loadfADCCalibration(instrID,numDevice,speed)
 	else
-		print "[WARNING] \"setfadcSpeed\": Changing the ADC speed without ajdusting the controlparameters might affect the precision."
+		print "[WARNING] \"setfadcSpeed\": Changing the ADC speed without ajdusting the calibration might affect the precision."
 	endif
 	
-	// update window FIX!
+	// update window
 	string adcSpeedMenu = "fadcSetting"+num2istr(numDevice)
-	popupMenu $adcSpeedMenu,mode=speed
+	svar value = $("sc_fadcSpeed"+num2istr(numDevice))
+	variable isoldvalue = findlistitem(num2str(speed),value,";")
+	if(isoldvalue < 0)
+		value = addlistItem(num2str(speed),value,";",Inf)
+	endif
+	value = sortlist(value,";",2)
+	variable mode = whichlistitem(num2str(speed),value,";")+1
+	popupMenu $adcSpeedMenu,mode=mode
 end
 
 function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
@@ -385,11 +393,85 @@ function/s setfdacCalibrationGain(instrID,channel,offset)
 	endif
 end
 
+function updatefadcCalibration(instrID,channel,zeroScale,fullScale)
+	variable instrID,channel,zeroScale,fullScale
+	
+	string cmd="", response="", err=""
+	sprintf cmd, "WRITE_ADC_CAL,%d,%d,%d", channel, zeroScale, fullScale
+	response = queryInstr(instrID,cmd,read_term="\n")
+	response = sc_stripTermination(response,"\r\n")
+	
+	if(fdacCheckResponse(response,cmd,isString=1,expectedResponse="CALIBRATION_CHANGED"))
+		// all good!
+	else
+		sprintf err, "[ERROR] \"updatefadcCalibration\": Updating calibration of ADC channel %d failed!", channel
+		print err
+		abort
+	endif
+end
+
 //// Utilities ////
 
-function loadfADCCalibration(numDevice,speed)
-	variable numDevice,speed
+function loadfADCCalibration(instrID,numDevice,speed)
+	variable instrID,numDevice,speed
 	
+	string regex = "", filelist = "", jstr=""
+	variable i=0,k=0
+	
+	sprintf regex, "fADC%dCalibration_%d", numDevice, speed
+	filelist = indexedfile(config,-1,".txt")
+	filelist = greplist(filelist,regex)
+	if(itemsinlist(filelist) == 1)
+		// we have a calibration file
+		jstr = readtxtfile(stringfromlist(0,filelist),"config")
+	elseif(itemsinlist(filelist) > 1)
+		// somehow there is more than file. Try to find the correct one!
+		for(i=0;i<itemsinlist(filelist);i+=1)
+			if(cmpstr(stringfromlist(i,filelist),regex) == 0)
+				// this is the correct file
+				k = -1
+				break
+			endif
+		endfor
+		if(k < 0)
+			jstr = readtxtfile(stringfromlist(i,filelist),"config")
+		else
+			// no calibration file found!
+			// raise error
+			print "[ERROR] \"loadfADCCalibration\": No calibration file found!"
+			abort
+		endif
+	else
+		// no calibration file found!
+		// raise error
+		print "[ERROR] \"loadfADCCalibration\": No calibration file found!"
+		abort
+	endif
+	
+	// do some checks
+	if(cmpstr(getresourceaddress(instrID),getJSONvalue(jstr, "visa_address")) == 0)
+		// it's the same instrument
+	else
+		// not the same visa address, likely not the same instrument, abort!
+		print "[ERORR] \"loadfADCCalibration\": visa address' not the same!"
+		abort
+	endif
+	if(speed == str2num(getJSONvalue(jstr, "speed")))
+		// it's the correct speed
+	else
+		// not the same speed, abort!
+		print "[ERORR] \"loadfADCCalibration\": speed is not correct!"
+		abort
+	endif
+	
+	// update the calibration on the the instrument
+	variable zero_scale = 0, full_scale = 0
+	string response = ""
+	for(i=0;i<str2num(getJSONvalue(jstr, "num_channels"));i+=1)
+		zero_scale = str2num(getJSONvalue(jstr, "zero-scale"+num2istr(i)))
+		full_scale = str2num(getJSONvalue(jstr, "full-scale"+num2istr(i)))
+		updatefadcCalibration(instrID,i,zero_scale,full_scale)
+	endfor
 end
 
 function fdacCalibrate(instrID)
@@ -1245,10 +1327,13 @@ function initFastDAC()
 	endfor
 	
 	// create waves to hold control info
-	fdacCheckForOldInit(numDACCh,numADCCh)
+	variable oldinit = fdacCheckForOldInit(numDACCh,numADCCh)
 	
 	variable/g num_fdacs = 0
-	string/g fadcSpeeds = "1:372,2:2008,3:6060,4:12195"
+	if(oldinit == -1)
+		string/g sc_fadcSpeed1="2532",sc_fadcSpeed2="2532",sc_fadcSpeed3="2532"
+		string/g sc_fadcSpeed4="2532",sc_fadcSpeed5="2532",sc_fadcSpeed6="2532"
+	endif
 	
 	// create GUI window
 	string cmd = ""
@@ -1278,11 +1363,15 @@ function fdacCheckForOldInit(numDACCh,numADCCh)
 		else
 			print "[Warning] \"fdacCheckForOldInit\": Bad user input - Init to default values"
 			fdacCreateControlWaves(numDACCh,numADCCh)
+			response = -1
 		endif
 	else
 		// Init to default values
 		fdacCreateControlWaves(numDACCh,numADCCh)
+		response = -1
 	endif
+	
+	return response
 end
 
 function fdacAskUser(numDACCh)
@@ -1386,12 +1475,18 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	button updatefadc,pos={400,265},size={90,20},proc=update_fadc,title="Update ADC"
 	checkbox sc_PrintfadcBox,pos={500,265},proc=sc_CheckBoxClicked,value=sc_Printfadc,side=1,title="\Z14Print filenames "
 	checkbox sc_SavefadcBox,pos={620,265},proc=sc_CheckBoxClicked,value=sc_Saverawfadc,side=1,title="\Z14Save raw data "
-	popupMenu fadcSetting1,pos={420,300},proc=update_fadcSpeed,mode=1,title="\Z14ADC1 speed",size={100,20},value="Slowest;Slow;Fast;Fastest"
-	popupMenu fadcSetting2,pos={620,300},proc=update_fadcSpeed,mode=1,title="\Z14ADC2 speed",size={100,20},value="Slowest;Slow;Fast;Fastest"
-	popupMenu fadcSetting3,pos={420,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC3 speed",size={100,20},value="Slowest;Slow;Fast;Fastest"
-	popupMenu fadcSetting4,pos={620,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC4 speed",size={100,20},value="Slowest;Slow;Fast;Fastest"
-	popupMenu fadcSetting5,pos={420,360},proc=update_fadcSpeed,mode=1,title="\Z14ADC5 speed",size={100,20},value="Slowest;Slow;Fast;Fastest"
-	popupMenu fadcSetting6,pos={620,360},proc=update_fadcSpeed,mode=1,title="\Z14ADC6 speed",size={100,20},value="Slowest;Slow;Fast;Fastest"
+	popupMenu fadcSetting1,pos={420,300},proc=update_fadcSpeed,mode=1,title="\Z14ADC1 speed",size={100,20},value=sc_fadcSpeed1
+	popupMenu fadcSetting2,pos={620,300},proc=update_fadcSpeed,mode=1,title="\Z14ADC2 speed",size={100,20},value=sc_fadcSpeed2
+	popupMenu fadcSetting3,pos={420,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC3 speed",size={100,20},value=sc_fadcSpeed3
+	popupMenu fadcSetting4,pos={620,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC4 speed",size={100,20},value=sc_fadcSpeed4
+	popupMenu fadcSetting5,pos={420,360},proc=update_fadcSpeed,mode=1,title="\Z14ADC5 speed",size={100,20},value=sc_fadcSpeed5
+	popupMenu fadcSetting6,pos={620,360},proc=update_fadcSpeed,mode=1,title="\Z14ADC6 speed",size={100,20},value=sc_fadcSpeed6
+	DrawText 550, 317, "\Z14Hz"
+	DrawText 750, 317, "\Z14Hz"
+	DrawText 550, 347, "\Z14Hz"
+	DrawText 750, 347, "\Z14Hz"
+	DrawText 550, 377, "\Z14Hz"
+	DrawText 750, 377, "\Z14Hz"
 	
 	// identical to ScanController window
 	// all function calls are to ScanController functions
