@@ -412,6 +412,16 @@ end
 
 //// Utilities ////
 
+function fdacClearBuffer(instrID)
+	variable instrID
+	
+	variable count=0
+	string buffer=""
+	do 
+		viRead(instrID, buffer, 2000, count)
+	while(count != 0)
+end
+
 function loadfADCCalibration(instrID,numDevice,speed)
 	variable instrID,numDevice,speed
 	
@@ -842,11 +852,15 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	// OPERATION, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF STEPS
 	sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, scanList.startVal, scanList.finVal, numpts
 	writeInstr(instrID,cmd)
+	variable sweepTimeStart = stopMSTimer(-2)
 	
 	// read returned values
 	variable numADCs = itemsinlist(scanList.adclist,",")
-	variable totalByteReturn = numADCs*2*numpts,read_chunk=0
-	variable chunksize = numADCs*2*30
+	variable totalByteReturn = numADCs*2*numpts, read_chunk=0, bytesSec = roundNum(numADCs*2*samplingFreq,0)
+	variable chunksize = roundNum(bytesSec/50,0)
+	if(chunksize < 50)
+		chunksize = 50
+	endif
 	if(totalByteReturn > chunksize)
 		read_chunk = chunksize
 	else
@@ -855,7 +869,8 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	
 	// hold incomming data chunks in string and distribute to data waves
 	string buffer = ""
-	variable bytes_read = 0
+	variable bytes_read = 0, plotUpdateTime = 15e-3, totaldump = 0,  bufferSize = 10000 // Ask Mark!
+	variable errCode = 0
 	do
 		buffer = readInstr(instrID, read_bytes=read_chunk, fdac_flag=1)
 		// If failed, abort
@@ -865,12 +880,42 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 		// add data to rawwaves and datawaves
 		sc_distribute_data(buffer,scanList.adclist,read_chunk,rowNum,bytes_read/(2*numADCs))
 		bytes_read += read_chunk
+		totaldump = bytesSec*(stopmstimer(-2)-sweepTimeStart)*1e-6
+		if(totaldump-bytes_read < 2*plotUpdateTime*bytesSec)
+			// we can update all plots
+			// should take ~15ms
+			doupdate
+			try
+				sc_checksweepstate(fastdac=1)
+			catch
+				errCode = GetRTError(1)
+				sc_stopfdacSweep(instrID)
+				abortonvalue 1,10
+			endtry
+		else
+			// just check sweep state
+			try
+				sc_checksweepstate(fastdac=1)
+			catch
+				errCode = GetRTError(1)
+				sc_stopfdacSweep(instrID)
+				abortonvalue 1,10
+			endtry
+		endif
 	while(totalByteReturn-bytes_read > read_chunk)
 	// do one last read if any data left to read
 	variable bytes_left = totalByteReturn-bytes_read
 	if(bytes_left > 0)
 		buffer = readInstr(instrID,read_bytes=bytes_left,fdac_flag=1)
 		sc_distribute_data(buffer,scanList.adclist,bytes_left,rowNum,bytes_read/(2*numADCs))
+		doupdate
+		try
+			sc_checksweepstate(fastdac=1)
+		catch
+			errCode = GetRTError(1)
+			sc_stopfdacSweep(instrID)
+			abortonvalue 1,10
+		endtry
 	endif
 	
 	// update window
@@ -1303,6 +1348,16 @@ function updatefdacWindow(fdacCh)
 	wave/t fdacvalstr, old_fdacvalstr
 	 
 	old_fdacvalstr[fdacCh] = fdacvalstr[fdacCh][1]
+end
+
+function sc_stopfdacSweep(instrID)
+	variable instrID
+	
+	// stop the current sweep
+	writeInstr(instrID,"STOP\r")
+	
+	// clear the buffer
+	fdacClearBuffer(instrID)
 end
 
 function initFastDAC()
