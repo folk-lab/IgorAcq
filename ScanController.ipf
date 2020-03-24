@@ -321,6 +321,10 @@ function InitScanController([configFile])
 	// deal with config file
 	string /g sc_current_config = ""
 	newpath /C/O/Q config getExpPath("config", full=3) // create/overwrite config path
+	// make some waves needed for the scancontroller window
+	variable /g sc_instrLimit = 20 // change this if necessary, seeems fine
+	make /o/N=(sc_instrLimit,3) instrBoxAttr = 2
+	
 	if(paramisdefault(configFile))
 		// look for newest config file
 		string filelist = greplist(indexedfile(config,-1,".json"),"sc")
@@ -351,9 +355,7 @@ function InitScanController([configFile])
 			variable/g sc_cleanup = 0
 
 			// instrument wave
-			variable /g sc_instrLimit = 20 // change this if necessary, seeems fine
 			make /t/o/N=(sc_instrLimit,3) sc_Instr
-			make /o/N=(sc_instrLimit,3) instrBoxAttr = 2
 
 			sc_Instr[0][0] = "openIPSconnection(\"ips1\", \"ASRL::1\", verbose=1)"
 			sc_Instr[0][1] = "initIPS120(ips1)"
@@ -960,11 +962,11 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	wave/t sc_RawWaveNames, sc_CalcWaveNames, sc_RawScripts, sc_CalcScripts
 	variable i=0, j=0
 	string cmd = "", wn = "", wn2d="", s, script = "", script0 = "", script1 = ""
-	string/g sc_x_label, sc_y_label
+	string/g sc_x_label, sc_y_label, activegraphs=""
 	variable/g sc_is2d, sc_scanstarttime = datetime
 	variable/g sc_startx=0, sc_finx=0, sc_numptsx=0, sc_starty=0, sc_finy=0, sc_numptsy=0
 	variable/g sc_abortsweep=0, sc_pause=0, sc_abortnosave=0
-	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, activegraphs="", cmd1="",window_string=""
+	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, cmd1="",window_string=""
 	string cmd2=""
 	variable index, graphopen, graphopen2d
 	svar sc_colormap
@@ -1137,13 +1139,13 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		do
 			if(fadcattr[i][2] == 48) // checkbox checked
 				wn = fadcvalstr[i][3]
-				cmd = "make/o/n=(" + num2istr(sc_numptsx) + ") " + wn + "=NaN"
+				cmd = "make/o/n=(" + num2istr(sc_numptsx) + ") " + wn + "=nan"
 				execute(cmd)
 				cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn
 				execute(cmd)
 				
 				wn_raw = "ADC"+num2istr(i)
-				cmd = "make/o/n=(" + num2istr(sc_numptsx) + ") " + wn_raw + "=NaN"
+				cmd = "make/o/n=(" + num2istr(sc_numptsx) + ") " + wn_raw + "=nan"
 				execute(cmd)
 				cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn_raw
 				execute(cmd)
@@ -1151,12 +1153,12 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 				if(sc_is2d == 1)
 					// In case this is a 2D measurement
 					wn2d = wn + "2d"
-					cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd)
+					cmd = "make/o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn2d + "=nan"; execute(cmd)
 					cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn2d; execute(cmd)
 					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
 					
 					wn_raw2d = wn_raw + "2d"
-					cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn_raw2d + "=NaN"; execute(cmd)
+					cmd = "make/o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn_raw2d + "=nan"; execute(cmd)
 					cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn_raw2d; execute(cmd)
 					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn_raw2d; execute(cmd)
 				endif
@@ -1168,7 +1170,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	// Find all open plots
 	graphlist = winlist("*",";","WIN:1")
 	j=0				
-	for (i=0;i<itemsinlist(graphlist);i=i+1) 
+	for(i=0;i<itemsinlist(graphlist);i=i+1) 
 		index = strsearch(graphlist,";",j)			
 		graphname = graphlist[j,index-1]
 		setaxis/w=$graphname /a
@@ -1327,17 +1329,17 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 				if(graphopen && graphopen2d)
 				elseif(graphopen2d)
 					display $wn
-					setwindow kwTopWin, enablehiresdraw=3
-					Label bottom, sc_x_label
+					setwindow kwTopWin, graphicsTech=0
+					label bottom, sc_x_label
 					activegraphs+= winname(0,1)+";"
 				elseif(graphopen)
 					if(sc_is2d)
 						wn2d = wn + "2d"
 						display
-						setwindow kwTopWin, enablehiresdraw=3
+						setwindow kwTopWin, graphicsTech=0
 						appendimage $wn2d
 						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
-						colorscale /c/n=$sc_ColorMap /e/a=rc
+						colorscale/e/a=rc
 						Label left, sc_y_label
 						Label bottom, sc_x_label
 						activegraphs+= winname(0,1)+";"
@@ -1345,15 +1347,15 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 				else
 					wn2d = wn + "2d"
 					display $wn
-					setwindow kwTopWin, enablehiresdraw=3
-					Label bottom, sc_x_label
+					setwindow kwTopWin, graphicsTech=0
+					label bottom, sc_x_label
 					activegraphs+= winname(0,1)+";"
 					if(sc_is2d)
 						display
-						setwindow kwTopWin, enablehiresdraw=3
+						setwindow kwTopWin, graphicsTech=0
 						appendimage $wn2d
 						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
-						colorscale /c/n=$sc_ColorMap /e/a=rc
+						colorscale/e/a=rc
 						Label left, sc_y_label
 						Label bottom, sc_x_label
 						activegraphs+= winname(0,1)+";"

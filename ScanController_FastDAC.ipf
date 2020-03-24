@@ -9,6 +9,10 @@
 // the standard ScanController window.
 // It is the users job to add the fastdac=1 flag to initWaves() and SaveWaves()
 //
+// This driver also provides a spectrum analyzer method. See the Spectrum Analyzer section at the bottom. 
+// As for everyting else, you must open a connection to a FastDAC and run "InitFastDAC" before you can use the
+// spectrum analyzer method.
+//
 // Written by Christian Olsen, 2020-02-25
 
 /////////////////////
@@ -91,7 +95,7 @@ end
 
 //// Get functions ////
 
-function getfadcSpeed(instrID)
+function getfadcspeed(instrID)
 	// Returns speed in Hz (but arduino thinks in microseconds)
 	variable instrID
 	svar fadcSpeeds
@@ -852,14 +856,13 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	// OPERATION, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF STEPS
 	sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, scanList.startVal, scanList.finVal, numpts
 	writeInstr(instrID,cmd)
-	variable sweepTimeStart = stopMSTimer(-2)
 	
 	// read returned values
 	variable numADCs = itemsinlist(scanList.adclist,",")
-	variable totalByteReturn = numADCs*2*numpts, read_chunk=0, bytesSec = roundNum(numADCs*2*samplingFreq,0)
-	variable chunksize = roundNum(bytesSec/50,0)
+	variable totalByteReturn = numADCs*2*numpts, read_chunk=0, bytesSec = roundNum(2*samplingFreq,0)
+	variable chunksize = roundNum(numADCs*bytesSec/50,0) - mod(roundNum(numADCs*bytesSec/50,0),numADCs*2)
 	if(chunksize < 50)
-		chunksize = 50
+		chunksize = 50 - mod(50,numADCs*2) // 50 or 48
 	endif
 	if(totalByteReturn > chunksize)
 		read_chunk = chunksize
@@ -869,22 +872,27 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	
 	// hold incomming data chunks in string and distribute to data waves
 	string buffer = ""
-	variable bytes_read = 0, plotUpdateTime = 15e-3, totaldump = 0,  bufferSize = 10000 // Ask Mark!
+	variable bytes_read = 0, plotUpdateTime = 15e-3, totaldump = 0,  saveBuffer = 1000
 	variable errCode = 0
+	variable bufferDumpStart = stopMSTimer(-2)
+	svar activegraphs
 	do
 		buffer = readInstr(instrID, read_bytes=read_chunk, fdac_flag=1)
 		// If failed, abort
 		if (cmpstr(buffer, "NaN") == 0)
+			sc_stopfdacSweep(instrID)
 			abort
 		endif
 		// add data to rawwaves and datawaves
 		sc_distribute_data(buffer,scanList.adclist,read_chunk,rowNum,bytes_read/(2*numADCs))
 		bytes_read += read_chunk
-		totaldump = bytesSec*(stopmstimer(-2)-sweepTimeStart)*1e-6
-		if(totaldump-bytes_read < 2*plotUpdateTime*bytesSec)
+		totaldump = bytesSec*(stopmstimer(-2)-bufferDumpStart)*1e-6
+		if(totaldump-bytes_read < saveBuffer)
 			// we can update all plots
-			// should take ~15ms
-			doupdate
+			// should take ~15ms extra
+			for(i=0;i<itemsinlist(activegraphs,";");i+=1)
+				doupdate/w=$stringfromlist(i,activegraphs,";")
+			endfor
 			try
 				sc_checksweepstate(fastdac=1)
 			catch
@@ -917,6 +925,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 			abortonvalue 1,10
 		endtry
 	endif
+	variable looptime = (stopmstimer(-2)-bufferDumpStart)*1e-6
 	
 	// update window
 	variable channel
@@ -927,6 +936,10 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 			channel = str2num(stringfromlist(i,scanlist.daclist,","))
 			fdacvalstr[channel][1] = stringfromlist(i,scanlist.finval,",")
 			updatefdacWindow(channel)
+		endfor
+		for(i=0;i<numADCs;i+=1)
+			channel = str2num(stringfromlist(i,scanlist.adclist,","))
+			getfadcChannel(instrID,channel)
 		endfor
 	endif
 
@@ -1020,6 +1033,8 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 		//silent abort
 		abortonvalue 1,10 
 	endtry
+	
+	return looptime
 end
 
 function sc_fdacSortChannels(s,rampCh,start,fin)
@@ -1833,4 +1848,215 @@ function fdacChar2Num(c1, c2, [minVal, maxVal])
 	endif
 	// Return calculated FastDac value
 	return (((b1*2^8 + b2)*(maxVal-minVal)/(2^16 - 1))+minVal)
+end
+
+///////////////////////////
+//// Spectrum Analyzer ////
+//////////////////////////
+
+function fdacSpectrumAnalyzer(instrID,channels,scanlength)
+	// channels must a comma seperated string, refering
+	// to the numbering in the ScanControllerFastDAC window.
+	// scanlength is in sec
+	variable instrID, scanlength
+	string channels
+	
+	svar fdackeys
+	
+	// num ADC channels
+	channels = sortlist(channels,",",2)
+	variable numChannels = itemsinlist(channels,",")
+	
+	// calculate number of points needed
+	variable samplingFreq = getfadcSpeed(instrID)
+	variable numpts = RoundNum(scanlength*samplingFreq/numChannels,0)
+	
+	// make sure numpts is even
+	// otherwise FFT will fail
+	numpts = numpts - mod(numpts,2)
+	
+	// resolve the ADC channel
+	variable numDevices = str2num(stringbykey("numDevices",fdacKeys,":",","))
+	variable i=0, j=0, numADCCh=0, startCh=0, dev_adc=0, adcCh=0
+	string adcList=""
+	for(i=0;i<numChannels;i+=1)
+		adcCh = str2num(stringfromlist(i,channels,","))
+		startCh = 0
+		for(j=0;j<numDevices+1;j+=1)
+			numADCCh = str2num(stringbykey("numADCCh"+num2istr(j+1),fdacKeys,":",","))
+			if(startCh+numADCCh-1 >= adcCh)
+				// this is the device
+				if(i > 0 && dev_adc != j)
+					print "[ERROR] \"fdacSpectrumAnalyzer\": All ADC channels must be on the same device!"
+					abort
+				endif
+				dev_adc = j
+				adcList = addlistitem(num2istr(adcCh),adcList,",",itemsinlist(adcList,","))
+				break
+			endif
+			startCh += numADCCh
+		endfor
+	endfor
+	
+	// generate waves to hold time series data
+	string wn = ""
+	for(i=0;i<numChannels;i+=1)
+		wn = "timeSeriesADC"+stringfromlist(i,channels,",")
+		make/o/n=(numpts) $wn = nan
+		setscale/i x, 0, scanlength, $wn
+	endfor
+	
+	// find all open plots
+	string graphlist = winlist("*",",","WIN:1"), graphname = "", graphtitle="", graphnumlist=""
+	string plottitle="", graphnum=""
+	j=0				
+	for(i=0;i<itemsinlist(graphlist,",");i=i+1) 			
+		graphname = stringfromlist(i,graphlist,",")
+		setaxis/w=$graphname /a
+		getwindow $graphname wtitle
+		splitstring /e="(.*):(.*)" s_value, graphnum, plottitle
+		graphtitle+= plottitle+","
+		graphnumlist+= graphnum+","
+	endfor
+	
+	// open plots and distribute on screen
+	variable graphopen=0
+	string openplots=""
+	for(i=0;i<itemsinlist(channels,",");i+=1)
+		wn = "timeSeriesADC"+stringfromlist(i,channels,",")
+		for(j=0;j<itemsinlist(graphtitle,",");j+=1)
+			if(stringmatch(wn,stringfromlist(j,graphtitle,",")))
+				graphopen = 1
+				openplots+= stringfromlist(j,graphnumlist,",")+","
+				label /w=$stringfromlist(j,graphnumlist,",") bottom,  "time [s]"
+			endif
+		endfor
+		if(!graphopen)
+			display $wn
+			setwindow kwTopWin, graphicsTech=0
+			label bottom, "time [s]"
+			openplots+= winname(0,1)+","
+		endif
+	endfor
+	
+	// tile windows
+	string cmd1 = "TileWindows/O=1/A=(4,1) "+openplots
+	execute(cmd1)
+
+	// set up and execute command
+	// SPEC_ANA,adcCh,numpts
+	string cmd = ""
+	sprintf cmd, "SPEC_ANA,%s,%s\r", replacestring(",",channels,""), num2str(numpts)
+	writeInstr(instrID,cmd)
+	
+	variable bytesSec = roundNum(2*samplingFreq,0)
+	variable read_chunk = roundNum(numChannels*bytesSec/50,0) - mod(roundNum(numChannels*bytesSec/50,0),numChannels*2)
+	if(read_chunk < 50)
+		read_chunk = 50 - mod(50,numChannels*2) // 50 or 48
+	endif
+	
+	// read incoming data
+	string buffer=""
+	variable bytes_read = 0, bytes_left = 0, totalbytesreturn = numChannels*numpts*2, saveBuffer = 1000, totaldump = 0
+	variable bufferDumpStart = stopMSTimer(-2)
+	
+	//print bytesSec, read_chunk, totalbytesreturn
+	do
+		buffer = readInstr(instrID, read_bytes=read_chunk, fdac_flag=1)
+		// If failed, abort
+		if (cmpstr(buffer, "NaN") == 0)
+			sc_stopfdacSweep(instrID)
+			abort
+		endif
+		// add data to datawave
+		specAna_distribute_data(buffer,read_chunk,channels,bytes_read/(2*numChannels))
+		bytes_read += read_chunk
+		totaldump = bytesSec*(stopmstimer(-2)-bufferDumpStart)*1e-6
+		if(totaldump-bytes_read < saveBuffer)
+			for(i=0;i<itemsinlist(openplots,",");i+=1)
+				doupdate/w=$stringfromlist(i,openplots,",")
+			endfor
+		endif
+	while(totalbytesreturn-bytes_read > read_chunk)
+	// do one last read if any data left to read
+	bytes_left = totalbytesreturn-bytes_read
+	if(bytes_left > 0)
+		buffer = readInstr(instrID,read_bytes=bytes_left,fdac_flag=1)
+		specAna_distribute_data(buffer,bytes_left,channels,bytes_read/(2*numChannels))
+		doupdate
+	endif
+	
+	buffer = readInstr(instrID,read_term="\n")
+	buffer = sc_stripTermination(buffer,"\r\n")
+	if(!fdacCheckResponse(buffer,cmd,isString=1,expectedResponse="READ_FINISHED"))
+		print "[ERROR] \"fdacSpectrumAnalyzer\": Error during read. Not all data recived!"
+		abort
+	endif
+	
+	// close the time series plots
+	for(i=0;i<numChannels;i+=1)
+		killwindow/z $stringfromlist(i,openplots,",")
+	endfor
+	openplots = ""
+	
+	// convert time series to spectrum
+	variable bandwidth = samplingFreq
+	string fftnames = ""
+	for(i=0;i<numChannels;i+=1)
+		fftnames = "fftADC"+stringfromlist(i,channels,",")
+		wn = "timeSeriesADC"+stringfromlist(i,channels,",")
+		wave timewn = $wn
+		timewn = timewn*1.0e-3
+		fft/out=3/dest=$fftnames timewn
+		wave fftwn = $fftnames
+		setscale/i x, 0, bandwidth/(2.0*numChannels), fftwn
+		fftwn = fftwn/sqrt(bandwidth)
+		display fftwn
+		label bottom, "frequency [Hz]"
+		label left, "Spectrum [V/sqrt(Hz)]"
+		openplots+= winname(0,1)+","
+	endfor
+	
+	// tile windows
+	cmd1 = "TileWindows/O=1/A=(3,4) "+openplots
+	execute(cmd1)
+	
+	// try to scale y axis
+	variable searchStart = 0, maxpeak = 0
+	for(i=0;i<numChannels;i+=1)
+		fftnames = "fftADC"+stringfromlist(i,channels,",")
+		wave fftwn = $fftnames
+		searchStart = 1.0
+		maxpeak = 0
+		do
+			findpeak/q/r=(searchStart,bandwidth/2.0)/i/m=0.1 fftwn
+			if(v_peakval > maxpeak)
+				maxpeak = v_peakval
+			endif
+			searchStart = v_peakloc+1.0
+		while(v_flag == 0)
+		setaxis/w=$stringfromlist(i,openplots,",") left 0.0,maxpeak
+	endfor
+end
+
+function specAna_distribute_data(buffer,bytes,channels,colNumStart)
+	string buffer, channels
+	variable bytes, colNumStart
+	
+	variable i=0, j=0, k=0, datapoint=0, numChannels = itemsinlist(channels,",")
+	string wave1d = "", s1="", s2=""
+	for(i=0;i<numChannels;i+=1)
+		// load data into wave
+		wave1d = "timeSeriesADC"+stringfromlist(i,channels,",")
+		wave timewave = $wave1d
+		k = 0
+		for(j=0;j<bytes;j+=2*numChannels)
+		// convert to floating point
+			s1 = buffer[j + (i*2)]
+			s2 = buffer[j + (i*2) + 1]
+			datapoint = fdacChar2Num(s1, s2)
+			timewave[colNumStart+k] = dataPoint
+			k += 1
+		endfor
+	endfor
 end

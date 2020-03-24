@@ -11,7 +11,7 @@ end
 
 function /s getResourceAddress(instrID)
 	variable instrID
-	string address
+	string address=""
 
 	viGetAttributeString(instrID, VI_ATTR_RSRC_NAME , address  )
 
@@ -279,7 +279,6 @@ threadsafe function/s readInstr(instrID, [read_term, read_bytes, fdac_flag])
 	 	endif
 	 endif
 	 
-
 	 return buffer
 end
 
@@ -386,7 +385,7 @@ function sc_progressbarDelay(delay,delaymsg)
 	delay = delay*1e6
 	variable start_time = stopMStimer(-2)
 	do
-		doupdate/w=progressBar
+		doupdate/w=ProgressBar
 		progress = (stopMStimer(-2)-start_time)/delay*100 // progress in procent
 		
 	while(stopMStimer(-2)-start_time < delay)
