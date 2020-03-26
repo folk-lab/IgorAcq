@@ -819,7 +819,7 @@ end
 //// ScanController ////
 ///////////////////////
 
-function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcutoff,numAverage,notch])
+function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay, ramprate,RCcutoff,numAverage,notch])
 	// RecordValues for FastDAC's. This function should replace RecordValues in scan functions.
 	// j is outer scan index, if it's a 1D scan just set j=0.
 	// rampCh is a comma seperated string containing the channels that should be ramped.
@@ -829,16 +829,15 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	//		- nocth sets the notch frequencie, as a comma seperated list (width is fixed at 5Hz)
 	variable instrID, rowNum
 	string rampCh, start, fin
-	variable numpts, ramprate, RCcutoff, numAverage
+	variable numpts, delay, ramprate, RCcutoff, numAverage
 	string notch
 	nvar sc_is2d, sc_startx, sc_starty, sc_finx, sc_starty, sc_finy, sc_numptsx, sc_numptsy
 	nvar sc_abortsweep, sc_pause, sc_scanstarttime
 	wave/t fadcvalstr, fdacvalstr
 	wave fadcattr
 	
-	if(paramisdefault(ramprate))
-		ramprate = 1000
-	endif
+	ramprate = paramisdefault(ramprate) ? 1000 : ramprate
+	delay = paramisdefault(delay) ? 0 : delay
 	
 	// compare to earlier call of InitializeWaves
 	nvar fastdac_init
@@ -922,6 +921,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	for(i=0;i<itemsinlist(scanList.daclist,",");i+=1)
 		rampOutputfdac(instrID,str2num(stringfromlist(i,scanList.daclist,",")),str2num(stringfromlist(i,scanList.startVal,",")),ramprate=ramprate)
 	endfor
+	sc_sleep(delay)  // Settle time for 2D sweeps
 	
 	// build command and start ramp
 	// for now we only have to send one command to one device.
@@ -1822,11 +1822,11 @@ function fdacCreateControlWaves(numDACCh,numADCCh)
 	variable numDACCh,numADCCh
 	
 	// create waves for DAC part
-	make/o/t/n=(numADCCh) fdacval0 = "0"
-	make/o/t/n=(numDACCh) fdacval1 = "0"
-	make/o/t/n=(numDACCh) fdacval2 = "-10000,10000"
-	make/o/t/n=(numDACCh) fdacval3 = "Label"
-	make/o/t/n=(numDACCh) fdacval4 = "1000"
+	make/o/t/n=(numDACCh) fdacval0 = "0"				// Channel
+	make/o/t/n=(numDACCh) fdacval1 = "0"				// Output /mV
+	make/o/t/n=(numDACCh) fdacval2 = "-10000,10000"	// Limits /mV
+	make/o/t/n=(numDACCh) fdacval3 = "Label"			// Labels
+	make/o/t/n=(numDACCh) fdacval4 = "1000"			// Ramprate limit /mV/s
 	variable i=0
 	for(i=0;i<numDACCh;i+=1)
 		fdacval0[i] = num2istr(i)
@@ -1838,11 +1838,11 @@ function fdacCreateControlWaves(numDACCh,numADCCh)
 	concatenate/o {fdacattr0,fdacattr1,fdacattr1,fdacattr1,fdacattr1}, fdacattr
 	
 	//create waves for ADC part
-	make/o/t/n=(numADCCh) fadcval0 = "0"
-	make/o/t/n=(numADCCh) fadcval1 = "0"
-	make/o/t/n=(numADCCh) fadcval2 = ""
-	make/o/t/n=(numADCCh) fadcval3 = ""
-	make/o/t/n=(numADCCh) fadcval4 = ""
+	make/o/t/n=(numADCCh) fadcval0 = "0"	// Channel
+	make/o/t/n=(numADCCh) fadcval1 = ""		// Input /mV  (initializes empty otherwise false reading)
+	make/o/t/n=(numADCCh) fadcval2 = ""		// Record (1/0)
+	make/o/t/n=(numADCCh) fadcval3 = ""		// Wave Name
+	make/o/t/n=(numADCCh) fadcval4 = ""		// Calc (e.g. ADC0*1e-6) 
 	for(i=0;i<numADCCh;i+=1)
 		fadcval0[i] = num2istr(i)
 		fadcval3[i] = "wave"+num2istr(i)
