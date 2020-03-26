@@ -53,7 +53,6 @@ function initSaveFiles([msg])
 
 	// may as well save this config file, since we already have it
 	sc_saveConfig(cconfig[0])
-
 end
 
 function saveSingleWave(wn)

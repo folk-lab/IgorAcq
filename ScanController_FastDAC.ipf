@@ -286,7 +286,7 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 				devchannel = channel-startCh
 				break
 			else
-				sprintf err, "[ERROR] \"rampOutputfdac\": channel %d is not present on devic with address %s", channel, instrAddress
+				sprintf err, "[ERROR] \"rampOutputfdac\": channel %d is not present on device with address %s", channel, instrAddress
 				print(err)
 				resetfdacwindow(channel)
 				abort
@@ -306,8 +306,21 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	
 	// check that output is within software limit
 	// overwrite output to software limit and warn user
-	if(abs(output) > str2num(fdacvalstr[channel][2]))
-		output = sign(output)*str2num(fdacvalstr[channel][2])
+	string softLimitPositive = "", softLimitNegative = "", expr = "(-?[[:digit:]]+),([[:digit:]]+)"
+	splitstring/e=(expr) fdacvalstr[channel][2], softLimitNegative, softLimitPositive
+	if(output < str2num(softLimitNegative) || output > str2num(softLimitPositive))
+		switch(sign(output))
+			case -1:
+				output = str2num(softLimitNegative)
+				break
+			case 1:
+				if(output != 0)
+					output = str2num(softLimitPositive)
+				else
+					output = 0
+				endif
+				break
+		endswitch
 		string warn
 		sprintf warn, "[WARNING] \"rampOutputfdac\": Output voltage must be within limit. Setting channel %d to %.3fmV", channel, output
 		print warn
@@ -827,8 +840,11 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 	
 	variable eff_ramprate = 0, answer = 0, i=0
 	string question = ""
-	// check if effective ramprate is higher than software limits
+	
+	svar activegraphs
+	variable k=0
 	if(rowNum == 0)
+		// check if effective ramprate is higher than software limits
 		for(i=0;i<itemsinlist(rampCh,",");i+=1)
 			eff_ramprate = abs(str2num(stringfromlist(i,scanlist.startval,","))-str2num(stringfromlist(i,scanlist.finval,",")))*(samplingFreq/numpts)
 			if(eff_ramprate > str2num(fdacvalstr[i][4]))
@@ -837,6 +853,32 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[ramprate,RCcut
 				answer = ask_user(question, type=1)
 				if(answer == 2)
 					print("[ERROR] \"RecordValues\": User abort!")
+					dowindow/k SweepControl // kill scan control window
+					for(k=0;k<itemsinlist(activegraphs,";");k+=1)
+						dowindow/k $stringfromlist(k,activegraphs,";")
+					endfor
+					abort
+				endif
+			endif
+		endfor
+	
+		// check that start and end values are within software limits
+		string softLimitPositive = "", softLimitNegative = "", expr = "(-?[[:digit:]]+),([[:digit:]]+)"
+		variable startval = 0, finval = 0
+		for(i=0;i<itemsinlist(scanlist.daclist,",");i+=1)
+			splitstring/e=(expr) fdacvalstr[str2num(stringfromlist(i,scanlist.daclist,","))][2], softLimitNegative, softLimitPositive
+			startval = str2num(stringfromlist(i,scanlist.startval,","))
+			finval = str2num(stringfromlist(i,scanlist.finval,","))
+			if(startval < str2num(softLimitNegative) || startval > str2num(softLimitPositive) || finval < str2num(softLimitNegative) || finval > str2num(softLimitPositive))
+				// we are outside limits
+				sprintf question, "DAC channel %s will be ramped outside software limits. Continue?", stringfromlist(i,scanlist.daclist,",")
+				answer = ask_user(question, type=1)
+				if(answer == 2)
+					print("[ERROR] \"RecordValues\": User abort!")
+					dowindow/k SweepControl // kill scan control window
+					for(k=0;k<itemsinlist(activegraphs,";");k+=1)
+						dowindow/k $stringfromlist(k,activegraphs,";")
+					endfor
 					abort
 				endif
 			endif
@@ -1384,6 +1426,10 @@ function initFastDAC()
 		abort
 	endif
 	
+	// create path for spectrum analyzer
+	string datapath = getExpPath("data", full=3)
+	newpath/c/o/q spectrum datapath+"spectrum:" // create/overwrite spectrum path
+	
 	// hardware limit (mV)
 	variable/g fdac_limit = 5000
 	
@@ -1517,14 +1563,14 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 15, 70, "Ch"
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 50, 70, "Output (mV)"
+	DrawText 50, 70, "Output"
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 140, 70, "Limit (mV)"
+	DrawText 120, 70, "Limit"
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 213, 70, "Label"
+	DrawText 220, 70, "Label"
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 285, 70, "Ramprate\r   (mV/s)"
-	ListBox fdaclist,pos={10,75},size={360,270},fsize=14,frame=2,widths={35,90,75,70}
+	DrawText 287, 70, "Ramprate"
+	ListBox fdaclist,pos={10,75},size={360,270},fsize=14,frame=2,widths={30,70,100,65}
 	ListBox fdaclist,listwave=root:fdacvalstr,selwave=root:fdacattr,mode=1
 	Button updatefdac,pos={50,354},size={65,20},proc=update_fdac,title="Update"
 	Button fdacramp,pos={150,354},size={65,20},proc=update_fdac,title="Ramp"
@@ -1733,7 +1779,7 @@ function fdacCreateControlWaves(numDACCh,numADCCh)
 	// create waves for DAC part
 	make/o/t/n=(numADCCh) fdacval0 = "0"
 	make/o/t/n=(numDACCh) fdacval1 = "0"
-	make/o/t/n=(numDACCh) fdacval2 = "10000"
+	make/o/t/n=(numDACCh) fdacval2 = "-10000,10000"
 	make/o/t/n=(numDACCh) fdacval3 = "Label"
 	make/o/t/n=(numDACCh) fdacval4 = "1000"
 	variable i=0
@@ -1854,12 +1900,21 @@ end
 //// Spectrum Analyzer ////
 //////////////////////////
 
-function fdacSpectrumAnalyzer(instrID,channels,scanlength)
+function fdacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear])
 	// channels must a comma seperated string, refering
 	// to the numbering in the ScanControllerFastDAC window.
 	// scanlength is in sec
-	variable instrID, scanlength
+	// if linear is set to 1, the spectrum will be plotted on a linear scale
+	variable instrID, scanlength, numAverage, linear
 	string channels
+	
+	if(paramisdefault(linear) || linear != 1)
+		linear = 0
+	endif
+	
+	if(paramisdefault(numAverage))
+		numAverage = 1
+	endif
 	
 	svar fdackeys
 	
@@ -1908,8 +1963,7 @@ function fdacSpectrumAnalyzer(instrID,channels,scanlength)
 	
 	// find all open plots
 	string graphlist = winlist("*",",","WIN:1"), graphname = "", graphtitle="", graphnumlist=""
-	string plottitle="", graphnum=""
-	j=0				
+	string plottitle="", graphnum=""			
 	for(i=0;i<itemsinlist(graphlist,",");i=i+1) 			
 		graphname = stringfromlist(i,graphlist,",")
 		setaxis/w=$graphname /a
@@ -1943,77 +1997,110 @@ function fdacSpectrumAnalyzer(instrID,channels,scanlength)
 	string cmd1 = "TileWindows/O=1/A=(4,1) "+openplots
 	execute(cmd1)
 
-	// set up and execute command
-	// SPEC_ANA,adcCh,numpts
-	string cmd = ""
-	sprintf cmd, "SPEC_ANA,%s,%s\r", replacestring(",",channels,""), num2str(numpts)
-	writeInstr(instrID,cmd)
-	
-	variable bytesSec = roundNum(2*samplingFreq,0)
-	variable read_chunk = roundNum(numChannels*bytesSec/50,0) - mod(roundNum(numChannels*bytesSec/50,0),numChannels*2)
-	if(read_chunk < 50)
-		read_chunk = 50 - mod(50,numChannels*2) // 50 or 48
-	endif
-	
-	// read incoming data
-	string buffer=""
-	variable bytes_read = 0, bytes_left = 0, totalbytesreturn = numChannels*numpts*2, saveBuffer = 1000, totaldump = 0
-	variable bufferDumpStart = stopMSTimer(-2)
-	
-	//print bytesSec, read_chunk, totalbytesreturn
-	do
-		buffer = readInstr(instrID, read_bytes=read_chunk, fdac_flag=1)
-		// If failed, abort
-		if (cmpstr(buffer, "NaN") == 0)
-			sc_stopfdacSweep(instrID)
-			abort
-		endif
-		// add data to datawave
-		specAna_distribute_data(buffer,read_chunk,channels,bytes_read/(2*numChannels))
-		bytes_read += read_chunk
-		totaldump = bytesSec*(stopmstimer(-2)-bufferDumpStart)*1e-6
-		if(totaldump-bytes_read < saveBuffer)
-			for(i=0;i<itemsinlist(openplots,",");i+=1)
-				doupdate/w=$stringfromlist(i,openplots,",")
-			endfor
-		endif
-	while(totalbytesreturn-bytes_read > read_chunk)
-	// do one last read if any data left to read
-	bytes_left = totalbytesreturn-bytes_read
-	if(bytes_left > 0)
-		buffer = readInstr(instrID,read_bytes=bytes_left,fdac_flag=1)
-		specAna_distribute_data(buffer,bytes_left,channels,bytes_read/(2*numChannels))
-		doupdate
-	endif
-	
-	buffer = readInstr(instrID,read_term="\n")
-	buffer = sc_stripTermination(buffer,"\r\n")
-	if(!fdacCheckResponse(buffer,cmd,isString=1,expectedResponse="READ_FINISHED"))
-		print "[ERROR] \"fdacSpectrumAnalyzer\": Error during read. Not all data recived!"
-		abort
-	endif
-	
-	// close the time series plots
-	for(i=0;i<numChannels;i+=1)
-		killwindow/z $stringfromlist(i,openplots,",")
-	endfor
-	openplots = ""
-	
-	// convert time series to spectrum
-	variable bandwidth = samplingFreq
+	// create waves for final fft output
 	string fftnames = ""
 	for(i=0;i<numChannels;i+=1)
 		fftnames = "fftADC"+stringfromlist(i,channels,",")
-		wn = "timeSeriesADC"+stringfromlist(i,channels,",")
-		wave timewn = $wn
-		timewn = timewn*1.0e-3
-		fft/out=3/dest=$fftnames timewn
-		wave fftwn = $fftnames
-		setscale/i x, 0, bandwidth/(2.0*numChannels), fftwn
-		fftwn = fftwn/sqrt(bandwidth)
-		display fftwn
+		make/o/n=(numpts/2) $fftnames = nan
+	endfor
+	
+	for(i=0;i<numAverage;i+=1)
+		// set up and execute command
+		// SPEC_ANA,adcCh,numpts
+		string cmd = ""
+		sprintf cmd, "SPEC_ANA,%s,%s\r", replacestring(",",channels,""), num2str(numpts)
+		writeInstr(instrID,cmd)
+		
+		variable bytesSec = roundNum(2*samplingFreq,0)
+		variable read_chunk = roundNum(numChannels*bytesSec/50,0) - mod(roundNum(numChannels*bytesSec/50,0),numChannels*2)
+		if(read_chunk < 50)
+			read_chunk = 50 - mod(50,numChannels*2) // 50 or 48
+		endif
+		
+		// read incoming data
+		string buffer=""
+		variable bytes_read = 0, bytes_left = 0, totalbytesreturn = numChannels*numpts*2, saveBuffer = 1000, totaldump = 0
+		variable bufferDumpStart = stopMSTimer(-2)
+		
+		//print bytesSec, read_chunk, totalbytesreturn
+		do
+			buffer = readInstr(instrID, read_bytes=read_chunk, fdac_flag=1)
+			// If failed, abort
+			if (cmpstr(buffer, "NaN") == 0)
+				sc_stopfdacSweep(instrID)
+				abort
+			endif
+			// add data to datawave
+			specAna_distribute_data(buffer,read_chunk,channels,bytes_read/(2*numChannels))
+			bytes_read += read_chunk
+			totaldump = bytesSec*(stopmstimer(-2)-bufferDumpStart)*1e-6
+			if(totaldump-bytes_read < saveBuffer)
+				for(j=0;j<itemsinlist(openplots,",");j+=1)
+					doupdate/w=$stringfromlist(j,openplots,",")
+				endfor
+			endif
+		while(totalbytesreturn-bytes_read > read_chunk)
+		// do one last read if any data left to read
+		bytes_left = totalbytesreturn-bytes_read
+		if(bytes_left > 0)
+			buffer = readInstr(instrID,read_bytes=bytes_left,fdac_flag=1)
+			specAna_distribute_data(buffer,bytes_left,channels,bytes_read/(2*numChannels))
+			doupdate
+		endif
+		
+		buffer = readInstr(instrID,read_term="\n")
+		buffer = sc_stripTermination(buffer,"\r\n")
+		if(!fdacCheckResponse(buffer,cmd,isString=1,expectedResponse="READ_FINISHED"))
+			print "[ERROR] \"fdacSpectrumAnalyzer\": Error during read. Not all data recived!"
+			abort
+		endif
+		
+		// convert time series to spectrum
+		variable bandwidth = samplingFreq
+		string ffttemps = ""
+		for(j=0;j<numChannels;j+=1)
+			ffttemps = "ffttempADC"+stringfromlist(j,channels,",")
+			wn = "timeSeriesADC"+stringfromlist(j,channels,",")
+			wave timewn = $wn
+			duplicate/o timewn, fftinput
+			fftinput = fftinput*1.0e-3
+			fft/out=3/dest=$ffttemps fftinput
+			wave fftwn = $ffttemps
+			setscale/i x, 0, bandwidth/(2.0*numChannels), fftwn
+			if(linear)
+				fftwn = fftwn/sqrt(bandwidth)
+			else
+				fftwn = 20*log(fftwn/sqrt(bandwidth))
+			endif
+			fftnames = "fftADC"+stringfromlist(j,channels,",")
+			wave fftwave = $fftnames
+			if(i==0)
+				fftwave = fftwn
+			else
+				fftwave = fftwave + fftwn
+				fftwave = fftwave/2.0
+			endif
+		endfor
+	endfor	
+	
+	// close the time series plots
+	for(j=0;j<numChannels;j+=1)
+		killwindow/z $stringfromlist(j,openplots,",")
+	endfor
+	openplots = ""
+		
+	// display fft plots
+	for(i=0;i<numChannels;i+=1)
+		fftnames = "fftADC"+stringfromlist(i,channels,",")
+		wave fftwave = $fftnames
+		setscale/i x, 0, bandwidth/(2.0*numChannels), fftwave
+		display fftwave
 		label bottom, "frequency [Hz]"
-		label left, "Spectrum [V/sqrt(Hz)]"
+		if(linear)
+			label left, "Spectrum [V/sqrt(Hz)]"
+		else
+			label left, "Spectrum [dBV/sqrt(Hz)]"
+		endif
 		openplots+= winname(0,1)+","
 	endfor
 	
@@ -2021,22 +2108,46 @@ function fdacSpectrumAnalyzer(instrID,channels,scanlength)
 	cmd1 = "TileWindows/O=1/A=(3,4) "+openplots
 	execute(cmd1)
 	
-	// try to scale y axis
-	variable searchStart = 0, maxpeak = 0
+	// try to scale y axis in plot is linear scale
+	if(linear)
+		variable searchStart = 0, maxpeak = 0, cutoff = 0.1
+		for(i=0;i<numChannels;i+=1)
+			fftnames = "fftADC"+stringfromlist(i,channels,",")
+			wave fftwave = $fftnames
+			searchStart = 1.0
+			maxpeak = 0
+			do
+				findpeak/q/r=(searchStart,bandwidth/2.0)/i/m=(cutoff) fftwave
+				if(abs(v_peakval) > abs(maxpeak))
+					maxpeak = v_peakval
+				endif
+				searchStart = v_peakloc+1.0
+			while(v_flag == 0)
+			setaxis/w=$stringfromlist(i,openplots,",") left 0.0,maxpeak
+		endfor
+	endif
+	
+	// save data to "data/spectrum/"
+	string filename = "spectrum_"+num2istr(unixtime())+".h5"
+	variable hdf5_id=0
+	// create empty HDF5 container
+	HDF5CreateFile/p=spectrum hdf5_id as filename
+	// save the spectrum
 	for(i=0;i<numChannels;i+=1)
 		fftnames = "fftADC"+stringfromlist(i,channels,",")
-		wave fftwn = $fftnames
-		searchStart = 1.0
-		maxpeak = 0
-		do
-			findpeak/q/r=(searchStart,bandwidth/2.0)/i/m=0.1 fftwn
-			if(v_peakval > maxpeak)
-				maxpeak = v_peakval
-			endif
-			searchStart = v_peakloc+1.0
-		while(v_flag == 0)
-		setaxis/w=$stringfromlist(i,openplots,",") left 0.0,maxpeak
+		HDF5SaveData/IGOR=-1/WRIT=1/Z $fftnames , hdf5_id
+		if (V_flag != 0)
+			print "HDF5SaveData failed: ", wn
+			return 0
+		endif
 	endfor
+	// close HDF5 container
+	HDF5CloseFile/Z hdf5_id
+	if (v_flag != 0)
+		print "HDF5CloseFile failed: ", filename
+	else
+		print "saving all spectra to file: "+filename
+	endif
 end
 
 function specAna_distribute_data(buffer,bytes,channels,colNumStart)
