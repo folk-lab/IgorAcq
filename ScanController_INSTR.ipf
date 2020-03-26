@@ -342,6 +342,31 @@ function/s postHTTP(instrID,cmd,payload,headers)
    endif
 end
 
+
+function/s putHTTP(instrID,cmd,payload,headers)
+	string instrID, cmd, payload, headers
+	string response=""
+
+//	print instrID+cmd, payload
+	URLRequest /TIME=15.0 /DSTR=payload url=instrID+cmd, method=put, headers=headers
+
+	if (V_flag == 0)    // No error
+		response = S_serverResponse // response is a JSON string
+		if (V_responseCode != 200)  // 200 is the HTTP OK code
+			print "[ERROR] HTTP response code " + num2str(V_responseCode)
+			if(strlen(response)>0)
+		   	printf "[MESSAGE] %s\r", getJSONvalue(response, "error")
+		   endif
+		   return ""
+		else
+			return response
+		endif
+   else
+        abort "HTTP connection error."
+   endif
+end
+
+
 function/s getHTTP(instrID,cmd,headers)
 	string instrID, cmd, headers
 	string response, error
