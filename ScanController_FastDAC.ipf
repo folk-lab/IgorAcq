@@ -172,8 +172,8 @@ function getfadcChannel(instrID,channel) // Units: mV
 	err = ""
 	if(fdacCheckResponse(response,cmd)) 
 		// good response, update window
-		fadcvalstr[channel][1] = num2str(str2num(response)*1000)
-		return str2num(response)*1000
+		fadcvalstr[channel][1] = num2str(str2num(response))
+		return str2num(response)
 	else
 		abort
 	endif
@@ -185,14 +185,14 @@ function getfdacOutput(instrID,channel) // Units: mV
 	wave/t old_fdacvalstr, fdacvalstr
 	string cmd="", response="",warn=""
 	sprintf cmd, "GET_DAC,%d", channel
-	response = queryInstr(instrID, cmd+"\r", read_term="\n") // response in Volts
+	response = queryInstr(instrID, cmd+"\r", read_term="\n")
 	response = sc_stripTermination(response,"\r\n")
 	
 	// check response
 	variable currentOutput=0
 	if(fdacCheckResponse(response,cmd))
 		// good response
-		currentOutput = str2num(response)*1000 // change units to mV
+		currentOutput = str2num(response)
 		fdacvalstr[channel][1] = num2str(currentOutput)
 		updatefdacwindow(channel)
 	else
@@ -201,6 +201,39 @@ function getfdacOutput(instrID,channel) // Units: mV
 	endif
 	
 	return currentOutput
+end
+
+function/s getFastDACStatus(instrID)
+	variable instrID
+	string  buffer = ""
+	
+	svar fdackeys
+
+	// find the correct fastdac
+	string visa = getresourceaddress(instrID)
+	variable i=0, dev = 0, numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
+	variable adcChs = 0
+	for(i=0;i<numDevices;i+=1)
+		if(cmpstr(visa,stringbykey("visa"+num2istr(i+1),fdackeys,":",","))==0)
+			dev = i+1
+			break
+		endif
+		adcChs += str2num(stringbykey("numADCCh"+num2istr(i+1),fdackeys,":",","))
+	endfor
+	
+	buffer = addJSONkeyval(buffer, "visa_address", visa)
+	
+	// DAC values
+	for(i=0;i<str2num(stringbykey("numDACCh"+num2istr(dev),fdackeys,":",","));i+=1)
+		buffer = addJSONkeyval(buffer, "DAC"+num2istr(i), num2numstr(getfdacOutput(instrID,i)))
+	endfor
+	
+	// ADC values
+	for(i=0;i<str2num(stringbykey("numADCCh"+num2istr(dev),fdackeys,":",","));i+=1)
+		buffer = addJSONkeyval(buffer, "ADC"+num2istr(i), num2numstr(getfadcChannel(instrID,adcChs+i)))
+	endfor
+
+	return addJSONkeyval("", "FastDAC "+num2istr(dev), buffer)
 end
 
 //// Set functions ////
@@ -1667,6 +1700,8 @@ function update_fadcSpeed(s) : PopupMenuControl
 				
 			viClose(tempname)
 			viClose(viRM)
+			// reopen normal instrument connections
+			sc_OpenInstrConnections(0)
 			// silent abort
 			abortonvalue 1,10
 		endtry
@@ -1679,6 +1714,8 @@ function update_fadcSpeed(s) : PopupMenuControl
 		// do nothing
 		return 0
 	endif
+	// reopen normal instrument connections
+	sc_OpenInstrConnections(0)
 end
 
 function update_fdac(action) : ButtonControl
@@ -1725,6 +1762,8 @@ function update_fdac(action) : ButtonControl
 				
 				viClose(tempname)
 				viClose(viRM)
+				// reopen normal instrument connections
+				sc_OpenInstrConnections(0)
 				// silent abort
 				abortonvalue 1,10
 			endtry
@@ -1735,6 +1774,8 @@ function update_fdac(action) : ButtonControl
 		endif
 		startCh =+ numDACCh
 	endfor
+	// reopen normal instrument connections
+	sc_OpenInstrConnections(0)
 end
 
 function update_fadc(action) : ButtonControl
@@ -1761,6 +1802,8 @@ function update_fadc(action) : ButtonControl
 				
 				viClose(tempname)
 				viClose(viRM)
+				// reopen normal instrument connections
+				sc_OpenInstrConnections(0)
 				// silent abort
 				abortonvalue 1,10
 			endtry
@@ -1771,6 +1814,8 @@ function update_fadc(action) : ButtonControl
 		endif
 		startCh += numADCCh
 	endfor
+	// reopen normal instrument connections
+	sc_OpenInstrConnections(0)
 end
 
 function fdacCreateControlWaves(numDACCh,numADCCh)
