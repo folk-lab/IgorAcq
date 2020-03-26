@@ -228,6 +228,12 @@ function/s getFastDACStatus(instrID)
 		buffer = addJSONkeyval(buffer, "DAC"+num2istr(i), num2numstr(getfdacOutput(instrID,i)))
 	endfor
 	
+	wave/t fdacvalstr
+	// DAC names
+	for(i=0;i<str2num(stringbykey("numDACCh"+num2istr(dev),fdackeys,":",","));i+=1)
+		buffer = addJSONkeyval(buffer, "DAC"+fdacvalstr[i][0]+"name", "\""+fdacvalstr[i][3]+"\"")
+	endfor
+	
 	// ADC values
 	for(i=0;i<str2num(stringbykey("numADCCh"+num2istr(dev),fdackeys,":",","));i+=1)
 		buffer = addJSONkeyval(buffer, "ADC"+num2istr(i), num2numstr(getfadcChannel(instrID,adcChs+i)))
@@ -1825,7 +1831,7 @@ function fdacCreateControlWaves(numDACCh,numADCCh)
 	make/o/t/n=(numDACCh) fdacval0 = "0"				// Channel
 	make/o/t/n=(numDACCh) fdacval1 = "0"				// Output /mV
 	make/o/t/n=(numDACCh) fdacval2 = "-10000,10000"	// Limits /mV
-	make/o/t/n=(numDACCh) fdacval3 = "Label"			// Labels
+	make/o/t/n=(numDACCh) fdacval3 = ""					// Labels
 	make/o/t/n=(numDACCh) fdacval4 = "1000"			// Ramprate limit /mV/s
 	variable i=0
 	for(i=0;i<numDACCh;i+=1)

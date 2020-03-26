@@ -92,7 +92,7 @@ function bdSetBoardNumbers(boards, custom)
 	variable /g bd_num_custom = 0
 	wave/t dacvalstr=dacvalstr
 
-	make/o listboxattr = {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},{2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0}, {2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0}}
+	make/o listboxattr = {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},{2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0}, {2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0}, {2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0}}
 
 	switch(numBoards)
 		case 1:
@@ -125,6 +125,11 @@ function bdSetBoardNumbers(boards, custom)
 		listboxattr[6][2] = 2
 		listboxattr[7][2] = 2
 
+		listboxattr[4][3] = 2
+		listboxattr[5][3] = 2
+		listboxattr[6][3] = 2
+		listboxattr[7][3] = 2
+
 		if(custom)
 			bd_num_custom += 4
 		endif
@@ -146,6 +151,11 @@ function bdSetBoardNumbers(boards, custom)
 		listboxattr[10][2] = 2
 		listboxattr[11][2] = 2
 
+		listboxattr[8][3] = 2
+		listboxattr[9][3] = 2
+		listboxattr[10][3] = 2
+		listboxattr[11][3] = 2
+
 		if(custom)
 			bd_num_custom += 4
 		endif
@@ -166,6 +176,11 @@ function bdSetBoardNumbers(boards, custom)
 		listboxattr[13][2] = 2
 		listboxattr[14][2] = 2
 		listboxattr[15][2] = 2
+
+		listboxattr[12][3] = 2
+		listboxattr[13][3] = 2
+		listboxattr[14][3] = 2
+		listboxattr[15][3] = 2
 
 		if(custom)
 			bd_num_custom += 4
@@ -374,7 +389,7 @@ function bdInitZeros()
 	nvar bd_num_custom
 
 	// Init all channels to 0V.
-	make/t/o dacvalstr = {{"0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15"},{"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}, {"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}}
+	make/t/o dacvalstr = {{"0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15"},{"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}, {"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}, {"","","","","","","","","","","","","","","",""}}
 	make/t/o old_dacvalstr = {{"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}}
 
 	// setup software limit
@@ -685,7 +700,7 @@ function RampOutputBD(instrID, channel, output, [ramprate, update])
 		sleeptime = 0.01 // account for screen-update delays
 	else
 		pauseupdate
-		sleeptime = 0.002 // can ramp finely if there's no updating!
+		sleeptime = 0.0024 // can ramp finely if there's no updating!
 	endif
 
 	if(paramisdefault(ramprate))
@@ -1005,7 +1020,7 @@ end
 
 window BabyDACWindow() : Panel
 	PauseUpdate; Silent 1 // building window
-	NewPanel /W=(0,0,320,530) // window size
+	NewPanel /W=(0,0,420,530) // window size
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv fsize= 25,fstyle= 1
@@ -1016,10 +1031,12 @@ window BabyDACWindow() : Panel
 	DrawText 108,85,"VOLT (mV)"
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 208,85,"LIM (mV)"
-	ListBox daclist,pos={10,90},size={300,390},fsize=16,frame=2 // interactive list
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 308,85,"Label"
+	ListBox daclist,pos={10,90},size={400,400},fsize=16,frame=2 // interactive list
 	ListBox daclist,fStyle=1,listWave=root:dacvalstr,selWave=root:listboxattr,mode= 1
-	Button ramp,pos={50,495},size={65,20},proc=update_BabyDAC,title="RAMP"
-	Button rampallzero,pos={170,495},size={90,20},proc=update_BabyDAC,title="RAMP ALL 0"
+	Button ramp,pos={80,500},size={65,20},proc=update_BabyDAC,title="RAMP"
+	Button rampallzero,pos={220,500},size={90,20},proc=update_BabyDAC,title="RAMP ALL 0"
 endMacro
 
 function update_BabyDAC(action) : ButtonControl
@@ -1147,7 +1164,7 @@ function/s GetBDDACStatus(instrID)
 	do
 		if(numtype(bd_boardnumbers[i])==0)
 			for(j=0;j<4;j+=1)
-				buffer = addJSONkeyval(buffer, "CH"+num2istr(4*i+j), dacvalstr[4*i+j][1])
+				buffer = addJSONkeyval(buffer, "DAC{"+dacvalstr[4*i+j][3]+"}"+num2istr(4*i+j), dacvalstr[4*i+j][1])
 			endfor
 		endif
 		i+=1
@@ -1161,6 +1178,7 @@ function/s GetBDDACStatus(instrID)
 			i=i+1
 		while(i<bd_num_custom)
 	endif
+	
 
 	buffer = addJSONkeyval(buffer, "com_port", bd_controller_addr, addQuotes=1)
 
