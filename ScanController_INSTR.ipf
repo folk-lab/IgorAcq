@@ -235,10 +235,10 @@ threadsafe function writeInstr(instrID, cmd)
 
 end
 
-threadsafe function/s readInstr(instrID, [read_term, read_bytes, fdac_flag])
+threadsafe function/s readInstr(instrID, [read_term, read_bytes, binary])
 	// generic error checking read function
-	// fdac_flag only ticked when reading long binary data from fdac
-	variable instrID, read_bytes, fdac_flag
+	// binary only ticked when reading long binary data from fdac
+	variable instrID, read_bytes, binary
 	string read_term
 
     if(!paramisdefault(read_term))
@@ -253,10 +253,10 @@ threadsafe function/s readInstr(instrID, [read_term, read_bytes, fdac_flag])
         visaSetReadTermEnable(instrID, 0)
     endif
     
-    if(!paramIsDefault(fdac_flag))
+    if(!paramIsDefault(binary))
     	 visaSetSerialEndIn(instrID, 0)
    	 else
-   	    fdac_flag = 0
+   	    binary = 0
    	 	 visaSetSerialEndIn(instrID, 2)
     endif
 
@@ -271,7 +271,7 @@ threadsafe function/s readInstr(instrID, [read_term, read_bytes, fdac_flag])
         VISAerrormsg("readInstr() -- viRead", instrID, status)
     	return "NaN" // abort not supported in threads (v7)
 	 endif
-	 if(fdac_flag)
+	 if(binary)
 	 	if(read_bytes != return_count)
 	 		sprintf err, "[ERROR] Returned bytes: %d. Expeted bytes: %d", return_count, read_bytes
 	 		print err

@@ -952,7 +952,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay, ramprat
 	variable bufferDumpStart = stopMSTimer(-2)
 	svar activegraphs
 	do
-		buffer = readInstr(instrID, read_bytes=read_chunk, fdac_flag=1)
+		buffer = readInstr(instrID, read_bytes=read_chunk, binary=1)
 		// If failed, abort
 		if (cmpstr(buffer, "NaN") == 0)
 			sc_stopfdacSweep(instrID)
@@ -989,7 +989,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay, ramprat
 	// do one last read if any data left to read
 	variable bytes_left = totalByteReturn-bytes_read
 	if(bytes_left > 0)
-		buffer = readInstr(instrID,read_bytes=bytes_left,fdac_flag=1)
+		buffer = readInstr(instrID,read_bytes=bytes_left,binary=1)
 		sc_distribute_data(buffer,scanList.adclist,bytes_left,rowNum,bytes_read/(2*numADCs))
 		doupdate
 		try
@@ -2069,7 +2069,7 @@ function fdacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear])
 		
 		//print bytesSec, read_chunk, totalbytesreturn
 		do
-			buffer = readInstr(instrID, read_bytes=read_chunk, fdac_flag=1)
+			buffer = readInstr(instrID, read_bytes=read_chunk, binary=1)
 			// If failed, abort
 			if (cmpstr(buffer, "NaN") == 0)
 				sc_stopfdacSweep(instrID)
@@ -2088,7 +2088,7 @@ function fdacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear])
 		// do one last read if any data left to read
 		bytes_left = totalbytesreturn-bytes_read
 		if(bytes_left > 0)
-			buffer = readInstr(instrID,read_bytes=bytes_left,fdac_flag=1)
+			buffer = readInstr(instrID,read_bytes=bytes_left,binary=1)
 			specAna_distribute_data(buffer,bytes_left,channels,bytes_read/(2*numChannels))
 			doupdate
 		endif
