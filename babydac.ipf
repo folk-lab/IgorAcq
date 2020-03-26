@@ -1154,17 +1154,18 @@ function/s GetBDDACStatus(instrID)
     // this doesn't actually require instrID
     //     it is only there to be consistent with the other devices
 	variable instrID
-	wave /t dacvalstr = dacvalstr
 	wave bd_boardnumbers = bd_boardnumbers
 	svar bd_controller_addr
 	nvar bd_num_custom
 
-	string buffer=""
+	string buffer="", key=""
+	wave /t dacvalstr = dacvalstr
 	variable i=0, j=0
 	do
 		if(numtype(bd_boardnumbers[i])==0)
 			for(j=0;j<4;j+=1)
-				buffer = addJSONkeyval(buffer, "DAC{"+dacvalstr[4*i+j][3]+"}"+num2istr(4*i+j), dacvalstr[4*i+j][1])
+				sprintf key, "DAC%d{%s}", num2istr(4*i+j), dacvalstr[4*i+j][3] 
+				buffer = addJSONkeyval(buffer, key, dacvalstr[4*i+j][1])
 			endfor
 		endif
 		i+=1

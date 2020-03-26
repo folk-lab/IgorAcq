@@ -205,8 +205,8 @@ end
 
 function/s getFastDACStatus(instrID)
 	variable instrID
-	string  buffer = ""
-	
+	string  buffer = "", key = ""
+	wave/t fdacvalstr	
 	svar fdackeys
 
 	// find the correct fastdac
@@ -225,14 +225,10 @@ function/s getFastDACStatus(instrID)
 	
 	// DAC values
 	for(i=0;i<str2num(stringbykey("numDACCh"+num2istr(dev),fdackeys,":",","));i+=1)
+		sprintf key, "DAC%d{%s}", num2istr(i), fdacvalstr[i][3]
 		buffer = addJSONkeyval(buffer, "DAC"+num2istr(i), num2numstr(getfdacOutput(instrID,i)))
 	endfor
-	
-	wave/t fdacvalstr
-	// DAC names
-	for(i=0;i<str2num(stringbykey("numDACCh"+num2istr(dev),fdackeys,":",","));i+=1)
-		buffer = addJSONkeyval(buffer, "DAC"+fdacvalstr[i][0]+"name", "\""+fdacvalstr[i][3]+"\"")
-	endfor
+
 	
 	// ADC values
 	for(i=0;i<str2num(stringbykey("numADCCh"+num2istr(dev),fdackeys,":",","));i+=1)
