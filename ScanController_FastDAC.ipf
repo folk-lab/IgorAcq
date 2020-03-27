@@ -1026,7 +1026,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay, ramprat
 	
 	string warn = "", notch_fracList = ""
 	variable doLowpass=0,cutoff_frac=0
-	if(!paramisdefault(RCcutoff))
+	if(RCCutoff != 0)
 		// add lowpass filter
 		doLowpass = 1
 		cutoff_frac = RCcutoff/samplingFreq
@@ -1040,7 +1040,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay, ramprat
 	endif
 	
 	variable doNotch=0,numNotch=0
-	if(!paramisdefault(notch))
+	if(cmpstr(notch, "")!=0)
 		// add notch filter(s)
 		doNotch = 1
 		numNotch = itemsinlist(notch,",")
