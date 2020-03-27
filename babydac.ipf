@@ -1164,7 +1164,7 @@ function/s GetBDDACStatus(instrID)
 	do
 		if(numtype(bd_boardnumbers[i])==0)
 			for(j=0;j<4;j+=1)
-				sprintf key, "DAC%d{%s}", num2istr(4*i+j), dacvalstr[4*i+j][3] 
+				sprintf key, "DAC%d{%s}", 4*i+j, dacvalstr[4*i+j][3] 
 				buffer = addJSONkeyval(buffer, key, dacvalstr[4*i+j][1])
 			endfor
 		endif

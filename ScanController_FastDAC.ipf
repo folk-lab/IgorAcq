@@ -225,7 +225,7 @@ function/s getFastDACStatus(instrID)
 	
 	// DAC values
 	for(i=0;i<str2num(stringbykey("numDACCh"+num2istr(dev),fdackeys,":",","));i+=1)
-		sprintf key, "DAC%d{%s}", num2istr(i), fdacvalstr[i][3]
+		sprintf key, "DAC%d{%s}", i, fdacvalstr[i][3]
 		buffer = addJSONkeyval(buffer, "DAC"+num2istr(i), num2numstr(getfdacOutput(instrID,i)))
 	endfor
 
