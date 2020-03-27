@@ -1050,10 +1050,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay, ramprat
 	endif
 	
 	variable doAverage=0
-	if(!paramisdefault(numAverage))
-		// do averaging
-		doAverage = 1
-	endif
+	doaverage = (numAverage != 0) ? 1 : 0 // If numaverage isn't zero then do average
 	
 	// setup FIR (Finite Impluse Response) filter(s)
 	variable FIRcoefs=0
