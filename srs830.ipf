@@ -6,6 +6,7 @@
 // Still a test driver, use InitSRS.
 // Units: mV, nA or Hz
 // Written by Christian/Nik, 2018-05-01
+// Modified by Tim Child, 2020-03
 
 /////////////////////////
 /// SRS specific COMM ///
@@ -119,6 +120,17 @@ threadsafe function GetSRSFrequency(instrID) // Units: Hz
 	return str2num(response)
 end
 
+function GetSRSreadout(instrID, [ch]) //Useful when reading output of SRS with ADC. 
+	//Returns 0,1,2,3 (for CH1: 0 = x, 1 = r, 2 = xnoise, 3=?.  For CH2: 0 = y, 1 = theta, 2 = rnoise?, 3=?)
+	variable instrID
+	variable ch
+	ch = paramisdefault(ch) ? 1 : ch //defaults to reading ch1 output
+	string response
+
+	response = queryInstr(instrID, "DDEF?"+num2str(ch)+"\n")
+	return str2num(response)
+end
+
 function GetSRSSensitivity(instrID,[integer]) // Units: mV or nA
 	variable instrID, integer
 	variable response, modulo, expo
@@ -208,9 +220,9 @@ function SetSRSTimeConst(instrID,timeConst) // Units: s
 	if(timeConst > 30000)
 		print "Time constant not within range, setting to nearest possible."
 		timeConst = 30000
-	elseif(timeConst < 0.01)
+	elseif(timeConst < 0.001)
 		print "Time constant not within range, setting to nearest possible."
-		timeConst = 0.01
+		timeConst = 0.001
 	endif
 
 	// transform to integer
@@ -228,6 +240,33 @@ function SetSRSPhase(instrID,phase) // Units: deg
 	endif
 	
 	writeInstr(instrID, "PHAS "+num2str(phase)+"\n")
+end
+
+function AutoSRSPhase(instrID) // Units: deg
+	variable instrID
+	writeInstr(instrID, "APHS \n")
+end
+
+function SetSRSreadout(instrID, readout, [ch, ratio]) //e.g. for Ch1: readout 0 = x, 1 = r, 2 = xnoise etc
+	variable instrID, readout
+	variable ch, ratio
+	variable disp //if =1 ch1 and ch2 output x and y, if 0 ch1 and ch2 output display
+	ch = paramisdefault(ch) ? 1 : ch //Defaults to channel 1
+	ratio = paramisdefault(ratio) ? 0 : ratio //Defaults to no ratio
+	if (readout != 0)
+		disp = 0
+	else
+		disp = 1
+	endif
+	// check for NAN and INF
+	if(sc_check_naninf(ch) != 0 || sc_check_naninf(readout) != 0 || sc_check_naninf(ratio) != 0)
+		abort "trying to set ch/readout/ratio to NaN or Inf"
+	endif
+	string buffer = ""
+	sprintf buffer, "DDEF %d, %d, %d\n", ch, readout, ratio
+	writeInstr(instrID, buffer)
+	sprintf buffer, "FPOP %d, %d", ch, disp 
+	writeInstr(instrID, buffer)
 end
 
 function SetSRSAmplitude(instrID,amplitude) // Units: mV
@@ -313,6 +352,7 @@ function/s GetSRSStatus(instrID)
 	buffer = addJSONkeyval(buffer, "phase deg", num2numStr(GetSRSPhase(instrID)))
 	buffer = addJSONkeyval(buffer, "sensitivity V", num2numStr(GetSRSSensitivity(instrID)))
 	buffer = addJSONkeyval(buffer, "harmonic", num2numStr(GetSRSHarmonic(instrID)))
-
+	buffer = addJSONkeyval(buffer, "CH1readout", num2numstr(Getsrsreadout(instrID, ch=1)))
+	buffer = addJSONkeyval(buffer, "CH2readout", num2numstr(Getsrsreadout(instrID, ch=2)))
 	return addJSONkeyval("", "SRS_"+gpib, buffer)
 end
