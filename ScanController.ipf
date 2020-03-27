@@ -4,7 +4,8 @@
 // Version 1.7 August 8, 2016
 // Version 1.8 XXXX X, 2017
 // Version 2.0 May, 2018
-// Authors: Mohammad Samani, Nik Hartman & Christian Olsen
+// Version 3.0 March, 2020
+// Authors: Mohammad Samani, Nik Hartman, Christian Olsen, Tim Child
 
 // Updates in 2.0:
 
@@ -13,6 +14,11 @@
 //		-- "Request scripts" are removed from the scancontroller window. Its only use was
 //			 trying to do async communication (badly).
 //    -- Added Async checkbox in scancontroller window
+
+// Updates in 3.0:
+
+//		-- Support for Fastdacs added (most Fastdac functions can be found in ScanController_Fastdac)
+//		-- Minor: Added Dat# to graphs
 
 
 ///////////////////////////////
@@ -962,16 +968,16 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	wave/t sc_RawWaveNames, sc_CalcWaveNames, sc_RawScripts, sc_CalcScripts
 	variable i=0, j=0
 	string cmd = "", wn = "", wn2d="", s, script = "", script0 = "", script1 = ""
-	string/g sc_x_label, sc_y_label, activegraphs=""
+	string/g sc_x_label, sc_y_label
 	variable/g sc_is2d, sc_scanstarttime = datetime
-	variable/g sc_startx=0, sc_finx=0, sc_numptsx=0, sc_starty=0, sc_finy=0, sc_numptsy=0
+	variable/g sc_startx, sc_finx, sc_numptsx, sc_starty, sc_finy, sc_numptsy
 	variable/g sc_abortsweep=0, sc_pause=0, sc_abortnosave=0
-	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, cmd1="",window_string=""
+	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, activegraphs="", cmd1="",window_string=""
 	string cmd2=""
 	variable index, graphopen, graphopen2d
 	svar sc_colormap
 	variable/g fastdac_init = 0
-	
+
 	if(paramisdefault(fastdac))
 		fastdac = 0
 		fastdac_init = 0
@@ -983,7 +989,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		fastdac = 0
 		fastdac_init = 0
 	endif
-	
+
 	if(fastdac == 0)
 		//do some sanity checks on wave names: they should not start or end with numbers.
 		do
@@ -1046,7 +1052,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 			print "[WARNING]: Your start and end values are the same!"
 		endif
 	endif
-	
+
 	if(linecut == 1 && fastdac == 0) //Tim:To make linecuts work with RecordValues
 		sc_is2d = 2
 		make/O/n=(numptsy) sc_linestart = NaN 						//To store first xvalue of each line of data
@@ -1095,13 +1101,13 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 					// In case this is a 2D line cut measurement
 					wn2d = sc_RawWaveNames[i]+"2d"
 					cmd = "make /o/n=(1, " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd) //Makes 1 by y wave, x is redimensioned in recordline
-					cmd = "setscale /P x, 0, " + num2str((sc_finx-sc_startx)/sc_numptsx) + "," + wn2d; execute(cmd) //sets x scale starting from 0 but with delta correct	
+					cmd = "setscale /P x, 0, " + num2str((sc_finx-sc_startx)/sc_numptsx) + "," + wn2d; execute(cmd) //sets x scale starting from 0 but with delta correct
 					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)//Useful to see if top and bottom of scan are filled with NaNs
 				endif
 			endif
 			i+=1
 		while (i<numpnts(sc_RawWaveNames))
-	
+
 		// Initialize waves for calculated data
 		i=0
 		do
@@ -1120,58 +1126,61 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 				elseif(sc_is2d == 2)
 					// In case this is a 2D line cut measurement
 					wn2d = sc_CalcWaveNames[i]+"2d"
-					cmd = "make /o/n=(1, " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd) //Same as for Raw (see above)	
-					cmd = "setscale /P x, 0, " + num2str((sc_finx-sc_startx)/sc_numptsx) + "," + wn2d; execute(cmd) //sets x scale starting from 0 but with delta correct		
+					cmd = "make /o/n=(1, " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd) //Same as for Raw (see above)
+					cmd = "setscale /P x, 0, " + num2str((sc_finx-sc_startx)/sc_numptsx) + "," + wn2d; execute(cmd) //sets x scale starting from 0 but with delta correct
 					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
 				endif
 			endif
 			i+=1
 		while (i<numpnts(sc_CalcWaveNames))
-	
+
 		sc_findAsyncMeasurements()
-		
+
 	elseif(fastdac == 1)
 		// create waves for fastdac
 		wave/t fadcvalstr
 		wave fadcattr
+		string/g sc_fastadc = ""
 		string wn_raw = "", wn_raw2d = ""
 		i=0
 		do
 			if(fadcattr[i][2] == 48) // checkbox checked
+				sc_fastadc = addlistitem(fadcvalstr[i][0], sc_fastadc, ",", inf)  //Add adc_channel to list being recorded (inf to add at end)
 				wn = fadcvalstr[i][3]
-				cmd = "make/o/n=(" + num2istr(sc_numptsx) + ") " + wn + "=nan"
+				cmd = "make/o/n=(" + num2istr(sc_numptsx) + ") " + wn + "=NaN"
 				execute(cmd)
 				cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn
 				execute(cmd)
-				
+
 				wn_raw = "ADC"+num2istr(i)
-				cmd = "make/o/n=(" + num2istr(sc_numptsx) + ") " + wn_raw + "=nan"
+				cmd = "make/o/n=(" + num2istr(sc_numptsx) + ") " + wn_raw + "=NaN"
 				execute(cmd)
 				cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn_raw
 				execute(cmd)
-				
-				if(sc_is2d == 1)
+
+				if(sc_is2d > 0)  // Should work for linecut too I think?
 					// In case this is a 2D measurement
-					wn2d = wn + "2d"
-					cmd = "make/o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn2d + "=nan"; execute(cmd)
+					wn2d = wn + "_2d"
+					cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd)
 					cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn2d; execute(cmd)
 					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
-					
-					wn_raw2d = wn_raw + "2d"
-					cmd = "make/o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn_raw2d + "=nan"; execute(cmd)
+
+					wn_raw2d = wn_raw + "_2d"
+					cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn_raw2d + "=NaN"; execute(cmd)
 					cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn_raw2d; execute(cmd)
 					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn_raw2d; execute(cmd)
 				endif
 			endif
-			i+=1
+			i++
 		while(i<dimsize(fadcvalstr,0))
+		sc_fastadc = sc_fastadc[0,strlen(sc_fastadc)-2]  // To chop off trailing comma
 	endif
-	
+
 	// Find all open plots
 	graphlist = winlist("*",";","WIN:1")
-	j=0				
-	for(i=0;i<itemsinlist(graphlist);i=i+1) 
-		index = strsearch(graphlist,";",j)			
+	j=0
+	for (i=0;i<itemsinlist(graphlist);i=i+1)
+		index = strsearch(graphlist,";",j)
 		graphname = graphlist[j,index-1]
 		setaxis/w=$graphname /a
 		getwindow $graphname wtitle
@@ -1180,7 +1189,9 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		graphnumlist+= graphnum+";"
 		j=index+1
 	endfor
-	
+
+	nvar filenum
+
 	if(fastdac == 0)
 		//Initialize plots for raw data waves
 		i=0
@@ -1193,7 +1204,11 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 					if(stringmatch(wn,stringfromlist(j,graphtitle)))
 						graphopen = 1
 						activegraphs+= stringfromlist(j,graphnumlist)+";"
-						Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
+						Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label	
+						if(sc_is2d == 0)
+							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label  // Can add something like current /nA as y_label for 1D only... if 2D sc_y_label will be for 2D plot
+						endif
+						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)					
 					endif
 					if(sc_is2d)
 						if(stringmatch(wn+"2d",stringfromlist(j,graphtitle)))
@@ -1201,48 +1216,59 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 							activegraphs+= stringfromlist(j,graphnumlist)+";"
 							Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
 							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+							TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)	
 						endif
 					endif
 				endfor
-				if(graphopen && graphopen2d)
-				elseif(graphopen2d)
+				if(graphopen && graphopen2d) //If both open do nothing
+				elseif(graphopen2d) //If only 2D is open then open 1D
 					display $wn
-					setwindow kwTopWin, enablehiresdraw=3
+					setwindow kwTopWin, graphicsTech=0
 					Label bottom, sc_x_label
+					if(sc_is2d == 0)
+						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+					endif
+					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
 					activegraphs+= winname(0,1)+";"
-				elseif(graphopen)
+				elseif(graphopen) // If only 1D is open then open 2D
 					if(sc_is2d)
 						wn2d = wn + "2d"
 						display
-						setwindow kwTopWin, enablehiresdraw=3
+						setwindow kwTopWin, graphicsTech=0
 						appendimage $wn2d
 						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
 						colorscale /c/n=$sc_ColorMap /e/a=rc
 						Label left, sc_y_label
 						Label bottom, sc_x_label
+						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
 						activegraphs+= winname(0,1)+";"
 					endif
-				else
+				else // Open Both
 					wn2d = wn + "2d"
 					display $wn
-					setwindow kwTopWin, enablehiresdraw=3
+					setwindow kwTopWin, graphicsTech=0
 					Label bottom, sc_x_label
+					if(sc_is2d == 0)
+						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+					endif
+					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
 					activegraphs+= winname(0,1)+";"
 					if(sc_is2d)
 						display
-						setwindow kwTopWin, enablehiresdraw=3
+						setwindow kwTopWin, graphicsTech=0
 						appendimage $wn2d
 						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
 						colorscale /c/n=$sc_ColorMap /e/a=rc
 						Label left, sc_y_label
 						Label bottom, sc_x_label
+						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
 						activegraphs+= winname(0,1)+";"
 					endif
 				endif
 			endif
-			i+= 1
+		i+= 1
 		while(i<numpnts(sc_RawWaveNames))
-	
+
 		//Initialize plots for calculated data waves
 		i=0
 		do
@@ -1255,6 +1281,10 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 						graphopen = 1
 						activegraphs+= stringfromlist(j,graphnumlist)+";"
 						Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
+						if(sc_is2d == 0)
+							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label 
+						endif
+						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
 					endif
 					if(sc_is2d)
 						if(stringmatch(wn+"2d",stringfromlist(j,graphtitle)))
@@ -1262,47 +1292,59 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 							activegraphs+= stringfromlist(j,graphnumlist)+";"
 							Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
 							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+							TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
 						endif
 					endif
 				endfor
 				if(graphopen && graphopen2d)
-				elseif(graphopen2d)
+				elseif(graphopen2d) // If only 2D open then open 1D
 					display $wn
-					setwindow kwTopWin, enablehiresdraw=3
+					setwindow kwTopWin, graphicsTech=0
 					Label bottom, sc_x_label
+					if(sc_is2d == 0)
+						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+					endif
+					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
 					activegraphs+= winname(0,1)+";"
-				elseif(graphopen)
+				elseif(graphopen) // If only 1D is open then open 2D
 					if(sc_is2d)
 						wn2d = wn + "2d"
 						display
-						setwindow kwTopWin, enablehiresdraw=3
 						appendimage $wn2d
 						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
 						colorscale /c/n=$sc_ColorMap /e/a=rc
 						Label left, sc_y_label
+						setwindow kwTopWin, graphicsTech=0
 						Label bottom, sc_x_label
+						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
 						activegraphs+= winname(0,1)+";"
 					endif
-				else
+				else // open both
 					wn2d = wn + "2d"
 					display $wn
-					setwindow kwTopWin, enablehiresdraw=3
+					setwindow kwTopWin, graphicsTech=0
 					Label bottom, sc_x_label
+					if(sc_is2d == 0)
+						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+					endif
+					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
 					activegraphs+= winname(0,1)+";"
 					if(sc_is2d)
 						display
-						setwindow kwTopWin, enablehiresdraw=3
+						setwindow kwTopWin, graphicsTech=0
 						appendimage $wn2d
 						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
 						colorscale /c/n=$sc_ColorMap /e/a=rc
 						Label left, sc_y_label
 						Label bottom, sc_x_label
+						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
 						activegraphs+= winname(0,1)+";"
 					endif
 				endif
 			endif
 			i+= 1
 		while(i<numpnts(sc_CalcWaveNames))
+	
 	elseif(fastdac == 1)
 		// open plots for fastdac
 		i=0
@@ -1316,48 +1358,63 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 						graphopen = 1
 						activegraphs+= stringfromlist(j,graphnumlist)+";"
 						Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
+						if(sc_is2d == 0)
+							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+						endif
+						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
 					endif
 					if(sc_is2d)
-						if(stringmatch(wn+"2d",stringfromlist(j,graphtitle)))
+						if(stringmatch(wn+"_2d",stringfromlist(j,graphtitle)))
 							graphopen2d = 1
 							activegraphs+= stringfromlist(j,graphnumlist)+";"
 							Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
 							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+							TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
 						endif
 					endif
 				endfor
 				if(graphopen && graphopen2d)
-				elseif(graphopen2d)
+				elseif(graphopen2d)  // If only 2D open then open 1D
 					display $wn
 					setwindow kwTopWin, graphicsTech=0
-					label bottom, sc_x_label
+					Label bottom, sc_x_label
+					if(sc_is2d == 0)
+						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+					endif
+					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
 					activegraphs+= winname(0,1)+";"
-				elseif(graphopen)
+				elseif(graphopen) // If only 1D is open then open 2D
 					if(sc_is2d)
-						wn2d = wn + "2d"
+						wn2d = wn + "_2d"
 						display
 						setwindow kwTopWin, graphicsTech=0
 						appendimage $wn2d
 						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
-						colorscale/e/a=rc
+						colorscale /c/n=$sc_ColorMap /e/a=rc
 						Label left, sc_y_label
 						Label bottom, sc_x_label
+						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
 						activegraphs+= winname(0,1)+";"
 					endif
-				else
-					wn2d = wn + "2d"
+				else // open both
+					wn2d = wn + "_2d"
 					display $wn
 					setwindow kwTopWin, graphicsTech=0
-					label bottom, sc_x_label
+					Label bottom, sc_x_label
+					if(sc_is2d == 0)
+						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+					endif
+					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
 					activegraphs+= winname(0,1)+";"
 					if(sc_is2d)
 						display
 						setwindow kwTopWin, graphicsTech=0
 						appendimage $wn2d
 						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
-						colorscale/e/a=rc
+						colorscale /c/n=$sc_ColorMap /e/a=rc
 						Label left, sc_y_label
 						Label bottom, sc_x_label
+						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
 						activegraphs+= winname(0,1)+";"
 					endif
 				endif
@@ -1377,9 +1434,9 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		cmd2 = "DoWindow/F " + window_string
 		execute(cmd2)
 	endfor
-
 	cmd1 += "SweepControl"
 	execute(cmd1)
+	doupdate
 end
  
 function sc_controlwindows(action)
