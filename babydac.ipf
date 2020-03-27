@@ -918,6 +918,10 @@ end
 //////////////////////////////////
 
 function bdLoadFromHDF(datnum, [no_check])
+	// Function to load babyDAC values and labels from a previously save HDF file in current data directory
+	// Requires Dac info to be saved in "DAC{label} : output" format
+	// with no_check = 0 (default) a window will be shown to user where values can be changed before committing to ramping, also can chose not to load from there
+	// setting no_check = 1 will ramp to loaded settings without user input
 	variable datnum, no_check
 	variable response
 	
@@ -1012,9 +1016,9 @@ Window bdLoadWindow() : Panel
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv fsize= 25,fstyle= 1
-	DrawText 90, 25,"BabyDAC Load From HDF" // Headline
+	DrawText 90, 35,"BabyDAC Load From HDF" // Headline
 	SetDrawEnv fsize= 20,fstyle= 1
-	DrawText 70, 55,"Current Setup" 
+	DrawText 70, 65,"Current Setup" 
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 12,85,"CHANNEL"
 	SetDrawEnv fsize= 16,fstyle= 1
@@ -1029,7 +1033,7 @@ Window bdLoadWindow() : Panel
 	
 	variable x_offset = 420
 	SetDrawEnv fsize= 20,fstyle= 1
-	DrawText 70+x_offset, 55,"Load from HDF Setup" 
+	DrawText 70+x_offset, 65,"Load from HDF Setup" 
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 12+x_offset,85,"CHANNEL"
 	SetDrawEnv fsize= 16,fstyle= 1
@@ -1043,7 +1047,7 @@ Window bdLoadWindow() : Panel
 	ListBox loaddaclist,fStyle=1,listWave=root:load_dacvalstr,selWave=root:listboxattr,mode= 1
 
 	Button do_nothing,pos={80,500},size={120,20},proc=bdloadaskuserbutton,title="Keep Current Setup"
-	Button load_from_hdf,pos={80+x_offset,500},size={90,20},proc=bdloadaskuserbutton,title="Load From HDF"
+	Button load_from_hdf,pos={80+x_offset,500},size={100,20},proc=bdloadaskuserbutton,title="Load From HDF"
 EndMacro
 
 
