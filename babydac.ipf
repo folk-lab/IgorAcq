@@ -6,7 +6,9 @@
 //	Procedure written by Christian, 2016-0X-XX
 //    Updated by Nik for binary control, ADC reading, and software limits
 //    Updated again to use VISA and async read 05-XX-2018
-
+// Updated by Tim Child, 2020-03 
+//		Added load from HDF functionality
+//
 /////////////////////////////
 /// BabyDAC specific COMM ///
 /////////////////////////////
@@ -911,6 +913,140 @@ function setAllZeroBD(instrID)
 
 end
 
+//////////////////////////////////
+///// Load BabyDACs from HDF /////
+//////////////////////////////////
+
+function bdLoadFromHDF(datnum, [no_check])
+	variable datnum, no_check
+	variable response
+	
+	get_babydacs_from_hdf(datnum) // Creates/Overwrites load_dacvalstr
+	
+	if (no_check == 0)  //Whether to show ask user dialog or not
+		response = bdLoadAskUser()
+	else
+		response = -1 
+	endif 
+	if(response == 1)
+		// Do_nothing
+		print "Keep current BabyDAC state chosen, no changes made"
+	elseif(response == -1)
+		// Load from HDF
+		printf "Loading BabyDAC values and labels from HDF"
+		duplicate/o/t load_dacvalstr, dacvalstr //Overwrite dacvalstr with loaded values
+
+		// Ramp to new values
+		svar bd_controller_addr
+		openBabyDACconnection("bd_window_resource", bd_controller_addr, verbose=0)		
+		nvar bd_window_resource, bd_ramprate
+		UpdateMultipleBD(bd_window_resource, action="Ramp", ramprate=bd_ramprate, update=1)
+		viclose(bd_window_resource)
+		
+	else
+		print "[WARNING] Bad user input -- BabyDAC will remain in current state"
+	endif
+end
+
+
+function get_babydacs_from_hdf(datnum)
+	//Creates/Overwrites load_dacvalstr by duplicating the current dacvalstr then changing the labels and outputs of any values found in the metadata of HDF at dat[datnum].h5
+	//Leaves dacvalstr unaltered	
+	variable datnum	
+	variable sl_id, bd_id  //JSON ids
+	
+	sl_id = get_sweeplogs(datnum)  // Get Sweep_logs JSON
+	bd_id = get_json_from_json_path(sl_id, "BabyDAC") // Get BabyDAC JSON from Sweeplogs
+
+	wave/t keys = JSON_getkeys(bd_id, "")
+	duplicate/o/t dacvalstr, load_dacvalstr
+	
+	variable i
+	string key, label_name, str_ch
+	variable ch = 0
+	for (i=0; i<numpnts(keys); i++)  // These are in a random order. Keys must be stored as "DAC#{label}:output" in JSON
+		key = keys[i]
+		if (strsearch(key, "DAC", 0) != -1)  // Check it is actually a DAC key and not something like com_port
+			SplitString/E="DAC(\d*){" key, str_ch //Gets DAC# so that I store values in correct places
+			ch = str2num(str_ch)
+			
+			load_dacvalstr[ch][1] = num2str(JSON_getvariable(bd_id, key))
+			SplitString/E="{(.*)}" key, label_name  //Looks for label inside {} part of e.g. BD{label}
+			load_dacvalstr[ch][3] = label_name
+		endif
+	endfor
+	JSONXOP_release /A  //Clear all stored JSON strings
+end
+
+
+function bdLoadAskUser()
+	variable/g bd_load_answer
+	
+	if (waveexists(load_dacvalstr) && waveexists(dacvalstr) && waveexists(listboxattr))	
+		execute("bdLoadWindow()")
+		PauseForUser bdLoadWindow
+		return bd_load_answer
+	else
+		abort "ERROR[bdLoadAskUser]: either load_dacvalstr, dacvalstr, or listboxattr doesn't exist when it should!"
+	endif
+end
+
+function bdLoadAskUserButton(action) : ButtonControl
+	string action
+	variable/g bd_load_answer
+	strswitch(action)
+		case "do_nothing":
+			bd_load_answer = 1
+			break
+		case "load_from_hdf":
+			bd_load_answer = -1
+			dowindow/k bdLoadWindow
+			break
+	endswitch
+end
+
+
+Window bdLoadWindow() : Panel
+	PauseUpdate; Silent 1 // building window
+	NewPanel /W=(0,0,840,530) // window size
+	ModifyPanel frameStyle=2
+	SetDrawLayer UserBack
+	SetDrawEnv fsize= 25,fstyle= 1
+	DrawText 90, 25,"BabyDAC Load From HDF" // Headline
+	SetDrawEnv fsize= 20,fstyle= 1
+	DrawText 70, 55,"Current Setup" 
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 12,85,"CHANNEL"
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 108,85,"VOLT (mV)"
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 208,85,"LIM (mV)"
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 308,85,"Label"
+
+	ListBox currentdaclist,pos={10,90},size={400,400},fsize=16,frame=2 // interactive list
+	ListBox currentdaclist,fStyle=1,listWave=root:dacvalstr,selWave=root:listboxattr,mode= 1
+	
+	variable x_offset = 420
+	SetDrawEnv fsize= 20,fstyle= 1
+	DrawText 70+x_offset, 55,"Load from HDF Setup" 
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 12+x_offset,85,"CHANNEL"
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 108+x_offset,85,"VOLT (mV)"
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 208+x_offset,85,"LIM (mV)"
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 308+x_offset,85,"Label"
+	
+	ListBox loaddaclist,pos={10+x_offset,90},size={400,400},fsize=16,frame=2 // interactive list
+	ListBox loaddaclist,fStyle=1,listWave=root:load_dacvalstr,selWave=root:listboxattr,mode= 1
+
+	Button do_nothing,pos={80,500},size={120,20},proc=bdloadaskuserbutton,title="Keep Current Setup"
+	Button load_from_hdf,pos={80+x_offset,500},size={90,20},proc=bdloadaskuserbutton,title="Load From HDF"
+EndMacro
+
+
 ////////////////////////
 ///// ACD readings /////
 ////////////////////////
@@ -1003,6 +1139,7 @@ Window bdInitWindow() : Panel
 	Button default_dacinit,pos={170,490},size={70,20},proc=bdAskUserUpdate,title="DEFAULT"
 EndMacro
 
+
 function bdAskUserUpdate(action) : ButtonControl
 	string action
 	variable/g bd_answer
@@ -1049,24 +1186,14 @@ function update_BabyDAC(action) : ButtonControl
 
 	// open temporary connection to babyDAC
 	svar bd_controller_addr
-	variable viRM = openBabyDACconnection("bd_window_resource", bd_controller_addr, verbose=0)
-	nvar bd_window_resource
+	
+	openBabyDACconnection("bd_window_resource", bd_controller_addr, verbose=0)
+	nvar bd_window_resource, bd_ramprate
 
 	try
 		strswitch(action)
 			case "ramp":
-				for(i=0;i<16;i+=1)
-					if(str2num(dacvalstr[i][1]) != str2num(old_dacvalstr[i][1]))
-						output = str2num(dacvalstr[i][1])
-						check = rampOutputBD(bd_window_resource, i,output)
-						if(check == 1)
-							old_dacvalstr[i][1] = dacvalstr[i][1]
-						else
-							dacvalstr[i][1] = old_dacvalstr[i][1]
-						endif
-					endif
-				endfor
-				break
+				UpdateMultipleBD(bd_window_resource, action="Ramp", ramprate=bd_ramprate, update=1)
 			case "rampallzero":
 				for(i=0;i<16;i+=1)
 					check = RampOutputBD(bd_window_resource, i, 0)
@@ -1084,7 +1211,7 @@ function update_BabyDAC(action) : ButtonControl
 	endtry
 
 	viClose(bd_window_resource) // close VISA resource
-	viClose(viRM) // close Resource Manager session
+
 
 	if(bd_num_custom > 0)
 		bdCalcCustomValues()

@@ -43,6 +43,10 @@ function initSaveFiles([msg])
 	make /FREE /T /N=1 cconfig = prettyJSONfmt(sc_createconfig())
 	make /FREE /T /N=1 sweep_logs = prettyJSONfmt(sc_createSweepLogs(msg=msg))
 	
+	// Check that prettyJSONfmt actually returned a valid JSON.
+	sc_confirm_JSON(sweep_logs, name="sweep_logs")
+	sc_confirm_JSON(cconfig, name="cconfig")
+	
 	HDF5SaveData /A="sweep_logs" sweep_logs, hdf5_id, "metadata"
 	HDF5SaveData /A="sc_config" cconfig, hdf5_id, "metadata"
 
@@ -54,6 +58,23 @@ function initSaveFiles([msg])
 	// may as well save this config file, since we already have it
 	sc_saveConfig(cconfig[0])
 end
+
+
+function sc_confirm_JSON(jsonwave, [name])
+	//Checks whether 'jsonwave' can be parsed as a JSON
+	//name is just to make it easier to identify the error
+	wave/t jsonwave
+	string name
+	if (paramisDefault(name))
+		name = ""
+	endif
+
+	JSONXOP_Parse/z jsonwave[0]
+	if (v_flag != 0)
+		printf "WARNING: %s JSON is not a valid JSON (saved anyway)\r", name
+	endif
+end			
+
 
 function saveSingleWave(wn)
 	// wave with name 'g1x' as dataset named 'g1x' in hdf5
@@ -84,6 +105,72 @@ function closeSaveFiles()
 	endif
 
 end
+
+////////////////////////////
+/// Load Experiment Data ///
+////////////////////////////
+
+function get_sweeplogs(datnum)
+	// Opens HDF5 file from current data folder and returns sweeplogs jsonID
+	// Remember to JSON_Release(jsonID) or JSONXOP_release/A to release all objects
+	variable datnum
+	variable fileid, metadataID, i, result
+	wave/t sc_sweeplogs
+	
+	HDF5OpenFile /P=data fileid as "dat"+num2str(datnum)+".h5"
+	HDF5LoadData /Q/O/Type=1/N=sc_sweeplogs /A="sweep_logs" fileid, "metadata"
+	
+	variable sweeplogsID
+	sweeplogsID = JSON_Parse(sc_sweeplogs[0])
+
+	return sweeplogsID
+end
+
+
+
+////// JSON General //////
+
+function print_keys(jsonID, path)
+	variable jsonID
+	string path
+	wave/t ans = JSON_getkeys(jsonID, path)
+	print ans
+end
+
+
+function get_json_from_json_path(jsonID, path)
+	// Returns jsonID of json object located at 'path' in jsonID passed in. e.g. get "BabyDAC" json from "Sweep_logs" json.
+	// Path should be able to be a true JSON pointer i.e. / separated path (e.g. "Magnets/Magx") but it is untested
+	variable jsonID
+	string path
+	variable i, tempID
+	string tempKey
+	
+	if (JSON_GetType(jsonID, path) != 0)	
+		abort "ERROR[get_json_from_json]: path does not point to JSON obect"
+	endif
+	
+	if (itemsinlist(path, "/") == 1)
+		return get_json_from_json_key(jsonID, path)
+	else
+		tempID = jsonID
+		for(i=0;i<itemsinlist(path, "/");i++)  //Should recursively get deeper JSON objects. Untested
+			tempKey = stringfromlist(i, path, "/")
+			tempID = get_json_from_json_key(tempID, tempkey)
+		endfor
+		return tempID
+	endif
+end
+	
+function get_json_from_json_key(jsonID, key)
+	variable jsonID
+	string key
+	if ((JSON_GetType(jsonID, key) != 0) || (itemsinlist(key, "/") != 1)	)
+		abort "ERROR[get_json_from_json_key]: key is not a top level JSON obect"
+	endif
+	return JSON_parse(getJSONvalue(json_dump(jsonID), key))  // 3/2020 could not find a way to get JSON object out of JSON so this is a workaround
+end
+
 
 ///////////////////////
 /// text read/write ///
