@@ -13,7 +13,8 @@
 // As for everyting else, you must open a connection to a FastDAC and run "InitFastDAC" before you can use the
 // spectrum analyzer method.
 //
-// Written by Christian Olsen, 2020-02-25
+// Written by Christian Olsen and Tim Child, 2020-03-27
+//
 
 /////////////////////
 //// Instrument ////
@@ -221,12 +222,12 @@ function/s getFastDACStatus(instrID)
 		adcChs += str2num(stringbykey("numADCCh"+num2istr(i+1),fdackeys,":",","))
 	endfor
 	
-	buffer = addJSONkeyval(buffer, "visa_address", visa)
+	buffer = addJSONkeyval(buffer, "visa_address", visa, addquotes=1)
 	
 	// DAC values
 	for(i=0;i<str2num(stringbykey("numDACCh"+num2istr(dev),fdackeys,":",","));i+=1)
 		sprintf key, "DAC%d{%s}", i, fdacvalstr[i][3]
-		buffer = addJSONkeyval(buffer, "DAC"+num2istr(i), num2numstr(getfdacOutput(instrID,i)))
+		buffer = addJSONkeyval(buffer, key, num2numstr(getfdacOutput(instrID,i)))
 	endfor
 
 	
@@ -313,7 +314,7 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	variable i=0, devchannel = 0, startCh = 0, numDACCh = 0
 	string deviceAddress = "", err = "", instrAddress = getResourceAddress(instrID)
 	for(i=0;i<numDevices;i+=1)
-		numDACCh =  str2num(stringbykey("numADCCh"+num2istr(i+1),fdackeys,":",","))
+		numDACCh =  str2num(stringbykey("numDACCh"+num2istr(i+1),fdackeys,":",","))
 		if(startCh+numDACCh-1 >= channel)
 			// this is the device, now check that instrID is pointing at the same device
 			deviceAddress = stringbykey("visa"+num2istr(i+1),fdackeys,":",",")
@@ -1717,14 +1718,21 @@ function update_fadcSpeed(s) : PopupMenuControl
 	sc_OpenInstrConnections(0)
 end
 
-function update_fdac(action) : ButtonControl
-	string action
+
+function update_all_fdac([option])
+	// Ramps or updates all FastDac outputs
+	string option // {"fdacramp": ramp all fastdacs to values currently in fdacvalstr, "fdacrampzero": ramp all to zero, "updatefdac": update fdacvalstr from what the dacs are currently at}
 	svar fdackeys
 	wave/t fdacvalstr
 	wave/t old_fdacvalstr
+	nvar fd_ramprate
+
+	if (paramisdefault(option))
+		option = "fdacramp"
+	endif
 	
 	// open temporary connection to FastDACs
-	// and update values if needed
+	// Either ramp fastdacs or update fdacvalstr
 	variable i=0,j=0,output = 0, numDACCh = 0, startCh = 0, viRM = 0
 	string visa_address = "", tempnamestr = "fdac_window_resource"
 	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
@@ -1735,18 +1743,18 @@ function update_fdac(action) : ButtonControl
 			viRM = openFastDACconnection(tempnamestr, visa_address, verbose=0)
 			nvar tempname = $tempnamestr
 			try
-				strswitch(action)
+				strswitch(option)
 					case "fdacramp":
 						for(j=0;j<numDACCh;j+=1)
 							output = str2num(fdacvalstr[startCh+j][1])
 							if(output != str2num(old_fdacvalstr[startCh+j]))
-								rampOutputfdac(tempname,j,output,ramprate=500)
+								rampOutputfdac(tempname,j,output,ramprate=fd_ramprate)
 							endif
 						endfor
 						break
 					case "fdacrampzero":
 						for(j=0;j<numDACCh;j+=1)
-							rampOutputfdac(tempname,j,0,ramprate=500)
+							rampOutputfdac(tempname,j,0,ramprate=fd_ramprate)
 						endfor
 						break
 					case "updatefdac":
@@ -1773,6 +1781,17 @@ function update_fdac(action) : ButtonControl
 		endif
 		startCh =+ numDACCh
 	endfor
+end
+
+function update_fdac(action) : ButtonControl
+	string action
+	svar fdackeys
+	wave/t fdacvalstr
+	wave/t old_fdacvalstr
+	nvar fd_ramprate
+	
+	update_all_fdac(option=action)
+	
 	// reopen normal instrument connections
 	sc_OpenInstrConnections(0)
 end
@@ -2215,3 +2234,159 @@ function specAna_distribute_data(buffer,bytes,channels,colNumStart)
 		endfor
 	endfor
 end
+
+
+
+//////////////////////////////////
+///// Load FastDACs from HDF /////
+//////////////////////////////////
+
+function fdLoadFromHDF(datnum, [fastdac_num, no_check])
+	// Function to load fastDAC values and labels from a previously save HDF file in current data directory
+	// Requires Dac info to be saved in "DAC{label} : output" format
+	// with no_check = 0 (default) a window will be shown to user where values can be changed before committing to ramping, also can chose not to load from there
+	// setting no_check = 1 will ramp to loaded settings without user input
+	// Fastdac_num is which fastdacboard to load. 3/2020 - Not tested
+	variable datnum, fastdac_num, no_check
+	variable response
+	
+	fastdac_num = paramisdefault(fastdac_num) ? 1 : fastdac_num  // Which fastdac board to load
+	get_fastdacs_from_hdf(datnum, fastdac_num=fastdac_num) // Creates/Overwrites load_fdacvalstr
+	
+	if (no_check == 0)  //Whether to show ask user dialog or not
+		response = fdLoadAskUser()
+	else
+		response = -1 
+	endif 
+	if(response == 1)
+		// Do_nothing
+		print "Keep current FastDAC state chosen, no changes made"
+	elseif(response == -1)
+		// Load from HDF
+		printf "Loading FastDAC values and labels from dat%d\r", datnum
+		wave/t load_fdacvalstr
+		duplicate/o/t load_fdacvalstr, fdacvalstr //Overwrite dacvalstr with loaded values
+
+		// Ramp to new values
+		update_all_fdac()
+	else
+		print "[WARNING] Bad user input -- FastDAC will remain in current state"
+	endif
+end
+
+
+function get_fastdacs_from_hdf(datnum, [fastdac_num])
+	//Creates/Overwrites load_fdacvalstr by duplicating the current fdacvalstr then changing the labels and outputs of any values found in the metadata of HDF at dat[datnum].h5
+	//Leaves fdacvalstr unaltered	
+	variable datnum, fastdac_num
+	variable sl_id, fd_id  //JSON ids
+	
+	fastdac_num = paramisdefault(fastdac_num) ? 1 : fastdac_num 
+	
+	if(fastdac_num != 1)
+		abort "WARNING: This is untested... remove this abort if you're feeling lucky!"
+	endif
+	
+	sl_id = get_sweeplogs(datnum)  // Get Sweep_logs JSON
+	fd_id = get_json_from_json_path(sl_id, "FastDAC "+num2istr(fastdac_num)) // Get FastDAC JSON from Sweeplogs
+
+	wave/t keys = JSON_getkeys(fd_id, "")
+	wave/t fdacvalstr
+	duplicate/o/t fdacvalstr, load_fdacvalstr
+	
+	variable i
+	string key, label_name, str_ch
+	variable ch = 0
+	for (i=0; i<numpnts(keys); i++)  // These are in a random order. Keys must be stored as "DAC#{label}:output" in JSON
+		key = keys[i]
+		if (strsearch(key, "DAC", 0) != -1)  // Check it is actually a DAC key and not something like com_port
+			SplitString/E="DAC(\d*){" key, str_ch //Gets DAC# so that I store values in correct places
+			ch = str2num(str_ch)
+			
+			load_fdacvalstr[ch][1] = num2str(JSON_getvariable(fd_id, key))
+			SplitString/E="{(.*)}" key, label_name  //Looks for label inside {} part of e.g. BD{label}
+			load_fdacvalstr[ch][3] = label_name
+		endif
+	endfor
+	JSONXOP_release /A  //Clear all stored JSON strings
+end
+
+
+function fdLoadAskUser()
+	variable/g fd_load_answer
+	wave/t load_fdacvalstr
+	wave/t fdacvalstr
+	wave fdacattr
+	if (waveexists(load_fdacvalstr) && waveexists(fdacvalstr) && waveexists(fdacattr))	
+		execute("fdLoadWindow()")
+		PauseForUser fdLoadWindow
+		return fd_load_answer
+	else
+		abort "ERROR[bdLoadAskUser]: either load_fdacvalstr, fdacvalstr, or fdacattr doesn't exist when it should!"
+	endif
+end
+
+function fdLoadAskUserButton(action) : ButtonControl
+	string action
+	variable/g fd_load_answer
+	strswitch(action)
+		case "do_nothing":
+			fd_load_answer = 1
+			break
+		case "load_from_hdf":
+			fd_load_answer = -1
+			dowindow/k fdLoadWindow
+			break
+	endswitch
+end
+
+
+Window fdLoadWindow() : Panel
+	PauseUpdate; Silent 1 // building window
+	NewPanel /W=(0,0,740,390) // window size
+	ModifyPanel frameStyle=2
+	SetDrawLayer UserBack
+	
+	variable tcoord = 80
+	
+	SetDrawEnv fsize= 25,fstyle= 1
+	DrawText 90, 35,"FastDAC Load From HDF" // Headline
+	
+	SetDrawEnv fsize= 20,fstyle= 1
+	DrawText 70, 65,"Current Setup" 
+	
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 15, tcoord, "Ch"
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 50, tcoord, "Output"
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 120, tcoord, "Limit"
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 220, tcoord, "Label"
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 287, tcoord, "Ramprate"
+	ListBox fdaclist,pos={10,tcoord+5},size={360,270},fsize=14,frame=2,widths={30,70,100,65}
+	ListBox fdaclist,listwave=root:fdacvalstr,selwave=root:fdacattr,mode=1
+	
+	variable x_offset = 360
+	SetDrawEnv fsize= 20,fstyle= 1
+	DrawText 70+x_offset, 65,"Load from HDF Setup" 
+
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 15+x_offset, tcoord, "Ch"
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 50+x_offset, tcoord, "Output"
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 120+x_offset, tcoord, "Limit"
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 220+x_offset, tcoord, "Label"
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 287+x_offset, tcoord, "Ramprate"
+	ListBox load_fdaclist,pos={10+x_offset,tcoord+5},size={360,270},fsize=14,frame=2,widths={30,70,100,65}
+	ListBox load_fdaclist,listwave=root:load_fdacvalstr,selwave=root:fdacattr,mode=1
+	
+
+
+	Button do_nothing,pos={80,tcoord+280},size={120,20},proc=fdLoadAskUserButton,title="Keep Current Setup"
+	Button load_from_hdf,pos={80+x_offset,tcoord+280},size={100,20},proc=fdLoadAskUserButton,title="Load From HDF"
+EndMacro

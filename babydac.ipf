@@ -937,7 +937,7 @@ function bdLoadFromHDF(datnum, [no_check])
 		print "Keep current BabyDAC state chosen, no changes made"
 	elseif(response == -1)
 		// Load from HDF
-		printf "Loading BabyDAC values and labels from HDF"
+		printf "Loading BabyDAC values and labels from dat%d\r", datnum
 		duplicate/o/t load_dacvalstr, dacvalstr //Overwrite dacvalstr with loaded values
 
 		// Ramp to new values
