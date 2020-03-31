@@ -208,6 +208,7 @@ function/s getFastDACStatus(instrID)
 	variable instrID
 	string  buffer = "", key = ""
 	wave/t fdacvalstr	
+	wave fadcattr // For checking how many ADCs being recorded
 	svar fdackeys
 
 	// find the correct fastdac
@@ -229,12 +230,22 @@ function/s getFastDACStatus(instrID)
 		sprintf key, "DAC%d{%s}", i, fdacvalstr[i][3]
 		buffer = addJSONkeyval(buffer, key, num2numstr(getfdacOutput(instrID,i)))
 	endfor
-
 	
+	// Num ADC recorded
+	variable num = 0
+	for(i=0;i<dimsize(fadcattr, 0);i++)
+		if(fadcattr[i][2] == 48)
+			num++
+		endif
+	endfor
+	buffer = addJSONkeyval(buffer, "ADCs recorded", num2istr(num))
 	// ADC values
 	for(i=0;i<str2num(stringbykey("numADCCh"+num2istr(dev),fdackeys,":",","));i+=1)
 		buffer = addJSONkeyval(buffer, "ADC"+num2istr(i), num2numstr(getfadcChannel(instrID,adcChs+i)))
 	endfor
+	
+	// ADC Sample Rate
+	buffer = addJSONkeyval(buffer, "Sample Rate", num2str(getfadcspeed(instrID)))
 
 	return addJSONkeyval("", "FastDAC "+num2istr(dev), buffer)
 end
