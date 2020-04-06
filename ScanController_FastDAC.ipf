@@ -2390,3 +2390,20 @@ Window fdLoadWindow() : Panel
 	Button do_nothing,pos={80,tcoord+280},size={120,20},proc=fdLoadAskUserButton,title="Keep Current Setup"
 	Button load_from_hdf,pos={80+x_offset,tcoord+280},size={100,20},proc=fdLoadAskUserButton,title="Load From HDF"
 EndMacro
+
+
+function fd_format_setpoints(start, fin, channels, starts, fins)
+	// Returns strings in starts and fins in the format that fdacRecordValues takes
+	// e.g. fd_format_setpoints(-10, 10, "1,2,3", s, f) will make string s = "-10,-10,-10" and string f = "10,10,10"
+	variable start, fin
+	string channels, &starts, &fins
+
+	variable i
+	string starts = "", fins = ""
+	for(i=0; i<itemsInList(channels, ","); i++)
+		starts = addlistitem(num2str(start), starts, ",")
+		fins = addlistitem(num2str(fin), fins, ",")
+	endfor
+	starts = starts[0,strlen(starts)-2] // Remove comma at end
+	fins = fins[0,strlen(fins)-2]	 		// Remove comma at end
+end
