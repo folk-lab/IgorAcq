@@ -27,6 +27,25 @@ function openLS625connection(instrVarName, visa_address, amps_per_tesla, max_fie
 	//    y -- 55.2181, 1000, 155.058
 	//    z -- 9.95025, 6000, 1159.57
 	
+	
+	//////////////////////////////////////////////////////////////////////////////////
+	//// This part is added my Manab : XLD system AMI magnet specifications
+	/////////////////////////////////////////////////////////////////////////////////
+	////Rated operating current = 86.13 Amperes
+	/// Field to current ratio =1.045 kG/Ampere
+	/// Ramp rate (0 to 55kG) = 0.058 Ampere/second
+	/// Ramp rate (55kG to 80kG) = 0.029 Ampere/second
+	/// Ramp rate (80kG to 90kG) = 0.014 Ampere/second
+	//////////Performance test result////////////////
+	//// Sweep rate used: 0 to 8T: 100 mT/min
+	/// Sweep rate used: 8 to 9T: 87.78 mT/min
+	
+	
+	//// amps_per_tesla, max_field, max_ramprate////
+	///////   in A/T, mT, mT/min
+	///// z -- 9.57 , 9000, 362
+	
+	
 	string instrVarName, visa_address
 	variable amps_per_tesla, max_field, max_ramprate, verbose, hold
 	

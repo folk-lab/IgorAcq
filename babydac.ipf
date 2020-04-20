@@ -1057,7 +1057,7 @@ function update_BabyDAC(action) : ButtonControl
 			endfor
 			break
 	endswitch
-
+		
 	viClose(bd_window_resource) // close VISA resource
 
 	if(bd_num_custom > 0)
