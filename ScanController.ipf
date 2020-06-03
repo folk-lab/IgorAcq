@@ -968,11 +968,11 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	wave/t sc_RawWaveNames, sc_CalcWaveNames, sc_RawScripts, sc_CalcScripts
 	variable i=0, j=0
 	string cmd = "", wn = "", wn2d="", s, script = "", script0 = "", script1 = ""
-	string/g sc_x_label, sc_y_label
+	string/g sc_x_label, sc_y_label, activegraphs=""
 	variable/g sc_is2d, sc_scanstarttime = datetime
 	variable/g sc_startx, sc_finx, sc_numptsx, sc_starty, sc_finy, sc_numptsy
 	variable/g sc_abortsweep=0, sc_pause=0, sc_abortnosave=0
-	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, activegraphs="", cmd1="",window_string=""
+	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, cmd1="",window_string=""
 	string cmd2=""
 	variable index, graphopen, graphopen2d
 	svar sc_colormap
@@ -2150,7 +2150,7 @@ function SaveWaves([msg,save_experiment,fastdac])
 				if(fadcattr[ii][2] == 48) //checkbox checked
 					wn = fadcvalstr[ii][3]
 					if(sc_is2d)
-						wn += "2d"
+						wn += "_2d"
 					endif
 					filename = "dat"+filenumstr+wn
 					duplicate $wn $filename
@@ -2162,7 +2162,7 @@ function SaveWaves([msg,save_experiment,fastdac])
 					if(sc_Saverawfadc)
 						wn_raw = "ADC"+num2istr(ii)
 						if(sc_is2d)
-							wn_raw += "2d"
+							wn_raw += "_2d"
 						endif
 						filename = "dat"+filenumstr+wn_raw
 						duplicate $wn_raw $filename

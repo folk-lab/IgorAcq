@@ -34,6 +34,12 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 		verbose=0
 	endif
 	
+	// Set default fd_ramprate if not already set
+	NVAR/Z fd_ramprate 
+	if( !NVAR_Exists(fd_ramprate) )
+		variable/g fd_ramprate=1000
+	endif
+	
 	variable localRM
 	variable status = viOpenDefaultRM(localRM) // open local copy of resource manager
 	if(status < 0)
@@ -95,6 +101,16 @@ function sc_fillfdacKeys(instrID,visa_address,numDACCh,numADCCh,[master])
 end
 
 //// Get functions ////
+function getNumFADC()
+	variable i=0, numadc=0
+	wave fadcattr
+	for (i=0; i<dimsize(fadcattr, 1)-1; i++) // Count how many ADCs are being measured
+		if (fadcattr[i][2] == 48)
+			numadc++
+		endif
+	endfor
+	return numadc
+end
 
 function getfadcspeed(instrID)
 	// Returns speed in Hz (but arduino thinks in microseconds)
@@ -253,7 +269,7 @@ function setfadcSpeed(instrID,speed,[loadCalibration]) // Units: Hz
 	endif
 	
 	// check formatting of speed
-	if(speed < 0)
+	if(speed <= 0)
 		print "[ERROR] \"setfadcSpeed\": Speed must be positive"
 		abort
 	endif
@@ -278,7 +294,7 @@ function setfadcSpeed(instrID,speed,[loadCalibration]) // Units: Hz
 		endif
 	endfor
 	
-	speed = roundNum(1.0/str2num(response)*1.0e-6,0)
+	speed = roundNum(1.0/str2num(response)*1.0e6,0)
 	
 	if(loadCalibration)
 		loadfADCCalibration(instrID,numDevice,speed)
@@ -307,7 +323,8 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	svar fdackeys
 	
 	if(paramIsDefault(ramprate))
-		ramprate = 1000
+		nvar fd_ramprate
+		ramprate = fd_ramprate
 	endif
 	
 	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
@@ -362,6 +379,12 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 		print warn
 	endif
 	
+	// Check that ramprate is within software limit, otherwise use software limit
+	if (ramprate > str2num(fdacvalstr[channel][4]))
+		printf "[WARNING] \"rampOutputfdac\": Ramprate of %.0fmV/s requested for channel %d. Using max_ramprate of %.0fmV/s instead" ramprate, channel, str2num(fdacvalstr[channel][4])
+		ramprate = str2num(fdacvalstr[channel][4])
+	endif
+		
 	// read current dac output and compare to window
 	variable currentoutput = getfdacOutput(instrID,devchannel)
 	
@@ -387,6 +410,22 @@ function rampOutputfdac(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 		abort
 	endif
 end
+
+function RampMultipleFD(InstrID, channels, setpoint, [ramprate])
+	variable InstrID, setpoint, ramprate
+	string channels
+	
+	nvar fd_ramprate
+	ramprate = paramIsDefault(ramprate) ? fd_ramprate : ramprate
+	
+	variable i=0, channel, nChannels = ItemsINList(channels, ",")
+	for(i=0;i<nChannels;i+=1)
+		channel = str2num(StringFromList(i, channels, ","))
+		rampOutputfdac(instrID, channel, setpoint, ramprate=ramprate)
+	endfor
+end
+
+	
 
 function fdacResetCalibration(instrID,channel)
 	variable instrID, channel
@@ -871,20 +910,21 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay, ramprat
 	
 	// get ADC sampling speed
 	variable samplingFreq=0
-	samplingFreq = getfadcSpeed(instrID)
+	samplingFreq = getfadcSpeed(instrID)/getNumFADC()  //Because sampling is split between number of ADCs being read //TODO: This needs to be adapted for multiple FastDacs
 	
 	variable eff_ramprate = 0, answer = 0, i=0
 	string question = ""
 	
 	svar activegraphs
-	variable k=0
+	variable k=0, channel
 	if(rowNum == 0)
 		// check if effective ramprate is higher than software limits
 		for(i=0;i<itemsinlist(rampCh,",");i+=1)
 			eff_ramprate = abs(str2num(stringfromlist(i,scanlist.startval,","))-str2num(stringfromlist(i,scanlist.finval,",")))*(samplingFreq/numpts)
-			if(eff_ramprate > str2num(fdacvalstr[i][4]))
-				// we are going to fast
-				sprintf question, "DAC channel %s will be ramped at %.1f mV/s, software limit is set to %s mV/s. Continue?", stringfromlist(i,scanlist.daclist,","), eff_ramprate, fdacvalstr[i][4]
+			channel = str2num(stringfromlist(i, rampCh, ","))
+			if(eff_ramprate > str2num(fdacvalstr[channel][4])*1.05)  // Allow 5% too high for convenience
+				// we are going too fast
+				sprintf question, "DAC channel %d will be ramped at %.1f mV/s, software limit is set to %s mV/s. Continue?", channel, eff_ramprate, fdacvalstr[channel][4]
 				answer = ask_user(question, type=1)
 				if(answer == 2)
 					print("[ERROR] \"RecordValues\": User abort!")
@@ -1006,7 +1046,6 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay, ramprat
 	variable looptime = (stopmstimer(-2)-bufferDumpStart)*1e-6
 	
 	// update window
-	variable channel
 	buffer = readInstr(instrID)
 	buffer = sc_stripTermination(buffer,"\r\n")
 	if(fdacCheckResponse(buffer,cmd,isString=1,expectedResponse="RAMP_FINISHED"))
@@ -1209,7 +1248,7 @@ function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart)
 			k += 1
 		endfor 
 		if(sc_is2d)
-			wave2d = wave1d+"2d"
+			wave2d = wave1d+"_2d"
 			wave rawwave2d = $wave2d
 			rawwave2d[][rowNum] = rawwave[p]
 		endif
@@ -1228,7 +1267,7 @@ function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart)
 			print "[WARNING] \"sc_distribute_data\": Wave calculation falied! Error: "+GetErrMessage(V_Flag,2)
 		endif
 		if(sc_is2d)
-			wave2d = wave1d+"2d"
+			wave2d = wave1d+"_2d"
 			wave datawave2d = $wave2d
 			datawave2d[][rowNum] = datawave[p]
 		endif
@@ -1303,7 +1342,7 @@ function sc_applyfilters(coefList,adcList,doLowpass,doNotch,cutoff_frac,sampling
 			endif
 		endfor
 		if(sc_is2d)
-			wave2d = wave1d+"2d"
+			wave2d = wave1d+"_2d"
 			wave datawave2d = $wave2d
 			datawave2d[][rowNum] = datawave[p]
 		endif
@@ -1351,8 +1390,8 @@ function sc_averageDataWaves(numAverage,adcList,lastRow,rowNum)
 				graph = stringfromlist(0,sc_findgraphs(wave1d),",")
 				modifygraph/w=$graph rgb($wave1d)=(0,0,65535), rgb($avg1d)=(65535,0,0)
 				// average 2d data
-				avg2d = "tempwave2d"
-				wave2d = wave1d+"2d"
+				avg2d = "tempwave_2d"
+				wave2d = wave1d+"_2d"
 				duplicate/o $wave2d, $avg2d
 				make/o/n=(newsize,sc_numptsy) $wave2d = nan
 				wave datawave2d = $wave2d
@@ -1464,7 +1503,7 @@ function initFastDAC()
 	newpath/c/o/q spectrum datapath+"spectrum:" // create/overwrite spectrum path
 	
 	// hardware limit (mV)
-	variable/g fdac_limit = 5000
+	variable/g fdac_limit = 10000
 	
 	variable i=0, numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
 	variable numDACCh=0, numADCCh=0
@@ -1692,8 +1731,7 @@ function update_fadcSpeed(s) : PopupMenuControl
 		try
 			variable viRM = openFastDACconnection(tempnamestr, visa_address, verbose=0)
 			nvar tempname = $tempnamestr
-		
-			setfadcSpeed(tempname,s.popnum)
+			setfadcSpeed(tempname,str2num(s.popStr))
 		catch
 			// reset error code, so VISA connection can be closed!
 			variable err = GetRTError(1)
@@ -1705,11 +1743,11 @@ function update_fadcSpeed(s) : PopupMenuControl
 			// silent abort
 			abortonvalue 1,10
 		endtry
-			
 			// close temp visa connection
 			viClose(tempname)
 			viClose(viRM)
-		return 0
+			sc_OpenInstrConnections(0)
+			return 0
 	else
 		// do nothing
 		return 0
@@ -2308,7 +2346,7 @@ function get_fastdacs_from_hdf(datnum, [fastdac_num])
 			load_fdacvalstr[ch][3] = label_name
 		endif
 	endfor
-	JSONXOP_release /A  //Clear all stored JSON strings
+	JSONXOP_Release /A  //Clear all stored JSON strings
 end
 
 
@@ -2397,9 +2435,10 @@ function fd_format_setpoints(start, fin, channels, starts, fins)
 	// e.g. fd_format_setpoints(-10, 10, "1,2,3", s, f) will make string s = "-10,-10,-10" and string f = "10,10,10"
 	variable start, fin
 	string channels, &starts, &fins
-
+	
 	variable i
-	string starts = "", fins = ""
+	starts = ""
+	fins = ""
 	for(i=0; i<itemsInList(channels, ","); i++)
 		starts = addlistitem(num2str(start), starts, ",")
 		fins = addlistitem(num2str(fin), fins, ",")
