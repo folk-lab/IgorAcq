@@ -2146,6 +2146,7 @@ function SaveWaves([msg,save_experiment,fastdac])
 			
 			// look for waves to save
 			ii=0
+			string str_2d = "", savename
 			do
 				if(fadcattr[ii][2] == 48) //checkbox checked
 					wn = fadcvalstr[ii][3]
@@ -2160,16 +2161,20 @@ function SaveWaves([msg,save_experiment,fastdac])
 					saveSingleWave(wn)
 					
 					if(sc_Saverawfadc)
+						str_2d = ""  // Set 2d_str blank until check if sc_is2d
 						wn_raw = "ADC"+num2istr(ii)
 						if(sc_is2d)
 							wn_raw += "_2d"
+							str_2d = "_2d"  // Need to add _2d to name if wave is 2d only.
 						endif
-						filename = "dat"+filenumstr+wn_raw
+						filename = "dat"+filenumstr+fadcvalstr[ii][3]+str_2d+"_RAW"  // More easily identify which Raw wave for which Calc wave
+						savename = fadcvalstr[ii][3]+str_2d+"_RAW"
 						duplicate $wn_raw $filename
+						duplicate/O $wn_raw $savename  // To store in HDF with more easily identifiable name
 						if(sc_Printfadc)
 							print filename
 						endif
-						saveSingleWave(wn_raw)
+						saveSingleWave(savename)
 					endif
 				endif
 				ii+=1
