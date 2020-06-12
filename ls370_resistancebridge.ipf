@@ -59,9 +59,9 @@ function setLS370system(system)
 	strswitch(system)
 		case "bfsmall":
 			ls_system = "bfsmall"
-			ls_label = "LD"
-			string/g bfchannellookup = "mc;still;magnet;4K;50K;6;5;4;2;1"
-			string/g bfheaterlookup = "mc;still;0;2"
+			ls_label = "XLD"
+			string/g bfchannellookup = "mc;still;magnet;4K;50K;6;5;4;2;1"  //TODO: Check with LD API
+			string/g bfheaterlookup = "mc;still;0;2"							 //TODO: Check with LD API
 			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,350,1201,1800,10000}}
 			break
 		case "igh":
@@ -143,9 +143,13 @@ function getLS370temp(instrID, plate, [max_age_s]) // Units: K
 			break
 	endswitch
 
-	sprintf command, "get-channel-data/%d?controller_label=%s", channel, ls_label
-
-	string result = sendLS370(instrID,command,"get",keys="data:record:temperature_k")
+	
+	string result
+	
+	// TODO: Try get from SQL first, and if recent enough then don't ask from Lakeshore!
+	
+	sprintf command, "get-channel-data/ch%d?ctrl_label=%s", channel, ls_label
+	result = sendLS370(instrID,command,"get",keys="data:record:temperature_k")
 	return str2num(result)
 end
 
@@ -193,11 +197,11 @@ function getLS370heaterpower(instrID,heater, [max_age_s]) // Units: mW
 	endswitch
 
 	if(channel > 0)
-		sprintf command, "get-analog-data/%d?controller_label=%s", channel, ls_label
+		sprintf command, "get-analog-data/%d?ctrl_label=%s", channel, ls_label
 	else
-		sprintf command, "get-heater-data?controller_label=%s", ls_label
+		sprintf command, "get-heater-data?ctrl_label=%s", ls_label
 	endif
-
+	
 	return str2num(sendLS370(instrID,command,"get", keys="power_mw"))
 end
 
@@ -211,13 +215,11 @@ function getLS370PIDtemp(instrID) // Units: mK
 	svar ls_label
 	nvar temp_set
 
-	payload = "{\"command\": \"SETP?\"}"
-	sprintf command, "command?controller_label=%s", ls_label
+	sprintf command, "get-temperature-control-setpoint?%s", ls_label
 
-	string test = sendLS370(instrID,command,"post", keys="v", payload=payload)
-	temp = str2num(test[1,inf])*1000
+	string test = sendLS370(instrID,command,"get", keys="data")
+	temp = str2num(test)*1000
 	temp_set = temp
-
 	return temp
 end
 
@@ -228,11 +230,10 @@ function/s getLS370heaterrange(instrID) // Units: AU
 	string command,payload,response
 	svar ls_label
 
-	sprintf payload, "{\"command\": \"HTRRNG?\"}", range
-	sprintf command, "command?controller_label=%s", ls_label
+	sprintf command, "get-heater-range-amps/%s", ls_label
 
-	response = sendLS370(instrID,command,"post", keys="v", payload=payload)
-	return response[1,inf]
+	response = sendLS370(instrID,command,"get", keys="data")
+	return response
 end
 
 function/s getLS370PIDparameters(instrID) // Units: No units
@@ -245,15 +246,13 @@ function/s getLS370PIDparameters(instrID) // Units: No units
 	string payload, pid, command
 	svar ls_label
 
-	payload = "{\"command\": \"PID?\"}"
-	sprintf command, "command?controller_label=%s", ls_label
+	sprintf command, "get-temperature-pid/%s", ls_label
 
-	pid = sendLS370(instrID,command,"post", keys="v", payload=payload)
-
-	p_value = str2num(stringfromlist(0,pid[1,inf],","))
-	i_value = str2num(stringfromlist(1,pid[1,inf],","))
-	d_value = str2num(stringfromlist(2,pid[1,inf],","))
-
+	pid = sendLS370(instrID,command,"get", keys="data")
+	p_value = str2num(getJSONvalue(pid, "P"))
+	i_value = str2num(getJSONvalue(pid, "I"))
+	d_value = str2num(getJSONvalue(pid, "D"))
+	sprintf pid, "P=%f,I=%f,D=%f", p_value, i_value, d_value  // For backwards compatability
 	return pid
 end
 
@@ -265,11 +264,31 @@ function getLS370controlmode(instrID) // Units: No units
 	string payload, command,response
 	svar ls_label
 
-	payload = "{\"command\": \"CMODE?\"}"
-	sprintf command, "command?controller_label=%s", ls_label
+	sprintf command, "get-temperature-control-mode?%s", ls_label
 
-	response = sendLS370(instrID,command,"post", keys="v", payload=payload)
-	pid_mode = str2num(response[1,inf])
+	response = sendLS370(instrID,command,"get", keys="data", payload=payload)
+	strswitch (response)
+		case "TCM_open_loop":
+			pid_mode = 3
+			break
+		case "TCM_closed_loop":
+			pid_mode = 0  // TODO: what should this be?
+			break
+		case "TCM_zone_tuning":
+			pid_mode = 0  // TODO: what should this be?
+			break
+		case "TCM_undefined":
+			pid_mode = 0  // TODO: what should this be?
+			break
+		case "TCM_off":
+			pid_mode = 4  
+			break
+		default:  
+			pid_mode = 0
+			print "Someone needs to check what the other possible returns are as they are not documented in docs!! Use to set pid_mode accordingly"
+	endswitch
+	
+	
 
 	if(pid_mode == 1)
 		pid_led = 1
@@ -329,6 +348,7 @@ end
 //// Set Functions ////
 //////////////////////
 
+// TODO: Do we actually want this?? It does exist in API 
 function setLS370tempcontrolmode(instrID, mode) // Units: No units
 	// sets the temperature control mode
 	// avaliable options are: off (4), PID (1) and Open loop (3)
@@ -339,6 +359,8 @@ function setLS370tempcontrolmode(instrID, mode) // Units: No units
 	svar ls_system, bfchannellookup, ighchannellookup
 
 	variable interval, maxcurrent, channel
+
+	abort "Not updated to new API"
 
 //	strswitch(ls_system)
 //		case "bfsmall":
@@ -386,29 +408,40 @@ function setLS370tempcontrolmode(instrID, mode) // Units: No units
 	pid_mode = mode
 end
 
+
 function setLS370PIDcontrol(instrID,channel,setpoint,maxcurrent) //Units: mK, mA
 	string instrID
 	variable channel, setpoint, maxcurrent
 	string payload, command
 	svar ls_label
 	nvar temp_set
+	
 
 	// check for NAN and INF
 	if(sc_check_naninf(setpoint) != 0)
 		abort "trying to set setpoint to NaN or Inf"
 	endif
 
-	sprintf payload, "{\"PID\":[%d,%d,%d], \"channel\": %d, \"ctrl_label\":\"%s\", \"delay\": %d, \"filter\":\"%s\",  \"max_current_ma\": %g, \"max_heater_level\": %d, \"setpoint\": %g, \"setpoint_units\":\"%s\", \"heater_output_display_type\":\"%s\"}", 	\
-							10, 10, 0, channel, ls_label, 1, "off", maxcurrent, 8, setpoint/1000, "kelvin", "current"
-	sprintf command, "set-temperature-control-parameters"
+	// set-temperature-control-parameters  
+	// TODO: This does not need to be called every time, should it be moved to seperate function?
+	sprintf payload, "{\"channel_label\": ch%d, \"delay\": %d, \"use_filtered_values\":\"%s\", \"max_heater_level\": %d,  \"setpoint_units\":\"%s\", \"heater_output_display_type\":\"%s\"}", 	\
+												channel, 				1, 									"true", 							8, 			 					"kelvin", 									"current"
+	sprintf command, "set-temperature-control-parameters/%s", ls_label
 	sendLS370(instrID,command,"put",payload=payload)
+	
+	// set-heater-range-amps //TODO: Check if this is how we can we set a max_current for the heating with new API?
+	print "WARNING: NO MAX CURRENT SET" 
+//	sprintf command, "set-heater-range-amps/%s/%f", ls_label, maxcurrent/1000
+//	sendLS370(instrID,command,"put")
+		
+	// set-temperature-control-setpoint
+	sprintf command, "set-temperature-control-setpoint/%s/%f", ls_label, setpoint/1000
+	sendLS370(instrID,command,"put")
+		
 	temp_set = setpoint
 end
 
-
-
-
-
+//TODO: Do we want this?
 function setLS370cmode(instrID,mode)
 	//PID: 1, open loop: 3, off: 4
 	string instrID
@@ -416,11 +449,14 @@ function setLS370cmode(instrID,mode)
 	string payload, command
 	svar ls_label
 
+	abort "Not updated to new API"  
+	
 	sprintf payload, "{\"command\": \"CMODE %d\"}", mode
-	sprintf command, "command?controller_label=%s", ls_label
+	sprintf command, "command?ctrl_label=%s", ls_label
 
 	sendLS370(instrID,command,"post", payload=payload)
 end
+
 
 function setLS370exclusivereader(instrID,channel,[interval])
 	// BF small channels: [ld_mc_heater, ld_still_heater, ld_50k, ld_4k, ld_magnet, ld_still, ld_mc]
@@ -430,14 +466,75 @@ function setLS370exclusivereader(instrID,channel,[interval])
 	string command, payload
 	svar ls_label
 
+	abort "Not updated to new API"  // TODO: How to make this work with setLS370LoggersSchedule??
+
 	if(paramisdefault(interval))
 		interval=5
 	endif
 
-	sprintf command, "set-exclusive-reader"
-	sprintf payload, "{\"channel_label\":\"%s\", \"ctrl_label\": \"%s\",\"interval_s\":%d}", channel, ls_label, interval
-	print payload
-	sendLS370(instrID,command,"put",payload=payload)
+// BELOW HERE NO LONGER EXISTS	
+//	sprintf command, "set-exclusive-reader"
+//	sprintf payload, "{\"channel_label\":\"%s\", \"ctrl_label\": \"%s\",\"interval_s\":%d}", channel, ls_label, interval
+//	print payload
+//	sendLS370(instrID,command,"put",payload=payload)
+
+end
+
+
+function setLS370loggersSchedule(instrID, schedule)
+	string instrID, schedule
+	svar ls_label
+	string command, payload
+	
+	abort "Not finished for new API"  
+	strswitch (schedule)
+		case "default":
+			// TODO: put default here
+			break
+		case "mc_exclusive":
+		// TODO: How can I store this nicely in IGOR? Then need to make an easy way to start from empty and fill only whichever exclusive. What is 
+//			{
+//			  "ok": true,
+//			  "error": null,
+//			  "data": {
+//			    "heater": {
+//			      "min": 30,
+//			      "max": 60
+//			    },
+//			    "analog_outputs": {
+//			      "ao1": {
+//			        "min": 10,
+//			        "max": 60
+//			      },
+//			      "ao2": {
+//			        "min": 20,
+//			        "max": 50
+//			      }
+//			    },
+//			    "channels": {
+//			      "ch1": {
+//			        "min": 120,
+//			        "max": 180
+//			      },
+//			      "ch2": {
+//			        "min": 30,
+//			        "max": 120
+//			      },
+//			      "ch3": {
+//			        "min": 200,
+//			        "max": 400
+//			      }
+//			    }
+//			  },
+//			  "processing_time_s": 0
+//			}
+			break
+		default:
+			abort "Not a valid option"
+	endswitch 
+	
+	sprintf command, "set-data-loggers-schedule/%s", ls_label
+	sendLS370(instrID,command,"put", payload=payload)
 
 end
 
@@ -446,17 +543,11 @@ function resetLS370exclusivereader(instrID)
 	string instrID
 	string command, payload
 	svar ls_label
-
-	sprintf command, "reset-exclusive-reader/%s", ls_label
-	payload = "{}"
-
-
-	sendLS370(instrID,command,"post",payload=payload)
+	setLS370loggersSchedule(instrID, "default")
 end
 
 
-
-
+// TODO: Do we want this?
 function setLS370PIDtemp(instrID,temp) // Units: mK
 	// sets the temperature for PID control and heater range
 	string instrID
@@ -467,29 +558,32 @@ function setLS370PIDtemp(instrID,temp) // Units: mK
 	nvar temp_set
 	svar bfchannellookup, ighchannellookup
 
+	abort "Not updated to new API"
+
 	// check for NAN and INF
 	if(sc_check_naninf(temp) != 0)
 		abort "trying to set temperarture to NaN or Inf"
 	endif
 
 	sprintf payload, "{\"command\": \"SETP %g\"}", temp/1000
-	sprintf command, "command?controller_label=%s", ls_label
+	sprintf command, "command?ctrl_label=%s", ls_label
 
 	sendLS370(instrID,command,"post",payload=payload)
 	temp_set = temp
 end
 
-function setLS370heaterrange(instrID,range) // Units: AU
-	// range must be a number between 0 and 8
-	string instrID,range
-	string command,payload
-	svar ls_label
 
-	sprintf payload, "{\"command\": \"HTRRNG %d\"}", range
-	sprintf command, "command?controller_label=%s", ls_label
-
-	sendLS370(instrID,command,"post", payload=payload)
-end
+//function setLS370heaterrange(instrID,range) // Units: AU
+//	// range must be a number between 0 and 8
+//	string instrID,range
+//	string command,payload
+//	svar ls_label
+//
+//	sprintf payload, "{\"command\": \"HTRRNG %d\"}", range
+//	sprintf command, "command?ctrl_label=%s", ls_label
+//
+//	sendLS370(instrID,command,"post", payload=payload)
+//end
 
 function setLS370PIDparameters(instrID,p,i,d) // Units: No units
 	// set the PID parameters for the PID control loop
@@ -506,10 +600,10 @@ function setLS370PIDparameters(instrID,p,i,d) // Units: No units
 	endif
 
 	if(0.001 <= p && p <= 1000 && 0 <= i && i <= 10000 && 0 <= d && d <= 2500)
-		sprintf cmd,"PID %s,%s,%s", num2str(p), num2str(i), num2str(d)
-		sprintf payload, "{\"command\": \"%s\"}", cmd
-		sprintf command, "command?controller_label=%s", ls_label
-		sendLS370(instrID,command,"post", payload=payload)
+
+		sprintf payload, "{\"P\":%f, \"I\":%f, \"D\":%f}", p, i, d
+		sprintf command, "set-temperature-pid/%s", ls_label
+		sendLS370(instrID,command,"put",payload=payload)	
 
 		p_value = p
 		i_value = i
@@ -518,6 +612,7 @@ function setLS370PIDparameters(instrID,p,i,d) // Units: No units
 		abort "PID parameters out of range"
 	endif
 end
+
 
 function setLS370heaterpower(instrID,heater,output) //Units: mW
 	// sets the manual heater output
@@ -531,6 +626,8 @@ function setLS370heaterpower(instrID,heater,output) //Units: mW
 	variable channel, heater_idx
 	string command, payload
 	svar ls_label
+
+	abort "Not updated to new API"  // TODO: Do this one... set-heater-power-milliw
 
 	// check for NAN and INF
 	if(sc_check_naninf(output) != 0)
@@ -562,7 +659,7 @@ function setLS370heaterpower(instrID,heater,output) //Units: mW
 
 	if(channel > 0)
 		sprintf payload, "{\"analog_channel\":%d, \"power_mw\":%d}", channel, output
-		sprintf command, "set-analog-output-power?controller_label=%s", ls_label
+		sprintf command, "set-analog-output-power?ctrl_label=%s", ls_label
 		if(channel > 1)
 			stillheater_set = output
 			if(output>0)
@@ -575,7 +672,7 @@ function setLS370heaterpower(instrID,heater,output) //Units: mW
 		endif
 	else
 		sprintf payload, "{\"power_mw\":%d}", output
-		sprintf command, "set-heater-power?controller_label=%s", ls_label
+		sprintf command, "set-heater-power?ctrl_label=%s", ls_label
 		mcheater_set = output
 	endif
 
@@ -591,9 +688,8 @@ function turnoffLS370heater(instrID)
 	svar ls_label
 	nvar pid_led, mcheater_led, pid_mode
 
-	sprintf command, "turn-heater-off"
-	payload = "{}"
-	sendLS370(instrID,command,"post", payload=payload)
+	sprintf command, "turn-heater-off/%s", ls_label
+	sendLS370(instrID,command,"post")
 	pid_led = 0
 	mcheater_led = 0
 	pid_mode = 4
@@ -602,6 +698,7 @@ function turnoffLS370heater(instrID)
 //	PopupMenu tempcontrol, mode=2, win=Lakeshore
 end
 
+// TODO: Do we want this?
 function toggleLS370magnetheater(instrID,onoff)
 	// toggles the state of the magnet heater on BF #1.
 	// it sets ANALOG 1 to -50% (-5V) in the "on" state
@@ -614,6 +711,8 @@ function toggleLS370magnetheater(instrID,onoff)
 	svar ls_system
 	string command,payload,cmd
 	svar ls_label
+
+	abort "Not updated to new API"
 
 	if(cmpstr(ls_system,"bfsmall") != 0)
 		abort "No heater installed on this system!"
@@ -638,7 +737,7 @@ function toggleLS370magnetheater(instrID,onoff)
 
 	sprintf cmd, "ANALOG 1,1,2,1,1,100.0,0.0,%g", output
 	sprintf payload, "{\"command\":%s}", cmd
-	sprintf command, "command?controller_label=%s", ls_label
+	sprintf command, "command?ctrl_label=%s", ls_label
 
 	sendLS370(instrID,command,"post", payload=payload)
 end
@@ -725,7 +824,7 @@ function/s sendLS370(instrID,cmd,method,[payload, keys])
 	string response
 
 //	print "SendLS370 temporarily disabled"
-	string headers = "accept: application/json\rlcmi-auth-token: igor"
+	string headers = "accept: application/json\rlcmi-auth-token: swagger"
 	if(cmpstr(method,"get")==0)
 		response = getHTTP(instrID,cmd,headers)
 //		print response
