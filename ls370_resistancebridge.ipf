@@ -59,7 +59,7 @@ function setLS370system(system)
 	strswitch(system)
 		case "bfsmall":
 			ls_system = "bfsmall"
-			ls_label = "XLD"
+			ls_label = "LD"
 			string/g bfchannellookup = "mc;still;magnet;4K;50K;6;5;4;2;1"  //TODO: Check with LD API
 			string/g bfheaterlookup = "mc;still;0;2"							 //TODO: Check with LD API
 			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,350,1201,1800,10000}}
@@ -74,8 +74,10 @@ function setLS370system(system)
 			break
 		case "bfbig":
 			ls_system = "bfbig"
-			ls_label = ""
-			print "No support for bfbig yet!"
+			ls_label = "XLD"
+			string/g bfchannellookup = "mc;still;magnet;4K;50K;ch6;ch5;ch4;ch2;ch1"  //TODO: Check with XLD API
+			string/g bfheaterlookup = "mc;still;0;2"							 //TODO: Check with XLD API
+			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,350,1201,1800,10000}} // TODO: What does this do?
 			break
 		default:
 			abort "[ERROR] Please choose a supported LS370 system: [bfsmall, igh, bfbig]"
@@ -127,10 +129,20 @@ function getLS370temp(instrID, plate, [max_age_s]) // Units: K
 				printf "The requested plate (%s) doesn't exsist!", plate
 				return 0.0
 			else
-				channel = str2num(stringfromlist(channel_idx+5,bfchannellookup,";"))
+				channel = stringfromlist(channel_idx+5,bfchannellookup,";")
+			endif
+			break
+		case "bfbig":
+			channel_idx = whichlistitem(plate,bfchannellookup,";")
+			if(channel_idx < 0)
+				printf "The requested plate (%s) doesn't exsist!", plate
+				return 0.0
+			else
+				channel = stringfromlist(channel_idx+5,bfchannellookup,";")
 			endif
 			break
 		case "igh":
+			print "WARNING: Probably looking for the wrong key in the returned JSON since update to new bluefors API 6/20"  // TODO: Can I remove this?
 			channel_idx = whichlistitem(plate,ighchannellookup,";")
 			if(channel_idx < 0)
 				printf "The requested plate (%s) doesn't exsist!", plate
@@ -138,18 +150,17 @@ function getLS370temp(instrID, plate, [max_age_s]) // Units: K
 			else
 				channel = str2num(stringfromlist(channel_idx+5,ighchannellookup,";"))
 			endif
-			break
-		case "bfbig":
-			break
+			break	
+		default:
+			abort "ls_system not implemented"
 	endswitch
-
 	
 	string result
 	
 	// TODO: Try get from SQL first, and if recent enough then don't ask from Lakeshore!
 	
-	sprintf command, "get-channel-data/ch%d?ctrl_label=%s", channel, ls_label
-	result = sendLS370(instrID,command,"get",keys="data:record:temperature_k")
+	sprintf command, "get-channel-data/%d?ctrl_label=%s", channel, ls_label
+	result = sendLS370(instrID,command,"get",keys="data:record:temperature_k") 
 	return str2num(result)
 end
 
@@ -424,7 +435,7 @@ function setLS370PIDcontrol(instrID,channel,setpoint,maxcurrent) //Units: mK, mA
 
 	// set-temperature-control-parameters  
 	// TODO: This does not need to be called every time, should it be moved to seperate function?
-	sprintf payload, "{\"channel_label\": ch%d, \"delay\": %d, \"use_filtered_values\":\"%s\", \"max_heater_level\": %d,  \"setpoint_units\":\"%s\", \"heater_output_display_type\":\"%s\"}", 	\
+	sprintf payload, "{\"channel_label\": %d, \"delay\": %d, \"use_filtered_values\":\"%s\", \"max_heater_level\": %d,  \"setpoint_units\":\"%s\", \"heater_output_display_type\":\"%s\"}", 	\
 												channel, 				1, 									"true", 							8, 			 					"kelvin", 									"current"
 	sprintf command, "set-temperature-control-parameters/%s", ls_label
 	sendLS370(instrID,command,"put",payload=payload)
