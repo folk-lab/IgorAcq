@@ -317,6 +317,9 @@ function InitScanController([configFile])
 
 	// check if a path is defined to backup data
 	sc_checkBackup()
+	
+	// check if we have the correct SQL driver
+	sc_checkSQLDriver()
 
 	// deal with config file
 	string /g sc_current_config = ""

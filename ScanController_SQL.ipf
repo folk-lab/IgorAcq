@@ -1,7 +1,6 @@
 ﻿#pragma TextEncoding = "UTF-8"
 #pragma rtGlobals=3		// Use modern global access method and strict wave access.
 #include <SQLConstants>
-#include <SQLUtils>
 
 ////////////////////////////
 //// SQL User functions ////
@@ -100,7 +99,7 @@ function sc_openSQLConnection(s)
 	endif
 	
 	// set ODBC version
-	error = SQLSetEnvAttrNum (envRefNum, SQL_ATTR_ODBC_VERSION, 3)
+	error = SQLSetEnvAttrNum(envRefNum, SQL_ATTR_ODBC_VERSION, 3)
 	if(error != SQL_SUCCESS)
 		SQLFreeHandle(SQL_HANDLE_ENV,envRefNum)
 		print "[ERROR] \"sc_openSQLConnection\": Unable to set ODBC version."
@@ -321,7 +320,6 @@ function sc_fetchSQLData(s,statement,wavenames)
 		abort
 	elseif(rowCount < 1)
 		print "[WARNING] \"sc_fetchSQLData\": No data to fetch. Try to adjust the SQL statement."
-		return 0
 	endif
 	
 	// make waves to hold data
@@ -348,7 +346,10 @@ function sc_fetchSQLData(s,statement,wavenames)
 	for(i=0;i<rowCount;i+=1)
 		// one row at a time
 		error = SQLFetch(s.statRefNum)
-		if(error != SQL_SUCCESS)
+		if(error == SQL_NO_DATA)
+			// no data to fetch. Likely that the statement didn't return any data
+			break
+		elseif(error != SQL_SUCCESS)
 			sc_closeSQLConnection(s)
 			print "[ERROR] \"sc_fetchSQLData\": Unable to fetch data."
 			abort
@@ -466,24 +467,85 @@ function/s sc_mapSQLTypeToWaveType(dataType)
 	return type
 end
 
-function/s sc_checkSQLDriver()
-	// listing available drivers:
-	variable environRefNum,err,i=0
-	string ddesc,attr,mess
-	SQLAllocHandle(SQL_HANDLE_ENV,0,environRefNum)
-	SQLSetEnvAttrNum(environRefNum,SQL_ATTR_ODBC_VERSION,3)
+function/s sc_checkSQLDriver([printToCommandLine])
+	// Locating avaliable drivers
+	// function will set global parameters:
+	// nvar sqldriver_avaliable
+	// svar sqldriver
+	// if printToCommandLine=1 the global parameters
+	// won't be set. Intended for diagnostics.
+	
+	variable printToCommandLine
+	
+	if(paramisdefault(printToCommandLine))
+		printToCommandLine = 0
+	elseif(printToCommandLine != 1)
+		printToCommandLine = 0
+		print "[WARNING] \"sc_checkSQLDriver\": Setting printToCommandLine = 0"
+	endif
+	
+	// allocate environment handle
+	variable envRefNum=0, error=0, i=0
+	string ddesc="", attr="", mess="", drivers=""
+	SQLAllocHandle(SQL_HANDLE_ENV,0,envRefNum)
+	if(error != SQL_SUCCESS)
+		print "[ERROR] \"sc_checkSQLDriver\": Unable to allocate environment handle."
+		abort
+	endif
+	
+	// set ODBC version
+	SQLSetEnvAttrNum(envRefNum,SQL_ATTR_ODBC_VERSION,3)
+	if(error != SQL_SUCCESS)
+		SQLFreeHandle(SQL_HANDLE_ENV,envRefNum)
+		print "[ERROR] \"sc_checkSQLDriver\": Unable to set ODBC version."
+		abort
+	endif
+	
 	do
 		if(i==0)
-			err = SQLDrivers(environRefNum,SQL_FETCH_FIRST,ddesc,256,attr,256)
+			error = SQLDrivers(envRefNum,SQL_FETCH_FIRST,ddesc,256,attr,256)
 		else
-			err = SQLDrivers(environRefNum,SQL_FETCH_NEXT,ddesc,256,attr,256)
+			error = SQLDrivers(envRefNum,SQL_FETCH_NEXT,ddesc,256,attr,256)
 		endif
-		if(err==0)
-			sprintf mess, "Driver: %s. Attr: %s", ddesc, attr
-			print mess
+		if(error == SQL_NO_DATA)
+			// no more drivers
+			break
+		elseif(error != SQL_SUCCESS)
+			print "[ERROR] \"sc_checkSQLDriver\": Unable to fetch drivers."
+			abort
+		else
+			// add the driver to the collection
+			drivers = addlistitem(ddesc,drivers,",")
 		endif
 		i+=1
-	while(err==0)
+	while(1)
+	
+	// if printToCommandLine=1 just print result and exit
+	if(printToCommandLine)
+		print "[INFO] \"sc_checkSQLDriver\": Avaliable drivers are:"
+		for(i=0;i<itemsinlist(drivers,",");i+=1)
+			print "\t"+stringfromlist(i,drivers,",")
+		endfor
+	else
+		variable/g sqldriver_available = 0
+		string/g sqldriver = ""
+		// check if right driver is installed
+		// looking for PostgreSQL ANSI(x64)
+		for(i=0;i<itemsinlist(drivers,",");i+=1)
+			if(cmpstr(stringfromlist(i,drivers,","),"PostgreSQL ANSI(x64)") == 0)
+				// we have the drivers we are looking for!
+				sqldriver_available = 1
+				sqldriver = stringfromlist(i,drivers,",")
+				break
+			endif
+		 endfor
+		 if(!sqldriver_available)
+		 	print "[WARNING] \"sc_checkSQLDriver\": Driver not found. SQL won't work!"
+		 endif
+	endif
+	
+	// free handle
+	SQLFreeHandle(SQL_HANDLE_ENV,envRefNum)
 end
 
 ////////////////////////
@@ -491,11 +553,54 @@ end
 ///////////////////////
 
 function sc_fetchSQLDataTest()
-	string constr = "" //add real constr
+	
+	svar sqldriver
+	string connParams = sc_readSQLConnectionParameters()
+	string connStr = ""
+	sprintf connStr, "DRIVER=%s;SERVER=%s;PORT=%s;DATABASE=%s;UID=%s;PWD=%s;CHARSET=UTF8;", sqldriver, stringbykey("server",connParams,":",","), stringbykey("port",connParams,":",","), stringbykey("database",connParams,":",","), stringbykey("uid",connParams,":",","), stringbykey("pwd",connParams,":",",") 
+	
 	//string sqlquery = "SELECT DISTINCT ON (ch_idx) ch_idx, time, t FROM qdot.lksh370.channel_data ORDER BY ch_idx, time DESC;"
-	string sqlquery = "SELECT t FROM qdot.lksh370.channel_data WHERE ch_idx=2 ORDER BY time DESC LIMIT 1;"
+	string sqlquery = "SELECT ch_idx, time, t FROM qdot.lksh370.channel_data WHERE ch_idx=1 ORDER BY time DESC LIMIT 1;"
 	//string sqlquery = "SELECT t, time FROM qdot.lksh370.channel_data WHERE ch_idx=2 AND time > TIMESTAMP '2020-01-13 00:00:00.00'"
 	//string sqlquery = "SELECT * FROM INFORMATION_SCHEMA.COLUMNS"
+	//string sqlquery = "SELECT ch_idx, time, t FROM (SELECT ch_idx, time, t, ROW_NUMBER() OVER (PARTITION BY ch_idx ORDER BY time DESC) rn FROM qdot.lksh370.channel_data) tmp WHERE rn = 1;"
 	//print sqlquery
-	SQLHighLevelOp/CSTR={constr,SQL_DRIVER_NOPROMPT}/o/e=1 sqlquery
+	SQLHighLevelOp/CSTR={connStr,SQL_DRIVER_NOPROMPT}/o/e=1 sqlquery
+end
+
+function timeSQLStatements()
+	// statement1 = 0.03s
+	// statement2 = 0.13s (full loop)
+	// statement3 = 0.16s (full loop)
+
+	string wavenames1 = "channels,timestamp,temperature"
+	string statement1 = "SELECT DISTINCT ON (ch_idx) ch_idx, time, t FROM qdot.lksh370.channel_data WHERE time > TIMESTAMP '2020-01-13 23:00:00.00' ORDER BY ch_idx, time DESC;"
+
+	variable starttime1 = stopmstimer(-2)
+	requestSQLData(statement1,wavenames=wavenames1)
+	variable totaltime1 = (stopmstimer(-2)-starttime1)*1e-6
+
+	string wavenames2 = "channels,timestamp,temperature"
+	string statement2 = ""
+	string ch = "1,2,4,5,6"
+
+	variable i=0
+	variable starttime2 = stopmstimer(-2)
+	for(i=0;i<itemsinlist(ch,",");i+=1)
+		sprintf statement2, "SELECT ch_idx, time, t FROM qdot.lksh370.channel_data WHERE ch_idx=%s ORDER BY time DESC LIMIT 1;", stringfromlist(i,ch,",")
+		requestSQLData(statement2,wavenames=wavenames2)
+	endfor
+	variable totaltime2 = (stopmstimer(-2)-starttime2)*1e-6
+	
+	string statement3=""
+	variable starttime3 = stopmstimer(-2)
+	for(i=0;i<itemsinlist(ch,",");i+=1)
+		sprintf statement3, "SELECT t FROM qdot.lksh370.channel_data WHERE ch_idx=%s AND time > TIMESTAMP '2020-01-13 23:00:00.00' ORDER BY time DESC LIMIT 1;", stringfromlist(i,ch,",")
+		requestSQLValue(statement3)
+	endfor
+	variable totaltime3 = (stopmstimer(-2)-starttime3)*1e-6
+	
+	string mess
+	sprintf mess, "Statement #1: %f s, statement #2: %f s, statement #3: %f s", totaltime1, totaltime2, totaltime3
+	print mess
 end
