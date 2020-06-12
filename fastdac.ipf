@@ -205,7 +205,7 @@ function/s getFDACStatus(instrID)
 	endfor
 	
 	buffer = addJSONkeyval(buffer, "visa_address", visa, addquotes=1)
-	
+	buffer = addJSONkeyval(buffer, "SamplingFreq", num2str(getFADCspeed(instrID)), addquotes=1)
 	// DAC values
 	for(i=0;i<str2num(stringbykey("numDACCh"+num2istr(dev),fdackeys,":",","));i+=1)
 		sprintf key, "DAC%d{%s}", i, fdacvalstr[i][3]
