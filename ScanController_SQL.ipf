@@ -6,7 +6,7 @@
 //// SQL User functions ////
 ///////////////////////////
 
-function requestSQLData(statement,[wavenames])
+function requestSQLData(statement,[wavenames, verbose])
 	// Returns data in waves. Each column in a seperate wave.
 	// wavenames must be a comma seperated string with wavenames
 	// for the data. If wavenames are not passed or number of waves doesn't match
@@ -15,6 +15,7 @@ function requestSQLData(statement,[wavenames])
 	// Data types supported: CHAR, REAL, TIMESTAMP, INTEGER
 	
 	string statement, wavenames
+	variable verbose
 	
 	if(paramisdefault(wavenames))
 		wavenames = ""
@@ -35,7 +36,7 @@ function requestSQLData(statement,[wavenames])
 	sc_openSQLConnection(s)
 	
 	// fetch data from datebase
-	sc_fetchSQLData(s,statement,wavenames)
+	sc_fetchSQLData(s,statement,wavenames, verbose=verbose)
 	
 	// close connection to database
 	sc_closeSQLConnection(s)
@@ -76,6 +77,17 @@ function/s requestSQLValue(statement,[key])
 	sc_closeSQLConnection(s)
 	
 	return result
+end
+
+
+function/s SQL_format_time(time_s)
+	// Converts time since 01/01/1904 in seconds to the format that SQL uses for its TIMESTAMP
+	variable time_s
+	
+	string time_str
+	sprintf time_str "'%s %s.00'", secs2Date(time_s, -2), secs2time(time_s, 3)
+											//'2020-01-13 23:00:00.00'  << This is the format
+	return time_str
 end
 
 ///////////////////////
@@ -242,9 +254,13 @@ function/s sc_fetchSQLSingle(s,statement,[key])
 	return result
 end
 
-function sc_fetchSQLData(s,statement,wavenames)
+function sc_fetchSQLData(s,statement,wavenames, [verbose])
 	struct sqlRefs &s
 	string statement, wavenames
+	variable verbose
+	variable/g sql_response_code = 0  // 0=success, 1=no_data, 2=other warning, -1=error
+	
+	verbose = paramisdefault(verbose) ? 1 : verbose
 	
 	// allocate statement handle
 	variable statRefNum = 0, error = 0
@@ -265,7 +281,7 @@ function sc_fetchSQLData(s,statement,wavenames)
 	else
 		for(i=0;i<itemsinlist(wavenames,",");i+=1)
 			if(checkname(stringfromlist(i,wavenames,","),1) == 0 || checkname(stringfromlist(i,wavenames,","),1) == 27)
-				// 0 means all good. 27 means another wave excists, we'll overwrite it!
+				// 0 means all good. 27 means another wave exists, we'll overwrite it!
 			else
 				sc_closeSQLConnection(s)
 				sprintf errMess, "[ERROR] \"sc_fetchSQLData\": Wave name %s used by string, variable or function.", stringfromlist(i,wavenames,",")
@@ -291,7 +307,10 @@ function sc_fetchSQLData(s,statement,wavenames)
 		print "[ERROR] \"sc_fetchSQLData\": Unable to fetch colunm count."
 		abort
 	elseif(itemsinlist(wavenames,",") != colCount && useGeneralWaves==0)	
-		print "[WARNING] \"sc_fetchSQLData\": Will dump data in generic waves with names based on database column names."
+		sql_response_code = 2
+		if (verbose)
+			print "[WARNING] \"sc_fetchSQLData\": Will dump data in generic waves with names based on database column names."
+		endif
 		useGeneralWaves = 1
 	endif
 	
@@ -319,7 +338,10 @@ function sc_fetchSQLData(s,statement,wavenames)
 		print "[ERROR] \"sc_fetchSQLData\": Unable to fetch row count."
 		abort
 	elseif(rowCount < 1)
-		print "[WARNING] \"sc_fetchSQLData\": No data to fetch. Try to adjust the SQL statement."
+		sql_response_code = 1
+		if (verbose)
+			print "[WARNING] \"sc_fetchSQLData\": No data to fetch. Try to adjust the SQL statement."
+		endif
 	endif
 	
 	// make waves to hold data
@@ -337,7 +359,10 @@ function sc_fetchSQLData(s,statement,wavenames)
 				abort
 			endtry
 		else
-			print "[WARNING] \"sc_fetchSQLData\": Data type not understood for data going in wave: "+stringfromlist(i,wavenames,",")
+			sql_response_code = 2
+			if (verbose)
+				print "[WARNING] \"sc_fetchSQLData\": Data type not understood for data going in wave: "+stringfromlist(i,wavenames,",")
+			endif
 		endif
 	endfor
 	
@@ -368,7 +393,10 @@ function sc_fetchSQLData(s,statement,wavenames)
 					print "[ERROR] \"sc_fetchSQLData\": Unable to fetch data."
 					abort
 				elseif(nullIndicator == SQL_NULL_DATA)
-					print "[WARNING] \"sc_fetchSQLData\": Fetched data is NULL."
+					sql_response_code = 2
+					if (verbose)
+						print "[WARNING] \"sc_fetchSQLData\": Fetched data is NULL."
+					endif
 					result = "nan"
 				else
 					sprintf result, "%s", dataStr
@@ -383,7 +411,10 @@ function sc_fetchSQLData(s,statement,wavenames)
 					print "[ERROR] \"sc_fetchSQLData\": Unable to fetch data."
 					abort
 				elseif(nullIndicator == SQL_NULL_DATA)
-					print "[WARNING] \"sc_fetchSQLData\": Fetched data is NULL."
+					sql_response_code = 2
+					if (verbose)
+						print "[WARNING] \"sc_fetchSQLData\": Fetched data is NULL."
+					endif
 					resultNum = nan
 				else
 					resultNum = data
