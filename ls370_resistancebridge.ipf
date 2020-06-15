@@ -6,13 +6,13 @@
 // Call SetSystem() before anything else. Current supported systems are: BFsmall, IGH
 // Communicates with server over http.
 // Procedure written by Christian Olsen 2018-03-xx
+// Modified to new API by Tim Child 2020-06-xx
 
 // Todo:
 // GetTempDB()
 // GetHeaterPowerDB()
 // GetPressureDB()
 // QueryDB()
-// Add support for BF #2
 
 ///////////////////////////
 /// LS37X specific COMM ///
@@ -114,10 +114,11 @@ function getLS370temp(instrID, plate, [max_age_s]) // Units: K
 	string plate
 	variable max_age_s
 	svar ls_system, bfchannellookup, ighchannellookup
-	variable channel_idx, channel
+	variable channel_idx
+	string channel
 	string command
 	svar ls_label
-
+	
 	if(paramisdefault(max_age_s))
 		max_age_s = 120
 	endif
@@ -148,7 +149,7 @@ function getLS370temp(instrID, plate, [max_age_s]) // Units: K
 				printf "The requested plate (%s) doesn't exsist!", plate
 				return 0.0
 			else
-				channel = str2num(stringfromlist(channel_idx+5,ighchannellookup,";"))
+				channel = stringfromlist(channel_idx+5,ighchannellookup,";")
 			endif
 			break	
 		default:
