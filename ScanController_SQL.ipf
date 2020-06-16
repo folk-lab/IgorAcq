@@ -85,7 +85,7 @@ function/s SQL_format_time(time_s)
 	variable time_s
 	
 	string time_str
-	sprintf time_str "'%s %s.00'", secs2Date(time_s, -2), secs2time(time_s, 3)
+	sprintf time_str "'%s %s'", secs2Date(time_s, -2), secs2time(time_s, 3, 2)
 											//'2020-01-13 23:00:00.00'  << This is the format
 	return time_str
 end

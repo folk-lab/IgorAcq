@@ -40,8 +40,8 @@ function openLS370connection(instrID, http_address, system, [verbose])
 	string options = ""
 
 	openHTTPinstr(comm, options=options, verbose=verbose)  // Sets svar (instrID) = url
-	setLS370system(system)  // Sets channel/heater/temp lookup strings/waves
-	LS370createGobals() //Only inits values if not already existing
+	setLS370system(system) // Sets channel/heater/temp lookup strings/waves
+	LS370createGobals() 	//Only inits values locally if not already existing. Nothing sent to LS
 end
 
 ////////////////////////////
@@ -207,7 +207,7 @@ end
 
 
 // get-data-loggers-schedule
-function/s getLS370dataLoggersSchedule(instrID)
+function/s getLS370loggersSchedule(instrID)
 	// See API docs. We don't use this, but putting it here to match API
 	string instrID
 	
@@ -216,7 +216,7 @@ function/s getLS370dataLoggersSchedule(instrID)
 	
 	
 	sprintf command, "get-data-loggers-schedule/%s", ls_label
-	result = sendLS370(instrID,command,"get",keys="") // Return the whole JSON response for now
+	result = sendLS370(instrID,command,"get", keys="") // Return the whole JSON response for now
 	return result
 end
 

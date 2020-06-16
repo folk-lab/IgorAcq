@@ -916,9 +916,13 @@ end
 //////////////////////////////////
 ///// Load BabyDACs from HDF /////
 //////////////////////////////////
+function bdSaveToHDF()
+
+end
+
 
 function bdLoadFromHDF(datnum, [no_check])
-	// Function to load babyDAC values and labels from a previously save HDF file in current data directory
+	// Function to load babyDAC values and labels from a previously save HDF file in sweeplogs in current data directory
 	// Requires Dac info to be saved in "DAC{label} : output" format
 	// with no_check = 0 (default) a window will be shown to user where values can be changed before committing to ramping, also can chose not to load from there
 	// setting no_check = 1 will ramp to loaded settings without user input
@@ -1001,6 +1005,7 @@ function bdLoadAskUserButton(action) : ButtonControl
 	strswitch(action)
 		case "do_nothing":
 			bd_load_answer = 1
+			dowindow/k bdLoadWindow
 			break
 		case "load_from_hdf":
 			bd_load_answer = -1
