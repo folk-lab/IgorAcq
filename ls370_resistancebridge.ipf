@@ -387,7 +387,7 @@ function setLS370exclusivereader(instrID,channel,[interval])
 end
 
 
-function GetLS370LoggingScheduleFromConfig(sched_name)
+function/s GetLS370LoggingScheduleFromConfig(sched_name)
 	string sched_name
 	// reads LoggingSchedules from LoggingSchedules.txt file on "config" path.
 	
@@ -396,11 +396,10 @@ function GetLS370LoggingScheduleFromConfig(sched_name)
 	findvalue/TEXT=sched_name JSON_getkeys(js_id, "")
 	if (V_value == -1)
 		string err_str
-		sprintf err_str "%s not found in top level keys of LoggingSchedules.txt, valid keys are ^^" sched_name
-		print JSON_getkeys(js_id, "")
+		sprintf err_str "%s not found in top level keys of LoggingSchedules.txt" sched_name
 		abort 	err_str
 	endif
-	return JSON_dump(get_json_from_json_path(json_id, sched_name))
+	return JSON_dump(get_json_from_json_path(js_id, sched_name))
 end
 
 end
