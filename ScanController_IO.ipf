@@ -7,10 +7,11 @@ pragma rtGlobals=1		// Use modern global access method.
 /// SAVING EXPERIMENT DATA ///
 //////////////////////////////
 
-function initSaveFiles([msg])
+function initSaveFiles([msg, logs_only])
 	//// create/open HDF5 files
-
 	string msg
+	variable logs_only  // 1=Don't save any data to HDF
+	
 	if(paramisdefault(msg)) // save meta data
 		msg=""
 	endif
@@ -24,16 +25,21 @@ function initSaveFiles([msg])
 	variable /g hdf5_id
 	HDF5CreateFile /P=data hdf5_id as h5name
 
-	// save x and y arrays
-	nvar sc_is2d
-	HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_xdata" , hdf5_id, "x_array"
-	if(sc_is2d == 1)
-		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_ydata" , hdf5_id, "y_array"
-	elseif(sc_is2d == 2)
-		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_ydata" , hdf5_id, "y_array"
-		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_linestart", hdf5_id, "linestart"
+	if (logs_only != 1)
+		// save x and y arrays
+		nvar sc_is2d
+		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_xdata" , hdf5_id, "x_array"
+		if(sc_is2d == 1)
+			HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_ydata" , hdf5_id, "y_array"
+		elseif(sc_is2d == 2)
+			HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_ydata" , hdf5_id, "y_array"
+			HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_linestart", hdf5_id, "linestart"
+		endif
+	else // Make attr in HDF which makes it clear this was only to store Logs
+		make/o/free/t/n=1 attr_message = "True"
+		HDF5SaveData /A="Logs_Only" attr_message, hdf5_id, "/"
 	endif
-
+	
 	// Create metadata
 	// this just creates one big JSON string attribute for the group
 	// its... fine
@@ -312,7 +318,7 @@ function/s getJSONkeyoffset(key,offset)
 	endfor
 	// if key is not found, return an empty string
 	print "[ERROR] JSON key not found: "+key
-	return ""
+	return t_tokentext[0] // Default to return everything
 end
 
 function /S getStrArrayShape(array)

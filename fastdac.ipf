@@ -328,7 +328,7 @@ function rampOutputFDAC(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 	
 	// check that output is within software limit
 	// overwrite output to software limit and warn user
-	string softLimitPositive = "", softLimitNegative = "", expr = "(-?[[:digit:]]+),([[:digit:]]+)"
+	string softLimitPositive = "", softLimitNegative = "", expr = "(-?[[:digit:]]+),\s*([[:digit:]]+)"
 	splitstring/e=(expr) fdacvalstr[channel][2], softLimitNegative, softLimitPositive
 	if(output < str2num(softLimitNegative) || output > str2num(softLimitPositive))
 		switch(sign(output))
@@ -344,13 +344,13 @@ function rampOutputFDAC(instrID,channel,output,[ramprate]) // Units: mV, mV/s
 				break
 		endswitch
 		string warn
-		sprintf warn, "[WARNING] \"rampOutputfdac\": Output voltage must be within limit. Setting channel %d to %.3fmV", channel, output
+		sprintf warn, "[WARNING] \"rampOutputfdac\": Output voltage must be within limit. Setting channel %d to %.3fmV\n", channel, output
 		print warn
 	endif
 	
 	// Check that ramprate is within software limit, otherwise use software limit
 	if (ramprate > str2num(fdacvalstr[channel][4]))
-		printf "[WARNING] \"rampOutputfdac\": Ramprate of %.0fmV/s requested for channel %d. Using max_ramprate of %.0fmV/s instead" ramprate, channel, str2num(fdacvalstr[channel][4])
+		printf "[WARNING] \"rampOutputfdac\": Ramprate of %.0fmV/s requested for channel %d. Using max_ramprate of %.0fmV/s instead\n" ramprate, channel, str2num(fdacvalstr[channel][4])
 		ramprate = str2num(fdacvalstr[channel][4])
 	endif
 		
@@ -848,12 +848,12 @@ end
 //// Spectrum Analyzer ////
 //////////////////////////
 
-function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear])
+function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,nosave])
 	// channels must a comma seperated string, refering
 	// to the numbering in the ScanControllerFastDAC window.
 	// scanlength is in sec
 	// if linear is set to 1, the spectrum will be plotted on a linear scale
-	variable instrID, scanlength, numAverage, linear
+	variable instrID, scanlength, numAverage, linear, nosave
 	string channels
 	
 	if(paramisdefault(linear) || linear != 1)
@@ -872,7 +872,8 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear])
 	
 	// calculate number of points needed
 	variable samplingFreq = getfadcSpeed(instrID)
-	variable numpts = RoundNum(scanlength*samplingFreq/numChannels,0)
+	variable measureFreq = samplingFreq/(numChannels)  // sampling split between channels
+	variable numpts = RoundNum(scanlength*measureFreq,0)
 	
 	// make sure numpts is even
 	// otherwise FFT will fail
@@ -909,6 +910,13 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear])
 		setscale/i x, 0, scanlength, $wn
 	endfor
 	
+	// create waves for final fft output
+	for(i=0;i<numChannels;i+=1)
+		wn = "fftADC"+stringfromlist(i,channels,",")
+		make/o/n=(numpts/2) $wn = nan
+		setscale/i x, 0, measureFreq/(2.0), $wn
+	endfor
+	
 	// find all open plots
 	string graphlist = winlist("*",",","WIN:1"), graphname = "", graphtitle="", graphnumlist=""
 	string plottitle="", graphnum=""			
@@ -924,8 +932,11 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear])
 	// open plots and distribute on screen
 	variable graphopen=0
 	string openplots=""
+	string num
 	for(i=0;i<itemsinlist(channels,",");i+=1)
-		wn = "timeSeriesADC"+stringfromlist(i,channels,",")
+		num = stringfromlist(i,channels,",")
+		wn = "timeSeriesADC"+num
+		graphopen=0
 		for(j=0;j<itemsinlist(graphtitle,",");j+=1)
 			if(stringmatch(wn,stringfromlist(j,graphtitle,",")))
 				graphopen = 1
@@ -939,19 +950,47 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear])
 			label bottom, "time [s]"
 			openplots+= winname(0,1)+","
 		endif
+		
+		wn = "fftADC"+num
+		graphopen=0
+		for(j=0;j<itemsinlist(graphtitle,",");j+=1)
+			if(stringmatch(wn,stringfromlist(j,graphtitle,",")))
+				graphopen = 1
+				openplots+= stringfromlist(j,graphnumlist,",")+","
+				label /w=$stringfromlist(j,graphnumlist,",") bottom,  "frequency [Hz]"
+				if(linear)
+					label/w=$stringfromlist(j,graphnumlist,",") left, "Spectrum [V/sqrt(Hz)]"
+				else
+					label/w=$stringfromlist(j,graphnumlist,",") left, "Spectrum [dBV/sqrt(Hz)]"
+				endif
+			endif
+		endfor
+		if(!graphopen)
+			display $wn
+			setwindow kwTopWin, graphicsTech=0
+			label bottom, "frequency [Hz]"
+			if(linear)
+				label left, "Spectrum [V/sqrt(Hz)]"
+			else
+				label left, "Spectrum [dBV/sqrt(Hz)]"
+			endif
+			openplots+= winname(0,1)+","
+		endif
 	endfor
-	
+
 	// tile windows
-	string cmd1 = "TileWindows/O=1/A=(4,1) "+openplots
+	string cmd1, cmd2, window_string
+	sprintf cmd1, "TileWindows/O=1/A=(%d,1) ", numChannels*2 
+	cmd2 = ""
+	// Tile graphs
+	for(i=0;i<itemsinlist(openplots, ",");i=i+1)
+		window_string = stringfromlist(i,openplots, ",")
+		cmd1+= window_string +","
+		cmd2 = "DoWindow/F " + window_string
+		execute(cmd2)
+	endfor
 	execute(cmd1)
 
-	// create waves for final fft output
-	string fftnames = ""
-	for(i=0;i<numChannels;i+=1)
-		fftnames = "fftADC"+stringfromlist(i,channels,",")
-		make/o/n=(numpts/2) $fftnames = nan
-	endfor
-	
 	for(i=0;i<numAverage;i+=1)
 		// set up and execute command
 		// SPEC_ANA,adcCh,numpts
@@ -1004,7 +1043,8 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear])
 		endif
 		
 		// convert time series to spectrum
-		variable bandwidth = samplingFreq
+		variable bandwidth = measureFreq/2.0
+		string fftnames = ""
 		string ffttemps = ""
 		for(j=0;j<numChannels;j+=1)
 			ffttemps = "ffttempADC"+stringfromlist(j,channels,",")
@@ -1014,7 +1054,7 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear])
 			fftinput = fftinput*1.0e-3
 			fft/out=3/dest=$ffttemps fftinput
 			wave fftwn = $ffttemps
-			setscale/i x, 0, bandwidth/(2.0*numChannels), fftwn
+			setscale/i x, 0, bandwidth, fftwn
 			if(linear)
 				fftwn = fftwn/sqrt(bandwidth)
 			else
@@ -1025,36 +1065,36 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear])
 			if(i==0)
 				fftwave = fftwn
 			else
-				fftwave = fftwave + fftwn
-				fftwave = fftwave/2.0
+				fftwave = fftwave*i + fftwn  // So weighting of rows is correct when averaging
+				fftwave = fftwave/(i+1)      // ""
 			endif
 		endfor
 	endfor	
 	
-	// close the time series plots
-	for(j=0;j<numChannels;j+=1)
-		killwindow/z $stringfromlist(j,openplots,",")
-	endfor
-	openplots = ""
+//	// close the time series plots
+//	for(j=0;j<numChannels;j+=1)
+//		killwindow/z $stringfromlist(j,openplots,",")
+//	endfor
+//	openplots = ""
 		
 	// display fft plots
-	for(i=0;i<numChannels;i+=1)
-		fftnames = "fftADC"+stringfromlist(i,channels,",")
-		wave fftwave = $fftnames
-		setscale/i x, 0, bandwidth/(2.0*numChannels), fftwave
-		display fftwave
-		label bottom, "frequency [Hz]"
-		if(linear)
-			label left, "Spectrum [V/sqrt(Hz)]"
-		else
-			label left, "Spectrum [dBV/sqrt(Hz)]"
-		endif
-		openplots+= winname(0,1)+","
-	endfor
+//	for(i=0;i<numChannels;i+=1)
+//		fftnames = "fftADC"+stringfromlist(i,channels,",")
+//		wave fftwave = $fftnames
+//		setscale/i x, 0, bandwidth, fftwave
+//		display fftwave
+//		label bottom, "frequency [Hz]"
+//		if(linear)
+//			label left, "Spectrum [V/sqrt(Hz)]"
+//		else
+//			label left, "Spectrum [dBV/sqrt(Hz)]"
+//		endif
+//		openplots+= winname(0,1)+","
+//	endfor
 	
 	// tile windows
-	cmd1 = "TileWindows/O=1/A=(3,4) "+openplots
-	execute(cmd1)
+//	cmd1 = "TileWindows/O=1/A=(3,4) "+openplots
+//	execute(cmd1)
 	
 	// try to scale y axis in plot is linear scale
 	if(linear)
@@ -1075,26 +1115,28 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear])
 		endfor
 	endif
 	
-	// save data to "data/spectrum/"
-	string filename = "spectrum_"+num2istr(unixtime())+".h5"
-	variable hdf5_id=0
-	// create empty HDF5 container
-	HDF5CreateFile/p=spectrum hdf5_id as filename
-	// save the spectrum
-	for(i=0;i<numChannels;i+=1)
-		fftnames = "fftADC"+stringfromlist(i,channels,",")
-		HDF5SaveData/IGOR=-1/WRIT=1/Z $fftnames , hdf5_id
-		if (V_flag != 0)
-			print "HDF5SaveData failed: ", wn
-			return 0
+	if (nosave == 0)
+		// save data to "data/spectrum/"
+		string filename = "spectrum_"+strTime()+".h5"
+		variable hdf5_id=0
+		// create empty HDF5 container
+		HDF5CreateFile/p=spectrum hdf5_id as filename
+		// save the spectrum
+		for(i=0;i<numChannels;i+=1)
+			fftnames = "fftADC"+stringfromlist(i,channels,",")
+			HDF5SaveData/IGOR=-1/WRIT=1/Z $fftnames , hdf5_id
+			if (V_flag != 0)
+				print "HDF5SaveData failed: ", wn
+				return 0
+			endif
+		endfor
+		// close HDF5 container
+		HDF5CloseFile/Z hdf5_id
+		if (v_flag != 0)
+			print "HDF5CloseFile failed: ", filename
+		else
+			print "saving all spectra to file: "+filename
 		endif
-	endfor
-	// close HDF5 container
-	HDF5CloseFile/Z hdf5_id
-	if (v_flag != 0)
-		print "HDF5CloseFile failed: ", filename
-	else
-		print "saving all spectra to file: "+filename
 	endif
 end
 
@@ -1119,3 +1161,164 @@ function specAna_distribute_data(buffer,bytes,channels,colNumStart)
 		endfor
 	endfor
 end
+
+
+
+//////////////////////////////////
+///// Load FastDACs from HDF /////
+//////////////////////////////////
+
+function fdLoadFromHDF(datnum, [no_check])
+	// Function to load fastDAC values and labels from a previously save HDF file in sweeplogs in current data directory
+	// Requires Dac info to be saved in "DAC{label} : output" format
+	// with no_check = 0 (default) a window will be shown to user where values can be changed before committing to ramping, also can chose not to load from there
+	// setting no_check = 1 will ramp to loaded settings without user input
+	// Fastdac_num is which fastdacboard to load. 3/2020 - Not tested
+	variable datnum, no_check
+	variable response
+	
+	svar fdackeys
+	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
+	if (numDevices !=1)
+		print "WARNING[fdLoadFromHDF]: Only tested to load 1 Fastdac, only first FastDAC will be loaded without code changes"
+	endif	
+	get_fastdacs_from_hdf(datnum, fastdac_num=1) // Creates/Overwrites load_fdacvalstr
+	
+	if (no_check == 0)  //Whether to show ask user dialog or not
+		response = fdLoadAskUser()
+	else
+		response = -1 
+	endif 
+	if(response == 1)
+		// Do_nothing
+		print "Keep current FastDAC state chosen, no changes made"
+	elseif(response == -1)
+		// Load from HDF
+		printf "Loading FastDAC values and labels from dat%d\r", datnum
+		wave/t load_fdacvalstr
+		duplicate/o/t load_fdacvalstr, fdacvalstr //Overwrite dacvalstr with loaded values
+
+		// Ramp to new values
+		update_all_fdac()
+	else
+		print "[WARNING] Bad user input -- FastDAC will remain in current state"
+	endif
+end
+
+
+function get_fastdacs_from_hdf(datnum, [fastdac_num])
+	//Creates/Overwrites load_fdacvalstr by duplicating the current fdacvalstr then changing the labels and outputs of any values found in the metadata of HDF at dat[datnum].h5
+	//Leaves fdacvalstr unaltered	
+	variable datnum, fastdac_num
+	variable sl_id, fd_id  //JSON ids
+	
+	fastdac_num = paramisdefault(fastdac_num) ? 1 : fastdac_num 
+	
+	if(fastdac_num != 1)
+		abort "WARNING: This is untested... remove this abort if you're feeling lucky!"
+	endif
+	
+	sl_id = get_sweeplogs(datnum)  // Get Sweep_logs JSON
+	fd_id = get_json_from_json_path(sl_id, "FastDAC "+num2istr(fastdac_num)) // Get FastDAC JSON from Sweeplogs
+
+	wave/t keys = JSON_getkeys(fd_id, "")
+	wave/t fdacvalstr
+	duplicate/o/t fdacvalstr, load_fdacvalstr
+	
+	variable i
+	string key, label_name, str_ch
+	variable ch = 0
+	for (i=0; i<numpnts(keys); i++)  // These are in a random order. Keys must be stored as "DAC#{label}:output" in JSON
+		key = keys[i]
+		if (strsearch(key, "DAC", 0) != -1)  // Check it is actually a DAC key and not something like com_port
+			SplitString/E="DAC(\d*){" key, str_ch //Gets DAC# so that I store values in correct places
+			ch = str2num(str_ch)
+			
+			load_fdacvalstr[ch][1] = num2str(JSON_getvariable(fd_id, key))
+			SplitString/E="{(.*)}" key, label_name  //Looks for label inside {} part of e.g. BD{label}
+			load_fdacvalstr[ch][3] = label_name
+		endif
+	endfor
+	JSONXOP_Release /A  //Clear all stored JSON strings
+end
+
+
+function fdLoadAskUser()
+	variable/g fd_load_answer
+	wave/t load_fdacvalstr
+	wave/t fdacvalstr
+	wave fdacattr
+	if (waveexists(load_fdacvalstr) && waveexists(fdacvalstr) && waveexists(fdacattr))	
+		execute("fdLoadWindow()")
+		PauseForUser fdLoadWindow
+		return fd_load_answer
+	else
+		abort "ERROR[bdLoadAskUser]: either load_fdacvalstr, fdacvalstr, or fdacattr doesn't exist when it should!"
+	endif
+end
+
+function fdLoadAskUserButton(action) : ButtonControl
+	string action
+	variable/g fd_load_answer
+	strswitch(action)
+		case "do_nothing":
+			fd_load_answer = 1
+			dowindow/k fdLoadWindow
+			break
+		case "load_from_hdf":
+			fd_load_answer = -1
+			dowindow/k fdLoadWindow
+			break
+	endswitch
+end
+
+
+Window fdLoadWindow() : Panel
+	PauseUpdate; Silent 1 // building window
+	NewPanel /W=(0,0,740,390) // window size
+	ModifyPanel frameStyle=2
+	SetDrawLayer UserBack
+	
+	variable tcoord = 80
+	
+	SetDrawEnv fsize= 25,fstyle= 1
+	DrawText 90, 35,"FastDAC Load From HDF" // Headline
+	
+	SetDrawEnv fsize= 20,fstyle= 1
+	DrawText 70, 65,"Current Setup" 
+	
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 15, tcoord, "Ch"
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 50, tcoord, "Output"
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 120, tcoord, "Limit"
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 220, tcoord, "Label"
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 287, tcoord, "Ramprate"
+	ListBox fdaclist,pos={10,tcoord+5},size={360,270},fsize=14,frame=2,widths={30,70,100,65}
+	ListBox fdaclist,listwave=root:fdacvalstr,selwave=root:fdacattr,mode=1
+	
+	variable x_offset = 360
+	SetDrawEnv fsize= 20,fstyle= 1
+	DrawText 70+x_offset, 65,"Load from HDF Setup" 
+
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 15+x_offset, tcoord, "Ch"
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 50+x_offset, tcoord, "Output"
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 120+x_offset, tcoord, "Limit"
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 220+x_offset, tcoord, "Label"
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 287+x_offset, tcoord, "Ramprate"
+	ListBox load_fdaclist,pos={10+x_offset,tcoord+5},size={360,270},fsize=14,frame=2,widths={30,70,100,65}
+	ListBox load_fdaclist,listwave=root:load_fdacvalstr,selwave=root:fdacattr,mode=1
+	
+
+
+	Button do_nothing,pos={80,tcoord+280},size={120,20},proc=fdLoadAskUserButton,title="Keep Current Setup"
+	Button load_from_hdf,pos={80+x_offset,tcoord+280},size={100,20},proc=fdLoadAskUserButton,title="Load From HDF"
+EndMacro

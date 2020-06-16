@@ -25,6 +25,16 @@
 ////// utility functions //////
 ///////////////////////////////
 
+function/s strTime()
+	// Returns the current time in YYYY-MM-DD;HH-MM-SS format
+	string datetime_str
+	string time_str
+	time_str = secs2time(datetime, 3)
+	sprintf time_str "%s-%s-%s", time_str[0,1], time_str[3,4], time_str[6,7]
+	sprintf datetime_str "%s;%s" secs2Date(datetime, -2), time_str
+	return datetime_str
+end
+
 function unixTime()
 	// returns the current unix time in seconds
 	return DateTime - date2secs(1970,1,1) - date2secs(-1,-1,-1)
