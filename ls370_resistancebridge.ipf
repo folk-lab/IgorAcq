@@ -387,6 +387,25 @@ function setLS370exclusivereader(instrID,channel,[interval])
 end
 
 
+function GetLS370LoggingScheduleFromConfig(sched_name)
+	string sched_name
+	// reads LoggingSchedules from LoggingSchedules.txt file on "config" path.
+	
+	variable js_id
+	js_id = JSON_parse(readtxtfile("LoggingSchedules.txt","config"))
+	findvalue/TEXT=sched_name JSON_getkeys(js_id, "")
+	if (V_value == -1)
+		string err_str
+		sprintf err_str "%s not found in top level keys of LoggingSchedules.txt, valid keys are ^^" sched_name
+		print JSON_getkeys(js_id, "")
+		abort 	err_str
+	endif
+	return JSON_dump(get_json_from_json_path(json_id, sched_name))
+end
+
+end
+
+
 function setLS370loggersSchedule(instrID, schedule)
 	string instrID, schedule
 	svar ls_label
@@ -395,53 +414,19 @@ function setLS370loggersSchedule(instrID, schedule)
 	abort "Not finished for new API"  
 	strswitch (schedule)
 		case "default":
-			// TODO: put default here
+			payload = GetLS370LoggingScheduleFromConfig("default")
 			break
 		case "mc_exclusive":
-		// TODO: How can I store this nicely in IGOR? Then need to make an easy way to start from empty and fill only whichever exclusive. What is 
-//			{
-//			  "ok": true,
-//			  "error": null,
-//			  "data": {
-//			    "heater": {
-//			      "min": 30,
-//			      "max": 60
-//			    },
-//			    "analog_outputs": {
-//			      "ao1": {
-//			        "min": 10,
-//			        "max": 60
-//			      },
-//			      "ao2": {
-//			        "min": 20,
-//			        "max": 50
-//			      }
-//			    },
-//			    "channels": {
-//			      "ch1": {
-//			        "min": 120,
-//			        "max": 180
-//			      },
-//			      "ch2": {
-//			        "min": 30,
-//			        "max": 120
-//			      },
-//			      "ch3": {
-//			        "min": 200,
-//			        "max": 400
-//			      }
-//			    }
-//			  },
-//			  "processing_time_s": 0
-//			}
+			payload = GetLS370LoggingScheduleFromConfig("mc_exclusive")
 			break
+		// Add other cases here (also add config to LoggingSchedules.txt in config folder)
 		default:
 			abort "Not a valid option"
 	endswitch 
-	
+	//TODO: Test this
+	abort "Not tested this yet, don't screw up logging schedule accidentally!"
 	sprintf command, "set-data-loggers-schedule/%s", ls_label
 	sendLS370(instrID,command,"put", payload=payload)
-
 end
 
 
@@ -449,6 +434,8 @@ function resetLS370exclusivereader(instrID)
 	string instrID
 	string command, payload
 	svar ls_label
+	abort "Not tested this yet"
+	// TODO: Test this
 	setLS370loggersSchedule(instrID, "default")
 end
 
