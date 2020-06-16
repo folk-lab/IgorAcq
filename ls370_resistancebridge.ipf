@@ -41,7 +41,7 @@ function openLS370connection(instrID, http_address, system, [verbose])
 
 	openHTTPinstr(comm, options=options, verbose=verbose)  // Sets svar (instrID) = url
 	setLS370system(system)  // Sets channel/heater/temp lookup strings/waves
-	createLS370Gobals() //Only inits values if not already existing
+	LS370createGobals() //Only inits values if not already existing
 end
 
 ////////////////////////////
@@ -78,6 +78,67 @@ end
 //// Get Functions ////
 //////////////////////
 
+// get-analog-data
+function getLS370analogData(instrID, [channel])
+	// Returns power_milliw from analog channel
+	// Channel = 'still'
+	string instrID, channel
+	
+	string api_channel, command, result
+	variable channel_idx
+	svar ls_label	
+	svar bfheaterlookup
+	
+	if (paramisdefault(channel))
+		channel = "still"
+	endif 
+
+	channel_idx = whichlistitem(channel,bfheaterlookup,";")
+	if(channel_idx < 0)
+		printf "The requested channel (%s) doesn't exsist!", channel
+		return 0.0
+	elseif (channel_idx >= 2) // Already given api_name
+		api_channel = channel
+	else
+		api_channel = stringfromlist(channel_idx+2,bfheaterlookup,";")
+	endif
+	
+	sprintf command, "get-analog-data/%s?ctrl_label=%s", api_channel, ls_label
+	result = sendLS370(instrID,command,"get",keys="data:record:power_milliw") 
+	return str2num(result)
+end
+
+// get-analog-parameters
+function/s getLS370analogParameters(instrID, [channel])
+	// Returns all params of analog heater (Don't think we use this info but it is in API)
+	// Channel = 'still' or API_channel label
+	string instrID, channel
+	
+	string api_channel, command, result
+	variable channel_idx
+	svar ls_label	
+	svar bfheaterlookup
+	
+	if (paramisdefault(channel))
+		channel = "still"
+	endif 
+	
+	channel_idx = whichlistitem(channel,bfheaterlookup,";")
+	if(channel_idx < 0)
+		printf "The requested channel (%s) doesn't exsist!", channel
+		return ""
+	elseif (channel_idx >= 2) // Already given api_name
+		api_channel = channel
+	else
+		api_channel = stringfromlist(channel_idx+2,bfheaterlookup,";")
+	endif
+	
+	sprintf command, "get-analog-parameters/%s?ctrl_label=%s", api_channel, ls_label
+	result = sendLS370(instrID,command,"get",keys="") // Return the whole JSON response for now
+	return result
+end
+
+// get-channel-data
 function getLS370temp(instrID, plate, [max_age_s]) // Units: K
 	// returns the temperature of the selected "plate".
 	// avaliable plates on BF systems: mc (mixing chamber), still, magnet, 4K, 50K
@@ -113,15 +174,54 @@ function getLS370temp(instrID, plate, [max_age_s]) // Units: K
 	endswitch
 	
 	string result
-	
-	// TODO: Try get from SQL first, and if recent enough then don't ask from Lakeshore!
-	
-	sprintf command, "get-channel-data/%d?ctrl_label=%s", channel, ls_label
-	result = sendLS370(instrID,command,"get",keys="data:record:temperature_k") 
-	return str2num(result)
+	variable temp
+	// TODO: test this (Christian needs to write it first...)
+	temp = getLS370tempDB(instrID, plate, max_age=max_age_s)
+	if (temp > 0)
+		return temp
+	else		
+		sprintf command, "get-channel-data/%d?ctrl_label=%s", channel, ls_label
+		result = sendLS370(instrID,command,"get",keys="data:record:temperature_k") 
+		return str2num(result)
+	endif
 end
 
 
+// get-controller-info/{ctrl_label}
+// get-controller-info
+function/s getLS370controllerInfo(instrID, [all])
+	// See API docs. We don't use this, but putting it here to match API
+	string instrID
+	variable all
+	svar ls_label
+	
+	string command, result
+	if (all == 0)
+		sprintf command, "get-controller-info/%s", ls_label
+	else
+		sprintf command, "get-controller-info"
+	endif
+	result = sendLS370(instrID,command,"get",keys="") // Return the whole JSON response for now
+	return result
+end
+
+
+// get-data-loggers-schedule
+function/s getLS370dataLoggersSchedule(instrID)
+	// See API docs. We don't use this, but putting it here to match API
+	string instrID
+	
+	svar ls_label
+	string command, result
+	
+	
+	sprintf command, "get-data-loggers-schedule/%s", ls_label
+	result = sendLS370(instrID,command,"get",keys="") // Return the whole JSON response for now
+	return result
+end
+
+
+// get-heater-data
 function getLS370heaterpower(instrID,heater, [max_age_s]) // Units: mW
 	// returns the power of the selected heater.
 	// avaliable heaters on BF systems: still (analog 2), mc
@@ -159,15 +259,64 @@ function getLS370heaterpower(instrID,heater, [max_age_s]) // Units: mW
 	endswitch
 
 	if(cmpstr(channel, "") != 0)
-		sprintf command, "get-analog-data/%s?ctrl_label=%s", channel, ls_label
+		return getLS370AnalogData(instrID, channel=channel) // Get Still heat using getAnalogData
 	else
 		sprintf command, "get-heater-data?ctrl_label=%s", ls_label
+		return str2num(sendLS370(instrID,command,"get", keys="power_mw")) 
 	endif
-	
-	return str2num(sendLS370(instrID,command,"get", keys="power_mw"))  // TODO: check this works for both MCheater and Still (analog) heater
 end
 
 
+// get-heater-range-amps
+function getLS370heaterrange(instrID) //mA
+	// Gets the max_current setting of MC heater (not the heater power mode which would be 0-8)
+	string instrID
+	variable range
+	string command,payload,response
+	svar ls_label
+
+	sprintf command, "get-heater-range-amps/%s", ls_label
+
+	response = sendLS370(instrID,command,"get", keys="data")
+	return str2num(response)
+end
+
+
+// get-temperature-control-mode
+function getLS370controlmode(instrID, [verbose]) // Units: No units
+	// returns the temperature control mode.
+	// 1: PID, 3: Open loop, 4: Off
+	string instrID
+	variable verbose
+	nvar pid_mode, pid_led, mcheater_led
+	string payload, command,response
+	svar ls_label
+
+	sprintf command, "get-temperature-control-mode?%s", ls_label
+
+	response = sendLS370(instrID,command,"get", keys="data", payload=payload)
+	pid_mode = LS370_mode_str_to_mode(response)
+	if (verbose)
+		print "Control mode is ", response
+	endif
+	return pid_mode
+end
+
+
+// get-temperature-control-parameters
+function/s getLS370controlParameters(instrID)
+	// See API docs. We don't use this, but putting it here to match API
+	string instrID
+	svar ls_label
+	
+	string command, result
+	sprintf command, "get-temperature-control-parameters/%s", ls_label
+	result = sendLS370(instrID,command,"get",keys="data") // Return the whole JSON response for now
+	return result
+end
+
+
+// get-temperature-control-setpoint
 function getLS370PIDtemp(instrID) // Units: mK
 	// returns the setpoint of the PID loop.
 	// the setpoint is set regardless of the actual state of the PID loop
@@ -187,20 +336,7 @@ function getLS370PIDtemp(instrID) // Units: mK
 end
 
 
-function/s getLS370heaterrange(instrID) // Units: AU
-	// range must be a number between 0 and 8
-	string instrID
-	variable range
-	string command,payload,response
-	svar ls_label
-
-	sprintf command, "get-heater-range-amps/%s", ls_label
-
-	response = sendLS370(instrID,command,"get", keys="data")
-	return response
-end
-
-
+// get-temperature-pid
 function/s getLS370PIDparameters(instrID) // Units: No units
 	// returns the PID parameters used.
 	// the retruned values are comma seperated values.
@@ -221,25 +357,6 @@ function/s getLS370PIDparameters(instrID) // Units: No units
 	return pid
 end
 
-
-function getLS370controlmode(instrID, [verbose]) // Units: No units
-	// returns the temperature control mode.
-	// 1: PID, 3: Open loop, 4: Off
-	string instrID
-	variable verbose
-	nvar pid_mode, pid_led, mcheater_led
-	string payload, command,response
-	svar ls_label
-
-	sprintf command, "get-temperature-control-mode?%s", ls_label
-
-	response = sendLS370(instrID,command,"get", keys="data", payload=payload)
-	pid_mode = mode_str_to_mode(response)
-	if (verbose)
-		print "Control mode is ", response
-	endif
-	return pid_mode
-end
 
 
 //// Get Functions - Directly from data base ////
@@ -319,93 +436,54 @@ end
 //// Set Functions ////
 //////////////////////
 
-function setLS370tempcontrolmode(instrID, mode) // Units: No units
-	// sets the temperature control mode
-	// avaliable options are: off (4), PID (1), Temp_zone (2), Open loop (3)
-	string instrID
-	variable mode
-
-	nvar pid_mode
-	svar ls_label
-	string command
-	
-	sprintf command, "set-temperature-control-parameters/%s/%s", ls_label
-	sendLS370(instrID,command,"put")
-
-	pid_mode = mode	
-end
-
-
-function setLS370PIDcontrol(instrID,channel,setpoint,maxcurrent) //Units: mK, mA
-	string instrID
-	variable channel, setpoint, maxcurrent
-	string payload, command
-	svar ls_label
-	nvar temp_set
-	
-
-	// check for NAN and INF
-	if(sc_check_naninf(setpoint) != 0)
-		abort "trying to set setpoint to NaN or Inf"
-	endif
-
-	// set-temperature-control-parameters  
-	// TODO: This does not need to be called every time, should it be moved to seperate function?
-	sprintf payload, "{\"channel_label\": %d, \"delay\": %d, \"use_filtered_values\":\"%s\", \"max_heater_level\": %d,  \"setpoint_units\":\"%s\", \"heater_output_display_type\":\"%s\"}", 	\
-												channel, 				1, 									"true", 							8, 			 					"kelvin", 									"current"
-	sprintf command, "set-temperature-control-parameters/%s", ls_label
-	sendLS370(instrID,command,"put",payload=payload)
-	
-	// set-heater-range-amps //TODO: Check if this is how we can we set a max_current for the heating with new API?
-	print "WARNING: NO MAX CURRENT SET" 
-//	sprintf command, "set-heater-range-amps/%s/%f", ls_label, maxcurrent/1000
-//	sendLS370(instrID,command,"put")
-		
-	// set-temperature-control-setpoint
-	sprintf command, "set-temperature-control-setpoint/%s/%f", ls_label, setpoint/1000
-	sendLS370(instrID,command,"put")
-		
-	temp_set = setpoint
-end
-
-
-function setLS370exclusivereader(instrID,channel,[interval])
-	// BF small channels: [ld_mc_heater, ld_still_heater, ld_50k, ld_4k, ld_magnet, ld_still, ld_mc]
-	// interval units: s
+//set-analog-output-parameters
+function setLS370analogOutputParameters(instrID, [channel])
 	string instrID, channel
-	variable interval
-	string command, payload
-	svar ls_label
-
-	abort "Not updated to new API"  // TODO: How to make this work with setLS370LoggersSchedule??
-
-	if(paramisdefault(interval))
-		interval=5
+	
+	string api_channel, command, payload
+	variable channel_idx
+	svar ls_label	
+	svar bfheaterlookup
+	
+	if (paramisdefault(channel))
+		channel = "still"
+	endif 
+	
+	channel_idx = whichlistitem(channel,bfheaterlookup,";")
+	if(channel_idx < 0)
+		printf "The requested channel (%s) doesn't exsist!", channel
+		return 0.0
+	elseif (channel_idx >= 2) // Already given api_name
+		api_channel = channel
+	else
+		api_channel = stringfromlist(channel_idx+2,bfheaterlookup,";")
 	endif
 	
-
-end
-
-
-function/s GetLS370LoggingScheduleFromConfig(sched_name)
-	string sched_name
-	// reads LoggingSchedules from LoggingSchedules.txt file on "config" path.
+	// TODO: What is useful to change here, do we have a default fixed state we want for analog outputs?
+	abort "[setLS370AnalogOutputParameters]:If you really want to use this function, you need to figure out what parameters you want to be able to set below!"
+	variable high_value = 0, low_value = 0, manual_value = 0
+	string mode = "aom_undefined"  // aom_undefined, aom_off, aom_channel, aom_manual, aom_zone, aom_still
+	variable monitored_channel = 0
+	string polarity = "pol_undefined"  // pol_undefined, pol_unipolar, pol_bipolar
+	string source = "aos_undefined"  // aos_undefined, aos_kelvin, aos_ohm, aos_linear_data
 	
-	variable js_id
-	js_id = JSON_parse(readtxtfile("LoggingSchedules.txt","config"))
-	findvalue/TEXT=sched_name JSON_getkeys(js_id, "")
-	if (V_value == -1)
-		string err_str
-		sprintf err_str "%s not found in top level keys of LoggingSchedules.txt" sched_name
-		abort 	err_str
-	endif
-	return JSON_dump(get_json_from_json_path(js_id, sched_name))
-end
+	sprintf payload, "{\"high_value\": %f,\n  \"low_value\": %f,\n  \"manual_value\": %f,\n  \"mode\": \"%s\",\n  \"monitored_channel\": %d,\n  \"polarity\": \"%s\",\n  \"source\": \"%s\"}",\
+							high_value, low_value, manual_value, mode, monitored_channel, polarity, source
 
+
+	sprintf command, "set-analog-parameters/%s/%s",  ls_label, api_channel
+	sendLS370(instrID,command,"put",payload=payload)
 end
 
 
+//set-analog-output-power
+// SEE setLS370heaterpower()
+
+
+
+// set-data-loggers-schedule
 function setLS370loggersSchedule(instrID, schedule)
+	// Sets the schedule of reading temperatures and heating powers from the Lakeshore. See LoggingSchedule.txt in Data:config folder
 	string instrID, schedule
 	svar ls_label
 	string command, payload
@@ -413,10 +491,10 @@ function setLS370loggersSchedule(instrID, schedule)
 	abort "Not finished for new API"  
 	strswitch (schedule)
 		case "default":
-			payload = GetLS370LoggingScheduleFromConfig("default")
+			payload = LS370getLoggingScheduleFromConfig("default")
 			break
 		case "mc_exclusive":
-			payload = GetLS370LoggingScheduleFromConfig("mc_exclusive")
+			payload = LS370getLoggingScheduleFromConfig("mc_exclusive")
 			break
 		// Add other cases here (also add config to LoggingSchedules.txt in config folder)
 		default:
@@ -429,66 +507,7 @@ function setLS370loggersSchedule(instrID, schedule)
 end
 
 
-function resetLS370exclusivereader(instrID)
-	string instrID
-	string command, payload
-	svar ls_label
-	abort "Not tested this yet"
-	// TODO: Test this
-	setLS370loggersSchedule(instrID, "default")
-end
-
-
-function setLS370TempSetpoint(instrID,temp) // Units: mK
-	// sets the target temperature for PID control
-	string instrID
-	variable temp
-	string command
-	svar ls_label
-	nvar temp_set
-
-	// check for NAN and INF
-	if(sc_check_naninf(temp) != 0)
-		abort "trying to set temperarture to NaN or Inf"
-	endif
-	
-	sprintf command, "set-temperature-control-setpoint/%s/%f", ls_label, temp/1000
-	sendLS370(instrID,command,"put")
-	temp_set = temp
-
-end
-
-
-function setLS370PIDparameters(instrID,p,i,d) // Units: No units
-	// set the PID parameters for the PID control loop
-	// P = {0.001 1000}, I = {0 10000}, D = {0 2500}
-	string instrID
-	variable p,i,d
-	nvar p_value,i_value,d_value
-	string command,payload,cmd
-	svar ls_label
-
-	// check for NAN and INF
-	if(sc_check_naninf(p) != 0 || sc_check_naninf(i) != 0 || sc_check_naninf(d) != 0)
-		abort "trying to set PID parameters to NaN or Inf"
-	endif
-
-	if(0.001 <= p && p <= 1000 && 0 <= i && i <= 10000 && 0 <= d && d <= 2500)
-
-		sprintf payload, "{\"P\":%f, \"I\":%f, \"D\":%f}", p, i, d
-		sprintf command, "set-temperature-pid/%s", ls_label
-		sendLS370(instrID,command,"put",payload=payload)	
-
-		p_value = p
-		i_value = i
-		d_value = d
-	else
-		abort "PID parameters out of range"
-	endif
-	
-end
-
-
+// set-heater-power-milliw
 function setLS370heaterpower(instrID,heater,output) //Units: mW
 	// sets the manual heater output
 	// avaliable heaters on BF systems: mc,still
@@ -539,7 +558,115 @@ function setLS370heaterpower(instrID,heater,output) //Units: mW
 	sendLS370(instrID,command,"put")
 end
 
-function turnoffLS370MCheater(instrID)
+
+// set-heater-range-amps
+function setLS370heaterRange(instrID, max_current_mA)
+	string instrID
+	variable max_current_mA
+	svar ls_label
+	
+	string command
+	
+	sprintf command, "set-heater-range-amps/%s/%f", ls_label, max_current_mA/1000
+	sendLS370(instrID,command,"put")
+end
+
+
+// set-temperature-control-mode
+function setLS370tempMode(instrID, mode) // Units: No units
+	// sets the temperature control mode
+	// avaliable options are: off (4), PID (1), Temp_zone (2), Open loop (3)
+	string instrID
+	variable mode
+
+	nvar pid_mode
+	svar ls_label
+	string command
+	
+	sprintf command, "set-temperature-control-mode/%s/%s", ls_label
+	sendLS370(instrID,command,"put")
+	pid_mode = mode	
+end
+
+// set-temperature-control-parameters
+function setLS370controlParameters(instrID)
+	// Set temperature control parameters excluding PID, max_current, control_mode
+	string instrID
+	svar ls_label
+	
+	string command, payload
+	svar bfchannellookup
+	
+	// TODO: Is there anything here we do want to be able to change easily? Mostly looks like defaults we don't need to change
+	print "[setLS370ControlParameters]: See function if you want to change any of the default values or make selectable"
+	string channel = stringfromlist(5,bfchannellookup,";") // MC API_label
+	variable delay = 1
+	string heater_output_display_type = "HODT_power" // HODT_current, HODT_power
+	variable max_heater_level = 8 // A limit on the power output of the heater (8 is max, but we limit with max_heater_current seperately)
+	string setpoint_units = "SU_kelvin" // SU_kelvin, SU_celsius
+	string use_filtered_values = "true"
+	
+	sprintf payload, "{\"channel_label\": \"%s\", \"delay\": %d, \"heater_output_display_type\":\"%s\", \"max_heater_level\": %d, \"setpoint_units\":\"%s\", \"use_filtered_values\":\"%s\"\"}" \
+												channel, delay, heater_output_display_type, max_heater_level, setpoint_units, use_filtered_values
+	sprintf command, "set-temperature-control-parameters/%s", ls_label
+	sendLS370(instrID,command,"put",payload=payload)
+end
+
+
+// set-temperature-control-setpoint
+function setLS370tempSetpoint(instrID,temp) // Units: mK
+	// sets the target temperature for PID control
+	string instrID
+	variable temp
+	string command
+	svar ls_label
+	nvar temp_set
+
+	// check for NAN and INF
+	if(sc_check_naninf(temp) != 0)
+		abort "trying to set temperarture to NaN or Inf"
+	endif
+	
+	sprintf command, "set-temperature-control-setpoint/%s/%f", ls_label, temp/1000
+	sendLS370(instrID,command,"put")
+	temp_set = temp
+
+end
+
+
+// set-temperature-pid
+function setLS370PIDparameters(instrID,p,i,d) // Units: No units
+	// set the PID parameters for the PID control loop
+	// P = {0.001 1000}, I = {0 10000}, D = {0 2500}
+	string instrID
+	variable p,i,d
+	nvar p_value,i_value,d_value
+	string command,payload,cmd
+	svar ls_label
+
+	// check for NAN and INF
+	if(sc_check_naninf(p) != 0 || sc_check_naninf(i) != 0 || sc_check_naninf(d) != 0)
+		abort "trying to set PID parameters to NaN or Inf"
+	endif
+
+	if(0.001 <= p && p <= 1000 && 0 <= i && i <= 10000 && 0 <= d && d <= 2500)
+
+		sprintf payload, "{\"P\":%f, \"I\":%f, \"D\":%f}", p, i, d
+		sprintf command, "set-temperature-pid/%s", ls_label
+		sendLS370(instrID,command,"put",payload=payload)	
+
+		p_value = p
+		i_value = i
+		d_value = d
+	else
+		abort "PID parameters out of range"
+	endif
+	
+end
+
+
+// turn-heater-off
+function setLS370heaterOff(instrID)
 	// turns off MC heater
 	string instrID
 	string command, payload
@@ -550,6 +677,61 @@ function turnoffLS370MCheater(instrID)
 	sendLS370(instrID,command,"post")
 	pid_mode = 4
 end
+
+
+//////// Set functions which don't map directly to API but are useful //////////
+
+function setLS370temp(instrID,channel,setpoint,[maxcurrent]) //Units: mK, mA
+	// Sets both setpoint and max_current if passed, else estimates using LS370_estimateheaterrange
+	string instrID
+	variable channel, setpoint, maxcurrent
+	string payload, command
+	svar ls_label
+	nvar temp_set
+	
+	if (paramisdefault(maxcurrent))
+		maxcurrent = LS370_estimateheaterrange(setpoint)
+	endif
+
+	// check for NAN and INF
+	if(sc_check_naninf(setpoint) != 0)
+		abort "trying to set setpoint to NaN or Inf"
+	endif
+	
+	setLS370HeaterRange(instrID, maxcurrent)
+	setLS370TempSetpoint(instrID, setpoint)
+end
+
+
+function setLS370exclusivereader(instrID,channel)
+	// This function is just for backwards compatability and convenience, it points to setLS370loggersSchedule
+	string instrID, channel
+	variable interval
+	string command, payload
+	svar ls_label
+	
+	string sched_name = "", err_str
+
+	strswitch (channel)
+		case "mc":
+			sched_name = "mc_exclusive"
+			break
+		default:
+			sprintf err_str, "ERROR[setLS370exclusivereader]:Need to add logger schedule to LoggingSchedules.txt for channel %s first. Then modify this func", channel
+			abort err_str
+			break
+	endswitch
+	setLS370loggersSchedule(instrID, sched_name)	
+end
+
+function resetLS370exclusivereader(instrID)
+	string instrID
+	string command, payload
+	svar ls_label
+	//TODO: Test this
+	setLS370loggersSchedule(instrID, "default")
+end
+
 
 // TODO: Do we want this?
 function toggleLS370magnetheater(instrID,onoff)
@@ -597,7 +779,23 @@ end
 //// Utillities ////
 ///////////////////
 
-function/s mode_to_str(mode)
+function/s LS370getLoggingScheduleFromConfig(sched_name)
+	string sched_name
+	// reads LoggingSchedules from LoggingSchedules.txt file on "config" path.
+	
+	variable js_id
+	js_id = JSON_parse(readtxtfile("LoggingSchedules.txt","config"))
+	findvalue/TEXT=sched_name JSON_getkeys(js_id, "")
+	if (V_value == -1)
+		string err_str
+		sprintf err_str "%s not found in top level keys of LoggingSchedules.txt" sched_name
+		abort 	err_str
+	endif
+	return JSON_dump(get_json_from_json_path(js_id, sched_name))
+end
+
+
+function/s LS370_mode_to_str(mode)
 	//Convert from mode variable used here to mode_str used in API
 	//off (4), PID (1), Temp_zone (2), Open loop (3)
 	variable mode
@@ -617,14 +815,14 @@ function/s mode_to_str(mode)
 			mode_str = "TCM_off"
 			break
 		default:
-			print "[WARNING] mode_to_str: Invalid mode passed, returning TCM_off"
+			print "[WARNING] LS370_mode_to_str: Invalid mode passed, returning TCM_off"
 			mode_str = "TCM_off"
 			break
 	endswitch
 	return mode_str
 end
 
-function mode_str_to_mode(mode_str)
+function LS370_mode_str_to_mode(mode_str)
 	// Convert from mode_str used in API to variable mode used here
 	//off (4), PID (1), Temp_zone (2), Open loop (3)
 	string mode_str
@@ -644,13 +842,13 @@ function mode_str_to_mode(mode_str)
 			mode = 4
 			break
 		default:
-			print "[WARNING] mode_str_to_mode: Invalid mode_str passed, returning -1"
+			print "[WARNING] LS370_mode_str_to_mode: Invalid mode_str passed, returning -1"
 			mode = -1
 			break
 	endswitch
 end
 
-function estimateheaterrangeLS370(temp) // Units: mK
+function LS370_estimateheaterrange(temp) // Units: mK
 	// sets the heater range based on the wanted output
 	// uses the range lookup table
 	// avaliable ranges: 1,2,3,4,5,6,7,8 --> 0,10,30,95,501,1200,5000,10000 mK
@@ -675,7 +873,7 @@ function estimateheaterrangeLS370(temp) // Units: mK
 end
 
 
-function createLS370Gobals()
+function LS370createGobals()
 	// Create the needed global variables for driver
 
 	// TODO: Should we be calling any get* functions in here to see if anything has changed, or is that overkill?
