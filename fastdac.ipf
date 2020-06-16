@@ -67,7 +67,25 @@ end
 //// Get functions ////
 ///////////////////////
 
+function getFADCmeasureFreq(instrID)
+	// Calculates measurement frequency as sampleFreq/numadc 
+	// NOTE: This will not currently work if more than one fastdac is connected
+	variable instrID
+	
+	svar fdackeys
+	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
+	if (numDevices != 1)
+		abort "ERROR[getFADCmeasureFreq]: This function only works for 1 fastdac currently"
+	endif
+	
+	variable numadc, samplefreq
+	numadc = getnumfadc() 
+	samplefreq = getFADCspeed(instrID)
+	return samplefreq/numadc
+end
+
 function getNumFADC() // Getting from scancontroller_Fastdac window but makes sense to put here as a get function
+	// Just looks at which boxes are ticked to see how many will be recorded
 	variable i=0, numadc=0
 	wave fadcattr
 	for (i=0; i<dimsize(fadcattr, 1)-1; i++) // Count how many ADCs are being measured
@@ -206,6 +224,8 @@ function/s getFDACStatus(instrID)
 	
 	buffer = addJSONkeyval(buffer, "visa_address", visa, addquotes=1)
 	buffer = addJSONkeyval(buffer, "SamplingFreq", num2str(getFADCspeed(instrID)), addquotes=1)
+	buffer = addJSONkeyval(buffer, "MeasureFreq", num2str(getFADCmeasureFreq(instrID)), addquotes=1)
+
 	// DAC values
 	for(i=0;i<str2num(stringbykey("numDACCh"+num2istr(dev),fdackeys,":",","));i+=1)
 		sprintf key, "DAC%d{%s}", i, fdacvalstr[i][3]
@@ -848,13 +868,17 @@ end
 //// Spectrum Analyzer ////
 //////////////////////////
 
-function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,nosave])
+function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,comments,nosave])
 	// channels must a comma seperated string, refering
 	// to the numbering in the ScanControllerFastDAC window.
 	// scanlength is in sec
 	// if linear is set to 1, the spectrum will be plotted on a linear scale
 	variable instrID, scanlength, numAverage, linear, nosave
-	string channels
+	string channels, comments
+	
+	if(paramisdefault(comments))
+		comments = ""
+	endif
 	
 	if(paramisdefault(linear) || linear != 1)
 		linear = 0
@@ -1116,6 +1140,7 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,nos
 	endif
 	
 	if (nosave == 0)
+		
 		// save data to "data/spectrum/"
 		string filename = "spectrum_"+strTime()+".h5"
 		variable hdf5_id=0
@@ -1130,6 +1155,32 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,nos
 				return 0
 			endif
 		endfor
+		
+		// Create metadata
+		// this just creates one big JSON string attribute for the group
+		// its... fine
+		variable /G meta_group_ID
+		HDF5CreateGroup hdf5_id, "metadata", meta_group_ID
+	
+		
+		make /FREE /T /N=1 cconfig = prettyJSONfmt(sc_createconfig())
+		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(sc_createSweepLogs(msg=comments))
+		
+		// Check that prettyJSONfmt actually returned a valid JSON.
+		sc_confirm_JSON(sweep_logs, name="sweep_logs")
+		sc_confirm_JSON(cconfig, name="cconfig")
+		
+		HDF5SaveData /A="sweep_logs" sweep_logs, hdf5_id, "metadata"
+		HDF5SaveData /A="sc_config" cconfig, hdf5_id, "metadata"
+	
+		HDF5CloseGroup /Z meta_group_id
+		if (V_flag != 0)
+			Print "HDF5CloseGroup Failed: ", "metadata"
+		endif
+	
+		// may as well save this config file, since we already have it
+		sc_saveConfig(cconfig[0])
+		
 		// close HDF5 container
 		HDF5CloseFile/Z hdf5_id
 		if (v_flag != 0)
