@@ -130,6 +130,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay,ramprate
 	wave/t fadcvalstr, fdacvalstr
 	wave fadcattr
 	
+	// Check inputs and set defaults
 	ramprate = paramisdefault(ramprate) ? 1000 : ramprate
 	delay = paramisdefault(delay) ? 0 : delay
 	direction = paramisdefault(direction) ? 1 : direction
@@ -170,8 +171,8 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay,ramprate
 	endif
 	
 	// get ADC sampling speed
-	variable samplingFreq=0
-	samplingFreq = getfadcSpeed(instrID)/getNumFADC()  //Because sampling is split between number of ADCs being read //TODO: This needs to be adapted for multiple FastDacs
+	variable samplingFreq = getfadcSpeed(instrID)
+	variable measureFreq = samplingFreq/getNumFADC()  //Because sampling is split between number of ADCs being read //TODO: This needs to be adapted for multiple FastDacs
 	
 	variable eff_ramprate = 0, answer = 0, i=0
 	string question = ""
@@ -181,7 +182,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay,ramprate
 	if(rowNum == 0)
 		// check if effective ramprate is higher than software limits
 		for(i=0;i<itemsinlist(rampCh,",");i+=1)
-			eff_ramprate = abs(str2num(stringfromlist(i,scanlist.startval,","))-str2num(stringfromlist(i,scanlist.finval,",")))*(samplingFreq/numpts)
+			eff_ramprate = abs(str2num(stringfromlist(i,scanlist.startval,","))-str2num(stringfromlist(i,scanlist.finval,",")))*(measureFreq/numpts)
 			channel = str2num(stringfromlist(i, rampCh, ","))
 			if(eff_ramprate > str2num(fdacvalstr[channel][4])*1.05)  // Allow 5% too high for convenience
 				// we are going too fast
@@ -241,7 +242,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay,ramprate
 	variable totalByteReturn = numADCs*2*numpts, read_chunk=0, bytesSec = roundNum(2*samplingFreq,0)
 	variable chunksize = roundNum(numADCs*bytesSec/50,0) - mod(roundNum(numADCs*bytesSec/50,0),numADCs*2)
 	if(chunksize < 50)
-		chunksize = 50 - mod(50,numADCs*2) // 50 or 48 //TIM: If this is so chunksize is a multiple of numADCs*2 then it will fail for 7ADCs
+		chunksize = 50 - mod(50,numADCs*2) // 50 or 48 //This will fail for 7ADCs
 	endif
 	if(totalByteReturn > chunksize)
 		read_chunk = chunksize
@@ -341,10 +342,10 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay,ramprate
 	if(RCCutoff != 0)
 		// add lowpass filter
 		doLowpass = 1
-		cutoff_frac = RCcutoff/samplingFreq
+		cutoff_frac = RCcutoff/measureFreq
 		if(cutoff_frac > 0.5)
-			print("[WARNING] \"fdacRecordValues\": RC cutoff frequency must be lower than half the sampling frequency!")
-			sprintf warn, "Setting it to %.2f", 0.5*samplingFreq
+			print("[WARNING] \"fdacRecordValues\": RC cutoff frequency must be lower than half the measuring frequency!")
+			sprintf warn, "Setting it to %.2f", 0.5*measureFreq
 			print(warn)
 			cutoff_frac = 0.5
 		endif
@@ -357,7 +358,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay,ramprate
 		doNotch = 1
 		numNotch = itemsinlist(notch,",")
 		for(i=0;i<numNotch;i+=1)
-			notch_fracList = addlistitem(num2str(str2num(stringfromlist(i,notch,","))/samplingFreq),notch_fracList,",",itemsinlist(notch_fracList))
+			notch_fracList = addlistitem(num2str(str2num(stringfromlist(i,notch,","))/measureFreq),notch_fracList,",",itemsinlist(notch_fracList))
 		endfor
 	endif
 	
@@ -387,7 +388,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay,ramprate
 		for(j=0;j<numNotch;j+=1)
 			coef = "coefs"+num2istr(numfilter)
 			make/o/d/n=0 $coef
-			filterfir/nmf={str2num(stringfromlist(j,notch_fraclist,",")),15.0/samplingFreq,1.0e-8,1}/coef $coef
+			filterfir/nmf={str2num(stringfromlist(j,notch_fraclist,",")),15.0/measureFreq,1.0e-8,1}/coef $coef
 			coefList = addlistitem(coef,coefList,",",itemsinlist(coefList))
 			numfilter += 1
 		endfor
@@ -395,7 +396,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay,ramprate
 	
 	// apply filters
 	if(doLowpass == 1 || doNotch == 1)
-		sc_applyfilters(coefList,scanList.adclist,doLowpass,doNotch,cutoff_frac,samplingFreq,FIRcoefs,notch_fraclist,rowNum)
+		sc_applyfilters(coefList,scanList.adclist,doLowpass,doNotch,cutoff_frac,measureFreq,FIRcoefs,notch_fraclist,rowNum)
 	endif
 	
 	// average datawaves
@@ -498,7 +499,7 @@ structure fdacChLists
 endstructure
 
 function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart,[direction])
-	string buffer, adcList
+	string &buffer, adcList  //passing buffer by reference for speed of execution
 	variable bytes, rowNum, colNumStart, direction
 	wave/t fadcvalstr
 	nvar sc_is2d
@@ -571,9 +572,9 @@ function sc_lastrow(rowNum)
 	endif
 end
 
-function sc_applyfilters(coefList,adcList,doLowpass,doNotch,cutoff_frac,samplingFreq,FIRcoefs,notch_fraclist,rowNum)
+function sc_applyfilters(coefList,adcList,doLowpass,doNotch,cutoff_frac,measureFreq,FIRcoefs,notch_fraclist,rowNum)
 	string coefList, adcList, notch_fraclist
-	variable doLowpass, doNotch, cutoff_frac, samplingFreq, FIRcoefs, rowNum
+	variable doLowpass, doNotch, cutoff_frac, measureFreq, FIRcoefs, rowNum
 	wave/t fadcvalstr
 	nvar sc_is2d
 	
@@ -588,29 +589,29 @@ function sc_applyfilters(coefList,adcList,doLowpass,doNotch,cutoff_frac,sampling
 				filterfir/lo={cutoff_frac,cutoff_frac,FIRcoefs}/coef=coefs datawave
 			elseif(doNotch == 1)
 				try
-					filterfir/nmf={str2num(stringfromlist(j,notch_fraclist,",")),15.0/samplingFreq,1.0e-8,1}/coef=coefs datawave
+					filterfir/nmf={str2num(stringfromlist(j,notch_fraclist,",")),15.0/measureFreq,1.0e-8,1}/coef=coefs datawave
 					abortonrte
 				catch
 					err = getrTError(1)
 					if(dimsize(coefs,0) > 2.0*dimsize(datawave,0))
 						// nothing we can do. Don't apply filter!
-						sprintf errmes, "[WARNING] \"sc_applyfilters\": Notch filter at %.1f Hz not applied. Length of datawave is too short!",str2num(stringfromlist(j,notch_fraclist,","))*samplingFreq
+						sprintf errmes, "[WARNING] \"sc_applyfilters\": Notch filter at %.1f Hz not applied. Length of datawave is too short!",str2num(stringfromlist(j,notch_fraclist,","))*measureFreq
 						print errmes
 					else
 						// try increasing the filter width to 30Hz
 						try
 							make/o/d/n=0 coefs2
-							filterfir/nmf={str2num(stringfromlist(j,notch_fraclist,",")),30.0/samplingFreq,1.0e-8,1}/coef coefs2, datawave
+							filterfir/nmf={str2num(stringfromlist(j,notch_fraclist,",")),30.0/measureFreq,1.0e-8,1}/coef coefs2, datawave
 							abortonrte
 							if(rowNum == 0 && i == 0)
-								sprintf errmes, "[WARNING] \"sc_applyfilters\": Notch filter at %.1f Hz applied with a filter width of 30Hz.", str2num(stringfromlist(j,notch_fraclist,","))*samplingFreq
+								sprintf errmes, "[WARNING] \"sc_applyfilters\": Notch filter at %.1f Hz applied with a filter width of 30Hz.", str2num(stringfromlist(j,notch_fraclist,","))*measureFreq
 								print errmes
 							endif
 						catch
 							err = getrTError(1)
 							// didn't work
 							if(rowNum == 0 && i == 0)
-								sprintf errmes, "[WARNING] \"sc_applyfilters\": Notch filter at %.1f Hz not applied. Increasing filter width to 30 Hz wasn't enough.", str2num(stringfromlist(j,notch_fraclist,","))*samplingFreq
+								sprintf errmes, "[WARNING] \"sc_applyfilters\": Notch filter at %.1f Hz not applied. Increasing filter width to 30 Hz wasn't enough.", str2num(stringfromlist(j,notch_fraclist,","))*measureFreq
 								print errmes
 							endif
 						endtry
