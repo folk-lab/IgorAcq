@@ -168,7 +168,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay,ramprate
 		fdRV_check_lims(scanList)
 	endif
 
-	fdRV_ramp_start(instrID, scanList, ramprate)
+	fdRV_ramp_start(instrID, scanList, ramprate, ignore_lims = 1)
 	sc_sleep(delay)  // Settle time for 2D sweeps
 
 	fdRV_start_INT_RAMP(instrID, scanList, numpts)
@@ -216,7 +216,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay,ramprate
 	/////////////////////////
 
 	variable cutoff_frac
-	string notch_fracList
+	string notch_fracList = ""
 
 	variable do_lowpass = fdRV_process_set_cutoff(RCCutoff, cutoff_frac, notch_fracList, measureFreq)
 	variable do_notch, numNotch
@@ -227,7 +227,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay,ramprate
 
 	// setup FIR (Finite Impluse Response) filter(s)
 	variable FIRcoefs
-	string coefList
+	string coefList = ""
 	fdRV_process_setup_filters(FIRcoefs, coefList, cutoff_frac, notch_fracList, numpts, do_lowpass, do_notch, numNotch, measureFreq)
 
 	// apply filters
@@ -305,44 +305,51 @@ end
 
 
 
-function fdRV_check_lims(scanList)
-  // check that start and end values are within software limits
-  struct fdacChLists &scanList
-
-  wave/T fdacvalstr
-   svar activegraphs
-  variable answer, i, k
-  string softLimitPositive = "", softLimitNegative = "", expr = "(-?[[:digit:]]+),([[:digit:]]+)", question
-  variable startval = 0, finval = 0
-  for(i=0;i<itemsinlist(scanlist.daclist,",");i+=1)
-    splitstring/e=(expr) fdacvalstr[str2num(stringfromlist(i,scanList.daclist,","))][2], softLimitNegative, softLimitPositive
-    startval = str2num(stringfromlist(i,scanlist.startval,","))
-    finval = str2num(stringfromlist(i,scanlist.finval,","))
-    if(startval < str2num(softLimitNegative) || startval > str2num(softLimitPositive) || finval < str2num(softLimitNegative) || finval > str2num(softLimitPositive))
-      // we are outside limits
-      sprintf question, "DAC channel %s will be ramped outside software limits. Continue?", stringfromlist(i,scanlist.daclist,",")
-      answer = ask_user(question, type=1)
-      if(answer == 2)
-        print("[ERROR] \"RecordValues\": User abort!")
-        dowindow/k SweepControl // kill scan control window
-        for(k=0;k<itemsinlist(activegraphs,";");k+=1)
-          dowindow/k $stringfromlist(k,activegraphs,";")
-        endfor
-        abort
-      endif
-    endif
-  endfor
+function fdRV_check_lims(scanList, [starty, endy, channelsy])
+	// check that start and end values are within software limits
+	struct fdacChLists &scanList
+	variable starty, endy
+	string channelsy
+												// TODO: DON'T DO BELOW! -- actually need to check starty/endy in 2D part of scan, and then ignore_lims when ramping
+												//     TODO: Maybe I should make the Scan templates also use a struct with a similar format?
+	string daclist = scanlist.daclist  // TODO: Append channelsy to list then use daclist instead of scanlist.daclist
+												// TODO: same for startVals and endVals (add starty, endy and use instead)
+												
+	
+	wave/T fdacvalstr
+	svar activegraphs
+	variable answer, i, k
+	string softLimitPositive = "", softLimitNegative = "", expr = "(-?[[:digit:]]+),([[:digit:]]+)", question
+	variable startval = 0, finval = 0
+	for(i=0;i<itemsinlist(scanlist.daclist,",");i+=1)
+		splitstring/e=(expr) fdacvalstr[str2num(stringfromlist(i,scanList.daclist,","))][2], softLimitNegative, softLimitPositive
+		startval = str2num(stringfromlist(i,scanlist.startval,","))
+		finval = str2num(stringfromlist(i,scanlist.finval,","))
+		if(startval < str2num(softLimitNegative) || startval > str2num(softLimitPositive) || finval < str2num(softLimitNegative) || finval > str2num(softLimitPositive))
+			// we are outside limits
+			sprintf question, "DAC channel %s will be ramped outside software limits. Continue?", stringfromlist(i,scanlist.daclist,",")
+			answer = ask_user(question, type=1)
+			if(answer == 2)
+				print("[ERROR] \"RecordValues\": User abort!")
+				dowindow/k SweepControl // kill scan control window
+				for(k=0;k<itemsinlist(activegraphs,";");k+=1)
+					dowindow/k $stringfromlist(k,activegraphs,";")
+				endfor
+				abort
+			endif
+		endif
+	endfor
 end
 
 
-function fdRV_ramp_start(instrID, scanList, ramprate)
+function fdRV_ramp_start(instrID, scanList, ramprate, [ignore_lims])
   // move DAC channels to starting point
   struct fdacChLists &scanList
-  variable instrID, ramprate
+  variable instrID, ramprate, ignore_lims
 
   variable i
   for(i=0;i<itemsinlist(scanList.daclist,",");i+=1)
-    rampOutputfdac(instrID,str2num(stringfromlist(i,scanList.daclist,",")),str2num(stringfromlist(i,scanList.startVal,",")),ramprate=ramprate)
+    rampOutputfdac(instrID,str2num(stringfromlist(i,scanList.daclist,",")),str2num(stringfromlist(i,scanList.startVal,",")),ramprate=ramprate, ignore_lims=ignore_lims)
   endfor
 end
 
@@ -496,36 +503,36 @@ end
 
 
 function fdRV_process_setup_filters(FIRcoefs, coefList, cutoff_frac, notch_fracList, numpts, do_lowpass, do_notch, numNotch, measureFreq)
-  variable &FIRcoefs, cutoff_frac, numpts, do_lowpass, do_notch, numNotch, measureFreq
-  string &coefList, notch_fracList
+	variable &FIRcoefs, cutoff_frac, numpts, do_lowpass, do_notch, numNotch, measureFreq
+	string &coefList, notch_fracList
 
-  if(numpts < 101)
-    FIRcoefs = numpts
-  else
-    FIRcoefs = 101
-  endif
+	if(numpts < 101)
+		FIRcoefs = numpts
+	else
+		FIRcoefs = 101
+	endif
 
-  string coef = ""
-  variable j=0,numfilter=0
-  // add RC filter
-  if(do_Lowpass == 1)
-    coef = "coefs"+num2istr(numfilter)
-    make/o/d/n=0 $coef
-    filterfir/lo={cutoff_frac,cutoff_frac,FIRcoefs}/coef $coef
-    coefList = addlistitem(coef,coefList,",",itemsinlist(coefList))
-    numfilter += 1
-  endif
-  // add notch filter(s)
-  if(do_Notch == 1)
-    for(j=0;j<numNotch;j+=1)
-      coef = "coefs"+num2istr(numfilter)
-      make/o/d/n=0 $coef
-      filterfir/nmf={str2num(stringfromlist(j,notch_fraclist,",")),15.0/measureFreq,1.0e-8,1}/coef $coef
-      coefList = addlistitem(coef,coefList,",",itemsinlist(coefList))
-      numfilter += 1
-    endfor
-  endif
-  return FIRcoefs
+	string coef = ""
+	variable j=0,numfilter=0
+	// add RC filter
+	if(do_Lowpass == 1)
+		coef = "coefs"+num2istr(numfilter)
+		make/o/d/n=0 $coef
+		filterfir/lo={cutoff_frac,cutoff_frac,FIRcoefs}/coef $coef
+		coefList = addlistitem(coef,coefList,",",itemsinlist(coefList))
+		numfilter += 1
+	endif
+	// add notch filter(s)
+	if(do_Notch == 1)
+		for(j=0;j<numNotch;j+=1)
+			coef = "coefs"+num2istr(numfilter)
+			make/o/d/n=0 $coef
+			filterfir/nmf={str2num(stringfromlist(j,notch_fraclist,",")),15.0/measureFreq,1.0e-8,1}/coef $coef
+			coefList = addlistitem(coef,coefList,",",itemsinlist(coefList))
+			numfilter += 1
+		endfor
+	endif
+	return FIRcoefs
 end
 
 
