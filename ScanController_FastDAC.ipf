@@ -125,10 +125,11 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay,ramprate
 	string rampCh, start, fin
 	variable numpts, delay, ramprate, RCcutoff, numAverage, direction
 	string notch
-	nvar sc_is2d, sc_startx, sc_starty, sc_finx, sc_starty, sc_finy, sc_numptsx, sc_numptsy
-	nvar sc_abortsweep, sc_pause, sc_scanstarttime
-	wave/t fadcvalstr, fdacvalstr
-	wave fadcattr
+
+	// nvar sc_is2d, sc_startx, sc_starty, sc_finx, sc_starty, sc_finy, sc_numptsx, sc_numptsy
+	// nvar sc_abortsweep, sc_pause, sc_scanstarttime
+	// wave/t fadcvalstr, fdacvalstr
+	// wave fadcattr
 
 	// Check inputs and set defaults
 	ramprate = paramisdefault(ramprate) ? 1000 : ramprate
@@ -143,6 +144,9 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay,ramprate
 		fin = temp
 	endif
 
+	struct fdRV_Struct S // Contains structs and variables to be used in scan
+	fdRV_set_struct_base_vars(S,instrID,rowNum,rampCh,start,fin,numpts,delay,ramprate,RCcutoff,numAverage,notch,direction)
+
 	// compare to earlier call of InitializeWaves
 	fdRV_check_init()
 
@@ -153,96 +157,40 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay,ramprate
 	// be replaced by a function that sorts DAC and ADC channels based on which device
 	// they belong to.
 
-	struct fdacChLists scanList
-	fdRV_set_scanList(scanList, rampCh, start, fin)
 
-	// get ADC sampling speed
-	variable samplingFreq = getfadcSpeed(instrID)
-	variable measureFreq = samplingFreq/getNumFADC()  //Because sampling is split between number of ADCs being read //TODO: This needs to be adapted for multiple FastDacs
+	// Set samplingFreq, numADCs, measureFreq
+	fdRV_set_measureFreq(S)
 
-	variable eff_ramprate = 0, answer = 0, i=0
-	string question = ""
+	// Check within limits and ramprates
+	fdRV_check_rr_lims(S)
 
-	if(rowNum == 0)
-		fdRV_check_ramprates(measureFreq, numpts, rampCh, scanList)
-		fdRV_check_lims(scanList)
-	endif
-
-	fdRV_ramp_start(instrID, scanList, ramprate, ignore_lims = 1)
+	fdRV_ramp_start(S.sv, S.fdList, ignore_lims = 1)
 	sc_sleep(delay)  // Settle time for 2D sweeps
 
-	fdRV_start_INT_RAMP(instrID, scanList, numpts)
+	// Start the fastdac INT_RAMP
+	fdRV_start_INT_RAMP(S.sv, S.fdList)
 
-	// hold incoming data chunks in string and distribute to data waves
-	variable numADCs = itemsinlist(scanList.adclist,",")
-	string buffer = ""
-	variable bytes_read = 0, plotUpdateTime = 15e-3, totaldump = 0,  saveBuffer = 1000
-	variable bufferDumpStart = stopMSTimer(-2)
-	variable totalByteReturn = numADCs*2*numpts
-	variable bytesSec = roundNum(2*measureFreq*numADCs,0)
-	variable read_chunk = fdRV_get_read_chunk_size(numADCs, numpts, bytesSec, totalByteReturn)
-	do
-		fdRV_read_chunk(instrID, read_chunk, buffer)  // puts data into buffer
-		fdRV_distribute_data(buffer, scanList, bytes_read, totalByteReturn, numADCs, read_chunk, rowNum, direction)
-		bytes_read += read_chunk
-		totaldump = bytesSec*(stopmstimer(-2)-bufferDumpStart)*1e-6  // Expected amount of bytes in buffer
-		if(totaldump-bytes_read < saveBuffer)  // if we aren't too far behind
-			// we can update all plots
-			// should take ~15ms extra
-			fdRV_update_graphs()
-		endif
-		fdRV_check_sweepstate(instrID)
-	while(totalByteReturn-bytes_read > read_chunk)
-
-	// do one last read if any data left to read
-	variable bytes_left = totalByteReturn-bytes_read
-	if(bytes_left > 0)
-		fdRV_read_chunk(instrID, bytes_left, buffer)  // puts data into buffer
-		fdRV_distribute_data(buffer, scanList, bytes_read, totalByteReturn, numADCs, bytes_left, rowNum, direction)
-		fdRV_check_sweepstate(instrID)
-		doupdate
-	endif
-	variable looptime = (stopmstimer(-2)-bufferDumpStart)*1e-6
+	// Record all the values sent back from the FastDAC to respective waves
+	variable looptime = 0
+	looptime = fdRV_record_buffer(S) // And get the total time
 
 	// update window
-	buffer = readInstr(instrID)
-	buffer = sc_stripTermination(buffer,"\r\n")
-	if(fdacCheckResponse(buffer,"INT_RAMP...",isString=1,expectedResponse="RAMP_FINISHED"))
-		fdRV_update_window(instrID, scanList, numADCs)
+	string endstr
+	endstr = readInstr(S.sv.instrID)
+	endstr = sc_stripTermination(endstr,"\r\n")
+	if(fdacCheckResponse(endstr,"INT_RAMP...",isString=1,expectedResponse="RAMP_FINISHED"))
+		fdRV_update_window(S.sv.instrID, S.fdList, S.numADCs)
 	endif
+
 
 	/////////////////////////
 	//// Post processing ////
 	/////////////////////////
 
-	variable cutoff_frac
-	string notch_fracList = ""
-
-	variable do_lowpass = fdRV_process_set_cutoff(RCCutoff, cutoff_frac, notch_fracList, measureFreq)
-	variable do_notch, numNotch
-	do_notch = fdRV_process_set_notch(notch, notch_fracList, measureFreq, numNotch)
-
-	variable doAverage=0
-	doaverage = (numAverage != 0) ? 1 : 0 // If numaverage isn't zero then do average
-
-	// setup FIR (Finite Impluse Response) filter(s)
-	variable FIRcoefs
-	string coefList = ""
-	fdRV_process_setup_filters(FIRcoefs, coefList, cutoff_frac, notch_fracList, numpts, do_lowpass, do_notch, numNotch, measureFreq)
-
-	// apply filters
-	if(do_Lowpass == 1 || do_Notch == 1)
-		sc_applyfilters(coefList,scanList.adclist,do_Lowpass,do_Notch,cutoff_frac,measureFreq,FIRcoefs,notch_fraclist,rowNum)
-	endif
-
-	// average datawaves
-	variable lastRow = sc_lastrow(rowNum)
-	if(doAverage == 1)
-		sc_averageDataWaves(numAverage,scanList.adcList,lastRow,rowNum)
-	endif
+	fdRV_Process_data(S)
 
 		// check abort/pause status
-	fdRV_check_sweepstate(instrID)
+	fdRV_check_sweepstate(S.sv.instrID)
 	return looptime
 end
 
@@ -256,7 +204,7 @@ function fdRV_check_init()
 end
 
 function fdRV_set_scanList(scanList, rampCh, start, fin)
-  struct fdacChLists &scanList  // alters passed struct
+  struct fdRV_ChLists &scanList  // alters passed struct
   string rampCh, start, fin
 
   variable dev_adc=0
@@ -273,20 +221,31 @@ function fdRV_set_scanList(scanList, rampCh, start, fin)
 end
 
 
-function fdRV_check_ramprates(measFreq, numpts rampCh, scanList)
+function fdRV_check_rr_lims(S)
+   struct fdRV_Struct &S
+
+   variable eff_ramprate = 0, answer = 0, i=0
+   string question = ""
+   if(S.rowNum == 0)
+      fdRV_check_ramprates(S.measureFreq, S.sv.numptsx, S.fdList)
+      fdRV_check_lims(S.fdList)
+   endif
+end
+
+
+function fdRV_check_ramprates(measFreq, numpts, scanList)
   // check if effective ramprate is higher than software limits
   variable measFreq, numpts
-  string rampCh
-  struct fdacChLists &scanList
+  struct fdRV_ChLists &scanList
 
   wave/T fdacvalstr
   svar activegraphs
 
   variable eff_ramprate, answer, i, k, channel
   string question
-  for(i=0;i<itemsinlist(rampCh,",");i+=1)
+  for(i=0;i<itemsinlist(ScanList.dacList,",");i+=1)
     eff_ramprate = abs(str2num(stringfromlist(i,scanlist.startval,","))-str2num(stringfromlist(i,scanlist.finval,",")))*(measFreq/numpts)
-    channel = str2num(stringfromlist(i, rampCh, ","))
+    channel = str2num(stringfromlist(i, scanList.dacList, ","))
     if(eff_ramprate > str2num(fdacvalstr[channel][4])*1.05)  // Allow 5% too high for convenience
       // we are going too fast
       sprintf question, "DAC channel %d will be ramped at %.1f mV/s, software limit is set to %s mV/s. Continue?", channel, eff_ramprate, fdacvalstr[channel][4]
@@ -305,17 +264,10 @@ end
 
 
 
-function fdRV_check_lims(scanList, [starty, endy, channelsy])
+function fdRV_check_lims(scanList)
 	// check that start and end values are within software limits
-	struct fdacChLists &scanList
-	variable starty, endy
-	string channelsy
-												// TODO: DON'T DO BELOW! -- actually need to check starty/endy in 2D part of scan, and then ignore_lims when ramping
-												//     TODO: Maybe I should make the Scan templates also use a struct with a similar format?
-	string daclist = scanlist.daclist  // TODO: Append channelsy to list then use daclist instead of scanlist.daclist
-												// TODO: same for startVals and endVals (add starty, endy and use instead)
-												
-	
+	struct fdRV_ChLists &scanList
+
 	wave/T fdacvalstr
 	svar activegraphs
 	variable answer, i, k
@@ -342,30 +294,68 @@ function fdRV_check_lims(scanList, [starty, endy, channelsy])
 end
 
 
-function fdRV_ramp_start(instrID, scanList, ramprate, [ignore_lims])
+function fdRV_ramp_start(scanVars, scanList, [ignore_lims])
   // move DAC channels to starting point
-  struct fdacChLists &scanList
-  variable instrID, ramprate, ignore_lims
+  struct sc_scanVars &scanVars
+  struct fdRV_ChLists &scanList
+  variable ignore_lims
 
   variable i
   for(i=0;i<itemsinlist(scanList.daclist,",");i+=1)
-    rampOutputfdac(instrID,str2num(stringfromlist(i,scanList.daclist,",")),str2num(stringfromlist(i,scanList.startVal,",")),ramprate=ramprate, ignore_lims=ignore_lims)
+    rampOutputfdac(scanVars.instrID,str2num(stringfromlist(i,scanList.daclist,",")),str2num(stringfromlist(i,scanList.startVal,",")),ramprate=scanVars.rampratex, ignore_lims=ignore_lims)
   endfor
 end
 
 
-function fdRV_start_INT_RAMP(instrID, scanList, numpts)
+function fdRV_start_INT_RAMP(scanVars, scanList)
   // build command and start ramp
   // for now we only have to send one command to one device.
-  struct fdacChLists &scanList
-  variable instrID, numpts
+  struct sc_scanVars &scanVars
+  struct fdRV_ChLists &scanList
+
 
   string cmd = "", dacs="", adcs=""
   dacs = replacestring(",",scanlist.daclist,"")
   adcs = replacestring(",",scanlist.adclist,"")
   // OPERATION, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF STEPS
-  sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, scanList.startVal, scanList.finVal, numpts
-  writeInstr(instrID,cmd)
+  sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, scanList.startVal, scanList.finVal, scanVars.numptsx
+  writeInstr(scanVars.instrID,cmd)
+end
+
+
+
+function fdRV_record_buffer(S)
+   struct fdRV_Struct &S
+   // hold incoming data chunks in string and distribute to data waves
+   string buffer = ""
+   variable bytes_read = 0, plotUpdateTime = 15e-3, totaldump = 0,  saveBuffer = 1000
+   variable bufferDumpStart = stopMSTimer(-2)
+   variable totalByteReturn = S.numADCs*2*S.sv.numptsx
+   variable bytesSec = roundNum(2*S.measureFreq*S.numADCs,0)
+   variable read_chunk = fdRV_get_read_chunk_size(S.numADCs, S.sv.numptsx, bytesSec, totalByteReturn)
+   do
+      fdRV_read_chunk(S.sv.instrID, read_chunk, buffer)  // puts data into buffer
+      fdRV_distribute_data(buffer, S.fdList, bytes_read, totalByteReturn, S.numADCs, read_chunk, S.rowNum, S.sv.direction)
+      bytes_read += read_chunk
+      totaldump = bytesSec*(stopmstimer(-2)-bufferDumpStart)*1e-6  // Expected amount of bytes in buffer
+      if(totaldump-bytes_read < saveBuffer)  // if we aren't too far behind
+         // we can update all plots
+         // should take ~15ms extra
+         fdRV_update_graphs()
+      endif
+      fdRV_check_sweepstate(S.sv.instrID)
+   while(totalByteReturn-bytes_read > read_chunk)
+
+   // do one last read if any data left to read
+   variable bytes_left = totalByteReturn-bytes_read
+   if(bytes_left > 0)
+      fdRV_read_chunk(S.sv.instrID, bytes_left, buffer)  // puts data into buffer
+      fdRV_distribute_data(buffer, S.fdList, bytes_read, totalByteReturn, S.numADCs, bytes_left, S.rowNum, S.sv.direction)
+      fdRV_check_sweepstate(S.sv.instrID)
+      doupdate
+   endif
+   variable looptime = (stopmstimer(-2)-bufferDumpStart)*1e-6
+   return looptime
 end
 
 
@@ -430,7 +420,7 @@ end
 
 function fdRV_distribute_data(buffer, scanList, bytes_read, totalByteReturn, numADCs, read_chunk, rowNum, direction)
   // add data to rawwaves and datawaves
-  struct fdacChLists &scanList
+  struct fdRV_ChLists &scanList
   string &buffer  // Passing by reference for speed of execution
   variable bytes_read, totalByteReturn, numADCs, read_chunk, rowNum, direction
 
@@ -445,7 +435,7 @@ end
 
 
 function fdRV_update_window(instrID, scanList, numAdcs)
-  struct fdacChLists &scanList
+  struct fdRV_ChLists &scanList
   variable instrID, numADCs
 
   wave/T fdacvalstr
@@ -463,81 +453,182 @@ function fdRV_update_window(instrID, scanList, numAdcs)
 end
 
 
-function fdRV_process_set_cutoff(RCCutoff, cutoff_frac, notch_fracList, measureFreq)
-  variable RCCutoff, &cutoff_frac, measureFreq
-  string &notch_fracList
+function fdRV_Process_data(S)
+   struct fdRV_Struct &S
 
-  string warn = ""
-  variable do_Lowpass=0
-  if(RCCutoff != 0)
-    // add lowpass filter
-    do_Lowpass = 1
-    cutoff_frac = RCcutoff/measureFreq
-    if(cutoff_frac > 0.5)
-      print("[WARNING] \"fdacRecordValues\": RC cutoff frequency must be lower than half the measuring frequency!")
-      sprintf warn, "Setting it to %.2f", 0.5*measureFreq
-      print(warn)
-      cutoff_frac = 0.5
-    endif
-    notch_fraclist = "0," //What does this do?
-  endif
-  return do_lowpass
+   fdRV_process_set_cutoff(S.pl) // sets pl.do_notch accordingly
+
+   fdRV_process_set_notch(S.pl)
+
+   S.pl.do_average = (S.pl.numAverage != 0) ? 1 : 0 // If numaverage isn't zero then do average
+
+   // setup FIR (Finite Impluse Response) filter(s)
+
+   fdRV_process_setup_filters(S.pl, S.sv.numptsx)
+
+   fdRV_do_filters_average(S.PL, S.fdList, S.rowNum)
 end
 
 
-function fdRV_process_set_notch(notch, notch_fracList, measureFreq, numNotch)
-  string notch, &notch_fracList
-  variable measureFreq, &numNotch
-	numNotch=0
-  variable doNotch=0, i=0
-	if(cmpstr(notch, "")!=0)
+function fdRV_process_set_cutoff(PL)
+   struct fdRV_processList &PL
+
+   string warn = ""
+   if(PL.RCCutoff != 0)
+      // add lowpass filter
+      PL.do_Lowpass = 1
+      PL.cutoff_frac = PL.RCcutoff/PL.measureFreq
+      if(PL.cutoff_frac > 0.5)
+         print("[WARNING] \"fdacRecordValues\": RC cutoff frequency must be lower than half the measuring frequency!")
+         sprintf warn, "Setting it to %.2f", 0.5*PL.measureFreq
+         print(warn)
+         PL.cutoff_frac = 0.5
+      endif
+      PL.notch_fraclist = "0," //What does this do?
+  endif
+end
+
+
+function fdRV_process_set_notch(PL)
+   struct fdRV_processList &PL
+
+   variable i=0
+   if(cmpstr(PL.notch_list, "")!=0)
 		// add notch filter(s)
-		doNotch = 1
-		numNotch = itemsinlist(notch,",")
-		for(i=0;i<numNotch;i+=1)
-			notch_fracList = addlistitem(num2str(str2num(stringfromlist(i,notch,","))/measureFreq),notch_fracList,",",itemsinlist(notch_fracList))
+		PL.do_Notch = 1
+		PL.numNotch = itemsinlist(PL.notch_list,",")
+		for(i=0;i<PL.numNotch;i+=1)
+			PL.notch_fracList = addlistitem(num2str(str2num(stringfromlist(i,PL.notch_list,","))/PL.measureFreq),PL.notch_fracList,",",itemsinlist(PL.notch_fracList))
 		endfor
 	endif
-  return doNotch
 end
 
 
-function fdRV_process_setup_filters(FIRcoefs, coefList, cutoff_frac, notch_fracList, numpts, do_lowpass, do_notch, numNotch, measureFreq)
-	variable &FIRcoefs, cutoff_frac, numpts, do_lowpass, do_notch, numNotch, measureFreq
-	string &coefList, notch_fracList
+function fdRV_process_setup_filters(PL, numpts)
+   struct fdRV_processList &PL
+   variable numpts
 
-	if(numpts < 101)
-		FIRcoefs = numpts
+   if(numpts < 101)
+		PL.FIRcoefs = numpts
 	else
-		FIRcoefs = 101
+		PL.FIRcoefs = 101
 	endif
 
 	string coef = ""
 	variable j=0,numfilter=0
 	// add RC filter
-	if(do_Lowpass == 1)
+	if(PL.do_Lowpass == 1)
 		coef = "coefs"+num2istr(numfilter)
 		make/o/d/n=0 $coef
-		filterfir/lo={cutoff_frac,cutoff_frac,FIRcoefs}/coef $coef
-		coefList = addlistitem(coef,coefList,",",itemsinlist(coefList))
+		filterfir/lo={PL.cutoff_frac,PL.cutoff_frac,PL.FIRcoefs}/coef $coef
+		PL.coefList = addlistitem(coef,PL.coefList,",",itemsinlist(PL.coefList))
 		numfilter += 1
 	endif
 	// add notch filter(s)
-	if(do_Notch == 1)
-		for(j=0;j<numNotch;j+=1)
+	if(PL.do_Notch == 1)
+		for(j=0;j<PL.numNotch;j+=1)
 			coef = "coefs"+num2istr(numfilter)
 			make/o/d/n=0 $coef
-			filterfir/nmf={str2num(stringfromlist(j,notch_fraclist,",")),15.0/measureFreq,1.0e-8,1}/coef $coef
-			coefList = addlistitem(coef,coefList,",",itemsinlist(coefList))
+			filterfir/nmf={str2num(stringfromlist(j,PL.notch_fraclist,",")),15.0/PL.measureFreq,1.0e-8,1}/coef $coef
+			PL.coefList = addlistitem(coef,PL.coefList,",",itemsinlist(PL.coefList))
 			numfilter += 1
 		endfor
 	endif
-	return FIRcoefs
 end
 
 
+function fdRV_do_filters_average(PL, SL, rowNum)
+   struct fdRV_processList &PL
+   struct fdRV_ChLists &SL
+   variable rowNum
+
+   // apply filters
+   if(PL.do_Lowpass == 1 || PL.do_Notch == 1)
+      sc_applyfilters(PL.coefList,SL.adclist,PL.do_Lowpass,PL.do_Notch,PL.cutoff_frac,PL.measureFreq,PL.FIRcoefs,PL.notch_fraclist,rowNum)
+   endif
+
+   // average datawaves
+   variable lastRow = sc_lastrow(rowNum)
+   if(PL.do_Average == 1)
+      sc_averageDataWaves(PL.numAverage,SL.adcList,lastRow,rowNum)
+   endif
+end
+
+
+function fdRV_set_measureFreq(S)
+   struct fdRV_Struct &S
+   S.samplingFreq = getfadcSpeed(S.sv.instrID)
+   S.numADCs = getNumFADC()
+   S.measureFreq = S.samplingFreq/S.numADCs  //Because sampling is split between number of ADCs being read //TODO: This needs to be adapted for multiple FastDacs
+	S.pl.measureFreq = S.measureFreq  // Also required for Processing
+end
+
+function fdRV_set_struct_base_vars(s, instrID,rowNum,rampCh,start,fin,numpts,delay,ramprate,RCcutoff,numAverage,notch,direction)
+   struct fdRV_Struct &s
+   variable instrID, rowNum
+   string rampCh, start, fin
+   variable numpts, delay, ramprate, RCcutoff, numAverage, direction
+   string notch
+   s.rowNum = rowNum
+   sc_set_scanVars(s.sv, instrID, NaN, NaN, rampCh, numpts, ramprate, delay, direction=direction)
+   fdRV_set_scanList(s.fdList, rampCh, start, fin)
+   s.pl.RCcutoff = RCCutoff
+   s.pl.numAverage = numAverage
+   s.pl.notch_list = notch
+   s.pl.coefList = ""
+end
+
+
+//Structure to hold all variables for fastdacRecordValues
+structure fdRV_Struct
+   struct fdRV_ChLists fdList   		// FD specific single sweep variables
+   struct sc_scanVars sv         	// Common scan variables
+   struct fdRV_processList pl   		// FD post processing variables
+   struct sc_global_vars sc     	// SC global variables for scans
+   // FD specific variables
+   variable rowNum
+   variable samplingFreq
+   variable measureFreq
+   variable numADCs
+endstructure
+
+
+// structure to hold DAC and ADC channels to be used in fdac scan.
+structure fdRV_ChLists
+		string dacList
+		string adcList
+		string startVal
+		string finVal
+endstructure
+
+
+structure fdRV_processList
+   variable RCCutoff
+   string notch_list
+   variable numAverage
+
+   variable FIRcoefs
+   string coefList
+   variable cutoff_frac
+   string notch_fracList
+   variable numNotch
+
+   variable measureFreq
+
+   variable do_Lowpass
+   variable do_notch
+   variable do_average
+endstructure
+
+structure sc_global_vars
+   nvar sc_is2d, sc_startx, sc_starty, sc_finx, sc_finy, sc_numptsx, sc_numptsy
+   nvar sc_abortsweep, sc_pause, sc_scanstarttime
+   wave fadcattr
+   wave/T fdacvalstr, facdvalstr
+endstructure
+
 function sc_fdacSortChannels(s,rampCh,start,fin)
-	struct fdacChLists &s
+	struct fdRV_ChLists &s
 	string rampCh, start, fin
 	wave fadcattr
 	wave/t fadcvalstr
@@ -602,13 +693,6 @@ function sc_fdacSortChannels(s,rampCh,start,fin)
 	return dev_adc
 end
 
-// structure to hold DAC and ADC channels to be used in fdac scan.
-structure fdacChLists
-		string dacList
-		string adcList
-		string startVal
-		string finVal
-endstructure
 
 function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart,[direction])
 	string &buffer, adcList  //passing buffer by reference for speed of execution

@@ -2607,3 +2607,48 @@ function /S getSlackNotice(username, [message, min_time])
 end
 
 
+//////////////////////////////////
+////////// Common Structs ////////
+//////////////////////////////////
+
+
+structure sc_scanVars
+	// To make using and passing common scanVariables easier in scan routines
+	// use sc_set_scanVars() as a nice way to initialize scanVars.
+   variable instrID
+   variable startx, finx, numptsx, delayx, rampratex
+   variable starty, finy, numptsy, delayy, rampratey
+   string channelsx
+   string channelsy
+   variable direction
+endstructure
+
+
+function sc_set_scanVars(s, instrID, startx, finx, channelsx, numptsx, rampratex, delayx, [starty, finy, channelsy, numptsy, rampratey, delayy, direction])
+   // Function to make setting up scanVars struct easier. 
+   // Note: This is designed to store 2D variables, so if just using 1D you still have to specify x at the end of each variable
+   struct sc_scanVars &s
+   variable instrID
+   variable startx, finx, numptsx, delayx, rampratex
+   variable starty, finy, numptsy, delayy, rampratey
+   string channelsx
+   string channelsy
+   variable direction
+
+   s.instrID = instrID
+   s.startx = startx
+   s.finx = finx
+   s.channelsx = channelsx
+   s.numptsx = numptsx
+   s.rampratex = rampratex
+   s.delayx = delayx
+   s.starty = paramisdefault(starty) ? NaN : starty
+   s.finy = paramisdefault(finy) ? NaN : finy
+   if (paramisdefault(channelsy))
+		s.channelsy = ""
+	endif
+	s.numptsy = paramisdefault(numptsy) ? NaN : numptsy
+   s.rampratey = paramisdefault(rampratey) ? NaN : rampratey
+   s.delayy = paramisdefault(delayy) ? NaN : delayy
+   s.direction = paramisdefault(direction) ? 1 : direction
+end
