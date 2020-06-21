@@ -111,6 +111,89 @@ end
 //// ScanController ////
 ///////////////////////
 
+
+function fdAWG_record_values(ScanVars, AWG_list, FilterOpts, rowNum)
+   struct sc_scanVars &scanVars
+   struct fdAWG_list &AWG_list
+   struct fdRV_Filter_options &FilterOpts
+   variable rowNum
+   // Almost exactly the same as fdacRecordValues with:
+   //    Improved usage of structures
+   //    Ability to use FDAC Arbitrary Wave Generator
+   // Note: May be worth using this function to replace fdacRecordValues at somepoint
+   // Note: Only works for 1 FastDAC! Not sure what implementation will look like for multiple yet
+
+
+   struct fdRV_Struct S
+   // Set up FastDac Record Values Struct.
+   // Note: FilterOpts get stored in S.pl (pl= ProcessList)
+   // Note: samplingFreq, measureFreq, numADCs also setup here.
+   // Note: This is also where start, fin variables in ScanVars are converted to strings for FastDAC
+   fdAWG_set_struct_base_vars(S, ScanVars, FilterOpts, rowNum)
+
+   // Check InitWaves was run with fastdac=1
+   fdRV_check_init()
+
+   // Check within limits and ramprates
+   fdRV_check_rr_lims(S)
+
+   // Ramp to start of scan ignoring lims because already checked
+   fdRV_ramp_start(S.sv, S.fdList, ignore_lims = 1)
+   sc_sleep(S.sv.delayx) // Settle time for 2D sweeps
+
+   // Start the AWG_RAMP
+   fdAWG_start_AWG_RAMP(S, AWG_list)
+
+   variable totalByteReturn = AWG_list.numCycles*AWG_list.numSteps*AWG_list.waveLen
+   // TODO: Either check that totalByteReturn is a multiple of numADCs, or that waveLen is a multiple of ADCs to reduce aliasing
+   variable looptime = 0
+   // TODO: Is is OK to be storing datapoints with increasing x even though steps will be only every AWG.waveLen/numADCs
+   looptime = fdRV_record_buffer(S, totalByteReturn)
+
+   // update window
+	string endstr
+	endstr = readInstr(S.sv.instrID)
+	endstr = sc_stripTermination(endstr,"\r\n")
+	if(fdacCheckResponse(endstr,"AWG_RAMP...",isString=1,expectedResponse="RAMP_FINISHED"))
+		fdRV_update_window(S.sv.instrID, S.fdList, S.numADCs)
+	endif
+
+   /////////////////////////
+	//// Post processing ////
+	/////////////////////////
+
+	fdRV_Process_data(S)
+
+		// check abort/pause status
+	fdRV_check_sweepstate(S.sv.instrID)
+	return looptime
+
+end
+
+function fdAWG_set_struct_base_vars(S, ScanVals, FilterOpts, rowNum)
+   struct fdRV_Struct &S
+   struct sc_ScanVars &scanVals
+   struct fdRV_Filter_options &FilterOpts
+   variable rowNum
+   S.sv = ScanVals
+   S.rowNum = rowNum
+
+   string starts = "", fins = ""
+   fd_format_setpoints(S.sv.startx, S.sv.finx, S.sv.channelsx, starts, fins)  // Gets starts/fins in FD string format
+   fdRV_set_scanList(s.fdList, S.sv.channelsx, starts, fins)  // Sets fdList with CHs, starts, fins
+
+   S.pl.RCCutoff = FilterOpts.RCcutoff
+   S.pl.numAverage = FilterOpts.numAverage
+   S.pl.notch_list = FilterOpts.notch_list
+
+   S.pl.coefList = ""
+
+   fdRV_set_measureFreq(S) // Sets S.samplingFreq/measureFreq/numADCs
+end
+
+
+
+
 function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay,ramprate,RCcutoff,numAverage,notch,direction])
 	// RecordValues for FastDAC's. This function should replace RecordValues in scan functions.
 	// j is outer scan index, if it's a 1D scan just set j=0.
@@ -121,6 +204,7 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay,ramprate
 	//		- nocth sets the notch frequency, as a comma seperated list (width is fixed at 5Hz)
 	// direction - used to reverse direction of scan (e.g. in alternating repeat scan) - leave start/fin unchanged
 	// 	   It is not sufficient to reverse start/fin because sc_distribute_data also needs to know
+
 	variable instrID, rowNum
 	string rampCh, start, fin
 	variable numpts, delay, ramprate, RCcutoff, numAverage, direction
@@ -171,8 +255,9 @@ function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay,ramprate
 	fdRV_start_INT_RAMP(S.sv, S.fdList)
 
 	// Record all the values sent back from the FastDAC to respective waves
+	variable totalByteReturn = S.numADCs*2*S.sv.numptsx
 	variable looptime = 0
-	looptime = fdRV_record_buffer(S) // And get the total time
+	looptime = fdRV_record_buffer(S, totalByteReturn) // And get the total time
 
 	// update window
 	string endstr
@@ -308,29 +393,31 @@ end
 
 
 function fdRV_start_INT_RAMP(scanVars, scanList)
-  // build command and start ramp
-  // for now we only have to send one command to one device.
-  struct sc_scanVars &scanVars
-  struct fdRV_ChLists &scanList
-
-
-  string cmd = "", dacs="", adcs=""
-  dacs = replacestring(",",scanlist.daclist,"")
-  adcs = replacestring(",",scanlist.adclist,"")
-  // OPERATION, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF STEPS
-  sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, scanList.startVal, scanList.finVal, scanVars.numptsx
-  writeInstr(scanVars.instrID,cmd)
+	// build command and start ramp
+	// for now we only have to send one command to one device.
+	struct sc_scanVars &scanVars
+	struct fdRV_ChLists &scanList
+	
+	
+	string cmd = "", dacs="", adcs=""
+	dacs = replacestring(",",scanlist.daclist,"")
+	adcs = replacestring(",",scanlist.adclist,"")
+	// OPERATION, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF STEPS
+	sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, scanList.startVal, scanList.finVal, scanVars.numptsx
+	writeInstr(scanVars.instrID,cmd)
 end
 
 
 
-function fdRV_record_buffer(S)
+function fdRV_record_buffer(S, totalByteReturn)
    struct fdRV_Struct &S
+   variable totalByteReturn
+   
    // hold incoming data chunks in string and distribute to data waves
    string buffer = ""
    variable bytes_read = 0, plotUpdateTime = 15e-3, totaldump = 0,  saveBuffer = 1000
    variable bufferDumpStart = stopMSTimer(-2)
-   variable totalByteReturn = S.numADCs*2*S.sv.numptsx
+   
    variable bytesSec = roundNum(2*S.measureFreq*S.numADCs,0)
    variable read_chunk = fdRV_get_read_chunk_size(S.numADCs, S.sv.numptsx, bytesSec, totalByteReturn)
    do
@@ -620,12 +707,6 @@ structure fdRV_processList
    variable do_average
 endstructure
 
-structure sc_global_vars
-   nvar sc_is2d, sc_startx, sc_starty, sc_finx, sc_finy, sc_numptsx, sc_numptsy
-   nvar sc_abortsweep, sc_pause, sc_scanstarttime
-   wave fadcattr
-   wave/T fdacvalstr, facdvalstr
-endstructure
 
 function sc_fdacSortChannels(s,rampCh,start,fin)
 	struct fdRV_ChLists &s

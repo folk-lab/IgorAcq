@@ -2652,3 +2652,12 @@ function sc_set_scanVars(s, instrID, startx, finx, channelsx, numptsx, rampratex
    s.delayy = paramisdefault(delayy) ? NaN : delayy
    s.direction = paramisdefault(direction) ? 1 : direction
 end
+
+
+structure sc_global_vars
+	// Structure to make accessing common sc global variables easier and cleaner
+   nvar sc_is2d, sc_startx, sc_starty, sc_finx, sc_finy, sc_numptsx, sc_numptsy
+   nvar sc_abortsweep, sc_pause, sc_scanstarttime
+   wave fadcattr
+   wave/T fdacvalstr, facdvalstr
+endstructure

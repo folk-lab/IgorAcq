@@ -1384,47 +1384,171 @@ EndMacro
 ////////////////////////////////////////////////////
 
 function fdAWG_add_wave(instrID, wave_num, add_wave)
-	// Adds to the AWGs stored in the fastdac
+	// Very basic command which adds to the AWGs stored in the fastdac
 	variable instrID
 	variable wave_num  	// Which AWG to add to (currently allowed 0 or 1)
 	wave add_wave		// add_wave should be 2D with add_wave[0] = mV setpoint for each step in wave
 					   		// 									 add_wave[1] = how many samples to stay at each setpoint
-	
-	// assert add_wave is 2D and has no nans/blanks
-	// assert wave_num = 0,1
-	
-	// get fd_address from instrID
-	
-	// convert to string in form "ADD_WAVE,<wave_num>,<sp0>,<#sp0>,...,<spn>,<#spn>"
-	// check len < 128/256/512 characters  (size of buffer input to fd)
-		// if not then split into necessary chunks
-	
-	// send command(s)
-	
-	// check response(s) ("WAVE,<wave_num>,<len_setpoints>")
-	
-	// add to wave fdAWG<wave_num> (2D of setpoints and sample times)
 
+
+
+                        // ADD_WAVE,<wave number (for now just 0 or 1)>,<Setpoint 0 in mV>,<Number of samples at setpoint 0>,….<Setpoint n in mV>,<Number of samples at Setpoint n>
+                        //
+                        // Response:
+                        //
+                        // WAVE,<wavenumber>,<total number of setpoints accumulated in waveform>
+                        //
+                        // Example:
+                        //
+                        // ADD_WAVE,0,300.1,50,-300.1,200
+                        //
+                        // Response:
+                        //
+                        // WAVE,0,2
+
+   waveStats add_wave
+   if (dimsize(add_wave, 0) != 2 || V_numNans !=0) // Check 2D(TODO: Check 0/1) and no NaNs
+      abort "ERROR[fdAWG_add_wave]: must be 2D (setpoints, samples) and contain no NaNs"
+   endif
+   if (wave_num != 0 || wave_num != 1)  // Check adding to AWG 0 or 1
+      abort "ERROR[fdAWG_add_wave]: Only supports AWG wave 0 or 1"
+   endif
+
+   // TODO: Any other checks on add_wave? i.e. setpoints within hardware/software lims, sample lengths within reasonable lims
+   // TODO: Will have to check against lims when setting ramp as thats when DACs are chosen to output.
+   // TODO: Should check that all sample_lengths are integers (i.e. not getting sent times in seconds)
+
+   variable i=0
+   string buffer = ""
+   for(i=0;i<numpnts(add_wave);i++)
+      sprintf buffer "%s,%d,%d,", buffer, add_wave[0][i], add_wave[1][i] // TODO: Check got correct wave dim here
+   endfor
+
+   buffer = buffer[0,strlen(buffer)-2]  // chop off last ","
+
+   string cmd = ""
+	// convert to string in form "ADD_WAVE,<wave_num>,<sp0>,<#sp0>,...,<spn>,<#spn>"
+   sprintf cmd "ADD_WAVE,%d,%s", wave_num, buffer
+
+   if (strlen(cmd) > 256)
+      sprintf buffer "ERROR[fdAWG_add_wave]: command length is %d, which exceeds fDAC buffer size of 256. Add to AWG in smaller chunks", strlen(cmd)
+      abort buffer
+   endif
+
+	 string response
+    response = queryInstr(instrID, cmd+"\r", read_term="\n")
+    response = sc_stripTermination(response, "\r\n")
+
+    string expected_response
+    sprintf expected_response "WAVE,%d,%d", wave_num, numpnts(add_wave)
+    if(fdacCheckResponse(response, cmd, isString=1, expectedResponse=expected_response))
+       wave AWG_wave = fdAWG_get_AWG_wave(wave_num)
+       AWG_wave = AWG_wave+add_wave  // TODO: check this concatenates properly
+    else
+       abort "ERROR[fdAWG_add_wave]: Failed to add add_wave to AWG_wave"+ num2str(wave_num)
+    endif
 end
 
+
+function/wave fdAWG_get_AWG_wave(wave_num)
+   // Either returns existing AWG_wave<wave_num> or creates and returns
+   variable wave_num
+   if (wave_num != 0 || wave_num != 1)  // Check adding to AWG 0 or 1
+      abort "ERROR[fdAWG_get_AWG_wave]: Only supports AWG wave 0 or 1"
+   endif
+
+   string wn = ""
+   sprintf wn, "AWG_wave%d", wave_num
+   wave AWG_wave = $wn
+   if(!waveExists(AWG_wave))
+      make/o/n=(-1,2) AWG_wave // TODO: check how dimensions of this look
+   endif
+   return AWG_wave
+end
 
 function fdAWG_clear_wave(instrID, wave_num)
 	// Clears AWG# from the fastdac and the corresponding global wave in IGOR
 	variable instrID
 	variable wave_num // Which AWG to clear (currently allowed 0 or 1)
 
-	// assert wave_num = 0,1
-	
-	// get fd_address...
-	
+   // CLR_WAVE,<wave number>
+   //
+   // Response:
+   //
+   // WAVE,<wave number>,0
+   //
+   // Example:
+   //
+   // CLR_WAVE,1
+   //
+   // Response:
+   //
+   // WAVE,1,0
+
 	string cmd
 	sprintf cmd, "CLR_WAVE,%d", wave_num
 	//send command
-	
-	//check response == "WAVE,<wave_num>,0"
-	
-	//clear fdAWG<wave_num>
-	
+	string response
+   response = queryInstr(instrID, cmd+"\r", read_term="\n")
+   response = sc_stripTermination(response, "\r\n")
+
+   string expected_response
+   sprintf expected_response "WAVE,%d,0", wave_num
+   if(fdacCheckResponse(response, cmd, isstring=1,expectedResponse=expected_response))
+		wave AWG_wave = fdAWG_get_AWG_wave(wave_num)
+		killwaves AWG_wave 
+   else
+      abort "ERROR[fdAWG_clear_wave]: Error while clearing AWG_wave"+num2str(wave_num)
+   endif
 end
 
 
+function fdAWG_start_AWG_RAMP(S, AWG_list)
+   struct fdRV_Struct &S
+   struct fdAWG_list &AWG_list
+
+   // AWG_RAMP,<number of waveforms>,<dac channel(s) to output waveform 0>,<dac channel(s) to output waveform n>,<dac channel(s) to ramp>,<adc channel(s)>,<initial dac voltage 1>,<…>,<initial dac voltage n>,<final dac voltage 1>,<…>,<final dac voltage n>,<# of waveform repetitions at each ramp step>,<# of ramp steps>
+   //
+   // Example:
+   //
+   // AWG_RAMP,2,012,345,67,0,-1000,1000,-2000,2000,50,50
+   //
+   // Response:
+   //
+   // <(2500 * waveform length) samples from ADC0>RAMP_FINISHED
+
+   string cmd = "", dacs="", adcs=""
+   dacs = replacestring(",",S.fdList.daclist,"")
+	adcs = replacestring(",",S.fdList.adclist,"")
+   // OPERATION, #N AWs, AW_dacs, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF Wave cycles per step, # ramp steps
+   // Note: AW_dacs is formatted (dacs_for_wave0, dacs_for_wave1, .... e.g. '01,23' for Dacs 0,1 to output wave0, Dacs 2,3 to output wave1)
+	sprintf cmd, "AWG_RAMP,%d, %s, %s,%s,%s,%s, %d, %d\r", AWG_list.numWaves, AWG_list.dacs, dacs, adcs, S.fdList.startVal, S.fdList.finVal, AWG_list.numCycles, AWG_list.numSteps
+	writeInstr(S.sv.instrID,cmd)
+
+end
+
+
+
+
+
+//////////////////////////////////////
+///////////// Structs ////////////////
+//////////////////////////////////////
+
+
+
+structure fdAWG_list
+   // Note: AW_dacs is formatted (dacs_for_wave0, dacs_for_wave1, .... e.g. '01,23' for Dacs 0,1 to output wave0, Dacs 2,3 to output wave1)
+   string dacs
+   variable numWaves   // # different AWGs (currently 1 or 2 only)
+   variable waveLen    // in samples (i.e. sum of samples at each setpoint for a single wave cycle)
+   variable numCycles  // # wave cycles per DAC step for a full 1D scan
+   variable numSteps   // # DAC steps for a full 1D scan
+endstructure
+
+structure fdRV_Filter_options
+	// For use in Scan functions to pass in filter options in a neater way
+   variable RCCutoff
+   variable numAverage
+   string notch_list
+endstructure
