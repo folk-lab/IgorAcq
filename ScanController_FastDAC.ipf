@@ -307,86 +307,6 @@ function fdRV_check_ramp_start(S)
 end
 
 
-
-function fdRV_check_ramprates(S)
-  // check if effective ramprate is higher than software limits
-  struct FD_ScanVars &S
-
-  wave/T fdacvalstr
-  svar activegraphs
-
-  variable eff_ramprate, answer, i, k, channel
-  string question
-  for(i=0;i<itemsinlist(S.channelsx,",");i+=1)
-    eff_ramprate = abs(str2num(stringfromlist(i,S.startxs,","))-str2num(stringfromlist(i,S.finxs,",")))*(S.measureFreq/S.numptsx)
-    channel = str2num(stringfromlist(i, S.channelsx, ","))
-    if(eff_ramprate > str2num(fdacvalstr[channel][4])*1.05)  // Allow 5% too high for convenience
-      // we are going too fast
-      sprintf question, "DAC channel %d will be ramped at %.1f mV/s, software limit is set to %s mV/s. Continue?", channel, eff_ramprate, fdacvalstr[channel][4]
-      answer = ask_user(question, type=1)
-      if(answer == 2)
-        print("[ERROR] \"RecordValues\": User abort!")
-        dowindow/k SweepControl // kill scan control window
-        for(k=0;k<itemsinlist(activegraphs,";");k+=1)
-          dowindow/k $stringfromlist(k,activegraphs,";")
-        endfor
-        abort
-      endif
-    endif
-  endfor
-  
-  if(numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0)
-  	// TODO: Check y values here
-  	  	// TODO: ACTUALLY just combine channels, starts, etc if they exist, then run the check on all in one go
-  
-  endif
-  
-  
-  
-end
-
-
-
-function fdRV_check_lims(scanList)
-	// check that start and end values are within software limits
-	struct FD_ScanVars &scanList
-
-	wave/T fdacvalstr
-	svar activegraphs
-	variable answer, i, k
-	string softLimitPositive = "", softLimitNegative = "", expr = "(-?[[:digit:]]+),([[:digit:]]+)", question
-	variable startval = 0, finval = 0
-	for(i=0;i<itemsinlist(scanlist.channelsx,",");i+=1)
-		splitstring/e=(expr) fdacvalstr[str2num(stringfromlist(i,scanList.channelsx,","))][2], softLimitNegative, softLimitPositive
-		startval = str2num(stringfromlist(i,scanlist.startxs,","))
-		finval = str2num(stringfromlist(i,scanlist.finxs,","))
-		if(startval < str2num(softLimitNegative) || startval > str2num(softLimitPositive) || finval < str2num(softLimitNegative) || finval > str2num(softLimitPositive))
-			// we are outside limits
-			sprintf question, "DAC channel %s will be ramped outside software limits. Continue?", stringfromlist(i,scanlist.channelsx,",")
-			answer = ask_user(question, type=1)
-			if(answer == 2)
-				print("[ERROR] \"RecordValues\": User abort!")
-				dowindow/k SweepControl // kill scan control window
-				for(k=0;k<itemsinlist(activegraphs,";");k+=1)
-					dowindow/k $stringfromlist(k,activegraphs,";")
-				endfor
-				abort
-			endif
-		endif
-	endfor
-	
-  if(numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0)
-  	// TODO: Check y values here
-  	// TODO: ACTUALLY just combine channels, starts, etc if they exist, then run the check on all in one go
-  
-  endif
-	
-end
-
-
-
-
-
 function/s fdRV_start_INT_RAMP(S)
 	// build command and start ramp
 	// for now we only have to send one command to one device.
@@ -680,69 +600,6 @@ structure fdRV_processList
    variable do_average
 endstructure
 
-// TODO: Change name and put somewhere that makes sense
-function sc_fdacSortChannels(s)
-	// Checks all rampChs and ADCs (selected in fd_scancontroller window)
-	// are on the same device. If so, sets adcList FD_ScanVars
-	struct FD_ScanVars &s
-	wave fadcattr
-	wave/t fadcvalstr
-	svar fdacKeys
-	
-	// check that all DAC channels are on the same device
-	variable numRampCh = itemsinlist(S.channelsx,","),i=0,j=0,dev_dac=0,dacCh=0,startCh=0
-	variable numDevices = str2num(stringbykey("numDevices",fdacKeys,":",",")),numDACCh=0
-	for(i=0;i<numRampCh;i+=1)
-		dacCh = str2num(stringfromlist(i,S.channelsx,","))
-		startCh = 0
-		for(j=0;j<numDevices;j+=1)
-			numDACCh = str2num(stringbykey("numDACCh"+num2istr(j+1),fdacKeys,":",","))
-			if(startCh+numDACCh-1 >= dacCh)
-				// this is the device
-				if(i > 0 && dev_dac != j)
-					print "[ERROR] \"sc_checkfdacDevice\": All DAC channels must be on the same device!"
-					abort
-				else
-					dev_dac = j
-					break
-				endif
-			endif
-			startCh += numDACCh
-		endfor
-	endfor
-	
-	// check that all adc channels are on the same device
-	variable q=0,numReadCh=0,h=0,dev_adc=0,adcCh=0,numADCCh=0
-	string  adcList = ""
-	for(i=0;i<dimsize(fadcattr,0);i+=1)
-		if(fadcattr[i][2] == 48)
-			adcCh = str2num(fadcvalstr[i][0])
-			startCh = 0
-			for(j=0;j<numDevices+1;j+=1)
-				numADCCh = str2num(stringbykey("numADCCh"+num2istr(j+1),fdacKeys,":",","))
-				if(startCh+numADCCh-1 >= adcCh)
-					// this is the device
-					if(i > 0 && dev_adc != j)
-						print "[ERROR] \"sc_checkfdacDevice\": All ADC channels must be on the same device!"
-						abort
-					elseif(j != dev_dac)
-						print "[ERROR] \"sc_checkfdacDevice\": DAC & ADC channels must be on the same device!"
-						abort
-					else
-						dev_adc = j
-						adcList = addlistitem(num2istr(adcCh),adcList,",",itemsinlist(adcList,","))
-						break
-					endif
-				endif
-				startCh += numADCCh
-			endfor
-		endif
-	endfor
-	
-	// add result to structure
-	s.adclist = adcList
-	return dev_adc
-end
 
 
 function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart,[direction])
@@ -1477,19 +1334,4 @@ function fdacSetGUIinteraction(numDevices)
 end
 
 
-function fd_format_setpoints(start, fin, channels, starts, fins)
-	// Returns strings in starts and fins in the format that fdacRecordValues takes
-	// e.g. fd_format_setpoints(-10, 10, "1,2,3", s, f) will make string s = "-10,-10,-10" and string f = "10,10,10"
-	variable start, fin
-	string channels, &starts, &fins
-	
-	variable i
-	starts = ""
-	fins = ""
-	for(i=0; i<itemsInList(channels, ","); i++)
-		starts = addlistitem(num2str(start), starts, ",")
-		fins = addlistitem(num2str(fin), fins, ",")
-	endfor
-	starts = starts[0,strlen(starts)-2] // Remove comma at end
-	fins = fins[0,strlen(fins)-2]	 		// Remove comma at end
-end
+
