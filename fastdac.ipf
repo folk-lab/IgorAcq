@@ -403,8 +403,8 @@ function rampOutputFDAC(instrID,channel,output,[ramprate, ignore_lims]) // Units
 	endif
 end
 
-function RampMultipleFDAC(InstrID, channels, setpoint, [ramprate])
-	variable InstrID, setpoint, ramprate
+function RampMultipleFDAC(InstrID, channels, setpoint, [ramprate, ignore_lims])
+	variable InstrID, setpoint, ramprate, ignore_lims
 	string channels
 	
 	nvar fd_ramprate
@@ -413,7 +413,7 @@ function RampMultipleFDAC(InstrID, channels, setpoint, [ramprate])
 	variable i=0, channel, nChannels = ItemsINList(channels, ",")
 	for(i=0;i<nChannels;i+=1)
 		channel = str2num(StringFromList(i, channels, ","))
-		rampOutputfdac(instrID, channel, setpoint, ramprate=ramprate)
+		rampOutputfdac(instrID, channel, setpoint, ramprate=ramprate, ignore_lims=ignore_lims)
 	endfor
 end
 
@@ -1526,7 +1526,7 @@ function fdAWG_clear_wave(instrID, wave_num)
 end
 
 
-function/s fdAWG_start_AWG_RAMP(S, AWG_list)
+function/s fd_start_AWG_RAMP(S, AWG_list)
    struct FD_ScanVars &S
    struct fdAWG_list &AWG_list
 
@@ -1540,17 +1540,53 @@ function/s fdAWG_start_AWG_RAMP(S, AWG_list)
    //
    // <(2500 * waveform length) samples from ADC0>RAMP_FINISHED
 
+	string starts, fins, temp
+	if(S.direction == 1)
+		starts = S.startxs
+		fins = S.finxs
+	elseif(S.direction == -1)
+		starts = S.finxs
+		fins = S.startxs
+	else
+		abort "ERROR[fdRV_start_INT_RAMP]: S.direction must be 1 or -1, not " + num2str(S.direction)
+	endif
+
    string cmd = "", dacs="", adcs=""
    dacs = replacestring(",",S.channelsx,"")
 	adcs = replacestring(",",S.adclist,"")
    // OPERATION, #N AWs, AW_dacs, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF Wave cycles per step, # ramp steps
    // Note: AW_dacs is formatted (dacs_for_wave0, dacs_for_wave1, .... e.g. '01,23' for Dacs 0,1 to output wave0, Dacs 2,3 to output wave1)
-	sprintf cmd, "AWG_RAMP,%d, %s, %s,%s,%s,%s, %d, %d\r", AWG_list.numWaves, AWG_list.dacs, dacs, adcs, S.startxs, S.finxs, AWG_list.numCycles, AWG_list.numSteps
+	sprintf cmd, "AWG_RAMP,%d, %s, %s,%s,%s,%s, %d, %d\r", AWG_list.numWaves, AWG_list.dacs, dacs, adcs, starts, fins, AWG_list.numCycles, AWG_list.numSteps
 	writeInstr(S.instrID,cmd)
 	return cmd
 end
 
-
+function/s fd_start_INT_RAMP(S)
+	// build command and start ramp
+	// for now we only have to send one command to one device.
+	struct FD_ScanVars &S
+	
+	
+	string cmd = "", dacs="", adcs=""
+	dacs = replacestring(",",S.channelsx,"")
+	adcs = replacestring(",",S.adclist,"")
+	
+	string starts, fins, temp
+	if(S.direction == 1)
+		starts = S.startxs
+		fins = S.finxs
+	elseif(S.direction == -1)
+		starts = S.finxs
+		fins = S.startxs
+	else
+		abort "ERROR[fdRV_start_INT_RAMP]: S.direction must be 1 or -1, not " + num2str(S.direction)
+	endif
+		
+	// OPERATION, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF STEPS
+	sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, starts, fins, S.numptsx
+	writeInstr(S.instrID,cmd)
+	return cmd
+end
 
 
 

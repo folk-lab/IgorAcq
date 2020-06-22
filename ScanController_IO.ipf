@@ -198,6 +198,7 @@ end
 // To be used in addition to home built JSON functions which work with JSON strings
 // JSON id's give access to all XOP functions (e.g. JSON_getKeys(jsonID, path))
 // functions here should be ...JSONX...() to mark as a function which works with JSON XOP ID's rather than strings
+// To switch between jsonID and json strings use JSON_Parse/JSON_dump 
 
 function getJSONXid(jsonID, path)
 	// Returns jsonID of json object located at "path" in jsonID passed in. e.g. get "BabyDAC" json from "Sweep_logs" json.

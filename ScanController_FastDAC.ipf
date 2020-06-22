@@ -112,15 +112,12 @@ end
 ///////////////////////
 
 
-function fd_record_values(S, PL, rowNum, [AWG_list])
+function fd_Record_Values(S, PL, rowNum, [AWG_list])
    struct FD_ScanVars &S
    struct fdRV_processList &PL
    variable rowNum
    struct fdAWG_list &AWG_list
-   // Almost exactly the same as fdacRecordValues with:
-   //    Improved usage of structures
-   //    Ability to use FDAC Arbitrary Wave Generator
-   // Note: May be worth using this function to replace fdacRecordValues at somepoint
+	// If passed AWG_list then it will run with the Arbitrary Wave Generator on
    // Note: Only works for 1 FastDAC! Not sure what implementation will look like for multiple yet
 
    // Check InitWaves was run with fastdac=1
@@ -128,7 +125,7 @@ function fd_record_values(S, PL, rowNum, [AWG_list])
 
    // Check that checks have been carried out in main scan function where they belong
 	if(S.lims_checked != 1)
-		abort "ERROR[fdAWG_record_values]: FD_ScanVars.lims_checked != 1. Probably called before limits/ramprates/sweeprates have been checked in the main Scan Function!"
+		abort "ERROR[fd_record_values]: FD_ScanVars.lims_checked != 1. Probably called before limits/ramprates/sweeprates have been checked in the main Scan Function!"
 	endif
 
    // Check that DACs are at start of ramp (will set if necessary but will give warning if it needs to)
@@ -136,14 +133,11 @@ function fd_record_values(S, PL, rowNum, [AWG_list])
 
 	string cmd_sent = ""
 	variable totalByteReturn
-	if(!paramisDefault(AWG_list))  // Do AWG_RAMP
-	   // Start the AWG_RAMP
-	   cmd_sent = fdAWG_start_AWG_RAMP(S, AWG_list)
+	if(!paramisDefault(AWG_list))  	// Do AWG_RAMP
+	   cmd_sent = fd_start_AWG_RAMP(S, AWG_list)
 	   totalByteReturn = AWG_list.numCycles*AWG_list.numSteps*AWG_list.waveLen
-	   // TODO: Either check that totalByteReturn is a multiple of numADCs, or that waveLen is a multiple of ADCs to reduce aliasing   
-	   // TODO: Is is OK to be storing datapoints with increasing x even though steps will be only every AWG.waveLen/numADCs
-	else								// DO normal INT_RAMP
-		cmd_sent = fdRV_start_INT_RAMP(S)
+	else									// DO normal INT_RAMP
+		cmd_sent = fd_start_INT_RAMP(S)
 		totalByteReturn = S.numADCs*2*S.numptsx
 	endif
 	
@@ -163,6 +157,7 @@ function fd_record_values(S, PL, rowNum, [AWG_list])
 	/////////////////////////
 
 	fdRV_Process_data(S, PL, rowNum)
+	doupdate
 
 	// check abort/pause status
 	fdRV_check_sweepstate(S.instrID)
@@ -292,7 +287,11 @@ function fdRV_check_ramp_start(S)
    variable i=0, require_ramp = 0, ch, sp, diff
    for(i=0;i<itemsinlist(S.channelsx);i++)
       ch = str2num(stringfromlist(i, S.channelsx, ","))
-      sp = str2num(stringfromlist(i, S.startxs, ","))
+      if(S.direction == 1)
+	      sp = str2num(stringfromlist(i, S.startxs, ","))
+	   elseif(S.direction == -1)
+	      sp = str2num(stringfromlist(i, S.finxs, ","))
+	   endif
       diff = getFDACOutput(S.instrID, ch)-sp
       if(abs(diff) > 0.5)  // if DAC is more than 0.5mV from start of ramp
          require_ramp = 1
@@ -301,28 +300,10 @@ function fdRV_check_ramp_start(S)
 
    if(require_ramp == 1)   
       print "WARNING[fdRV_check_ramp_start]: At least one DAC was not at start point, it has been ramped and slept for delayx, but this should be done in top level scan function!"
-      SFfd_ramp_start(S, ignore_lims = 1)
+      SFfd_ramp_start(S, ignore_lims = 1, x_only=1)
       sc_sleep(S.delayy) // Settle time for 2D sweeps
    endif
 end
-
-
-function/s fdRV_start_INT_RAMP(S)
-	// build command and start ramp
-	// for now we only have to send one command to one device.
-	struct FD_ScanVars &S
-	
-	
-	string cmd = "", dacs="", adcs=""
-	dacs = replacestring(",",S.channelsx,"")
-	adcs = replacestring(",",S.adclist,"")
-	// OPERATION, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF STEPS
-	sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, S.startxs, S.finxs, S.numptsx
-	writeInstr(S.instrID,cmd)
-	return cmd
-end
-
-
 
 function fdRV_record_buffer(S, rowNum, totalByteReturn)
    struct FD_ScanVars &S
@@ -513,7 +494,9 @@ end
 function fdRV_process_setup_filters(PL, numpts, measureFreq)
    struct fdRV_processList &PL
    variable numpts, measureFreq
-
+	
+	PL.coefList = ""
+	
    if(numpts < 101)
 		PL.FIRcoefs = numpts
 	else
