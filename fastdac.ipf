@@ -498,6 +498,29 @@ end
 //// Utilities ////
 ///////////////////
 
+
+function fd_get_numpts_from_sweeprate(fd, start, fin, sweeprate)
+/// Convert sweeprate in mV/s to numptsx for fdacrecordvalues
+	variable fd, start, fin, sweeprate
+	variable numpts, adcspeed, numadc = 0, i
+	numadc = getNumFADC()
+	adcspeed = getfadcspeed(fd)
+	numpts = round(abs(fin-start)*(adcspeed/numadc)/sweeprate)   // distance * steps per second / sweeprate
+	return numpts
+end
+
+function fd_get_sweeprate_from_numpts(fd, start, fin, numpts)
+	// Convert numpts into sweeprate in mV/s
+	variable fd, start, fin, numpts
+	variable sweeprate, adcspeed, numadc = 0, i
+	numadc = getNumFADC()
+	adcspeed = getfadcspeed(fd)
+	sweeprate = round(abs(fin-start)*(adcspeed/numadc)/numpts)   // distance * steps per second / numpts
+	return sweeprate
+end
+
+
+
 function ClearFdacBuffer(instrID)
 	variable instrID
 	
@@ -1503,8 +1526,8 @@ function fdAWG_clear_wave(instrID, wave_num)
 end
 
 
-function fdAWG_start_AWG_RAMP(S, AWG_list)
-   struct fdRV_Struct &S
+function/s fdAWG_start_AWG_RAMP(S, AWG_list)
+   struct FD_ScanVars &S
    struct fdAWG_list &AWG_list
 
    // AWG_RAMP,<number of waveforms>,<dac channel(s) to output waveform 0>,<dac channel(s) to output waveform n>,<dac channel(s) to ramp>,<adc channel(s)>,<initial dac voltage 1>,<…>,<initial dac voltage n>,<final dac voltage 1>,<…>,<final dac voltage n>,<# of waveform repetitions at each ramp step>,<# of ramp steps>
@@ -1518,13 +1541,13 @@ function fdAWG_start_AWG_RAMP(S, AWG_list)
    // <(2500 * waveform length) samples from ADC0>RAMP_FINISHED
 
    string cmd = "", dacs="", adcs=""
-   dacs = replacestring(",",S.fdList.daclist,"")
-	adcs = replacestring(",",S.fdList.adclist,"")
+   dacs = replacestring(",",S.channelsx,"")
+	adcs = replacestring(",",S.adclist,"")
    // OPERATION, #N AWs, AW_dacs, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF Wave cycles per step, # ramp steps
    // Note: AW_dacs is formatted (dacs_for_wave0, dacs_for_wave1, .... e.g. '01,23' for Dacs 0,1 to output wave0, Dacs 2,3 to output wave1)
-	sprintf cmd, "AWG_RAMP,%d, %s, %s,%s,%s,%s, %d, %d\r", AWG_list.numWaves, AWG_list.dacs, dacs, adcs, S.fdList.startVal, S.fdList.finVal, AWG_list.numCycles, AWG_list.numSteps
-	writeInstr(S.sv.instrID,cmd)
-
+	sprintf cmd, "AWG_RAMP,%d, %s, %s,%s,%s,%s, %d, %d\r", AWG_list.numWaves, AWG_list.dacs, dacs, adcs, S.startxs, S.finxs, AWG_list.numCycles, AWG_list.numSteps
+	writeInstr(S.instrID,cmd)
+	return cmd
 end
 
 
@@ -1546,9 +1569,4 @@ structure fdAWG_list
    variable numSteps   // # DAC steps for a full 1D scan
 endstructure
 
-structure fdRV_Filter_options
-	// For use in Scan functions to pass in filter options in a neater way
-   variable RCCutoff
-   variable numAverage
-   string notch_list
-endstructure
+
