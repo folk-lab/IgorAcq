@@ -2,6 +2,30 @@
 #pragma rtGlobals=3		// Use modern global access method and strict wave access.
 #include <SQLConstants>
 
+function getLSStatus(instrID)
+	variable instrID
+	
+	// Load max ages from "LakeshoreConfig.txt" in setup folder.
+	string jstr = readtxtfile("SlackConfig.txt","setup")
+	if(cmpstr(jstr,"")==0)
+		abort "SlackConfig.txt not found!"
+	endif
+	
+	variable max_50k = str2num(getJSONvalue(jstr,"loggingschedules:default:channels:ch1:max"))
+	variable max_4k = str2num(getJSONvalue(jstr,"loggingschedules:default:channels:ch2:max"))
+	variable max_magnet = str2num(getJSONvalue(jstr,"loggingschedules:default:channels:ch3:max"))
+	variable max_still = str2num(getJSONvalue(jstr,"loggingschedules:default:channels:ch5:max"))
+	variable max_mc = str2num(getJSONvalue(jstr,"loggingschedules:default:channels:ch6:max"))
+	
+	// Get temperature data from SQL database
+	string wavenames = "channels,timestamp,temperature"
+	string statement = "SELECT DISTINCT ON (ch_idx) ch_idx, time, t FROM qdot.lksh370.channel_data WHERE time > TIMESTAMP '2020-01-13 23:00:00.00' ORDER BY ch_idx, time DESC;"
+	requestSQLData(statement, wavenames=wavenames)
+	
+	
+end
+
+
 ////////////////////////////
 //// SQL User functions ////
 ///////////////////////////
@@ -421,7 +445,7 @@ end
 function/s sc_readSQLConnectionParameters()
 	// reads SQL setup parameters from SQLParameters.txt file on "config" path.
 	
-	string jstr = readtxtfile("SQLParameters.txt","config")
+	string jstr = readtxtfile("SQLConfig.txt","setup")
 	if(cmpstr(jstr,"")==0)
 		abort
 	endif

@@ -220,6 +220,22 @@ function /S getExpPath(whichpath, [full])
 			else // full=0 or 1
 				return ""
 			endif
+		case "setup":
+			if(full==0)
+				return ReplaceString(":", temp3[1,inf], "/")+"setup/"
+			elseif(full==1)
+				return temp3[1,inf]+"config:"
+			elseif(full==2)
+				if(cmpstr(platform,"Windows")==0)
+					return ParseFilePath(5, temp1+temp2+temp3+"setup:", separatorStr, 0, 0)
+				else
+					return ParseFilePath(5, temp1+temp2+temp3, separatorStr, 0, 0)+"setup/"
+				endif
+			elseif(full==3)
+				return S_path+"setup:"
+			else
+				return ""
+			endif
 	endswitch
 end
 
@@ -320,6 +336,9 @@ function InitScanController([configFile])
 	
 	// check if we have the correct SQL driver
 	sc_checkSQLDriver()
+	
+	// create/overwrite setup path. All instrument/interface configs are stored here.
+	newpath /C/O/Q setup getExpPath("setup", full=3)
 
 	// deal with config file
 	string /g sc_current_config = ""
@@ -2140,23 +2159,31 @@ end
 //////////////////////////
 /// sweep notification ///
 //////////////////////////
-
-
-//tim.child = U8W2V6QK0 
-function /S getSlackNotice(username, [message, min_time]) 
-	// Usernames no longer work for new users since 2017. See https://api.slack.com/changelog/2017-09-the-one-about-usernames
-	// Can use member ID instead
+ 
+function/s getSlackNotice([message, min_time]) 
+	// Loading slack setup parameters from external config.
+	// Setup config file ("SlackConfig.txt") should be placed in the setup folder.
+	// Parameters are: userid, webhook, displayname & emoji
 	
 	// this function will send a notification to Slack -- run it as if it were a getInstrStatus function
-	// username = your slack username, notice will be a DM
 	// message = string to include in Slack message
 	// min_time = if time elapsed for this current scan is less than min_time no notification will be sent
 	//					defaults to 60 seconds
-	string username, message
+	string message
 	variable min_time
 	nvar filenum, sweep_t_elapsed, sc_abortsweep
-	string sc_slack_url = "https://hooks.slack.com/services/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"
-	string txt="", buffer="", payload="", out="", botname = "qdotbot", emoji = ":the_horns:"
+	
+	// load setup from file
+	string jstr = readtxtfile("SlackConfig.txt","setup")
+	if(cmpstr(jstr,"")==0)
+		abort
+	endif
+	
+	string sc_slack_url = getJSONvalue(jstr,"webhook")
+	string displayname = getJSONvalue(jstr,"displayname")
+	string userid = getJSONvalue(jstr,"userid")
+	string emoji = getJSONvalue(jstr,"emoji")
+	string txt="", buffer="", payload=""
 
 	//// check if I need a notification ////
 	if (paramisdefault(min_time))
@@ -2184,8 +2211,8 @@ function /S getSlackNotice(username, [message, min_time])
 
 	//// build payload ////
 	sprintf buffer, "{\"text\": \"%s\"", txt; payload+=buffer //
-	sprintf buffer, ", \"username\": \"%s\"", botname; payload+=buffer
-	sprintf buffer, ", \"channel\": \"@%s\"", username; payload+=buffer
+	sprintf buffer, ", \"username\": \"%s\"", displayname; payload+=buffer
+	sprintf buffer, ", \"channel\": \"@%s\"", userid; payload+=buffer
 	sprintf buffer, ", \"icon_emoji\": \"%s\"", emoji; payload+=buffer //
 	payload += "}"
 	//// end payload ////
