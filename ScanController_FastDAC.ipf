@@ -302,7 +302,7 @@ function fdRV_check_ramp_start(S)
    if(require_ramp == 1)   
       print "WARNING[fdRV_check_ramp_start]: At least one DAC was not at start point, it has been ramped and slept for delayx, but this should be done in top level scan function!"
       SFfd_ramp_start(S, ignore_lims = 1)
-      sc_sleep(S.delayx) // Settle time for 2D sweeps
+      sc_sleep(S.delayy) // Settle time for 2D sweeps
    endif
 end
 

@@ -616,8 +616,8 @@ function getSetpointBD(channel, output)
 	return round((2^20-1)*frac)
 end
 
-function setOutputBD(instrID, channel, output) // in mV
-	variable instrID, channel, output
+function setOutputBD(instrID, channel, output, [ignore_lims]) // in mV
+	variable instrID, channel, output, ignore_lims
 	wave bd_boardnumbers=bd_boardnumbers
 	wave/t dacvalstr=dacvalstr
 	wave/t old_dacvalstr=old_dacvalstr
@@ -640,15 +640,17 @@ function setOutputBD(instrID, channel, output) // in mV
 		abort err
 	endif
 
-	// check that the voltage is within software limits
-	// if it is outside the limit, do not interrupt
-	// set output to maximum value according to limits
-	sw_limit = str2num(dacvalstr[channel][2])
-	if(abs(output) > sw_limit)
-		if(output > 0)
-			output = sw_limit
-		else
-			output = -1*sw_limit
+	if(ignore_lims != 1)
+		// check that the voltage is within software limits
+		// if it is outside the limit, do not interrupt
+		// set output to maximum value according to limits
+		sw_limit = str2num(dacvalstr[channel][2])
+		if(abs(output) > sw_limit)
+			if(output > 0)
+				output = sw_limit
+			else
+				output = -1*sw_limit
+			endif
 		endif
 	endif
 
@@ -682,8 +684,8 @@ function setOutputBD(instrID, channel, output) // in mV
 	return 1
 end
 
-function RampOutputBD(instrID, channel, output, [ramprate, update])
-	variable instrID, channel, output,ramprate, update // output is in mV, ramprate in mV/s
+function RampOutputBD(instrID, channel, output, [ramprate, update, ignore_lims])
+	variable instrID, channel, output,ramprate, update, ignore_lims // output is in mV, ramprate in mV/s
 	wave/t dacvalstr=dacvalstr
 	wave /t old_dacvalstr=old_dacvalstr
 	variable voltage, sgn, step
@@ -717,7 +719,7 @@ function RampOutputBD(instrID, channel, output, [ramprate, update])
 	voltage+=sgn*step
 	if(sgn*voltage >= sgn*output)
 		//// we started less than one step away from the target. set voltage and leave
-		setOutputBD(instrID, channel, output)
+		setOutputBD(instrID, channel, output, ignore_lims=ignore_lims)
 		return 1
 	endif
 
@@ -725,14 +727,14 @@ function RampOutputBD(instrID, channel, output, [ramprate, update])
 		if(update==1)
 			doupdate
 		endif
-		setOutputBD(instrID, channel, voltage)
+		setOutputBD(instrID, channel, voltage, ignore_lims=ignore_lims)
 
 		sc_sleep(sleeptime)
 
 		voltage+=sgn*step
 	while(sgn*voltage<sgn*output-step)
 
-	setOutputBD(instrID, channel, output)
+	setOutputBD(instrID, channel, output, ignore_lims=ignore_lims)
 
 	if(update==0)
 		resumeupdate
@@ -741,7 +743,7 @@ function RampOutputBD(instrID, channel, output, [ramprate, update])
 	return 1
 end
 
-function UpdateMultipleBD(instrID, [action, ramprate, update])
+function UpdateMultipleBD(instrID, [action, ramprate, update, ignore_lims])
 
 	// usage:
 	// function Experiment(....)
@@ -753,7 +755,7 @@ function UpdateMultipleBD(instrID, [action, ramprate, update])
 
 	variable instrID
 	string action // "set" or "ramp"
-	variable ramprate, update
+	variable ramprate, update, ignore_lims
 	wave/t dacvalstr=dacvalstr
 	wave/t old_dacvalstr=old_dacvalstr
 	variable output,i
@@ -791,8 +793,8 @@ function UpdateMultipleBD(instrID, [action, ramprate, update])
 	return 1
 end
 
-function rampMultipleBD(instrID, channels, setpoint, [ramprate, update])
-	variable instrID, setpoint, ramprate, update
+function rampMultipleBD(instrID, channels, setpoint, [ramprate, update, ignore_lims])
+	variable instrID, setpoint, ramprate, update, ignore_lims
 	string channels
 	variable i, kind, nChannels = ItemsInList(channels, ",")
 	string channel
@@ -818,7 +820,7 @@ function rampMultipleBD(instrID, channels, setpoint, [ramprate, update])
 			UpdateCustom(channel,setpoint)
 		endif
 	endfor
-	UpdateMultipleBD(instrID, action="ramp", ramprate=ramprate, update = update)
+	UpdateMultipleBD(instrID, action="ramp", ramprate=ramprate, update = update, ignore_lims=ignore_lims)
 	if(bd_num_custom > 0)
 		bdCalcCustomValues()
 	endif
