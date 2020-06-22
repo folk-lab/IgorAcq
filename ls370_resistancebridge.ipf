@@ -791,7 +791,7 @@ function/s LS370getLoggingScheduleFromConfig(sched_name)
 		sprintf err_str "%s not found in top level keys of LoggingSchedules.txt" sched_name
 		abort 	err_str
 	endif
-	return JSON_dump(get_json_from_json_path(js_id, sched_name))
+	return JSON_getString(js_id, sched_name)
 end
 
 

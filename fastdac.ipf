@@ -1296,7 +1296,7 @@ function get_fastdacs_from_hdf(datnum, [fastdac_num])
 	endif
 	
 	sl_id = get_sweeplogs(datnum)  // Get Sweep_logs JSON
-	fd_id = get_json_from_json_path(sl_id, "FastDAC "+num2istr(fastdac_num)) // Get FastDAC JSON from Sweeplogs
+	fd_id = getJSONXid(sl_id, "FastDAC "+num2istr(fastdac_num)) // Get FastDAC JSON from Sweeplogs
 
 	wave/t keys = JSON_getkeys(fd_id, "")
 	wave/t fdacvalstr

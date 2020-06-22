@@ -119,6 +119,7 @@ end
 function get_sweeplogs(datnum)
 	// Opens HDF5 file from current data folder and returns sweeplogs jsonID
 	// Remember to JSON_Release(jsonID) or JSONXOP_release/A to release all objects
+	// Can be converted to JSON string by using JSON_dump(jsonID)
 	variable datnum
 	variable fileid, metadataID, i, result
 	wave/t sc_sweeplogs
@@ -130,51 +131,6 @@ function get_sweeplogs(datnum)
 	sweeplogsID = JSON_Parse(sc_sweeplogs[0])
 
 	return sweeplogsID
-end
-
-
-
-////// JSON General //////
-
-function print_keys(jsonID, path)
-	variable jsonID
-	string path
-	wave/t ans = JSON_getkeys(jsonID, path)
-	print ans
-end
-
-
-function get_json_from_json_path(jsonID, path)
-	// Returns jsonID of json object located at 'path' in jsonID passed in. e.g. get "BabyDAC" json from "Sweep_logs" json.
-	// Path should be able to be a true JSON pointer i.e. / separated path (e.g. "Magnets/Magx") but it is untested
-	variable jsonID
-	string path
-	variable i, tempID
-	string tempKey
-	
-	if (JSON_GetType(jsonID, path) != 0)	
-		abort "ERROR[get_json_from_json]: path does not point to JSON obect"
-	endif
-	
-	if (itemsinlist(path, "/") == 1)
-		return get_json_from_json_key(jsonID, path)
-	else
-		tempID = jsonID
-		for(i=0;i<itemsinlist(path, "/");i++)  //Should recursively get deeper JSON objects. Untested
-			tempKey = stringfromlist(i, path, "/")
-			tempID = get_json_from_json_key(tempID, tempkey)
-		endfor
-		return tempID
-	endif
-end
-	
-function get_json_from_json_key(jsonID, key)
-	variable jsonID
-	string key
-	if ((JSON_GetType(jsonID, key) != 0) || (itemsinlist(key, "/") != 1)	)
-		abort "ERROR[get_json_from_json_key]: key is not a top level JSON obect"
-	endif
-	return JSON_parse(getJSONvalue(json_dump(jsonID), key))  // 3/2020 could not find a way to get JSON object out of JSON so this is a workaround
 end
 
 
@@ -235,6 +191,51 @@ end
 /////////////
 /// JSON  ///
 /////////////
+
+//// Using JSON XOP ////  
+
+// Using JSON XOP requires working with JSON id's rather than JSON strings.
+// To be used in addition to home built JSON functions which work with JSON strings
+// JSON id's give access to all XOP functions (e.g. JSON_getKeys(jsonID, path))
+// functions here should be ...JSONX...() to mark as a function which works with JSON XOP ID's rather than strings
+
+function getJSONXid(jsonID, path)
+	// Returns jsonID of json object located at "path" in jsonID passed in. e.g. get "BabyDAC" json from "Sweep_logs" json.
+	// Path should be able to be a true JSON pointer i.e. "/" separated path (e.g. "Magnets/Magx") but it is untested
+	variable jsonID
+	string path
+	variable i, tempID
+	string tempKey
+	
+	if (JSON_GetType(jsonID, path) != 0)	
+		abort "ERROR[get_json_from_json]: path does not point to JSON obect"
+	endif
+
+	if (itemsinlist(path, "/") == 1)
+		return getJSONXid_fromKey(jsonID, path)
+	else
+		tempID = jsonID
+		for(i=0;i<itemsinlist(path, "/");i++)  //Should recursively get deeper JSON objects. Untested
+			tempKey = stringfromlist(i, path, "/")
+			tempID = getJSONXid_fromKey(tempID, tempkey)
+		endfor
+		return tempID
+	endif
+end
+	
+function getJSONXid_fromKey(jsonID, key)
+	// Should only be called from getJSONid to convert the inner JSON into a new JSONid pointer.
+	// User should use the more general getJSONid(jsonID, path) where path can be a single key or "/" separated path
+	variable jsonID
+	string key
+	if ((JSON_GetType(jsonID, key) != 0) || (itemsinlist(key, "/") != 1)	)
+		abort "ERROR[get_json_from_json_key]: key is not a top level JSON obect"
+	endif
+	return JSON_parse(getJSONvalue(json_dump(jsonID), key))  // workaround to get a jsonID of inner JSON
+end
+
+//// END of Using JSON XOP ////
+
 
 /// read ///
 

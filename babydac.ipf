@@ -966,7 +966,7 @@ function get_babydacs_from_hdf(datnum)
 	variable sl_id, bd_id  //JSON ids
 
 	sl_id = get_sweeplogs(datnum)  // Get Sweep_logs JSON
-	bd_id = get_json_from_json_path(sl_id, "BabyDAC") // Get BabyDAC JSON from Sweeplogs
+	bd_id = getJSONXid(sl_id, "BabyDAC") // Get BabyDAC JSON from Sweeplogs
 
 	wave/t keys = JSON_getkeys(bd_id, "")
 	duplicate/o/t dacvalstr, load_dacvalstr
