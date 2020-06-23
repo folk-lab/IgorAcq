@@ -117,9 +117,15 @@ function fd_Record_Values(S, PL, rowNum, [AWG_list])
    struct fdRV_processList &PL
    variable rowNum
    struct fdAWG_list &AWG_list
-	// If passed AWG_list then it will run with the Arbitrary Wave Generator on
+	// If passed AWG_list with AWG_list.use_AWG == 1 then it will run with the Arbitrary Wave Generator on
    // Note: Only works for 1 FastDAC! Not sure what implementation will look like for multiple yet
 
+	// Check if AWG_list passed
+	variable use_AWG = paramisdefault(AWG_list) ? 0 : 1
+	if(use_AWG == 1 && rowNum == 0)
+		print "fd_Record_Values: Using AWG"
+	endif
+	
    // Check InitWaves was run with fastdac=1
    fdRV_check_init()
 
@@ -133,10 +139,10 @@ function fd_Record_Values(S, PL, rowNum, [AWG_list])
 
 	string cmd_sent = ""
 	variable totalByteReturn
-	if(!paramisDefault(AWG_list))  	// Do AWG_RAMP
+	if(use_AWG)  	// Do AWG_RAMP
 	   cmd_sent = fd_start_AWG_RAMP(S, AWG_list)
 	   totalByteReturn = AWG_list.numCycles*AWG_list.numSteps*AWG_list.waveLen
-	else									// DO normal INT_RAMP
+	else				// DO normal INT_RAMP
 		cmd_sent = fd_start_INT_RAMP(S)
 		totalByteReturn = S.numADCs*2*S.numptsx
 	endif

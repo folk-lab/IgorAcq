@@ -324,12 +324,13 @@ function ScanBabyDAC_SRS(babydacID, srsID, startx, finx, channelsx, numptsx, del
 	endif
 end
 
-function ScanFastDAC(instrID, start, fin, channels, [numpts, sweeprate, ramprate, delay, y_label, comments, RCcutoff, numAverage, notch, nosave]) //Units: mV
+function ScanFastDAC(instrID, start, fin, channels, [numpts, sweeprate, ramprate, delay, y_label, comments, RCcutoff, numAverage, notch, use_AWG, nosave]) //Units: mV
 	// sweep one or more FastDac channels from start to fin using either numpnts or sweeprate /mV/s
 	// Note: ramprate is for ramping to beginning of scan ONLY
 	// Note: Delay is the wait after rampoint to start position ONLY
 	// channels should be a comma-separated string ex: "0,4,5"
-	variable instrID, start, fin, numpts, sweeprate, ramprate, delay, RCcutoff, numAverage, nosave
+	// use_AWG is option to use Arbitrary Wave Generator. AWG 
+	variable instrID, start, fin, numpts, sweeprate, ramprate, delay, RCcutoff, numAverage, nosave, use_AWG
 	string channels, comments, notch, y_label
 
    // Reconnect instruments
@@ -352,6 +353,14 @@ function ScanFastDAC(instrID, start, fin, channels, [numpts, sweeprate, ramprate
 
    // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
    SFfd_pre_checks(SV)  
+   
+   // If using AWG then get that now and check it
+	if(use_AWG)
+		struct fdAWG_List AWG
+		fdAWG_get_global_AWG_list(AWG)
+		AWG.numSteps = SV.numptsx/AWG.waveLen  // TODO: Check this is correct
+		SFawg_check_AWG_list(AWG, SV)	// Check AWG for clashes/exceeding lims etc
+	endif
 
    // Ramp to start without checks since checked above
    SFfd_ramp_start(SV, ignore_lims = 1)
@@ -367,8 +376,12 @@ function ScanFastDAC(instrID, start, fin, channels, [numpts, sweeprate, ramprate
 	// Make waves
 	InitializeWaves(SV.startx, SV.finx, SV.numptsx, x_label=x_label, y_label=y_label, fastdac=1)
 
-	// Do 1D scan (rownum set to 0)  // TODO: Replace with much more concise version after fixing fdacRecordValues
-	fd_Record_Values(SV, PL, 0)
+	// Do 1D scan (rownum set to 0)
+	if(!use_AWG) // If not then use normal scan
+		fd_Record_Values(SV, PL, 0)
+	else			// Otherwise use AWG
+		fd_Record_Values(SV, PL, 0, AWG_list=AWG)
+	endif
 
 	// Save by default
 	if (nosave == 0)
@@ -379,12 +392,12 @@ function ScanFastDAC(instrID, start, fin, channels, [numpts, sweeprate, ramprate
 end
 
 
-function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, numptsy, [numpts, sweeprate, bdID, rampratex, rampratey, delayy, comments, RCcutoff, numAverage, notch, nosave])
+function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, numptsy, [numpts, sweeprate, bdID, rampratex, rampratey, delayy, comments, RCcutoff, numAverage, notch, nosave, use_AWG])
 	// 2D Scan for FastDAC only OR FastDAC on fast axis and BabyDAC on slow axis
 	// Note: Must provide numptsx OR sweeprate in optional parameters instead
 	// Note: To ramp with babyDAC on slow axis provide the BabyDAC variable in bdID
 	// Note: channels should be a comma-separated string ex: "0,4,5"
-	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, rampratex, rampratey, delayy, RCcutoff, numAverage, nosave
+	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, rampratex, rampratey, delayy, RCcutoff, numAverage, nosave, use_AWG
 	string channelsx, channelsy, comments, notch
 	variable i=0, j=0
 
@@ -422,6 +435,14 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
    if(use_bd == 1)
    		SFbd_pre_checks(Bsv)
    	endif
+   	
+   	// If using AWG then get that now and check it
+	if(use_AWG)
+		struct fdAWG_List AWG
+		fdAWG_get_global_AWG_list(AWG)
+		AWG.numSteps = Fsv.numptsx/AWG.waveLen  // TODO: Check this is correct
+		SFawg_check_AWG_list(AWG, Fsv)	// Check AWG for clashes/exceeding lims etc
+	endif
    
    // Ramp to start without checks
    SFfd_ramp_start(Fsv, ignore_lims=1)
@@ -446,7 +467,6 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 
 	// Main measurement loop
 	variable setpointy
-	
 	for(i=0; i<Fsv.numptsy; i++)
 		// Ramp slow axis
 		setpointy = starty + (i*(finy-starty)/(Fsv.numptsy-1))	// Note: Again, setpointy is independent of FD/BD
@@ -459,7 +479,12 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 		SFfd_ramp_start(Fsv, ignore_lims=1, x_only=1)
 		sc_sleep(Fsv.delayy)
 		// Record fast axis
-		fd_Record_Values(Fsv, PL, i)
+		if(!use_AWG)  	//if not, do normal ramp
+			fd_Record_Values(Fsv, PL, i)
+		else				// use AWG
+			fd_Record_Values(Fsv, PL, i, AWG_list = AWG)
+		endif
+		
 	endfor
 
 	// Save by default
@@ -995,6 +1020,69 @@ function SFbd_ramp_start(S, [ignore_lims])
 		RampMultipleBD(S.instrID, S.channelsy, S.starty, ramprate=S.rampratey, ignore_lims=ignore_lims)
 	endif
 end
+
+
+function SFawg_check_AWG_list(AWG, Fsv)
+	// Check that AWG and FastDAC ScanValues don't have any clashing DACs and check AWG within limits etc
+	struct fdAWG_List &AWG
+	struct FD_ScanVars &Fsv
+	
+	string AWdacs  // Used for storing all DACS for 1 channel  e.g. "123" = Dacs 1,2,3
+	string err_msg
+	variable i=0, j=0
+		
+	// Check initialized
+	if(AWG.initialized == 0)
+		abort "ERROR[SFawg_check_AWG_list]: AWG_List needs to be initialized. Maybe something changed since last use!"
+	endif
+			
+	// Check there are DACs set for each AW_wave (i.e. if using 2 AWs, need at least 1 DAC for each)
+	if(itemsInList(AWG.AW_waves, ",") != (itemsinlist(AWG.AW_Dacs,",")))
+		sprintf err_msg "ERROR[SFawg_check_AWG_list]: Number of AWs doesn't match sets of AW_Dacs. AW_Waves: %s; AW_Dacs: %s", AWG.AW_waves, AWG.AW_Dacs
+		abort err_msg
+	endif	
+	
+	// Check no overlap between DACs for sweeping, and DACs for AWG
+	string channel // Single DAC channel
+	string FDchannels = addlistitem(Fsv.Channelsy, Fsv.Channelsx, ",") // combine channels lists
+	for(i=0;i<itemsinlist(AWG.AW_Dacs, ",");i++)
+		AWdacs = stringfromlist(i, AWG.AW_Dacs, ",")
+		for(j=0;j<strlen(AWdacs);j++)
+			channel = AWdacs[j]
+			if(findlistitem(channel, FDchannels, ",") != -1)
+				abort "ERROR[SFawg_check_AWG_list]: Trying to use same DAC channel for FD scan and AWG at the same time"
+			endif
+		endfor
+	endfor
+
+	// Check that all setpoints for each AW_Dac will stay within software limits
+	wave/T fdacvalstr	
+	string softLimitPositive = "", softLimitNegative = "", expr = "(-?[[:digit:]]+),([[:digit:]]+)", question
+	variable setpoint, answer, ch_num
+	string wn
+	for(i=0;i<itemsinlist(AWG.AW_Dacs,",");i+=1)
+		AWdacs = stringfromlist(i, AWG.AW_Dacs, ",")
+		wave w = fdAWG_get_AWG_wave(str2num(AWG.AW_Waves[i]))  // Get IGOR wave of AW#
+		duplicate/o/r=[0][] w setpoints  							// Just get setpoints part
+		for(j=0;j<strlen(AWdacs);j++)  // Check for each DAC that will be outputting this wave
+			ch_num = str2num(AWdacs[j])
+			splitstring/e=(expr) fdacvalstr[ch_num][2], softLimitNegative, softLimitPositive
+			for(j=0;j<numpnts(setpoints);j++)	// Check against each setpoint in AW
+				if(setpoint < str2num(softLimitNegative) || setpoint > str2num(softLimitPositive))
+					// we are outside limits
+					sprintf question, "DAC channel %s will be ramped outside software limits. Continue?", AWdacs[j]
+					answer = ask_user(question, type=1)
+					if(answer == 2)
+						print("ERROR[SFawg_check_AWG_list]: User abort!")
+						abort
+					endif
+				endif
+			endfor
+		endfor
+	endfor		
+	
+end
+	
 
 ///////////////////////////////// SCAN STRUCTS //////////////////////////////////////////////
 
