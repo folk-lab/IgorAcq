@@ -142,8 +142,7 @@ function fd_Record_Values(S, PL, rowNum, [AWG_list])
 	if(use_AWG)  	// Do AWG_RAMP
 	   cmd_sent = fd_start_AWG_RAMP(S, AWG_list)
 	   totalByteReturn = S.numptsx*S.numADCs*2 //AWG_list.numCycles*AWG_list.numSteps*AWG_list.waveLen  // Wrong?
-		printf "Expected bytes returned: %d", totalByteReturn
-//	   totalByteReturn = 20000
+		printf "Expected bytes returned: %d", totalByteReturn		// DEBUG
 	else				// DO normal INT_RAMP
 		cmd_sent = fd_start_INT_RAMP(S)
 		totalByteReturn = S.numADCs*2*S.numptsx

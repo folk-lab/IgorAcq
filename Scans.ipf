@@ -612,7 +612,7 @@ function StepTempScanSomething()
 
 	variable i=0
 	do
-		setLS370Temp(ls370,6,targettemps[i],maxcurrent = heaterranges[i])
+		setLS370Temp(ls370,targettemps[i],maxcurrent = heaterranges[i])
 		sc_sleep(2.0)
 		WaitTillTempStable(ls370, targettemps[i], 5, 20, 0.10)
 		sc_sleep(60.0)

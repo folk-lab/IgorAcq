@@ -56,9 +56,9 @@ function setLS370system(system)
 	strswitch(system)
 		case "bfsmall":
 			ls_system = "bfsmall"
-			ls_label = "LD"				//plate					//labels	  //IDs
-			string/g bfchannellookup = "mc;still;magnet;4K;50K;6;5;4;2;1;6;5;4;2;1"  //TODO: Check with LD API
-			string/g bfheaterlookup = "mc;still;sc_mc;2"						//sc_mc only used internally, still label refers to API //TODO: Check with LD API
+			ls_label = "LD"				//plate					//labels	  									//IDs
+			string/g bfchannellookup = "mc;still;magnet;4K;50K;ld_mc;ld_still;ld_magnet;ld_4K;ld_50K;6;5;4;2;1"  //TODO: Check with LD API
+			string/g bfheaterlookup = "mc;still;sc_mc;ld_still_heater"						//sc_mc only used internally, still label refers to API //TODO: Check with LD API
 			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,350,1201,1800,10000}}
 			break
 		case "bfbig":
@@ -79,7 +79,7 @@ end
 //////////////////////
 
 // get-analog-data
-function getLS370analogData(instrID, [channel])
+function getLS370analogData(instrID, [channel])  //mW
 	// Returns power_milliw from analog channel
 	// Channel = 'still'
 	string instrID, channel
@@ -93,7 +93,7 @@ function getLS370analogData(instrID, [channel])
 		channel = "still"
 	endif 
 
-	channel_idx = whichlistitem(channel,bfheaterlookup,";")
+	channel_idx = whichlistitem(channel,bfheaterlookup,";", 0, 0)
 	if(channel_idx < 0)
 		printf "The requested channel (%s) doesn't exsist!", channel
 		return 0.0
@@ -123,7 +123,7 @@ function/s getLS370analogParameters(instrID, [channel])
 		channel = "still"
 	endif 
 	
-	channel_idx = whichlistitem(channel,bfheaterlookup,";")
+	channel_idx = whichlistitem(channel,bfheaterlookup,";", 0, 0)
 	if(channel_idx < 0)
 		printf "The requested channel (%s) doesn't exsist!", channel
 		return ""
@@ -161,9 +161,9 @@ function getLS370temp(instrID, plate, [max_age_s]) // Units: K
 	strswitch(ls_system)
 		case "bfsmall":
 		case "bfbig":
-			channel_idx = whichlistitem(plate,bfchannellookup,";")
+			channel_idx = whichlistitem(plate,bfchannellookup,";", 0, 0)
 			if(channel_idx < 0)
-				printf "The requested plate (%s) doesn't exsist!", plate
+				printf "The requested plate (%s) doesn't exsist!\r", plate
 				return 0.0
 			else
 				channel = stringfromlist(channel_idx+5,bfchannellookup,";")
@@ -176,11 +176,11 @@ function getLS370temp(instrID, plate, [max_age_s]) // Units: K
 	string result
 	variable temp
 	// TODO: test this (Christian needs to write it first...)
-	temp = getLS370tempDB(instrID, plate, max_age=max_age_s)
+//	temp = getLS370tempDB(instrID, plate, max_age=max_age_s)
 	if (temp > 0)
 		return temp
 	else		
-		sprintf command, "get-channel-data/%d?ctrl_label=%s", channel, ls_label
+		sprintf command, "get-channel-data/%s?ctrl_label=%s", channel, ls_label
 		result = sendLS370(instrID,command,"get",keys="data:record:temperature_k") 
 		return str2num(result)
 	endif
@@ -199,7 +199,7 @@ function/s getLS370controllerInfo(instrID, [all])
 	if (all == 0)
 		sprintf command, "get-controller-info/%s", ls_label
 	else
-		sprintf command, "get-controller-info"
+		sprintf command, "get-controllers-info"
 	endif
 	result = sendLS370(instrID,command,"get",keys="") // Return the whole JSON response for now
 	return result
@@ -246,7 +246,7 @@ function getLS370heaterpower(instrID,heater, [max_age_s]) // Units: mW
 	strswitch(ls_system)
 		case "bfsmall":
 		case "bfbig":
-			heater_idx = whichlistitem(heater,bfheaterlookup,";")
+			heater_idx = whichlistitem(heater,bfheaterlookup,";", 0, 0)
 			if(heater_idx < 0)
 				printf "The requested heater (%s) doesn't exsist!", heater
 				return -1.0
@@ -258,11 +258,11 @@ function getLS370heaterpower(instrID,heater, [max_age_s]) // Units: mW
 			abort "ls_system not implemented"
 	endswitch
 
-	if(cmpstr(channel, "") != 0)
+	if(cmpstr(heater, "still") == 0)  // If looking for still, use getAnalog
 		return getLS370AnalogData(instrID, channel=channel) // Get Still heat using getAnalogData
 	else
-		sprintf command, "get-heater-data?ctrl_label=%s", ls_label
-		return str2num(sendLS370(instrID,command,"get", keys="power_mw")) 
+		sprintf command, "get-heater-data/%s", ls_label
+		return str2num(sendLS370(instrID,command,"get", keys="data:record:power_milliw")) 
 	endif
 end
 
@@ -289,12 +289,12 @@ function getLS370controlmode(instrID, [verbose]) // Units: No units
 	string instrID
 	variable verbose
 	nvar pid_mode, pid_led, mcheater_led
-	string payload, command,response
+	string command,response
 	svar ls_label
 
-	sprintf command, "get-temperature-control-mode?%s", ls_label
+	sprintf command, "get-temperature-control-mode/%s", ls_label
 
-	response = sendLS370(instrID,command,"get", keys="data", payload=payload)
+	response = sendLS370(instrID,command,"get", keys="data")
 	pid_mode = LS370_mode_str_to_mode(response)
 	if (verbose)
 		print "Control mode is ", response
@@ -327,7 +327,7 @@ function getLS370PIDtemp(instrID) // Units: mK
 	svar ls_label
 	nvar temp_set
 
-	sprintf command, "get-temperature-control-setpoint?%s", ls_label
+	sprintf command, "get-temperature-control-setpoint/%s", ls_label
 
 	string response = sendLS370(instrID,command,"get", keys="data")
 	temp = str2num(response)*1000
@@ -379,7 +379,7 @@ function getLS370tempDB(instrID,plate, [max_age]) // Units: mK
 	strswitch(ls_system)
 		case "bfsmall":
 		case "bfbig":
-			channel_idx = whichlistitem(plate,bfchannellookup,";")
+			channel_idx = whichlistitem(plate,bfchannellookup,";", 0, 0)
 			if(channel_idx < 0)
 				printf "The requested plate (%s) doesn't exsist!", plate
 				return -1
@@ -449,7 +449,7 @@ function setLS370analogOutputParameters(instrID, [channel])
 		channel = "still"
 	endif 
 	
-	channel_idx = whichlistitem(channel,bfheaterlookup,";")
+	channel_idx = whichlistitem(channel,bfheaterlookup,";", 0, 0)
 	if(channel_idx < 0)
 		printf "The requested channel (%s) doesn't exsist!", channel
 		return 0.0
@@ -478,7 +478,6 @@ end
 
 //set-analog-output-power
 // SEE setLS370heaterpower()
-
 
 
 // set-data-loggers-schedule
@@ -530,7 +529,7 @@ function setLS370heaterpower(instrID,heater,output) //Units: mW
 	strswitch(ls_system)
 		case "bfsmall":
 		case "bfbig":
-			heater_idx = whichlistitem(heater,bfheaterlookup,";")
+			heater_idx = whichlistitem(heater,bfheaterlookup,";", 0, 0)
 			if(heater_idx < 0)
 				printf "The requested heater (%s) doesn't exsist!", heater
 				return -1.0
@@ -681,10 +680,10 @@ end
 
 //////// Set functions which don't map directly to API but are useful //////////
 
-function setLS370temp(instrID,channel,setpoint,[maxcurrent]) //Units: mK, mA
+function setLS370temp(instrID,setpoint,[maxcurrent]) //Units: mK, mA
 	// Sets both setpoint and max_current if passed, else estimates using LS370_estimateheaterrange
 	string instrID
-	variable channel, setpoint, maxcurrent
+	variable setpoint, maxcurrent
 	string payload, command
 	svar ls_label
 	nvar temp_set
@@ -826,7 +825,7 @@ function LS370_mode_str_to_mode(mode_str)
 	// Convert from mode_str used in API to variable mode used here
 	//off (4), PID (1), Temp_zone (2), Open loop (3)
 	string mode_str
-	variable mode
+	int mode
 	
 	strswitch (mode_str)
 		case "TCM_closed_loop":
@@ -846,6 +845,7 @@ function LS370_mode_str_to_mode(mode_str)
 			mode = -1
 			break
 	endswitch
+	return mode
 end
 
 function LS370_estimateheaterrange(temp) // Units: mK
@@ -923,14 +923,18 @@ function/s sendLS370(instrID,cmd,method,[payload, keys])
 //	print "SendLS370 temporarily disabled"
 	string headers = "accept: application/json\rlcmi-auth-token: swagger"
 	if(cmpstr(method,"get")==0)
+		printf "GET: %s%s\rHeaders: %s\r", instrID, cmd, headers  		// DEBUG
 		response = getHTTP(instrID,cmd,headers)
-//		print response
+		printf "RESPONSE: %s\r", response									// DEBUG
 	elseif(cmpstr(method,"post")==0 && !paramisdefault(payload))
+		printf "POST: %s%s\rHeaders: %s\r", instrID, cmd, headers  	// DEBUG
 		response = postHTTP(instrID,cmd,payload,headers)
-//		print response
+		printf "RESPONSE: %s\r", response									// DEBUG
 	elseif(cmpstr(method,"put")==0 && !paramisdefault(payload))
+		printf "PUT: %s%s\rHeaders: %s\r", instrID, cmd, headers  		// DEBUG
+		printf "PAYLOAD: %s\r", payload										// DEBUG
 		response = putHTTP(instrID,cmd,payload,headers)
-//		print response
+		printf "RESPONSE: %s\r", response									// DEBUG
 	else
 		abort "Not a supported method or you forgot to add a payload."
 	endif
