@@ -278,7 +278,7 @@ function getLS370heaterrange(instrID) //mA
 	sprintf command, "get-heater-range-amps/%s", ls_label
 
 	response = sendLS370(instrID,command,"get", keys="data")
-	return str2num(response)
+	return str2num(response)*1000  // Convert from A to mA
 end
 
 
@@ -486,8 +486,7 @@ function setLS370loggersSchedule(instrID, schedule)
 	string instrID, schedule
 	svar ls_label
 	string command, payload
-	
-	abort "Not finished for new API"  
+ 
 	strswitch (schedule)
 		case "default":
 			payload = LS370getLoggingScheduleFromConfig("default")
@@ -495,12 +494,16 @@ function setLS370loggersSchedule(instrID, schedule)
 		case "mc_exclusive":
 			payload = LS370getLoggingScheduleFromConfig("mc_exclusive")
 			break
-		// Add other cases here (also add config to LoggingSchedules.txt in config folder)
+		case "still_exclusive":
+			payload = LS370getLoggingScheduleFromConfig("still_exclusive")
+			break
+		case "using_magnet":
+			payload = LS370getLoggingScheduleFromConfig("using_magnet")
+			break
 		default:
 			abort "Not a valid option"
 	endswitch 
-	//TODO: Test this
-	abort "Not tested this yet, don't screw up logging schedule accidentally!"
+
 	sprintf command, "set-data-loggers-schedule/%s", ls_label
 	sendLS370(instrID,command,"put", payload=payload)
 end
@@ -564,10 +567,17 @@ function setLS370heaterRange(instrID, max_current_mA)
 	variable max_current_mA
 	svar ls_label
 	
-	string command
+	string command, response
+	variable true_val
 	
 	sprintf command, "set-heater-range-amps/%s/%f", ls_label, max_current_mA/1000
-	sendLS370(instrID,command,"put")
+	response = sendLS370(instrID,command,"put", keys="data")
+	
+	// Can only be set to certain values, if tried to set to something > 10% different then warn user.
+	true_val = str2num(response)*1000
+	if((true_val-max_current_mA)/max_current_mA > 0.1)
+		printf "WARNING[setLS370heaterRange]: Requested %.2fmA, set to closest allowable value of %.2fmA instead\r", max_current_mA, true_val
+	endif	
 end
 
 
@@ -581,8 +591,8 @@ function setLS370tempMode(instrID, mode) // Units: No units
 	nvar pid_mode
 	svar ls_label
 	string command
-	
-	sprintf command, "set-temperature-control-mode/%s/%s", ls_label
+	string mode_str = LS370_mode_to_str(mode)
+	sprintf command, "set-temperature-control-mode/%s/%s", ls_label, mode_str
 	sendLS370(instrID,command,"put")
 	pid_mode = mode	
 end
@@ -715,6 +725,9 @@ function setLS370exclusivereader(instrID,channel)
 		case "mc":
 			sched_name = "mc_exclusive"
 			break
+		case "still":
+			sched_name = "still_exclusive"
+			break
 		default:
 			sprintf err_str, "ERROR[setLS370exclusivereader]:Need to add logger schedule to LoggingSchedules.txt for channel %s first. Then modify this func", channel
 			abort err_str
@@ -727,7 +740,6 @@ function resetLS370exclusivereader(instrID)
 	string instrID
 	string command, payload
 	svar ls_label
-	//TODO: Test this
 	setLS370loggersSchedule(instrID, "default")
 end
 
@@ -781,16 +793,20 @@ end
 function/s LS370getLoggingScheduleFromConfig(sched_name)
 	string sched_name
 	// reads LoggingSchedules from LoggingSchedules.txt file on "config" path.
+	svar ls_label
 	
 	variable js_id
-	js_id = JSON_parse(readtxtfile("LoggingSchedules.txt","config"))
+	string file_name
+	sprintf file_name "%sLoggingSchedules.txt", ls_label
+	js_id = JSON_parse(readtxtfile(file_name,"config"))
 	findvalue/TEXT=sched_name JSON_getkeys(js_id, "")
 	if (V_value == -1)
 		string err_str
 		sprintf err_str "%s not found in top level keys of LoggingSchedules.txt" sched_name
 		abort 	err_str
 	endif
-	return JSON_getString(js_id, sched_name)
+//	return JSON_getString(js_id, sched_name)
+	return JSON_dump(getJSONXid(js_id, sched_name))
 end
 
 
@@ -919,26 +935,37 @@ function/s sendLS370(instrID,cmd,method,[payload, keys])
 	//      if no keys are provided, an empty string is returned
 	string instrID, cmd, keys, method, payload
 	string response
+	
+	payload = selectstring(paramisdefault(payload), payload, "")  // Some PUT/POST commands require no payload
 
 //	print "SendLS370 temporarily disabled"
 	string headers = "accept: application/json\rlcmi-auth-token: swagger"
 	if(cmpstr(method,"get")==0)
-		printf "GET: %s%s\rHeaders: %s\r", instrID, cmd, headers  		// DEBUG
+//		printf "GET: %s%s\rHeaders: %s\r", instrID, cmd, headers  		// DEBUG
 		response = getHTTP(instrID,cmd,headers)
-		printf "RESPONSE: %s\r", response									// DEBUG
-	elseif(cmpstr(method,"post")==0 && !paramisdefault(payload))
-		printf "POST: %s%s\rHeaders: %s\r", instrID, cmd, headers  	// DEBUG
+//		printf "RESPONSE: %s\r", response									// DEBUG
+	elseif(cmpstr(method,"post")==0)
+//		printf "POST: %s%s\rHeaders: %s\r", instrID, cmd, headers  	// DEBUG
 		response = postHTTP(instrID,cmd,payload,headers)
-		printf "RESPONSE: %s\r", response									// DEBUG
-	elseif(cmpstr(method,"put")==0 && !paramisdefault(payload))
-		printf "PUT: %s%s\rHeaders: %s\r", instrID, cmd, headers  		// DEBUG
-		printf "PAYLOAD: %s\r", payload										// DEBUG
+//		printf "RESPONSE: %s\r", response									// DEBUG
+	elseif(cmpstr(method,"put")==0)
+//		printf "PUT: %s%s\rHeaders: %s\r", instrID, cmd, headers  		// DEBUG
+//		printf "PAYLOAD: %s\r", payload										// DEBUG
 		response = putHTTP(instrID,cmd,payload,headers)
-		printf "RESPONSE: %s\r", response									// DEBUG
+//		printf "RESPONSE: %s\r", response									// DEBUG
 	else
-		abort "Not a supported method or you forgot to add a payload."
+		abort "Not a supported method"
 	endif
-
+	
+	// Check "ok": true in response
+	string resp_ok, err_msg
+	resp_ok = getJSONvalue(response, "ok")
+	if(cmpstr(resp_ok, "true") !=0)
+		printf err_msg "ERROR[sendLS370]: Server responded with \"ok\": %s\r\rFull response: \r%s\r", resp_ok, response
+		abort "ERROR[sendLS370]: Server responded with \"ok\": " + resp_ok
+	endif
+	
+	// Get key requested from response
 	if(!paramisdefault(keys))
 		string value = getJSONvalue(response, keys)
 		if(strlen(value)==0)
@@ -984,3 +1011,432 @@ function/s getLS370status(instrID, [max_age_s])
 			return addJSONkeyval("","BF big",buffer)
 	endswitch
 end
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////// TESTING MACRO //////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////
+// This function can be used to test ALL of the get/set commands used with the LS370 as of 
+// Jun 24th 2020
+
+
+//function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
+//	// Testing all Lakeshore commands
+//	string ls370
+//	variable gets, sets, ask, set_defaults
+//	
+//	ask = paramisdefault(ask) ? 1 : ask
+//	variable ans
+//	
+//	if(gets == 1)
+////		print 	"COMMAND: getLS370analogData(ls370, channel=\"still\")\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %f\r\r", getLS370analogData(ls370, channel="still")
+////		endif
+////		
+////		print 	"COMMAND: getLS370analogParameters(ls370, channel=\"still\")\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %s\r\r", getLS370analogParameters(ls370, channel="still")
+////		endif
+////		
+////		print 	"COMMAND: getLS370temp(ls370, \"mc\")\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %f\r\r", getLS370temp(ls370, "mc")
+////		endif
+////		
+////		print 	"COMMAND: getLS370temp(ls370, \"still\")\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %f\r\r", getLS370temp(ls370, "still")
+////		endif		
+////		
+////		print 	"COMMAND: getLS370temp(ls370, \"4k\")\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %f\r\r", getLS370temp(ls370, "4k")
+////		endif		
+////		
+////		print 	"COMMAND: getLS370temp(ls370, \"magnet\")\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %f\r\r", getLS370temp(ls370, "magnet")
+////		endif
+////		
+////		print 	"COMMAND: getLS370temp(ls370, \"50k\")\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %f\r\r", getLS370temp(ls370, "50k")
+////		endif	
+////		
+////		print 	"COMMAND: getLS370controllerInfo(ls370)\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %s\r\r", getLS370controllerInfo(ls370)
+////		endif	
+////		
+////		print 	"COMMAND: getLS370controllerInfo(ls370, all=1)\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %s\r\r", getLS370controllerInfo(ls370, all=1)
+////		endif	
+////		
+////		print 	"COMMAND: getLS370loggersSchedule(ls370)\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %s\r\r", getLS370loggersSchedule(ls370)
+////		endif	
+////		
+////		print 	"COMMAND: getLS370heaterpower(ls370 ,\"mc\")\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %f\r\r", getLS370heaterpower(ls370 ,"mc")
+////		endif	
+////		
+////		print 	"COMMAND: getLS370heaterpower(ls370 ,\"still\")\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %f\r\r", getLS370heaterpower(ls370 ,"still")
+////		endif	
+////		   
+////		// TODO: Is return in mA or A?
+////		print 	"COMMAND: getLS370heaterrange(ls370)\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %f\r\r", getLS370heaterrange(ls370)
+////		endif	
+////		
+////		print 	"COMMAND: getLS370controlmode(ls370)\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %f\r\r", getLS370controlmode(ls370)
+////		endif	
+////		   
+////		print 	"COMMAND: getLS370controlParameters(ls370)\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %s\r\r", getLS370controlParameters(ls370)
+////		endif	
+////		   
+////		print 	"COMMAND: getLS370PIDtemp(ls370)\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %f\r\r", getLS370PIDtemp(ls370)
+////		endif	
+////		   
+////		print 	"COMMAND: getLS370PIDparameters(ls370)\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %s\r\r", getLS370PIDparameters(ls370)
+////		endif	
+////		   
+//////////		print 	"COMMAND: \r"
+//////////		ans = ask_continue(ask)
+//////////		if(ans == 1)
+//////////			printf "RETURN: %f\r\r", getLS370tempDB(ls370,plate, [max_age])
+//////////		endif			
+////		
+////		print 	"COMMAND: getLS370status(ls370, max_age_s=0)\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %s\r\r", getLS370status(ls370, max_age_s=0)
+////		endif	
+////		
+//////////		print 	"COMMAND: getLS370status(ls370, max_age_s=3000)\r"
+//////////		ans = ask_continue(ask)
+//////////		if(ans == 1)
+//////////		   printf "RETURN: %s\r\r", getLS370status(ls370, max_age_s=3000)
+//////////		endif	
+//	endif
+//	
+//	if(sets == 1)
+//////////		print 	"COMMAND: setLS370analogOutputParameters(ls370, channel=\"still\")\r"
+//////////		ans = ask_continue(ask)
+//////////		if(ans == 1)
+//////////			setLS370analogOutputParameters(ls370, channel="still")
+//////////		endif
+//////////
+//////////		print 	"COMMAND: getLS370analogParameters(ls370, channel=\"still\")\r"
+//////////		ans = ask_continue(ask)
+//////////		if(ans == 1)
+//////////		   printf "RETURN: %s\r\r", getLS370analogParameters(ls370, channel="still")
+//////////		endif
+//////////			
+///////////////////////// LOGGING SCHEDULES ////////////////////////////////////////////////
+////		print 	"COMMAND: setLS370loggersSchedule(ls370, \"default\")\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////			setLS370loggersSchedule(ls370, "default")
+////		endif	
+////		
+////		print 	"COMMAND: getLS370loggersSchedule(ls370)\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %s\r\r", getLS370loggersSchedule(ls370)
+////		endif	
+////		
+////		print 	"COMMAND: setLS370loggersSchedule(ls370, \"mc_exclusive\")\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////			setLS370loggersSchedule(ls370, "mc_exclusive")
+////		endif	
+////		
+////		print 	"COMMAND: getLS370loggersSchedule(ls370)\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %s\r\r", getLS370loggersSchedule(ls370)
+////		endif	
+////			
+////		print 	"COMMAND: setLS370loggersSchedule(ls370, \"still_exclusive\")\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////			setLS370loggersSchedule(ls370, "still_exclusive")
+////		endif	
+////		
+////		print 	"COMMAND: getLS370loggersSchedule(ls370)\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %s\r\r", getLS370loggersSchedule(ls370)
+////		endif		
+////		
+////		print 	"COMMAND: setLS370loggersSchedule(ls370, \"using_magnet\")\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////			setLS370loggersSchedule(ls370, "using_magnet")
+////		endif	
+////		
+////		print 	"COMMAND: getLS370loggersSchedule(ls370)\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %s\r\r", getLS370loggersSchedule(ls370)
+////		endif	
+////		
+///////////////////////// END OF LOGGING SCHEDULES //////////////////////////////////////////
+//
+///////////////////////// HEATER POWERS //////////////////////////////////////////
+////		print 	"COMMAND: setLS370heaterpower(ls370,\"mc\",1)  //1mW heat\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////			setLS370heaterpower(ls370,"mc",1)  //1mW heat
+////		endif	
+////	
+////		print 	"COMMAND: getLS370heaterpower(ls370 ,\"mc\")\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %f\r\r", getLS370heaterpower(ls370 ,"mc")
+////		endif	
+////	
+////		print 	"COMMAND: setLS370heaterpower(ls370,\"still\",1)  //1mW heat\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////			setLS370heaterpower(ls370,"still",1)  //1mW heat
+////		endif	
+////			
+////		print 	"COMMAND: getLS370heaterpower(ls370 ,\"still\")\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %f\r\r", getLS370heaterpower(ls370 ,"still")
+////		endif	
+///////////////////////// END OF HEATER POWERS //////////////////////////////////////////
+//
+//
+///////////////////////// HEATER RANGES //////////////////////////////////////////
+////		print 	"COMMAND: setLS370heaterRange(ls370, 5)  //5mA max\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////			setLS370heaterRange(ls370, 5)  //5mA max
+////		endif	
+////		
+////		print 	"COMMAND: getLS370heaterrange(ls370)\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %f\r\r", getLS370heaterrange(ls370)
+////		endif	
+///////////////////////// END OF HEATER RANGES //////////////////////////////////////////		
+//
+//
+///////////////////////// CONTROL MODES //////////////////////////////////////////		
+////		print 	"COMMAND: setLS370tempMode(ls370, 1)  //PID\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////			setLS370tempMode(ls370, 1)  //PID
+////		endif	
+////
+////		print 	"COMMAND: getLS370controlmode(ls370)\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %f\r\r", getLS370controlmode(ls370)
+////		endif	
+////		
+////		print 	"COMMAND: setLS370tempMode(ls370, 3)  //PID\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////			setLS370tempMode(ls370, 3)  //PID
+////		endif	
+////
+////		print 	"COMMAND: getLS370controlmode(ls370)\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %f\r\r", getLS370controlmode(ls370)
+////		endif	
+////			
+////		print 	"COMMAND: setLS370tempMode(ls370, 4)  //off\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////			setLS370tempMode(ls370, 4)  //off
+////		endif	
+////		
+////		print 	"COMMAND: getLS370controlmode(ls370)\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %f\r\r", getLS370controlmode(ls370)
+////		endif	
+//
+///////////////////////// END OF CONTROL MODES //////////////////////////////////////////		
+//			
+//////////		print 	"COMMAND: setLS370controlParameters(ls370) //sets defaults (can be adapted later to give more control)\r"
+//////////		ans = ask_continue(ask)
+//////////		if(ans == 1)
+//////////			setLS370controlParameters(ls370) //sets defaults (can be adapted later to give more control)
+//////////		endif	
+//////////		
+//
+///////////////////////// PID PARAMS //////////////////////////////////////////		
+////		print 	"COMMAND: setLS370tempSetpoint(ls370,100) //100mK\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////			setLS370tempSetpoint(ls370,100) //100mK
+////		endif	
+////		
+////		print 	"COMMAND: getLS370PIDtemp(ls370)\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %f\r\r", getLS370PIDtemp(ls370)
+////		endif	
+////
+////		print 	"COMMAND: setLS370PIDparameters(ls370,10,5,0)  // p,i,d: 10, 5, 0\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////			setLS370PIDparameters(ls370,10,5,0)  // p,i,d: 10, 5, 0
+////		endif	
+////
+////		print 	"COMMAND: getLS370PIDparameters(ls370)\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %s\r\r", getLS370PIDparameters(ls370)
+////		endif	
+////
+//
+///////////////////////// END OF PID PARAMS //////////////////////////////////////////		
+//////////			
+////		print 	"COMMAND: setLS370heaterOff(ls370)	// mc off\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////			setLS370heaterOff(ls370)	// mc off
+////		endif	
+//		
+//
+//
+///////////////////////// PID TEMPERATURE CONTROL //////////////////////////////////////////
+//
+//////////			
+//////////		print 	"COMMAND: setLS370temp(ls370,100,maxcurrent=3.1)  //100mK max 3.1mA\r"
+//////////		ans = ask_continue(ask)
+//////////		if(ans == 1)
+//////////			setLS370temp(ls370,100,maxcurrent=3.1)  //100mK max 3.1mA
+//////////		endif	
+//////////			
+//////////		print 	"COMMAND: setLS370temp(ls370,200)  //100mK max current set automatically (should be 3.1 or 10)\r"
+//////////		ans = ask_continue(ask)
+//////////		if(ans == 1)
+//////////			setLS370temp(ls370,200)  //100mK max current set automatically (should be 3.1 or 10)
+//////////		endif	
+//////////		
+///////////////////////// END OF PID TEMPERATURE CONTROL //////////////////////////////////////////
+//
+//
+///////////////////////// EXCLUSIVE READERS //////////////////////////////////////////		
+////		print 	"COMMAND: setLS370exclusivereader(ls370,\"mc\")\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////			setLS370exclusivereader(ls370,"mc")
+////		endif	
+////
+////		print 	"COMMAND: getLS370loggersSchedule(ls370)\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %s\r\r", getLS370loggersSchedule(ls370)
+////		endif	
+////		
+////		print 	"COMMAND: setLS370exclusivereader(ls370,\"still\")\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////			setLS370exclusivereader(ls370,"still")
+////		endif	
+////			
+////		print 	"COMMAND: getLS370loggersSchedule(ls370)\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %s\r\r", getLS370loggersSchedule(ls370)
+////		endif	
+////			
+////		print 	"COMMAND: resetLS370exclusivereader(ls370)\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////			resetLS370exclusivereader(ls370)
+////		endif	
+////
+////		print 	"COMMAND: getLS370loggersSchedule(ls370)\r"
+////		ans = ask_continue(ask)
+////		if(ans == 1)
+////		   printf "RETURN: %s\r\r", getLS370loggersSchedule(ls370)
+////		endif	
+////		
+///////////////////////// END OF EXCLUSIVE READERS //////////////////////////////////////////	
+//			
+//	endif
+//	
+//	if (set_defaults == 1)
+//		printf "Still heat was at %f. Setting to 0\r", 		getLS370heaterpower(ls370,"still")
+//		setLS370heaterpower(ls370,"still",0)
+//		
+//		printf "MC heat was at %f. Setting to 0\r", 			getLS370heaterpower(ls370,"mc")
+//		setLS370heaterOff(ls370)
+//		
+//		printf "PID params were: %s\rSetting PID to 10,5,0\r", getLS370PIDparameters(ls370)
+//		setLS370PIDparameters(ls370,10,5,0)
+//		
+//		printf "Temp control mode was %d, setting to 4 (off)\r", getLS370controlmode(ls370)
+//		setLS370tempMode(ls370, 4)  //off
+//
+//		printf "Temp setpoint was %fmV, setting to 0mK\r",		getLS370PIDtemp(ls370)
+//		setLS370tempSetpoint(ls370,0) //100mK
+//
+//		printf "Max heater current was %fmA, setting to 0mA\r", getLS370heaterrange(ls370)
+//		setLS370heaterRange(ls370, 0)  //5mA max
+//
+//		printf "Logging schedule was:\r%s\r\rSetting to \"default\"\r",	getLS370loggersSchedule(ls370)
+//		setLS370loggersSchedule(ls370, "default")
+//	endif
+//	
+//end
+//
+//function ask_continue(ask)
+//	variable ask
+//	
+//	variable ans
+//	if(ask ==1)
+//		ans = ask_user("Send command?", type=2)
+//		if (ans == 3)
+//			abort
+//		endif
+//		return ans
+//	else
+//		return 1
+//	endif
+//end

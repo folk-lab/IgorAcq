@@ -254,7 +254,10 @@ function/s getJSONvalue(jstr, key)
 	wave/t t_tokentext
 	wave w_tokentype, w_tokensize
 
-	if(key_length==1)
+	if(key_length==0)
+		// return whole json
+		return jstr
+	elseif(key_length==1)
 		// this is the only key with this name
 		// if not, the first key will be returned
 		offset = 0
