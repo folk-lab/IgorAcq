@@ -358,7 +358,8 @@ function ScanFastDAC(instrID, start, fin, channels, [numpts, sweeprate, ramprate
 	if(use_AWG)
 		struct fdAWG_List AWG
 		fdAWG_get_global_AWG_list(AWG)
-		AWG.numSteps = SV.numptsx/AWG.waveLen  // TODO: Check this is correct
+		AWG.numSteps = round(SV.numptsx/(AWG.waveLen*AWG.numCycles))  
+		SV.numptsx = (AWG.numSteps*AWG.waveLen*AWG.numCycles)
 		SFawg_check_AWG_list(AWG, SV)	// Check AWG for clashes/exceeding lims etc
 	endif
 
@@ -1035,6 +1036,11 @@ function SFawg_check_AWG_list(AWG, Fsv)
 	if(AWG.initialized == 0)
 		abort "ERROR[SFawg_check_AWG_list]: AWG_List needs to be initialized. Maybe something changed since last use!"
 	endif
+	
+	// Check numSteps is an integer and not zero
+	if(AWG.numSteps != trunc(AWG.numSteps) || AWG.numSteps == 0)
+		abort "ERROR[SFawg_check_AWG_list]: numSteps must be an integer, not " + num2str(AWG.numSteps)
+	endif
 			
 	// Check there are DACs set for each AW_wave (i.e. if using 2 AWs, need at least 1 DAC for each)
 	if(itemsInList(AWG.AW_waves, ",") != (itemsinlist(AWG.AW_Dacs,",")))
@@ -1059,10 +1065,10 @@ function SFawg_check_AWG_list(AWG, Fsv)
 	wave/T fdacvalstr	
 	string softLimitPositive = "", softLimitNegative = "", expr = "(-?[[:digit:]]+),([[:digit:]]+)", question
 	variable setpoint, answer, ch_num
-	string wn
 	for(i=0;i<itemsinlist(AWG.AW_Dacs,",");i+=1)
 		AWdacs = stringfromlist(i, AWG.AW_Dacs, ",")
-		wave w = fdAWG_get_AWG_wave(str2num(AWG.AW_Waves[i]))  // Get IGOR wave of AW#
+		string wn = fdAWG_get_AWG_wave(str2num(AWG.AW_Waves[i]))  // Get IGOR wave of AW#
+		wave w = $wn
 		duplicate/o/r=[0][] w setpoints  							// Just get setpoints part
 		for(j=0;j<strlen(AWdacs);j++)  // Check for each DAC that will be outputting this wave
 			ch_num = str2num(AWdacs[j])

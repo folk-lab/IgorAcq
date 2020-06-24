@@ -1429,14 +1429,14 @@ function fdAWG_setup_AWG([AWs, DACs, numCycles])
 	// IGOR AWs must be set in a separate function (which should reset AWG_List.initialized to 0)
 	// Sets AWG_list.initialized to 1 to allow fd_Record_Values to run
 	// If either parameter is not provided it will assume using previous settings
-	string AWs, DACs  // CSV for AWs to select which AWs (1,2) to use. // CSV sets for DACS e.g. "02, 1" for DACs 0, 2 to output AW1, and DAC 1 to output AW2
+	string AWs, DACs  // CSV for AWs to select which AWs (0,1) to use. // CSV sets for DACS e.g. "02, 1" for DACs 0, 2 to output AW0, and DAC 1 to output AW1
 	variable numCycles // How many full waves to execute for each ramp step
 	
 	struct fdAWG_List S
 	fdAWG_get_global_AWG_list(S)
 	
-	S.AW_Waves = selectstring(paramisdefault(AWs), S.AW_Waves, AWs)
-	S.AW_DACs = selectstring(paramisdefault(DACs), S.AW_Dacs, DACs)
+	S.AW_Waves = selectstring(paramisdefault(AWs), AWs, S.AW_Waves)
+	S.AW_DACs = selectstring(paramisdefault(DACs), DACs, S.AW_Dacs)
 	S.numCycles = paramisDefault(numCycles) ? S.numCycles : numCycles
 	
 	S.numWaves = itemsinlist(AWs, ",")
@@ -1444,10 +1444,10 @@ function fdAWG_setup_AWG([AWs, DACs, numCycles])
 	variable i, waveLen = 0
 	for(i=0;i<S.numWaves;i++)
 		// Get IGOR AW
-		wave w = fdAWG_get_AWG_wave(str2num(stringfromlist(i, S.AW_waves, ",")))
-		
+		string wn = fdAWG_get_AWG_wave(str2num(stringfromlist(i, S.AW_waves, ",")))
+		wave w = $wn
 		// Check AW has correct form and meets criteria. Checks length of wave = waveLen (or sets waveLen if == 0)
-		fdAWG_check_AW(w, len=waveLen)
+		fdAWG_check_AW(w,len=waveLen)
 	endfor
 	S.waveLen = waveLen
 	// Note: numSteps must be set in Scan... (i.e. based on numptsx or sweeprate or something)
@@ -1466,17 +1466,29 @@ function fdAWG_check_AW(w, [len])
 	wave w
 	variable &len  // length in samples (all AWs must have the same sample length)
 	
-	if(dimsize(w, 1) != 2) //  // TODO: check correct dim
+	// Check 2D (i.e. setpoints, samples)
+	if(dimsize(w, 1) != 2)
 		abort "AWs are required to be 2D wave. 1st row = setpoints, 2nd row = numSamples for corresponding setpoint"
 	endif
-	if(sum(w) > 1) // If period of wave is greater than 1s warn  // TODO: Make this actually sum just the sampleLens then * by measureFreq (or sampleFreq?)
-		printf "WARNING[fdAWG_check_AW]: Period of AW is %.1fs, continuing anyway"
-	endif
+	
+	// Check all sampleLens are integers
+	duplicate/o/free/r=[][1] w samples	
+	variable i = 0
+	for(i=0;i<numpnts(samples);i++)
+		if(samples[i] != trunc(samples[i])) // IGORs bs way of checking if integer
+			abort "ERROR[fdAWG_check_AW]: Received a non-integer number of samples for setpoint " + num2str(i)
+		endif
+	endfor
+	
+	// Check length of AWs is equal (if passed in len to compare to)
 	if(!paramisdefault(len)) // Check length of wave matches len, or set len if len == 0
 		if (len == 0)
-			len = dimsize(w, 0) 	// TODO: check correct dim
+			len = sum(samples)
+			if(len == 0)
+				abort "ERROR[fdAWG_check_AW]: AW has zero length!"
+			endif
 		else
-			if(dimsize(w, 0) != len)
+			if(sum(samples) != len)
 				abort "ERROR[fdAWG_check_AW]: Length of AW does not match len which is " + num2str(len)
 			endif
 		endif
@@ -1509,29 +1521,36 @@ function fdAWG_add_wave(instrID, wave_num, add_wave)
                         //
                         // WAVE,0,2
 
-   waveStats add_wave
-   if (dimsize(add_wave, 0) != 2 || V_numNans !=0) // Check 2D(TODO: Check 0/1) and no NaNs
-      abort "ERROR[fdAWG_add_wave]: must be 2D (setpoints, samples) and contain no NaNs"
+	variable i=0
+
+   waveStats/q add_wave
+   if (dimsize(add_wave, 1) != 2 || V_numNans !=0 || V_numINFs != 0) // Check 2D(TODO: Check 0/1) and no NaNs
+      abort "ERROR[fdAWG_add_wave]: must be 2D (setpoints, samples) and contain no NaNs or INFs"
    endif
-   if (wave_num != 0 || wave_num != 1)  // Check adding to AWG 0 or 1
+   if (wave_num != 0 && wave_num != 1)  // Check adding to AWG 0 or 1
       abort "ERROR[fdAWG_add_wave]: Only supports AWG wave 0 or 1"
    endif
 
-   // TODO: Any other checks on add_wave? i.e. setpoints within hardware/software lims, sample lengths within reasonable lims
-   // TODO: Will have to check against lims when setting ramp as thats when DACs are chosen to output.
-   // TODO: Should check that all sample_lengths are integers (i.e. not getting sent times in seconds)
+	// Check all sample lengths are integers
+ 	duplicate/o/free/r=[][1] add_wave samples
+	for(i=0;i<numpnts(samples);i++)
+		if(samples[i] != trunc(samples[i])) // IGORs bs way of checking if integer
+			abort "ERROR[fdAWG_add_wave]: Received a non-integer number of samples for setpoint " + num2str(i)
+		endif
+	endfor
 
-	// Make Setpoint, SampleLen, ... part of command
-   variable i=0
+	// Compile wave part of command
    string buffer = ""
-   for(i=0;i<numpnts(add_wave);i++)
-      sprintf buffer "%s,%d,%d,", buffer, add_wave[0][i], add_wave[1][i] // TODO: Check got correct wave dim here
+   for(i=0;i<dimsize(add_wave, 0);i++)
+		buffer = addlistitem(num2str(add_wave[i][0]), buffer, ",", INF)
+		buffer = addlistitem(num2str(add_wave[i][1]), buffer, ",", INF)
    endfor
    buffer = buffer[0,strlen(buffer)-2]  // chop off last ","
 
 	// Make full command in form "ADD_WAVE,<wave_num>,<sp0>,<#sp0>,...,<spn>,<#spn>"
    string cmd = ""
    sprintf cmd "ADD_WAVE,%d,%s", wave_num, buffer
+	printf "Command sent: %s", cmd
 
 	// Check within FD input buffer length
    if (strlen(cmd) > 256)
@@ -1545,21 +1564,25 @@ function fdAWG_add_wave(instrID, wave_num, add_wave)
 	response = sc_stripTermination(response, "\r\n")
 
 	// Check response and add to IGOR fdAW_<wave_num> if successful
-	wave AWG_wave = fdAWG_get_AWG_wave(wave_num)
+	string wn = fdAWG_get_AWG_wave(wave_num)
+	wave AWG_wave = $wn
+	variable awg_len = dimsize(AWG_wave,0)
 	string expected_response
-	sprintf expected_response "WAVE,%d,%d", wave_num, numpnts(add_wave)
+	sprintf expected_response "WAVE,%d,%d", wave_num, awg_len+dimsize(add_wave,0)
 	if(fdacCheckResponse(response, cmd, isString=1, expectedResponse=expected_response))
-		AWG_wave = AWG_wave+add_wave  // TODO: check this concatenates properly
+		concatenate/o/Free/NP=0 {AWG_wave, add_wave}, tempwave
+		redimension/n=(awg_len+dimsize(add_wave,0), -1) AWG_wave 
+		AWG_wave[awg_len,][] = tempwave[p][q]
 	else
 		abort "ERROR[fdAWG_add_wave]: Failed to add add_wave to AWG_wave"+ num2str(wave_num)
 	endif
 end
 
 
-function/wave fdAWG_get_AWG_wave(wave_num)
-   // Either returns existing igor fdAW_<wave_num> or creates and returns
+function/s fdAWG_get_AWG_wave(wave_num)
+   // Returns name of AW wave (and creates the wave first if necessary)
    variable wave_num
-   if (wave_num != 0 || wave_num != 1)  // Check adding to AWG 0 or 1
+   if (wave_num != 0 && wave_num != 1)  // Check adding to AWG 0 or 1
       abort "ERROR[fdAWG_get_AWG_wave]: Only supports AWG wave 0 or 1"
    endif
 
@@ -1567,9 +1590,9 @@ function/wave fdAWG_get_AWG_wave(wave_num)
    sprintf wn, "fdAW_%d", wave_num
    wave AWG_wave = $wn
    if(!waveExists(AWG_wave))
-      make/o/n=(-1,2) AWG_wave // TODO: check how dimensions of this look
+      make/o/n=(0,2) $wn
    endif
-   return AWG_wave
+   return wn
 end
 
 function fdAWG_clear_wave(instrID, wave_num)
@@ -1593,6 +1616,7 @@ function fdAWG_clear_wave(instrID, wave_num)
 
 	string cmd
 	sprintf cmd, "CLR_WAVE,%d", wave_num
+	printf "Command sent: %s", cmd
 	//send command
 	string response
    response = queryInstr(instrID, cmd+"\r", read_term="\n")
@@ -1601,7 +1625,8 @@ function fdAWG_clear_wave(instrID, wave_num)
    string expected_response
    sprintf expected_response "WAVE,%d,0", wave_num
    if(fdacCheckResponse(response, cmd, isstring=1,expectedResponse=expected_response))
-		wave AWG_wave = fdAWG_get_AWG_wave(wave_num)
+		string wn = fdAWG_get_AWG_wave(wave_num)
+		wave AWG_wave = $wn
 		killwaves AWG_wave 
    else
       abort "ERROR[fdAWG_clear_wave]: Error while clearing AWG_wave"+num2str(wave_num)
@@ -1639,7 +1664,8 @@ function/s fd_start_AWG_RAMP(S, AWG_list)
 	adcs = replacestring(",",S.adclist,"")
    // OPERATION, #N AWs, AW_dacs, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF Wave cycles per step, # ramp steps
    // Note: AW_dacs is formatted (dacs_for_wave0, dacs_for_wave1, .... e.g. '01,23' for Dacs 0,1 to output wave0, Dacs 2,3 to output wave1)
-	sprintf cmd, "AWG_RAMP,%d, %s, %s,%s,%s,%s, %d, %d\r", AWG_list.numWaves, AWG_list.AW_dacs, dacs, adcs, starts, fins, AWG_list.numCycles, AWG_list.numSteps
+	sprintf cmd, "AWG_RAMP,%d,%s,%s,%s,%s,%s,%d,%d\r", AWG_list.numWaves, AWG_list.AW_dacs, dacs, adcs, starts, fins, AWG_list.numCycles, AWG_list.numSteps
+	printf "Command sent: %s", cmd
 	writeInstr(S.instrID,cmd)
 	return cmd
 end
@@ -1679,7 +1705,8 @@ function fdAWG_make_multi_square_wave(instrID, v0, vP, vM, v0len, vPlen, vMlen, 
    // To make simple square wave set length of unwanted setpoints to zero.
    variable instrID, v0, vP, vM, v0len, vPlen, vMlen, wave_num  // lens in seconds
 	
-   // TODO: need to make a warning that if changing ADC frequency that AWG_frequency changes
+	// Open connection
+	sc_openinstrconnections(0)
 
    // put inputs into waves to make them easier to work with
    make/o/free sps = {v0, vP, vM}
@@ -1697,7 +1724,7 @@ function fdAWG_make_multi_square_wave(instrID, v0, vP, vM, v0len, vPlen, vMlen, 
    endif
 
    // make wave to store setpoints/sample_lengths
-   make/o/free/n=(-1, 2) awg_sqw  // TODO: check dims of wave
+   make/o/free/n=(0, 2) awg_sqw
 
 	// Get current measureFreq to calculate require sampleLens to achieve durations in s
    variable measureFreq = getFADCmeasureFreq(instrID) 
@@ -1711,8 +1738,8 @@ function fdAWG_make_multi_square_wave(instrID, v0, vP, vM, v0len, vPlen, vMlen, 
          if(numSamples == 0)  // Prevent adding zero length setpoint
             abort "ERROR[Set_multi_square_wave]: trying to add setpoint with zero length, duration too short for sampleFreq"
          endif
-         awg_sqw[j][0] = sps[i]
-         awg_sqw[j][1] = numSamples
+         awg_sqw[j][0] = {sps[i]}
+         awg_sqw[j][1] = {numSamples}
          j++ // Increment awg_sqw position for storing next setpoint/sampleLen
       endif
    endfor
@@ -1725,9 +1752,8 @@ function fdAWG_make_multi_square_wave(instrID, v0, vP, vM, v0len, vPlen, vMlen, 
 	// Clear current wave and then reset with new awg_sqw
    fdAWG_clear_wave(instrID, wave_num)
    fdAWG_add_wave(instrID, wave_num, awg_sqw)
-	
 	// Print with current settings (changing settings will affect square wave!)
-   printf "Set square wave on AWG_wave%d with Frequency %.2f at settings:\n\tnumADCs = %d\n\tSamplingFreq = %.0f\n\tMeasureFreq = %.0f", wave_num, 1/(v0len*2+vPlen+vMlen), getNumFadc(), getFADCspeed(instrID), getFADCmeasureFreq(instrID)
+   printf "Set square wave on AWG_wave%d with Frequency %.2f at settings:\n\tnumADCs = %d\n\tSamplingFreq = %.0f\n\tMeasureFreq = %.0f\r", wave_num, 1/(v0len*2+vPlen+vMlen), getNumFadc(), getFADCspeed(instrID), getFADCmeasureFreq(instrID)
    
    // Make sure user sets up AWG_list again after this change using fdAWG_setup_AWG()
    fdAWG_reset_init()
@@ -1745,19 +1771,37 @@ end
 
 
 structure fdAWG_list
+	// Note: Variables must come after all strings/waves/etc so that structPut will save them!!
+
+	// strings/waves/etc //
 	// Convenience
-	variable initialized	// Must set to 1 in order for this to be used in fd_Record_Values
 	string AW_Waves		// Which AWs to use e.g. "2" for AW_2 only, "1,2" for fdAW_1 and fdAW_2. (only supports 1 and 2 so far)
-	variable waveLen		// in samples (i.e. sum of samples at each setpoint for a single wave cycle)
 	
 	// Used in AWG_RAMP
 	string AW_dacs		// Dacs to use for waves
 							// Note: AW_dacs is formatted (dacs_for_wave0, dacs_for_wave1, .... e.g. '01,23' for Dacs 0,1 to output wave0, Dacs 2,3 to output wave1)
+
+	// Variables //
+	// Convenience	
+	variable initialized	// Must set to 1 in order for this to be used in fd_Record_Values
+	variable waveLen		// in samples (i.e. sum of samples at each setpoint for a single wave cycle)
+
+	// Used in AWG_Ramp
 	variable numWaves	// Number of AWs being used
 	variable numCycles 	// # wave cycles per DAC step for a full 1D scan
 	variable numSteps  	// # DAC steps for a full 1D scan
+	
 
 endstructure
+
+
+function fdAWG_init_global_AWG_list()
+	// Makes an empty AWG_List and stores as global
+	struct fdAWG_list S
+	S.AW_waves = ""
+	S.AW_dacs = ""
+	fdAWG_set_global_AWG_list(S)
+end
 
 
 function fdAWG_set_global_AWG_list(S)
@@ -1770,8 +1814,9 @@ function fdAWG_set_global_AWG_list(S)
 	string/g fdAWG_globals_AW_dacs = S.AW_dacs
 	
 	// Store variable parts
-	make/o fdAWG_globals_stuct_vars
-	structPut S, fdAWG_globals_stuct_vars
+//	make/o fdAWG_globals_stuct_vars
+	string/g fdAWG_globals_stuct_vars
+	structPut/S S, fdAWG_globals_stuct_vars
 end
 
 
@@ -1781,8 +1826,9 @@ function fdAWG_get_global_AWG_list(S)
 	struct fdAWG_list &S
 	
 	// Get variable parts
-	wave fdAWG_globals_stuct_vars
-	structGet S fdAWG_globals_stuct_vars
+//	wave fdAWG_globals_stuct_vars
+	svar fdAWG_globals_stuct_vars
+	structGet/S S fdAWG_globals_stuct_vars
 	
 	// Get string parts
 	svar fdAWG_globals_AW_Waves
