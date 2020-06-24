@@ -142,7 +142,6 @@ function fd_Record_Values(S, PL, rowNum, [AWG_list])
 	if(use_AWG)  	// Do AWG_RAMP
 	   cmd_sent = fd_start_AWG_RAMP(S, AWG_list)
 	   totalByteReturn = S.numptsx*S.numADCs*2 //AWG_list.numCycles*AWG_list.numSteps*AWG_list.waveLen  // Wrong?
-		printf "Expected bytes returned: %d", totalByteReturn		// DEBUG
 	else				// DO normal INT_RAMP
 		cmd_sent = fd_start_INT_RAMP(S)
 		totalByteReturn = S.numADCs*2*S.numptsx
@@ -168,7 +167,7 @@ function fd_Record_Values(S, PL, rowNum, [AWG_list])
 
 	// check abort/pause status
 	fdRV_check_sweepstate(S.instrID)
-	
+	printf "LOOPTIME: %.2f\r", looptime				//DEBUG
 	return looptime
 end
 

@@ -1550,8 +1550,7 @@ function fdAWG_add_wave(instrID, wave_num, add_wave)
 	// Make full command in form "ADD_WAVE,<wave_num>,<sp0>,<#sp0>,...,<spn>,<#spn>"
    string cmd = ""
    sprintf cmd "ADD_WAVE,%d,%s", wave_num, buffer
-	printf "Command sent: %s", cmd // DEBUG
-
+   
 	// Check within FD input buffer length
    if (strlen(cmd) > 256)
       sprintf buffer "ERROR[fdAWG_add_wave]: command length is %d, which exceeds fDAC buffer size of 256. Add to AWG in smaller chunks", strlen(cmd)
@@ -1616,7 +1615,7 @@ function fdAWG_clear_wave(instrID, wave_num)
 
 	string cmd
 	sprintf cmd, "CLR_WAVE,%d", wave_num
-	printf "Command sent: %s", cmd  // DEBUG
+
 	//send command
 	string response
    response = queryInstr(instrID, cmd+"\r", read_term="\n")
@@ -1665,7 +1664,6 @@ function/s fd_start_AWG_RAMP(S, AWG_list)
    // OPERATION, #N AWs, AW_dacs, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF Wave cycles per step, # ramp steps
    // Note: AW_dacs is formatted (dacs_for_wave0, dacs_for_wave1, .... e.g. '01,23' for Dacs 0,1 to output wave0, Dacs 2,3 to output wave1)
 	sprintf cmd, "AWG_RAMP,%d,%s,%s,%s,%s,%s,%d,%d\r", AWG_list.numWaves, AWG_list.AW_dacs, dacs, adcs, starts, fins, AWG_list.numCycles, AWG_list.numSteps
-	printf "Command sent: %s", cmd  // DEBUG
 	writeInstr(S.instrID,cmd)
 	return cmd
 end
@@ -1753,7 +1751,7 @@ function fdAWG_make_multi_square_wave(instrID, v0, vP, vM, v0len, vPlen, vMlen, 
    fdAWG_clear_wave(instrID, wave_num)
    fdAWG_add_wave(instrID, wave_num, awg_sqw)
 	// Print with current settings (changing settings will affect square wave!)
-   printf "Set square wave on AWG_wave%d with Frequency %.2f at settings:\n\tnumADCs = %d\n\tSamplingFreq = %.0f\n\tMeasureFreq = %.0f\r", wave_num, 1/(v0len*2+vPlen+vMlen), getNumFadc(), getFADCspeed(instrID), getFADCmeasureFreq(instrID)
+   printf "Set square wave on AWG_wave%d with Frequency %.2fHz at settings:\n\tnumADCs = %d\n\tSamplingFreq = %.0f\n\tMeasureFreq = %.0f\r", wave_num, 1/(v0len*2+vPlen+vMlen), getNumFadc(), getFADCspeed(instrID), getFADCmeasureFreq(instrID)
    
    // Make sure user sets up AWG_list again after this change using fdAWG_setup_AWG()
    fdAWG_reset_init()
