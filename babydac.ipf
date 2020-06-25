@@ -1205,6 +1205,7 @@ function update_BabyDAC(action) : ButtonControl
 		strswitch(action)
 			case "ramp":
 				UpdateMultipleBD(bd_window_resource, action="Ramp", ramprate=bd_ramprate, update=1)
+				break
 			case "rampallzero":
 				for(i=0;i<16;i+=1)
 					check = RampOutputBD(bd_window_resource, i, 0)
