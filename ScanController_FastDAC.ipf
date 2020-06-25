@@ -476,7 +476,7 @@ function fdRV_process_set_cutoff(PL, measureFreq)
          print(warn)
          PL.cutoff_frac = 0.5
       endif
-      PL.notch_fraclist = "0," //What does this do?
+      PL.notch_fraclist = "0," //TODO: Christian, What does this do?
   endif
 end
 
@@ -484,6 +484,9 @@ end
 function fdRV_process_set_notch(PL, measureFreq)
    struct fdRV_processList &PL
 	variable measureFreq
+	
+	// Set to empty if currently null
+	PL.notch_fracList = selectString(numtype(strlen(PL.notch_fraclist))==2, PL.notch_fraclist, "")
 
    variable i=0
    if(cmpstr(PL.notch_list, "")!=0)

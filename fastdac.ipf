@@ -1423,12 +1423,13 @@ function fdAWG_reset_init()
 	fdAWG_set_global_AWG_list(S)
 end
 
-function fdAWG_setup_AWG([AWs, DACs, numCycles])
+function fdAWG_setup_AWG(instrID, [AWs, DACs, numCycles])
 	// Function which initializes AWG_List s.t. selected DACs will use selected AWs when called in fd_Record_Values
 	// Required because fd_Record_Values needs to know the total number of samples it will get back, which is calculated from values in AWG_list
 	// IGOR AWs must be set in a separate function (which should reset AWG_List.initialized to 0)
 	// Sets AWG_list.initialized to 1 to allow fd_Record_Values to run
 	// If either parameter is not provided it will assume using previous settings
+	variable instrID  // For printing information about frequency etc
 	string AWs, DACs  // CSV for AWs to select which AWs (0,1) to use. // CSV sets for DACS e.g. "02, 1" for DACs 0, 2 to output AW0, and DAC 1 to output AW1
 	variable numCycles // How many full waves to execute for each ramp step
 	
@@ -1441,22 +1442,59 @@ function fdAWG_setup_AWG([AWs, DACs, numCycles])
 	
 	S.numWaves = itemsinlist(AWs, ",")
 	
+	// For checking things don't change before scanning
+	S.numADCs = getNumFADC()  // Store number of ADCs selected in window so can check if this changes
+	S.samplingFreq = getfadcspeed(instrID)
+	S.measureFreq = S.samplingFreq/S.numADCs
+	
 	variable i, waveLen = 0
+	string wn
+	variable min_samples = INF  // Minimum number of samples at a setpoint
 	for(i=0;i<S.numWaves;i++)
 		// Get IGOR AW
-		string wn = fdAWG_get_AWG_wave(str2num(stringfromlist(i, S.AW_waves, ",")))
+		wn = fdAWG_get_AWG_wave(str2num(stringfromlist(i, S.AW_waves, ",")))
 		wave w = $wn
 		// Check AW has correct form and meets criteria. Checks length of wave = waveLen (or sets waveLen if == 0)
 		fdAWG_check_AW(w,len=waveLen)
+		
+		// Get length of shortest setpoint in samples
+		duplicate/o/free/r=[][1] w samples
+		wavestats/q samples
+		if(V_min < min_samples)
+			min_samples = V_min
+		endif
 	endfor
 	S.waveLen = waveLen
-	// Note: numSteps must be set in Scan... (i.e. based on numptsx or sweeprate or something)
+	// Note: numSteps must be set in Scan... (i.e. based on numptsx or sweeprate)
 	
 	// Set initialized
 	S.initialized = 1
 	
 	// Store as global to be access in fd_Record_Values
 	fdAWG_set_global_AWG_list(S)
+	
+	// Print with current settings (changing settings will affect square wave!)
+	variable j = 0
+	string buffer = ""
+	string dacs4wave, dac_list, aw_num
+	for(i=0;i<S.numWaves;i++)
+		aw_num = stringfromlist(i, AWs, ",")
+		dacs4wave = stringfromlist(i, DACs, ",")
+		dac_list = ""
+		for(j=0;j<strlen(dacs4wave);j++)  // Go through DACs for AW#i (i.e. 012 means DACs 0,1,2)
+			dac_list = addlistitem(dacs4wave[j], dac_list, ",")
+		endfor
+		dac_list = dac_list[0,strlen(dac_list)-2] // remove comma at end
+		sprintf buffer "%s\tAW%s on DAC(s) %s\r", buffer, aw_num, dac_list
+	endfor 
+
+	variable awFreq = 1/(s.waveLen/S.measureFreq)
+	variable duration_per_step = s.waveLen/S.measureFreq*S.numCycles
+	
+	printf "\r\rAWG set with:\r\tAWFreq = %.2fHz\r\tMin Samples for step = %d\r\tCycles per step = %d\r\tDuration per step = %.3fs\r\tnumADCs = %d\r\tSamplingFreq = %.1f/s\r\tMeasureFreq = %.1f/s\rOutputs are:\r%s\r",\
+  									awFreq,											min_samples,			S.numCycles,						duration_per_step,		S.numADCs, 		S.samplingFreq,					S.measureFreq,						buffer											
+
+   
 end
 
 
@@ -1750,9 +1788,7 @@ function fdAWG_make_multi_square_wave(instrID, v0, vP, vM, v0len, vPlen, vMlen, 
 	// Clear current wave and then reset with new awg_sqw
    fdAWG_clear_wave(instrID, wave_num)
    fdAWG_add_wave(instrID, wave_num, awg_sqw)
-	// Print with current settings (changing settings will affect square wave!)
-   printf "Set square wave on AWG_wave%d with Frequency %.2fHz at settings:\n\tnumADCs = %d\n\tSamplingFreq = %.0f\n\tMeasureFreq = %.0f\r", wave_num, 1/(v0len*2+vPlen+vMlen), getNumFadc(), getFADCspeed(instrID), getFADCmeasureFreq(instrID)
-   
+
    // Make sure user sets up AWG_list again after this change using fdAWG_setup_AWG()
    fdAWG_reset_init()
 end
@@ -1783,12 +1819,18 @@ structure fdAWG_list
 	// Convenience	
 	variable initialized	// Must set to 1 in order for this to be used in fd_Record_Values
 	variable waveLen		// in samples (i.e. sum of samples at each setpoint for a single wave cycle)
+	
+	// Checking things don't change
+	variable numADCs  	// num ADCs selected to measure when setting up AWG
+	variable samplingFreq // SampleFreq when setting up AWG
+	variable measureFreq // MeasureFreq when setting up AWG
 
 	// Used in AWG_Ramp
 	variable numWaves	// Number of AWs being used
 	variable numCycles 	// # wave cycles per DAC step for a full 1D scan
 	variable numSteps  	// # DAC steps for a full 1D scan
 	
+
 
 endstructure
 

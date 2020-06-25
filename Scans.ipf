@@ -356,11 +356,9 @@ function ScanFastDAC(instrID, start, fin, channels, [numpts, sweeprate, ramprate
    
    // If using AWG then get that now and check it
 	if(use_AWG)
-		struct fdAWG_List AWG
+		struct fdAWG_list AWG
 		fdAWG_get_global_AWG_list(AWG)
-		AWG.numSteps = round(SV.numptsx/(AWG.waveLen*AWG.numCycles))  
-		SV.numptsx = (AWG.numSteps*AWG.waveLen*AWG.numCycles)
-		SFawg_check_AWG_list(AWG, SV)	// Check AWG for clashes/exceeding lims etc
+		SFawg_set_and_precheck(AWG, SV)  // Note: sets SV.numptsx here
 	endif
 
    // Ramp to start without checks since checked above
@@ -439,10 +437,9 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
    	
    	// If using AWG then get that now and check it
 	if(use_AWG)
-		struct fdAWG_List AWG
+		struct fdAWG_list AWG
 		fdAWG_get_global_AWG_list(AWG)
-		AWG.numSteps = Fsv.numptsx/AWG.waveLen  // TODO: Check this is correct
-		SFawg_check_AWG_list(AWG, Fsv)	// Check AWG for clashes/exceeding lims etc
+		SFawg_set_and_precheck(AWG, Fsv)  // Note: sets SV.numptsx here
 	endif
    
    // Ramp to start without checks
@@ -497,11 +494,11 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 end
 
 
-function ScanfastDACRepeat(instrID, start, fin, channels, numptsy, [numptsx, sweeprate, delay, ramprate, alternate, comments, RCcutoff, numAverage, notch, nosave])
+function ScanfastDACRepeat(instrID, start, fin, channels, numptsy, [numptsx, sweeprate, delay, ramprate, alternate, comments, RCcutoff, numAverage, notch, nosave, use_awg])
 	// 1D repeat scan for FastDAC
 	// Note: to alternate scan direction set alternate=1
 	// Note: Ramprate is only for ramping gates between scans
-	variable instrID, start, fin, numptsy, numptsx, sweeprate, delay, ramprate, alternate, RCcutoff, numAverage, nosave
+	variable instrID, start, fin, numptsy, numptsx, sweeprate, delay, ramprate, alternate, RCcutoff, numAverage, nosave, use_awg
 	string channels, comments, notch
 	variable i=0, j=0
 
@@ -527,6 +524,13 @@ function ScanfastDACRepeat(instrID, start, fin, channels, numptsy, [numptsx, swe
    // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
    SFfd_pre_checks(SV)  
 
+	// If using AWG then get that now and check it
+	if(use_AWG)
+		struct fdAWG_list AWG
+		fdAWG_get_global_AWG_list(AWG)
+		SFawg_set_and_precheck(AWG, SV)  // Note: sets SV.numptsx here
+	endif
+
    // Ramp to start without checks since checked above
    SFfd_ramp_start(SV, ignore_lims = 1)
 
@@ -549,7 +553,11 @@ function ScanfastDACRepeat(instrID, start, fin, channels, numptsy, [numptsx, swe
 		SFfd_ramp_start(SV, ignore_lims=1, x_only=1)
 		sc_sleep(SV.delayy)
 		// Record values for 1D sweep
-		fd_Record_Values(SV,PL,j)
+		if(!use_awg)  // do normal
+			fd_Record_Values(SV,PL,j)
+		else
+			fd_Record_Values(SV,PL,j, AWG_list = AWG)
+		endif
 		if (alternate!=0) // If want to alternate scan scandirection for next row
 			d = d*-1
 		endif
@@ -1037,6 +1045,17 @@ function SFawg_check_AWG_list(AWG, Fsv)
 		abort "ERROR[SFawg_check_AWG_list]: AWG_List needs to be initialized. Maybe something changed since last use!"
 	endif
 	
+	// Check numADCs hasn't changed since setting up waves
+	if(AWG.numADCs != getNumFADC())
+		abort "ERROR[SFawg_check_AWG_list]: Number of ADCs being measured has changed since setting up AWG, this will change AWG frequency. Set up AWG again to continue"
+	endif
+	
+	// Check measureFreq hasn't change since setting up waves
+	if(AWG.measureFreq != Fsv.measureFreq  || AWG.samplingFreq != Fsv.samplingFreq)
+		sprintf err_msg, "ERROR[SFawg_check_AWG_list]: MeasureFreq has changed from %.2f/s to %.2f/s since setting up AWG. Set up AWG again to continue", AWG.measureFreq, Fsv.measureFreq
+		abort err_msg
+	endif
+	
 	// Check numSteps is an integer and not zero
 	if(AWG.numSteps != trunc(AWG.numSteps) || AWG.numSteps == 0)
 		abort "ERROR[SFawg_check_AWG_list]: numSteps must be an integer, not " + num2str(AWG.numSteps)
@@ -1067,7 +1086,7 @@ function SFawg_check_AWG_list(AWG, Fsv)
 	variable setpoint, answer, ch_num
 	for(i=0;i<itemsinlist(AWG.AW_Dacs,",");i+=1)
 		AWdacs = stringfromlist(i, AWG.AW_Dacs, ",")
-		string wn = fdAWG_get_AWG_wave(str2num(AWG.AW_Waves[i]))  // Get IGOR wave of AW#
+		string wn = fdAWG_get_AWG_wave(str2num(stringfromlist(i, AWG.AW_Waves, ",")))  // Get IGOR wave of AW#
 		wave w = $wn
 		duplicate/o/r=[0][] w setpoints  							// Just get setpoints part
 		for(j=0;j<strlen(AWdacs);j++)  // Check for each DAC that will be outputting this wave
@@ -1086,6 +1105,20 @@ function SFawg_check_AWG_list(AWG, Fsv)
 			endfor
 		endfor
 	endfor		
+	
+end
+
+
+function SFawg_set_and_precheck(AWG, Fsv)
+	struct fdAWG_List &AWG
+	struct FD_ScanVars &Fsv
+	
+	// Set numptsx in Scan s.t. it is a whole number of full cycles
+	AWG.numSteps = round(Fsv.numptsx/(AWG.waveLen*AWG.numCycles))  
+	Fsv.numptsx = (AWG.numSteps*AWG.waveLen*AWG.numCycles)
+	
+	// Check AWG for clashes/exceeding lims etc
+	SFawg_check_AWG_list(AWG, Fsv)	
 	
 end
 	
