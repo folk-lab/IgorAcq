@@ -225,7 +225,8 @@ threadsafe function writeInstr(instrID, cmd)
     variable count = strlen(cmd) // strlen is a problem
                                  // with non-ascii characters
                                  // it does not equal numBytes
-
+	
+//	printf "COMMAND: %s\r", cmd				// DEBUG
     variable return_count = 0    // how many bytes were written
     variable status = viWrite(instrID, cmd, count, return_count)
     if (status)
@@ -278,7 +279,6 @@ threadsafe function/s readInstr(instrID, [read_term, read_bytes, binary])
 	 		return "Nan"
 	 	endif
 	 endif
-	 
 	 return buffer
 end
 
@@ -287,7 +287,7 @@ threadsafe function/s queryInstr(instrID, cmd, [read_term, delay])
 	variable instrID, delay
 	string cmd, read_term
 	string response
-
+	
 	writeInstr(instrID, cmd)
 	if(!paramisdefault(delay))
 		sleep/s delay
@@ -297,7 +297,7 @@ threadsafe function/s queryInstr(instrID, cmd, [read_term, delay])
     else
         response = readInstr(instrID, read_term = read_term)
     endif
-
+//	printf "RESPONSE: %s\r", response 		//DEBUG
 	return response
 end
 

@@ -1,0 +1,86 @@
+{
+  "default": {
+    "heater": {
+      "min": 30,
+      "max": 60
+    },
+    "analog_outputs": {
+      "ao1": {
+        "min": 10,
+        "max": 60
+      },
+      "ao2": {
+        "min": 20,
+        "max": 50
+      }
+    },
+    "channels": {
+      "ch1": {
+        "min": 120,
+        "max": 180
+      },
+      "ch2": {
+        "min": 30,
+        "max": 120
+      },
+      "ch3": {
+        "min": 200,
+        "max": 400
+      },
+      "ch4": {
+        "min": 200,
+        "max": 400
+      },
+      "ch5": {
+        "min": 200,
+        "max": 400
+      },
+      "ch6": {
+        "min": 200,
+        "max": 400
+      }
+    }
+  },
+  "mc_exclusive": {
+    "heater": {
+      "min": 30,
+      "max": 60
+    },
+    "analog_outputs": {
+      "ao1": {
+        "min": 10,
+        "max": 60
+      },
+      "ao2": {
+        "min": 20,
+        "max": 50
+      }
+    },
+    "channels": {
+      "ch1": {
+        "min": 120,
+        "max": 180
+      },
+      "ch2": {
+        "min": 30,
+        "max": 120
+      },
+      "ch3": {
+        "min": 200,
+        "max": 400
+      },
+      "ch4": {
+        "min": 200,
+        "max": 400
+      },
+      "ch5": {
+        "min": 200,
+        "max": 400
+      },
+      "ch6": {
+        "min": 200,
+        "max": 400
+      }
+    }
+  }
+}

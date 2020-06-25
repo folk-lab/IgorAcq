@@ -25,6 +25,16 @@
 ////// utility functions //////
 ///////////////////////////////
 
+function/s strTime()
+	// Returns the current time in YYYY-MM-DD;HH-MM-SS format
+	string datetime_str
+	string time_str
+	time_str = secs2time(datetime, 3)
+	sprintf time_str "%s-%s-%s", time_str[0,1], time_str[3,4], time_str[6,7]
+	sprintf datetime_str "%s;%s" secs2Date(datetime, -2), time_str
+	return datetime_str
+end
+
 function unixTime()
 	// returns the current unix time in seconds
 	return DateTime - date2secs(1970,1,1) - date2secs(-1,-1,-1)
@@ -226,6 +236,22 @@ function /S getExpPath(whichpath, [full])
 			else // full=0 or 1
 				return ""
 			endif
+		case "setup":
+			if(full==0)
+				return ReplaceString(":", temp3[1,inf], "/")+"setup/"
+			elseif(full==1)
+				return temp3[1,inf]+"config:"
+			elseif(full==2)
+				if(cmpstr(platform,"Windows")==0)
+					return ParseFilePath(5, temp1+temp2+temp3+"setup:", separatorStr, 0, 0)
+				else
+					return ParseFilePath(5, temp1+temp2+temp3, separatorStr, 0, 0)+"setup/"
+				endif
+			elseif(full==3)
+				return S_path+"setup:"
+			else
+				return ""
+			endif
 	endswitch
 end
 
@@ -323,6 +349,12 @@ function InitScanController([configFile])
 
 	// check if a path is defined to backup data
 	sc_checkBackup()
+	
+	// check if we have the correct SQL driver
+	sc_checkSQLDriver()
+	
+	// create/overwrite setup path. All instrument/interface configs are stored here.
+	newpath /C/O/Q setup getExpPath("setup", full=3)
 
 	// deal with config file
 	string /g sc_current_config = ""
@@ -968,11 +1000,11 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 	wave/t sc_RawWaveNames, sc_CalcWaveNames, sc_RawScripts, sc_CalcScripts
 	variable i=0, j=0
 	string cmd = "", wn = "", wn2d="", s, script = "", script0 = "", script1 = ""
-	string/g sc_x_label, sc_y_label
+	string/g sc_x_label, sc_y_label, activegraphs=""
 	variable/g sc_is2d, sc_scanstarttime = datetime
 	variable/g sc_startx, sc_finx, sc_numptsx, sc_starty, sc_finy, sc_numptsy
 	variable/g sc_abortsweep=0, sc_pause=0, sc_abortnosave=0
-	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, activegraphs="", cmd1="",window_string=""
+	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, cmd1="",window_string=""
 	string cmd2=""
 	variable index, graphopen, graphopen2d
 	svar sc_colormap
@@ -2146,11 +2178,12 @@ function SaveWaves([msg,save_experiment,fastdac])
 			
 			// look for waves to save
 			ii=0
+			string str_2d = "", savename
 			do
 				if(fadcattr[ii][2] == 48) //checkbox checked
 					wn = fadcvalstr[ii][3]
 					if(sc_is2d)
-						wn += "2d"
+						wn += "_2d"
 					endif
 					filename = "dat"+filenumstr+wn
 					duplicate $wn $filename
@@ -2160,16 +2193,20 @@ function SaveWaves([msg,save_experiment,fastdac])
 					saveSingleWave(wn)
 					
 					if(sc_Saverawfadc)
+						str_2d = ""  // Set 2d_str blank until check if sc_is2d
 						wn_raw = "ADC"+num2istr(ii)
 						if(sc_is2d)
-							wn_raw += "2d"
+							wn_raw += "_2d"
+							str_2d = "_2d"  // Need to add _2d to name if wave is 2d only.
 						endif
-						filename = "dat"+filenumstr+wn_raw
+						filename = "dat"+filenumstr+fadcvalstr[ii][3]+str_2d+"_RAW"  // More easily identify which Raw wave for which Calc wave
+						savename = fadcvalstr[ii][3]+str_2d+"_RAW"
 						duplicate $wn_raw $filename
+						duplicate/O $wn_raw $savename  // To store in HDF with more easily identifiable name
 						if(sc_Printfadc)
 							print filename
 						endif
-						saveSingleWave(wn_raw)
+						saveSingleWave(savename)
 					endif
 				endif
 				ii+=1
@@ -2524,23 +2561,31 @@ end
 //////////////////////////
 /// sweep notification ///
 //////////////////////////
-
-
-//tim.child = U8W2V6QK0 
-function /S getSlackNotice(username, [message, min_time]) 
-	// Usernames no longer work for new users since 2017. See https://api.slack.com/changelog/2017-09-the-one-about-usernames
-	// Can use member ID instead
+ 
+function/s getSlackNotice([message, min_time]) 
+	// Loading slack setup parameters from external config.
+	// Setup config file ("SlackConfig.txt") should be placed in the setup folder.
+	// Parameters are: userid, webhook, displayname & emoji
 	
 	// this function will send a notification to Slack -- run it as if it were a getInstrStatus function
-	// username = your slack username, notice will be a DM
 	// message = string to include in Slack message
 	// min_time = if time elapsed for this current scan is less than min_time no notification will be sent
 	//					defaults to 60 seconds
-	string username, message
+	string message
 	variable min_time
 	nvar filenum, sweep_t_elapsed, sc_abortsweep
-	string sc_slack_url = "https://hooks.slack.com/services/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"
-	string txt="", buffer="", payload="", out="", botname = "qdotbot", emoji = ":the_horns:"
+	
+	// load setup from file
+	string jstr = readtxtfile("SlackConfig.txt","setup")
+	if(cmpstr(jstr,"")==0)
+		abort
+	endif
+	
+	string sc_slack_url = getJSONvalue(jstr,"webhook")
+	string displayname = getJSONvalue(jstr,"displayname")
+	string userid = getJSONvalue(jstr,"userid")
+	string emoji = getJSONvalue(jstr,"emoji")
+	string txt="", buffer="", payload=""
 
 	//// check if I need a notification ////
 	if (paramisdefault(min_time))
@@ -2568,8 +2613,8 @@ function /S getSlackNotice(username, [message, min_time])
 
 	//// build payload ////
 	sprintf buffer, "{\"text\": \"%s\"", txt; payload+=buffer //
-	sprintf buffer, ", \"username\": \"%s\"", botname; payload+=buffer
-	sprintf buffer, ", \"channel\": \"@%s\"", username; payload+=buffer
+	sprintf buffer, ", \"username\": \"%s\"", displayname; payload+=buffer
+	sprintf buffer, ", \"channel\": \"@%s\"", userid; payload+=buffer
 	sprintf buffer, ", \"icon_emoji\": \"%s\"", emoji; payload+=buffer //
 	payload += "}"
 	//// end payload ////
@@ -2587,5 +2632,4 @@ function /S getSlackNotice(username, [message, min_time])
         return "{slack_notice: false}"
     endif
 end
-
 
