@@ -4,7 +4,6 @@
 function AAScans()
 end
 
-
 function ReadVsTime(delay, [comments]) // Units: s
 	variable delay
 	string comments
