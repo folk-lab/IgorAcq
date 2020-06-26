@@ -2,27 +2,56 @@
 #pragma rtGlobals=3		// Use modern global access method and strict wave access.
 #include <SQLConstants>
 
-function getLSStatus(instrID)
-	variable instrID
+function/s getLSStatus(instrID)
+	string instrID
 	
-	// Load max ages from "LakeshoreConfig.txt" in setup folder.
-	string jstr = readtxtfile("SlackConfig.txt","setup")
+	// Load database schemas from SQLConfig.txt
+	string jstr = readtxtfile("SQLConfig.txt","setup")
 	if(cmpstr(jstr,"")==0)
-		abort "SlackConfig.txt not found!"
+		abort "SQLConfig.txt not found!"
 	endif
 	
-	variable max_50k = str2num(getJSONvalue(jstr,"loggingschedules:default:channels:ch1:max"))
-	variable max_4k = str2num(getJSONvalue(jstr,"loggingschedules:default:channels:ch2:max"))
-	variable max_magnet = str2num(getJSONvalue(jstr,"loggingschedules:default:channels:ch3:max"))
-	variable max_still = str2num(getJSONvalue(jstr,"loggingschedules:default:channels:ch5:max"))
-	variable max_mc = str2num(getJSONvalue(jstr,"loggingschedules:default:channels:ch6:max"))
+	string database = getJSONvalue(jstr,"database")
+	string temp_schema = getJSONvalue(jstr,"temperature_schema")
+	string heater_schema = getJSONvalue(jstr,"heater_schema")
+	
+	// Load "LakeshoreConfig.txt" in setup folder.
+	jstr = readtxtfile("LakeshoreConfig.txt","setup")
+	if(cmpstr(jstr,"")==0)
+		abort "LakeshoreConfig.txt not found!"
+	endif
+	
+	//// Temperatures ////
 	
 	// Get temperature data from SQL database
-	string wavenames = "channels,timestamp,temperature"
-	string statement = "SELECT DISTINCT ON (ch_idx) ch_idx, time, t FROM qdot.lksh370.channel_data WHERE time > TIMESTAMP '2020-01-13 23:00:00.00' ORDER BY ch_idx, time DESC;"
-	requestSQLData(statement, wavenames=wavenames)
+	string ch = "1,2,3,5,6", JSONkeys = "50K Plate K,4K Plate K,Magnet K,Still K,MC K"
+	string LSkeys = "50K,4K,magnet,still,mc"
+	string searchStr="", statement="", timestamp="", temp="", tempBuffer=""
+	variable i=0
+	for(i=0;i<itemsinlist(ch,",");i+=1)
+		sprintf searchStr, "loggingschedules:default:channels:ch%s:max", stringfromlist(i,ch,",")
+		timestamp = sc_SQLtimestamp(str2num(getJSONvalue(jstr,searchStr)))
+		sprintf statement, "SELECT t FROM %s.%s WHERE ch_idx=%s AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, temp_schema, stringfromlist(i,ch,","), timestamp
+		temp = requestSQLValue(statement)
+		
+		if(cmpstr(temp,"") == 0)
+			// nothing returned from database
+			// request from Lakeshore and overwrite
+			//temp = num2str(getLS370temp(instrID,stringfromlist(i,LSkeys,",")))
+		endif
+		
+		// add to meta data
+		tempBuffer = addJSONkeyval(tempBuffer, stringfromlist(i,JSONkeys,","), temp)
+	endfor
 	
+	// end temperature part
+	tempBuffer = addJSONkeyval("","Temperature",tempBuffer)
 	
+	//// Heaters ////
+	string heatBuffer="{\"MC Heater mW\":5, \"Still Heater mW\":3}"
+	string buffer = addJSONkeyval(tempBuffer,"Heaters",heatBuffer)
+	
+	return addJSONkeyval("","Lakeshore",buffer)
 end
 
 
@@ -197,7 +226,7 @@ function/s sc_fetchSQLSingle(s,statement,[key])
 		sc_closeSQLConnection(s)
 		print "[ERROR] \"sc_fetchSQLSingle\": Unable to fetch colunm count."
 		abort
-	elseif(colCount != 1)
+	elseif(colCount > 1)
 		print "[WARNINIG] \"sc_fetchSQLSingle\": More than a single value is being returned! The last value will be set as result."
 		warningIssued = 1
 	endif
@@ -209,7 +238,7 @@ function/s sc_fetchSQLSingle(s,statement,[key])
 		sc_closeSQLConnection(s)
 		print "[ERROR] \"sc_fetchSQLSingle\": Unable to fetch row count."
 		abort
-	elseif(rowCount != 1 && warningIssued == 0)
+	elseif(rowCount > 1 && warningIssued == 0)
 		print "[WARNINIG] \"sc_fetchSQLSingle\": More than a single value is being returned! The last value will be set as result."
 	endif
 	
@@ -603,6 +632,55 @@ function/s sc_checkSQLDriver([printToCommandLine])
 	SQLFreeHandle(SQL_HANDLE_ENV,envRefNum)
 end
 
+function timestamp2secs(timestamp)
+	// converts timestamp to secs
+	// timestamp: YYYY:MM:DD HH:MM:SS.+S
+	string timestamp
+	
+	string year, month, day, hours, minutes, seconds, fraction
+	string expr="([[:digit:]]{4})-([[:digit:]]{2})-([[:digit:]]{2}) ([[:digit:]]{2}):([[:digit:]]{2}):([[:digit:]]{2}).([[:digit:]]+)"
+	splitstring/e=(expr) timestamp, year, month, day, hours, minutes, seconds, fraction
+	
+	if(v_flag == 0)
+		// wrong input format
+		print "[ERROR] \"time2secs\": Wrong input format! Timestamp must be YYYY:MM:DD HH:MM:SS.+S"
+		abort
+	endif
+	
+	sprintf fraction, "0.%d", fraction
+	variable fracSecs = str2num(fraction)
+	
+	return date2secs(str2num(year),str2num(month),str2num(day)) + 3600*str2num(hours) + 60*str2num(minutes) + str2num(seconds) + fracSecs
+end
+
+function/s sc_SQLDatabaseTime()
+	string statement = "SELECT NOW();"
+	string result = requestSQLValue(statement)
+	
+	return result
+end
+
+function/s sc_SQLtimestamp(secs)
+	// constructs a valid sql timestamp "secs" into the past,
+	// based on the current database time.
+	variable secs
+	
+	// get current database time
+	string databaseTime = sc_SQLDatabaseTime()
+	
+	// convert to seconds and substract secs
+	variable newTimeSecs = timestamp2secs(databaseTime) - secs
+	
+	// construct new timestamp
+	string newTimestamp
+	string newDate = secs2date(newTimeSecs,-2,"-")
+	string newTime = secs2time(newTimeSecs,3,6)
+	
+	sprintf newTimestamp, "%s %s", newDate, newTime
+	
+	return newTimestamp
+end
+
 ////////////////////////
 //// Test functions ////
 ///////////////////////
@@ -659,3 +737,4 @@ function timeSQLStatements()
 	sprintf mess, "Statement #1: %f s, statement #2: %f s, statement #3: %f s", totaltime1, totaltime2, totaltime3
 	print mess
 end
+
