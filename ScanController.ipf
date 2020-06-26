@@ -2152,6 +2152,7 @@ function SaveWaves([msg,save_experiment,fastdac])
 			while (ii < numpnts(sc_CalcWaveNames))
 			closeSaveFiles()
 		endif
+	// Save Fastdac waves	
 	elseif(fastdac == 1)
 		wave/t fadcvalstr
 		wave fadcattr

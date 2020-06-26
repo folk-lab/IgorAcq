@@ -120,10 +120,13 @@ function fd_Record_Values(S, PL, rowNum, [AWG_list])
 	// If passed AWG_list with AWG_list.use_AWG == 1 then it will run with the Arbitrary Wave Generator on
    // Note: Only works for 1 FastDAC! Not sure what implementation will look like for multiple yet
 
-	// Check if AWG_list passed
-	variable use_AWG = paramisdefault(AWG_list) ? 0 : 1
-	if(use_AWG == 1 && rowNum == 0)
-		print "fd_Record_Values: Using AWG"
+	// Check if AWG_list passed with use_AWG = 1
+	variable/g sc_AWG_used = 0  // Global so that this can be used in SaveWaves() to save AWG info if used
+	if(!paramisdefault(AWG_list) && AWG_list.use_AWG == 1)  // TODO: Does this work?
+		sc_AWG_used = 1
+		if(rowNum == 0)
+			print "fd_Record_Values: Using AWG"
+		endif
 	endif
 
    // Check InitWaves was run with fastdac=1
@@ -139,7 +142,7 @@ function fd_Record_Values(S, PL, rowNum, [AWG_list])
 
 	string cmd_sent = ""
 	variable totalByteReturn
-	if(use_AWG)  	// Do AWG_RAMP
+	if(sc_AWG_used)  	// Do AWG_RAMP
 	   cmd_sent = fd_start_AWG_RAMP(S, AWG_list)
 	   totalByteReturn = S.numptsx*S.numADCs*2 //AWG_list.numCycles*AWG_list.numSteps*AWG_list.waveLen  // Wrong?
 	else				// DO normal INT_RAMP

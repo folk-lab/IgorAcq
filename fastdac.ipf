@@ -209,7 +209,7 @@ function/s getFDACStatus(instrID)
 	string  buffer = "", key = ""
 	wave/t fdacvalstr	
 	svar fdackeys
-
+	
 	// find the correct fastdac
 	string visa = getresourceaddress(instrID)
 	variable i=0, dev = 0, numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
@@ -237,11 +237,47 @@ function/s getFDACStatus(instrID)
 	for(i=0;i<str2num(stringbykey("numADCCh"+num2istr(dev),fdackeys,":",","));i+=1)
 		buffer = addJSONkeyval(buffer, "ADC"+num2istr(i), num2numstr(getfadcChannel(instrID,adcChs+i)))
 	endfor
-
+	
+	// AWG info if used
+	nvar sc_AWG_used
+	if(sc_AWG_used == 1)
+		buffer = addJSONkeyval(buffer, "AWG", add_AWG_status())  //NOTE: AW saved in add_AWG_status()
+	endif
+	
 	return addJSONkeyval("", "FastDAC "+num2istr(dev), buffer)
 end
 
 
+function/s add_AWG_status()
+	// Function to be called from getFDACstatus() to add a section with information about the AWG used
+	// Also adds AWs used to HDF
+	
+	string buffer = ""// For storing JSON to return
+	
+	// Get the Global AWG list (which has info about what was used in scan)
+	struct fdAWG_list AWG
+	fdAWG_get_global_AWG_list(AWG)
+	
+	buffer = addJSONkeyval(buffer, "AW_Waves", AWG.AW_Waves, addquotes=1)							// Which waves were used (e.g. "0,1" for both AW0 and AW1)
+	buffer = addJSONkeyval(buffer, "AW_Dacs", AWG.AW_Dacs, addquotes=1)								// Which Dacs output each wave (e.g. "01,2" for Dacs 0,1 outputting AW0 and Dac 2 outputting AW1)
+	buffer = addJSONkeyval(buffer, "waveLen", num2str(AWG.waveLen), addquotes=0)					// How are the AWs in total samples
+	buffer = addJSONkeyval(buffer, "numADCs", num2str(AWG.numADCs), addquotes=0)					// How many ADCs were selected to record when the AWG was set up
+	buffer = addJSONkeyval(buffer, "samplingFreq", num2str(AWG.samplingFreq), addquotes=0)		// Sample rate of the Fastdac at time AWG was set up
+	buffer = addJSONkeyval(buffer, "measureFreq", num2str(AWG.measureFreq), addquotes=0)			// Measure freq at time AWG was set up (i.e. sampleRate/numADCs)
+	buffer = addJSONkeyval(buffer, "numWaves", num2str(AWG.numWaves), addquotes=0)				// How many AWs were used in total (should be 1 or 2)
+	buffer = addJSONkeyval(buffer, "numCycles", num2str(AWG.numCycles), addquotes=0)				// How many full cycles of the AWs per DAC step
+	buffer = addJSONkeyval(buffer, "numSteps", num2str(AWG.numSteps), addquotes=0)				// How many DAC steps for the full ramp
+
+	// Add AWs used to HDF file
+	variable i
+	string wn
+	for(i=0;i<AWG.numWaves;i++)
+		// Get IGOR AW
+		wn = fdAWG_get_AWG_wave(str2num(stringfromlist(i, AWG.AW_waves, ",")))
+		savesinglewave(wn)
+	endfor
+	return buffer
+end
 ///////////////////////
 //// Set functions ////
 ///////////////////////
@@ -1817,8 +1853,9 @@ structure fdAWG_list
 
 	// Variables //
 	// Convenience	
-	variable initialized	// Must set to 1 in order for this to be used in fd_Record_Values
-	variable waveLen		// in samples (i.e. sum of samples at each setpoint for a single wave cycle)
+	variable initialized	// Must set to 1 in order for this to be used in fd_Record_Values (this is per setup change basis)
+	variable use_AWG 		// Must be set to 1 in order to use in fd_Record_Values (this is per scan basis)
+	variable waveLen			// in samples (i.e. sum of samples at each setpoint for a single wave cycle)
 	
 	// Checking things don't change
 	variable numADCs  	// num ADCs selected to measure when setting up AWG
@@ -1829,8 +1866,6 @@ structure fdAWG_list
 	variable numWaves	// Number of AWs being used
 	variable numCycles 	// # wave cycles per DAC step for a full 1D scan
 	variable numSteps  	// # DAC steps for a full 1D scan
-	
-
 
 endstructure
 
@@ -1869,6 +1904,7 @@ function fdAWG_get_global_AWG_list(S)
 //	wave fdAWG_globals_stuct_vars
 	svar fdAWG_globals_stuct_vars
 	structGet/S S fdAWG_globals_stuct_vars
+	S.use_AWG = 0  // Always initialized to zero so that checks have to be run before using in scan (see SFawg_set_and_precheck())
 	
 	// Get string parts
 	svar fdAWG_globals_AW_Waves

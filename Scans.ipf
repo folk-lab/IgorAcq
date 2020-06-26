@@ -353,11 +353,13 @@ function ScanFastDAC(instrID, start, fin, channels, [numpts, sweeprate, ramprate
    // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
    SFfd_pre_checks(SV)  
    
-   // If using AWG then get that now and check it
-	if(use_AWG)
-		struct fdAWG_list AWG
+   	// If using AWG then get that now and check it
+	struct fdAWG_list AWG
+	if(use_AWG)	
 		fdAWG_get_global_AWG_list(AWG)
-		SFawg_set_and_precheck(AWG, SV)  // Note: sets SV.numptsx here
+		SFawg_set_and_precheck(AWG, SV)  // Note: sets SV.numptsx here and AWG.use_AWG = 1 if pass checks
+	else  // Don't use AWG
+		AWG.use_AWG = 0  	// This is the default, but just putting here explicitly
 	endif
 
    // Ramp to start without checks since checked above
@@ -375,11 +377,7 @@ function ScanFastDAC(instrID, start, fin, channels, [numpts, sweeprate, ramprate
 	InitializeWaves(SV.startx, SV.finx, SV.numptsx, x_label=x_label, y_label=y_label, fastdac=1)
 
 	// Do 1D scan (rownum set to 0)
-	if(!use_AWG) // If not then use normal scan
-		fd_Record_Values(SV, PL, 0)
-	else			// Otherwise use AWG
-		fd_Record_Values(SV, PL, 0, AWG_list=AWG)
-	endif
+	fd_Record_Values(SV, PL, 0, AWG_list=AWG)
 
 	// Save by default
 	if (nosave == 0)
@@ -435,10 +433,12 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
    	endif
    	
    	// If using AWG then get that now and check it
-	if(use_AWG)
-		struct fdAWG_list AWG
+	struct fdAWG_list AWG
+	if(use_AWG)	
 		fdAWG_get_global_AWG_list(AWG)
-		SFawg_set_and_precheck(AWG, Fsv)  // Note: sets SV.numptsx here
+		SFawg_set_and_precheck(AWG, Fsv)  // Note: sets SV.numptsx here and AWG.use_AWG = 1 if pass checks
+	else  // Don't use AWG
+		AWG.use_AWG = 0  	// This is the default, but just putting here explicitly
 	endif
    
    // Ramp to start without checks
@@ -476,12 +476,7 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 		SFfd_ramp_start(Fsv, ignore_lims=1, x_only=1)
 		sc_sleep(Fsv.delayy)
 		// Record fast axis
-		if(!use_AWG)  	//if not, do normal ramp
-			fd_Record_Values(Fsv, PL, i)
-		else				// use AWG
-			fd_Record_Values(Fsv, PL, i, AWG_list = AWG)
-		endif
-		
+		fd_Record_Values(Fsv, PL, i, AWG_list = AWG)
 	endfor
 
 	// Save by default
@@ -523,11 +518,13 @@ function ScanfastDACRepeat(instrID, start, fin, channels, numptsy, [numptsx, swe
    // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
    SFfd_pre_checks(SV)  
 
-	// If using AWG then get that now and check it
-	if(use_AWG)
-		struct fdAWG_list AWG
+   	// If using AWG then get that now and check it
+	struct fdAWG_list AWG
+	if(use_AWG)	
 		fdAWG_get_global_AWG_list(AWG)
-		SFawg_set_and_precheck(AWG, SV)  // Note: sets SV.numptsx here
+		SFawg_set_and_precheck(AWG, SV)  // Note: sets SV.numptsx here and AWG.use_AWG = 1 if pass checks
+	else  // Don't use AWG
+		AWG.use_AWG = 0  	// This is the default, but just putting here explicitly
 	endif
 
    // Ramp to start without checks since checked above
@@ -548,15 +545,14 @@ function ScanfastDACRepeat(instrID, start, fin, channels, numptsy, [numptsx, swe
 	variable d=1
 	for (j=0; j<numptsy; j++)
       SV.direction = d  // Will determine direction of scan in fd_Record_Values
+      
 		// Ramp to start of fast axis
 		SFfd_ramp_start(SV, ignore_lims=1, x_only=1)
 		sc_sleep(SV.delayy)
+		
 		// Record values for 1D sweep
-		if(!use_awg)  // do normal
-			fd_Record_Values(SV,PL,j)
-		else
-			fd_Record_Values(SV,PL,j, AWG_list = AWG)
-		endif
+		fd_Record_Values(SV,PL,j, AWG_list = AWG)
+		
 		if (alternate!=0) // If want to alternate scan scandirection for next row
 			d = d*-1
 		endif
@@ -1104,13 +1100,13 @@ function SFawg_check_AWG_list(AWG, Fsv)
 			endfor
 		endfor
 	endfor		
-	
 end
 
 
 function SFawg_set_and_precheck(AWG, Fsv)
 	struct fdAWG_List &AWG
 	struct FD_ScanVars &Fsv
+
 	
 	// Set numptsx in Scan s.t. it is a whole number of full cycles
 	AWG.numSteps = round(Fsv.numptsx/(AWG.waveLen*AWG.numCycles))  
@@ -1118,7 +1114,7 @@ function SFawg_set_and_precheck(AWG, Fsv)
 	
 	// Check AWG for clashes/exceeding lims etc
 	SFawg_check_AWG_list(AWG, Fsv)	
-	
+	AWG.use_AWG = 1
 end
 	
 
