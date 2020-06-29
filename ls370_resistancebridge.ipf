@@ -77,6 +77,25 @@ end
 ///////////////////////
 //// Get Functions ////
 //////////////////////
+function/s getLS370channelLabel(plate)
+	// To be used by other functions, not directly by user
+	// Returns the channel label for either XLD or LD system (whichever is initialized) corresponding to
+	// standard channel names ("50K,4K,magnet,still,mc")
+	string plate
+
+	svar bfchannellookup
+	
+	string channel
+	variable channel_idx
+	channel_idx = whichlistitem(plate,bfchannellookup,";", 0, 0)
+	if(channel_idx < 0)
+		printf "The requested plate (%s) doesn't exsist!\r", plate
+		abort
+	else
+		channel = stringfromlist(channel_idx+5,bfchannellookup,";")
+	endif
+	return channel
+end
 
 // get-analog-data
 function getLS370analogData(instrID, [channel])  //mW
@@ -158,20 +177,7 @@ function getLS370temp(instrID, plate, [max_age_s]) // Units: K
 		max_age_s = 120
 	endif
 
-	strswitch(ls_system)
-		case "bfsmall":
-		case "bfbig":
-			channel_idx = whichlistitem(plate,bfchannellookup,";", 0, 0)
-			if(channel_idx < 0)
-				printf "The requested plate (%s) doesn't exsist!\r", plate
-				return 0.0
-			else
-				channel = stringfromlist(channel_idx+5,bfchannellookup,";")
-			endif
-			break
-		default:
-			abort "ls_system not implemented"
-	endswitch
+	channel = getLS370channelLabel(plate)
 	
 	string result
 	variable temp
@@ -997,10 +1003,15 @@ function/s getLS370status(instrID, [max_age_s])
 	variable i=0
 
 	buffer = addJSONkeyval(buffer,"MC K",num2str(getLS370temp(instrID, "mc", max_age_s=max_age_s)))
-	buffer = addJSONkeyval(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age_s=max_age_s)))
-	buffer = addJSONkeyval(buffer,"4K Plate K",num2str(getLS370temp(instrID, "4K", max_age_s=max_age_s)))
-	buffer = addJSONkeyval(buffer,"Magnet K",num2str(getLS370temp(instrID, "magnet", max_age_s=max_age_s)))
-	buffer = addJSONkeyval(buffer,"50K Plate K",num2str(getLS370temp(instrID, "50K", max_age_s=max_age_s)))
+//	buffer = addJSONkeyval(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age_s=max_age_s)))
+//	buffer = addJSONkeyval(buffer,"4K Plate K",num2str(getLS370temp(instrID, "4K", max_age_s=max_age_s)))
+//	buffer = addJSONkeyval(buffer,"Magnet K",num2str(getLS370temp(instrID, "magnet", max_age_s=max_age_s)))
+//	buffer = addJSONkeyval(buffer,"50K Plate K",num2str(getLS370temp(instrID, "50K", max_age_s=max_age_s)))
+	
+	buffer = addJSONkeyval(buffer,"Still K","4")
+	buffer = addJSONkeyval(buffer,"4K Plate K","4")
+	buffer = addJSONkeyval(buffer,"Magnet K","4")
+	buffer = addJSONkeyval(buffer,"50K Plate K","50")
 	
 	// TODO: add other variables like (temp setpoint, heater power etc)
 
