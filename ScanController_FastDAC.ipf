@@ -870,6 +870,9 @@ function initFastDAC()
 	string datapath = getExpPath("data", full=3)
 	newpath/c/o/q spectrum datapath+"spectrum:" // create/overwrite spectrum path
 
+	// Init Arbitrary Wave Generator global Struct
+	fdAWG_init_global_AWG_list()
+
 	// hardware limit (mV)
 	variable/g fdac_limit = 10000
 
@@ -887,8 +890,8 @@ function initFastDAC()
 
 	variable/g num_fdacs = 0
 	if(oldinit == -1)
-		string/g sc_fadcSpeed1="2532",sc_fadcSpeed2="2532",sc_fadcSpeed3="2532"
-		string/g sc_fadcSpeed4="2532",sc_fadcSpeed5="2532",sc_fadcSpeed6="2532"
+		string/g sc_fadcSpeed1="2538",sc_fadcSpeed2="2538",sc_fadcSpeed3="2538"
+		string/g sc_fadcSpeed4="2538",sc_fadcSpeed5="2538",sc_fadcSpeed6="2538"
 	endif
 
 	// create GUI window
