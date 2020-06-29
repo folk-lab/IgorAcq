@@ -1786,11 +1786,11 @@ function fdAWG_make_multi_square_wave(instrID, v0, vP, vM, v0len, vPlen, vMlen, 
 	sc_openinstrconnections(0)
 
    // put inputs into waves to make them easier to work with
-   make/o/free sps = {v0, vP, vM}
-   make/o/free lens = {v0len, vPlen, vMlen}
+   make/o/free sps = {v0, vP, v0, vM}
+   make/o/free lens = {v0len, vPlen, v0len, vMlen}
 
    // Sanity check on period
-   // Note: limit checks happen in AWG_RAMP  // TODO: put that check in
+   // Note: limit checks happen in AWG_RAMP 
    if (sum(lens) > 1)
       string msg
       sprintf msg "Do you really want to make a square wave with period %.3gs?", sum(lens)

@@ -1115,6 +1115,9 @@ function SFawg_set_and_precheck(AWG, Fsv)
 	// Check AWG for clashes/exceeding lims etc
 	SFawg_check_AWG_list(AWG, Fsv)	
 	AWG.use_AWG = 1
+	
+	// Save numSteps in AWG_list for sweeplogs later
+	fdAWG_set_global_AWG_list(AWG)
 end
 	
 
