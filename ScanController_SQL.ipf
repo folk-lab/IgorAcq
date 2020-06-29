@@ -5,6 +5,7 @@
 function/s getLSStatus(instrID)
 	string instrID
 	
+	svar ls_label, bfchannellookup
 	// Load database schemas from SQLConfig.txt
 	string jstr = readtxtfile("SQLConfig.txt","setup")
 	if(cmpstr(jstr,"")==0)
@@ -16,28 +17,29 @@ function/s getLSStatus(instrID)
 	string heater_schema = getJSONvalue(jstr,"heater_schema")
 	
 	// Load "LakeshoreConfig.txt" in setup folder.
-	jstr = readtxtfile("LakeshoreConfig.txt","setup")
+	string file_name
+	sprintf file_name "%sLoggingSchedules.txt", ls_label
+	jstr = readtxtfile(file_name,"setup")
 	if(cmpstr(jstr,"")==0)
-		abort "LakeshoreConfig.txt not found!"
+		abort file_name + " not found!"
 	endif
 	
 	//// Temperatures ////
 	
 	// Get temperature data from SQL database
-	string ch = "1,2,3,5,6", JSONkeys = "50K Plate K,4K Plate K,Magnet K,Still K,MC K"
+	string JSONkeys = "50K Plate K,4K Plate K,Magnet K,Still K,MC K"
 	string LSkeys = "50K,4K,magnet,still,mc"
-	string searchStr="", statement="", timestamp="", temp="", tempBuffer=""
+	string searchStr="", statement="", timestamp="", temp="", tempBuffer="", channel_label
 	variable i=0
-	for(i=0;i<itemsinlist(ch,",");i+=1)
-		sprintf searchStr, "loggingschedules:default:channels:ch%s:max", stringfromlist(i,ch,",")
+	for(i=0;i<itemsinlist(LSkeys,",");i+=1)
+		channel_label = getLS370channelLabel(stringfromlist(i, LSkeys, ","))
+		sprintf searchStr, "default:channels:%s:max", channel_label
 		timestamp = sc_SQLtimestamp(str2num(getJSONvalue(jstr,searchStr)))
-		sprintf statement, "SELECT t FROM %s.%s WHERE ch_idx=%s AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, temp_schema, stringfromlist(i,ch,","), timestamp
+		sprintf statement, "SELECT t FROM %s.%s WHERE channel_label=%s AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, temp_schema, channel_label, timestamp
 		temp = requestSQLValue(statement)
 		
 		if(cmpstr(temp,"") == 0)
-			// nothing returned from database
-			// request from Lakeshore and overwrite
-			//temp = num2str(getLS370temp(instrID,stringfromlist(i,LSkeys,",")))
+			temp = num2str(getLS370temp(instrID,stringfromlist(i,LSkeys,",")))
 		endif
 		
 		// add to meta data
@@ -48,8 +50,10 @@ function/s getLSStatus(instrID)
 	tempBuffer = addJSONkeyval("","Temperature",tempBuffer)
 	
 	//// Heaters ////
-	string heatBuffer="{\"MC Heater mW\":5, \"Still Heater mW\":3}"
-	string buffer = addJSONkeyval(tempBuffer,"Heaters",heatBuffer)
+	//TODO: Add heaters info to logs
+//	string heatBuffer="{\"MC Heater mW\":5, \"Still Heater mW\":3}"
+//	string buffer = addJSONkeyval(tempBuffer,"Heaters",heatBuffer)
+	string buffer = tempBuffer
 	
 	return addJSONkeyval("","Lakeshore",buffer)
 end
@@ -57,7 +61,7 @@ end
 
 ////////////////////////////
 //// SQL User functions ////
-///////////////////////////
+////////////////////////////
 
 function requestSQLData(statement,[wavenames, verbose])
 	// Returns data in waves. Each column in a seperate wave.
