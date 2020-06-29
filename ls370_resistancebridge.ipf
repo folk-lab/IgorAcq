@@ -588,7 +588,7 @@ end
 
 
 // set-temperature-control-mode
-function setLS370tempMode(instrID, mode) // Units: No units
+function setLS370controlMode(instrID, mode) // Units: No units
 	// sets the temperature control mode
 	// avaliable options are: off (4), PID (1), Temp_zone (2), Open loop (3)
 	string instrID
@@ -715,6 +715,10 @@ function setLS370temp(instrID,setpoint,[maxcurrent]) //Units: mK, mA
 	
 	setLS370HeaterRange(instrID, maxcurrent)
 	setLS370TempSetpoint(instrID, setpoint)
+	nvar pid_mode
+	if (pid_mode != 1)
+		setLS370controlMode(instrID, 1)
+	endif
 end
 
 
@@ -804,7 +808,7 @@ function/s LS370getLoggingScheduleFromConfig(sched_name)
 	variable js_id
 	string file_name
 	sprintf file_name "%sLoggingSchedules.txt", ls_label
-	js_id = JSON_parse(readtxtfile(file_name,"config"))
+	js_id = JSON_parse(readtxtfile(file_name,"setup"))
 	findvalue/TEXT=sched_name JSON_getkeys(js_id, "")
 	if (V_value == -1)
 		string err_str
@@ -1272,10 +1276,10 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 
 
 /////////////////////// CONTROL MODES //////////////////////////////////////////		
-//		print 	"COMMAND: setLS370tempMode(ls370, 1)  //PID\r"
+//		print 	"COMMAND: setLS370controlMode(ls370, 1)  //PID\r"
 //		ans = ask_continue(ask)
 //		if(ans == 1)
-//			setLS370tempMode(ls370, 1)  //PID
+//			setLS370controlMode(ls370, 1)  //PID
 //		endif	
 //
 //		print 	"COMMAND: getLS370controlmode(ls370)\r"
@@ -1284,10 +1288,10 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 //		   printf "RETURN: %f\r\r", getLS370controlmode(ls370)
 //		endif	
 //		
-//		print 	"COMMAND: setLS370tempMode(ls370, 3)  //PID\r"
+//		print 	"COMMAND: setLS370controlMode(ls370, 3)  //PID\r"
 //		ans = ask_continue(ask)
 //		if(ans == 1)
-//			setLS370tempMode(ls370, 3)  //PID
+//			setLS370controlMode(ls370, 3)  //PID
 //		endif	
 //
 //		print 	"COMMAND: getLS370controlmode(ls370)\r"
@@ -1296,10 +1300,10 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 //		   printf "RETURN: %f\r\r", getLS370controlmode(ls370)
 //		endif	
 //			
-//		print 	"COMMAND: setLS370tempMode(ls370, 4)  //off\r"
+//		print 	"COMMAND: setLS370controlMode(ls370, 4)  //off\r"
 //		ans = ask_continue(ask)
 //		if(ans == 1)
-//			setLS370tempMode(ls370, 4)  //off
+//			setLS370controlMode(ls370, 4)  //off
 //		endif	
 //		
 //		print 	"COMMAND: getLS370controlmode(ls370)\r"
@@ -1439,7 +1443,7 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 		setLS370PIDparameters(ls370,10,5,0)
 		
 		printf "Temp control mode was %d, setting to 4 (off)\r", getLS370controlmode(ls370)
-		setLS370tempMode(ls370, 4)  //off
+		setLS370controlMode(ls370, 4)  //off
 
 		printf "Temp setpoint was %fmV, setting to 0mK\r",		getLS370PIDtemp(ls370)
 		setLS370tempSetpoint(ls370,0) //100mK
