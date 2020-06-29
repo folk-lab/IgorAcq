@@ -183,7 +183,7 @@ end
 function/s get34401AStatus(instrID)
 	variable instrID
 	string  buffer = ""
-
+	string temp = ""
 	string gpib = num2istr(getAddressGPIB(instrID))
 	buffer = addJSONkeyval(buffer, "gpib_address", gpib)
 
@@ -197,8 +197,18 @@ function/s get34401AStatus(instrID)
 		i+=1
 	while(i<strlen(config))
 	buffer = addJSONkeyval(buffer, "units", TrimString(config[1,i-1]), addQuotes=1)
-	buffer = addJSONkeyval(buffer, "range", StringFromList(0, config[i,strlen(config)-2],","))
-	buffer = addJSONkeyval(buffer, "resolution", StringFromList(1, config[i,strlen(config)-2],","))
+	
+	temp = StringFromList(0, config[i,strlen(config)-2],",")
+	if (cmpstr(temp[0], "+")==0)  // Not valid JSON to start with +
+		temp = temp[1, strlen(temp)-1]
+	endif
+	buffer = addJSONkeyval(buffer, "range", temp)
+	
+	temp = StringFromList(1, config[i,strlen(config)-2],",")
+	if (cmpstr(temp[0], "+")==0)  // Not valid JSON to start with +
+		temp = temp[1, strlen(temp)-1]
+	endif
+	buffer = addJSONkeyval(buffer, "resolution", temp)
 
 	return addJSONkeyval("", "HP34401A_"+gpib, buffer)
 end
