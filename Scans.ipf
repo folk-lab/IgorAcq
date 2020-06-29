@@ -244,7 +244,7 @@ function ScanBabyDACUntil(instrID, start, fin, channels, numpts, delay, ramprate
   sc_sleep(1.0)
 
   wave w = $checkwave
-  wave resist
+  wave resist  //TODO: What is this?
   do
     setpoint = start + (i*(fin-start)/(numpts-1))
     RampMultipleBD(instrID, channels, setpoint, ramprate=ramprate)
@@ -1153,13 +1153,12 @@ function SF_init_BDscanVars(s, instrID, [startx, finx, channelsx, numptsx, rampr
    variable direction
 
    s.instrID = instrID
-   
+    
    // Set X's			// NOTE: All optional because may be used for just slow axis of FastDac scan for example
 	s.startx = paramisdefault(startx) ? NaN : startx
 	s.finx = paramisdefault(finx) ? NaN : finx
-	if (paramisdefault(channelsx))
-		s.channelsx = ""
-	endif
+	s.channelsx = selectstring(paramisdefault(channelsx), channelsx, "")
+
 	s.numptsx = paramisdefault(numptsx) ? NaN : numptsx
 	s.rampratex = paramisdefault(rampratex) ? NaN : rampratex
 	s.delayx = paramisdefault(delayx) ? NaN : delayx
@@ -1167,13 +1166,12 @@ function SF_init_BDscanVars(s, instrID, [startx, finx, channelsx, numptsx, rampr
    // Set Y's
    s.starty = paramisdefault(starty) ? NaN : starty
    s.finy = paramisdefault(finy) ? NaN : finy
-   if (paramisdefault(channelsy))
-		s.channelsy = ""
-	endif
+	s.channelsy = selectstring(paramisdefault(channelsy), channelsy, "")
+	
 	s.numptsy = paramisdefault(numptsy) ? NaN : numptsy
    s.rampratey = paramisdefault(rampratey) ? NaN : rampratey
    s.delayy = paramisdefault(delayy) ? NaN : delayy
-   s.direction = paramisdefault(direction) ? 1 : direction
+   s.direction = paramisdefault(direction) ? 1 : direction 
 end
 
 
