@@ -451,6 +451,8 @@ function RampMultipleFDAC(InstrID, channels, setpoint, [ramprate, ignore_lims])
 	variable InstrID, setpoint, ramprate, ignore_lims
 	string channels
 	
+	channels = SF_get_channels(channels, fastdac=1)
+	
 	nvar fd_ramprate
 	ramprate = paramIsDefault(ramprate) ? fd_ramprate : ramprate
 	

@@ -170,7 +170,7 @@ function fd_Record_Values(S, PL, rowNum, [AWG_list])
 
 	// check abort/pause status
 	fdRV_check_sweepstate(S.instrID)
-	printf "LOOPTIME: %.2f\r", looptime				//DEBUG
+//	printf "LOOPTIME: %.2f\r", looptime				//DEBUG
 	return looptime
 end
 
