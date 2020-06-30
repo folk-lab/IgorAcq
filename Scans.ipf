@@ -820,6 +820,11 @@ function SFfd_check_lims(S)
 		fins = addlistitem(S.finys, fins, ",")
 	endif
 
+	// Check channels were concatenated correctly (Seems unnecessary, but possibly killed my device because of this...)
+	if(stringmatch(channels, "*,,*") == 1)
+		abort "ERROR[SFfd_check_lims]: Channels list contains ',,' which means something has gone wrong and limit checking WONT WORK!!"
+	endif
+
 	// Check that start/fin for each channel will stay within software limits
 	string softLimitPositive = "", softLimitNegative = "", expr = "(-?[[:digit:]]+),([[:digit:]]+)", question
 	variable startval = 0, finval = 0
