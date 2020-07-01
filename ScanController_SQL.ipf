@@ -3,7 +3,21 @@
 #include <SQLConstants>
 
 function/s getLSStatus(instrID)
+	// instrID is setting the system, ld or xld
 	string instrID
+	
+	string channelLabel="", stillLabel="", ch_idx=""
+	if(cmpstr(instrID,"ld") == 0)
+		channelLabel = "ld_50K,ld_4K,ld_magnet,ld_still,ld_mc"
+		stillLabel = "ld_still_heater"
+		ch_idx = "1,2,4,5,6"
+	elseif(cmpstr(instrID,"xld") == 0)
+		channelLabel = "xld_50K,xld_4K,xld_magnet,xld_still,xld_mc"
+		stillLabel = "xld_still_heater"
+		ch_idx = "1,2,3,5,6"
+	else
+		print "[ERROR] \"getLSStatus\": pass the system id as instrID: \"ld\" or \"xld\"."
+	endif
 	
 	// Load database schemas from SQLConfig.txt
 	string jstr = readtxtfile("SQLConfig.txt","setup")
@@ -11,9 +25,10 @@ function/s getLSStatus(instrID)
 		abort "SQLConfig.txt not found!"
 	endif
 	
-	string database = getJSONvalue(jstr,"database")
+	string database = getJSONvalue(jstr,"database_ls")
 	string temp_schema = getJSONvalue(jstr,"temperature_schema")
-	string heater_schema = getJSONvalue(jstr,"heater_schema")
+	string mc_heater_schema = getJSONvalue(jstr,"mc_heater_schema")
+	string still_heater_schema = getJSONvalue(jstr,"still_heater_schema")
 	
 	// Load "LakeshoreConfig.txt" in setup folder.
 	jstr = readtxtfile("LakeshoreConfig.txt","setup")
@@ -24,15 +39,15 @@ function/s getLSStatus(instrID)
 	//// Temperatures ////
 	
 	// Get temperature data from SQL database
-	string ch = "1,2,3,5,6", JSONkeys = "50K Plate K,4K Plate K,Magnet K,Still K,MC K"
+	string JSONkeys = "50K Plate K,4K Plate K,Magnet K,Still K,MC K"
 	string LSkeys = "50K,4K,magnet,still,mc"
 	string searchStr="", statement="", timestamp="", temp="", tempBuffer=""
 	variable i=0
-	for(i=0;i<itemsinlist(ch,",");i+=1)
-		sprintf searchStr, "loggingschedules:default:channels:ch%s:max", stringfromlist(i,ch,",")
+	for(i=0;i<itemsinlist(channelLabel,",");i+=1)
+		sprintf searchStr, "loggingschedules:default:channels:ch%s:max", stringfromlist(i,ch_idx,",")
 		timestamp = sc_SQLtimestamp(str2num(getJSONvalue(jstr,searchStr)))
-		sprintf statement, "SELECT t FROM %s.%s WHERE ch_idx=%s AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, temp_schema, stringfromlist(i,ch,","), timestamp
-		temp = requestSQLValue(statement)
+		sprintf statement, "SELECT temperature_k FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, temp_schema, stringfromlist(i,channelLabel,","), timestamp
+		temp = requestSQLValue(statement,"ls")
 		
 		if(cmpstr(temp,"") == 0)
 			// nothing returned from database
@@ -48,10 +63,130 @@ function/s getLSStatus(instrID)
 	tempBuffer = addJSONkeyval("","Temperature",tempBuffer)
 	
 	//// Heaters ////
-	string heatBuffer="{\"MC Heater mW\":5, \"Still Heater mW\":3}"
+	
+	// MC heater
+	string heatBuffer=""
+	timestamp = sc_SQLtimestamp(300)
+	sprintf statement, "SELECT power_milliw FROM %s.%s WHERE time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, mc_heater_schema, timestamp
+	heatBuffer = addJSONkeyval(heatBuffer,"MC Heater mW",requestSQLValue(statement,"ls"))
+	
+	// Still heater
+	sprintf statement, "SELECT power_milliw FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, still_heater_schema, stillLabel, timestamp
+	heatBuffer = addJSONkeyval(heatBuffer,"Still Heater mW",requestSQLValue(statement,"ls"))
+	
 	string buffer = addJSONkeyval(tempBuffer,"Heaters",heatBuffer)
 	
 	return addJSONkeyval("","Lakeshore",buffer)
+end
+
+function/s getBFStatus(instrID)
+	// instrID is setting the system, ld or xld
+	string instrID
+	
+	string pressure_schema="", flow_schema=""
+	if(cmpstr(instrID,"ld") == 0)
+		pressure_schema = "ld.pressure"
+		flow_schema = "ld.flow"
+	elseif(cmpstr(instrID,"xld") == 0)
+		pressure_schema = "xld.pressure"
+		flow_schema = "xld.flow"
+	else
+		print "[ERROR] \"getLSStatus\": pass the system id as instrID: \"ld\" or \"xld\"."
+	endif
+	
+	// Load database schemas from SQLConfig.txt
+	string jstr = readtxtfile("SQLConfig.txt","setup")
+	if(cmpstr(jstr,"")==0)
+		abort "SQLConfig.txt not found!"
+	endif
+	
+	//// Pressure ////
+	
+	string database = getJSONvalue(jstr,"database_bf")
+	string channelLabel = "CH1,CH2,CH3,CH4,CH5,CH6"
+	
+	variable i=0
+	string pres="", presBuffer="", timestamp="", statement=""
+	for(i=0;i<itemsinlist(channelLabel,",");i+=1)
+		timestamp = sc_SQLtimestamp(300)
+		sprintf statement, "SELECT pressure_mbar FROM %s.%s WHERE channel_id='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, pressure_schema, stringfromlist(i,channelLabel,","), timestamp
+		pres = requestSQLValue(statement,"bf")
+		
+		presBuffer = addJSONkeyval(presBuffer, stringfromlist(i,channelLabel,",")+" mbar", pres)
+	endfor
+	
+	presBuffer = addJSONkeyval("","Pressure",presBuffer)
+	
+	//// flow ////
+	string flowBuffer=""
+	sprintf statement, "SELECT flow_mmol_per_s FROM %s.%s WHERE time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, flow_schema, timestamp
+	flowBuffer = addJSONkeyval(flowBuffer,"Flow mmol/s",requestSQLValue(statement,"bf"))
+	
+	string buffer = addJSONkeyval(presBuffer,"Mixture Flow",flowBuffer)
+	
+	return addJSONkeyval("","BlueFors",buffer)
+end
+
+function getLS370tempBD2(instrID,plate,[max_age_s]) // Units: K
+	string instrID, plate
+	variable max_age_s
+	
+	if(paramisdefault(max_age_s))
+		max_age_s = 300
+	endif
+	
+	// set correct system
+	svar ls_system
+	
+	string system=""
+	strswitch(ls_system)
+		case "bfsmall":
+			system = "ld"
+			break
+		case "bfbig":
+			system = "xld"
+			break
+		default:
+			print "[ERROR] \"getLS370tempBD\": ls_system not implemented."
+			abort
+	endswitch
+	
+	string channelLabel=""
+	strswitch(plate)
+		case "50K":
+			sprintf channelLabel, "%s_50K", system
+			break
+		case "4K":
+			sprintf channelLabel, "%s_4K", system
+			break
+		case "magnet":
+			sprintf channelLabel, "%s_magnet", system
+			break
+		case "still":
+			sprintf channelLabel, "%s_still", system
+			break
+		case "mc":
+			sprintf channelLabel, "%s_mc", system
+			break
+		default:
+			print "[ERROR] \"getLS370tempBD\": invalid plate."
+			abort
+	endswitch
+	
+	// Load database schemas from SQLConfig.txt
+	string jstr = readtxtfile("SQLConfig.txt","setup")
+	if(cmpstr(jstr,"")==0)
+		abort "SQLConfig.txt not found!"
+	endif
+	
+	string database = getJSONvalue(jstr,"database_ls")
+	string temp_schema = getJSONvalue(jstr,"temperature_schema")
+	
+	string timestamp = sc_SQLtimestamp(max_age_s), statement=""
+	sprintf statement, "SELECT temperature_k FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, temp_schema, channelLabel, timestamp
+	string temp = requestSQLValue(statement,"ls")
+	
+	return str2num(temp)
 end
 
 
@@ -59,7 +194,7 @@ end
 //// SQL User functions ////
 ///////////////////////////
 
-function requestSQLData(statement,[wavenames, verbose])
+function requestSQLData(statement,database,[wavenames, verbose])
 	// Returns data in waves. Each column in a seperate wave.
 	// wavenames must be a comma seperated string with wavenames
 	// for the data. If wavenames are not passed or number of waves doesn't match
@@ -67,7 +202,7 @@ function requestSQLData(statement,[wavenames, verbose])
 	// the data.
 	// Data types supported: CHAR, REAL, TIMESTAMP, INTEGER
 	
-	string statement, wavenames
+	string statement, database, wavenames
 	variable verbose
 	
 	if(paramisdefault(wavenames))
@@ -86,7 +221,7 @@ function requestSQLData(statement,[wavenames, verbose])
 	
 	// open connection to database
 	struct sqlRefs s
-	sc_openSQLConnection(s)
+	sc_openSQLConnection(s,database)
 	
 	// fetch data from datebase
 	sc_fetchSQLData(s,statement,wavenames, verbose=verbose)
@@ -95,14 +230,14 @@ function requestSQLData(statement,[wavenames, verbose])
 	sc_closeSQLConnection(s)
 end
 
-function/s requestSQLValue(statement,[key])
+function/s requestSQLValue(statement,database,[key])
 	// Returns a single value regardless of how many values the SQL statement returns.
 	// Data types supported: CHAR, REAL, TIMESTAMP, INTEGER
 	// The following statement returns last recorded 4K plate temperature:
 	// "SELECT t FROM qdot.lksh370.channel_data WHERE ch_idx=2 ORDER BY time DESC LIMIT 1;"
 	// Passing a key will return a key:value string
 	
-	string statement, key
+	string statement, database, key
 	
 	if(paramisdefault(key))
 		key=""
@@ -120,7 +255,7 @@ function/s requestSQLValue(statement,[key])
 	
 	// open connection to database
 	struct sqlRefs s
-	sc_openSQLConnection(s)
+	sc_openSQLConnection(s,database)
 	
 	// fetch data from database
 	string result=""
@@ -147,12 +282,13 @@ end
 //// SQL Utilities ////
 //////////////////////
 
-function sc_openSQLConnection(s)
+function sc_openSQLConnection(s,database)
 	struct sqlRefs &s
+	string database
 	
 	// get database connection parameters
 	svar sqldriver
-	string connParams = sc_readSQLConnectionParameters()
+	string connParams = sc_readSQLConnectionParameters(database)
 	
 	// allocate SQL handles
 	variable envRefNum=0, connRefNum=0, error=0
@@ -502,8 +638,19 @@ function sc_closeSQLConnection(s)
 	SQLFreeHandle(SQL_HANDLE_ENV, s.envRefNum)
 end
 
-function/s sc_readSQLConnectionParameters()
+function/s sc_readSQLConnectionParameters(database)
+	// pass "ls" for lksh370 database and "bf" for bluefors database
 	// reads SQL setup parameters from SQLParameters.txt file on "config" path.
+	string database
+	
+	if(cmpstr(database,"ls") == 0)
+		database = "database_ls"
+	elseif(cmpstr(database,"bf") == 0)
+		database = "database_bf"
+	else
+		print "[ERROR] \"sc_readSQLConnectionParameters\": invalid database"
+		abort
+	endif
 	
 	string jstr = readtxtfile("SQLConfig.txt","setup")
 	if(cmpstr(jstr,"")==0)
@@ -512,7 +659,7 @@ function/s sc_readSQLConnectionParameters()
 	string connParams = ""
 	connParams = addlistitem("server:"+getJSONvalue(jstr,"server"),connParams,",",inf)
 	connParams = addlistitem("port:"+getJSONvalue(jstr,"port"),connParams,",",inf)
-	connParams = addlistitem("database:"+getJSONvalue(jstr,"database"),connParams,",",inf)
+	connParams = addlistitem("database:"+getJSONvalue(jstr,database),connParams,",",inf)
 	connParams = addlistitem("uid:"+getJSONvalue(jstr,"uid"),connParams,",",inf)
 	connParams = addlistitem("pwd:"+getJSONvalue(jstr,"pwd"),connParams,",",inf)
 	
@@ -541,6 +688,9 @@ function/s sc_mapSQLTypeToWaveType(dataType)
 			type = "0"
 			break
 		case SQL_TYPE_TIMESTAMP:
+			type = "0"
+			break
+		case SQL_VARCHAR:
 			type = "0"
 			break
 		default:
@@ -655,7 +805,7 @@ end
 
 function/s sc_SQLDatabaseTime()
 	string statement = "SELECT NOW();"
-	string result = requestSQLValue(statement)
+	string result = requestSQLValue(statement,"ls")
 	
 	return result
 end
@@ -681,6 +831,19 @@ function/s sc_SQLtimestamp(secs)
 	return newTimestamp
 end
 
+function sc_SQLinformation_schema(database)
+	string database
+	// retrun an overveiw of the database
+	// add WHERE table_name = 'table_name' to get info on specific table
+	string statement = "SELECT * FROM information_schema.columns WHERE table_name = 'pressure'"
+	
+	svar sqldriver
+	string connParams = sc_readSQLConnectionParameters(database)
+	string connStr = ""
+	sprintf connStr, "DRIVER=%s;SERVER=%s;PORT=%s;DATABASE=%s;UID=%s;PWD=%s;CHARSET=UTF8;", sqldriver, stringbykey("server",connParams,":",","), stringbykey("port",connParams,":",","), stringbykey("database",connParams,":",","), stringbykey("uid",connParams,":",","), stringbykey("pwd",connParams,":",",") 
+	SQLHighLevelOp/CSTR={connStr,SQL_DRIVER_NOPROMPT}/o/e=1 statement
+end
+
 ////////////////////////
 //// Test functions ////
 ///////////////////////
@@ -688,12 +851,13 @@ end
 function sc_fetchSQLDataTest()
 	
 	svar sqldriver
-	string connParams = sc_readSQLConnectionParameters()
+	string database = "bf"
+	string connParams = sc_readSQLConnectionParameters(database)
 	string connStr = ""
 	sprintf connStr, "DRIVER=%s;SERVER=%s;PORT=%s;DATABASE=%s;UID=%s;PWD=%s;CHARSET=UTF8;", sqldriver, stringbykey("server",connParams,":",","), stringbykey("port",connParams,":",","), stringbykey("database",connParams,":",","), stringbykey("uid",connParams,":",","), stringbykey("pwd",connParams,":",",") 
 	
-	//string sqlquery = "SELECT DISTINCT ON (ch_idx) ch_idx, time, t FROM qdot.lksh370.channel_data ORDER BY ch_idx, time DESC;"
-	string sqlquery = "SELECT ch_idx, time, t FROM qdot.lksh370.channel_data WHERE ch_idx=1 ORDER BY time DESC LIMIT 1;"
+	string sqlquery = "SELECT DISTINCT ON (channel_id) channel_id, time FROM bluefors.ld.pressure ORDER BY channel_id, time DESC;"
+	//string sqlquery = "SELECT ch_idx, time, t FROM qdot.lksh370.channel_data WHERE ch_idx=1 ORDER BY time DESC LIMIT 1;"
 	//string sqlquery = "SELECT t, time FROM qdot.lksh370.channel_data WHERE ch_idx=2 AND time > TIMESTAMP '2020-01-13 00:00:00.00'"
 	//string sqlquery = "SELECT * FROM INFORMATION_SCHEMA.COLUMNS"
 	//string sqlquery = "SELECT ch_idx, time, t FROM (SELECT ch_idx, time, t, ROW_NUMBER() OVER (PARTITION BY ch_idx ORDER BY time DESC) rn FROM qdot.lksh370.channel_data) tmp WHERE rn = 1;"
@@ -708,9 +872,10 @@ function timeSQLStatements()
 
 	string wavenames1 = "channels,timestamp,temperature"
 	string statement1 = "SELECT DISTINCT ON (ch_idx) ch_idx, time, t FROM qdot.lksh370.channel_data WHERE time > TIMESTAMP '2020-01-13 23:00:00.00' ORDER BY ch_idx, time DESC;"
-
+	
+	string database = "ls"
 	variable starttime1 = stopmstimer(-2)
-	requestSQLData(statement1,wavenames=wavenames1)
+	requestSQLData(statement1,database,wavenames=wavenames1)
 	variable totaltime1 = (stopmstimer(-2)-starttime1)*1e-6
 
 	string wavenames2 = "channels,timestamp,temperature"
@@ -721,7 +886,7 @@ function timeSQLStatements()
 	variable starttime2 = stopmstimer(-2)
 	for(i=0;i<itemsinlist(ch,",");i+=1)
 		sprintf statement2, "SELECT ch_idx, time, t FROM qdot.lksh370.channel_data WHERE ch_idx=%s ORDER BY time DESC LIMIT 1;", stringfromlist(i,ch,",")
-		requestSQLData(statement2,wavenames=wavenames2)
+		requestSQLData(statement2,database,wavenames=wavenames2)
 	endfor
 	variable totaltime2 = (stopmstimer(-2)-starttime2)*1e-6
 	
@@ -729,7 +894,7 @@ function timeSQLStatements()
 	variable starttime3 = stopmstimer(-2)
 	for(i=0;i<itemsinlist(ch,",");i+=1)
 		sprintf statement3, "SELECT t FROM qdot.lksh370.channel_data WHERE ch_idx=%s AND time > TIMESTAMP '2020-01-13 23:00:00.00' ORDER BY time DESC LIMIT 1;", stringfromlist(i,ch,",")
-		requestSQLValue(statement3)
+		requestSQLValue(statement3,database)
 	endfor
 	variable totaltime3 = (stopmstimer(-2)-starttime3)*1e-6
 	
