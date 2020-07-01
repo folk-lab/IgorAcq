@@ -289,7 +289,7 @@ function setFADCSpeed(instrID,speed,[loadCalibration]) // Units: Hz
 	variable instrID, speed, loadCalibration
 	
 	if(paramisdefault(loadCalibration))
-		loadCalibration = 0
+		loadCalibration = 1
 	elseif(loadCalibration != 1)
 		loadCalibration = 0
 	endif
@@ -323,7 +323,12 @@ function setFADCSpeed(instrID,speed,[loadCalibration]) // Units: Hz
 	speed = roundNum(1.0/str2num(response)*1.0e6,0)
 	
 	if(loadCalibration)
-		loadfADCCalibration(instrID,speed)
+		try
+			loadfADCCalibration(instrID,speed)
+		catch
+			variable rte = getrterror(1)
+			print "WARNING[setFADCspeed]: loadFADCCalibration failed. If no calibration file exists, run CalibrateFADC() to create one"
+		endtry			
 	else
 		print "[WARNING] \"setfadcSpeed\": Changing the ADC speed without ajdusting the calibration might affect the precision."
 	endif
@@ -445,6 +450,8 @@ end
 function RampMultipleFDAC(InstrID, channels, setpoint, [ramprate, ignore_lims])
 	variable InstrID, setpoint, ramprate, ignore_lims
 	string channels
+	
+	channels = SF_get_channels(channels, fastdac=1)
 	
 	nvar fd_ramprate
 	ramprate = paramIsDefault(ramprate) ? fd_ramprate : ramprate
@@ -697,7 +704,7 @@ function CalibrateFDAC(instrID)
 		endif
 		
 		// ramp channel to 0V
-		rampOutputfdac(instrID,channel,0)
+		rampOutputfdac(instrID,channel,0, ramprate=100000, ignore_lims=1)
 		sprintf question, "Input value displayed by DMM in volts."
 		user_input = prompt_user("DAC offset calibration",question)
 		if(numtype(user_input) == 2)
@@ -711,11 +718,11 @@ function CalibrateFDAC(instrID)
 		sprintf key, "offset%d_", channel
 		result = replacenumberbykey(key+"stepsize",result,str2num(stringfromlist(1,offsetReg,",")),":",",")
 		result = replacenumberbykey(key+"register",result,str2num(stringfromlist(2,offsetReg,",")),":",",")
-		sprintf message, "Offset calibration of DAC channel %d finished. Final values are:\rOffset stepsize = %.2f uV\rOffset register = %d", channel, str2num(stringfromlist(0,offsetReg,",")), str2num(stringfromlist(1,offsetReg,","))
+		sprintf message, "Offset calibration of DAC channel %d finished. Final values are:\rOffset stepsize = %.2fuV\rOffset register = %d", channel, str2num(stringfromlist(1,offsetReg,",")), str2num(stringfromlist(2,offsetReg,","))
 		print message
 		
 		// ramp channel to -10V
-		rampOutputfdac(instrID,channel,-10000, ramprate=100000)
+		rampOutputfdac(instrID,channel,-10000, ramprate=100000, ignore_lims=1)
 		sprintf question, "Input value displayed by DMM in volts."
 		user_input = prompt_user("DAC gain calibration",question)
 		if(numtype(user_input) == 2)
@@ -1781,11 +1788,11 @@ function fdAWG_make_multi_square_wave(instrID, v0, vP, vM, v0len, vPlen, vMlen, 
 	sc_openinstrconnections(0)
 
    // put inputs into waves to make them easier to work with
-   make/o/free sps = {v0, vP, vM}
-   make/o/free lens = {v0len, vPlen, vMlen}
+   make/o/free sps = {v0, vP, v0, vM}
+   make/o/free lens = {v0len, vPlen, v0len, vMlen}
 
    // Sanity check on period
-   // Note: limit checks happen in AWG_RAMP  // TODO: put that check in
+   // Note: limit checks happen in AWG_RAMP 
    if (sum(lens) > 1)
       string msg
       sprintf msg "Do you really want to make a square wave with period %.3gs?", sum(lens)

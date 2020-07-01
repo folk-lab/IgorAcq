@@ -244,7 +244,7 @@ function ScanBabyDACUntil(instrID, start, fin, channels, numpts, delay, ramprate
   sc_sleep(1.0)
 
   wave w = $checkwave
-  wave resist
+  wave resist  //TODO: What is this?
   do
     setpoint = start + (i*(fin-start)/(numpts-1))
     RampMultipleBD(instrID, channels, setpoint, ramprate=ramprate)
@@ -812,12 +812,17 @@ function SFfd_check_lims(S)
 	if(numtype(strlen(s.channelsx)) == 0 && strlen(s.channelsx) != 0)  // If not NaN and not ""
 		channels = addlistitem(S.channelsx, channels, ",")
 		starts = addlistitem(S.startxs, starts, ",")
-		fins = addlistitem(S.startxs, fins, ",")
+		fins = addlistitem(S.finxs, fins, ",")
 	endif
 	if(numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0)  // If not NaN and not ""
 		channels = addlistitem(S.channelsy, channels, ",")
 		starts = addlistitem(S.startys, starts, ",")
-		fins = addlistitem(S.startys, fins, ",")
+		fins = addlistitem(S.finys, fins, ",")
+	endif
+
+	// Check channels were concatenated correctly (Seems unnecessary, but possibly killed my device because of this...)
+	if(stringmatch(channels, "*,,*") == 1)
+		abort "ERROR[SFfd_check_lims]: Channels list contains ',,' which means something has gone wrong and limit checking WONT WORK!!"
 	endif
 
 	// Check that start/fin for each channel will stay within software limits
@@ -932,14 +937,15 @@ function SFbd_check_lims(S)
    struct BD_ScanVars &S
 	
 	// Make single list out of X's and Y's (checking if each exists first)
-	string channels = "", outputs = ""
+	string all_channels = "", outputs = ""
 	if(numtype(strlen(s.channelsx)) == 0 && strlen(s.channelsx) != 0)  // If not NaN and not ""
-		channels = addlistitem(S.channelsx, channels, ",")
+		all_channels = addlistitem(S.channelsx, all_channels, ";")
 		outputs = addlistitem(num2str(S.startx), outputs, ",")
 		outputs = addlistitem(num2str(S.finx), outputs, ",")
 	endif
+
 	if(numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0)  // If not NaN and not ""
-		channels = addlistitem(S.channelsy, channels, ",")
+		all_channels = addlistitem(S.channelsy, all_channels, ";")
 		outputs = addlistitem(num2str(S.starty), outputs, ",")
 		outputs = addlistitem(num2str(S.finy), outputs, ",")
 	endif
@@ -950,39 +956,48 @@ function SFbd_check_lims(S)
 	wave bd_range_span, bd_range_high, bd_range_low
 
 	variable board_index, sw_limit
-	variable answer, i, j, channel, output, kill_graphs = 0
-	string abort_msg = "", question
-	for(i=0;i<itemsinlist(channels, ",");i++)
-		channel = str2num(stringfromlist(i, channels, ","))
-		for(j=0;j<2;j++)  // Start/Fin for each channel
-			output = str2num(stringfromlist(2*i+j, outputs, ","))
-			// Check that the DAC board is initialized
-			bdGetBoard(channel)
-			board_index = floor(channel/4)
-		
-			// check for NAN and INF
-			if(sc_check_naninf(output) != 0)
-				abort "trying to set voltage to NaN or Inf"
-			endif
-		
-			// Check that the voltage is valid
-			if(output > bd_range_high[board_index] || output < bd_range_low[board_index])
-				sprintf abort_msg, "voltage out of DAC range, %.3fmV", output
-				kill_graphs = 1
-				break
-			endif
-		
-			// check that the voltage is within software limits
-			// if outside, ask user if want to continue anyway
-			sw_limit = str2num(dacvalstr[channel][2])
-			if(abs(output) > sw_limit)
-				sprintf question, "DAC channel %s will be ramped outside software limits. Continue?", stringfromlist(i,channels,",")
-				answer = ask_user(question, type=1)
-				if(answer == 2)
-					sprintf abort_msg "User aborted"
+	variable answer, i, j, k, channel, output, kill_graphs = 0
+	string channels, abort_msg = "", question
+	for(i=0;i<itemsinlist(all_channels, ";");i++)  		// channelsx then channelsy if it exists
+		channels = stringfromlist(i, all_channels, ";")
+		for(j=0;j<itemsinlist(channels, ",");j++)			// each channel from channelsx/channelsy
+			channel = str2num(stringfromlist(i, channels, ","))
+			for(k=0;k<2;k++)  									// Start/Fin for each channel
+				output = str2num(stringfromlist(2*i+k, outputs, ","))  // 2 per channelsx/channelsy
+				// Check that the DAC board is initialized
+				bdGetBoard(channel)
+				board_index = floor(channel/4)
+			
+				// check for NAN and INF
+				if(sc_check_naninf(output) != 0)
+					abort "trying to set voltage to NaN or Inf"
+				endif
+			
+				// Check that the voltage is valid
+				if(output > bd_range_high[board_index] || output < bd_range_low[board_index])
+					sprintf abort_msg, "voltage out of DAC range, %.3fmV", output
 					kill_graphs = 1
 					break
 				endif
+			
+				// check that the voltage is within software limits
+				// if outside, ask user if want to continue anyway
+				sw_limit = str2num(dacvalstr[channel][2])
+				if(abs(output) > sw_limit)
+					sprintf question, "DAC channel %s will be ramped outside software limits. Continue?", stringfromlist(i,channels,",")
+					answer = ask_user(question, type=1)
+					if(answer == 2)
+						sprintf abort_msg "User aborted"
+						kill_graphs = 1
+						break
+					endif
+				endif
+				if(kill_graphs == 1)  // Don't bother checking the rest
+					break
+				endif
+			endfor
+			if(kill_graphs == 1)  // Don't bother checking the rest
+				break
 			endif
 		endfor
 		if(kill_graphs == 1)  // Don't bother checking the rest
@@ -991,7 +1006,6 @@ function SFbd_check_lims(S)
 	endfor
 
 	if(kill_graphs == 1)
-		variable k
 		dowindow/k SweepControl // kill scan control window
 		for(k=0;k<itemsinlist(activegraphs,";");k+=1)
 			dowindow/k $stringfromlist(k,activegraphs,";")
@@ -1115,6 +1129,9 @@ function SFawg_set_and_precheck(AWG, Fsv)
 	// Check AWG for clashes/exceeding lims etc
 	SFawg_check_AWG_list(AWG, Fsv)	
 	AWG.use_AWG = 1
+	
+	// Save numSteps in AWG_list for sweeplogs later
+	fdAWG_set_global_AWG_list(AWG)
 end
 	
 
@@ -1153,13 +1170,20 @@ function SF_init_BDscanVars(s, instrID, [startx, finx, channelsx, numptsx, rampr
    variable direction
 
    s.instrID = instrID
-   
+    
+    string channels
+	
+    
    // Set X's			// NOTE: All optional because may be used for just slow axis of FastDac scan for example
 	s.startx = paramisdefault(startx) ? NaN : startx
 	s.finx = paramisdefault(finx) ? NaN : finx
-	if (paramisdefault(channelsx))
+	if(!paramisdefault(channelsx))
+		channels = SF_get_channels(channelsx)
+		s.channelsx = channels
+	else
 		s.channelsx = ""
 	endif
+
 	s.numptsx = paramisdefault(numptsx) ? NaN : numptsx
 	s.rampratex = paramisdefault(rampratex) ? NaN : rampratex
 	s.delayx = paramisdefault(delayx) ? NaN : delayx
@@ -1167,13 +1191,17 @@ function SF_init_BDscanVars(s, instrID, [startx, finx, channelsx, numptsx, rampr
    // Set Y's
    s.starty = paramisdefault(starty) ? NaN : starty
    s.finy = paramisdefault(finy) ? NaN : finy
-   if (paramisdefault(channelsy))
+	if(!paramisdefault(channelsy))
+		channels = SF_get_channels(channelsy)
+		s.channelsy = channels
+	else
 		s.channelsy = ""
 	endif
+	
 	s.numptsy = paramisdefault(numptsy) ? NaN : numptsy
    s.rampratey = paramisdefault(rampratey) ? NaN : rampratey
    s.delayy = paramisdefault(delayy) ? NaN : delayy
-   s.direction = paramisdefault(direction) ? 1 : direction
+   s.direction = paramisdefault(direction) ? 1 : direction 
 end
 
 
@@ -1224,9 +1252,12 @@ function SF_init_FDscanVars(s, instrID, startx, finx, channelsx, numptsx, rampra
 
 	string starts = "", fins = ""  // Used for getting string start/fin for x and y
 
+	string channels
+	channels = SF_get_channels(channelsx, fastdac=1)
+
 	// Set Variables in Struct
    s.instrID = instrID
-   s.channelsx = channelsx
+   s.channelsx = channels
    s.adcList = SFfd_get_adcs()
    
 	s.startx = startx
@@ -1248,7 +1279,8 @@ function SF_init_FDscanVars(s, instrID, startx, finx, channelsx, numptsx, rampra
    s.starty = paramisdefault(starty) ? NaN : starty
    s.finy = paramisdefault(finy) ? NaN : finy
    if (!paramisdefault(channelsy))
-		s.channelsy = channelsy
+   		channels = SF_get_channels(channelsy, fastdac=1)
+		s.channelsy = channels
 		// Gets starts/fins in FD string format
 	   SFfd_format_setpoints(S.starty, S.finy, S.channelsy, starts, fins)  
 		s.startys = starts
@@ -1265,3 +1297,54 @@ function SF_init_FDscanVars(s, instrID, startx, finx, channelsx, numptsx, rampra
    										// Note: Valid for same start/fin points only (uses S.startx, S.finx NOT S.startxs, S.finxs)
    SFfd_set_measureFreq(S) 		// Sets S.samplingFreq/measureFreq/numADCs	
 end
+
+
+function/s SF_get_channels(channels, [fastdac])
+	// Returns channels as numbers whether numbers or labels passed
+	string channels
+	variable fastdac
+	
+	string new_channels = "", err_msg
+	variable i = 0
+	string ch
+	if(fastdac == 1)
+		wave/t fdacvalstr
+		for(i=0;i<itemsinlist(channels, ",");i++)
+			ch = stringfromlist(i, channels, ",")
+			ch = removeLeadingWhitespace(ch)
+			ch = removeTrailingWhiteSpace(ch)
+			if(numtype(str2num(ch)) != 0)
+				duplicate/o/free/t/r=[][3] fdacvalstr fdacnames
+				findvalue/RMD=[][3]/TEXT=ch/TXOP=0 fdacnames
+				if(V_Value == -1)  // Not found
+					sprintf err_msg "ERROR[SF_get_channesl]:No FastDAC channel found with name %s", ch
+					abort err_msg
+				else  // Replace with DAC number
+					ch = fdacvalstr[V_value][0]
+				endif
+			endif
+			new_channels = addlistitem(ch, new_channels, ",", INF)
+		endfor
+	else  // Babydac
+		wave/t dacvalstr
+		for(i=0;i<itemsinlist(channels, ",");i++)
+			ch = stringfromlist(i, channels, ",")
+			ch = removeLeadingWhitespace(ch)
+			ch = removeTrailingWhiteSpace(ch)
+			if(numtype(str2num(ch)) != 0)
+				duplicate/o/free/t/r=[][3] dacvalstr dacnames
+				findvalue/RMD=[][3]/TEXT=ch/TXOP=0 dacnames
+				if(V_Value == -1)  // Not found
+					sprintf err_msg "ERROR[SF_get_channesl]:No BabyDAC channel found with name %s", ch
+					abort err_msg
+				else  // Replace with DAC number
+					ch = dacvalstr[V_value][0]
+				endif
+			endif
+			new_channels = addlistitem(ch, new_channels, ",", INF)
+		endfor
+	endif
+	new_channels = new_channels[0,strlen(new_channels)-2]  // Remove comma at end (DESTROYS LIMIT CHECKING OTHERWISE)
+	return new_channels
+end
+	

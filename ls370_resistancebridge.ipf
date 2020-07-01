@@ -77,6 +77,25 @@ end
 ///////////////////////
 //// Get Functions ////
 //////////////////////
+function/s getLS370channelLabel(plate)
+	// To be used by other functions, not directly by user
+	// Returns the channel label for either XLD or LD system (whichever is initialized) corresponding to
+	// standard channel names ("50K,4K,magnet,still,mc")
+	string plate
+
+	svar bfchannellookup
+	
+	string channel
+	variable channel_idx
+	channel_idx = whichlistitem(plate,bfchannellookup,";", 0, 0)
+	if(channel_idx < 0)
+		printf "The requested plate (%s) doesn't exsist!\r", plate
+		abort
+	else
+		channel = stringfromlist(channel_idx+5,bfchannellookup,";")
+	endif
+	return channel
+end
 
 // get-analog-data
 function getLS370analogData(instrID, [channel])  //mW
@@ -158,20 +177,7 @@ function getLS370temp(instrID, plate, [max_age_s]) // Units: K
 		max_age_s = 120
 	endif
 
-	strswitch(ls_system)
-		case "bfsmall":
-		case "bfbig":
-			channel_idx = whichlistitem(plate,bfchannellookup,";", 0, 0)
-			if(channel_idx < 0)
-				printf "The requested plate (%s) doesn't exsist!\r", plate
-				return 0.0
-			else
-				channel = stringfromlist(channel_idx+5,bfchannellookup,";")
-			endif
-			break
-		default:
-			abort "ls_system not implemented"
-	endswitch
+	channel = getLS370channelLabel(plate)
 	
 	string result
 	variable temp
@@ -582,7 +588,7 @@ end
 
 
 // set-temperature-control-mode
-function setLS370tempMode(instrID, mode) // Units: No units
+function setLS370controlMode(instrID, mode) // Units: No units
 	// sets the temperature control mode
 	// avaliable options are: off (4), PID (1), Temp_zone (2), Open loop (3)
 	string instrID
@@ -709,6 +715,10 @@ function setLS370temp(instrID,setpoint,[maxcurrent]) //Units: mK, mA
 	
 	setLS370HeaterRange(instrID, maxcurrent)
 	setLS370TempSetpoint(instrID, setpoint)
+	nvar pid_mode
+	if (pid_mode != 1)
+		setLS370controlMode(instrID, 1)
+	endif
 end
 
 
@@ -798,7 +808,7 @@ function/s LS370getLoggingScheduleFromConfig(sched_name)
 	variable js_id
 	string file_name
 	sprintf file_name "%sLoggingSchedules.txt", ls_label
-	js_id = JSON_parse(readtxtfile(file_name,"config"))
+	js_id = JSON_parse(readtxtfile(file_name,"setup"))
 	findvalue/TEXT=sched_name JSON_getkeys(js_id, "")
 	if (V_value == -1)
 		string err_str
@@ -997,10 +1007,15 @@ function/s getLS370status(instrID, [max_age_s])
 	variable i=0
 
 	buffer = addJSONkeyval(buffer,"MC K",num2str(getLS370temp(instrID, "mc", max_age_s=max_age_s)))
-	buffer = addJSONkeyval(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age_s=max_age_s)))
-	buffer = addJSONkeyval(buffer,"4K Plate K",num2str(getLS370temp(instrID, "4K", max_age_s=max_age_s)))
-	buffer = addJSONkeyval(buffer,"Magnet K",num2str(getLS370temp(instrID, "magnet", max_age_s=max_age_s)))
-	buffer = addJSONkeyval(buffer,"50K Plate K",num2str(getLS370temp(instrID, "50K", max_age_s=max_age_s)))
+//	buffer = addJSONkeyval(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age_s=max_age_s)))
+//	buffer = addJSONkeyval(buffer,"4K Plate K",num2str(getLS370temp(instrID, "4K", max_age_s=max_age_s)))
+//	buffer = addJSONkeyval(buffer,"Magnet K",num2str(getLS370temp(instrID, "magnet", max_age_s=max_age_s)))
+//	buffer = addJSONkeyval(buffer,"50K Plate K",num2str(getLS370temp(instrID, "50K", max_age_s=max_age_s)))
+	
+	buffer = addJSONkeyval(buffer,"Still K","4")
+	buffer = addJSONkeyval(buffer,"4K Plate K","4")
+	buffer = addJSONkeyval(buffer,"Magnet K","4")
+	buffer = addJSONkeyval(buffer,"50K Plate K","50")
 	
 	// TODO: add other variables like (temp setpoint, heater power etc)
 
@@ -1261,10 +1276,10 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 
 
 /////////////////////// CONTROL MODES //////////////////////////////////////////		
-//		print 	"COMMAND: setLS370tempMode(ls370, 1)  //PID\r"
+//		print 	"COMMAND: setLS370controlMode(ls370, 1)  //PID\r"
 //		ans = ask_continue(ask)
 //		if(ans == 1)
-//			setLS370tempMode(ls370, 1)  //PID
+//			setLS370controlMode(ls370, 1)  //PID
 //		endif	
 //
 //		print 	"COMMAND: getLS370controlmode(ls370)\r"
@@ -1273,10 +1288,10 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 //		   printf "RETURN: %f\r\r", getLS370controlmode(ls370)
 //		endif	
 //		
-//		print 	"COMMAND: setLS370tempMode(ls370, 3)  //PID\r"
+//		print 	"COMMAND: setLS370controlMode(ls370, 3)  //PID\r"
 //		ans = ask_continue(ask)
 //		if(ans == 1)
-//			setLS370tempMode(ls370, 3)  //PID
+//			setLS370controlMode(ls370, 3)  //PID
 //		endif	
 //
 //		print 	"COMMAND: getLS370controlmode(ls370)\r"
@@ -1285,10 +1300,10 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 //		   printf "RETURN: %f\r\r", getLS370controlmode(ls370)
 //		endif	
 //			
-//		print 	"COMMAND: setLS370tempMode(ls370, 4)  //off\r"
+//		print 	"COMMAND: setLS370controlMode(ls370, 4)  //off\r"
 //		ans = ask_continue(ask)
 //		if(ans == 1)
-//			setLS370tempMode(ls370, 4)  //off
+//			setLS370controlMode(ls370, 4)  //off
 //		endif	
 //		
 //		print 	"COMMAND: getLS370controlmode(ls370)\r"
@@ -1428,7 +1443,7 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 		setLS370PIDparameters(ls370,10,5,0)
 		
 		printf "Temp control mode was %d, setting to 4 (off)\r", getLS370controlmode(ls370)
-		setLS370tempMode(ls370, 4)  //off
+		setLS370controlMode(ls370, 4)  //off
 
 		printf "Temp setpoint was %fmV, setting to 0mK\r",		getLS370PIDtemp(ls370)
 		setLS370tempSetpoint(ls370,0) //100mK
