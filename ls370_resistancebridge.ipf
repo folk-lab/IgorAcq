@@ -506,6 +506,9 @@ function setLS370loggersSchedule(instrID, schedule)
 		case "using_magnet":
 			payload = LS370getLoggingScheduleFromConfig("using_magnet")
 			break
+		case "fast":
+			payload = LS370getLoggingScheduleFromConfig("fast")
+			break
 		default:
 			abort "Not a valid option"
 	endswitch 
