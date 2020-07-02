@@ -1591,7 +1591,6 @@ function sc_sleep(delay)
 	nvar sc_abortsweep, sc_pause
 
 	doupdate // do this just once during the sleep function
-
 	do
 		try
 			sc_checksweepstate()
@@ -2036,10 +2035,11 @@ function sc_update_xdata()
 	sc_xdata = x  // set wave data equal to x scaling
 end
 
-function SaveWaves([msg,save_experiment,fastdac])
+function SaveWaves([msg,save_experiment,fastdac, wave_names])
 	// the message will be printed in the history, and will be saved in the HDF file corresponding to this scan
 	// save_experiment=1 to save the experiment file
-	string msg
+	// Use wave_names to manually save comma separated waves in HDF file with sweeplogs etc. 
+	string msg, wave_names					
 	variable save_experiment, fastdac
 	string his_str
 	nvar sc_is2d, sc_PrintRaw, sc_PrintCalc, sc_scanstarttime
@@ -2052,25 +2052,32 @@ function SaveWaves([msg,save_experiment,fastdac])
 	wave sc_RawRecord, sc_CalcRecord
 	variable filecount = 0
 
+	variable save_type = 0
+
 	if (!paramisdefault(msg))
 		print msg
 	else
 		msg=""
 	endif
 
-	if(paramisdefault(fastdac))
-		fastdac = 0
-	elseif(fastdac > 1)
-		fastdac = 0
-		print("[WARNING] \"SaveWaves\": Pass fastdac = 1! Setting it to 0.")
+	save_type = 0
+	if(!paramisdefault(fastdac) && !paramisdefault(wave_names))
+		abort "ERROR[SaveWaves]: Can only save FastDAC waves OR wave_names, not both at same time"
+	elseif(fastdac == 1)
+		save_type = 1  // Save Fastdac_ScanController waves
+	elseif(!paramisDefault(wave_names))
+		save_type = 2  // Save given wave_names ONLY
+	else
+		save_type = 0  // Save normal ScanController waves
 	endif
+	
 	
 	// compare to earlier call of InitializeWaves
 	nvar fastdac_init
-	if(fastdac > fastdac_init)
+	if(fastdac > fastdac_init && save_type != 2)
 		print("[ERROR] \"SaveWaves\": Trying to save fastDAC files, but they weren't initialized by \"InitializeWaves\"")
 		abort
-	elseif(fastdac < fastdac_init)
+	elseif(fastdac < fastdac_init  && save_type != 2)
 		print("[ERROR] \"SaveWaves\": Trying to save non-fastDAC files, but they weren't initialized by \"InitializeWaves\"")
 		abort	
 	endif
@@ -2083,15 +2090,18 @@ function SaveWaves([msg,save_experiment,fastdac])
 
 	KillDataFolder/z root:async // clean this up for next time
 
-	// save timing variables
-	variable /g sweep_t_elapsed = datetime-sc_scanstarttime
-	printf "Time elapsed: %.2f s \r", sweep_t_elapsed
-
-	dowindow/k SweepControl // kill scan control window
+	if(save_type != 2)
+		// save timing variables
+		variable /g sweep_t_elapsed = datetime-sc_scanstarttime
+		printf "Time elapsed: %.2f s \r", sweep_t_elapsed
+		dowindow/k SweepControl // kill scan control window
+	else
+		variable /g sweep_t_elapsed = 0
+	endif
 
 	// count up the number of data files to save
 	variable ii=0
-	if(fastdac == 0)
+	if(save_type == 0)
 		// normal non-fastdac files
 		variable Rawadd = sum(sc_RawRecord)
 		variable Calcadd = sum(sc_CalcRecord)
@@ -2153,7 +2163,7 @@ function SaveWaves([msg,save_experiment,fastdac])
 			closeSaveFiles()
 		endif
 	// Save Fastdac waves	
-	elseif(fastdac == 1)
+	elseif(save_type == 1)
 		wave/t fadcvalstr
 		wave fadcattr
 		string wn_raw = ""
@@ -2214,6 +2224,27 @@ function SaveWaves([msg,save_experiment,fastdac])
 			while(ii<dimsize(fadcattr,0))
 			closeSaveFiles()
 		endif
+	elseif(save_type == 2)
+		// Check that all waves trying to save exist
+		for(ii=0;ii<itemsinlist(wave_names, ",");ii++)
+			wn = stringfromlist(ii, wave_names, ",")
+			if (!exists(wn))
+				string err_msg	
+				sprintf err_msg, "WARNING[SaveWaves]: Wavename %s does not exist. No data saved", wn
+				abort err_msg
+			endif
+		endfor
+		
+		// Only init Save file after we know that the waves exist
+		initSaveFiles(msg=msg, logs_only=1)
+		printf "Saving waves [%s] in dat%d.h5", wave_names, filenum
+		
+		// Now save each wave
+		for(ii=0;ii<itemsinlist(wave_names, ",");ii++)
+			wn = stringfromlist(ii, wave_names, ",")
+			saveSingleWave(wn)
+		endfor
+		
 	endif
 	
 	if(save_experiment==1 & (datetime-sc_save_time)>180.0)
@@ -2241,9 +2272,12 @@ function SaveWaves([msg,save_experiment,fastdac])
 	endif
 	
 	// increment filenum
-	if(Rawadd+Calcadd > 0 || filecount > 0)
+	if(Rawadd+Calcadd > 0 || filecount > 0  || save_type == 2)
 		filenum+=1
 	endif
+
+	nvar hdf5_id
+	HDF5CloseFile hdf5_id  // Good practice to close files after. Also forces data to be flushed to disk.
 end
 
 function sc_cleanVolatileMemory()
