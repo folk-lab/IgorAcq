@@ -1014,51 +1014,61 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 	endfor
 	
 	// find all open plots
-	string graphlist = winlist("*",",","WIN:1"), graphname = "", graphtitle="", graphnumlist=""
+	string graphlist = winlist("*",";","WIN:1"), graphname = "", graphtitle="", graphnumlist=""
 	string plottitle="", graphnum=""			
-	for(i=0;i<itemsinlist(graphlist,",");i=i+1) 			
-		graphname = stringfromlist(i,graphlist,",")
+	j=0
+	variable index
+	for (i=0;i<itemsinlist(graphlist);i=i+1)
+		index = strsearch(graphlist,";",j)
+		graphname = graphlist[j,index-1]
 		setaxis/w=$graphname /a
 		getwindow $graphname wtitle
 		splitstring /e="(.*):(.*)" s_value, graphnum, plottitle
-		graphtitle+= plottitle+","
-		graphnumlist+= graphnum+","
+		graphtitle+= plottitle+";"
+		graphnumlist+= graphnum+";"
+		j=index+1
 	endfor
-	
+
 	// open plots and distribute on screen
 	variable graphopen=0
 	string openplots=""
 	string num
+	string match_str
 	for(i=0;i<itemsinlist(channels,",");i+=1)
 		num = stringfromlist(i,channels,",")
 		wn = "timeSeriesADC"+num
 		graphopen=0
-		for(j=0;j<itemsinlist(graphtitle,",");j+=1)
-			if(stringmatch(wn,stringfromlist(j,graphtitle,",")))
+		for(j=0;j<itemsinlist(graphtitle);j+=1)
+			sprintf match_str, "*%s*", wn
+			if(stringmatch(stringfromlist(j,graphtitle), match_str))
 				graphopen = 1
-				openplots+= stringfromlist(j,graphnumlist,",")+","
-				label /w=$stringfromlist(j,graphnumlist,",") bottom,  "time [s]"
+				openplots+= stringfromlist(j,graphnumlist)+";"
+				label /w=$stringfromlist(j,graphnumlist) bottom,  "time [s]"
+				TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 strTime()
 			endif
 		endfor
 		if(!graphopen)
 			display $wn
 			setwindow kwTopWin, graphicsTech=0
 			label bottom, "time [s]"
-			openplots+= winname(0,1)+","
+			TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 strTime()
+			openplots+= winname(0,1)+";"
 		endif
 		
 		wn = "fftADC"+num
 		graphopen=0
-		for(j=0;j<itemsinlist(graphtitle,",");j+=1)
-			if(stringmatch(wn,stringfromlist(j,graphtitle,",")))
+		for(j=0;j<itemsinlist(graphtitle);j+=1)
+			sprintf match_str, "*%s*", wn
+			if(stringmatch(stringfromlist(j,graphtitle), match_str))
 				graphopen = 1
-				openplots+= stringfromlist(j,graphnumlist,",")+","
-				label /w=$stringfromlist(j,graphnumlist,",") bottom,  "frequency [Hz]"
+				openplots+= stringfromlist(j,graphnumlist)+";"
+				label /w=$stringfromlist(j,graphnumlist) bottom,  "frequency [Hz]"
 				if(linear)
-					label/w=$stringfromlist(j,graphnumlist,",") left, "Spectrum [V/sqrt(Hz)]"
+					label/w=$stringfromlist(j,graphnumlist) left, "Spectrum [V/sqrt(Hz)]"
 				else
-					label/w=$stringfromlist(j,graphnumlist,",") left, "Spectrum [dBV/sqrt(Hz)]"
+					label/w=$stringfromlist(j,graphnumlist) left, "Spectrum [dBV/sqrt(Hz)]"
 				endif
+				TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 strTime()
 			endif
 		endfor
 		if(!graphopen)
@@ -1070,7 +1080,8 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 			else
 				label left, "Spectrum [dBV/sqrt(Hz)]"
 			endif
-			openplots+= winname(0,1)+","
+			TextBox/W=$stringfromlist(j,graphnumlist,",")/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 strTime()
+			openplots+= winname(0,1)+";"
 		endif
 	endfor
 
@@ -1079,8 +1090,8 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 	sprintf cmd1, "TileWindows/O=1/A=(%d,1) ", numChannels*2 
 	cmd2 = ""
 	// Tile graphs
-	for(i=0;i<itemsinlist(openplots, ",");i=i+1)
-		window_string = stringfromlist(i,openplots, ",")
+	for(i=0;i<itemsinlist(openplots);i=i+1)
+		window_string = stringfromlist(i,openplots)
 		cmd1+= window_string +","
 		cmd2 = "DoWindow/F " + window_string
 		execute(cmd2)
