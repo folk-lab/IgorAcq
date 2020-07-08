@@ -223,8 +223,8 @@ function/s getFDACStatus(instrID)
 	endfor
 	
 	buffer = addJSONkeyval(buffer, "visa_address", visa, addquotes=1)
-	buffer = addJSONkeyval(buffer, "SamplingFreq", num2str(getFADCspeed(instrID)), addquotes=1)
-	buffer = addJSONkeyval(buffer, "MeasureFreq", num2str(getFADCmeasureFreq(instrID)), addquotes=1)
+	buffer = addJSONkeyval(buffer, "SamplingFreq", num2str(getFADCspeed(instrID)), addquotes=0)
+	buffer = addJSONkeyval(buffer, "MeasureFreq", num2str(getFADCmeasureFreq(instrID)), addquotes=0)
 
 	// DAC values
 	for(i=0;i<str2num(stringbykey("numDACCh"+num2istr(dev),fdackeys,":",","));i+=1)
@@ -570,11 +570,13 @@ end
 function ClearFdacBuffer(instrID)
 	variable instrID
 	
-	variable count=0
+	variable count=0, total = 0
 	string buffer=""
 	do 
 		viRead(instrID, buffer, 2000, count)
+		total += count
 	while(count != 0)
+	printf "Cleared %d bytes of data from buffer\r", total
 end
 
 function loadFadcCalibration(instrID,speed)
@@ -1021,10 +1023,10 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 	for (i=0;i<itemsinlist(graphlist);i=i+1)
 		index = strsearch(graphlist,";",j)
 		graphname = graphlist[j,index-1]
-		setaxis/w=$graphname /a
+//		setaxis/w=$graphname /a
 		getwindow $graphname wtitle
 		splitstring /e="(.*):(.*)" s_value, graphnum, plottitle
-		graphtitle+= plottitle+";"
+		graphtitle+= plottitle+"|"  // Use a weird separator so that it doesn't clash with ':' or ';' or ',' which all get used in graph names
 		graphnumlist+= graphnum+";"
 		j=index+1
 	endfor
@@ -1038,9 +1040,9 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 		num = stringfromlist(i,channels,",")
 		wn = "timeSeriesADC"+num
 		graphopen=0
-		for(j=0;j<itemsinlist(graphtitle);j+=1)
+		for(j=0;j<itemsinlist(graphtitle, "|");j+=1)
 			sprintf match_str, "*%s*", wn
-			if(stringmatch(stringfromlist(j,graphtitle), match_str))
+			if(stringmatch(stringfromlist(j,graphtitle, "|"), match_str))
 				graphopen = 1
 				openplots+= stringfromlist(j,graphnumlist)+";"
 				label /w=$stringfromlist(j,graphnumlist) bottom,  "time [s]"
@@ -1057,9 +1059,9 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 		
 		wn = "fftADC"+num
 		graphopen=0
-		for(j=0;j<itemsinlist(graphtitle);j+=1)
+		for(j=0;j<itemsinlist(graphtitle, "|");j+=1)
 			sprintf match_str, "*%s*", wn
-			if(stringmatch(stringfromlist(j,graphtitle), match_str))
+			if(stringmatch(stringfromlist(j,graphtitle, "|"), match_str))
 				graphopen = 1
 				openplots+= stringfromlist(j,graphnumlist)+";"
 				label /w=$stringfromlist(j,graphnumlist) bottom,  "frequency [Hz]"
@@ -1159,14 +1161,34 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 			wave timewn = $wn
 			duplicate/o timewn, fftinput
 			fftinput = fftinput*1.0e-3
-			fft/out=3/dest=$ffttemps fftinput
+			
+			
+			// USING PERIODOGRAM INSTEAD OF FFT /////
+			if(linear)
+				DSPPeriodogram/PARS/NODC=1 fftinput
+			else
+				DSPPeriodogram/DBR=1/PARS/NODC=1 fftinput
+			endif
+			wave w_Periodogram
+			duplicate/o w_Periodogram, $ffttemps
 			wave fftwn = $ffttemps
 			setscale/i x, 0, bandwidth, fftwn
-			if(linear)
-				fftwn = fftwn/sqrt(bandwidth)
-			else
-				fftwn = 20*log(fftwn/sqrt(bandwidth))
-			endif
+			
+			////////////////////////////////////////
+			
+			///// USING FFT /////////////////////////////
+//			fft/out=3/dest=$ffttemps fftinput
+//			wave fftwn = $ffttemps
+//			setscale/i x, 0, bandwidth, fftwn
+//
+////			fftwn = fftwn/sqrt(bandwidth)
+//			if(linear)
+//				fftwn = fftwn/sqrt(bandwidth)
+//			else
+//				fftwn = 20*log(fftwn/sqrt(bandwidth))
+//			endif
+			////////////////////////////////////////////// 
+			
 			fftnames = "fftADC"+stringfromlist(j,channels,",")
 			wave fftwave = $fftnames
 			if(i==0)
@@ -1176,6 +1198,9 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 				fftwave = fftwave/(i+1)      // ""
 			endif
 		endfor
+//		if(!linear)
+//			fftwn = 20*log(fftwn)
+//		endif
 	endfor	
 	
 //	// close the time series plots
@@ -1489,6 +1514,8 @@ function fdAWG_setup_AWG(instrID, [AWs, DACs, numCycles])
 	
 	struct fdAWG_List S
 	fdAWG_get_global_AWG_list(S)
+	
+	DACs = SF_get_channels(DACs, fastdac=1)  // Convert from label to numbers
 	
 	S.AW_Waves = selectstring(paramisdefault(AWs), AWs, S.AW_Waves)
 	S.AW_DACs = selectstring(paramisdefault(DACs), DACs, S.AW_Dacs)
