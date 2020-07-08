@@ -149,7 +149,7 @@ function fd_Record_Values(S, PL, rowNum, [AWG_list])
 		cmd_sent = fd_start_INT_RAMP(S)
 		totalByteReturn = S.numADCs*2*S.numptsx
 	endif
-
+	sc_sleep(0.5) 	// Trying to get 1s of data per loop, will timeout on first loop without a bit of a wait first
 	variable looptime = 0
    looptime = fdRV_record_buffer(S, rowNum, totalByteReturn)
 
@@ -356,9 +356,9 @@ function fdRV_get_read_chunk_size(numADCs, numpts, bytesSec, totalByteReturn)
   variable numADCs, numpts, bytesSec, totalByteReturn
 
   variable read_chunk=0
-  variable chunksize = roundNum(numADCs*bytesSec/50,0) - mod(roundNum(numADCs*bytesSec/50,0),numADCs*2)
+  variable chunksize = (round(bytesSec) - mod(round(bytesSec),numADCs*2))
   if(chunksize < 50)
-    chunksize = 50 - mod(50,numADCs*2) // 50 or 48 //This will fail for 7ADCs
+    chunksize = 50 - mod(50,numADCs*2)
   endif
   if(totalByteReturn > chunksize)
     read_chunk = chunksize

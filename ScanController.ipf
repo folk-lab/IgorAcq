@@ -2230,14 +2230,14 @@ function SaveWaves([msg,save_experiment,fastdac, wave_names])
 			wn = stringfromlist(ii, wave_names, ",")
 			if (!exists(wn))
 				string err_msg	
-				sprintf err_msg, "WARNING[SaveWaves]: Wavename %s does not exist. No data saved", wn
+				sprintf err_msg, "WARNING[SaveWaves]: Wavename %s does not exist. No data saved\r", wn
 				abort err_msg
 			endif
 		endfor
 		
 		// Only init Save file after we know that the waves exist
 		initSaveFiles(msg=msg, logs_only=1)
-		printf "Saving waves [%s] in dat%d.h5", wave_names, filenum
+		printf "Saving waves [%s] in dat%d.h5\r", wave_names, filenum
 		
 		// Now save each wave
 		for(ii=0;ii<itemsinlist(wave_names, ",");ii++)
@@ -2276,8 +2276,8 @@ function SaveWaves([msg,save_experiment,fastdac, wave_names])
 		filenum+=1
 	endif
 
-	nvar hdf5_id
-	HDF5CloseFile hdf5_id  // Good practice to close files after. Also forces data to be flushed to disk.
+//	nvar hdf5_id
+//	HDF5CloseFile hdf5_id  // Good practice to close files after. Also forces data to be flushed to disk.
 end
 
 function sc_cleanVolatileMemory()
