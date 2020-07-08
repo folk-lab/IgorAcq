@@ -802,6 +802,8 @@ function rampMultipleBD(instrID, channels, setpoint, [ramprate, update, ignore_l
 	wave /t customdacvalstr
 	nvar bd_num_custom
 
+	channels = SF_get_channels(channels)  // Converts label names to Dac channels
+
 	if(paramisdefault(ramprate))
 		nvar bd_ramprate
 		ramprate = bd_ramprate    // (mV/s)
@@ -1299,12 +1301,17 @@ function/s GetBDDACStatus(instrID)
 
 	string buffer="", key=""
 	wave /t dacvalstr = dacvalstr
+	wave/t old_dacvalstr
 	variable i=0, j=0
 	do
 		if(numtype(bd_boardnumbers[i])==0)
 			for(j=0;j<4;j+=1)
 				sprintf key, "DAC%d{%s}", 4*i+j, dacvalstr[4*i+j][3]
-				buffer = addJSONkeyval(buffer, key, dacvalstr[4*i+j][1])
+				buffer = addJSONkeyval(buffer, key, old_dacvalstr[4*i+j])  	// This is actually where DACs are at
+//				buffer = addJSONkeyval(buffer, key, dacvalstr[4*i+j][1])	 	// This is only true if everything has been ramped
+				if (str2num(dacvalstr[4*i+j][1]) != str2num(old_dacvalstr[4*i+j]))
+					printf "\r\rWARNING[GetBDDACStatus]: DACs may not be set where you think!! Old_dacvalstr[%d] = %.1fmV, dacvalstr[%d] = %.1fmV.\rOld_dacvalstr is likely where DACs really are\r\r", 4*i+j, str2num(old_dacvalstr[4*i+j]), 4*i+j, str2num(dacvalstr[4*i+j][1])
+				endif
 			endfor
 		endif
 		i+=1
