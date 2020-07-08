@@ -1010,15 +1010,15 @@ function/s getLS370status(instrID, [max_age_s])
 	variable i=0
 
 	buffer = addJSONkeyval(buffer,"MC K",num2str(getLS370temp(instrID, "mc", max_age_s=max_age_s)))
-//	buffer = addJSONkeyval(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age_s=max_age_s)))
-//	buffer = addJSONkeyval(buffer,"4K Plate K",num2str(getLS370temp(instrID, "4K", max_age_s=max_age_s)))
-//	buffer = addJSONkeyval(buffer,"Magnet K",num2str(getLS370temp(instrID, "magnet", max_age_s=max_age_s)))
-//	buffer = addJSONkeyval(buffer,"50K Plate K",num2str(getLS370temp(instrID, "50K", max_age_s=max_age_s)))
+	buffer = addJSONkeyval(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age_s=max_age_s)))
+	buffer = addJSONkeyval(buffer,"4K Plate K",num2str(getLS370temp(instrID, "4K", max_age_s=max_age_s)))
+	buffer = addJSONkeyval(buffer,"Magnet K",num2str(getLS370temp(instrID, "magnet", max_age_s=max_age_s)))
+	buffer = addJSONkeyval(buffer,"50K Plate K",num2str(getLS370temp(instrID, "50K", max_age_s=max_age_s)))
 	
-	buffer = addJSONkeyval(buffer,"Still K","4")
-	buffer = addJSONkeyval(buffer,"4K Plate K","4")
-	buffer = addJSONkeyval(buffer,"Magnet K","4")
-	buffer = addJSONkeyval(buffer,"50K Plate K","50")
+//	buffer = addJSONkeyval(buffer,"Still K","4")
+//	buffer = addJSONkeyval(buffer,"4K Plate K","4")
+//	buffer = addJSONkeyval(buffer,"Magnet K","4")
+//	buffer = addJSONkeyval(buffer,"50K Plate K","50")
 	
 	// TODO: add other variables like (temp setpoint, heater power etc)
 
