@@ -31,6 +31,7 @@ function/s getLSStatus(instrID)
 	string still_heater_schema = getJSONvalue(jstr,"still_heater_schema")
 
 	// Load "LakeshoreConfig.txt" in setup folder.
+	svar ls_label
 	string file_name
 	sprintf file_name "%sLoggingSchedules.txt", ls_label
 	jstr = readtxtfile(file_name,"setup")

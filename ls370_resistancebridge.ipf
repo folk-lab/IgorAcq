@@ -367,58 +367,64 @@ end
 
 //// Get Functions - Directly from data base ////
 
-function getLS370tempDB(instrID,plate, [max_age]) // Units: mK
-	// returns the temperature of the selected "plate".
-	// avaliable plates on BF systems: mc (mixing chamber), still, magnet, 4K, 50K
-	// data is queried directly from the SQL database
-	string instrID, plate
-	variable max_age
-	svar ls_system
-	
-	max_age = paramisdefault(max_age) ? 60 : max_age
-	
-	svar bfchannellookup
-	string channel
-	variable ch_id
-	variable channel_idx
-	
-	strswitch(ls_system)
-		case "bfsmall":
-		case "bfbig":
-			channel_idx = whichlistitem(plate,bfchannellookup,";", 0, 0)
-			if(channel_idx < 0)
-				printf "The requested plate (%s) doesn't exsist!", plate
-				return -1
-			else
-				channel = stringfromlist(channel_idx+5,bfchannellookup,";")
-				ch_id = str2num(stringfromlist(channel_idx+10,bfchannellookup,";"))  // TODO: Remove requirement for the actual ch_id and be able to use the label instead
-			endif
-			break
-		default:
-			abort "ls_system not implemented"
-	endswitch
-	
-	nvar sqr = sql_response_code  // 0=success, 1=no_data, 2=other warning, -1=error
-	variable t = datetime-max_age
-	string timestamp = SQL_format_time(t)
-	
-	
-	string command = ""
-	sprintf command, "SELECT DISTINCT ON (ch_idx) ch_idx, time, t FROM qdot.lksh370.channel_data WHERE time > TIMESTAMP %s ORDER BY ch_idx, time DESC;", timestamp
-	string wavenames = "sql_ls370_channels,sql_ls370_timestamp,sql_ls370_temperature"
-	requestSQLData(command,wavenames=wavenames, verbose=1) // TODO: change verbose to 0
-	if (sqr == 1) // no rows of data
-		return -1
-	else
-		wave temp_wave = sql_ls370_temperature
-		wave ch_wave = sql_ls370_channels
-		wave t_wave = sql_ls370_timestamp
-		print ch_wave
-		print t
-		print temp_wave
-		return temp_wave(ch_id)  // return temp of channel // TODO: access this by label instead of ch_ID
-	endif
-end
+//function getLS370tempDB(instrID,plate, [max_age]) // Units: mK
+//	// returns the temperature of the selected "plate".
+//	// avaliable plates on BF systems: mc (mixing chamber), still, magnet, 4K, 50K
+//	// data is queried directly from the SQL database
+//	string instrID, plate
+//	variable max_age
+//	svar ls_system
+//	
+//	max_age = paramisdefault(max_age) ? 60 : max_age
+//	
+//	svar bfchannellookup
+//	string channel
+//	variable ch_id
+//	variable channel_idx
+//	
+//	strswitch(ls_system)
+//		case "bfsmall":
+//		case "bfbig":
+//			channel_idx = whichlistitem(plate,bfchannellookup,";", 0, 0)
+//			if(channel_idx < 0)
+//				printf "The requested plate (%s) doesn't exsist!", plate
+//				return -1
+//			else
+//				channel = stringfromlist(channel_idx+5,bfchannellookup,";")
+//				ch_id = str2num(stringfromlist(channel_idx+10,bfchannellookup,";"))  // TODO: Remove requirement for the actual ch_id and be able to use the label instead
+//			endif
+//			break
+//		default:
+//			abort "ls_system not implemented"
+//	endswitch
+//	
+//	nvar sqr = sql_response_code  // 0=success, 1=no_data, 2=other warning, -1=error
+//	variable t = datetime-max_age
+//	string timestamp = SQL_format_time(t)
+//	
+//	
+//	string command = ""
+//	sprintf command, "SELECT DISTINCT ON (ch_idx) ch_idx, time, t FROM qdot.lksh370.channel_data WHERE time > TIMESTAMP %s ORDER BY ch_idx, time DESC;", timestamp
+//	string wavenames = "sql_ls370_channels,sql_ls370_timestamp,sql_ls370_temperature"
+//	requestSQLData(command,wavenames=wavenames, verbose=1) // TODO: change verbose to 0
+//	if (sqr == 1) // no rows of data
+//		return -1
+//	else
+//		wave temp_wave = sql_ls370_temperature
+//		wave ch_wave = sql_ls370_channels
+//		wave t_wave = sql_ls370_timestamp
+//		print ch_wave
+//		print t
+//		print temp_wave
+//		return temp_wave(ch_id)  // return temp of channel // TODO: access this by label instead of ch_ID
+//	endif
+//end
+
+
+
+
+
+
 
 //function getLS370heaterpowerDB(instrID,heater) // Units: mW
 //	// returns the power of the selected heater.
