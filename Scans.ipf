@@ -575,32 +575,52 @@ end
 function AAMacros()
 end
 
-function Scan3DTemplate()
+function ScanMultiVarTemplate()
 	//Template loop for varying up to three parameters around any scan
 	// nvar fastdac, bd6
-	string buffer
-	variable i, j, k
+	
+	/////////// Scan Params  ///////////
+	// e.g. start, fin, numpts etc... Just easier to put them all here than in one long scan function
+	
+	
+	////////////////////////////////////
+	
+	
+	//////////// Scan Variables to change between scans ////////////////
 	make/o/free Var1 = {0}
 	make/o/free Var2 = {0}
 	make/o/free Var3 = {0}
-
-	i=0; j=0; k=0
-	do // Loop to change k var3
+	////////////////////////////////////////////////////////////////////
+	
+	
+	variable numi = numpnts(Var1), numj = numpnts(Var2), numk = numpnts(Var3)
+	variable ifin = numi, jfin = numj, kfin = numk
+	variable istart, jstart, kstart
+	
+	
+	/////// Change range of outer scan variables (useful when retaking a few measurements) ////////
+	/// Starts
+	istart=0; jstart=0; kstart=0
+	
+	/// Fins
+	ifin=ifin; jfin=jfin; kfin=kfin
+	////////////////////////////////////////////////////////////////////////////////////////////////
+	
+	
+	string buffer
+	variable i, j, k
+	i = istart; j=jstart; k=kstart
+	for(k=kstart;k<kfin;k++)  // Loop for change k var 3
 		//RAMP VAR 3
-		do	// Loop for change j var2
+		for(j=jstart;j<jfin;j++)	// Loop for change j var2
 			//RAMP VAR 2
-			do // Loop for changing i var1 and running scan
+			for(i=istart;i<ifin;i++) // Loop for changing i var1 and running scan
 				// RAMP VAR 1
 				sprintf buffer, "Starting scan at Var1 = %.1fmV, Var2 = %.1fmV, Var3 = %.1fmV\r", Var1[i], Var2[j], Var3[k]
 				//SCAN HERE
-				i+=1
-			while (i < numpnts(Var1))
-			i=0
-			j+=1
-		while (j < numpnts(Var2))
-		j=0
-		k+=1
-	while (k< numpnts(Var3))
+			endfor
+		endfor
+	endfor
 	print "Finished all scans"
 end
 
@@ -1300,7 +1320,7 @@ end
 
 
 function/s SF_get_channels(channels, [fastdac])
-	// Returns channels as numbers whether numbers or labels passed
+	// Returns channels as numbers string whether numbers or labels passed
 	string channels
 	variable fastdac
 	
