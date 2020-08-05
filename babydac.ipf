@@ -61,7 +61,7 @@ function InitBabyDACs(instrID, boards, ranges, [custom])
 
 	variable instrID, custom
 	string boards, ranges
-//	string /g bd_controller_addr = getResourceAddress(instrID) // for use by window functions
+	string /g bd_controller_addr = getResourceAddress(instrID) // for use by window functions
 	variable /g bd_ramprate = 200 // default ramprate
 
 	if(paramisdefault(custom))

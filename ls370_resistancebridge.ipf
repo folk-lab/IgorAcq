@@ -3,7 +3,7 @@
 
 // Driver for controling a Dilution fridge, via a LakeShore 370 controller and an intermidiate server
 // running on a RPi.
-// Call SetSystem() before anything else. Current supported systems are: BFsmall, IGH
+// Call SetSystem() before anything else. Current supported systems are: BFsmall, BFbig
 // Communicates with server over http.
 // Procedure written by Christian Olsen 2018-03-xx
 // Modified to new API by Tim Child 2020-06-xx
@@ -1000,41 +1000,168 @@ end
 ///// Status /////
 //////////////////
 
-function/s getLS370status(instrID, [max_age_s])
-	// returns JSON string with current status
+function/s getLS370Status(instrID)
+	// instrID is passed to getLS370temp if needed
 	string instrID
-	variable max_age_s
-	if(paramisdefault(max_age_s))
-		max_age_s=300
+
+	svar ls_system
+	string channelLabel="", stillLabel="", ch_idx=""
+	if(cmpstr(ls_system,"bfsmall") == 0)
+		channelLabel = "ld_50K,ld_4K,ld_magnet,ld_still,ld_mc"
+		stillLabel = "ld_still_heater"
+		ch_idx = "1,2,4,5,6"
+	elseif(cmpstr(ls_system,"bfbig") == 0)
+		channelLabel = "xld_50K,xld_4K,xld_magnet,xld_still,xld_mc"
+		stillLabel = "xld_still_heater"
+		ch_idx = "1,2,3,5,6"
 	else
-		//TODO: Implement max_age_s from SQL query
-		print "max_age_s doesn't work and needs to be implemented differently (4th Feb 2020)"
+		print "[ERROR] \"getLSStatus\": pass the system id as instrID: \"ld\" or \"xld\"."
 	endif
 
-	svar ls_system, ighgaugelookup
-	string  buffer="", gauge=""
+	// Load database schemas from SQLConfig.txt
+	string jstr = readtxtfile("SQLConfig.txt","setup")
+	if(cmpstr(jstr,"")==0)
+		abort "SQLConfig.txt not found!"
+	endif
+
+	string database = getJSONvalue(jstr,"database_ls")
+	string temp_schema = getJSONvalue(jstr,"temperature_schema")
+	string mc_heater_schema = getJSONvalue(jstr,"mc_heater_schema")
+	string still_heater_schema = getJSONvalue(jstr,"still_heater_schema")
+
+	// Load "LakeshoreConfig.txt" in setup folder.
+	svar ls_label
+	string file_name = "LakeshoreConfig.txt"
+	jstr = readtxtfile(file_name,"setup")
+	if(cmpstr(jstr,"")==0)
+		abort file_name + " not found!"
+	endif
+
+	//// Temperatures ////
+
+	// Get temperature data from SQL database
+	string JSONkeys = "50K Plate K,4K Plate K,Magnet K,Still K,MC K"
+	string LSkeys = "50K,4K,magnet,still,mc"
+	string searchStr="", statement="", timestamp="", temp="", tempBuffer="", channel_label
 	variable i=0
+	for(i=0;i<itemsinlist(channelLabel,",");i+=1)
+		sprintf searchStr, "loggingschedules:default:channels:ch%s:max", stringfromlist(i,ch_idx,",")
+		timestamp = sc_SQLtimestamp(str2num(getJSONvalue(jstr,searchStr)))
+		sprintf statement, "SELECT temperature_k FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, temp_schema, stringfromlist(i,channelLabel,","), timestamp
+		temp = requestSQLValue(statement,"ls")
 
-	buffer = addJSONkeyval(buffer,"MC K",num2str(getLS370temp(instrID, "mc", max_age_s=max_age_s)))
-	buffer = addJSONkeyval(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age_s=max_age_s)))
-	buffer = addJSONkeyval(buffer,"4K Plate K",num2str(getLS370temp(instrID, "4K", max_age_s=max_age_s)))
-	buffer = addJSONkeyval(buffer,"Magnet K",num2str(getLS370temp(instrID, "magnet", max_age_s=max_age_s)))
-	buffer = addJSONkeyval(buffer,"50K Plate K",num2str(getLS370temp(instrID, "50K", max_age_s=max_age_s)))
-	
-//	buffer = addJSONkeyval(buffer,"Still K","4")
-//	buffer = addJSONkeyval(buffer,"4K Plate K","4")
-//	buffer = addJSONkeyval(buffer,"Magnet K","4")
-//	buffer = addJSONkeyval(buffer,"50K Plate K","50")
-	
-	// TODO: add other variables like (temp setpoint, heater power etc)
+		if(cmpstr(temp,"") == 0)
+			temp = num2str(getLS370temp(instrID,stringfromlist(i,LSkeys,",")))
+		endif
 
-	strswitch(ls_system)
-		case "bfsmall":
-			return addJSONkeyval("","BF Small",buffer)
-		case "bfbig":
-			return addJSONkeyval("","BF big",buffer)
-	endswitch
+		// add to meta data
+		tempBuffer = addJSONkeyval(tempBuffer, stringfromlist(i,JSONkeys,","), temp)
+	endfor
+
+	// end temperature part
+	tempBuffer = addJSONkeyval("","Temperature",tempBuffer)
+
+	//// Heaters ////
+
+	// MC heater
+	string heatBuffer=""
+	timestamp = sc_SQLtimestamp(300)
+	sprintf statement, "SELECT power_milliw FROM %s.%s WHERE time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, mc_heater_schema, timestamp
+	heatBuffer = addJSONkeyval(heatBuffer,"MC Heater mW",requestSQLValue(statement,"ls"))
+
+	// Still heater
+	sprintf statement, "SELECT power_milliw FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, still_heater_schema, stillLabel, timestamp
+	heatBuffer = addJSONkeyval(heatBuffer,"Still Heater mW",requestSQLValue(statement,"ls"))
+
+	string buffer = addJSONkeyval(tempBuffer,"Heaters",heatBuffer)
+
+	return addJSONkeyval("","Lakeshore",buffer)
 end
+
+function/s getBFStatus(instrID)
+	// instrID is not used here, just pass any string. It's kept for consistency.
+	string instrID
+
+	svar ls_system
+	string pressure_schema="", flow_schema=""
+	if(cmpstr(ls_system,"bfsmall") == 0)
+		pressure_schema = "ld.pressure"
+		flow_schema = "ld.flow"
+	elseif(cmpstr(instrID,"bfbig") == 0)
+		pressure_schema = "xld.pressure"
+		flow_schema = "xld.flow"
+	else
+		print "[ERROR] \"getLSStatus\": global string \"ls_system\" likely not set correctly!"
+	endif
+
+	// Load database schemas from SQLConfig.txt
+	string jstr = readtxtfile("SQLConfig.txt","setup")
+	if(cmpstr(jstr,"")==0)
+		abort "SQLConfig.txt not found!"
+	endif
+
+	//// Pressure ////
+
+	string database = getJSONvalue(jstr,"database_bf")
+	string channelLabel = "CH1,CH2,CH3,CH4,CH5,CH6"
+
+	variable i=0
+	string pres="", presBuffer="", timestamp="", statement=""
+	for(i=0;i<itemsinlist(channelLabel,",");i+=1)
+		timestamp = sc_SQLtimestamp(300)
+		sprintf statement, "SELECT pressure_mbar FROM %s.%s WHERE channel_id='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, pressure_schema, stringfromlist(i,channelLabel,","), timestamp
+		pres = requestSQLValue(statement,"bf")
+
+		presBuffer = addJSONkeyval(presBuffer, stringfromlist(i,channelLabel,",")+" mbar", pres)
+	endfor
+
+	presBuffer = addJSONkeyval("","Pressure",presBuffer)
+
+	//// flow ////
+	string flowBuffer=""
+	sprintf statement, "SELECT flow_mmol_per_s FROM %s.%s WHERE time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, flow_schema, timestamp
+	flowBuffer = addJSONkeyval(flowBuffer,"Flow mmol/s",requestSQLValue(statement,"bf"))
+
+	string buffer = addJSONkeyval(presBuffer,"Mixture Flow",flowBuffer)
+
+	return addJSONkeyval("","BlueFors",buffer)
+end
+
+//function/s getLS370status(instrID, [max_age_s])
+//	// returns JSON string with current status
+//	string instrID
+//	variable max_age_s
+//	if(paramisdefault(max_age_s))
+//		max_age_s=300
+//	else
+//		//TODO: Implement max_age_s from SQL query
+//		print "max_age_s doesn't work and needs to be implemented differently (4th Feb 2020)"
+//	endif
+//
+//	svar ls_system, ighgaugelookup
+//	string  buffer="", gauge=""
+//	variable i=0
+//
+//	buffer = addJSONkeyval(buffer,"MC K",num2str(getLS370temp(instrID, "mc", max_age_s=max_age_s)))
+//	buffer = addJSONkeyval(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age_s=max_age_s)))
+//	buffer = addJSONkeyval(buffer,"4K Plate K",num2str(getLS370temp(instrID, "4K", max_age_s=max_age_s)))
+//	buffer = addJSONkeyval(buffer,"Magnet K",num2str(getLS370temp(instrID, "magnet", max_age_s=max_age_s)))
+//	buffer = addJSONkeyval(buffer,"50K Plate K",num2str(getLS370temp(instrID, "50K", max_age_s=max_age_s)))
+//	
+////	buffer = addJSONkeyval(buffer,"Still K","4")
+////	buffer = addJSONkeyval(buffer,"4K Plate K","4")
+////	buffer = addJSONkeyval(buffer,"Magnet K","4")
+////	buffer = addJSONkeyval(buffer,"50K Plate K","50")
+//	
+//	// TODO: add other variables like (temp setpoint, heater power etc)
+//
+//	strswitch(ls_system)
+//		case "bfsmall":
+//			return addJSONkeyval("","BF Small",buffer)
+//		case "bfbig":
+//			return addJSONkeyval("","BF big",buffer)
+//	endswitch
+//end
 
 
 

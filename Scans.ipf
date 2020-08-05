@@ -23,6 +23,25 @@ function ReadVsTime(delay, [comments]) // Units: s
 	SaveWaves(msg=comments)
 end
 
+function ReadVsTimeUntil(delay,readtime, [comments])
+	variable delay, readtime
+	string comments
+	
+	if (paramisdefault(comments))
+		comments=""
+	endif
+
+	InitializeWaves(0, 1, 1, x_label="time (s)")
+	nvar sc_scanstarttime // Global variable set when InitializeWaves is called
+	variable i=0
+	do
+		sc_sleep(delay)
+		RecordValues(i, 0,readvstime=1)
+		i+=1
+	while(datetime-sc_scanstarttime < readtime)
+	SaveWaves(msg=comments)
+end
+
 
 function ScanBabyDAC(instrID, start, fin, channels, numpts, delay, ramprate, [comments, nosave]) //Units: mV
 	// sweep one or more babyDAC channels
@@ -31,7 +50,7 @@ function ScanBabyDAC(instrID, start, fin, channels, numpts, delay, ramprate, [co
 	string channels, comments
 
    // Reconnect instruments
-   sc_openinstrconnections(0)
+   //sc_openinstrconnections(0)
 
    // Set defaults
    comments = selectstring(paramisdefault(comments), comments, "")
@@ -79,7 +98,7 @@ function ScanBabyDAC2D(instrID, startx, finx, channelsx, numptsx, delayx, rampra
 	string channelsx, channelsy, comments
 	
 	// Reconnect instruments
-	sc_openinstrconnections(0)
+	//sc_openinstrconnections(0)
 	
 	// Set defaults
 	comments = selectstring(paramisdefault(comments), comments, "")
@@ -143,7 +162,7 @@ function ScanBabyDACRepeat(instrID, startx, finx, channelsx, numptsx, delayx, ra
 	string channelsx, comments
 
    // Reconnect instruments
-	sc_openinstrconnections(0)
+	//sc_openinstrconnections(0)
 
    // Set defaults
 	comments = selectstring(paramisdefault(comments), comments, "")
@@ -157,7 +176,14 @@ function ScanBabyDACRepeat(instrID, startx, finx, channelsx, numptsx, delayx, ra
 	SFbd_pre_checks(SV)  
 	
 	// Ramp to start without checks because checked above
-	SFbd_ramp_start(SV, ignore_lims=1)
+	// Ramp inner loop to finx if alternate=1
+	if(alternate == 1)
+		SV.startx = finx
+		SFbd_ramp_start(SV, ignore_lims=1)
+		SV.startx = startx
+	else
+		SFbd_ramp_start(SV, ignore_lims=1)
+	endif
 	
 	// Let gates settle 
 	sc_sleep(SV.delayy)
@@ -262,66 +288,66 @@ function ScanBabyDACUntil(instrID, start, fin, channels, numpts, delay, ramprate
 end
 
 
-function ScanBabyDAC_SRS(babydacID, srsID, startx, finx, channelsx, numptsx, delayx, rampratex, starty, finy, numptsy, delayy, [comments, nosave]) //Units: mV, mV
-	// Example of how to make new babyDAC scan stepping a different instrument (here SRS)
-	variable babydacID, srsID, startx, finx, numptsx, delayx, rampratex, starty, finy, numptsy, delayy, nosave
-	string channelsx, comments
-	
-   // Reconnect instruments
-   sc_openinstrconnections(0)
-   
-   // Set defaults
-   comments = selectstring(paramisdefault(comments), comments, "")
-   
-   // Set sc_ScanVars struct
-   struct BD_ScanVars SV
-   SF_init_BDscanVars(SV, BabydacID, startx=startx, finx=finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
-                                numptsy=numptsy, delayy=delayy)
-   
-   // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
-   SFbd_pre_checks(SV)  
-   
-   // Ramp to start without checks because checked above
-   SFbd_ramp_start(SV, ignore_lims=1)
-   SetSRSAmplitude(srsID, starty)
-   
-   // Let gates settle 
-   sc_sleep(SV.delayy)
-   
-   // Get labels for waves
-   string x_label, y_label
-   x_label = GetLabel(SV.channelsx)
-   sprintf y_label, "SRS%d (mV)", getAddressGPIB(srsID)
-	
-	// initialize waves
-	InitializeWaves(SV.startx, SV.finx, SV.numptsx, starty=starty, finy=finy, numptsy=SV.numptsy, x_label=x_label, y_label=y_label)
-
-	// main loop
-   variable i=0, j=0, setpointx, setpointy
-   do
-		setpointx = SV.startx
-		setpointy = starty + (i*(finy-starty)/(SV.numptsy-1))
-		RampMultipleBD(SV.instrID, SV.channelsx, setpointx, ramprate=SV.rampratex, ignore_lims=1)
-		SetSRSAmplitude(srsID,setpointy)
-		sc_sleep(SV.delayy)
-		j=0
-		do
-			setpointx = SV.startx + (j*(SV.finx-SV.startx)/(SV.numptsx-1))
-			RampMultipleBD(SV.instrID, SV.channelsx, setpointx, ramprate=SV.rampratex, ignore_lims=1)
-			sc_sleep(SV.delayx)
-			RecordValues(i, j)
-			j+=1
-		while (j<SV.numptsx)
-		i+=1
-	while (i<SV.numptsy)
-   
-   // Save by default
-	if (nosave == 0)
-		 SaveWaves(msg=comments)
-	else
-		 dowindow /k SweepControl
-	endif
-end
+//function ScanBabyDAC_SRS(babydacID, srsID, startx, finx, channelsx, numptsx, delayx, rampratex, starty, finy, numptsy, delayy, [comments, nosave]) //Units: mV, mV
+//	// Example of how to make new babyDAC scan stepping a different instrument (here SRS)
+//	variable babydacID, srsID, startx, finx, numptsx, delayx, rampratex, starty, finy, numptsy, delayy, nosave
+//	string channelsx, comments
+//	
+//   // Reconnect instruments
+//   sc_openinstrconnections(0)
+//   
+//   // Set defaults
+//   comments = selectstring(paramisdefault(comments), comments, "")
+//   
+//   // Set sc_ScanVars struct
+//   struct BD_ScanVars SV
+//   SF_init_BDscanVars(SV, BabydacID, startx=startx, finx=finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
+//                                numptsy=numptsy, delayy=delayy)
+//   
+//   // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
+//   SFbd_pre_checks(SV)  
+//   
+//   // Ramp to start without checks because checked above
+//   SFbd_ramp_start(SV, ignore_lims=1)
+//   SetSRSAmplitude(srsID, starty)
+//   
+//   // Let gates settle 
+//   sc_sleep(SV.delayy)
+//   
+//   // Get labels for waves
+//   string x_label, y_label
+//   x_label = GetLabel(SV.channelsx)
+//   sprintf y_label, "SRS%d (mV)", getAddressGPIB(srsID)
+//	
+//	// initialize waves
+//	InitializeWaves(SV.startx, SV.finx, SV.numptsx, starty=starty, finy=finy, numptsy=SV.numptsy, x_label=x_label, y_label=y_label)
+//
+//	// main loop
+//   variable i=0, j=0, setpointx, setpointy
+//   do
+//		setpointx = SV.startx
+//		setpointy = starty + (i*(finy-starty)/(SV.numptsy-1))
+//		RampMultipleBD(SV.instrID, SV.channelsx, setpointx, ramprate=SV.rampratex, ignore_lims=1)
+//		SetSRSAmplitude(srsID,setpointy)
+//		sc_sleep(SV.delayy)
+//		j=0
+//		do
+//			setpointx = SV.startx + (j*(SV.finx-SV.startx)/(SV.numptsx-1))
+//			RampMultipleBD(SV.instrID, SV.channelsx, setpointx, ramprate=SV.rampratex, ignore_lims=1)
+//			sc_sleep(SV.delayx)
+//			RecordValues(i, j)
+//			j+=1
+//		while (j<SV.numptsx)
+//		i+=1
+//	while (i<SV.numptsy)
+//   
+//   // Save by default
+//	if (nosave == 0)
+//		 SaveWaves(msg=comments)
+//	else
+//		 dowindow /k SweepControl
+//	endif
+//end
 
 function ScanFastDAC(instrID, start, fin, channels, [numpts, sweeprate, ramprate, delay, y_label, comments, RCcutoff, numAverage, notch, use_AWG, nosave]) //Units: mV
 	// sweep one or more FastDac channels from start to fin using either numpnts or sweeprate /mV/s
@@ -625,35 +651,35 @@ function ScanMultiVarTemplate()
 end
 
 
-function StepTempScanSomething()
-	// nvar bd6, srs1
-	svar ls370
-
-	make/o targettemps =  {300, 275, 250, 225, 200, 175, 150, 125, 100, 75, 50, 40, 30, 20}
-	make/o heaterranges = {10, 3.1, 3.1, 3.1, 3.1, 3.1, 3.1, 3.1, 3.1, 3.1, 1, 1, 1, 1}
-	setLS370exclusivereader(ls370,"bfsmall_mc")
-
-	variable i=0
-	do
-		setLS370Temp(ls370,targettemps[i],maxcurrent = heaterranges[i])
-		sc_sleep(2.0)
-		WaitTillTempStable(ls370, targettemps[i], 5, 20, 0.10)
-		sc_sleep(60.0)
-		print "MEASURE AT: "+num2str(targettemps[i])+"mK"
-
-		//SCAN HERE
-
-		i+=1
-	while ( i<numpnts(targettemps) )
-
-	// kill temperature control
-//	turnoffLS370MCheater(ls370)
-	resetLS370exclusivereader(ls370)
-	sc_sleep(60.0*30)
-
-	// 	SCAN HERE for base temp
-end
-
+//function StepTempScanSomething()
+//	// nvar bd6, srs1
+//	svar ls370
+//
+//	make/o targettemps =  {300, 275, 250, 225, 200, 175, 150, 125, 100, 75, 50, 40, 30, 20}
+//	make/o heaterranges = {10, 3.1, 3.1, 3.1, 3.1, 3.1, 3.1, 3.1, 3.1, 3.1, 1, 1, 1, 1}
+//	setLS370exclusivereader(ls370,"bfsmall_mc")
+//
+//	variable i=0
+//	do
+//		setLS370Temp(ls370,targettemps[i],maxcurrent = heaterranges[i])
+//		sc_sleep(2.0)
+//		WaitTillTempStable(ls370, targettemps[i], 5, 20, 0.10)
+//		sc_sleep(60.0)
+//		print "MEASURE AT: "+num2str(targettemps[i])+"mK"
+//
+//		//SCAN HERE
+//
+//		i+=1
+//	while ( i<numpnts(targettemps) )
+//
+//	// kill temperature control
+////	turnoffLS370MCheater(ls370)
+//	resetLS370exclusivereader(ls370)
+//	sc_sleep(60.0*30)
+//
+//	// 	SCAN HERE for base temp
+//end
+//
 
 
 
