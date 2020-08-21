@@ -1395,6 +1395,7 @@ function get_fastdacs_from_hdf(datnum, [fastdac_num])
 			
 			load_fdacvalstr[ch][1] = num2str(JSON_getvariable(fd_id, key))
 			SplitString/E="{(.*)}" key, label_name  //Looks for label inside {} part of e.g. BD{label}
+			label_name = replaceString("~1", label_name, "/")  // Somehow igor reads '/' as '~1' don't know why...
 			load_fdacvalstr[ch][3] = label_name
 		endif
 	endfor

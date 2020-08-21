@@ -981,9 +981,9 @@ function get_babydacs_from_hdf(datnum)
 		if (strsearch(key, "DAC", 0) != -1)  // Check it is actually a DAC key and not something like com_port
 			SplitString/E="DAC(\d*){" key, str_ch //Gets DAC# so that I store values in correct places
 			ch = str2num(str_ch)
-
 			load_dacvalstr[ch][1] = num2str(JSON_getvariable(bd_id, key))
 			SplitString/E="{(.*)}" key, label_name  //Looks for label inside {} part of e.g. BD{label}
+			label_name = replaceString("~1", label_name, "/")  // Somehow igor reads '/' as '~1' don't know why...
 			load_dacvalstr[ch][3] = label_name
 		endif
 	endfor
