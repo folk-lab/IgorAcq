@@ -1024,7 +1024,7 @@ function/s getLS370Status(instrID)
 		abort "SQLConfig.txt not found!"
 	endif
 
-	string database = getJSONvalue(jstr,"database_ls")
+	string database = getJSONvalue(jstr,"database")
 	string temp_schema = getJSONvalue(jstr,"temperature_schema")
 	string mc_heater_schema = getJSONvalue(jstr,"mc_heater_schema")
 	string still_heater_schema = getJSONvalue(jstr,"still_heater_schema")
@@ -1048,7 +1048,7 @@ function/s getLS370Status(instrID)
 		sprintf searchStr, "loggingschedules:default:channels:ch%s:max", stringfromlist(i,ch_idx,",")
 		timestamp = sc_SQLtimestamp(str2num(getJSONvalue(jstr,searchStr)))
 		sprintf statement, "SELECT temperature_k FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, temp_schema, stringfromlist(i,channelLabel,","), timestamp
-		temp = requestSQLValue(statement,"ls")
+		temp = requestSQLValue(statement)
 
 		if(cmpstr(temp,"") == 0)
 			temp = num2str(getLS370temp(instrID,stringfromlist(i,LSkeys,",")))
@@ -1067,11 +1067,11 @@ function/s getLS370Status(instrID)
 	string heatBuffer=""
 	timestamp = sc_SQLtimestamp(300)
 	sprintf statement, "SELECT power_milliw FROM %s.%s WHERE time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, mc_heater_schema, timestamp
-	heatBuffer = addJSONkeyval(heatBuffer,"MC Heater mW",requestSQLValue(statement,"ls"))
+	heatBuffer = addJSONkeyval(heatBuffer,"MC Heater mW",requestSQLValue(statement))
 
 	// Still heater
 	sprintf statement, "SELECT power_milliw FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, still_heater_schema, stillLabel, timestamp
-	heatBuffer = addJSONkeyval(heatBuffer,"Still Heater mW",requestSQLValue(statement,"ls"))
+	heatBuffer = addJSONkeyval(heatBuffer,"Still Heater mW",requestSQLValue(statement))
 
 	string buffer = addJSONkeyval(tempBuffer,"Heaters",heatBuffer)
 
@@ -1083,16 +1083,6 @@ function/s getBFStatus(instrID)
 	string instrID
 
 	svar ls_system
-	string pressure_schema="", flow_schema=""
-	if(cmpstr(ls_system,"bfsmall") == 0)
-		pressure_schema = "ld.pressure"
-		flow_schema = "ld.flow"
-	elseif(cmpstr(instrID,"bfbig") == 0)
-		pressure_schema = "xld.pressure"
-		flow_schema = "xld.flow"
-	else
-		print "[ERROR] \"getLSStatus\": global string \"ls_system\" likely not set correctly!"
-	endif
 
 	// Load database schemas from SQLConfig.txt
 	string jstr = readtxtfile("SQLConfig.txt","setup")
@@ -1102,15 +1092,16 @@ function/s getBFStatus(instrID)
 
 	//// Pressure ////
 
-	string database = getJSONvalue(jstr,"database_bf")
-	string channelLabel = "CH1,CH2,CH3,CH4,CH5,CH6"
+	string database = getJSONvalue(jstr,"database")
+	string pressure_schema = getJSONvalue(jstr,"pressure_schema")
+ 	string channelLabel = "CH1,CH2,CH3,CH4,CH5,CH6"
 
 	variable i=0
 	string pres="", presBuffer="", timestamp="", statement=""
 	for(i=0;i<itemsinlist(channelLabel,",");i+=1)
 		timestamp = sc_SQLtimestamp(300)
 		sprintf statement, "SELECT pressure_mbar FROM %s.%s WHERE channel_id='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, pressure_schema, stringfromlist(i,channelLabel,","), timestamp
-		pres = requestSQLValue(statement,"bf")
+		pres = requestSQLValue(statement)
 
 		presBuffer = addJSONkeyval(presBuffer, stringfromlist(i,channelLabel,",")+" mbar", pres)
 	endfor
@@ -1119,8 +1110,9 @@ function/s getBFStatus(instrID)
 
 	//// flow ////
 	string flowBuffer=""
-	sprintf statement, "SELECT flow_mmol_per_s FROM %s.%s WHERE time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, flow_schema, timestamp
-	flowBuffer = addJSONkeyval(flowBuffer,"Flow mmol/s",requestSQLValue(statement,"bf"))
+	string flow_schema = getJSONvalue(jstr,"flow_schema")
+ 	sprintf statement, "SELECT flow_mmol_per_s FROM %s.%s WHERE time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, flow_schema, timestamp
+	flowBuffer = addJSONkeyval(flowBuffer,"Flow mmol/s",requestSQLValue(statement))
 
 	string buffer = addJSONkeyval(presBuffer,"Mixture Flow",flowBuffer)
 

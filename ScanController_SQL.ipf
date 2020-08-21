@@ -195,7 +195,7 @@
 //// SQL User functions ////
 ////////////////////////////
 
-function requestSQLData(statement,database,[wavenames, verbose])
+function requestSQLData(statement,[wavenames, verbose])
 	// Returns data in waves. Each column in a seperate wave.
 	// wavenames must be a comma seperated string with wavenames
 	// for the data. If wavenames are not passed or number of waves doesn't match
@@ -203,7 +203,7 @@ function requestSQLData(statement,database,[wavenames, verbose])
 	// the data.
 	// Data types supported: CHAR, REAL, TIMESTAMP, INTEGER
 
-	string statement, database, wavenames
+	string statement, wavenames
 	variable verbose
 
 	if(paramisdefault(wavenames))
@@ -222,7 +222,7 @@ function requestSQLData(statement,database,[wavenames, verbose])
 
 	// open connection to database
 	struct sqlRefs s
-	sc_openSQLConnection(s,database)
+	sc_openSQLConnection(s)
 
 	// fetch data from datebase
 	sc_fetchSQLData(s,statement,wavenames, verbose=verbose)
@@ -231,14 +231,14 @@ function requestSQLData(statement,database,[wavenames, verbose])
 	sc_closeSQLConnection(s)
 end
 
-function/s requestSQLValue(statement,database,[key])
+function/s requestSQLValue(statement,[key])
 	// Returns a single value regardless of how many values the SQL statement returns.
 	// Data types supported: CHAR, REAL, TIMESTAMP, INTEGER
 	// The following statement returns last recorded 4K plate temperature:
 	// "SELECT t FROM qdot.lksh370.channel_data WHERE ch_idx=2 ORDER BY time DESC LIMIT 1;"
 	// Passing a key will return a key:value string
 
-	string statement, database, key
+	string statement, key
 
 	if(paramisdefault(key))
 		key=""
@@ -256,7 +256,7 @@ function/s requestSQLValue(statement,database,[key])
 
 	// open connection to database
 	struct sqlRefs s
-	sc_openSQLConnection(s,database)
+	sc_openSQLConnection(s)
 
 	// fetch data from database
 	string result=""
@@ -283,13 +283,12 @@ end
 //// SQL Utilities ////
 //////////////////////
 
-function sc_openSQLConnection(s,database)
+function sc_openSQLConnection(s)
 	struct sqlRefs &s
-	string database
 
 	// get database connection parameters
 	svar sqldriver
-	string connParams = sc_readSQLConnectionParameters(database)
+	string connParams = sc_readSQLConnectionParameters()
 
 	// allocate SQL handles
 	variable envRefNum=0, connRefNum=0, error=0
@@ -639,19 +638,9 @@ function sc_closeSQLConnection(s)
 	SQLFreeHandle(SQL_HANDLE_ENV, s.envRefNum)
 end
 
-function/s sc_readSQLConnectionParameters(database)
+function/s sc_readSQLConnectionParameters()
 	// pass "ls" for lksh370 database and "bf" for bluefors database
 	// reads SQL setup parameters from SQLParameters.txt file on "config" path.
-	string database
-
-	if(cmpstr(database,"ls") == 0)
-		database = "database_ls"
-	elseif(cmpstr(database,"bf") == 0)
-		database = "database_bf"
-	else
-		print "[ERROR] \"sc_readSQLConnectionParameters\": invalid database"
-		abort
-	endif
 
 	string jstr = readtxtfile("SQLConfig.txt","setup")
 	if(cmpstr(jstr,"")==0)
@@ -660,7 +649,7 @@ function/s sc_readSQLConnectionParameters(database)
 	string connParams = ""
 	connParams = addlistitem("server:"+getJSONvalue(jstr,"server"),connParams,",",inf)
 	connParams = addlistitem("port:"+getJSONvalue(jstr,"port"),connParams,",",inf)
-	connParams = addlistitem("database:"+getJSONvalue(jstr,database),connParams,",",inf)
+	connParams = addlistitem("database:"+getJSONvalue(jstr,"database"),connParams,",",inf)
 	connParams = addlistitem("uid:"+getJSONvalue(jstr,"uid"),connParams,",",inf)
 	connParams = addlistitem("pwd:"+getJSONvalue(jstr,"pwd"),connParams,",",inf)
 
@@ -806,7 +795,7 @@ end
 
 function/s sc_SQLDatabaseTime()
 	string statement = "SELECT NOW();"
-	string result = requestSQLValue(statement,"ls")
+	string result = requestSQLValue(statement)
 
 	return result
 end
@@ -832,14 +821,13 @@ function/s sc_SQLtimestamp(secs)
 	return newTimestamp
 end
 
-function sc_SQLinformation_schema(database)
-	string database
+function sc_SQLinformation_schema()
 	// retrun an overveiw of the database
 	// add WHERE table_name = 'table_name' to get info on specific table
-	string statement = "SELECT * FROM information_schema.columns WHERE table_name = 'pressure'"
+	string statement = "SELECT * FROM information_schema.columns WHERE table_name = 'channel_data'"
 
 	svar sqldriver
-	string connParams = sc_readSQLConnectionParameters(database)
+	string connParams = sc_readSQLConnectionParameters()
 	string connStr = ""
 	sprintf connStr, "DRIVER=%s;SERVER=%s;PORT=%s;DATABASE=%s;UID=%s;PWD=%s;CHARSET=UTF8;", sqldriver, stringbykey("server",connParams,":",","), stringbykey("port",connParams,":",","), stringbykey("database",connParams,":",","), stringbykey("uid",connParams,":",","), stringbykey("pwd",connParams,":",",")
 	SQLHighLevelOp/CSTR={connStr,SQL_DRIVER_NOPROMPT}/o/e=1 statement
@@ -853,7 +841,7 @@ function sc_fetchSQLDataTest()
 
 	svar sqldriver
 	string database = "bf"
-	string connParams = sc_readSQLConnectionParameters(database)
+	string connParams = sc_readSQLConnectionParameters()
 	string connStr = ""
 	sprintf connStr, "DRIVER=%s;SERVER=%s;PORT=%s;DATABASE=%s;UID=%s;PWD=%s;CHARSET=UTF8;", sqldriver, stringbykey("server",connParams,":",","), stringbykey("port",connParams,":",","), stringbykey("database",connParams,":",","), stringbykey("uid",connParams,":",","), stringbykey("pwd",connParams,":",",")
 
@@ -876,7 +864,7 @@ function timeSQLStatements()
 
 	string database = "ls"
 	variable starttime1 = stopmstimer(-2)
-	requestSQLData(statement1,database,wavenames=wavenames1)
+	requestSQLData(statement1,wavenames=wavenames1)
 	variable totaltime1 = (stopmstimer(-2)-starttime1)*1e-6
 
 	string wavenames2 = "channels,timestamp,temperature"
@@ -887,7 +875,7 @@ function timeSQLStatements()
 	variable starttime2 = stopmstimer(-2)
 	for(i=0;i<itemsinlist(ch,",");i+=1)
 		sprintf statement2, "SELECT ch_idx, time, t FROM qdot.lksh370.channel_data WHERE ch_idx=%s ORDER BY time DESC LIMIT 1;", stringfromlist(i,ch,",")
-		requestSQLData(statement2,database,wavenames=wavenames2)
+		requestSQLData(statement2,wavenames=wavenames2)
 	endfor
 	variable totaltime2 = (stopmstimer(-2)-starttime2)*1e-6
 
@@ -895,7 +883,7 @@ function timeSQLStatements()
 	variable starttime3 = stopmstimer(-2)
 	for(i=0;i<itemsinlist(ch,",");i+=1)
 		sprintf statement3, "SELECT t FROM qdot.lksh370.channel_data WHERE ch_idx=%s AND time > TIMESTAMP '2020-01-13 23:00:00.00' ORDER BY time DESC LIMIT 1;", stringfromlist(i,ch,",")
-		requestSQLValue(statement3,database)
+		requestSQLValue(statement3)
 	endfor
 	variable totaltime3 = (stopmstimer(-2)-starttime3)*1e-6
 
