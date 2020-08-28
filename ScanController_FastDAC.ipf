@@ -1184,9 +1184,9 @@ function update_all_fdac([option])
 				abortonvalue 1,10
 			endtry
 
-			// close temp visa connection
-			viClose(tempname)
-			viClose(viRM)
+				// close temp visa connection
+				viClose(tempname)
+				viClose(viRM)
 		endif
 		startCh =+ numDACCh
 	endfor

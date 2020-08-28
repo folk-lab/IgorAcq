@@ -1251,7 +1251,7 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 		
 		// save data to "data/spectrum/"
 		string filename = "spectrum_"+strTime()+".h5"
-		variable hdf5_id=0
+		variable/g hdf5_id = 0
 		// create empty HDF5 container
 		HDF5CreateFile/p=spectrum hdf5_id as filename
 		// save the spectrum
@@ -1262,8 +1262,9 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 				print "HDF5SaveData failed: ", wn
 				return 0
 			endif
+			wn = "timeSeriesADC"+stringfromlist(i,channels,",")
+			savesinglewave(wn)
 		endfor
-		
 		// Create metadata
 		// this just creates one big JSON string attribute for the group
 		// its... fine
