@@ -7,6 +7,7 @@
 
 function killVISA()
 	VISAControl killIO	  //Terminate all VISA sessions
+	
 end
 
 function /s getResourceAddress(instrID)
