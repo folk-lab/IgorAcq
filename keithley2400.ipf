@@ -90,6 +90,16 @@ threadsafe function getK2400voltage(instrID) // Units: mV
 	return str2num(response)*1e3
 end
 
+function getK2400VoltageOutput(instrID) 
+	variable instrID
+	string cmd, response
+	
+	cmd = ":sour:volt:lev?"
+	writeInstr(instrID,cmd)
+	response = queryInstr(instrID,"READ?",read_term="\n")
+	return str2num(response)*1e3
+end
+
 /////////////////////////
 //// Ramp functions ////
 ///////////////////////
@@ -103,7 +113,7 @@ function rampK2400Voltage(instrID,output,[ramprate]) // Units: mV, mV/s
 		ramprate = 500  // mV/s
 	endif
 
-	startpoint = getK2400voltage(instrID)
+	startpoint = getK2400voltageOutput(instrID)
 	sgn = sign(output-startpoint)
 
 	step = ramprate*sleeptime
