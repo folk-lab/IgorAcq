@@ -112,10 +112,10 @@ end
 ///////////////////////
 
 
-function fd_Record_Values(S, PL, rowNum, [AWG_list])
+function fd_Record_Values(S, PL, rowNum, [AWG_list, linestart])
    struct FD_ScanVars &S
    struct fdRV_processList &PL
-   variable rowNum
+   variable rowNum, linestart
    struct fdAWG_list &AWG_list
 	// If passed AWG_list with AWG_list.use_AWG == 1 then it will run with the Arbitrary Wave Generator on
    // Note: Only works for 1 FastDAC! Not sure what implementation will look like for multiple yet
@@ -128,6 +128,13 @@ function fd_Record_Values(S, PL, rowNum, [AWG_list])
 			print "fd_Record_Values: Using AWG"
 		endif
 	endif
+	
+	// Check if this is a linecut scan and update centers if it is
+	wave sc_linestart
+	if(!paramIsDefault(linestart))
+		sc_linestart[rowNum] = linestart
+	endif
+
 
    // Check InitWaves was run with fastdac=1
    fdRV_check_init()
@@ -144,11 +151,10 @@ function fd_Record_Values(S, PL, rowNum, [AWG_list])
 	variable totalByteReturn
 	if(sc_AWG_used)  	// Do AWG_RAMP
 	   cmd_sent = fd_start_AWG_RAMP(S, AWG_list)
-	   totalByteReturn = S.numptsx*S.numADCs*2 //AWG_list.numCycles*AWG_list.numSteps*AWG_list.waveLen  // Wrong?
 	else				// DO normal INT_RAMP
 		cmd_sent = fd_start_INT_RAMP(S)
-		totalByteReturn = S.numADCs*2*S.numptsx
 	endif
+	totalByteReturn = S.numADCs*2*S.numptsx
 	sc_sleep(0.5) 	// Trying to get 1s of data per loop, will timeout on first loop without a bit of a wait first
 	variable looptime = 0
    looptime = fdRV_record_buffer(S, rowNum, totalByteReturn)
@@ -159,6 +165,9 @@ function fd_Record_Values(S, PL, rowNum, [AWG_list])
 	endstr = sc_stripTermination(endstr,"\r\n")
 	if(fdacCheckResponse(endstr,cmd_sent,isString=1,expectedResponse="RAMP_FINISHED"))
 		fdRV_update_window(S, S.numADCs)
+		if(sc_AWG_used)  // Reset AWs back to zero (I don't see any reason the user would want them left at the final position of the AW)
+			rampmultiplefdac(S.instrID, AWG_list.AW_DACs, 0)
+		endif
 	endif
 
    /////////////////////////

@@ -136,8 +136,33 @@ function getFADCspeed(instrID)
 	return 1.0/(str2num(response)*1.0e-6) // return value in Hz
 end
 
-function getFADCChannel(instrID,channel) // Units: mV
+function getFADCchannel(fdid, channel, [len_avg])
+	// Instead of just grabbing one single datapoint which is susceptible to high f noise, this averages data over len_avg and returns a single value
+	// getFADCChannel calls this with default len_avg
+	variable fdid, channel, len_avg
+	
+	len_avg = paramisdefault(len_avg) ? 0.05 : len_avg
+	
+	variable numpts = ceil(getFADCspeed(fdid)*len_avg)
+	if(numpts <= 0)
+		numpts = 1
+	endif
+	
+	fd_readChunk(fdid, num2str(channel), numpts)  // Creates fd_readChunk_# wave	
+
+	wave w = $"fd_readChunk_"+num2str(channel)
+	wavestats/q w
+	wave/t fadcvalstr
+	fadcvalstr[channel][1] = num2str(v_avg)
+	return V_avg
+end
+
+
+function getFADCChannelSingle(instrID,channel) // Units: mV
 	// channel must be the channel number given by the GUI!
+	// Gets a single FADC reading only, likely to be very noisy because no filtering of high f noise
+	// Use getFADCchannelAVG for averaged value
+	
 	variable instrID, channel
 	wave/t fadcvalstr
 	svar fdackeys
@@ -1120,12 +1145,7 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 		
 		//print bytesSec, read_chunk, totalbytesreturn
 		do
-			buffer = readInstr(instrID, read_bytes=read_chunk, binary=1)
-			// If failed, abort
-			if (cmpstr(buffer, "NaN") == 0)
-				stopFDACsweep(instrID)
-				abort
-			endif
+			fdRV_read_chunk(instrID, read_chunk, buffer)
 			// add data to datawave
 			specAna_distribute_data(buffer,read_chunk,channels,bytes_read/(2*numChannels))
 			bytes_read += read_chunk
@@ -1816,19 +1836,108 @@ function/s fd_start_INT_RAMP(S)
 	return cmd
 end
 
+function fd_readChunk(fdid, adc_channels, numpts, [verbose])
+	// Reads numpnts data without ramping anywhere, does not update graphs or anything, just returns full waves in 
+	// waves named fd_readChunk_# where # is 0, 1 etc for ADC0, 1 etc
+	variable fdid, numpts, verbose
+	string adc_channels
+	
+	variable samplingFreq = getFADCspeed(fdid)
+	variable numChannels = itemsinlist(adc_channels, ",")
+	
+	string channels
+	channels = replacestring(",", adc_channels, "")
+	channels = replacestring(" ", channels, "")
+	
+	string cmd = ""
+	sprintf cmd, "SPEC_ANA,%s,%s\r", channels, num2str(numpts)
+	writeInstr(fdID,cmd)
 
-function fdAWG_make_multi_square_wave(instrID, v0, vP, vM, v0len, vPlen, vMlen, wave_num)
+	variable bytesSec = roundNum(2*samplingFreq,0)
+	variable read_chunk = roundNum(numChannels*bytesSec,0)
+	if(read_chunk < 50)
+		read_chunk = 50 - mod(50,numChannels*2) // usually 50 or 48
+	endif
+	
+	// read incoming data
+	string buffer=""
+	variable bytes_read = 0, bytes_left = 0, totalbytesreturn = numChannels*numpts*2
+	variable bufferDumpStart = stopMSTimer(-2)
+	string full_buffer=""
+	
+	if (read_chunk > totalbytesreturn)
+		read_chunk = totalbytesreturn
+	endif
+	
+	do
+		buffer = readInstr(fdid, read_bytes=read_chunk, binary=1)
+		// If failed, abort
+		if (cmpstr(buffer, "NaN") == 0)
+			stopFDACsweep(fdid)
+			print "ERROR [fd_readChunk]: Read failed"
+			abort
+		endif
+		
+		full_buffer += buffer
+		bytes_read += read_chunk
+	while(totalbytesreturn-bytes_read > read_chunk)
+	// do one last read if any data left to read
+	bytes_left = totalbytesreturn-bytes_read
+	if(bytes_left > 0)
+		buffer = readInstr(fdid,read_bytes=bytes_left,binary=1)
+		full_buffer += buffer
+	endif
+	
+	buffer = readInstr(fdid,read_term="\n")
+	buffer = sc_stripTermination(buffer,"\r\n")
+	if(!fdacCheckResponse(buffer,cmd,isString=1,expectedResponse="READ_FINISHED"))
+		print "[ERROR] \"fd_readChunk\": Error during read. Not all data recived!"
+		abort
+	endif
+	
+	variable i=0, j=0, k=0, datapoint
+	string s1, s2
+	string wn
+	for(i=0;i<numChannels;i++)
+		sprintf wn "fd_readChunk_%s", channels[i]
+		make/o/n=(numpts) $wn
+		wave w = $wn
+		k=0
+		for(j=0; j<totalbytesreturn;j+=numchannels*2)
+			s1 = full_buffer[j + (i*2)]
+			s2 = full_buffer[j + (i*2) + 1]
+			datapoint = fdacChar2Num(s1, s2)
+			w[k] = dataPoint
+			k += 1
+		endfor
+	endfor
+	
+	if(verbose)
+		print "Stationary sweep waves created with names \"fd_readChunk_#\""
+	endif
+end
+
+function fdAWG_make_multi_square_wave(instrID, v0, vP, vM, v0len, vPlen, vMlen, wave_num, [ramplen])
    // Make square waves with form v0, +vP, v0, -vM (useful for Tim's Entropy)
    // Stores copy of wave in Igor (accessible by fdAWG_get_AWG_wave(wave_num))
    // Note: Need to call, fdAWG_setup_AWG() after making new wave
    // To make simple square wave set length of unwanted setpoints to zero.
-   variable instrID, v0, vP, vM, v0len, vPlen, vMlen, wave_num  // lens in seconds
+   variable instrID, v0, vP, vM, v0len, vPlen, vMlen, wave_num
+   variable ramplen  // lens in seconds
+   variable max_setpoints = 26
+
+
+	ramplen = paramisdefault(ramplen) ? 0.003 : ramplen
+
+	if (ramplen < 0)
+		abort "ERROR[fdAWG_make_multi_square_wave]: Cannot use a negative ramplen"
+	endif
 	
-	// Open connection
-	sc_openinstrconnections(0)
+    // Open connection
+    sc_openinstrconnections(0)
 
    // put inputs into waves to make them easier to work with
-   make/o/free sps = {v0, vP, v0, vM}
+   make/o/free sps = {v0, vP, v0, vM} // CHANGE refers to output
    make/o/free lens = {v0len, vPlen, v0len, vMlen}
 
    // Sanity check on period
@@ -1841,42 +1950,74 @@ function fdAWG_make_multi_square_wave(instrID, v0, vP, vM, v0len, vPlen, vMlen, 
          abort "User aborted"
       endif
    endif
+   // Ensure that ramplen is not too long (will never reach setpoints)
+   variable i=0
+   for(i=0;i<numpnts(lens);i++)
+    if (lens[i] < ramplen)
+      msg = "Do you really want to ramp for longer than the duration of a setpoint? You will never reach the setpoint"
+      ans = ask_user(msg, type=1)
+      if (ans == 2)
+         abort "User aborted"
+      endif
+    endif
+   endfor
 
-   // make wave to store setpoints/sample_lengths
-   make/o/free/n=(0, 2) awg_sqw
 
-	// Get current measureFreq to calculate require sampleLens to achieve durations in s
+    // Get current measureFreq to calculate require sampleLens to achieve durations in s
    variable measureFreq = getFADCmeasureFreq(instrID) 
    variable numSamples = 0
 
-	// Make wave
-   variable i=0, j=0
+   // Make wave
+   variable j=0, k=0
+   variable max_ramp_per_setpoint = floor((max_setpoints - numpnts(sps))/numpnts(sps)) // CHANGE setpoint per ramp
+   variable ramp_per_setpoint = min(max_ramp_per_setpoint, floor(measureFreq * ramplen)) // CHANGE to ramp_step_size
+   variable ramp_setpoint_duration = 0
+
+   if (ramp_per_setpoint != 0)
+     ramp_setpoint_duration = ramplen / ramp_per_setpoint 
+   endif
+
+   // make wave to store setpoints/sample_lengths, correctly sized
+   make/o/free/n=((numpnts(sps)*ramp_per_setpoint + numpnts(sps)), 2) awg_sqw
+
+   //Initialize prev_setpoint to the last setpoint
+   variable prev_setpoint = sps[numpnts(sps) - 1]
+   variable ramp_step = 0
    for(i=0;i<numpnts(sps);i++)
       if(lens[i] != 0)  // Only add to wave if duration is non-zero
-         numSamples = round(lens[i]*measureFreq)  // Convert to # samples
+         // Ramps happen at the beginning of a setpoint and use the 'previous' wave setting to compute
+         // where to ramp from. Obviously this does not work for the first wave length, is that avoidable?
+         ramp_step = (sps[i] - prev_setpoint)/(ramp_per_setpoint + 1)
+         for (k = 1; k < ramp_per_setpoint+1; k++)
+          // THINK ABOUT CASE CASE RAMPLEN 0 -> ramp_setpoint_furation = 0
+          numSamples = round(ramp_setpoint_duration * measureFreq)
+          awg_sqw[j][0] = {prev_setpoint + (ramp_step * k)}
+          awg_sqw[j][1] = {numSamples}
+          j++
+         endfor 
+         numSamples = round((lens[i]-ramplen)*measureFreq)  // Convert to # samples
          if(numSamples == 0)  // Prevent adding zero length setpoint
             abort "ERROR[Set_multi_square_wave]: trying to add setpoint with zero length, duration too short for sampleFreq"
          endif
          awg_sqw[j][0] = {sps[i]}
          awg_sqw[j][1] = {numSamples}
          j++ // Increment awg_sqw position for storing next setpoint/sampleLen
+         prev_setpoint = sps[i]
       endif
    endfor
 
-	// Check there is a awg_sqw to add
+    // Check there is a awg_sqw to add
    if(numpnts(awg_sqw) == 0)
       abort "ERROR[Set_multi_square_wave]: No setpoints added to awg_sqw"
    endif
 
-	// Clear current wave and then reset with new awg_sqw
+    // Clear current wave and then reset with new awg_sqw
    fdAWG_clear_wave(instrID, wave_num)
    fdAWG_add_wave(instrID, wave_num, awg_sqw)
 
    // Make sure user sets up AWG_list again after this change using fdAWG_setup_AWG()
    fdAWG_reset_init()
 end
-
-
 
 
 

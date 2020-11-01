@@ -480,6 +480,38 @@ function/s sc_createConfig()
 	tmpstr = addJSONkeyval(tmpstr, "calc", num2bool(sc_PrintCalc))
 	configstr = addJSONkeyval(configstr, "print_to_history", tmpstr)
 
+
+	// FastDac if it exists
+	WAVE/Z fadcvalstr
+	if( WaveExists(fadcvalstr) )
+		variable i = 0
+		wave fadcattr
+		make/o/free/n=(dimsize(fadcattr, 0)) tempwave
+		
+		string fdinfo = ""
+		duplicate/o/free/r=[][0] fadcvalstr tempstrwave
+		fdinfo = addJSONkeyval(fdinfo, "ADCnums", textwave2strarray(tempstrwave))
+
+		duplicate/o/free/r=[][1] fadcvalstr tempstrwave
+		fdinfo = addJSONkeyval(fdinfo, "ADCvals", textwave2strarray(tempstrwave))
+		
+		tempwave = fadcattr[p][2]
+		for (i=0;i<numpnts(tempwave);i++)
+			tempwave[i] =	tempwave[i] == 48 ? 1 : 0
+		endfor
+
+		fdinfo = addJSONkeyval(fdinfo, "record", wave2boolarray(tempwave))
+		
+		duplicate/o/free/r=[][3] fadcvalstr tempstrwave
+		fdinfo = addJSONkeyval(fdinfo, "calc_name", textwave2strarray(tempstrwave))
+		
+		duplicate/o/free/r=[][4] fadcvalstr tempstrwave
+		fdinfo = addJSONkeyval(fdinfo, "calc_script", textwave2strarray(tempstrwave))
+
+
+		configstr = addJSONkeyval(configstr, "FastDAC", fdinfo)
+	endif
+
 	configstr = addJSONkeyval(configstr, "filenum", num2istr(filenum))
 	
 	configstr = addJSONkeyval(configstr, "cleanup", num2istr(sc_cleanup))
@@ -1122,7 +1154,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 		endif
 	endif
 
-	if(linecut == 1 && fastdac == 0) //Tim:To make linecuts work with RecordValues
+	if(linecut == 1)
 		sc_is2d = 2
 		make/O/n=(numptsy) sc_linestart = NaN 						//To store first xvalue of each line of data
 		cmd = "setscale/I x " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + "sc_linestart"; execute(cmd)
@@ -1716,7 +1748,7 @@ function RecordValues(i, j, [readvstime, fillnan])
 
 	//// Setup and run async data collection ////
 	wave sc_measAsync
-	if( (sum(sc_measAsync) > 1) && (fillnan==0) && (sc_is2d != 2)) //Tim:TODO: Make async work for Line cut
+	if( (sum(sc_measAsync) > 1) && (fillnan==0) && (sc_is2d != 2))
 		variable tgID = sc_ManageThreads(innerindex, outerindex, readvstime) // start threads, wait, collect data
 		sc_KillThreads(tgID) // Terminate threads
 	endif
@@ -2234,7 +2266,9 @@ function SaveWaves([msg,save_experiment,fastdac, wave_names])
 						wn += "_2d"
 					endif
 					filename = "dat"+filenumstr+wn
-					duplicate $wn $filename
+
+//					duplicate $wn $filename    ////////////////////////////////////////////////////////
+
 					if(sc_Printfadc)
 						print filename
 					endif
@@ -2249,7 +2283,11 @@ function SaveWaves([msg,save_experiment,fastdac, wave_names])
 						endif
 						filename = "dat"+filenumstr+fadcvalstr[ii][3]+str_2d+"_RAW"  // More easily identify which Raw wave for which Calc wave
 						savename = fadcvalstr[ii][3]+str_2d+"_RAW"
-						duplicate $wn_raw $filename
+
+
+//						duplicate $wn_raw $filename  ///////////////////////////////////////////////////
+
+
 						duplicate/O $wn_raw $savename  // To store in HDF with more easily identifiable name
 						if(sc_Printfadc)
 							print filename
@@ -2281,7 +2319,7 @@ function SaveWaves([msg,save_experiment,fastdac, wave_names])
 			wn = stringfromlist(ii, wave_names, ",")
 			saveSingleWave(wn)
 		endfor
-		
+		closeSaveFiles()
 	endif
 	
 	if(save_experiment==1 & (datetime-sc_save_time)>180.0)
@@ -2299,22 +2337,19 @@ function SaveWaves([msg,save_experiment,fastdac, wave_names])
 	endif
 
 	// add info about scan to the scan history file in /config
-	sc_saveFuncCall(getrtstackinfo(2))
+//	sc_saveFuncCall(getrtstackinfo(2))
 	
 	// delete waves old waves, so only the newest 500 scans are stored in volatile memory
 	// turn on by setting sc_cleanup = 1
-	nvar sc_cleanup
-	if(sc_cleanup == 1)
-		sc_cleanVolatileMemory()
-	endif
+//	nvar sc_cleanup
+//	if(sc_cleanup == 1)
+//		sc_cleanVolatileMemory()
+//	endif
 	
 	// increment filenum
 	if(Rawadd+Calcadd > 0 || filecount > 0  || save_type == 2)
 		filenum+=1
 	endif
-
-//	nvar hdf5_id
-//	HDF5CloseFile hdf5_id  // Good practice to close files after. Also forces data to be flushed to disk.
 end
 
 function sc_cleanVolatileMemory()
