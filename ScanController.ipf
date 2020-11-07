@@ -31,7 +31,7 @@ function/s strTime()
 	string time_str
 	time_str = secs2time(datetime, 3)
 	sprintf time_str "%s-%s-%s", time_str[0,1], time_str[3,4], time_str[6,7]
-	sprintf datetime_str "%s;%s" secs2Date(datetime, -2), time_str
+	sprintf datetime_str "%s_%s" secs2Date(datetime, -2), time_str
 	return datetime_str
 end
 

@@ -65,7 +65,7 @@ function setLS370system(system)
 			ls_system = "bfbig"
 			ls_label = "XLD"					//plate				//labels	  			//IDs
 			string/g bfchannellookup = "mc;still;magnet;4K;50K;ch6;ch5;ch4;ch2;ch1;6;5;4;2;1"  //TODO: Check with XLD API
-			string/g bfheaterlookup = "mc;still;sc_mc;2"							 		//sc_mc only used internally, still label refers to API 	//TODO: Check with XLD API
+			string/g bfheaterlookup = "mc;still;sc_mc;ao2"							 		//sc_mc only used internally, still label refers to API 	//TODO: Check with XLD API
 			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,350,1201,1800,10000}} // TODO: What does this do?
 			break
 		default:

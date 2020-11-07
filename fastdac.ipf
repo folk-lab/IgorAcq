@@ -48,7 +48,8 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 	
 	string comm = ""
 	sprintf comm, "name=FastDAC,instrID=%s,visa_address=%s" instrID, visa_address
-	string options = "baudrate=57600,databits=8,stopbits=1,parity=0,test_query=*IDN?"
+	string options = "baudrate=1750000,databits=8,stopbits=1,parity=0,test_query=*IDN?"
+	// string options = "baudrate=57600,databits=8,stopbits=1,parity=0,test_query=*IDN?" // Use this option if using USB fdac
 	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
 	
 	if(paramisdefault(master))
@@ -624,6 +625,7 @@ function loadFadcCalibration(instrID,speed)
 	endfor
 	
 	sprintf regex, "fADC%dCalibration_%d", deviceNum, speed
+	print regex
 	filelist = indexedfile(config,-1,".txt")
 	filelist = greplist(filelist,regex)
 	if(itemsinlist(filelist) == 1)
@@ -974,6 +976,7 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 	// if linear is set to 1, the spectrum will be plotted on a linear scale
 	variable instrID, scanlength, numAverage, linear, nosave
 	string channels, comments
+	string datestring = strTime()
 	
 	if(paramisdefault(comments))
 		comments = ""
@@ -1071,14 +1074,14 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 				graphopen = 1
 				openplots+= stringfromlist(j,graphnumlist)+";"
 				label /w=$stringfromlist(j,graphnumlist) bottom,  "time [s]"
-				TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 strTime()
+				TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 datestring
 			endif
 		endfor
 		if(!graphopen)
 			display $wn
 			setwindow kwTopWin, graphicsTech=0
 			label bottom, "time [s]"
-			TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 strTime()
+			TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 datestring
 			openplots+= winname(0,1)+";"
 		endif
 		
@@ -1095,7 +1098,7 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 				else
 					label/w=$stringfromlist(j,graphnumlist) left, "Spectrum [dBV/sqrt(Hz)]"
 				endif
-				TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 strTime()
+				TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 datestring
 			endif
 		endfor
 		if(!graphopen)
@@ -1107,7 +1110,7 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 			else
 				label left, "Spectrum [dBV/sqrt(Hz)]"
 			endif
-			TextBox/W=$stringfromlist(j,graphnumlist,",")/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 strTime()
+			TextBox/W=$stringfromlist(j,graphnumlist,",")/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 datestring
 			openplots+= winname(0,1)+";"
 		endif
 	endfor
@@ -1129,7 +1132,7 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 		// set up and execute command
 		// SPEC_ANA,adcCh,numpts
 		string cmd = ""
-		sprintf cmd, "SPEC_ANA,%s,%s\r", replacestring(",",channels,""), num2str(numpts)
+		sprintf cmd, "SPEC_ANA,%s,%s\r", replacestring(",",channels,""), num2istr(numpts)
 		writeInstr(instrID,cmd)
 		
 		variable bytesSec = roundNum(2*samplingFreq,0)
@@ -1178,7 +1181,12 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 		for(j=0;j<numChannels;j+=1)
 			ffttemps = "ffttempADC"+stringfromlist(j,channels,",")
 			wn = "timeSeriesADC"+stringfromlist(j,channels,",")
-			wave timewn = $wn
+		
+			wave timewn= $wn
+			variable le=dimsize(timewn,0)
+		Make/N=(le,numAverage)/D/O signal
+		signal[][i]=timewn[p]
+
 			duplicate/o timewn, fftinput
 			fftinput = fftinput*1.0e-3
 			
@@ -1270,7 +1278,8 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 	if (nosave == 0)
 		
 		// save data to "data/spectrum/"
-		string filename = "spectrum_"+strTime()+".h5"
+		
+		string filename = "spectrum_"+datestring+".h5"
 		variable/g hdf5_id = 0
 		// create empty HDF5 container
 		HDF5CreateFile/p=spectrum hdf5_id as filename
@@ -1284,6 +1293,7 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 			endif
 			wn = "timeSeriesADC"+stringfromlist(i,channels,",")
 			savesinglewave(wn)
+			savesinglewave("signal")
 		endfor
 		// Create metadata
 		// this just creates one big JSON string attribute for the group
