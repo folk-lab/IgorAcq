@@ -44,7 +44,11 @@ function initSaveFiles([msg, logs_only])
 	// this just creates one big JSON string attribute for the group
 	// its... fine
 	variable /G meta_group_ID
-	HDF5CreateGroup hdf5_id, "metadata", meta_group_ID
+	HDF5CreateGroup/z hdf5_id, "metadata", meta_group_ID
+	if (V_flag != 0)
+			Print "HDF5OpenGroup Failed: ", "metadata"
+	endif
+
 
 	make /FREE /T /N=1 cconfig = prettyJSONfmt(sc_createconfig())
 	make /FREE /T /N=1 sweep_logs = prettyJSONfmt(sc_createSweepLogs(msg=msg))
@@ -53,8 +57,15 @@ function initSaveFiles([msg, logs_only])
 	sc_confirm_JSON(sweep_logs, name="sweep_logs")
 	sc_confirm_JSON(cconfig, name="cconfig")
 	
-	HDF5SaveData /A="sweep_logs" sweep_logs, hdf5_id, "metadata"
-	HDF5SaveData /A="sc_config" cconfig, hdf5_id, "metadata"
+	HDF5SaveData/z /A="sweep_logs" sweep_logs, hdf5_id, "metadata"
+	if (V_flag != 0)
+			Print "HDF5SaveData Failed: ", "sweep_logs"
+	endif
+	
+	HDF5SaveData/z /A="sc_config" cconfig, hdf5_id, "metadata"
+	if (V_flag != 0)
+			Print "HDF5SaveData Failed: ", "sc_config"
+	endif
 
 	HDF5CloseGroup /Z meta_group_id
 	if (V_flag != 0)

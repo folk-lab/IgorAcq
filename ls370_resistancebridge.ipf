@@ -1007,9 +1007,9 @@ function/s getLS370Status(instrID)
 	svar ls_system
 	string channelLabel="", stillLabel="", ch_idx=""
 	if(cmpstr(ls_system,"bfsmall") == 0)
-		channelLabel = "ld_50K,ld_4K,ld_magnet,ld_still,ld_mc"
+		channelLabel = "ld_mc,ld_50K,ld_4K,ld_magnet,ld_still"
 		stillLabel = "ld_still_heater"
-		ch_idx = "1,2,4,5,6"
+		ch_idx = "6,1,2,4,5"
 	elseif(cmpstr(ls_system,"bfbig") == 0)
 		channelLabel = "xld_50K,xld_4K,xld_magnet,xld_still,xld_mc"
 		stillLabel = "xld_still_heater"
@@ -1040,16 +1040,19 @@ function/s getLS370Status(instrID)
 	//// Temperatures ////
 
 	// Get temperature data from SQL database
-	string JSONkeys = "50K Plate K,4K Plate K,Magnet K,Still K,MC K"
-	string LSkeys = "50K,4K,magnet,still,mc"
+	string JSONkeys = "MC K,50K Plate K,4K Plate K,Magnet K,Still K"
+	string LSkeys = "mc,50K,4K,magnet,still"
 	string searchStr="", statement="", timestamp="", temp="", tempBuffer="", channel_label
 	variable i=0
 	for(i=0;i<itemsinlist(channelLabel,",");i+=1)
 		sprintf searchStr, "loggingschedules:default:channels:ch%s:max", stringfromlist(i,ch_idx,",")
-		timestamp = sc_SQLtimestamp(str2num(getJSONvalue(jstr,searchStr)))
+		
+		timestamp = sc_SQLtimestamp(str2num(getJSONvalue(jstr,searchStr)))		
+//		timestamp = sc_SQLtimestamp(3600) // Temporarily allow any old measurement of temp
+		
 		sprintf statement, "SELECT temperature_k FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, temp_schema, stringfromlist(i,channelLabel,","), timestamp
 		temp = requestSQLValue(statement)
-
+		
 		if(cmpstr(temp,"") == 0)
 			temp = num2str(getLS370temp(instrID,stringfromlist(i,LSkeys,",")))
 		endif
