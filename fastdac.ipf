@@ -48,8 +48,8 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 	
 	string comm = ""
 	sprintf comm, "name=FastDAC,instrID=%s,visa_address=%s" instrID, visa_address
-	string options = "baudrate=1750000,databits=8,stopbits=1,parity=0,test_query=*IDN?"
-	// string options = "baudrate=57600,databits=8,stopbits=1,parity=0,test_query=*IDN?" // Use this option if using USB fdac
+//	string options = "baudrate=1750000,databits=8,stopbits=1,parity=0,test_query=*IDN?"
+	string options = "baudrate=57600,databits=8,stopbits=1,parity=0,test_query=*IDN?" // Use this option if using USB fdac
 	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
 	
 	if(paramisdefault(master))
