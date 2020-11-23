@@ -1,0 +1,138 @@
+{
+  "default": {
+    "heater": {
+      "min": 120,
+      "max": 240
+    },
+    "analog_outputs": {
+      "ld_still_heater": {
+        "min": 120,
+        "max": 240
+      }
+    },
+    "channels": {
+      "ld_50K": {
+        "min": 120,
+        "max": 180
+      },
+      "ld_4K": {
+        "min": 120,
+        "max": 180
+      },
+      "ld_magnet": {
+        "min": 120,
+        "max": 180
+      },
+      "ld_still": {
+        "min": 60,
+        "max": 120
+      },
+      "ld_mc": {
+        "min": 30,
+        "max": 60
+      }
+    }
+  },
+  "mc_exclusive": {
+    "heater": {
+      "min": 1,
+      "max": 5
+    },
+    "analog_outputs": {
+      "ld_still_heater": {
+        "min": 2,
+        "max": 10
+      }
+    },
+    "channels": {
+      "ld_50K": {
+        "min": 600000,
+        "max": 600001
+      },
+      "ld_4K": {
+        "min": 600000,
+        "max": 600001
+      },
+      "ld_magnet": {
+        "min": 600000,
+        "max": 600001
+      },
+      "ld_still": {
+        "min": 600000,
+        "max": 600001
+      },
+      "ld_mc": {
+        "min": 1,
+        "max": 3
+      }
+    }
+  },
+  "still_exclusive": {
+    "heater": {
+      "min": 5,
+      "max": 10
+    },
+    "analog_outputs": {
+      "ld_still_heater": {
+        "min": 1,
+        "max": 5
+      }
+    },
+    "channels": {
+      "ld_50K": {
+        "min": 600000,
+        "max": 600001
+      },
+      "ld_4K": {
+        "min": 600000,
+        "max": 600001
+      },
+      "ld_magnet": {
+        "min": 600000,
+        "max": 600001
+      },
+      "ld_still": {
+        "min": 1,
+        "max": 10
+      },
+      "ld_mc": {
+        "min": 600000,
+        "max": 600001
+      }
+    }
+  },
+  "using_magnet": {
+    "heater": {
+      "min": 10,
+      "max": 60
+    },
+    "analog_outputs": {
+      "ld_still_heater": {
+        "min": 10,
+        "max": 60
+      }
+    },
+    "channels": {
+      "ld_50K": {
+        "min": 120,
+        "max": 180
+      },
+      "ld_4K": {
+        "min": 30,
+        "max": 120
+      },
+      "ld_magnet": {
+        "min": 20,
+        "max": 40
+      },
+      "ld_still": {
+        "min": 15,
+        "max": 30
+      },
+      "ld_mc": {
+        "min": 5,
+        "max": 15
+      }
+    }
+  }
+}

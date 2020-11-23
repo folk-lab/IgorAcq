@@ -7,10 +7,11 @@ pragma rtGlobals=1		// Use modern global access method.
 /// SAVING EXPERIMENT DATA ///
 //////////////////////////////
 
-function initSaveFiles([msg])
+function initSaveFiles([msg, logs_only])
 	//// create/open HDF5 files
-
 	string msg
+	variable logs_only  // 1=Don't save any data to HDF
+	
 	if(paramisdefault(msg)) // save meta data
 		msg=""
 	endif
@@ -24,27 +25,47 @@ function initSaveFiles([msg])
 	variable /g hdf5_id
 	HDF5CreateFile /P=data hdf5_id as h5name
 
-	// save x and y arrays
-	nvar sc_is2d
-	HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_xdata" , hdf5_id, "x_array"
-	if(sc_is2d == 1)
-		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_ydata" , hdf5_id, "y_array"
-	elseif(sc_is2d == 2)
-		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_ydata" , hdf5_id, "y_array"
-		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_linestart", hdf5_id, "linestart"
+	if (logs_only != 1)
+		// save x and y arrays
+		nvar sc_is2d
+		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_xdata" , hdf5_id, "x_array"
+		if(sc_is2d == 1)
+			HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_ydata" , hdf5_id, "y_array"
+		elseif(sc_is2d == 2)
+			HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_ydata" , hdf5_id, "y_array"
+			HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_linestart", hdf5_id, "linestart"
+		endif
+	else // Make attr in HDF which makes it clear this was only to store Logs
+		make/o/free/t/n=1 attr_message = "True"
+		HDF5SaveData /A="Logs_Only" attr_message, hdf5_id, "/"
 	endif
-
+	
 	// Create metadata
 	// this just creates one big JSON string attribute for the group
 	// its... fine
 	variable /G meta_group_ID
-	HDF5CreateGroup hdf5_id, "metadata", meta_group_ID
+	HDF5CreateGroup/z hdf5_id, "metadata", meta_group_ID
+	if (V_flag != 0)
+			Print "HDF5OpenGroup Failed: ", "metadata"
+	endif
+
 
 	make /FREE /T /N=1 cconfig = prettyJSONfmt(sc_createconfig())
 	make /FREE /T /N=1 sweep_logs = prettyJSONfmt(sc_createSweepLogs(msg=msg))
 	
-	HDF5SaveData /A="sweep_logs" sweep_logs, hdf5_id, "metadata"
-	HDF5SaveData /A="sc_config" cconfig, hdf5_id, "metadata"
+	// Check that prettyJSONfmt actually returned a valid JSON.
+	sc_confirm_JSON(sweep_logs, name="sweep_logs")
+	sc_confirm_JSON(cconfig, name="cconfig")
+	
+	HDF5SaveData/z /A="sweep_logs" sweep_logs, hdf5_id, "metadata"
+	if (V_flag != 0)
+			Print "HDF5SaveData Failed: ", "sweep_logs"
+	endif
+	
+	HDF5SaveData/z /A="sc_config" cconfig, hdf5_id, "metadata"
+	if (V_flag != 0)
+			Print "HDF5SaveData Failed: ", "sc_config"
+	endif
 
 	HDF5CloseGroup /Z meta_group_id
 	if (V_flag != 0)
@@ -53,8 +74,24 @@ function initSaveFiles([msg])
 
 	// may as well save this config file, since we already have it
 	sc_saveConfig(cconfig[0])
-
 end
+
+
+function sc_confirm_JSON(jsonwave, [name])
+	//Checks whether 'jsonwave' can be parsed as a JSON
+	//name is just to make it easier to identify the error
+	wave/t jsonwave
+	string name
+	if (paramisDefault(name))
+		name = ""
+	endif
+
+	JSONXOP_Parse/z jsonwave[0]
+	if (v_flag != 0)
+		printf "WARNING: %s JSON is not a valid JSON (saved anyway)\r", name
+	endif
+end			
+
 
 function saveSingleWave(wn)
 	// wave with name 'g1x' as dataset named 'g1x' in hdf5
@@ -85,6 +122,28 @@ function closeSaveFiles()
 	endif
 
 end
+
+////////////////////////////
+/// Load Experiment Data ///
+////////////////////////////
+
+function get_sweeplogs(datnum)
+	// Opens HDF5 file from current data folder and returns sweeplogs jsonID
+	// Remember to JSON_Release(jsonID) or JSONXOP_release/A to release all objects
+	// Can be converted to JSON string by using JSON_dump(jsonID)
+	variable datnum
+	variable fileid, metadataID, i, result
+	wave/t sc_sweeplogs
+	
+	HDF5OpenFile /P=data fileid as "dat"+num2str(datnum)+".h5"
+	HDF5LoadData /Q/O/Type=1/N=sc_sweeplogs /A="sweep_logs" fileid, "metadata"
+	
+	variable sweeplogsID
+	sweeplogsID = JSON_Parse(sc_sweeplogs[0])
+
+	return sweeplogsID
+end
+
 
 ///////////////////////
 /// text read/write ///
@@ -144,6 +203,52 @@ end
 /// JSON  ///
 /////////////
 
+//// Using JSON XOP ////  
+
+// Using JSON XOP requires working with JSON id's rather than JSON strings.
+// To be used in addition to home built JSON functions which work with JSON strings
+// JSON id's give access to all XOP functions (e.g. JSON_getKeys(jsonID, path))
+// functions here should be ...JSONX...() to mark as a function which works with JSON XOP ID's rather than strings
+// To switch between jsonID and json strings use JSON_Parse/JSON_dump 
+
+function getJSONXid(jsonID, path)
+	// Returns jsonID of json object located at "path" in jsonID passed in. e.g. get "BabyDAC" json from "Sweep_logs" json.
+	// Path should be able to be a true JSON pointer i.e. "/" separated path (e.g. "Magnets/Magx") but it is untested
+	variable jsonID
+	string path
+	variable i, tempID
+	string tempKey
+	
+	if (JSON_GetType(jsonID, path) != 0)	
+		abort "ERROR[get_json_from_json]: path does not point to JSON obect"
+	endif
+
+	if (itemsinlist(path, "/") == 1)
+		return getJSONXid_fromKey(jsonID, path)
+	else
+		tempID = jsonID
+		for(i=0;i<itemsinlist(path, "/");i++)  //Should recursively get deeper JSON objects. Untested
+			tempKey = stringfromlist(i, path, "/")
+			tempID = getJSONXid_fromKey(tempID, tempkey)
+		endfor
+		return tempID
+	endif
+end
+	
+function getJSONXid_fromKey(jsonID, key)
+	// Should only be called from getJSONid to convert the inner JSON into a new JSONid pointer.
+	// User should use the more general getJSONid(jsonID, path) where path can be a single key or "/" separated path
+	variable jsonID
+	string key
+	if ((JSON_GetType(jsonID, key) != 0) || (itemsinlist(key, "/") != 1)	)
+		abort "ERROR[get_json_from_json_key]: key is not a top level JSON obect"
+	endif
+	return JSON_parse(getJSONvalue(json_dump(jsonID), key))  // workaround to get a jsonID of inner JSON
+end
+
+//// END of Using JSON XOP ////
+
+
 /// read ///
 
 function/s getJSONvalue(jstr, key)
@@ -160,7 +265,10 @@ function/s getJSONvalue(jstr, key)
 	wave/t t_tokentext
 	wave w_tokentype, w_tokensize
 
-	if(key_length==1)
+	if(key_length==0)
+		// return whole json
+		return jstr
+	elseif(key_length==1)
 		// this is the only key with this name
 		// if not, the first key will be returned
 		offset = 0
@@ -226,7 +334,7 @@ function/s getJSONkeyoffset(key,offset)
 	endfor
 	// if key is not found, return an empty string
 	print "[ERROR] JSON key not found: "+key
-	return ""
+	return t_tokentext[0] // Default to return everything
 end
 
 function /S getStrArrayShape(array)
@@ -623,6 +731,11 @@ function/s addJSONkeyval(JSONstr,key,value,[addquotes])
 	// if JSONstr is empty, start a new JSON object
 	string JSONstr, key, value
 	variable addquotes
+	
+	// check value, can't be an empty string
+	if(strlen(value)==0)
+		value = "null"
+	endif
 
 	if(!paramisdefault(addquotes))
 		if(addquotes==1)
@@ -630,12 +743,12 @@ function/s addJSONkeyval(JSONstr,key,value,[addquotes])
 			value = "\""+escapeQuotes(value)+"\""
 		endif
 	endif
-
+	
 	if(strlen(JSONstr)!=0)
-		// remove all starting brackets + whitespace
+		// remove all starting brackets, whitespace or plus signs
 		variable i=0
 		do
-			if( (isWhitespace(JSONstr[i])==1) || (CmpStr(JSONstr[i],"{")==0) )
+			if((isWhitespace(JSONstr[i])==1) || (CmpStr(JSONstr[i],"{")==0) || (CmpStr(JSONstr[i],"+")==0))
 				i+=1
 			else
 				break
@@ -645,9 +758,9 @@ function/s addJSONkeyval(JSONstr,key,value,[addquotes])
 		// remove single ending bracket + whitespace
 		variable j=strlen(JSONstr)-1
 		do
-			if( (isWhitespace(JSONstr[j])==1) )
+			if((isWhitespace(JSONstr[j])==1))
 				j-=1
-			elseif( (CmpStr(JSONstr[j],"}")==0) )
+			elseif((CmpStr(JSONstr[j],"}")==0))
 				j-=1
 				break
 			else
@@ -703,7 +816,6 @@ function /s prettyJSONfmt(jstr)
 				output+=(getIndent(indent)+key+": "+val+",\n")
 			endif
 		endif
-
 	endfor
 
 	return output[0,strlen(output)-3]+"\n}\n"
@@ -809,7 +921,7 @@ function /S escapeQuotes(str)
 		endif
 		i+=1
 
-	while(1==1)
+	while(1)
 	return str
 end
 

@@ -7,11 +7,12 @@
 
 function killVISA()
 	VISAControl killIO	  //Terminate all VISA sessions
+	
 end
 
 function /s getResourceAddress(instrID)
 	variable instrID
-	string address
+	string address=""
 
 	viGetAttributeString(instrID, VI_ATTR_RSRC_NAME , address  )
 
@@ -225,7 +226,8 @@ threadsafe function writeInstr(instrID, cmd)
     variable count = strlen(cmd) // strlen is a problem
                                  // with non-ascii characters
                                  // it does not equal numBytes
-
+	
+//	printf "COMMAND: %s\r", cmd				// DEBUG
     variable return_count = 0    // how many bytes were written
     variable status = viWrite(instrID, cmd, count, return_count)
     if (status)
@@ -235,9 +237,10 @@ threadsafe function writeInstr(instrID, cmd)
 
 end
 
-threadsafe function/s readInstr(instrID, [read_term, read_bytes])
+threadsafe function/s readInstr(instrID, [read_term, read_bytes, binary])
 	// generic error checking read function
-	variable instrID, read_bytes
+	// binary only ticked when reading long binary data from fdac
+	variable instrID, read_bytes, binary
 	string read_term
 
     if(!paramisdefault(read_term))
@@ -251,20 +254,33 @@ threadsafe function/s readInstr(instrID, [read_term, read_bytes])
         // specified by the interface being used
         visaSetReadTermEnable(instrID, 0)
     endif
+    
+    if(!paramIsDefault(binary))
+    	 visaSetSerialEndIn(instrID, 0)
+   	 else
+   	    binary = 0
+   	 	 visaSetSerialEndIn(instrID, 2)
+    endif
 
     if(paramisdefault(read_bytes))
         read_bytes = 1024
     endif
 
-    string buffer
+    string buffer, err
     variable return_count
     variable status = viRead(instrID, buffer, read_bytes, return_count)
-    if (status)
+    if(status != 0 && status != 0x3fff0006) // 0x3fff0006 means read_bytes = return_count (NOT AN ERROR).
         VISAerrormsg("readInstr() -- viRead", instrID, status)
     	return "NaN" // abort not supported in threads (v7)
-	endif
-
-	return buffer
+	 endif
+	 if(binary)
+	 	if(read_bytes != return_count)
+	 		sprintf err, "[ERROR] Returned bytes: %d. Expeted bytes: %d", return_count, read_bytes
+	 		print err
+	 		return "Nan"
+	 	endif
+	 endif
+	 return buffer
 end
 
 threadsafe function/s queryInstr(instrID, cmd, [read_term, delay])
@@ -272,12 +288,30 @@ threadsafe function/s queryInstr(instrID, cmd, [read_term, delay])
 	variable instrID, delay
 	string cmd, read_term
 	string response
-
+	
 	writeInstr(instrID, cmd)
 	if(!paramisdefault(delay))
-		sleep /S delay
+		sleep/s delay
 	endif
     if(paramisdefault(read_term))
+        response = readInstr(instrID)
+    else
+        response = readInstr(instrID, read_term = read_term)
+    endif
+//	printf "RESPONSE: %s\r", response 		//DEBUG
+	return response
+end
+
+function/s queryInstrProgress(instrID, cmd, delay, delaymsg, [read_term])
+	variable instrID, delay
+	string cmd, delaymsg, read_term
+	
+	writeInstr(instrID, cmd)
+	
+	sc_progressbarDelay(delay,delaymsg)
+	
+	string response = ""
+	if(paramisdefault(read_term))
         response = readInstr(instrID)
     else
         response = readInstr(instrID, read_term = read_term)
@@ -309,12 +343,37 @@ function/s postHTTP(instrID,cmd,payload,headers)
    endif
 end
 
+
+function/s putHTTP(instrID,cmd,payload,headers)
+	string instrID, cmd, payload, headers
+	string response=""
+
+//	print instrID+cmd, payload
+	URLRequest /TIME=15.0 /DSTR=payload url=instrID+cmd, method=put, headers=headers
+
+	if (V_flag == 0)    // No error
+		response = S_serverResponse // response is a JSON string
+		if (V_responseCode != 200)  // 200 is the HTTP OK code
+			print "[ERROR] HTTP response code " + num2str(V_responseCode)
+			if(strlen(response)>0)
+		   	printf "[MESSAGE] %s\r", getJSONvalue(response, "error")
+		   endif
+		   return ""
+		else
+			return response
+		endif
+   else
+        abort "HTTP connection error."
+   endif
+end
+
+
 function/s getHTTP(instrID,cmd,headers)
 	string instrID, cmd, headers
 	string response, error
 
 //	print instrID+cmd
-	URLRequest /TIME=15.0 url=instrID+cmd, method=get, headers=headers
+	URLRequest /TIME=25.0 url=instrID+cmd, method=get, headers=headers
 
 	if (V_flag == 0)    // No error
 		response = S_serverResponse // response is a JSON string
@@ -329,6 +388,55 @@ function/s getHTTP(instrID,cmd,headers)
 		return ""
    endif
 end
+
+//// Util ////
+
+function/s sc_stripTermination(visaString,termChar)
+	string visaString, termChar
+	
+	string regex = "(.*)"+termChar, value=""
+	splitstring/e=regex visaString, value
+	
+	return value
+end
+
+function sc_progressbarDelay(delay,delaymsg)
+	variable delay
+	string delaymsg
+	
+	variable/g progress = 0
+	string/g progressStr = delaymsg
+	execute("progressBar()")
+	
+	delay = delay*1e6
+	variable start_time = stopMStimer(-2)
+	do
+		doupdate/w=ProgressBar
+		progress = (stopMStimer(-2)-start_time)/delay*100 // progress in procent
+		
+	while(stopMStimer(-2)-start_time < delay)
+	dowindow/k ProgressBar
+end
+
+window progressBar() : Panel
+	PauseUpdate; Silent 1       // building window...
+	NewPanel /W=(267+400,122+400,480+400,200+400)/N=ProgressBar
+	SetDrawLayer UserBack
+	SetDrawEnv fsize= 14
+	DrawText 72,23, "Progress ..."
+	ValDisplay valdispProgress,pos={8,28},size={200,15},mode=3,frame=2
+	ValDisplay valdispProgress,limits={0,100,0},barmisc={0,0},bodyWidth=200
+	ValDisplay valdispProgress,value=progress
+	SetDrawEnv fsize= 14
+	variable msglength = strlen(progressStr), doubleline = strsearch(progressStr,"\n",0)
+	if(msglength > 0)
+		if(doubleline < 0)
+			DrawText 102-msglength*3,65, progressStr
+		else
+			DrawText 90-(msglength-doubleline)*3,77, progressStr
+		endif
+	endif
+endmacro
 
 ////////////
 /// GPIB ///
@@ -577,6 +685,12 @@ function visaSetSerialEndOut(instrID, out)
 	variable instrID, out
 
 	variable status = viSetAttribute(instrID, VI_ATTR_ASRL_END_OUT, out)
+	return status
+end
+
+threadsafe function visaSetSerialEndIn(instrID, in)
+	variable instrID, in
+	variable status = viSetAttribute(instrID, VI_ATTR_ASRL_END_IN, in)
 	return status
 end
 

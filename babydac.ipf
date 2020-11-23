@@ -6,7 +6,9 @@
 //	Procedure written by Christian, 2016-0X-XX
 //    Updated by Nik for binary control, ADC reading, and software limits
 //    Updated again to use VISA and async read 05-XX-2018
-
+// Updated by Tim Child, 2020-03
+//		Added load from HDF functionality
+//
 /////////////////////////////
 /// BabyDAC specific COMM ///
 /////////////////////////////
@@ -16,25 +18,26 @@ function openBabyDACconnection(instrID, visa_address, [verbose])
 	// visa_address is the VISA address string, i.e. ASRL1::INSTR
 	string instrID, visa_address
 	variable verbose
-	
+
 	if(paramisdefault(verbose))
 		verbose=1
 	elseif(verbose!=1)
 		verbose=0
 	endif
-	
+
 	variable localRM
 	variable status = viOpenDefaultRM(localRM) // open local copy of resource manager
 	if(status < 0)
 		VISAerrormsg("open BD connection:", localRM, status)
 		abort
 	endif
-	
+
 	string comm = ""
 	sprintf comm, "name=BabyDAC,instrID=%s,visa_address=%s" instrID, visa_address
 	string options = "baudrate=57600,databits=8,stopbits=1,parity=0"
 	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
-	
+
+	return localRM
 end
 
 /////////////////////////////////
@@ -91,7 +94,7 @@ function bdSetBoardNumbers(boards, custom)
 	variable /g bd_num_custom = 0
 	wave/t dacvalstr=dacvalstr
 
-	make/o listboxattr = {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},{2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0}, {2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0}}
+	make/o listboxattr = {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},{2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0}, {2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0}, {2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0}}
 
 	switch(numBoards)
 		case 1:
@@ -124,6 +127,11 @@ function bdSetBoardNumbers(boards, custom)
 		listboxattr[6][2] = 2
 		listboxattr[7][2] = 2
 
+		listboxattr[4][3] = 2
+		listboxattr[5][3] = 2
+		listboxattr[6][3] = 2
+		listboxattr[7][3] = 2
+
 		if(custom)
 			bd_num_custom += 4
 		endif
@@ -145,6 +153,11 @@ function bdSetBoardNumbers(boards, custom)
 		listboxattr[10][2] = 2
 		listboxattr[11][2] = 2
 
+		listboxattr[8][3] = 2
+		listboxattr[9][3] = 2
+		listboxattr[10][3] = 2
+		listboxattr[11][3] = 2
+
 		if(custom)
 			bd_num_custom += 4
 		endif
@@ -165,6 +178,11 @@ function bdSetBoardNumbers(boards, custom)
 		listboxattr[13][2] = 2
 		listboxattr[14][2] = 2
 		listboxattr[15][2] = 2
+
+		listboxattr[12][3] = 2
+		listboxattr[13][3] = 2
+		listboxattr[14][3] = 2
+		listboxattr[15][3] = 2
 
 		if(custom)
 			bd_num_custom += 4
@@ -373,7 +391,7 @@ function bdInitZeros()
 	nvar bd_num_custom
 
 	// Init all channels to 0V.
-	make/t/o dacvalstr = {{"0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15"},{"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}, {"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}}
+	make/t/o dacvalstr = {{"0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15"},{"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}, {"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}, {"","","","","","","","","","","","","","","",""}}
 	make/t/o old_dacvalstr = {{"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}}
 
 	// setup software limit
@@ -598,8 +616,8 @@ function getSetpointBD(channel, output)
 	return round((2^20-1)*frac)
 end
 
-function setOutputBD(instrID, channel, output) // in mV
-	variable instrID, channel, output
+function setOutputBD(instrID, channel, output, [ignore_lims]) // in mV
+	variable instrID, channel, output, ignore_lims
 	wave bd_boardnumbers=bd_boardnumbers
 	wave/t dacvalstr=dacvalstr
 	wave/t old_dacvalstr=old_dacvalstr
@@ -609,12 +627,12 @@ function setOutputBD(instrID, channel, output) // in mV
 	// Check that the DAC board is initialized
 	bdGetBoard(channel)
 	board_index = floor(channel/4)
-	
+
 	// check for NAN and INF
 	if(sc_check_naninf(output) != 0)
 		abort "trying to set voltage to NaN or Inf"
 	endif
-	
+
 	// Check that the voltage is valid
 	if(output > bd_range_high[board_index] || output < bd_range_low[board_index])
 		string err
@@ -622,15 +640,17 @@ function setOutputBD(instrID, channel, output) // in mV
 		abort err
 	endif
 
-	// check that the voltage is within software limits
-	// if it is outside the limit, do not interrupt
-	// set output to maximum value according to limits
-	sw_limit = str2num(dacvalstr[channel][2])
-	if(abs(output) > sw_limit)
-		if(output > 0)
-			output = sw_limit
-		else
-			output = -1*sw_limit
+	if(ignore_lims != 1)
+		// check that the voltage is within software limits
+		// if it is outside the limit, do not interrupt
+		// set output to maximum value according to limits
+		sw_limit = str2num(dacvalstr[channel][2])
+		if(abs(output) > sw_limit)
+			if(output > 0)
+				output = sw_limit
+			else
+				output = -1*sw_limit
+			endif
 		endif
 	endif
 
@@ -664,8 +684,8 @@ function setOutputBD(instrID, channel, output) // in mV
 	return 1
 end
 
-function RampOutputBD(instrID, channel, output, [ramprate, update])
-	variable instrID, channel, output,ramprate, update // output is in mV, ramprate in mV/s
+function RampOutputBD(instrID, channel, output, [ramprate, update, ignore_lims])
+	variable instrID, channel, output,ramprate, update, ignore_lims // output is in mV, ramprate in mV/s
 	wave/t dacvalstr=dacvalstr
 	wave /t old_dacvalstr=old_dacvalstr
 	variable voltage, sgn, step
@@ -684,7 +704,7 @@ function RampOutputBD(instrID, channel, output, [ramprate, update])
 		sleeptime = 0.01 // account for screen-update delays
 	else
 		pauseupdate
-		sleeptime = 0.002 // can ramp finely if there's no updating!
+		sleeptime = 0.0024 // can ramp finely if there's no updating!
 	endif
 
 	if(paramisdefault(ramprate))
@@ -699,7 +719,7 @@ function RampOutputBD(instrID, channel, output, [ramprate, update])
 	voltage+=sgn*step
 	if(sgn*voltage >= sgn*output)
 		//// we started less than one step away from the target. set voltage and leave
-		setOutputBD(instrID, channel, output)
+		setOutputBD(instrID, channel, output, ignore_lims=ignore_lims)
 		return 1
 	endif
 
@@ -707,14 +727,14 @@ function RampOutputBD(instrID, channel, output, [ramprate, update])
 		if(update==1)
 			doupdate
 		endif
-		setOutputBD(instrID, channel, voltage)
+		setOutputBD(instrID, channel, voltage, ignore_lims=ignore_lims)
 
 		sc_sleep(sleeptime)
 
 		voltage+=sgn*step
 	while(sgn*voltage<sgn*output-step)
 
-	setOutputBD(instrID, channel, output)
+	setOutputBD(instrID, channel, output, ignore_lims=ignore_lims)
 
 	if(update==0)
 		resumeupdate
@@ -723,7 +743,7 @@ function RampOutputBD(instrID, channel, output, [ramprate, update])
 	return 1
 end
 
-function UpdateMultipleBD(instrID, [action, ramprate, update])
+function UpdateMultipleBD(instrID, [action, ramprate, update, ignore_lims])
 
 	// usage:
 	// function Experiment(....)
@@ -735,7 +755,7 @@ function UpdateMultipleBD(instrID, [action, ramprate, update])
 
 	variable instrID
 	string action // "set" or "ramp"
-	variable ramprate, update
+	variable ramprate, update, ignore_lims
 	wave/t dacvalstr=dacvalstr
 	wave/t old_dacvalstr=old_dacvalstr
 	variable output,i
@@ -773,14 +793,16 @@ function UpdateMultipleBD(instrID, [action, ramprate, update])
 	return 1
 end
 
-function rampMultipleBD(instrID, channels, setpoint, [ramprate, update])
-	variable instrID, setpoint, ramprate, update
+function rampMultipleBD(instrID, channels, setpoint, [ramprate, update, ignore_lims])
+	variable instrID, setpoint, ramprate, update, ignore_lims
 	string channels
 	variable i, kind, nChannels = ItemsInList(channels, ",")
 	string channel
 	wave /t dacvalstr = dacvalstr
 	wave /t customdacvalstr
 	nvar bd_num_custom
+
+	channels = SF_get_channels(channels)  // Converts label names to Dac channels
 
 	if(paramisdefault(ramprate))
 		nvar bd_ramprate
@@ -800,7 +822,7 @@ function rampMultipleBD(instrID, channels, setpoint, [ramprate, update])
 			UpdateCustom(channel,setpoint)
 		endif
 	endfor
-	UpdateMultipleBD(instrID, action="ramp", ramprate=ramprate, update = update)
+	UpdateMultipleBD(instrID, action="ramp", ramprate=ramprate, update = update, ignore_lims=ignore_lims)
 	if(bd_num_custom > 0)
 		bdCalcCustomValues()
 	endif
@@ -895,6 +917,149 @@ function setAllZeroBD(instrID)
 
 end
 
+//////////////////////////////////
+///// Load BabyDACs from HDF /////
+//////////////////////////////////
+function bdSaveToHDF()
+
+end
+
+
+function bdLoadFromHDF(datnum, [no_check])
+	// Function to load babyDAC values and labels from a previously save HDF file in sweeplogs in current data directory
+	// Requires Dac info to be saved in "DAC{label} : output" format
+	// with no_check = 0 (default) a window will be shown to user where values can be changed before committing to ramping, also can chose not to load from there
+	// setting no_check = 1 will ramp to loaded settings without user input
+	variable datnum, no_check
+	variable response
+
+	get_babydacs_from_hdf(datnum) // Creates/Overwrites load_dacvalstr
+
+	if (no_check == 0)  //Whether to show ask user dialog or not
+		response = bdLoadAskUser()
+	else
+		response = -1
+	endif
+	if(response == 1)
+		// Do_nothing
+		print "Keep current BabyDAC state chosen, no changes made"
+	elseif(response == -1)
+		// Load from HDF
+		printf "Loading BabyDAC values and labels from dat%d\r", datnum
+		duplicate/o/t load_dacvalstr, dacvalstr //Overwrite dacvalstr with loaded values
+
+		// Ramp to new values
+		svar bd_controller_addr
+		openBabyDACconnection("bd_window_resource", bd_controller_addr, verbose=0)
+		nvar bd_window_resource, bd_ramprate
+		UpdateMultipleBD(bd_window_resource, action="Ramp", ramprate=bd_ramprate, update=1)
+		viclose(bd_window_resource)
+
+	else
+		print "[WARNING] Bad user input -- BabyDAC will remain in current state"
+	endif
+end
+
+
+function get_babydacs_from_hdf(datnum)
+	//Creates/Overwrites load_dacvalstr by duplicating the current dacvalstr then changing the labels and outputs of any values found in the metadata of HDF at dat[datnum].h5
+	//Leaves dacvalstr unaltered
+	variable datnum
+	variable sl_id, bd_id  //JSON ids
+
+	sl_id = get_sweeplogs(datnum)  // Get Sweep_logs JSON
+	bd_id = getJSONXid(sl_id, "BabyDAC") // Get BabyDAC JSON from Sweeplogs
+
+	wave/t keys = JSON_getkeys(bd_id, "")
+	duplicate/o/t dacvalstr, load_dacvalstr
+
+	variable i
+	string key, label_name, str_ch
+	variable ch = 0
+	for (i=0; i<numpnts(keys); i++)  // These are in a random order. Keys must be stored as "DAC#{label}:output" in JSON
+		key = keys[i]
+		if (strsearch(key, "DAC", 0) != -1)  // Check it is actually a DAC key and not something like com_port
+			SplitString/E="DAC(\d*){" key, str_ch //Gets DAC# so that I store values in correct places
+			ch = str2num(str_ch)
+			load_dacvalstr[ch][1] = num2str(JSON_getvariable(bd_id, key))
+			SplitString/E="{(.*)}" key, label_name  //Looks for label inside {} part of e.g. BD{label}
+			label_name = replaceString("~1", label_name, "/")  // Somehow igor reads '/' as '~1' don't know why...
+			load_dacvalstr[ch][3] = label_name
+		endif
+	endfor
+	JSONXOP_release /A  //Clear all stored JSON strings
+end
+
+
+function bdLoadAskUser()
+	variable/g bd_load_answer
+
+	if (waveexists(load_dacvalstr) && waveexists(dacvalstr) && waveexists(listboxattr))
+		execute("bdLoadWindow()")
+		PauseForUser bdLoadWindow
+		return bd_load_answer
+	else
+		abort "ERROR[bdLoadAskUser]: either load_dacvalstr, dacvalstr, or listboxattr doesn't exist when it should!"
+	endif
+end
+
+function bdLoadAskUserButton(action) : ButtonControl
+	string action
+	variable/g bd_load_answer
+	strswitch(action)
+		case "do_nothing":
+			bd_load_answer = 1
+			dowindow/k bdLoadWindow
+			break
+		case "load_from_hdf":
+			bd_load_answer = -1
+			dowindow/k bdLoadWindow
+			break
+	endswitch
+end
+
+
+Window bdLoadWindow() : Panel
+	PauseUpdate; Silent 1 // building window
+	NewPanel /W=(0,0,840,530) // window size
+	ModifyPanel frameStyle=2
+	SetDrawLayer UserBack
+	SetDrawEnv fsize= 25,fstyle= 1
+	DrawText 90, 35,"BabyDAC Load From HDF" // Headline
+	SetDrawEnv fsize= 20,fstyle= 1
+	DrawText 70, 65,"Current Setup"
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 12,85,"CHANNEL"
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 108,85,"VOLT (mV)"
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 208,85,"LIM (mV)"
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 308,85,"Label"
+
+	ListBox currentdaclist,pos={10,90},size={400,400},fsize=16,frame=2 // interactive list
+	ListBox currentdaclist,fStyle=1,listWave=root:dacvalstr,selWave=root:listboxattr,mode= 1
+
+	variable x_offset = 420
+	SetDrawEnv fsize= 20,fstyle= 1
+	DrawText 70+x_offset, 65,"Load from HDF Setup"
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 12+x_offset,85,"CHANNEL"
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 108+x_offset,85,"VOLT (mV)"
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 208+x_offset,85,"LIM (mV)"
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 308+x_offset,85,"Label"
+
+	ListBox loaddaclist,pos={10+x_offset,90},size={400,400},fsize=16,frame=2 // interactive list
+	ListBox loaddaclist,fStyle=1,listWave=root:load_dacvalstr,selWave=root:listboxattr,mode= 1
+
+	Button do_nothing,pos={80,500},size={120,20},proc=bdloadaskuserbutton,title="Keep Current Setup"
+	Button load_from_hdf,pos={80+x_offset,500},size={100,20},proc=bdloadaskuserbutton,title="Load From HDF"
+EndMacro
+
+
 ////////////////////////
 ///// ACD readings /////
 ////////////////////////
@@ -987,6 +1152,7 @@ Window bdInitWindow() : Panel
 	Button default_dacinit,pos={170,490},size={70,20},proc=bdAskUserUpdate,title="DEFAULT"
 EndMacro
 
+
 function bdAskUserUpdate(action) : ButtonControl
 	string action
 	variable/g bd_answer
@@ -1004,7 +1170,7 @@ end
 
 window BabyDACWindow() : Panel
 	PauseUpdate; Silent 1 // building window
-	NewPanel /W=(0,0,320,530) // window size
+	NewPanel /W=(0,0,420,530) // window size
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv fsize= 25,fstyle= 1
@@ -1015,10 +1181,12 @@ window BabyDACWindow() : Panel
 	DrawText 108,85,"VOLT (mV)"
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 208,85,"LIM (mV)"
-	ListBox daclist,pos={10,90},size={300,390},fsize=16,frame=2 // interactive list
+	SetDrawEnv fsize= 16,fstyle= 1
+	DrawText 308,85,"Label"
+	ListBox daclist,pos={10,90},size={400,400},fsize=16,frame=2 // interactive list
 	ListBox daclist,fStyle=1,listWave=root:dacvalstr,selWave=root:listboxattr,mode= 1
-	Button ramp,pos={50,495},size={65,20},proc=update_BabyDAC,title="RAMP"
-	Button rampallzero,pos={170,495},size={90,20},proc=update_BabyDAC,title="RAMP ALL 0"
+	Button ramp,pos={80,500},size={65,20},proc=update_BabyDAC,title="RAMP"
+	Button rampallzero,pos={220,500},size={90,20},proc=update_BabyDAC,title="RAMP ALL 0"
 endMacro
 
 function update_BabyDAC(action) : ButtonControl
@@ -1031,34 +1199,33 @@ function update_BabyDAC(action) : ButtonControl
 
 	// open temporary connection to babyDAC
 	svar bd_controller_addr
-	openBabyDACconnection("bd_window_resource", bd_controller_addr, verbose=0)
-	nvar bd_window_resource
 
-	strswitch(action)
-		case "ramp":
-			for(i=0;i<16;i+=1)
-				if(str2num(dacvalstr[i][1]) != str2num(old_dacvalstr[i][1]))
-					output = str2num(dacvalstr[i][1])
-					check = rampOutputBD(bd_window_resource, i,output)
-					if(check == 1)
+	openBabyDACconnection("bd_window_resource", bd_controller_addr, verbose=0)
+	nvar bd_window_resource, bd_ramprate
+
+	try
+		strswitch(action)
+			case "ramp":
+				UpdateMultipleBD(bd_window_resource, action="Ramp", ramprate=bd_ramprate, update=1)
+				break
+			case "rampallzero":
+				for(i=0;i<16;i+=1)
+					check = RampOutputBD(bd_window_resource, i, 0)
+					if(check==1)
 						old_dacvalstr[i][1] = dacvalstr[i][1]
-					else
-						dacvalstr[i][1] = old_dacvalstr[i][1]
 					endif
-				endif
-			endfor
-			break
-		case "rampallzero":
-			for(i=0;i<16;i+=1)
-				check = RampOutputBD(bd_window_resource, i, 0)
-				if(check==1)
-					old_dacvalstr[i][1] = dacvalstr[i][1]
-				endif
-			endfor
-			break
-	endswitch
+				endfor
+				break
+		endswitch
+	catch
+		// reset error flag, so code below try block will run
+		// this makes sure the VISA resource is closed and the
+		// custom window is updated
+		variable err = GetRTError(1)
+	endtry
 
 	viClose(bd_window_resource) // close VISA resource
+
 
 	if(bd_num_custom > 0)
 		bdCalcCustomValues()
@@ -1128,17 +1295,23 @@ function/s GetBDDACStatus(instrID)
     // this doesn't actually require instrID
     //     it is only there to be consistent with the other devices
 	variable instrID
-	wave /t dacvalstr = dacvalstr
 	wave bd_boardnumbers = bd_boardnumbers
 	svar bd_controller_addr
 	nvar bd_num_custom
 
-	string buffer=""
+	string buffer="", key=""
+	wave /t dacvalstr = dacvalstr
+	wave/t old_dacvalstr
 	variable i=0, j=0
 	do
 		if(numtype(bd_boardnumbers[i])==0)
 			for(j=0;j<4;j+=1)
-				buffer = addJSONkeyval(buffer, "CH"+num2istr(4*i+j), dacvalstr[4*i+j][1])
+				sprintf key, "DAC%d{%s}", 4*i+j, dacvalstr[4*i+j][3]
+				buffer = addJSONkeyval(buffer, key, old_dacvalstr[4*i+j])  	// This is actually where DACs are at
+//				buffer = addJSONkeyval(buffer, key, dacvalstr[4*i+j][1])	 	// This is only true if everything has been ramped
+				if (str2num(dacvalstr[4*i+j][1]) != str2num(old_dacvalstr[4*i+j]))
+					printf "\r\rWARNING[GetBDDACStatus]: DACs may not be set where you think!! Old_dacvalstr[%d] = %.1fmV, dacvalstr[%d] = %.1fmV.\rOld_dacvalstr is likely where DACs really are\r\r", 4*i+j, str2num(old_dacvalstr[4*i+j]), 4*i+j, str2num(dacvalstr[4*i+j][1])
+				endif
 			endfor
 		endif
 		i+=1
@@ -1152,6 +1325,7 @@ function/s GetBDDACStatus(instrID)
 			i=i+1
 		while(i<bd_num_custom)
 	endif
+
 
 	buffer = addJSONkeyval(buffer, "com_port", bd_controller_addr, addQuotes=1)
 

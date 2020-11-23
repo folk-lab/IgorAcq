@@ -1,0 +1,5 @@
+This file cannot be stored on GitHub. Request this from Tim or Christian
+
+Since you're here. Other useful info for getting SQL stuff to work:
+1. Copy SQL XOP from Igor files "More Extensions (64-bit)" > Utilities" to "Igor Extensions (64-bit)"
+2. Install postgresql drivers from https://www.postgresql.org/ftp/odbc/versions/msi/
