@@ -503,6 +503,9 @@ function setLS370loggersSchedule(instrID, schedule)
 		case "default":
 			payload = LS370getLoggingScheduleFromConfig("default")
 			break
+		case "default_nomag":
+			payload = LS370getLoggingScheduleFromConfig("default_nomag")
+			break
 		case "mc_exclusive":
 			payload = LS370getLoggingScheduleFromConfig("mc_exclusive")
 			break
@@ -960,9 +963,9 @@ function/s sendLS370(instrID,cmd,method,[payload, keys])
 //	print "SendLS370 temporarily disabled"
 	string headers = "accept: application/json\rlcmi-auth-token: swagger"
 	if(cmpstr(method,"get")==0)
-//		printf "GET: %s%s\rHeaders: %s\r", instrID, cmd, headers  		// DEBUG
+		printf "GET: %s%s\rHeaders: %s\r", instrID, cmd, headers  		// DEBUG
 		response = getHTTP(instrID,cmd,headers)
-//		printf "RESPONSE: %s\r", response									// DEBUG
+		printf "RESPONSE: %s\r", response									// DEBUG
 	elseif(cmpstr(method,"post")==0)
 //		printf "POST: %s%s\rHeaders: %s\r", instrID, cmd, headers  	// DEBUG
 		response = postHTTP(instrID,cmd,payload,headers)
@@ -1009,11 +1012,13 @@ function/s getLS370Status(instrID)
 	if(cmpstr(ls_system,"bfsmall") == 0)
 		channelLabel = "ld_mc,ld_50K,ld_4K,ld_magnet,ld_still"
 		stillLabel = "ld_still_heater"
-		ch_idx = "6,1,2,4,5"
+//		ch_idx = "6,1,2,4,5"
+		ch_idx = "mc,50k,4k,magnet,still"
 	elseif(cmpstr(ls_system,"bfbig") == 0)
 		channelLabel = "xld_50K,xld_4K,xld_magnet,xld_still,xld_mc"
 		stillLabel = "xld_still_heater"
-		ch_idx = "1,2,3,5,6"
+//		ch_idx = "1,2,3,5,6"
+		ch_idx = "50k,4k,magnet,still,mc"
 	else
 		print "[ERROR] \"getLSStatus\": pass the system id as instrID: \"ld\" or \"xld\"."
 	endif
@@ -1045,10 +1050,11 @@ function/s getLS370Status(instrID)
 	string searchStr="", statement="", timestamp="", temp="", tempBuffer="", channel_label
 	variable i=0
 	for(i=0;i<itemsinlist(channelLabel,",");i+=1)
-		sprintf searchStr, "loggingschedules:default:channels:ch%s:max", stringfromlist(i,ch_idx,",")
+		sprintf searchStr, "loggingschedules:default:channels:%s:max", stringfromlist(i,ch_idx,",")
 		
-		timestamp = sc_SQLtimestamp(str2num(getJSONvalue(jstr,searchStr)))		
+//		timestamp = sc_SQLtimestamp(str2num(getJSONvalue(jstr,searchStr)))		
 //		timestamp = sc_SQLtimestamp(3600) // Temporarily allow any old measurement of temp
+		timestamp = sc_SQLtimestamp(1) // Temporarily always request new
 		
 		sprintf statement, "SELECT temperature_k FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, temp_schema, stringfromlist(i,channelLabel,","), timestamp
 		temp = requestSQLValue(statement)

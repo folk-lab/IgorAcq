@@ -48,8 +48,8 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 	
 	string comm = ""
 	sprintf comm, "name=FastDAC,instrID=%s,visa_address=%s" instrID, visa_address
-//	string options = "baudrate=1750000,databits=8,stopbits=1,parity=0,test_query=*IDN?"
-	string options = "baudrate=57600,databits=8,stopbits=1,parity=0,test_query=*IDN?" // Use this option if using USB fdac
+ 	string options = "baudrate=1750000,databits=8,stopbits=1,parity=0,test_query=*IDN?"
+//	string options = "baudrate=57600,databits=8,stopbits=1,parity=0,test_query=*IDN?" // Use this option if using USB fdac
 	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
 	
 	if(paramisdefault(master))
@@ -81,6 +81,9 @@ function getFADCmeasureFreq(instrID)
 	
 	variable numadc, samplefreq
 	numadc = getnumfadc() 
+	if (numadc == 0)
+		numadc = 1
+	endif
 	samplefreq = getFADCspeed(instrID)
 	return samplefreq/numadc
 end
@@ -443,7 +446,7 @@ function rampOutputFDAC(instrID,channel,output,[ramprate, ignore_lims]) // Units
 		
 	// Check that ramprate is within software limit, otherwise use software limit
 	if (ramprate > str2num(fdacvalstr[channel][4]))
-		printf "[WARNING] \"rampOutputfdac\": Ramprate of %.0fmV/s requested for channel %d. Using max_ramprate of %.0fmV/s instead\n" ramprate, channel, str2num(fdacvalstr[channel][4])
+		//printf "[WARNING] \"rampOutputfdac\": Ramprate of %.0fmV/s requested for channel %d. Using max_ramprate of %.0fmV/s instead\n" ramprate, channel, str2num(fdacvalstr[channel][4])
 		ramprate = str2num(fdacvalstr[channel][4])
 	endif
 		
@@ -1060,73 +1063,73 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 	endfor
 
 	// open plots and distribute on screen
-	variable graphopen=0
-	string openplots=""
-	string num
-	string match_str
-	for(i=0;i<itemsinlist(channels,",");i+=1)
-		num = stringfromlist(i,channels,",")
-		wn = "timeSeriesADC"+num
-		graphopen=0
-		for(j=0;j<itemsinlist(graphtitle, "|");j+=1)
-			sprintf match_str, "*%s*", wn
-			if(stringmatch(stringfromlist(j,graphtitle, "|"), match_str))
-				graphopen = 1
-				openplots+= stringfromlist(j,graphnumlist)+";"
-				label /w=$stringfromlist(j,graphnumlist) bottom,  "time [s]"
-				TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 datestring
-			endif
-		endfor
-		if(!graphopen)
-			display $wn
-			setwindow kwTopWin, graphicsTech=0
-			label bottom, "time [s]"
-			TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 datestring
-			openplots+= winname(0,1)+";"
-		endif
-		
-		wn = "fftADC"+num
-		graphopen=0
-		for(j=0;j<itemsinlist(graphtitle, "|");j+=1)
-			sprintf match_str, "*%s*", wn
-			if(stringmatch(stringfromlist(j,graphtitle, "|"), match_str))
-				graphopen = 1
-				openplots+= stringfromlist(j,graphnumlist)+";"
-				label /w=$stringfromlist(j,graphnumlist) bottom,  "frequency [Hz]"
-				if(linear)
-					label/w=$stringfromlist(j,graphnumlist) left, "Spectrum [V/sqrt(Hz)]"
-				else
-					label/w=$stringfromlist(j,graphnumlist) left, "Spectrum [dBV/sqrt(Hz)]"
-				endif
-				TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 datestring
-			endif
-		endfor
-		if(!graphopen)
-			display $wn
-			setwindow kwTopWin, graphicsTech=0
-			label bottom, "frequency [Hz]"
-			if(linear)
-				label left, "Spectrum [V/sqrt(Hz)]"
-			else
-				label left, "Spectrum [dBV/sqrt(Hz)]"
-			endif
-			TextBox/W=$stringfromlist(j,graphnumlist,",")/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 datestring
-			openplots+= winname(0,1)+";"
-		endif
-	endfor
-
-	// tile windows
-	string cmd1, cmd2, window_string
-	sprintf cmd1, "TileWindows/O=1/A=(%d,1) ", numChannels*2 
-	cmd2 = ""
-	// Tile graphs
-	for(i=0;i<itemsinlist(openplots);i=i+1)
-		window_string = stringfromlist(i,openplots)
-		cmd1+= window_string +","
-		cmd2 = "DoWindow/F " + window_string
-		execute(cmd2)
-	endfor
-	execute(cmd1)
+//	variable graphopen=0
+//	string openplots=""
+//	string num
+//	string match_str
+//	for(i=0;i<itemsinlist(channels,",");i+=1)
+//		num = stringfromlist(i,channels,",")
+//		wn = "timeSeriesADC"+num
+//		graphopen=0
+//		for(j=0;j<itemsinlist(graphtitle, "|");j+=1)
+//			sprintf match_str, "*%s*", wn
+//			if(stringmatch(stringfromlist(j,graphtitle, "|"), match_str))
+//				graphopen = 1
+//				openplots+= stringfromlist(j,graphnumlist)+";"
+//				label /w=$stringfromlist(j,graphnumlist) bottom,  "time [s]"
+//				TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 datestring
+//			endif
+//		endfor
+//		if(!graphopen)
+//			display $wn
+//			setwindow kwTopWin, graphicsTech=0
+//			label bottom, "time [s]"
+//			TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 datestring
+//			openplots+= winname(0,1)+";"
+//		endif
+//		
+//		wn = "fftADC"+num
+//		graphopen=0
+//		for(j=0;j<itemsinlist(graphtitle, "|");j+=1)
+//			sprintf match_str, "*%s*", wn
+//			if(stringmatch(stringfromlist(j,graphtitle, "|"), match_str))
+//				graphopen = 1
+//				openplots+= stringfromlist(j,graphnumlist)+";"
+//				label /w=$stringfromlist(j,graphnumlist) bottom,  "frequency [Hz]"
+//				if(linear)
+//					label/w=$stringfromlist(j,graphnumlist) left, "Spectrum [V/sqrt(Hz)]"
+//				else
+//					label/w=$stringfromlist(j,graphnumlist) left, "Spectrum [dBV/sqrt(Hz)]"
+//				endif
+//				TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 datestring
+//			endif
+//		endfor
+//		if(!graphopen)
+//			display $wn
+//			setwindow kwTopWin, graphicsTech=0
+//			label bottom, "frequency [Hz]"
+//			if(linear)
+//				label left, "Spectrum [V/sqrt(Hz)]"
+//			else
+//				label left, "Spectrum [dBV/sqrt(Hz)]"
+//			endif
+//			TextBox/W=$stringfromlist(j,graphnumlist,",")/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 datestring
+//			openplots+= winname(0,1)+";"
+//		endif
+//	endfor
+//
+//	// tile windows
+//	string cmd1, cmd2, window_string
+//	sprintf cmd1, "TileWindows/O=1/A=(%d,1) ", numChannels*2 
+//	cmd2 = ""
+//	// Tile graphs
+//	for(i=0;i<itemsinlist(openplots);i=i+1)
+//		window_string = stringfromlist(i,openplots)
+//		cmd1+= window_string +","
+//		cmd2 = "DoWindow/F " + window_string
+//		execute(cmd2)
+//	endfor
+//	execute(cmd1)
 
 	for(i=0;i<numAverage;i+=1)
 		// set up and execute command
@@ -1154,9 +1157,9 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 			bytes_read += read_chunk
 			totaldump = bytesSec*(stopmstimer(-2)-bufferDumpStart)*1e-6
 			if(totaldump-bytes_read < saveBuffer)
-				for(j=0;j<itemsinlist(openplots,",");j+=1)
-					doupdate/w=$stringfromlist(j,openplots,",")
-				endfor
+//				for(j=0;j<itemsinlist(openplots,",");j+=1)
+//					doupdate/w=$stringfromlist(j,openplots,",")
+//				endfor
 			endif
 		while(totalbytesreturn-bytes_read > read_chunk)
 		// do one last read if any data left to read
@@ -1257,23 +1260,23 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 //	execute(cmd1)
 	
 	// try to scale y axis in plot is linear scale
-	if(linear)
-		variable searchStart = 0, maxpeak = 0, cutoff = 0.1
-		for(i=0;i<numChannels;i+=1)
-			fftnames = "fftADC"+stringfromlist(i,channels,",")
-			wave fftwave = $fftnames
-			searchStart = 1.0
-			maxpeak = 0
-			do
-				findpeak/q/r=(searchStart,bandwidth/2.0)/i/m=(cutoff) fftwave
-				if(abs(v_peakval) > abs(maxpeak))
-					maxpeak = v_peakval
-				endif
-				searchStart = v_peakloc+1.0
-			while(v_flag == 0)
-			setaxis/w=$stringfromlist(i,openplots,",") left 0.0,maxpeak
-		endfor
-	endif
+//	if(linear)
+//		variable searchStart = 0, maxpeak = 0, cutoff = 0.1
+//		for(i=0;i<numChannels;i+=1)
+//			fftnames = "fftADC"+stringfromlist(i,channels,",")
+//			wave fftwave = $fftnames
+//			searchStart = 1.0
+//			maxpeak = 0
+//			do
+//				findpeak/q/r=(searchStart,bandwidth/2.0)/i/m=(cutoff) fftwave
+//				if(abs(v_peakval) > abs(maxpeak))
+//					maxpeak = v_peakval
+//				endif
+//				searchStart = v_peakloc+1.0
+//			while(v_flag == 0)
+//			setaxis/w=$stringfromlist(i,openplots,",") left 0.0,maxpeak
+//		endfor
+//	endif
 	
 	if (nosave == 0)
 		

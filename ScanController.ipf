@@ -2267,7 +2267,7 @@ function SaveWaves([msg,save_experiment,fastdac, wave_names])
 					endif
 					filename = "dat"+filenumstr+wn
 
-//					duplicate $wn $filename    ////////////////////////////////////////////////////////
+					duplicate $wn $filename   
 
 					if(sc_Printfadc)
 						print filename
@@ -2285,7 +2285,7 @@ function SaveWaves([msg,save_experiment,fastdac, wave_names])
 						savename = fadcvalstr[ii][3]+str_2d+"_RAW"
 
 
-//						duplicate $wn_raw $filename  ///////////////////////////////////////////////////
+						duplicate $wn_raw $filename  
 
 
 						duplicate/O $wn_raw $savename  // To store in HDF with more easily identifiable name
