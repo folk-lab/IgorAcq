@@ -1445,17 +1445,19 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 
 /////////////////////// END OF CONTROL MODES //////////////////////////////////////////		
 			
-		print 	"COMMAND: setLS370controlParameters(ls370) //sets defaults (can be adapted later to give more control)\r"
-		ans = ask_continue(ask)
-		if(ans == 1)
-			setLS370controlParameters(ls370) //sets defaults (can be adapted later to give more control)
-		endif	
+//		print 	"COMMAND: setLS370controlParameters(ls370) //sets defaults (can be adapted later to give more control)\r"
+//		ans = ask_continue(ask)
+//		if(ans == 1)
+//			setLS370controlParameters(ls370) //sets defaults (can be adapted later to give more control)
+//		endif	
+//		
+//		print 	"COMMAND: getLS370controlParameters(ls370)\r"
+//		ans = ask_continue(ask)
+//		if(ans == 1)
+//		   printf "RETURN: %s\r\r", getLS370controlParameters(ls370)
+//		endif	
+//		
 		
-		print 	"COMMAND: getLS370controlParameters(ls370)\r"
-		ans = ask_continue(ask)
-		if(ans == 1)
-		   printf "RETURN: %s\r\r", getLS370controlParameters(ls370)
-		endif	
 /////////////////////// PID PARAMS //////////////////////////////////////////		
 //		print 	"COMMAND: setLS370tempSetpoint(ls370,100) //100mK\r"
 //		ans = ask_continue(ask)
@@ -1588,17 +1590,17 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 	
 end
 
-function ask_continue(ask)
-	variable ask
-	
-	variable ans
-	if(ask ==1)
-		ans = ask_user("Send command?", type=2)
-		if (ans == 3)
-			abort
-		endif
-		return ans
-	else
-		return 1
-	endif
-end
+//function ask_continue(ask)
+//	variable ask
+//	
+//	variable ans
+//	if(ask ==1)
+//		ans = ask_user("Send command?", type=2)
+//		if (ans == 3)
+//			abort
+//		endif
+//		return ans
+//	else
+//		return 1
+//	endif
+//end
