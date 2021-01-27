@@ -802,7 +802,7 @@ function rampMultipleBD(instrID, channels, setpoint, [ramprate, update, ignore_l
 	wave /t customdacvalstr
 	nvar bd_num_custom
 
-	channels = SF_get_channels(channels)  // Converts label names to Dac channels
+	channels = bd_get_channel_str(channels)  // Converts label names to Dac channels
 
 	if(paramisdefault(ramprate))
 		nvar bd_ramprate
@@ -853,6 +853,34 @@ function ChannelLookUp(channel)
 			return 1
 		endif
 	endif
+end
+
+function/s bd_get_channel_str(channels)
+	// Returns channels as numbers string whether numbers or labels passed
+	string channels
+	
+	string new_channels = "", err_msg
+	variable i = 0
+	string ch
+	wave/t dacvalstr
+	for(i=0;i<itemsinlist(channels, ",");i++)
+		ch = stringfromlist(i, channels, ",")
+		ch = removeLeadingWhitespace(ch)
+		ch = removeTrailingWhiteSpace(ch)
+		if(numtype(str2num(ch)) != 0)
+			duplicate/o/free/t/r=[][3] dacvalstr dacnames
+			findvalue/RMD=[][3]/TEXT=ch/TXOP=0 dacnames
+			if(V_Value == -1)  // Not found
+				sprintf err_msg "ERROR[SF_get_channesl]:No BabyDAC channel found with name %s", ch
+				abort err_msg
+			else  // Replace with DAC number
+				ch = dacvalstr[V_value][0]
+			endif
+		endif
+		new_channels = addlistitem(ch, new_channels, ",", INF)
+	endfor
+	new_channels = new_channels[0,strlen(new_channels)-2]  // Remove comma at end (DESTROYS LIMIT CHECKING OTHERWISE)
+	return new_channels
 end
 
 function UpdateCustom(channel,setpoint)
@@ -920,9 +948,9 @@ end
 //////////////////////////////////
 ///// Load BabyDACs from HDF /////
 //////////////////////////////////
-function bdSaveToHDF()
-
-end
+//function bdSaveToHDF()
+//
+//end
 
 
 function bdLoadFromHDF(datnum, [no_check])
