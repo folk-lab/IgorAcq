@@ -528,197 +528,198 @@ function/T ScanFastDAC2DLineCut(fdID, width, minx, maxx, channelsx, starty, finy
 	variable i=0, j=0, center=0
 	string line_eq_str
 
-	// Check inputs
-	if ((paramisdefault(slope) || paramisdefault(y_int)) && (paramisdefault(x1) || paramisdefault(y1) || paramisdefault(x2) || paramisdefault(y2)))
-		abort "Must provide slope and y_int, or all of x1, y1, x2, y2"
-	endif
-
-	// Reconnect instruments
-	sc_openinstrconnections(0)
-
-	// Set defaults
-	nvar fd_ramprate
-	variable has_fchan
-	rampratex = paramisdefault(rampratex) ? fd_ramprate : rampratex
-	rampratey = ParamIsDefault(rampratey) ? fd_ramprate : rampratey
-	delayy = ParamIsDefault(delayy) ? 0.5 : delayy
-	if (paramisdefault(channelsxfast))
-		channelsxfast = channelsx
-		has_fchan = 0
-	else
-		if (ParamIsDefault(fastch_ratio))
-			abort "Must include a multiplier for finest axis"
-		endif
-		has_fchan = 1
-	endif
-	fastch_ratio = ParamIsDefault(fastch_ratio) ? 1 : fastch_ratio
-	notch = selectstring(paramisdefault(notch), notch, "")
-   comments = selectstring(paramisdefault(comments), comments, "")
-   cs_wname = selectstring(paramisdefault(cs_wname), cs_wname, "cscurrent")
-   // Calculate starting center
-   // center = LC_next_transition(x1, y1, x2, y2, starty)
-   if (ParamIsDefault(slope) || ParamIsDefault(y_int))
-   		slope = (y2 - y1)/(x2 - x1) // Calculate slope
-   		Y_int = y1 - (slope * x1) // Calculate y intercept
-   endif
-   
-   variable use_bd = paramisdefault(bdid) ? 0 : 1 		// Whether using both FD and BD or just FD
-   // Set sc_scanVars struct
- 	struct FD_ScanVars Fsv
- 	if(use_bd == 0)  	// if not using BabyDAC then fully init FDscanVars
-	   SF_init_FDscanVars(Fsv, fdID, center-width, center+width, channelsxfast, numpts, rampratex, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
-	   						 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey)
-	else  				// Using BabyDAC for Y axis so init x in FD_ScanVars, and init y in BD_ScanVars
-	   SF_init_FDscanVars(Fsv, fdID, center-width, center+width, channelsxfast, numpts, rampratex, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy)
-		struct BD_ScanVars Bsv
-		SF_init_BDscanVars(Bsv, bdID, starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey)
-	endif
-   
-   // Set ProcessList Struct
-   struct fdRV_ProcessList PL
-   SFfd_init_ProcessList(PL, RCcutoff, numAverage, notch)
-   
-   // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
-   SFfd_pre_checks(Fsv)  
-   if(use_bd == 1)
-   		SFbd_pre_checks(Bsv)
-   	endif
-   	
-   
-   // Ramp to start without checks
-   SFfd_ramp_start(Fsv, y_only = 1, ignore_lims=1)
-   if(use_bd == 1)
-   		SFbd_ramp_start(Bsv, ignore_lims=1)
-   	endif
-   	
-   	// Let gates settle
-	sc_sleep(Fsv.delayy)
-
-	// Get Labels for waves
-	string x_label, y_label
-	x_label = GetLabel(Fsv.channelsx, fastdac=1)
-	if (use_bd == 0) // If using FastDAC on slow axis
-		y_label = GetLabel(Fsv.channelsy, fastdac=1)
-	else // If using BabyDAC on slow axislabels
-		y_label = GetLabel(Bsv.channelsy, fastdac=0)
-	endif
-
-	
-	
-	// Main measurement loop
-	variable setpointy, mid
-	variable stepsize = (finy-starty)/(Fsv.numptsy-1)
-	// Make "real" centers wave for reference
-	make/o/N=(Fsv.numptsy) lc_centers
-	make/o/N=(Fsv.numptsy) lc_centers_y
-	for(i=0; i<Fsv.numptsy; i++)
-		// Calculate setpoint
-		setpointy = starty + (i*stepsize)	// Note: Again, setpointy is independent of FD/BD
-		
-		// Calculate next center
-	   center = LC_next_center(slope, y_int, setpointy, starty, stepsize, i)
-	  
-	   // Check that scan is in bounds
-	   if (has_fchan == 1)
-	   		if (center < minx || center > maxx)
-		   		print "Last used slope " + num2str(slope) + " and intercept " + num2str(y_int)
-	   			abort "Scan out of bounds, run SaveWaves(msg=\"linecut\",fastdac=1)"
-	   		endif
-	   else
-	   		if (center-width < minx || center+width>maxx)
-		   		print "Last used slope " + num2str(slope) + " and intercept " + num2str(y_int)
-	   			abort "Scan out of bounds, run SaveWaves(msg=\"linecut\",fastdac=1)"
-	   		endif
-	   endif
-	   
-	   // Only update after checks are passed
-	   	line_eq_str = ""
-		line_eq_str = addlistItem(num2str(slope), line_eq_str, ";", INF)
-		line_eq_str = addlistItem(num2str(y_int), line_eq_str, ";", INF)
-	   
-	   // Update Fsv 
-	   if(use_bd == 0)  	// if not using BabyDAC then fully init FDscanVars
-	  		mid = 0
-	   		if (has_fchan == 0)
-				mid = center
-	   		endif
-	   		SF_init_FDscanVars(Fsv, fdID, mid-width, mid+width, channelsxfast, numpts, rampratex, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
-	   						 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey)
-		else  				// Using BabyDAC for Y axis so init x in FD_ScanVars, and init y in BD_ScanVars
-	   		SF_init_FDscanVars(Fsv, fdID, mid-width, mid+width, channelsxfast, numpts, rampratex, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy)
-	   	endif
-	   	
-	   	// If using AWG then get that now and check it
-		struct fdAWG_list AWG
-		if(use_AWG)	
-			fdAWG_get_global_AWG_list(AWG)
-			SFawg_set_and_precheck(AWG, Fsv)  // Note: sets SV.numptsx here and AWG.use_AWG = 1 if pass checks
-		else  // Don't use AWG
-			AWG.use_AWG = 0  	// This is the default, but just putting here explicitly
-		endif
-	  
-	   if (i == 0)
-		   // Make waves												// Note: Using just starty, finy because initwaves doesn't care if it's FD/BD
-			InitializeWaves(Fsv.startx, Fsv.finx, Fsv.numptsx, starty=starty, finy=finy, numptsy=Fsv.numptsy, x_label=x_label, y_label=y_label, linecut=1, fastdac=1)
-		endif
-	    
-		if (use_bd == 0) // If using FastDAC on slow axis
-			RampMultipleFDac(Fsv.instrID, Fsv.channelsy, setpointy, ramprate=Fsv.rampratey, ignore_lims=1)
-		else // If using BabyDAC on slow axislabels
-			RampMultipleBD(Bsv.instrID, Bsv.channelsy, setpointy, ramprate=Bsv.rampratey, ignore_lims=1)
-		endif
-		
-		
-		// Ramp X and set charge sensor
-	   	if (has_fchan == 1)
-			RampMultipleFDac(Fsv.instrID, channelsxfast, 0 - (0.1*width), ramprate=sweeprate*10, ignore_lims=1)
-			RampMultipleFDac(Fsv.instrID, channelsx, center, ignore_lims=1)
-		else
-			RampMultipleFDac(Fsv.instrID, channelsx, center - (0.1*width), ignore_lims=1)
-	   	endif
-
-		if (!paramisdefault(cs_gate))
-		   CorrectChargeSensor(fd=Fsv.instrID, fdchannelstr=cs_gate, fadcID=Fsv.instrID, fadcchannel=0, check=0, direction=1)
-		endif	
-		
-		// Ramp back again
-		if (has_fchan == 1)
-			RampMultipleFDac(Fsv.instrID, channelsxfast, 0, ramprate=10*fastch_ratio, ignore_lims=1)
-		else
-			RampMultipleFDac(Fsv.instrID, channelsx, center, ramprate=100, ignore_lims=1)
-	   	endif
-		
-		// Ramp to start of fast axis
-		SFfd_ramp_start(Fsv, ignore_lims=1, x_only=1)
-		sc_sleep(Fsv.delayy)
-		// Record fast axis
-		fd_Record_Values(Fsv, PL, i, AWG_list = AWG, linestart=center)
-		// Record real center for reference
-		lc_centers[i] = center + (findtransitionmid($cs_wname)/fastch_ratio) // Real center in LP space
-		lc_centers_y[i] = setpointy
-	endfor
-	
-	// Fast channel x back to 0
-	if (has_fchan == 1)
-		RampMultipleFDac(Fsv.instrID, channelsxfast, 0, ramprate=10*fastch_ratio, ignore_lims=1)
-	endif
-
-	// Save by default
-	if (nosave == 0)
-  		SaveWaves(msg=comments, fastdac=1)
-  	else
-  		dowindow /k SweepControl
-	endif
-	
-	/////////////////////// something like this, but maybe should be updated each time and printed on abort or something? 
-	line_eq_str = ""
-	line_eq_str = addlistItem(num2str(slope), line_eq_str, ";", INF)
-	line_eq_str = addlistItem(num2str(y_int), line_eq_str, ";", INF)
-	
-	print "Completed linecut with final slope " + num2str(slope) + " and intercept " + num2str(y_int)
-	
-	return line_eq_str
-	////////////////////////////
+//	// Check inputs
+//	if ((paramisdefault(slope) || paramisdefault(y_int)) && (paramisdefault(x1) || paramisdefault(y1) || paramisdefault(x2) || paramisdefault(y2)))
+//		abort "Must provide slope and y_int, or all of x1, y1, x2, y2"
+//	endif
+//
+//	// Reconnect instruments
+//	sc_openinstrconnections(0)
+//
+//	// Set defaults
+//	nvar fd_ramprate
+//	variable has_fchan
+//	rampratex = paramisdefault(rampratex) ? fd_ramprate : rampratex
+//	rampratey = ParamIsDefault(rampratey) ? fd_ramprate : rampratey
+//	delayy = ParamIsDefault(delayy) ? 0.5 : delayy
+//	if (paramisdefault(channelsxfast))
+//		channelsxfast = channelsx
+//		has_fchan = 0
+//	else
+//		if (ParamIsDefault(fastch_ratio))
+//			abort "Must include a multiplier for finest axis"
+//		endif
+//		has_fchan = 1
+//	endif
+//	fastch_ratio = ParamIsDefault(fastch_ratio) ? 1 : fastch_ratio
+//	notch = selectstring(paramisdefault(notch), notch, "")
+//   comments = selectstring(paramisdefault(comments), comments, "")
+//   cs_wname = selectstring(paramisdefault(cs_wname), cs_wname, "cscurrent")
+//   // Calculate starting center
+//   // center = LC_next_transition(x1, y1, x2, y2, starty)
+//   if (ParamIsDefault(slope) || ParamIsDefault(y_int))
+//   		slope = (y2 - y1)/(x2 - x1) // Calculate slope
+//   		Y_int = y1 - (slope * x1) // Calculate y intercept
+//   endif
+//   
+//   variable use_bd = paramisdefault(bdid) ? 0 : 1 		// Whether using both FD and BD or just FD
+//   // Set sc_scanVars struct
+// 	struct FD_ScanVars Fsv
+// 	if(use_bd == 0)  	// if not using BabyDAC then fully init FDscanVars
+//	   SF_init_FDscanVars(Fsv, fdID, center-width, center+width, channelsxfast, numpts, rampratex, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
+//	   						 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey)
+//	else  				// Using BabyDAC for Y axis so init x in FD_ScanVars, and init y in BD_ScanVars
+//	   SF_init_FDscanVars(Fsv, fdID, center-width, center+width, channelsxfast, numpts, rampratex, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy)
+//		struct BD_ScanVars Bsv
+//		SF_init_BDscanVars(Bsv, bdID, starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey)
+//	endif
+//   
+//   // Set ProcessList Struct
+//   struct fdRV_ProcessList PL
+//   SFfd_init_ProcessList(PL, RCcutoff, numAverage, notch)
+//   
+//   // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
+//   SFfd_pre_checks(Fsv)  
+//   if(use_bd == 1)
+//   		SFbd_pre_checks(Bsv)
+//   	endif
+//   	
+//   
+//   // Ramp to start without checks
+//   SFfd_ramp_start(Fsv, y_only = 1, ignore_lims=1)
+//   if(use_bd == 1)
+//   		SFbd_ramp_start(Bsv, ignore_lims=1)
+//   	endif
+//   	
+//   	// Let gates settle
+//	sc_sleep(Fsv.delayy)
+//
+//	// Get Labels for waves
+//	string x_label, y_label
+//	x_label = GetLabel(Fsv.channelsx, fastdac=1)
+//	if (use_bd == 0) // If using FastDAC on slow axis
+//		y_label = GetLabel(Fsv.channelsy, fastdac=1)
+//	else // If using BabyDAC on slow axislabels
+//		y_label = GetLabel(Bsv.channelsy, fastdac=0)
+//	endif
+//
+//	
+//	
+//	// Main measurement loop
+//	variable setpointy, mid
+//	variable stepsize = (finy-starty)/(Fsv.numptsy-1)
+//	// Make "real" centers wave for reference
+//	make/o/N=(Fsv.numptsy) lc_centers
+//	make/o/N=(Fsv.numptsy) lc_centers_y
+//	for(i=0; i<Fsv.numptsy; i++)
+//		// Calculate setpoint
+//		setpointy = starty + (i*stepsize)	// Note: Again, setpointy is independent of FD/BD
+//		
+//		// Calculate next center
+//	   center = LC_next_center(slope, y_int, setpointy, starty, stepsize, i)
+//	  
+//	   // Check that scan is in bounds
+//	   if (has_fchan == 1)
+//	   		if (center < minx || center > maxx)
+//		   		print "Last used slope " + num2str(slope) + " and intercept " + num2str(y_int)
+//	   			abort "Scan out of bounds, run SaveWaves(msg=\"linecut\",fastdac=1)"
+//	   		endif
+//	   else
+//	   		if (center-width < minx || center+width>maxx)
+//		   		print "Last used slope " + num2str(slope) + " and intercept " + num2str(y_int)
+//	   			abort "Scan out of bounds, run SaveWaves(msg=\"linecut\",fastdac=1)"
+//	   		endif
+//	   endif
+//	   
+//	   // Only update after checks are passed
+//	   	line_eq_str = ""
+//		line_eq_str = addlistItem(num2str(slope), line_eq_str, ";", INF)
+//		line_eq_str = addlistItem(num2str(y_int), line_eq_str, ";", INF)
+//	   
+//	   // Update Fsv 
+//	   if(use_bd == 0)  	// if not using BabyDAC then fully init FDscanVars
+//	  		mid = 0
+//	   		if (has_fchan == 0)
+//				mid = center
+//	   		endif
+//	   		SF_init_FDscanVars(Fsv, fdID, mid-width, mid+width, channelsxfast, numpts, rampratex, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
+//	   						 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey)
+//		else  				// Using BabyDAC for Y axis so init x in FD_ScanVars, and init y in BD_ScanVars
+//	   		SF_init_FDscanVars(Fsv, fdID, mid-width, mid+width, channelsxfast, numpts, rampratex, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy)
+//	   	endif
+//	   	
+//	   	// If using AWG then get that now and check it
+//		struct fdAWG_list AWG
+//		if(use_AWG)	
+//			fdAWG_get_global_AWG_list(AWG)
+//			SFawg_set_and_precheck(AWG, Fsv)  // Note: sets SV.numptsx here and AWG.use_AWG = 1 if pass checks
+//		else  // Don't use AWG
+//			AWG.use_AWG = 0  	// This is the default, but just putting here explicitly
+//		endif
+//	  
+//	   if (i == 0)
+//		   // Make waves												// Note: Using just starty, finy because initwaves doesn't care if it's FD/BD
+//			InitializeWaves(Fsv.startx, Fsv.finx, Fsv.numptsx, starty=starty, finy=finy, numptsy=Fsv.numptsy, x_label=x_label, y_label=y_label, linecut=1, fastdac=1)
+//		endif
+//	    
+//		if (use_bd == 0) // If using FastDAC on slow axis
+//			RampMultipleFDac(Fsv.instrID, Fsv.channelsy, setpointy, ramprate=Fsv.rampratey, ignore_lims=1)
+//		else // If using BabyDAC on slow axislabels
+//			RampMultipleBD(Bsv.instrID, Bsv.channelsy, setpointy, ramprate=Bsv.rampratey, ignore_lims=1)
+//		endif
+//		
+//		
+//		// Ramp X and set charge sensor
+//	   	if (has_fchan == 1)
+//			RampMultipleFDac(Fsv.instrID, channelsxfast, 0 - (0.1*width), ramprate=sweeprate*10, ignore_lims=1)
+//			RampMultipleFDac(Fsv.instrID, channelsx, center, ignore_lims=1)
+//		else
+//			RampMultipleFDac(Fsv.instrID, channelsx, center - (0.1*width), ignore_lims=1)
+//	   	endif
+//
+//		if (!paramisdefault(cs_gate))
+//			abort "Need to implement a CorrectChargeSensor function for this"
+////		   CorrectChargeSensor(fd=Fsv.instrID, fdchannelstr=cs_gate, fadcID=Fsv.instrID, fadcchannel=0, check=0, direction=1)
+//		endif	
+//		
+//		// Ramp back again
+//		if (has_fchan == 1)
+//			RampMultipleFDac(Fsv.instrID, channelsxfast, 0, ramprate=10*fastch_ratio, ignore_lims=1)
+//		else
+//			RampMultipleFDac(Fsv.instrID, channelsx, center, ramprate=100, ignore_lims=1)
+//	   	endif
+//		
+//		// Ramp to start of fast axis
+//		SFfd_ramp_start(Fsv, ignore_lims=1, x_only=1)
+//		sc_sleep(Fsv.delayy)
+//		// Record fast axis
+//		fd_Record_Values(Fsv, PL, i, AWG_list = AWG, linestart=center)
+//		// Record real center for reference
+//		lc_centers[i] = center + (findtransitionmid($cs_wname)/fastch_ratio) // Real center in LP space
+//		lc_centers_y[i] = setpointy
+//	endfor
+//	
+//	// Fast channel x back to 0
+//	if (has_fchan == 1)
+//		RampMultipleFDac(Fsv.instrID, channelsxfast, 0, ramprate=10*fastch_ratio, ignore_lims=1)
+//	endif
+//
+//	// Save by default
+//	if (nosave == 0)
+//  		SaveWaves(msg=comments, fastdac=1)
+//  	else
+//  		dowindow /k SweepControl
+//	endif
+//	
+//	/////////////////////// something like this, but maybe should be updated each time and printed on abort or something? 
+//	line_eq_str = ""
+//	line_eq_str = addlistItem(num2str(slope), line_eq_str, ";", INF)
+//	line_eq_str = addlistItem(num2str(y_int), line_eq_str, ";", INF)
+//	
+//	print "Completed linecut with final slope " + num2str(slope) + " and intercept " + num2str(y_int)
+//	
+//	return line_eq_str
+//	////////////////////////////
 	
 end
 
@@ -942,25 +943,7 @@ end
 // SFfd = ScanFunction fastDac specific
 // SFbd = ScanFunction babyDac specific
 
-function SFfd_set_numpts_sweeprate(SV)
-   struct FD_ScanVars &SV
-   
-   // If NaN then set to zero so rest of logic works
-   if(numtype(SV.sweeprate) == 2)
-   		SV.sweeprate = 0
-   	endif
-   
-   // Chose which input to use for numpts of scan
-   if (SV.numptsx == 0 && SV.sweeprate == 0)
-      abort "ERROR[ScanFastDac]: User must provide either numpts OR sweeprate for scan [neither provided]"
-   elseif (SV.numptsx!=0 && SV.sweeprate!=0)
-      abort "ERROR[ScanFastDac]: User must provide either numpts OR sweeprate for scan [both provided]"
-   elseif (SV.numptsx!=0) // If numpts provided, just use that
-      SV.sweeprate = fd_get_sweeprate_from_numpts(SV.instrID, SV.startx, SV.finx, SV.numptsx)
-   elseif (SV.sweeprate!=0) // If sweeprate provided calculate numpts required
-      SV.numptsx = fd_get_numpts_from_sweeprate(SV.instrID, SV.startx, SV.finx, SV.sweeprate)
-   endif
-end
+
 
 function SFfd_init_ProcessList(PL, RCcutoff, numAverage, notch)
    struct fdRV_ProcessList &PL
@@ -974,21 +957,7 @@ function SFfd_init_ProcessList(PL, RCcutoff, numAverage, notch)
 end
 
 
-function/s SFfd_get_adcs()	
-	wave fadcattr
-	wave/t fadcvalstr
-	variable adcCh=0
-	string  adcList = ""
-	variable i = 0
-	for(i=0;i<dimsize(fadcattr,0);i+=1)
-		if(fadcattr[i][2] == 48)
-			adcCh = str2num(fadcvalstr[i][0])
-			adcList = addlistitem(num2istr(adcCh),adcList,",",itemsinlist(adcList,","))	
-		endif
-	endfor
-	return adcList
-end
-	
+
 
 function SFfd_pre_checks(S)
    struct FD_ScanVars &S
@@ -999,97 +968,9 @@ function SFfd_pre_checks(S)
 end
 
 
-function SFfd_ramp_start(S, [ignore_lims, x_only, y_only])
-	// move DAC channels to starting point
-	struct FD_ScanVars &S
-	variable ignore_lims, x_only, y_only
-
-	variable i, setpoint
-	// If x exists ramp them to start
-	if(numtype(strlen(s.channelsx)) == 0 && strlen(s.channelsx) != 0 && y_only != 1)  // If not NaN and not ""
-		for(i=0;i<itemsinlist(S.channelsx,",");i+=1)
-			if(S.direction == 1)
-				setpoint = str2num(stringfromlist(i,S.startxs,","))
-			elseif(S.direction == -1)
-				setpoint = str2num(stringfromlist(i,S.finxs,","))
-			else
-				abort "ERROR[SFfd_ramp_start]: S.direction not set to 1 or -1"
-			endif
-			rampOutputfdac(S.instrID,str2num(stringfromlist(i,S.channelsx,",")),setpoint,ramprate=S.rampratex, ignore_lims=ignore_lims)			
-		endfor
-	endif  
-	
-	// If y exists ramp them to start
-	if(numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0 && x_only != 1)  // If not NaN and not "" and not x only
-		for(i=0;i<itemsinlist(S.channelsy,",");i+=1)
-			rampOutputfdac(S.instrID,str2num(stringfromlist(i,S.channelsy,",")),str2num(stringfromlist(i,S.startys,",")),ramprate=S.rampratey, ignore_lims=ignore_lims)
-		endfor
-	endif
-  
-end
 
 
-function SFfd_set_measureFreq(S)
-   struct FD_ScanVars &S
-   S.samplingFreq = getfadcSpeed(S.instrID)
-   S.numADCs = getNumFADC()
-   S.measureFreq = S.samplingFreq/S.numADCs  //Because sampling is split between number of ADCs being read //TODO: This needs to be adapted for multiple FastDacs
-end
 
-function SFfd_check_ramprates(S)
-  // check if effective ramprate is higher than software limits
-  struct FD_ScanVars &S
-
-  wave/T fdacvalstr
-  svar activegraphs
-
-	variable kill_graphs = 0
-	// Check x's won't be swept to fast by calculated sweeprate for each channel in x ramp
-	// Should work for different start/fin values for x
-	variable eff_ramprate, answer, i, k, channel
-	string question
-
-	if(numtype(strlen(s.channelsx)) == 0 && strlen(s.channelsx) != 0)  // if s.Channelsx != (NaN or "")
-		for(i=0;i<itemsinlist(S.channelsx,",");i+=1)
-			eff_ramprate = abs(str2num(stringfromlist(i,S.startxs,","))-str2num(stringfromlist(i,S.finxs,",")))*(S.measureFreq/S.numptsx)
-			channel = str2num(stringfromlist(i, S.channelsx, ","))
-			if(eff_ramprate > str2num(fdacvalstr[channel][4])*1.05)  // Allow 5% too high for convenience
-				// we are going too fast
-				sprintf question, "DAC channel %d will be ramped at %.1f mV/s, software limit is set to %s mV/s. Continue?", channel, eff_ramprate, fdacvalstr[channel][4]
-				answer = ask_user(question, type=1)
-				if(answer == 2)
-					kill_graphs = 1
-					break
-				endif
-			endif
-		endfor
-	endif
-  
-	// if Y channels exist, then check against rampratey (not sweeprate because only change on slow axis)	
-	if(numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0  && kill_graphs == 0)  // if s.Channelsy != (NaN or "") and not killing graphs yet 
-		for(i=0;i<itemsinlist(S.channelsy,",");i+=1)
-			channel = str2num(stringfromlist(i, S.channelsy, ","))
-			if(s.rampratey > str2num(fdacvalstr[channel][4]))
-				sprintf question, "DAC channel %d will be ramped at %.1f mV/s, software limit is set to %s mV/s. Continue?", channel, S.rampratey, fdacvalstr[channel][4]
-				answer = ask_user(question, type=1)
-				if(answer == 2)
-					kill_graphs = 1
-					break
-				endif
-			endif
-		endfor
-	endif
-
-	if(kill_graphs == 1)  // If user selected do not continue, then kill graphs and abort
-		print("[ERROR] \"RecordValues\": User abort!")
-		dowindow/k SweepControl // kill scan control window
-		for(k=0;k<itemsinlist(activegraphs,";");k+=1)
-			dowindow/k $stringfromlist(k,activegraphs,";")
-		endfor
-		abort
-	endif
-  
-end
 
 
 
@@ -1200,22 +1081,7 @@ function SFfd_check_same_device(S)
 end
 
 
-function SFfd_format_setpoints(start, fin, channels, starts, fins)
-	// Returns strings in starts and fins in the format that fdacRecordValues takes
-	// e.g. fd_format_setpoints(-10, 10, "1,2,3", s, f) will make string s = "-10,-10,-10" and string f = "10,10,10"
-	variable start, fin
-	string channels, &starts, &fins
-	
-	variable i
-	starts = ""
-	fins = ""
-	for(i=0; i<itemsInList(channels, ","); i++)
-		starts = addlistitem(num2str(start), starts, ",")
-		fins = addlistitem(num2str(fin), fins, ",")
-	endfor
-	starts = starts[0,strlen(starts)-2] // Remove comma at end
-	fins = fins[0,strlen(fins)-2]	 		// Remove comma at end
-end
+
 
 
 function SFbd_pre_checks(S)
@@ -1472,7 +1338,7 @@ function SF_init_BDscanVars(s, instrID, [startx, finx, channelsx, numptsx, rampr
 	s.startx = paramisdefault(startx) ? NaN : startx
 	s.finx = paramisdefault(finx) ? NaN : finx
 	if(!paramisdefault(channelsx))
-		channels = SF_get_channels(channelsx)
+		channels = bd_get_channel_str(channelsx)
 		s.channelsx = channels
 	else
 		s.channelsx = ""
@@ -1486,7 +1352,7 @@ function SF_init_BDscanVars(s, instrID, [startx, finx, channelsx, numptsx, rampr
    s.starty = paramisdefault(starty) ? NaN : starty
    s.finy = paramisdefault(finy) ? NaN : finy
 	if(!paramisdefault(channelsy))
-		channels = SF_get_channels(channelsy)
+		channels = bd_get_channel_str(channelsy)
 		s.channelsy = channels
 	else
 		s.channelsy = ""
@@ -1500,146 +1366,3 @@ end
 
 
 
-// structure to hold DAC and ADC channels to be used in fdac scan.
-structure FD_ScanVars
-	// Place to store common ScanVariables for scans with FastDAC
-	// Equivalent to BD_ScanVars for the BabyDAC
-	variable instrID
-	
-	variable lims_checked  	// This is a flag to make sure that checks on software limits/ramprates/sweeprates have
-									// been carried out before executing ramps in record_values
-
-	variable numADCs				// number of ADCs being from (sample rate is split between them)
-	variable samplingFreq		// from getFdacSpeed()
-	variable measureFreq		// MeasureFreq is sampleFreq/numADCs
-	variable sweeprate  		// Sweeprate and numptsx are tied together by measureFreq
-									// Note: Does not work for multiple start/end points! 
-	variable numptsx				// Linked to sweeprate and measureFreq
-
-	string adcList	 
-	
-	string channelsx   
-	variable startx, finx		// Only here to match BD format and because current use is 1 start/fin value for all DACs.
-									// Should use startxs, finxs strings as soon as possible
-	string startxs, finxs 		// Use this ASAP because FastDAC supports different start/fin values for each DAC
-	variable rampratex
-	
-	string channelsy
-	variable starty, finy  	// OK to use starty, finy for things like rampoutputfdac(...)
-	string startys, finys		// Note: Although y channels aren't part of fastdac sweep, store as strings so that check functions work for both x and y 
-	variable numptsy, delayy, rampratey	
-	
-	variable direction		// For storing what direction to scan in (for scanRepeat)
-endstructure
-
-
-function SF_init_FDscanVars(s, instrID, startx, finx, channelsx, numptsx, rampratex, [sweeprate, starty, finy, channelsy, numptsy, rampratey, delayy, direction])
-   // Function to make setting up scanVars struct easier. 
-   // Note: This is designed to store 2D variables, so if just using 1D you still have to specify x at the end of each variable
-   struct FD_ScanVars &s
-   variable instrID
-   variable startx, finx, numptsx, rampratex
-   variable starty, finy, numptsy, delayy, rampratey
-   string channelsx
-   string channelsy
-   variable direction, sweeprate
-
-	string starts = "", fins = ""  // Used for getting string start/fin for x and y
-
-	string channels
-	channels = SF_get_channels(channelsx, fastdac=1)
-
-	// Set Variables in Struct
-   s.instrID = instrID
-   s.channelsx = channels
-   s.adcList = SFfd_get_adcs()
-   
-	s.startx = startx
-	s.finx = finx	
-   s.numptsx = numptsx
-   s.rampratex = rampratex
-   	
-   	// Gets starts/fins in FD string format
-   SFfd_format_setpoints(S.startx, S.finx, S.channelsx, starts, fins)  
-	s.startxs = starts
-	s.finxs = fins
-	
-   s.sweeprate = paramisdefault(sweeprate) ? NaN : sweeprate
-	
-	// For repeat scans
-   s.direction = paramisdefault(direction) ? 1 : direction
-	
-	// Optionally set variables for 2D scan
-   s.starty = paramisdefault(starty) ? NaN : starty
-   s.finy = paramisdefault(finy) ? NaN : finy
-   if (!paramisdefault(channelsy))
-   		channels = SF_get_channels(channelsy, fastdac=1)
-		s.channelsy = channels
-		// Gets starts/fins in FD string format
-	   SFfd_format_setpoints(S.starty, S.finy, S.channelsy, starts, fins)  
-		s.startys = starts
-		s.finys = fins
-	else
-		s.channelsy = ""
-	endif
-	s.numptsy = paramisdefault(numptsy) ? NaN : numptsy
-   s.rampratey = paramisdefault(rampratey) ? NaN : rampratey
-   s.delayy = paramisdefault(delayy) ? NaN : delayy
-
-	// Set variables with some calculation
-   SFfd_set_numpts_sweeprate(S) 	// Checks that either numpts OR sweeprate was provided, and sets both in SV accordingly
-   										// Note: Valid for same start/fin points only (uses S.startx, S.finx NOT S.startxs, S.finxs)
-   SFfd_set_measureFreq(S) 		// Sets S.samplingFreq/measureFreq/numADCs	
-end
-
-
-
-function/s SF_get_channels(channels, [fastdac])
-	// Returns channels as numbers string whether numbers or labels passed
-	string channels
-	variable fastdac
-	
-	string new_channels = "", err_msg
-	variable i = 0
-	string ch
-	if(fastdac == 1)
-		wave/t fdacvalstr
-		for(i=0;i<itemsinlist(channels, ",");i++)
-			ch = stringfromlist(i, channels, ",")
-			ch = removeLeadingWhitespace(ch)
-			ch = removeTrailingWhiteSpace(ch)
-			if(numtype(str2num(ch)) != 0)
-				duplicate/o/free/t/r=[][3] fdacvalstr fdacnames
-				findvalue/RMD=[][3]/TEXT=ch/TXOP=0 fdacnames
-				if(V_Value == -1)  // Not found
-					sprintf err_msg "ERROR[SF_get_channesl]:No FastDAC channel found with name %s", ch
-					abort err_msg
-				else  // Replace with DAC number
-					ch = fdacvalstr[V_value][0]
-				endif
-			endif
-			new_channels = addlistitem(ch, new_channels, ",", INF)
-		endfor
-	else  // Babydac
-		wave/t dacvalstr
-		for(i=0;i<itemsinlist(channels, ",");i++)
-			ch = stringfromlist(i, channels, ",")
-			ch = removeLeadingWhitespace(ch)
-			ch = removeTrailingWhiteSpace(ch)
-			if(numtype(str2num(ch)) != 0)
-				duplicate/o/free/t/r=[][3] dacvalstr dacnames
-				findvalue/RMD=[][3]/TEXT=ch/TXOP=0 dacnames
-				if(V_Value == -1)  // Not found
-					sprintf err_msg "ERROR[SF_get_channesl]:No BabyDAC channel found with name %s", ch
-					abort err_msg
-				else  // Replace with DAC number
-					ch = dacvalstr[V_value][0]
-				endif
-			endif
-			new_channels = addlistitem(ch, new_channels, ",", INF)
-		endfor
-	endif
-	new_channels = new_channels[0,strlen(new_channels)-2]  // Remove comma at end (DESTROYS LIMIT CHECKING OTHERWISE)
-	return new_channels
-end
-	
