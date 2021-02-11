@@ -972,26 +972,25 @@ end
 //// Spectrum Analyzer ////
 //////////////////////////
 
-function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,comments,nosave])
+function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,ca_amp, nosave])
 	// channels must a comma seperated string, refering
 	// to the numbering in the ScanControllerFastDAC window.
 	// scanlength is in sec
 	// if linear is set to 1, the spectrum will be plotted on a linear scale
-	variable instrID, scanlength, numAverage, linear, nosave
+	variable instrID, scanlength, numAverage, nosave, ca_amp
 	string channels, comments
 	string datestring = strTime()
+	
 	
 	if(paramisdefault(comments))
 		comments = ""
 	endif
 	
-	if(paramisdefault(linear) || linear != 1)
-		linear = 0
-	endif
-	
 	if(paramisdefault(numAverage))
 		numAverage = 1
 	endif
+	
+	ca_amp = paramisdefault(ca_amp) ? 9 : ca_amp
 	
 	svar fdackeys
 	
@@ -1032,7 +1031,7 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 	endfor
 	
 	// generate waves to hold time series data
-	string wn = ""
+	string wn = "", wn_lin = ""
 	for(i=0;i<numChannels;i+=1)
 		wn = "timeSeriesADC"+stringfromlist(i,channels,",")
 		make/o/n=(numpts) $wn = nan
@@ -1044,6 +1043,11 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 		wn = "fftADC"+stringfromlist(i,channels,",")
 		make/o/n=(numpts/2) $wn = nan
 		setscale/i x, 0, measureFreq/(2.0), $wn
+		
+		wn_lin = "fftADClin"+stringfromlist(i,channels,",")
+		make/o/n=(numpts/2) $wn_lin = nan
+		setscale/i x, 0, measureFreq/(2.0), $wn_lin
+		
 	endfor
 	
 	// find all open plots
@@ -1180,9 +1184,12 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 		// convert time series to spectrum
 		variable bandwidth = measureFreq/2.0
 		string fftnames = ""
+		string fftnamelin = ""
 		string ffttemps = ""
+		string ffttemplin = ""
 		for(j=0;j<numChannels;j+=1)
 			ffttemps = "ffttempADC"+stringfromlist(j,channels,",")
+			ffttemplin = "ffttempADClin"+stringfromlist(j,channels,",")
 			wn = "timeSeriesADC"+stringfromlist(j,channels,",")
 		
 			wave timewn= $wn
@@ -1191,19 +1198,24 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 		signal[][i]=timewn[p]
 
 			duplicate/o timewn, fftinput
-			fftinput = fftinput*1.0e-3
+			fftinput = fftinput*1.0e-3*10^-ca_amp*1e9  // mV -> V -> A -> nA
 			
 			
 			// USING PERIODOGRAM INSTEAD OF FFT /////
-			if(linear)
-				DSPPeriodogram/PARS/NODC=1 fftinput
-			else
-				DSPPeriodogram/DBR=1/PARS/NODC=1 fftinput
-			endif
+			DSPPeriodogram/DBR=1/PARS/NODC=1 fftinput
 			wave w_Periodogram
+			
 			duplicate/o w_Periodogram, $ffttemps
 			wave fftwn = $ffttemps
 			setscale/i x, 0, bandwidth, fftwn
+			
+			// Calculate linear for integrated
+			
+			DSPPeriodogram/PARS/NODC=1 fftinput
+			wave w_Periodogram
+			duplicate/o w_Periodogram, $ffttemplin
+			wave fftwnlin = $ffttemplin
+			setscale/i x, 0, bandwidth, fftwnlin
 			
 			////////////////////////////////////////
 			
@@ -1221,13 +1233,21 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 			////////////////////////////////////////////// 
 			
 			fftnames = "fftADC"+stringfromlist(j,channels,",")
+			fftnamelin = "fftADClin"+stringfromlist(j,channels,",")
+			
 			wave fftwave = $fftnames
+			wave fftwavelin = $fftnamelin
 			if(i==0)
 				fftwave = fftwn
+				fftwavelin = fftwnlin
 			else
 				fftwave = fftwave*i + fftwn  // So weighting of rows is correct when averaging
 				fftwave = fftwave/(i+1)      // ""
+				
+				fftwavelin = fftwavelin*i + fftwnlin
+				fftwavelin = fftwavelin/(i+1)
 			endif
+			
 		endfor
 //		if(!linear)
 //			fftwn = 20*log(fftwn)
@@ -1289,7 +1309,9 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 		// save the spectrum
 		for(i=0;i<numChannels;i+=1)
 			fftnames = "fftADC"+stringfromlist(i,channels,",")
+			fftnamelin = "fftADClin"+stringfromlist(i,channels,",")
 			HDF5SaveData/IGOR=-1/WRIT=1/Z $fftnames , hdf5_id
+			HDF5SaveData/IGOR=-1/WRIT=1/Z $fftnamelin , hdf5_id
 			if (V_flag != 0)
 				print "HDF5SaveData failed: ", wn
 				return 0
@@ -1306,7 +1328,9 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,linear,com
 	
 		
 		make /FREE /T /N=1 cconfig = prettyJSONfmt(sc_createconfig())
-		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(sc_createSweepLogs(msg=comments))
+		
+		string temp = sc_createSweepLogs(msg=comments)
+		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(temp)
 		
 		// Check that prettyJSONfmt actually returned a valid JSON.
 		sc_confirm_JSON(sweep_logs, name="sweep_logs")
