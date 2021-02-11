@@ -1680,6 +1680,23 @@ function sc_sleep(delay)
 
 end
 
+function asleep(s)
+  // Sleep function which allows user to abort or continue if sleep is longer than 2s
+	variable s
+	variable t1, t2
+	if (s > 2)
+		t1 = datetime
+		doupdate	
+		sleep/S/C=6/B/Q s
+		t2 = datetime-t1
+		if ((s-t2)>5)
+			printf "User continued, slept for %.0fs\r", t2
+		endif
+	else
+		sc_sleep(s)
+	endif
+end
+
 threadsafe function sc_sleep_noupdate(delay)
 	// sleep for delay seconds
 	variable delay
@@ -2008,9 +2025,10 @@ function /s sc_createSweepLogs([msg])
 	svar sc_current_config, sc_hostname, sc_x_label, sc_y_label
 
 	// information about this specific sweep
-	if(!paramisdefault(msg))
-		jstr = addJSONkeyval(jstr, "comment", msg, addQuotes=1)
+	if(numtype(strlen(msg)) != 2) // if null (default or set as null)
+		msg = ""	
 	endif
+	jstr = addJSONkeyval(jstr, "comment", msg, addQuotes=1)
 	jstr = addJSONkeyval(jstr, "filenum", num2istr(filenum))
 	
 	buffer = addJSONkeyval(buffer, "x", sc_x_label, addQuotes=1)
