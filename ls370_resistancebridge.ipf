@@ -963,9 +963,9 @@ function/s sendLS370(instrID,cmd,method,[payload, keys])
 //	print "SendLS370 temporarily disabled"
 	string headers = "accept: application/json\rlcmi-auth-token: swagger"
 	if(cmpstr(method,"get")==0)
-		printf "GET: %s%s\rHeaders: %s\r", instrID, cmd, headers  		// DEBUG
+//		printf "GET: %s%s\rHeaders: %s\r", instrID, cmd, headers  		// DEBUG
 		response = getHTTP(instrID,cmd,headers)
-		printf "RESPONSE: %s\r", response									// DEBUG
+//		printf "RESPONSE: %s\r", response									// DEBUG
 	elseif(cmpstr(method,"post")==0)
 //		printf "POST: %s%s\rHeaders: %s\r", instrID, cmd, headers  	// DEBUG
 		response = postHTTP(instrID,cmd,payload,headers)
