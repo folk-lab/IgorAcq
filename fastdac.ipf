@@ -1194,19 +1194,20 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 		
 			wave timewn= $wn
 			variable le=dimsize(timewn,0)
-		Make/N=(le,numAverage)/D/O signal
-		signal[][i]=timewn[p]
+			Make/N=(le,numAverage)/D/O signal
+			signal[][i]=timewn[p]
 
 			duplicate/o timewn, fftinput
 			fftinput = fftinput*1.0e-3*10^-ca_amp*1e9  // mV -> V -> A -> nA
 			
 			
 			// USING PERIODOGRAM INSTEAD OF FFT /////
-			DSPPeriodogram/DBR=1/PARS/NODC=1 fftinput
+			DSPPeriodogram/PARS/DBR=1/NODC=1 fftinput 
 			wave w_Periodogram
 			
 			duplicate/o w_Periodogram, $ffttemps
 			wave fftwn = $ffttemps
+			fftwn = fftwn+10*log(scanlength)
 			setscale/i x, 0, bandwidth, fftwn
 			
 			// Calculate linear for integrated
@@ -1215,6 +1216,8 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 			wave w_Periodogram
 			duplicate/o w_Periodogram, $ffttemplin
 			wave fftwnlin = $ffttemplin
+			fftwnlin = fftwnlin*scanlength
+			
 			setscale/i x, 0, bandwidth, fftwnlin
 			
 			////////////////////////////////////////
