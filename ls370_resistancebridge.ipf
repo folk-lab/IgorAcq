@@ -59,14 +59,14 @@ function setLS370system(system)
 			ls_label = "LD"				//plate					//labels	  									//IDs
 			string/g bfchannellookup = "mc;still;magnet;4K;50K;ld_mc;ld_still;ld_magnet;ld_4K;ld_50K;6;5;4;2;1"  //TODO: Check with LD API
 			string/g bfheaterlookup = "mc;still;sc_mc;ld_still_heater"						//sc_mc only used internally, still label refers to API //TODO: Check with LD API
-			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,350,1201,1800,10000}}
+			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,290,1201,1800,10000}}
 			break
 		case "bfbig":
 			ls_system = "bfbig"
 			ls_label = "XLD"					//plate				//labels	  			//IDs
-			string/g bfchannellookup = "mc;still;magnet;4K;50K;ch6;ch5;ch4;ch2;ch1;6;5;4;2;1"  //TODO: Check with XLD API
+			string/g bfchannellookup = "mc;still;magnet;4K;50K;ch6;ch5;ch3;ch2;ch1;6;5;3;2;1"  //TODO: Check with XLD API
 			string/g bfheaterlookup = "mc;still;sc_mc;ao2"							 		//sc_mc only used internally, still label refers to API 	//TODO: Check with XLD API
-			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,350,1201,1800,10000}} // TODO: What does this do?
+			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,290,1201,1800,10000}} 
 			break
 		default:
 			abort "[ERROR] Please choose a supported LS370 system: [bfsmall, bfbig]"
@@ -1054,10 +1054,12 @@ function/s getLS370Status(instrID)
 		
 //		timestamp = sc_SQLtimestamp(str2num(getJSONvalue(jstr,searchStr)))		
 //		timestamp = sc_SQLtimestamp(3600) // Temporarily allow any old measurement of temp
-		timestamp = sc_SQLtimestamp(1) // Temporarily always request new
+//		timestamp = sc_SQLtimestamp(1) // Temporarily always request new
 		
-		sprintf statement, "SELECT temperature_k FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, temp_schema, stringfromlist(i,channelLabel,","), timestamp
-		temp = requestSQLValue(statement)
+//		sprintf statement, "SELECT temperature_k FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, temp_schema, stringfromlist(i,channelLabel,","), timestamp
+//		temp = requestSQLValue(statement)
+
+		temp = "" // TEMPORARY FIX
 		
 		if(cmpstr(temp,"") == 0)
 			temp = num2str(getLS370temp(instrID,stringfromlist(i,LSkeys,",")))
@@ -1072,18 +1074,20 @@ function/s getLS370Status(instrID)
 
 	//// Heaters ////
 
-	// MC heater
-	string heatBuffer=""
-	timestamp = sc_SQLtimestamp(300)
-	sprintf statement, "SELECT power_milliw FROM %s.%s WHERE time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, mc_heater_schema, timestamp
-	heatBuffer = addJSONkeyval(heatBuffer,"MC Heater mW",requestSQLValue(statement))
-
-	// Still heater
-	sprintf statement, "SELECT power_milliw FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, still_heater_schema, stillLabel, timestamp
-	heatBuffer = addJSONkeyval(heatBuffer,"Still Heater mW",requestSQLValue(statement))
-
-	string buffer = addJSONkeyval(tempBuffer,"Heaters",heatBuffer)
-
+//	// MC heater
+//	string heatBuffer=""
+//	timestamp = sc_SQLtimestamp(300)
+//	sprintf statement, "SELECT power_milliw FROM %s.%s WHERE time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, mc_heater_schema, timestamp
+//	heatBuffer = addJSONkeyval(heatBuffer,"MC Heater mW",requestSQLValue(statement))
+//
+//	// Still heater
+//	sprintf statement, "SELECT power_milliw FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, still_heater_schema, stillLabel, timestamp
+//	heatBuffer = addJSONkeyval(heatBuffer,"Still Heater mW",requestSQLValue(statement))
+//
+//	string buffer = addJSONkeyval(tempBuffer,"Heaters",heatBuffer)
+	
+	string buffer = tempBuffer // TEMPORARY FIX
+	
 	return addJSONkeyval("","Lakeshore",buffer)
 end
 
