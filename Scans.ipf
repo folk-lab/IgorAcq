@@ -432,7 +432,7 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 	nvar fd_ramprate
 	rampratex = paramisdefault(rampratex) ? fd_ramprate : rampratex
 	rampratey = ParamIsDefault(rampratey) ? fd_ramprate : rampratey
-	delayy = ParamIsDefault(delayy) ? 0.5 : delayy
+	delayy = ParamIsDefault(delayy) ? 0.01 : delayy
 	notch = selectstring(paramisdefault(notch), notch, "")
    comments = selectstring(paramisdefault(comments), comments, "")
    
@@ -1688,7 +1688,7 @@ function/s SF_get_channels(channels, [fastdac])
 			ch = removeTrailingWhiteSpace(ch)
 			if(numtype(str2num(ch)) != 0)
 				duplicate/o/free/t/r=[][3] fdacvalstr fdacnames
-				findvalue/RMD=[][3]/TEXT=ch/TXOP=0 fdacnames
+				findvalue/RMD=[][3]/TEXT=ch/TXOP=5 fdacnames
 				if(V_Value == -1)  // Not found
 					sprintf err_msg "ERROR[SF_get_channesl]:No FastDAC channel found with name %s", ch
 					abort err_msg

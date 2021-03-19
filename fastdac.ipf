@@ -1195,7 +1195,7 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 			wave timewn= $wn
 			variable le=dimsize(timewn,0)
 			Make/N=(le,numAverage)/D/O signal
-			signal[][i]=timewn[p]
+			signal[][i]=timewn[p]*1.0e-3*10^-ca_amp*1e9
 
 			duplicate/o timewn, fftinput
 			fftinput = fftinput*1.0e-3*10^-ca_amp*1e9  // mV -> V -> A -> nA
