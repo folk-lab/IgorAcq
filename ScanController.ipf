@@ -1338,7 +1338,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 						setwindow kwTopWin, graphicsTech=0
 						appendimage $wn2d
 						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
-						colorscale /c/n=$sc_ColorMap /e/a=rc
+						colorscale /c/n=$sc_ColorMap /e/a=rc image=$wn2d
 						Label left, sc_y_label
 						Label bottom, sc_x_label
 						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
@@ -1359,7 +1359,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 						setwindow kwTopWin, graphicsTech=0
 						appendimage $wn2d
 						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
-						colorscale /c/n=$sc_ColorMap /e/a=rc
+						colorscale /c/n=$sc_ColorMap /e/a=rc image=$wn2d
 						Label left, sc_y_label
 						Label bottom, sc_x_label
 						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
@@ -1413,7 +1413,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 						display
 						appendimage $wn2d
 						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
-						colorscale /c/n=$sc_ColorMap /e/a=rc
+						colorscale /c/n=$sc_ColorMap /e/a=rc image=$wn2d
 						Label left, sc_y_label
 						setwindow kwTopWin, graphicsTech=0
 						Label bottom, sc_x_label
@@ -1435,7 +1435,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 						setwindow kwTopWin, graphicsTech=0
 						appendimage $wn2d
 						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
-						colorscale /c/n=$sc_ColorMap /e/a=rc
+						colorscale /c/n=$sc_ColorMap /e/a=rc image=$wn2d
 						Label left, sc_y_label
 						Label bottom, sc_x_label
 						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
@@ -1491,7 +1491,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 						setwindow kwTopWin, graphicsTech=0
 						appendimage $wn2d
 						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
-						colorscale /c/n=$sc_ColorMap /e/a=rc
+						colorscale /c/n=$sc_ColorMap /e/a=rc image=$wn2d
 						Label left, sc_y_label
 						Label bottom, sc_x_label
 						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
@@ -1512,7 +1512,7 @@ function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_
 						setwindow kwTopWin, graphicsTech=0
 						appendimage $wn2d
 						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
-						colorscale /c/n=$sc_ColorMap /e/a=rc
+						colorscale /c/n=$sc_ColorMap /e/a=rc image=$wn2d
 						Label left, sc_y_label
 						Label bottom, sc_x_label
 						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
@@ -2025,7 +2025,7 @@ function /s sc_createSweepLogs([msg])
 	svar sc_current_config, sc_hostname, sc_x_label, sc_y_label
 
 	// information about this specific sweep
-	if(numtype(strlen(msg)) != 2) // if null (default or set as null)
+	if(numtype(strlen(msg)) == 2) // if null (default or set as null)
 		msg = ""	
 	endif
 	jstr = addJSONkeyval(jstr, "comment", msg, addQuotes=1)

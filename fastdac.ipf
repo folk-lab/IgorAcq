@@ -142,7 +142,6 @@ end
 
 function getFADCchannel(fdid, channel, [len_avg])
 	// Instead of just grabbing one single datapoint which is susceptible to high f noise, this averages data over len_avg and returns a single value
-	// getFADCChannel calls this with default len_avg
 	variable fdid, channel, len_avg
 	
 	len_avg = paramisdefault(len_avg) ? 0.05 : len_avg
@@ -159,6 +158,23 @@ function getFADCchannel(fdid, channel, [len_avg])
 	wave/t fadcvalstr
 	fadcvalstr[channel][1] = num2str(v_avg)
 	return V_avg
+end
+
+function getFADCvalue(fdid, channel, [len_avg])
+	// Same as FADCchannel except it also applies the Calc Function before returning
+	variable fdid, channel, len_avg
+	
+	len_avg = paramisdefault(len_avg) ? 0.05 : len_avg
+	
+	variable/g fd_val_mv = getFADCchannel(fdid, channel, len_avg=len_avg)  // Must be global so can use execute
+	variable/g fd_val_real
+	wave/t fadcvalstr
+	string func = fadcvalstr[channel][4]
+
+	string cmd = replaceString("ADC"+num2str(channel), func, "fd_val_mv")
+	sprintf cmd, "fd_val_real = %s", cmd
+	execute/q/z cmd
+	return fd_val_real
 end
 
 
@@ -261,11 +277,16 @@ function/s getFDACStatus(instrID)
 		buffer = addJSONkeyval(buffer, key, num2numstr(getfdacOutput(instrID,i)))
 	endfor
 
-	
 	// ADC values
 	for(i=0;i<str2num(stringbykey("numADCCh"+num2istr(dev),fdackeys,":",","));i+=1)
 		buffer = addJSONkeyval(buffer, "ADC"+num2istr(i), num2numstr(getfadcChannel(instrID,adcChs+i)))
 	endfor
+	
+	// Sweep Lims
+	if (exists("sweepgates_x") == 1)  // Then the rest should exist too
+		savesinglewave("sweepgates_x")
+		savesinglewave("sweepgates_y")
+	endif
 	
 	// AWG info if used
 	nvar sc_AWG_used
@@ -601,6 +622,8 @@ function ClearFdacBuffer(instrID)
 	
 	variable count=0, total = 0
 	string buffer=""
+	writeInstr(instrID,"STOP\r")
+	total = -5 //Stop command makes fastdac return a 5 character string
 	do 
 		viRead(instrID, buffer, 2000, count)
 		total += count
