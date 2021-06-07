@@ -195,7 +195,6 @@ function/s readTXTFile(filename, path)
 		txtstr+=buffer
 	while(1)
 	close refnum
-
 	return txtstr
 end
 
@@ -258,7 +257,7 @@ function/s getJSONvalue(jstr, key)
 	string jstr, key
 	variable offset, key_length
 	string indices
-
+	
 	key_length = itemsinlist(key,":")
 
 	JSONSimple jstr

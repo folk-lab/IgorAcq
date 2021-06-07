@@ -227,7 +227,7 @@ threadsafe function writeInstr(instrID, cmd)
                                  // with non-ascii characters
                                  // it does not equal numBytes
 	
-//	printf "COMMAND: %s\r", cmd				// DEBUG
+	 // printf "COMMAND: %s\r", cmd				// DEBUG
     variable return_count = 0    // how many bytes were written
     variable status = viWrite(instrID, cmd, count, return_count)
     if (status)

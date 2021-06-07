@@ -48,8 +48,8 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 	
 	string comm = ""
 	sprintf comm, "name=FastDAC,instrID=%s,visa_address=%s" instrID, visa_address
- 	string options = "baudrate=1750000,databits=8,stopbits=1,parity=0,test_query=*IDN?"
-//	string options = "baudrate=57600,databits=8,stopbits=1,parity=0,test_query=*IDN?" // Use this option if using USB fdac
+// 	string options = "baudrate=1750000,databits=8,stopbits=1,parity=0,test_query=*IDN?"
+	string options = "baudrate=57600,databits=8,stopbits=1,parity=0,test_query=*IDN?" // Use this option if using USB fdac
 	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
 	
 	if(paramisdefault(master))
@@ -97,6 +97,11 @@ function getNumFADC() // Getting from scancontroller_Fastdac window but makes se
 			numadc++
 		endif
 	endfor
+	
+	if(numadc == 0)
+		print "WARNING: No ADCs set to record. Behaviour may be unpredictable"
+	endif
+		
 	return numadc
 end
 
@@ -850,6 +855,7 @@ function CalibrateFADC(instrID)
 	string response = queryInstr(instrID,cmd,read_term="\n",delay=2)
 	response = sc_stripTermination(response,"\r\n")
 
+	print response
 	// turn result into key/value string
 	// response is formatted like this: "numCh0,zero,numCh1,zero,numCh0,full,numCh1,full,"
 	string result="", key_zero="", key_full=""
@@ -1159,50 +1165,52 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 //	execute(cmd1)
 
 	for(i=0;i<numAverage;i+=1)
-		// set up and execute command
-		// SPEC_ANA,adcCh,numpts
-		string cmd = ""
-		sprintf cmd, "SPEC_ANA,%s,%s\r", replacestring(",",channels,""), num2istr(numpts)
-		writeInstr(instrID,cmd)
+//		// set up and execute command
+//		// SPEC_ANA,adcCh,numpts
+//		string cmd = ""
+//		sprintf cmd, "SPEC_ANA,%s,%s\r", replacestring(",",channels,""), num2istr(numpts)
+//		writeInstr(instrID,cmd)
+//		
+//		variable bytesSec = roundNum(2*samplingFreq,0)
+//		variable read_chunk = roundNum(numChannels*bytesSec/50,0) - mod(roundNum(numChannels*bytesSec/50,0),numChannels*2)
+//		if(read_chunk < 50)
+//			read_chunk = 50 - mod(50,numChannels*2) // 50 or 48
+//		endif
+//		
+//		// read incoming data
+//		string buffer=""
+//		variable bytes_read = 0, bytes_left = 0, totalbytesreturn = numChannels*numpts*2, saveBuffer = 1000, totaldump = 0
+//		variable bufferDumpStart = stopMSTimer(-2)
+//		
+//		//print bytesSec, read_chunk, totalbytesreturn
+//		do
+//			fdRV_read_chunk(instrID, read_chunk, buffer)
+//			// add data to datawave
+//			specAna_distribute_data(buffer,read_chunk,channels,bytes_read/(2*numChannels))
+//			bytes_read += read_chunk
+//			totaldump = bytesSec*(stopmstimer(-2)-bufferDumpStart)*1e-6
+//			if(totaldump-bytes_read < saveBuffer)
+////				for(j=0;j<itemsinlist(openplots,",");j+=1)
+////					doupdate/w=$stringfromlist(j,openplots,",")
+////				endfor
+//			endif
+//		while(totalbytesreturn-bytes_read > read_chunk)
+//		// do one last read if any data left to read
+//		bytes_left = totalbytesreturn-bytes_read
+//		if(bytes_left > 0)
+//			buffer = readInstr(instrID,read_bytes=bytes_left,binary=1)
+//			specAna_distribute_data(buffer,bytes_left,channels,bytes_read/(2*numChannels))
+//			doupdate
+//		endif
+//		
+//		buffer = readInstr(instrID,read_term="\n")
+//		buffer = sc_stripTermination(buffer,"\r\n")
+//		if(!fdacCheckResponse(buffer,cmd,isString=1,expectedResponse="READ_FINISHED"))
+//			print "[ERROR] \"fdacSpectrumAnalyzer\": Error during read. Not all data recived!"
+//			abort
+//		endif
 		
-		variable bytesSec = roundNum(2*samplingFreq,0)
-		variable read_chunk = roundNum(numChannels*bytesSec/50,0) - mod(roundNum(numChannels*bytesSec/50,0),numChannels*2)
-		if(read_chunk < 50)
-			read_chunk = 50 - mod(50,numChannels*2) // 50 or 48
-		endif
-		
-		// read incoming data
-		string buffer=""
-		variable bytes_read = 0, bytes_left = 0, totalbytesreturn = numChannels*numpts*2, saveBuffer = 1000, totaldump = 0
-		variable bufferDumpStart = stopMSTimer(-2)
-		
-		//print bytesSec, read_chunk, totalbytesreturn
-		do
-			fdRV_read_chunk(instrID, read_chunk, buffer)
-			// add data to datawave
-			specAna_distribute_data(buffer,read_chunk,channels,bytes_read/(2*numChannels))
-			bytes_read += read_chunk
-			totaldump = bytesSec*(stopmstimer(-2)-bufferDumpStart)*1e-6
-			if(totaldump-bytes_read < saveBuffer)
-//				for(j=0;j<itemsinlist(openplots,",");j+=1)
-//					doupdate/w=$stringfromlist(j,openplots,",")
-//				endfor
-			endif
-		while(totalbytesreturn-bytes_read > read_chunk)
-		// do one last read if any data left to read
-		bytes_left = totalbytesreturn-bytes_read
-		if(bytes_left > 0)
-			buffer = readInstr(instrID,read_bytes=bytes_left,binary=1)
-			specAna_distribute_data(buffer,bytes_left,channels,bytes_read/(2*numChannels))
-			doupdate
-		endif
-		
-		buffer = readInstr(instrID,read_term="\n")
-		buffer = sc_stripTermination(buffer,"\r\n")
-		if(!fdacCheckResponse(buffer,cmd,isString=1,expectedResponse="READ_FINISHED"))
-			print "[ERROR] \"fdacSpectrumAnalyzer\": Error during read. Not all data recived!"
-			abort
-		endif
+		fd_readvstime(instrID, channels, numpts, samplingFreq, numChannels, spectrum_analyser=1)
 		
 		// convert time series to spectrum
 		variable bandwidth = measureFreq/2.0

@@ -184,6 +184,65 @@ function fd_Record_Values(S, PL, rowNum, [AWG_list, linestart])
 end
 
 
+function fd_readvstime(instrID, channels, numpts, samplingFreq, numChannels, [spectrum_analyser])
+	//	Just measures for a fixed number of points without ramping anything
+	// Args:
+	// spectrum_analyser: whether to send data to timeSeriesADC# instead of waves in initialize waves
+	variable instrID, numpts, samplingFreq, spectrum_analyser, numChannels
+	string channels
+	
+	string cmd = ""
+	sprintf cmd, "SPEC_ANA,%s,%s\r", replacestring(",",channels,""), num2istr(numpts)
+	writeInstr(instrID,cmd)
+	
+	variable bytesSec = roundNum(2*samplingFreq,0)
+	variable read_chunk = roundNum(numChannels*bytesSec/50,0) - mod(roundNum(numChannels*bytesSec/50,0),numChannels*2)
+	if(read_chunk < 50)
+		read_chunk = 50 - mod(50,numChannels*2) // 50 or 48
+	endif
+	
+	// read incoming data
+	string buffer=""
+	variable bytes_read = 0, bytes_left = 0, totalbytesreturn = numChannels*numpts*2, saveBuffer = 1000, totaldump = 0
+	variable bufferDumpStart = stopMSTimer(-2)
+	
+	//print bytesSec, read_chunk, totalbytesreturn
+	do
+		fdRV_read_chunk(instrID, read_chunk, buffer)
+		// add data to datawave
+		if (spectrum_analyser)
+			specAna_distribute_data(buffer,read_chunk,channels,bytes_read/(2*numChannels))
+		else
+			sc_distribute_data(buffer, channels, read_chunk, 0, bytes_read/(2*numChannels))
+		endif
+		bytes_read += read_chunk
+		totaldump = bytesSec*(stopmstimer(-2)-bufferDumpStart)*1e-6
+		if(totaldump-bytes_read < saveBuffer)
+			fdRV_check_sweepstate(instrID)
+			doupdate
+		endif
+	while(totalbytesreturn-bytes_read > read_chunk)
+	// do one last read if any data left to read
+	bytes_left = totalbytesreturn-bytes_read
+	if(bytes_left > 0)
+		buffer = readInstr(instrID,read_bytes=bytes_left,binary=1)
+		if (spectrum_analyser)
+			specAna_distribute_data(buffer,bytes_left,channels,bytes_read/(2*numChannels))
+		else
+			sc_distribute_data(buffer, channels, bytes_left, 0, bytes_read/(2*numChannels))
+		endif
+		doupdate
+	endif
+	
+	buffer = readInstr(instrID,read_term="\n")
+	buffer = sc_stripTermination(buffer,"\r\n")
+	if(!fdacCheckResponse(buffer,cmd,isString=1,expectedResponse="READ_FINISHED"))
+		print "[ERROR] \"fd_readvstime\": Error during read. Not all data recived!"
+		abort
+	endif
+end
+
+
 
 //function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay,ramprate,RCcutoff,numAverage,notch,direction])
 //	// RecordValues for FastDAC's. This function should replace RecordValues in scan functions.

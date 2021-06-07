@@ -1055,10 +1055,10 @@ function/s getLS370Status(instrID)
 //		timestamp = sc_SQLtimestamp(str2num(getJSONvalue(jstr,searchStr)))		
 //		timestamp = sc_SQLtimestamp(3600) // Temporarily allow any old measurement of temp
 //		timestamp = sc_SQLtimestamp(1) // Temporarily always request new
-		
+//		
 //		sprintf statement, "SELECT temperature_k FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, temp_schema, stringfromlist(i,channelLabel,","), timestamp
 //		temp = requestSQLValue(statement)
-
+//		print temp
 		temp = "" // TEMPORARY FIX
 		
 		if(cmpstr(temp,"") == 0)
@@ -1603,7 +1603,8 @@ function ask_continue(ask)
 	
 	variable ans
 	if(ask ==1)
-		ans = ask_user("Send command?", type=2)
+		abort "WARNING: ask user has failed"
+		// ans = ask_user("Send command?", type=2)
 		if (ans == 3)
 			abort
 		endif

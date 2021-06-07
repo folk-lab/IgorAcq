@@ -23,6 +23,38 @@ function ReadVsTime(delay, [comments]) // Units: s
 	SaveWaves(msg=comments)
 end
 
+function ReadVsTimeFastdac(instrID, duration, [y_label, comments]) // Units: s 
+	variable instrID, duration
+	string comments, y_label
+	
+	comments = selectstring(paramisdefault(comments), comments, "")
+	y_label = selectstring(paramisdefault(y_label), y_label, "Not Set")
+
+	wave fadcattr
+	variable i=0
+
+	string channels = ""
+	for(i=0;i<dimsize(fadcattr, 0);i++)
+		if(fadcattr[i][2] == 48) // checkbox checked
+			channels = addlistitem(num2str(i), channels, ",")
+		endif
+	endfor
+	
+	if(itemsinlist(channels, ",") == 0)
+		abort "[ERROR] \"ReadVsTimeFastdac\": No ADC channels selected"
+	endif
+
+	variable measure_freq = getfadcmeasurefreq(instrID)
+	variable numpts = round(measure_freq*duration)
+
+	InitializeWaves(0, duration, numpts, x_label="Time /s", y_label=y_label ,fastdac=1)
+	nvar sc_scanstarttime // Global variable set when InitializeWaves is called
+	fd_readvstime(instrID, channels, numpts, getfadcspeed(instrid), itemsinlist(channels, ","))
+	SaveWaves(msg=comments, fastdac=1)
+end
+
+
+
 function ReadVsTimeUntil(delay,readtime, [comments])
 	variable delay, readtime
 	string comments
@@ -81,6 +113,59 @@ function ScanBabyDAC(instrID, start, fin, channels, numpts, delay, ramprate, [co
 		setpoint = SV.startx + (i*(SV.finx-SV.startx)/(SV.numptsx-1))
 		RampMultipleBD(SV.instrID, SV.channelsx, setpoint, ramprate=SV.rampratex, ignore_lims=1)
 		sc_sleep(SV.delayx)
+		RecordValues(i, 0)
+		i+=1
+	while (i<SV.numptsx)
+
+   // Save by default
+   if (nosave == 0)
+  		SaveWaves(msg=comments)
+  	else
+  		dowindow /k SweepControl
+	endif
+end
+
+
+function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate, [comments, nosave]) //Units: mV
+	// sweep one or more FastDAC channels but in the ScanController way (not ScanControllerFastdac). I.e. ramp, measure, ramp, measure...
+	// channels should be a comma-separated string ex: "0, 4, 5"
+	variable instrID, start, fin, numpts, delay, ramprate, nosave
+	string channels, comments
+
+   // Reconnect instruments
+   //sc_openinstrconnections(0)
+
+   // Set defaults
+   comments = selectstring(paramisdefault(comments), comments, "")
+
+   // Set sc_ScanVars struct
+   struct FD_ScanVars SV
+   nvar fd_ramprate
+   SF_init_FDscanVars(SV, instrID, start, fin, channels, 0, ramprate, sweeprate=1)  // Numpts and sweeprate won't actually be used in this 
+
+   // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
+   SFfd_pre_checks(SV)  
+   SV.numptsx = numpts  // Can be put in AFTER checks, otherwise looks like it is going to sweep super fast, but it isn't because this is ramp, measure, ramp, measure...
+
+	// Ramp to start without checks because checked above
+	SFfd_ramp_start(SV, ignore_lims=1)
+
+   // Let gates settle 
+	sc_sleep(delay*5)
+
+   // Get labels for waves
+   string x_label
+   x_label = GetLabel(SV.channelsx)
+
+   // Make waves
+	InitializeWaves(SV.startx, SV.finx, SV.numptsx, x_label=x_label)
+
+   // Main measurement loop
+	variable i=0, j=0, setpoint
+	do
+		setpoint = SV.startx + (i*(SV.finx-SV.startx)/(SV.numptsx-1))
+		RampMultipleFDac(SV.instrID, SV.channelsx, setpoint, ramprate=SV.rampratex, ignore_lims=1)
+		sc_sleep(delay)
 		RecordValues(i, 0)
 		i+=1
 	while (i<SV.numptsx)

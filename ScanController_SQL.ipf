@@ -324,7 +324,7 @@ function sc_openSQLConnection(s)
 	if(error != SQL_SUCCESS)
 		SQLFreeHandle(SQL_HANDLE_DBC, connRefNum)
 		SQLFreeHandle(SQL_HANDLE_ENV, envRefNum)
-		print "[ERROR] \"sc_openSQLConnection\": Unable to connected to database."
+		print "[ERROR] \"sc_openSQLConnection\": Unable to connect to database."
 		abort
 	endif
 
