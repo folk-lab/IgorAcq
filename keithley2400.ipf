@@ -76,8 +76,10 @@ end
 threadsafe function getK2400current(instrID) // Units: nA
 	variable instrID
 	string response
+	//response = queryInstr(instrID,":sens:func \"curr\";:form:elem curr\n",read_term="\n")
+	writeInstr(instrID,":sens:func \"curr\";:form:elem curr\n")
 
-	response = queryInstr(instrID,":sens:func \"curr\";:form:elem curr\n",read_term="\n")
+	response = queryInstr(instrID,"READ?",read_term="\n")
 	return str2num(response)*1e9
 end
 
