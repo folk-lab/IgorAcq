@@ -67,6 +67,43 @@ function ask_user(question, [type])
 	return V_flag
 end
 
+function/S GetLabel(channels, [fastdac])
+  // Returns Label name of given channel, defaults to BD# or FD#
+  // Used to get x_label, y_label for init_waves 
+	string channels
+	variable fastdac
+
+	variable i=0
+	variable nChannels
+	string channel, buffer, xlabelfriendly = ""
+	wave/t dacvalstr
+	wave/t fdacvalstr
+	nChannels = ItemsInList(channels, ",")
+	for(i=0;i<nChannels;i+=1)
+		channel = StringFromList(i, channels, ",")
+
+		if (fastdac == 0)
+			buffer = dacvalstr[str2num(channel)][3] // Grab name from dacvalstr
+			if (cmpstr(buffer, "") == 0)
+				buffer = "BD"+channel
+			endif
+		elseif (fastdac == 1)
+			buffer = fdacvalstr[str2num(channel)][3] // Grab name from fdacvalstr
+			if (cmpstr(buffer, "") == 0)
+				buffer = "FD"+channel
+			endif
+		else
+			abort "\"GetLabel\": Fastdac flag must be 0 or 1"
+		endif
+
+		if (cmpstr(xlabelfriendly, "") != 0)
+			buffer = ", "+buffer
+		endif
+		xlabelfriendly += buffer
+	endfor
+	return xlabelfriendly + " (mV)"
+end
+
 
 function/s SF_get_channels(channels, [fastdac])
 	// Returns channels as numbers string whether numbers or labels passed
