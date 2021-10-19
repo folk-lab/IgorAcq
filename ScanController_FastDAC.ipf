@@ -19,27 +19,7 @@
 /////////////////////
 //// Util  //////////
 /////////////////////
-function prompt_user(promptTitle,promptStr)
-	string promptTitle, promptStr
 
-	variable x=0
-	prompt x, promptStr
-	doprompt promptTitle, x
-	if(v_flag == 0)
-		return x
-	else
-		return nan
-	endif
-end
-
-function ask_user(question, [type])
-	//type = 0,1,2 for OK, Yes/No, Yes/No/Cancel returns are V_flag = 1: Yes, 2: No, 3: Cancel
-	string question
-	variable type
-	type = paramisdefault(type) ? 1 : type
-	doalert type, question
-	return V_flag
-end
 
 
 function sc_fillfdacKeys(instrID,visa_address,numDACCh,numADCCh,[master])
@@ -242,146 +222,6 @@ function fd_readvstime(instrID, channels, numpts, samplingFreq, numChannels, [sp
 	endif
 end
 
-
-
-//function fdacRecordValues(instrID,rowNum,rampCh,start,fin,numpts,[delay,ramprate,RCcutoff,numAverage,notch,direction])
-//	// RecordValues for FastDAC's. This function should replace RecordValues in scan functions.
-//	// j is outer scan index, if it's a 1D scan just set j=0.
-//	// rampCh is a comma seperated string containing the channels that should be ramped.
-//	// Data processing:
-//	// 		- RCcutoff set the lowpass cutoff frequency
-//	//		- average set the number of points to average
-//	//		- nocth sets the notch frequency, as a comma seperated list (width is fixed at 5Hz)
-//	// direction - used to reverse direction of scan (e.g. in alternating repeat scan) - leave start/fin unchanged
-//	// 	   It is not sufficient to reverse start/fin because sc_distribute_data also needs to know
-//
-//	variable instrID, rowNum
-//	string rampCh, start, fin
-//	variable numpts, delay, ramprate, RCcutoff, numAverage, direction
-//	string notch
-//
-//	// nvar sc_is2d, sc_startx, sc_starty, sc_finx, sc_starty, sc_finy, sc_numptsx, sc_numptsy
-//	// nvar sc_abortsweep, sc_pause, sc_scanstarttime
-//	// wave/t fadcvalstr, fdacvalstr
-//	// wave fadcattr
-//
-//	// Check inputs and set defaults
-//	ramprate = paramisdefault(ramprate) ? 1000 : ramprate
-//	delay = paramisdefault(delay) ? 0 : delay
-//	direction = paramisdefault(direction) ? 1 : direction
-//	if (!(direction == 1 || direction == -1))  // Abort if direction is not 1 or -1
-//		abort "ERROR[fdacRecordValues]: Direction must be 1 or -1"
-//	endif
-//	if (direction == -1)  // Switch start and end values to scan in reverse direction
-//		string temp = start
-//		start = fin
-//		fin = temp
-//	endif
-//
-//	struct fdRV_Struct S // Contains structs and variables to be used in scan
-//	fdRV_set_struct_base_vars(S,instrID,rowNum,rampCh,start,fin,numpts,delay,ramprate,RCcutoff,numAverage,notch,direction)
-//
-//	// compare to earlier call of InitializeWaves
-//	fdRV_check_init()
-//
-//	// Everything below has to be changed if we get hardware triggers!
-//	// Check that dac and adc channels are all on the same device and sort lists
-//	// of DAC and ADC channels for scan.
-//	// When (if) we get hardware triggers on the fastdacs, this function call should
-//	// be replaced by a function that sorts DAC and ADC channels based on which device
-//	// they belong to.
-//
-//
-//	// Set samplingFreq, numADCs, measureFreq
-//	fdRV_set_measureFreq(S)
-//
-//	// Check within limits and ramprates
-//	fdRV_check_rr_lims(S)
-//
-//	fdRV_ramp_start(S.sv, S.fdList, ignore_lims = 1)
-//	sc_sleep(delay)  // Settle time for 2D sweeps
-//
-//	// Start the fastdac INT_RAMP
-//	fdRV_start_INT_RAMP(S.sv, S.fdList)
-//
-//	// Record all the values sent back from the FastDAC to respective waves
-//	variable totalByteReturn = S.numADCs*2*S.sv.numptsx
-//	variable looptime = 0
-//	looptime = fdRV_record_buffer(S, totalByteReturn) // And get the total time
-//
-//	// update window
-//	string endstr
-//	endstr = readInstr(S.sv.instrID)
-//	endstr = sc_stripTermination(endstr,"\r\n")
-//	if(fdacCheckResponse(endstr,"INT_RAMP...",isString=1,expectedResponse="RAMP_FINISHED"))
-//		fdRV_update_window(S.sv.instrID, S.fdList, S.numADCs)
-//	endif
-//
-//
-//	/////////////////////////
-//	//// Post processing ////
-//	/////////////////////////
-//
-//	fdRV_Process_data(S)
-//
-//		// check abort/pause status
-//	fdRV_check_sweepstate(S.sv.instrID)
-//	return looptime
-//end
-
-
-function fdRV_check_init()
-  nvar fastdac_init
-  if(fastdac_init != 1)
-    print("[ERROR] \"RecordValues\": Trying to record fastDACs, but they weren't initialized by \"InitializeWaves\"")
-    abort
-  endif
-end
-
-//function fdRV_set_scanList(scanList, start, fin)
-//  struct FD_ScanVars &scanList  // alters passed struct
-//  string start, fin
-//  variable dev_adc=0
-//	dev_adc = sc_fdacSortChannels(scanlist)
-//
-//	string err = ""
-//	// check that the number of dac channels equals the number of start and end values
-//	if(itemsinlist(scanlist.channelsx,",") != itemsinlist(scanlist.startxs,",") || itemsinlist(scanlist.channelsx,",") != itemsinlist(scanlist.finxs,","))
-//		print("The number of DAC channels must be equal to the number of starting and ending values!")
-//		sprintf err, "Number of DAC Channel = %d, number of starting values = %d & number of ending values = %d", itemsinlist(scanlist.channelsx,","), itemsinlist(scanlist.startxs,","), itemsinlist(scanlist.finxs,",")
-//		print err
-//		abort
-//	endif
-//end
-
-
-
-function fdRV_check_ramp_start(S)
-	// Checks that DACs are at the start of the ramp. If not it will ramp there and wait the delay time, but
-	// will give the user a WARNING that this should have been done already in the top level scan function
-   struct FD_ScanVars &S
-
-   variable i=0, require_ramp = 0, ch, sp, diff
-   for(i=0;i<itemsinlist(S.channelsx);i++)
-      ch = str2num(stringfromlist(i, S.channelsx, ","))
-      if(S.direction == 1)
-	      sp = str2num(stringfromlist(i, S.startxs, ","))
-	   elseif(S.direction == -1)
-	      sp = str2num(stringfromlist(i, S.finxs, ","))
-	   endif
-      diff = getFDACOutput(S.instrID, ch)-sp
-      if(abs(diff) > 0.5)  // if DAC is more than 0.5mV from start of ramp
-         require_ramp = 1
-      endif
-   endfor
-
-   if(require_ramp == 1)
-      print "WARNING[fdRV_check_ramp_start]: At least one DAC was not at start point, it has been ramped and slept for delayx, but this should be done in top level scan function!"
-      SFfd_ramp_start(S, ignore_lims = 1, x_only=1)
-      sc_sleep(S.delayy) // Settle time for 2D sweeps
-   endif
-end
-
 function fdRV_record_buffer(S, rowNum, totalByteReturn)
    struct FD_ScanVars &S
    variable rowNum, totalByteReturn
@@ -417,7 +257,6 @@ function fdRV_record_buffer(S, rowNum, totalByteReturn)
    variable looptime = (stopmstimer(-2)-bufferDumpStart)*1e-6
    return looptime
 end
-
 
 function fdRV_get_read_chunk_size(numADCs, numpts, bytesSec, totalByteReturn)
   // Returns the size of chunks that should be read at a time
@@ -465,7 +304,6 @@ function fdRV_check_sweepstate(instrID)
 	endtry
 end
 
-
 function fdRV_read_chunk(instrID, read_chunk, buffer)
   variable instrID, read_chunk
   string &buffer
@@ -512,6 +350,148 @@ function fdRV_update_window(S, numAdcs)
   endfor
 end
 
+function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart,[direction])
+	string &buffer, adcList  //passing buffer by reference for speed of execution
+	variable bytes, rowNum, colNumStart, direction
+	wave/t fadcvalstr
+	nvar sc_is2d
+
+	direction = paramisdefault(direction) ? 1 : direction
+	if (!(direction == 1 || direction == -1))  // Abort if direction is not 1 or -1
+		abort "ERROR[sc_distribute_data]: Direction must be 1 or -1"
+	endif
+
+	variable i=0, j=0, k=0, numADCCh = itemsinlist(adcList,","), adcIndex=0, dataPoint=0
+	string wave1d = "", wave2d = "", s1, s2
+	// load data into raw wave
+	for(i=0;i<numADCCh;i+=1)
+		adcIndex = str2num(stringfromlist(i,adcList,","))
+		wave1d = "ADC"+num2istr(str2num(stringfromlist(i,adcList,",")))
+		wave rawwave = $wave1d
+		k = 0
+		for(j=0;j<bytes;j+=numADCCh*2)
+		// convert to floating point
+			s1 = buffer[j + (i*2)]
+			s2 = buffer[j + (i*2) + 1]
+			datapoint = fdacChar2Num(s1, s2)
+			rawwave[colNumStart+k] = dataPoint
+			k += 1*direction
+		endfor
+		if(sc_is2d)
+			wave2d = wave1d+"_2d"
+			wave rawwave2d = $wave2d
+			rawwave2d[][rowNum] = rawwave[p]
+		endif
+	endfor
+
+	// load calculated data into datawave
+	string script="", cmd=""
+	for(i=0;i<numADCCh;i+=1)
+		adcIndex = str2num(stringfromlist(i,adcList,","))
+		wave1d = fadcvalstr[adcIndex][3]
+		wave datawave = $wave1d
+		script = trimstring(fadcvalstr[adcIndex][4])
+		sprintf cmd, "%s = %s", wave1d, script
+		execute/q/z cmd
+		if(v_flag!=0)
+			print "[WARNING] \"sc_distribute_data\": Wave calculation falied! Error: "+GetErrMessage(V_Flag,2)
+		endif
+		if(sc_is2d)
+			wave2d = wave1d+"_2d"
+			wave datawave2d = $wave2d
+			datawave2d[][rowNum] = datawave[p]
+		endif
+	endfor
+end
+
+function/s sc_samegraph(wave1,wave2)
+	// Return list of graphs which contain both waves
+	string wave1,wave2
+
+	string graphs1="",graphs2=""
+	graphs1 = sc_findgraphs(wave1)
+	graphs2 = sc_findgraphs(wave2)
+
+	variable graphLen1 = itemsinlist(graphs1,","), graphLen2 = itemsinlist(graphs2,","), result=0, i=0, j=0
+	string testitem="",graphlist="", graphitem=""
+	graphlist=addlistItem("result:0",graphlist,",",0)
+	if(graphLen1 > 0 && graphLen2 > 0)
+		for(i=0;i<graphLen1;i+=1)
+			testitem = stringfromlist(i,graphs1,",")
+			for(j=0;j<graphLen2;j+=1)
+				if(cmpstr(testitem,stringfromlist(j,graphs2,",")) == 0)
+					result += 1
+					graphlist = replaceStringbykey("result",graphlist,num2istr(result),":",",")
+					sprintf graphitem, "graph%d:%s",result-1,testitem
+					graphlist = addlistitem(graphitem,graphlist,",",result)
+				endif
+			endfor
+		endfor
+	endif
+
+	return graphlist
+end
+
+function/s sc_findgraphs(inputwave)
+	// Return list of graphs which contain inputwave
+	string inputwave
+	string opengraphs = winlist("*",",","WIN:1"), waveslist = "", graphlist = "", graphname = ""
+	variable i=0, j=0
+	for(i=0;i<itemsinlist(opengraphs,",");i+=1)
+		sprintf graphname, "WIN:%s", stringfromlist(i,opengraphs,",")
+		waveslist = wavelist("*",",",graphname)
+		for(j=0;j<itemsinlist(waveslist,",");j+=1)
+			if(cmpstr(inputwave,stringfromlist(j,waveslist,",")) == 0)
+				graphlist = addlistItem(stringfromlist(i,opengraphs,","),graphlist,",")
+			endif
+		endfor
+	endfor
+	return graphlist
+end
+////////////////////////////////////////////////////////////////////////////////////////
+////////////////////// CHECKS  /////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
+
+function fdRV_check_init()
+	// Check initialize waves was called for fastDAC measurement
+  nvar fastdac_init
+  if(fastdac_init != 1)
+    print("[ERROR] \"RecordValues\": Trying to record fastDACs, but they weren't initialized by \"InitializeWaves\"")
+    abort
+  endif
+end
+
+
+function fdRV_check_ramp_start(S)
+	// Checks that DACs are at the start of the ramp. If not it will ramp there and wait the delay time, but
+	// will give the user a WARNING that this should have been done already in the top level scan function
+   struct FD_ScanVars &S
+
+   variable i=0, require_ramp = 0, ch, sp, diff
+   for(i=0;i<itemsinlist(S.channelsx);i++)
+      ch = str2num(stringfromlist(i, S.channelsx, ","))
+      if(S.direction == 1)
+	      sp = str2num(stringfromlist(i, S.startxs, ","))
+	   elseif(S.direction == -1)
+	      sp = str2num(stringfromlist(i, S.finxs, ","))
+	   endif
+      diff = getFDACOutput(S.instrID, ch)-sp
+      if(abs(diff) > 0.5)  // if DAC is more than 0.5mV from start of ramp
+         require_ramp = 1
+      endif
+   endfor
+
+   if(require_ramp == 1)
+      print "WARNING[fdRV_check_ramp_start]: At least one DAC was not at start point, it has been ramped and slept for delayx, but this should be done in top level scan function!"
+      SFfd_ramp_start(S, ignore_lims = 1, x_only=1)
+      sc_sleep(S.delayy) // Settle time for 2D sweeps
+   endif
+end
+
+
+///////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////// Processing /////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////
 
 function fdRV_Process_data(S, PL, rowNum)
    struct FD_ScanVars &S
@@ -623,102 +603,6 @@ function fdRV_do_filters_average(PL, SL, rowNum)
    endif
 end
 
-
-
-//function fdRV_set_struct_base_vars(s, instrID,rowNum,rampCh,start,fin,numpts,delay,ramprate,RCcutoff,numAverage,notch,direction)
-//   struct fdRV_Struct &s
-//   variable instrID, rowNum
-//   string rampCh, start, fin
-//   variable numpts, delay, ramprate, RCcutoff, numAverage, direction
-//   string notch
-//   s.rowNum = rowNum
-//   SF_set_FDscanVars(s.fdList, instrID, start, fin, rampCh, numpts, ramprate, delay, direction=direction)
-//
-//   s.pl.RCcutoff = RCCutoff
-//   s.pl.numAverage = numAverage
-//   s.pl.notch_list = notch
-//   s.pl.coefList = ""
-//end
-
-
-//Structure to hold all variables for fastdacRecordValues
-structure fdRV_Struct
-   struct FD_ScanVars fdsv   			// Common FastDAC scanVars
-   struct fdRV_processList pl   		// FD post processing variables
-endstructure
-
-structure fdRV_processList
-   variable RCCutoff
-   string notch_list
-   variable numAverage
-
-   variable FIRcoefs
-   string coefList
-   variable cutoff_frac
-   string notch_fracList
-   variable numNotch
-
-   variable do_Lowpass
-   variable do_notch
-   variable do_average
-endstructure
-
-
-
-function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart,[direction])
-	string &buffer, adcList  //passing buffer by reference for speed of execution
-	variable bytes, rowNum, colNumStart, direction
-	wave/t fadcvalstr
-	nvar sc_is2d
-
-	direction = paramisdefault(direction) ? 1 : direction
-	if (!(direction == 1 || direction == -1))  // Abort if direction is not 1 or -1
-		abort "ERROR[sc_distribute_data]: Direction must be 1 or -1"
-	endif
-
-	variable i=0, j=0, k=0, numADCCh = itemsinlist(adcList,","), adcIndex=0, dataPoint=0
-	string wave1d = "", wave2d = "", s1, s2
-	// load data into raw wave
-	for(i=0;i<numADCCh;i+=1)
-		adcIndex = str2num(stringfromlist(i,adcList,","))
-		wave1d = "ADC"+num2istr(str2num(stringfromlist(i,adcList,",")))
-		wave rawwave = $wave1d
-		k = 0
-		for(j=0;j<bytes;j+=numADCCh*2)
-		// convert to floating point
-			s1 = buffer[j + (i*2)]
-			s2 = buffer[j + (i*2) + 1]
-			datapoint = fdacChar2Num(s1, s2)
-			rawwave[colNumStart+k] = dataPoint
-			k += 1*direction
-		endfor
-		if(sc_is2d)
-			wave2d = wave1d+"_2d"
-			wave rawwave2d = $wave2d
-			rawwave2d[][rowNum] = rawwave[p]
-		endif
-	endfor
-
-	// load calculated data into datawave
-	string script="", cmd=""
-	for(i=0;i<numADCCh;i+=1)
-		adcIndex = str2num(stringfromlist(i,adcList,","))
-		wave1d = fadcvalstr[adcIndex][3]
-		wave datawave = $wave1d
-		script = trimstring(fadcvalstr[adcIndex][4])
-		sprintf cmd, "%s = %s", wave1d, script
-		execute/q/z cmd
-		if(v_flag!=0)
-			print "[WARNING] \"sc_distribute_data\": Wave calculation falied! Error: "+GetErrMessage(V_Flag,2)
-		endif
-		if(sc_is2d)
-			wave2d = wave1d+"_2d"
-			wave datawave2d = $wave2d
-			datawave2d[][rowNum] = datawave[p]
-		endif
-	endfor
-end
-
 function sc_lastrow(rowNum)
 	variable rowNum
 
@@ -739,7 +623,8 @@ function sc_lastrow(rowNum)
 	endif
 end
 
-function sc_applyfilters(coefList,adcList,doLowpass,doNotch,cutoff_frac,measureFreq,FIRcoefs,notch_fraclist,rowNum)
+
+function sc_applyfilters(coefList,adcList,doLowpass,doNotch,cutoff_frac,measureFreq,FIRcoefs,notch_fraclist,rowNum) 
 	string coefList, adcList, notch_fraclist
 	variable doLowpass, doNotch, cutoff_frac, measureFreq, FIRcoefs, rowNum
 	wave/t fadcvalstr
@@ -808,6 +693,7 @@ function sc_averageDataWaves(numAverage,adcList,lastRow,rowNum)
 		wave datawave = $wave1d
 		newsize = floor(dimsize(datawave,0)/numAverage)
 		avg1d = "avg_"+wave1d
+
 		// check if waves are plotted on the same graph
 		graphlist = sc_samegraph(wave1d,avg1d)
 		if(str2num(stringbykey("result",graphlist,":",",")) > 1)
@@ -867,48 +753,64 @@ function sc_averageDataWaves(numAverage,adcList,lastRow,rowNum)
 	endfor
 end
 
-function/s sc_samegraph(wave1,wave2)
-	string wave1,wave2
+/////////////////////////////////////////////////////////////////////////////////
+////////////////////// SCAN INFORMATION /////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
 
-	string graphs1="",graphs2=""
-	graphs1 = sc_findgraphs(wave1)
-	graphs2 = sc_findgraphs(wave2)
+//Structure to hold all variables for fastdacRecordValues
+structure fdRV_Struct
+   struct FD_ScanVars fdsv   			// Common FastDAC scanVars
+   struct fdRV_processList pl   		// FD post processing variables
+endstructure
 
-	variable graphLen1 = itemsinlist(graphs1,","), graphLen2 = itemsinlist(graphs2,","), result=0, i=0, j=0
-	string testitem="",graphlist="", graphitem=""
-	graphlist=addlistItem("result:0",graphlist,",",0)
-	if(graphLen1 > 0 && graphLen2 > 0)
-		for(i=0;i<graphLen1;i+=1)
-			testitem = stringfromlist(i,graphs1,",")
-			for(j=0;j<graphLen2;j+=1)
-				if(cmpstr(testitem,stringfromlist(j,graphs2,",")) == 0)
-					result += 1
-					graphlist = replaceStringbykey("result",graphlist,num2istr(result),":",",")
-					sprintf graphitem, "graph%d:%s",result-1,testitem
-					graphlist = addlistitem(graphitem,graphlist,",",result)
-				endif
-			endfor
-		endfor
-	endif
+// Structure to hold processing information
+structure fdRV_processList
+   variable RCCutoff
+   string notch_list
+   variable numAverage
 
-	return graphlist
-end
+   variable FIRcoefs
+   string coefList
+   variable cutoff_frac
+   string notch_fracList
+   variable numNotch
 
-function/s sc_findgraphs(inputwave)
-	string inputwave
-	string opengraphs = winlist("*",",","WIN:1"), waveslist = "", graphlist = "", graphname = ""
-	variable i=0, j=0
-	for(i=0;i<itemsinlist(opengraphs,",");i+=1)
-		sprintf graphname, "WIN:%s", stringfromlist(i,opengraphs,",")
-		waveslist = wavelist("*",",",graphname)
-		for(j=0;j<itemsinlist(waveslist,",");j+=1)
-			if(cmpstr(inputwave,stringfromlist(j,waveslist,",")) == 0)
-				graphlist = addlistItem(stringfromlist(i,opengraphs,","),graphlist,",")
-			endif
-		endfor
+   variable do_Lowpass
+   variable do_notch
+   variable do_average
+endstructure
+
+
+function SFfd_create_sweepgate_save_info(s)
+	// Create sweepgates_x, sweepgates_y waves which hold information about gates being swept for SweepLogs
+	struct FD_ScanVars &s
+	
+	variable i = 0
+
+	make/o/N=(3, itemsinlist(s.channelsx, ",")) sweepgates_x = 0
+	for (i=0; i<itemsinlist(s.channelsx, ","); i++)
+		sweepgates_x[0][i] = str2num(stringfromList(i, s.channelsx, ","))
+		sweepgates_x[1][i] = str2num(stringfromlist(i, s.startxs, ","))
+		sweepgates_x[2][i] = str2num(stringfromlist(i, s.finxs, ","))
 	endfor
-	return graphlist
+	
+
+	if (!(numtype(strlen(s.channelsy)) != 0 || strlen(s.channelsy) == 0))  // Also Y info
+		make/o/N=(3, itemsinlist(s.channelsy, ",")) sweepgates_y = 0
+		for (i=0; i<itemsinlist(s.channelsy, ","); i++)
+			sweepgates_y[0][i] = str2num(stringfromList(i, s.channelsy, ","))
+			sweepgates_y[1][i] = str2num(stringfromlist(i, s.startys, ","))
+			sweepgates_y[2][i] = str2num(stringfromlist(i, s.finys, ","))
+		endfor
+	else
+		make/o sweepgates_y = {{NaN, NaN, NaN}}
+	endif
+	
 end
+
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////// FastDAC Scancontroller window /////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
 
 function resetfdacwindow(fdacCh)
 	variable fdacCh

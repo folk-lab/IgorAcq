@@ -25,41 +25,6 @@
 ////// utility functions //////
 ///////////////////////////////
 
-function/s strTime()
-	// Returns the current time in YYYY-MM-DD;HH-MM-SS format
-	string datetime_str
-	string time_str
-	time_str = secs2time(datetime, 3)
-	sprintf time_str "%s-%s-%s", time_str[0,1], time_str[3,4], time_str[6,7]
-	sprintf datetime_str "%s_%s" secs2Date(datetime, -2), time_str
-	return datetime_str
-end
-
-function unixTime()
-	// returns the current unix time in seconds
-	return DateTime - date2secs(1970,1,1) - date2secs(-1,-1,-1)
-end
-
-function roundNum(number,decimalplace) // to return integers, decimalplace=0
-	variable number, decimalplace
-	variable multiplier
-	multiplier = 10^decimalplace
-	return round(number*multiplier)/multiplier
-end
-
-function AppendValue(thewave, thevalue)
-	wave thewave
-	variable thevalue
-	Redimension /N=(numpnts(thewave)+1) thewave
-	thewave[numpnts(thewave)-1] = thevalue
-end
-
-function AppendString(thewave, thestring)
-	wave/t thewave
-	string thestring
-	Redimension /N=(numpnts(thewave)+1) thewave
-	thewave[numpnts(thewave)-1] = thestring
-end
 
 function /S executeWinCmd(command)
 	// run the shell command
@@ -257,7 +222,6 @@ end
 
 threadsafe function sc_check_NaNInf(num)
 	variable num
-
 	return numtype(num)
 end
 
