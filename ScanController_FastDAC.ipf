@@ -87,10 +87,9 @@ function fdacCheckResponse(response,command,[isString,expectedResponse])
 end
 
 
-////////////////////////
-//// ScanController ////
-///////////////////////
-
+//////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////// Taking Data and processing //////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////
 
 function fd_Record_Values(S, PL, rowNum, [AWG_list, linestart])
    struct FD_ScanVars &S
@@ -150,10 +149,7 @@ function fd_Record_Values(S, PL, rowNum, [AWG_list, linestart])
 		endif
 	endif
 
-   /////////////////////////
-	//// Post processing ////
-	/////////////////////////
-
+	// Post processing
 	fdRV_Process_data(S, PL, rowNum)
 	doupdate
 
@@ -342,7 +338,8 @@ function fdRV_update_window(S, numAdcs)
   for(i=0;i<itemsinlist(S.channelsx,",");i+=1)
     channel = str2num(stringfromlist(i,S.channelsx,","))
     fdacvalstr[channel][1] = stringfromlist(i,S.finxs,",")
-    updatefdacWindow(channel)
+    // updatefdacWindow(channel)
+    updateOldFDacStr(channel)
   endfor
   for(i=0;i<numADCs;i+=1)
     channel = str2num(stringfromlist(i,S.adclist,","))
@@ -448,6 +445,8 @@ function/s sc_findgraphs(inputwave)
 	endfor
 	return graphlist
 end
+
+
 ////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////// CHECKS  /////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -819,7 +818,8 @@ function resetfdacwindow(fdacCh)
 	fdacvalstr[fdacCh][1] = old_fdacvalstr[fdacCh]
 end
 
-function updatefdacWindow(fdacCh)
+//function updatefdacWindow(fdacCh)
+function updateOldFDacStr(fdacCh)
 	variable fdacCh
 	wave/t fdacvalstr, old_fdacvalstr
 
@@ -1127,18 +1127,23 @@ function update_all_fdac([option])
 						for(j=0;j<numDACCh;j+=1)
 							output = str2num(fdacvalstr[startCh+j][1])
 							if(output != str2num(old_fdacvalstr[startCh+j]))
-								rampOutputfdac(tempname,j,output,ramprate=fd_ramprate)
+								// rampOutputfdac(tempname,j,output,ramprate=fd_ramprate)
+								rampOutputfdac(tempname,startCh+j,output,ramprate=fd_ramprate)
 							endif
 						endfor
 						break
 					case "fdacrampzero":
 						for(j=0;j<numDACCh;j+=1)
-							rampOutputfdac(tempname,j,0,ramprate=fd_ramprate)
+							// rampOutputfdac(tempname,j,0,ramprate=fd_ramprate)
+							rampOutputfdac(tempname,startCh+j,0,ramprate=fd_ramprate)
 						endfor
 						break
 					case "updatefdac":
+						variable value
 						for(j=0;j<numDACCh;j+=1)
-							getfdacOutput(tempname,j)
+							// getfdacOutput(tempname,j)
+							value = getfdacOutput(tempname,j) // j only because this is PER DEVICE
+							updateFdacValStr(startCh+j, value, update_oldValStr=1)
 						endfor
 						break
 				endswitch
@@ -1229,7 +1234,7 @@ function fdacCreateControlWaves(numDACCh,numADCCh)
 		fdacval0[i] = num2istr(i)
 	endfor
 	concatenate/o {fdacval0,fdacval1,fdacval2,fdacval3,fdacval4}, fdacvalstr
-	duplicate/o fdacvalstr, old_fdacvalstr
+	duplicate/o/R=[][1] fdacvalstr, old_fdacvalstr
 	make/o/n=(numDACCh) fdacattr0 = 0
 	make/o/n=(numDACCh) fdacattr1 = 2
 	concatenate/o {fdacattr0,fdacattr1,fdacattr1,fdacattr1,fdacattr1}, fdacattr

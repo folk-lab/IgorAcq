@@ -314,6 +314,7 @@ function getFADCChannelSingle(instrID,channel) // Units: mV
 end
 
 function getFDACOutput(instrID,channel) // Units: mV
+	// NOTE: Channel is PER INSTRUMENT
 	variable instrID, channel
 	
 	wave/t old_fdacvalstr, fdacvalstr
@@ -323,19 +324,29 @@ function getFDACOutput(instrID,channel) // Units: mV
 	response = sc_stripTermination(response,"\r\n")
 	
 	// check response
-	variable currentOutput=0
 	if(fdacCheckResponse(response,cmd))
 		// good response
-		currentOutput = str2num(response)
-		fdacvalstr[channel][1] = num2str(currentOutput)
-		updatefdacwindow(channel)
+		return str2num(response)
 	else
-		resetfdacwindow(channel)
 		abort
 	endif
-	
-	return currentOutput
 end
+
+function updateFdacValStr(channel, value, [update_oldValStr])
+	// Update the global string(s) which store FastDAC values. Update the oldValStr if you know that is the current DAC output.
+	variable channel, value, update_oldValStr
+
+	wave/t fdacvalstr
+	fdacvalstr[channel][1] = num2str(value)
+	if (update_oldValStr != 0)
+		wave/t old_fdacvalstr
+		old_fdacvalstr[channel] = num2str(value)
+	endif
+end
+
+
+
+
 
 function/s getFDACStatus(instrID)
 	variable instrID
@@ -555,7 +566,7 @@ function rampOutputFDAC(instrID,channel,output,[ramprate, ignore_lims]) // Units
 		
 	// Check that ramprate is within software limit, otherwise use software limit
 	if (ramprate > str2num(fdacvalstr[channel][4]))
-		//printf "[WARNING] \"rampOutputfdac\": Ramprate of %.0fmV/s requested for channel %d. Using max_ramprate of %.0fmV/s instead\n" ramprate, channel, str2num(fdacvalstr[channel][4])
+		printf "[WARNING] \"rampOutputfdac\": Ramprate of %.0fmV/s requested for channel %d. Using max_ramprate of %.0fmV/s instead\n" ramprate, channel, str2num(fdacvalstr[channel][4])
 		ramprate = str2num(fdacvalstr[channel][4])
 	endif
 		
@@ -577,8 +588,10 @@ function rampOutputFDAC(instrID,channel,output,[ramprate, ignore_lims]) // Units
 	
 	// check respose
 	if(fdacCheckResponse(response,cmd,isString=1,expectedResponse="RAMP_FINISHED"))
-		fdacvalstr[channel][1] = num2str(output)
-		updatefdacWindow(channel)
+		// fdacvalstr[channel][1] = num2str(output)
+		// updatefdacWindow(channel)
+		output = getfdacOutput(instrID, devchannel)
+		updatefdacValStr(devchannel, output, update_oldValStr=1)
 	else
 		resetfdacwindow(channel)
 		abort
