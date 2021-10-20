@@ -677,6 +677,8 @@ function setOutputBD(instrID, channel, output, [ignore_lims]) // in mV
 	writeBytesBD(instrID, bd_cmd_wave)
 
 	wave response_wave = readBytesBD(instrID, 7)
+	
+//	print(response_wave[0])  // DEBUGGING (X=any number. 19X seems to mean the message was transmitted successfully but not used 6X means it worked)
 
 	// Update stored values
 	dacvalstr[channel][1] = num2str(output)
@@ -920,10 +922,6 @@ end
 //////////////////////////////////
 ///// Load BabyDACs from HDF /////
 //////////////////////////////////
-function bdSaveToHDF()
-
-end
-
 
 function bdLoadFromHDF(datnum, [no_check])
 	// Function to load babyDAC values and labels from a previously save HDF file in sweeplogs in current data directory
