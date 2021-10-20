@@ -93,36 +93,37 @@ end
 
 
 function fd_Record_Values(S, PL, rowNum, [AWG_list, linestart])
-   struct FD_ScanVars &S
-   struct fdRV_processList &PL
-   variable rowNum, linestart
-   struct fdAWG_list &AWG_list
+	struct FD_ScanVars &S
+	struct fdRV_processList &PL
+	variable rowNum, linestart
+	struct fdAWG_list &AWG_list
 	// If passed AWG_list with AWG_list.use_AWG == 1 then it will run with the Arbitrary Wave Generator on
-   // Note: Only works for 1 FastDAC! Not sure what implementation will look like for multiple yet
+	// Note: Only works for 1 FastDAC! Not sure what implementation will look like for multiple yet
 
 	// Check if AWG_list passed with use_AWG = 1
 	variable/g sc_AWG_used = 0  // Global so that this can be used in SaveWaves() to save AWG info if used
 	if(!paramisdefault(AWG_list) && AWG_list.use_AWG == 1)  // TODO: Does this work?
 		sc_AWG_used = 1
-		if(rowNum == 0)
-			print "fd_Record_Values: Using AWG"
-		endif
+		(rowNum == 0) ? print "fd_Record_Values: Using AWG" 
+		// if(rowNum == 0)
+		// 	print "fd_Record_Values: Using AWG"
+		// endif
 	endif
 	
 	// Check if this is a linecut scan and update centers if it is
-	wave sc_linestart
 	if(!paramIsDefault(linestart))
+		wave sc_linestart
 		sc_linestart[rowNum] = linestart
 	endif
-
 
    // Check InitWaves was run with fastdac=1
    fdRV_check_init()
 
    // Check that checks have been carried out in main scan function where they belong
-	if(S.lims_checked != 1)
-		abort "ERROR[fd_record_values]: FD_ScanVars.lims_checked != 1. Probably called before limits/ramprates/sweeprates have been checked in the main Scan Function!"
-	endif
+   (S.lims_checked != 1) ? abort "ERROR[fd_record_values]: FD_ScanVars.lims_checked != 1. Probably called before limits/ramprates/sweeprates have been checked in the main Scan Function!" 
+	// if(S.lims_checked != 1)
+	// 	abort "ERROR[fd_record_values]: FD_ScanVars.lims_checked != 1. Probably called before limits/ramprates/sweeprates have been checked in the main Scan Function!"
+	// endif
 
    // Check that DACs are at start of ramp (will set if necessary but will give warning if it needs to)
 	fdRV_check_ramp_start(S)
@@ -492,6 +493,7 @@ end
 ///////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////// Processing /////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////
+
 
 function fdRV_Process_data(S, PL, rowNum)
    struct FD_ScanVars &S
