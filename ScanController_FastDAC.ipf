@@ -103,10 +103,10 @@ function fd_Record_Values(S, PL, rowNum, [AWG_list, linestart])
 	variable/g sc_AWG_used = 0  // Global so that this can be used in SaveWaves() to save AWG info if used
 	if(!paramisdefault(AWG_list) && AWG_list.use_AWG == 1)  // TODO: Does this work?
 		sc_AWG_used = 1
-		(rowNum == 0) ? print "fd_Record_Values: Using AWG" 
-		// if(rowNum == 0)
-		// 	print "fd_Record_Values: Using AWG"
-		// endif
+
+		if(rowNum == 0)
+			print "fd_Record_Values: Using AWG"
+		endif
 	endif
 	
 	// Check if this is a linecut scan and update centers if it is
@@ -119,10 +119,9 @@ function fd_Record_Values(S, PL, rowNum, [AWG_list, linestart])
    fdRV_check_init()
 
    // Check that checks have been carried out in main scan function where they belong
-   (S.lims_checked != 1) ? abort "ERROR[fd_record_values]: FD_ScanVars.lims_checked != 1. Probably called before limits/ramprates/sweeprates have been checked in the main Scan Function!" 
-	// if(S.lims_checked != 1)
-	// 	abort "ERROR[fd_record_values]: FD_ScanVars.lims_checked != 1. Probably called before limits/ramprates/sweeprates have been checked in the main Scan Function!"
-	// endif
+	if(S.lims_checked != 1)
+		abort "ERROR[fd_record_values]: FD_ScanVars.lims_checked != 1. Probably called before limits/ramprates/sweeprates have been checked in the main Scan Function!"
+	endif
 
    // Check that DACs are at start of ramp (will set if necessary but will give warning if it needs to)
 	fdRV_check_ramp_start(S)

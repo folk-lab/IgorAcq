@@ -1,7 +1,7 @@
 ///// Aim for data saving/plotting 
 
 function test_scan_2d(fdID, startx, finx, channelsx, starty, finy, channelsy, numptsy, [numpts, sweeprate, rampratex, rampratey, delayy, comments])
-	variable fdID, startx, finx, starty, finy, numptys, numpts, sweeprate, rampratex, rampratey, delayy
+	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, rampratex, rampratey, delayy
 	string channelsx, channelsy, comments
 
 	// Reconnect instruments
