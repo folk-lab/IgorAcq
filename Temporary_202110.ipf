@@ -358,7 +358,8 @@ function NEWSaveWaves([msg,save_experiment,fastdac, wave_names])
 
 	save_type = saveType(fastdac, wave_names) // set the save type
 
-	initializeWavesCheck(fastdac) // check if waves were initialzed
+	// nvar fastdac_init
+	initializeScansCheck(fastdac, save_type) // check if waves were initialzed
 
 	nvar sc_save_time
 	if (paramisdefault(save_experiment))
@@ -505,16 +506,16 @@ end
 
 
 
-function saveType([fastdac, wave_names])
+function saveType(fastdac, wave_names)
    string wave_names
 	variable fastdac
 	variable save_type = 0
 
-	if(!paramisdefault(fastdac) && !paramisdefault(wave_names))
-		abort "ERROR[SaveWaves]: Can only save FastDAC waves OR wave_names, not both at same time"
-	elseif(fastdac == 1)
+//	if(!paramisdefault(fastdac) && !paramisdefault(wave_names))
+//		abort "ERROR[SaveWaves]: Can only save FastDAC waves OR wave_names, not both at same time"
+	if(fastdac == 1)
 		save_type = 1  // Save Fastdac_ScanController waves
-	elseif(!paramisDefault(wave_names))
+	elseif(numtype(strlen(wave_names)) == 0)
 		save_type = 2  // Save given wave_names ONLY
 	else
 		save_type = 0  // Save normal ScanController waves
@@ -524,8 +525,8 @@ function saveType([fastdac, wave_names])
 end
 
 
-function initializeWavesCheck([fastdac])
-	variable fastdac
+function initializeScansCheck(fastdac, save_type)
+	variable fastdac, save_type
 	nvar fastdac_init
 
 	if(fastdac > fastdac_init && save_type != 2)
@@ -538,7 +539,7 @@ function initializeWavesCheck([fastdac])
 end
 
 
-function FastDacSave([msg])
+function FastDacSave(msg)
 	string msg
 	wave/t fadcvalstr
 	wave fadcattr
@@ -551,6 +552,8 @@ function FastDacSave([msg])
 	sprintf filenumstr, "%d", filenum
 	variable filecount = 0
 	variable ii=0
+	string wn, filename
+	
 
 	do
 		if(fadcattr[ii][2] == 48)
@@ -610,6 +613,7 @@ function FastDacSave([msg])
 			ii+=1
 		while(ii<dimsize(fadcattr,0))
 		closeSaveFiles()
+	endif
 end
 ////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////
