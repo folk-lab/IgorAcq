@@ -17,7 +17,7 @@ function test_scan_2d(fdID, startx, finx, channelsx, starty, finy, channelsy, nu
 	// Put info into scanVars struct (to more easily pass around later)
  	struct FD_ScanVars Fsv
 	SF_init_FDscanVars(Fsv, fdID, startx, finx, channelsx, numpts, rampratex, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
-	   						 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys)
+	   						 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs="", finxs="", startys="", finys="")
 
 	// Check scan is within limits
 	SFfd_pre_checks(Fsv)
@@ -47,7 +47,7 @@ function test_scan_2d(fdID, startx, finx, channelsx, starty, finy, channelsy, nu
 	NEW_InitializeScan()
 
 	// Main Measurement loop
-	variable setpointy, sy, fy
+	variable setpointy, sy, fy, i, j
 	string chy
 	for(i=0; i<Fsv.numptsy; i++)
 		// Ramp slow axis
@@ -57,8 +57,8 @@ function test_scan_2d(fdID, startx, finx, channelsx, starty, finy, channelsy, nu
 			chy = stringfromList(j, Fsv.channelsy, ",")
 			setpointy = sy + (i*(fy-sy)/(Fsv.numptsy-1))	
 			RampMultipleFDac(Fsv.instrID, chy, setpointy, ramprate=Fsv.rampratey, ignore_lims=1)
-		endif
-
+		endfor
+		
 		// Ramp to start of fast axis
 		SFfd_ramp_start(Fsv, ignore_lims=1, x_only=1)
 		sc_sleep(Fsv.delayy)
@@ -102,10 +102,9 @@ function NEW_fd_record_values(S, rowNum, [AWG_list, linestart])
 	variable/g sc_AWG_used = 0  // Global so that this can be used in SaveWaves() to save AWG info if used
 	if(!paramisdefault(AWG_list) && AWG_list.use_AWG == 1)  // TODO: Does this work?
 		sc_AWG_used = 1
-		(rowNum == 0) ? print "fd_Record_Values: Using AWG" 
-		// if(rowNum == 0)
-		// 	print "fd_Record_Values: Using AWG"
-		// endif
+		if(rowNum == 0)
+			print "fd_Record_Values: Using AWG"
+		endif
 	endif
 	
 	// Check if this is a linecut scan and update centers if it is
@@ -118,16 +117,16 @@ function NEW_fd_record_values(S, rowNum, [AWG_list, linestart])
    fdRV_check_init()
 
    // Check that checks have been carried out in main scan function where they belong
-   (S.lims_checked != 1) ? abort "ERROR[fd_record_values]: FD_ScanVars.lims_checked != 1. Probably called before limits/ramprates/sweeprates have been checked in the main Scan Function!" 
-	// if(S.lims_checked != 1)
-	// 	abort "ERROR[fd_record_values]: FD_ScanVars.lims_checked != 1. Probably called before limits/ramprates/sweeprates have been checked in the main Scan Function!"
-	// endif
+   
+	if(S.lims_checked != 1)
+		abort "ERROR[fd_record_values]: FD_ScanVars.lims_checked != 1. Probably called before limits/ramprates/sweeprates have been checked in the main Scan Function!"
+	endif
 
    	// Check that DACs are at start of ramp (will set if necessary but will give warning if it needs to)
 	fdRV_check_ramp_start(S)
 
 	// Send command and read values
-	fdRV_send_command_and_read()
+	fdRV_send_command_and_read(S, AWG_list, rowNum)
 
 	// Process 1D read and distribute
 	fdRV_process_and_distribute()
@@ -137,33 +136,41 @@ function NEW_fd_record_values(S, rowNum, [AWG_list, linestart])
 	// return looptime
 end
 
-function fdRV_send_command_and_read()
+function fdRV_send_command_and_read(ScanVars, AWG_list, rowNum)
+	struct FD_ScanVars &ScanVars
+	struct fdAWG_list &AWG_list
+	variable rowNum
 	string cmd_sent = ""
 	variable totalByteReturn
+	nvar sc_AWG_used
 	if(sc_AWG_used)  	// Do AWG_RAMP
-	   cmd_sent = fd_start_AWG_RAMP(S, AWG_list)
+	   cmd_sent = fd_start_AWG_RAMP(ScanVars, AWG_list)
 	else				// DO normal INT_RAMP
-		cmd_sent = fd_start_INT_RAMP(S)
+		cmd_sent = fd_start_INT_RAMP(ScanVars)
 	endif
-	totalByteReturn = S.numADCs*2*S.numptsx
+	totalByteReturn = ScanVars.numADCs*2*ScanVars.numptsx
 	sc_sleep(0.1) 	// Trying to get 0.2s of data per loop, will timeout on first loop without a bit of a wait first
 	variable looptime = 0
-   looptime = fdRV_record_buffer(S, rowNum, totalByteReturn)
+   looptime = fdRV_record_buffer(ScanVars, rowNum, totalByteReturn)
 
    // update window
 	string endstr
-	endstr = readInstr(S.instrID)
+	endstr = readInstr(ScanVars.instrID)
 	endstr = sc_stripTermination(endstr,"\r\n")
 	if(fdacCheckResponse(endstr,cmd_sent,isString=1,expectedResponse="RAMP_FINISHED"))
-		fdRV_update_window(S, S.numADCs)
+		fdRV_update_window(ScanVars, ScanVars.numADCs)
 		if(sc_AWG_used)  // Reset AWs back to zero (I don't see any reason the user would want them left at the final position of the AW)
-			rampmultiplefdac(S.instrID, AWG_list.AW_DACs, 0)
+			rampmultiplefdac(ScanVars.instrID, AWG_list.AW_DACs, 0)
 		endif
 	endif
 
 	// fdRV_check_sweepstate(S.instrID)
 end
 
+
+function fdRV_process_and_distribute()
+
+end
 
 function NEW_EndScan()
 
