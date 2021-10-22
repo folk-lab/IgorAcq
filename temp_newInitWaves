@@ -1,0 +1,391 @@
+// Structure to hold scan information (general to all scans)
+structure ScanVars
+    variable instrID
+    
+    variable lims_checked // Flag that gets set to 1 after checks on software limits/ramprates etc has been carried out
+
+    string channelsx
+    variable startx, finx, numptsx, rampratex
+
+    // For 2D scans
+    variable is2d
+    string channelsy 
+    variable starty, finy, numptsy, rampratey 
+
+    // For scanRepeat
+    variable direction
+
+    // Other useful info
+    variable start_time // Should be recorded right before measurements begin (e.g. after all checks are carried out)
+    variable end_time // Should be recorded right after measurements end (e.g. before getting sweeplogs etc)
+    string x_label
+    string y_label
+
+    // Specific to Fastdac 
+    variable numADCs
+    variable samplingFreq, measureFreq
+    variable sweeprate
+    string adcList
+    string startxs, finxs
+    string startys, finys
+endstructure
+
+function initFDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate, rampratex, starty, finy, channelsy, numptsy, rampratey, delayy, direction, startxs, finxs, startys, finys])
+    // Function to make setting up scanVars struct easier for FastDAC scans
+    // PARAMETERS:
+    // startx, finx, starty, finy -- Single start/fin point for all channelsx/channelsy
+    // startxs, finxs, startys, finys -- For passing in multiple start/fin points for each channel as a comma separated string instead of a single start/fin for all channels
+    //		Note: Just pass anything for startx/finx if using startxs/finxs, they will be overwritten
+    struct ScanVars &s
+    variable instrID
+    variable startx, finx, numptsx, rampratex
+    variable starty, finy, numptsy, delayy, rampratey
+    string channelsx
+    string channelsy
+    string startxs, finxs, startys, finys
+    variable direction, sweeprate
+
+    // Handle Optional Parameters
+    s.numptsx = paramisdefault(numptsx) ? NaN : numptsx
+    s.rampratex = paramisDefault(rampratex) ? NaN : rampratex
+    s.delayx = paramisDefault(delayx) ? NaN : delayx
+
+    s.sweeprate = paramisdefault(sweeprate) ? NaN : sweeprate  // TODO: Should this be different?
+
+	s.numptsy = paramisdefault(numptsy) ? NaN : numptsy
+    s.rampratey = paramisdefault(rampratey) ? NaN : rampratey
+    s.delayy = paramisdefault(delayy) ? NaN : delayy
+
+	// Set Variables in Struct
+    s.instrID = instrID
+    s.adcList = SFfd_get_adcs()
+
+	// For repeat scans 
+    s.direction = paramisdefault(direction) ? 1 : direction
+   	
+   	// Sets channelsx, channelsy and is2d
+    setChannels(channelsx, channelsy, fastdac=1)
+
+   	// Sets starts/fins in FD string format
+    setFDsetpoints(S, startx, finx, starty, finy, S.is2d, startxs, finxs, startys, finys)
+	
+	// Set variables with some calculation
+    SFfd_set_numpts_sweeprate(S) 	// Checks that either numpts OR sweeprate was provided, and sets both in ScanVars accordingly
+                                    // Note: Valid for same start/fin points only (uses S.startx, S.finx NOT S.startxs, S.finxs)
+    SFfd_set_measureFreq(S) 		// Sets S.samplingFreq/measureFreq/numADCs	
+   
+	// Make waves for storing sweepgates, starts, ends for both x and y
+    // TODO: Move this into InitScan()???
+	SFfd_create_sweepgate_save_info(S)
+end
+
+
+function initBDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate, rampratex, starty, finy, channelsy, numptsy, rampratey, delayy, direction])
+    // Function to make setting up scanVars struct easier for FastDAC scans
+    // PARAMETERS:
+    // startx, finx, starty, finy -- Single start/fin point for all channelsx/channelsy
+    // startxs, finxs, startys, finys -- For passing in multiple start/fin points for each channel as a comma separated string instead of a single start/fin for all channels
+    //		Note: Just pass anything for startx/finx if using startxs/finxs, they will be overwritten
+    struct ScanVars &s
+    variable instrID
+    variable startx, finx, numptsx, rampratex
+    variable starty, finy, numptsy, delayy, rampratey
+    string channelsx
+    string channelsy
+    variable direction, sweeprate
+
+    // Handle Optional Parameters
+    s.numptsx = paramisdefault(numptsx) ? NaN : numptsx
+    s.rampratex = paramisDefault(rampratex) ? NaN : rampratex
+    s.delayx = paramisDefault(delayx) ? NaN : delayx
+
+    s.sweeprate = paramisdefault(sweeprate) ? NaN : sweeprate  // TODO: Should this be different?
+
+	s.numptsy = paramisdefault(numptsy) ? NaN : numptsy
+    s.rampratey = paramisdefault(rampratey) ? NaN : rampratey
+    s.delayy = paramisdefault(delayy) ? NaN : delayy
+
+	// Set Variables in Struct
+    s.instrID = instrID
+
+	// For repeat scans 
+    s.direction = paramisdefault(direction) ? 1 : direction
+   	
+   	// Sets channelsx, channelsy and is2d
+    setChannels(channelsx, channelsy, fastdac=0)
+end
+
+function setChannels(S, channelsx, channelsy, fastdac)
+    // Set S.channelsx and S.channelys converting channel labels to numbers where necessary
+    // Note: Also sets S.is2d
+    struct ScanVars &S
+    string channelsx, channelsy
+    variable fastdac
+
+    s.channelsx = SF_get_channels(channelsx, fastdac=fastdac)
+
+	if (numtype(strlen(channelsy)) != 0 || strlen(channelsy) == 0)  // No Y set at all
+		s.starty = NaN
+		s.finy = NaN
+		s.channelsy = ""
+        s.is2d = 0
+	else
+		s.channelsy = SF_get_channels(channelsy, fastdac=fastdac)
+        s.is2d = 1
+    endif
+end
+
+function setFDsetpoints(S, startx, finx, starty, finy, startxs, finxs, startys, finys)
+    struct ScanVars &S
+    variable startx, finx, starty, finy
+    string startxs, finxs, startys, finys
+
+    // Set X
+   	if ((numtype(strlen(startxs)) != 0 || strlen(startxs) == 0) && (numtype(strlen(finxs)) != 0 || strlen(finxs) == 0))  // Then just a single start/end for channelsx
+   		s.startx = startx
+		s.finx = finx	
+        SFfd_format_setpoints(S.startx, S.finx, S.channelsx, starts, fins)  
+		s.startxs = starts
+		s.finxs = fins
+	elseif (!(numtype(strlen(startxs)) != 0 || strlen(startxs) == 0) && !(numtype(strlen(finxs)) != 0 || strlen(finxs) == 0))
+		SFfd_sanitize_setpoints(startxs, finxs, channelsx, starts, fins)
+		s.startx = str2num(StringFromList(0, starts, ","))
+		s.finx = str2num(StringFromList(0, fins, ","))
+		s.startxs = starts
+		s.finxs = fins
+	else
+		abort "If either of startxs/finxs is provided, both must be provided"
+	endif
+
+    // If 2D then set Y
+    if (S.is2d) 
+        if ((numtype(strlen(startys)) != 0 || strlen(startys) == 0) && (numtype(strlen(finys)) != 0 || strlen(finys) == 0) && !paramisdefault(starty) && !paramisdefault(finy))  // Single start/end for Y
+            s.starty = starty
+            s.finy = finy	
+            SFfd_format_setpoints(S.starty, S.finy, S.channelsy, starts, fins)  
+            s.startys = starts
+            s.finys = fins
+        elseif (!(numtype(strlen(startys)) != 0 || strlen(startys) == 0) && !(numtype(strlen(finys)) != 0 || strlen(finys) == 0)) // Multiple start/end for Ys
+            SFfd_sanitize_setpoints(startys, finys, S.channelsy, starts, fins)
+            s.starty = str2num(StringFromList(0, starts, ","))
+            s.finy = str2num(StringFromList(0, fins, ","))
+            s.startys = starts
+            s.finys = fins
+        else
+            abort "Something wrong with Y part. Note: If either of startys/finys is provided, both must be provided"
+        endif
+    endif
+end
+
+function initializeScan(ScanVars, fastdac)
+    struct FD_ScanVars 
+    variable fastdac
+    // Most of InitializeWaves()
+	// Requirements for this part:
+	// Initialize waves -- 	Need 1D and 2D waves for the raw data coming from the fastdac
+	// 						Need 2D waves for either the raw data, or filtered data if a filter is set
+	//							(If a filter is set, the raw waves should only ever be plotted 1D)
+	//							(This will be after calc (i.e. don't need before and after calc wave))
+	// Initialize graphs -- 	Need 1D graphs for raw data coming in for each sweep
+	//								(Only these should be updated during the sweep, then the 2D plots after a 1D sweep)
+	// 							Need 2D graphs for the filtered/calc'd waves
+	//								(Should get updated at the end of each sweep)
+	// Open the abort sweep window
+	// Does the current InitializeWaves do anything else?
+    killVISA()
+    sc_OpenInstrConnections(0)
+
+    new_initializeWaves(ScanVars)
+    // TODO: Might need to get the S.adcList differently because sc_fastadc is no longer created in initWaves
+
+    initializeGraphs()
+
+    openAbortWindow()
+
+end
+
+
+function new_initializeWaves(ScanVars, fastdac)
+    struct FD_ScanVars
+    variable fastdac
+
+    string wavenames, wn
+    variable i, j
+    for (i = 0; i<2; i++) // 0 = Calc, 1 = Raw
+        wavenames = get1DWaveNames(raw=i)
+        sanityCheckWavenames(wavenames)
+        makeWaves(wavenames, i, ScanVars)
+        for (j=0; j<itemsinlist(wavenames, ',';j++))
+            wn = itemfromlist(i, wavenames, ',')
+            init1DWave(wn, ScanVars.numptsx, ScanVars.startx, ScanVars.finx)
+            if (ScanVars.is2d == 1)
+                init2DWave(wn+"_2d", ScanVars.numptsx, ScanVars.startx, ScanVars.finx, ScanVars.numptsy, ScanVars.starty, ScanVars.finy)
+            elseif (ScanVars.is2d == 2)
+                abort "Need to fix how waves are initialized, i.e. need to replicate something like the commented code below instead of just init1Dwave(...)"
+					// cmd = "make /o/n=(1, " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd) //Makes 1 by y wave, x is redimensioned in recordline
+					// cmd = "setscale /P x, 0, " + num2str((sc_finx-sc_startx)/sc_numptsx) + "," + wn2d; execute(cmd) //sets x scale starting from 0 but with delta correct
+					// cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)//Useful to see if top and bottom of scan are filled with NaNs
+            endif
+        endfor
+    endfor
+
+    // If a linecut scan, then initialize the Row start X value wave
+    if (ScanVars.is2d == 2) 
+        init1DWave("sc_linestart", ScanVars.starty, ScanVars.finy)  // Wave to store first X value for each sweep
+    endif
+
+    // TODO: This is where x_array and y_array were made, but that should just be done in the savewaves part now
+end
+
+function init1DWave(waveName, numpts, start, fin)
+    // Overwrites waveName with scaled wave from start to fin with numpts
+    string waveName
+    variable numpts, start, fin
+    string cmd
+    make/O/n=(numpts) $waveName = NaN  // TODO: can put in a cmd and execute if necessary
+    cmd = "setscale/I x " + num2str(start) + ", " + num2str(fin) + ", " + waveName; execute(cmd)
+end
+
+function init2DWave(waveName, numptsx, startx, finx, numptsy, starty, finy)
+    // Overwrites waveName with scaled wave from start to fin with numpts
+    string waveName
+    variable numptsx, startx, finx, numptsy, starty, finy
+    string cmd
+    make/O/n=(numptsx, numptsy) $waveName = NaN  // TODO: can put in a cmd and execute if necessary
+    cmd = "setscale/I x " + num2str(startx) + ", " + num2str(finx) + ", " + waveName; execute(cmd)
+	cmd = "setscale/I y " + num2str(starty) + ", " + num2str(finy) + ", " + waveName; execute(cmd)
+end
+
+function/t get1DWaveNames(raw, fastdac)
+    // Return a comma separated list of Raw or Calc wavenames (without any checks)
+    variable raw, fastdac
+    string wavenames
+    variable i
+    if (fastdac == 1) 
+        wave/t fadcvalstr
+        for (i = 0; i<dimsize(fadcvalstr, 0); i++)
+            if (fadcattr[i][2] == 48) // Checkbox checked
+                if (raw == 1)
+                    addlistItem("ADC"+num2str(i), wavenames, ',')  
+                else 
+                    addlistItem(fadcvalstr[i][3], wavenames, ',')  
+                endif
+            endif
+        endfor
+    else  // Regular ScanController
+        if (raw == 1)
+            wave recordWave = sc_RawRecord
+            wave waveNameWave = sc_RawWaveNames
+        else
+            wave recordWave = sc_CalcRecord
+            wave waveNameWave = sc_CalcWaveNames
+        endif
+        for (i = 0; i<numpnts(waveNameWave); i++)     
+            if (recordWave[i])
+                addlistItem(waveNameWave[i], wavenames, ',')
+            endif
+        endfor
+    endif
+    return wavenames
+end
+
+function sanityCheckWavenames(wavenames)
+    // Take comma separated list of wavenames, and check they all make sense
+    string wavenames
+    string s
+    for (variable i = 0; i<itemsinlist(wavenames, ','); i++)
+        s = itemfromlist(i, wavenames, ',')
+        if (!((char2num(s[0]) >= 97 && char2num(s[0]) <= 122) || (char2num(s[0]) >= 65 && char2num(s[0]) <= 90)))
+            print "The first character of a wave name should be an alphabet a-z A-Z. The problematic wave name is " + s;
+            abort
+        endif
+        if (!((char2num(s[strlen(s)-1]) >= 97 && char2num(s[strlen(s)-1]) <= 122) || (char2num(s[strlen(s)-1]) >= 65 && char2num(s[strlen(s)-1]) <= 90)))
+            print "The last character of a wave name should be an alphabet a-z A-Z. The problematic wave name is " + s;
+            abort
+        endif
+    endfor
+end
+
+function makeWaves(wavenames, raw, ScanVars)
+    string wavenames
+    variable raw
+    struct FD_ScanVars &ScanVars
+
+
+
+end
+
+function initializeGraphs()
+    string graphNames = getOpenGraphNames()
+    string graphTitles = getOpenGraphTitles()    
+    string graphNums = getOpenGraphNums()
+
+    for graphName in graphNames
+        // TODO: Why do this?
+		setaxis/w=$graphname /a
+    endfor
+
+    for name in wavenames:
+        if graph not alredy open 
+            Open
+        endif
+    endfor
+
+    // Tile Graphs
+    string cmd
+    cmd = "TileWindows/O=1/A=(3,4) "  
+    for graph in active graphs:
+        and graph name to list
+        close that graph
+    endfor
+    open all with cmd1  // Also add SweepControl ? Or maybe this should be opened somewhere else
+    doupdate
+end
+
+function/t getOpenGraphTitles()
+	string graphlist = winlist("*",";","WIN:1")
+    string graphNames
+	variable i, j=0
+	for (i=0;i<itemsinlist(graphlist);i=i+1)
+		index = strsearch(graphlist,";",j)
+		graphname = graphlist[j,index-1]
+        graphnames += graphname+";"
+		j=index+1
+	endfor
+    return graphNames
+end
+
+function/t getOpenGraphTitles()
+	string graphlist = winlist("*",";","WIN:1")
+    string graphTitles
+	variable i, j=0
+	for (i=0;i<itemsinlist(graphlist);i=i+1)
+		index = strsearch(graphlist,";",j)
+		graphname = graphlist[j,index-1]
+		getwindow $graphname wtitle
+		splitstring /e="(.*):(.*)" s_value, graphnum, plottitle
+		graphtitles+= plottitle+";"
+		j=index+1
+	endfor
+    return graphTitles
+end
+
+function/t getOpenGraphNums()
+	string graphlist = winlist("*",";","WIN:1")
+    string graphNums
+    string wtitle
+	variable i, j=0
+	for (i=0;i<itemsinlist(graphlist);i=i+1)
+		index = strsearch(graphlist,";",j)
+		graphname = graphlist[j,index-1]
+		getwindow $graphname wtitle
+		splitstring /e="(.*):(.*)" s_value, graphnum, plottitle
+		graphnumlist+= graphnum+";"
+		j=index+1
+	endfor
+    return graphNums
+end
+
+function openAbortWindow()
+    doWindow "SweepControl" //TODO: Something like this?
+end
