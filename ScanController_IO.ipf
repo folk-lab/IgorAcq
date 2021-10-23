@@ -16,10 +16,13 @@ function initSaveFiles([msg, logs_only])
 		msg=""
 	endif
 
+
+
 	nvar filenum
 	string filenumstr = ""
 	sprintf filenumstr, "%d", filenum
 	string /g h5name = "dat"+filenumstr+".h5"
+
 
 	// Open HDF5 file
 	variable /g hdf5_id
