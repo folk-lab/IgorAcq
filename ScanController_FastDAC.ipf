@@ -231,13 +231,13 @@ function fdRV_record_buffer(S, rowNum, totalByteReturn)
    variable read_chunk = fdRV_get_read_chunk_size(S.numADCs, S.numptsx, bytesSec, totalByteReturn)
    do
       fdRV_read_chunk(S.instrID, read_chunk, buffer)  // puts data into buffer
-      fdRV_distribute_data(buffer, S, bytes_read, totalByteReturn, read_chunk, rowNum, S.direction)
+      fdRV_distribute_data(buffer, S, bytes_read, totalByteReturn, read_chunk, rowNum, S.direction) ///////////// TODO: Change THIS
       bytes_read += read_chunk
       totaldump = bytesSec*(stopmstimer(-2)-bufferDumpStart)*1e-6  // Expected amount of bytes in buffer
       if(totaldump-bytes_read < saveBuffer)  // if we aren't too far behind
          // we can update all plots
          // should take ~15ms extra
-         fdRV_update_graphs()
+         fdRV_update_graphs()     ///////// TODO: UPDATE RAW 1D GRAPHS ONLY
       endif
       fdRV_check_sweepstate(S.instrID)
    while(totalByteReturn-bytes_read > read_chunk)
@@ -377,7 +377,8 @@ function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart,[direction])
 		if(sc_is2d)
 			wave2d = wave1d+"_2d"
 			wave rawwave2d = $wave2d
-			rawwave2d[][rowNum] = rawwave[p]
+			rawwave2d[colNumStart,colNumStart+bytes/2][rowNum] = rawwave[p]   /// NOT TESTED
+//			rawwave2d[][rowNum] = rawwave[p]
 		endif
 	endfor
 
@@ -396,7 +397,9 @@ function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart,[direction])
 		if(sc_is2d)
 			wave2d = wave1d+"_2d"
 			wave datawave2d = $wave2d
-			datawave2d[][rowNum] = datawave[p]
+			datawave2d[colNumStart,colNumStart+bytes/2][rowNum] = datawave[p]  /// ALSO NOT TESTED
+//			datawave2d[][rowNum] = datawave[p]
+
 		endif
 	endfor
 end
@@ -959,7 +962,7 @@ end
 window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	variable v_left,v_right,v_top,v_bottom
 	PauseUpdate; Silent 1 // pause everything else, while building the window
-	NewPanel/w=(0,0,790,570)/n=ScanControllerFastDAC // window size
+	NewPanel/w=(0,0,790,630)/n=ScanControllerFastDAC // window size ////// EDIT 570 -> 600
 	if(v_left+v_right+v_top+v_bottom > 0)
 		MoveWindow/w=ScanControllerFastDAC v_left,v_top,V_right,v_bottom
 	endif
@@ -969,10 +972,10 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	DrawText 160, 45, "DAC"
 	SetDrawEnv fsize=25, fstyle=1
 	DrawText 546, 45, "ADC"
-	DrawLine 385,15,385,385
-	DrawLine 10,385,780,385
+	DrawLine 385,15,385,385 
+	DrawLine 10,415,780,415 /////EDIT 385-> 415
 	SetDrawEnv dash=7
-	Drawline 395,295,780,295
+	Drawline 395,320,780,320 /////EDIT 295 -> 320
 	// DAC, 12 channels shown
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 15, 70, "Ch"
@@ -1005,39 +1008,40 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	button updatefadc,pos={400,265},size={90,20},proc=update_fadc,title="Update ADC"
 	checkbox sc_PrintfadcBox,pos={500,265},proc=sc_CheckBoxClicked,value=sc_Printfadc,side=1,title="\Z14Print filenames "
 	checkbox sc_SavefadcBox,pos={620,265},proc=sc_CheckBoxClicked,value=sc_Saverawfadc,side=1,title="\Z14Save raw data "
-	popupMenu fadcSetting1,pos={420,300},proc=update_fadcSpeed,mode=1,title="\Z14ADC1 speed",size={100,20},value=sc_fadcSpeed1
-	popupMenu fadcSetting2,pos={620,300},proc=update_fadcSpeed,mode=1,title="\Z14ADC2 speed",size={100,20},value=sc_fadcSpeed2
-	popupMenu fadcSetting3,pos={420,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC3 speed",size={100,20},value=sc_fadcSpeed3
-	popupMenu fadcSetting4,pos={620,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC4 speed",size={100,20},value=sc_fadcSpeed4
-	popupMenu fadcSetting5,pos={420,360},proc=update_fadcSpeed,mode=1,title="\Z14ADC5 speed",size={100,20},value=sc_fadcSpeed5
-	popupMenu fadcSetting6,pos={620,360},proc=update_fadcSpeed,mode=1,title="\Z14ADC6 speed",size={100,20},value=sc_fadcSpeed6
-	DrawText 550, 317, "\Z14Hz"
-	DrawText 750, 317, "\Z14Hz"
-	DrawText 550, 347, "\Z14Hz"
-	DrawText 750, 347, "\Z14Hz"
-	DrawText 550, 377, "\Z14Hz"
-	DrawText 750, 377, "\Z14Hz"
+	checkbox sc_FilterfadcBox,pos={620,290},proc=sc_CheckBoxClicked,value=sc_Filterfadc,side=1,title="\Z14Filter data " /////EDIT ADDED
+	popupMenu fadcSetting1,pos={420,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC1 speed",size={100,20},value=sc_fadcSpeed1 /////EDIT 300->330
+	popupMenu fadcSetting2,pos={620,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC2 speed",size={100,20},value=sc_fadcSpeed2 /////EDIT 300->330
+	popupMenu fadcSetting3,pos={420,360},proc=update_fadcSpeed,mode=1,title="\Z14ADC3 speed",size={100,20},value=sc_fadcSpeed3 /////EDIT 330->360
+	popupMenu fadcSetting4,pos={620,360},proc=update_fadcSpeed,mode=1,title="\Z14ADC4 speed",size={100,20},value=sc_fadcSpeed4 /////EDIT 330->360
+	popupMenu fadcSetting5,pos={420,390},proc=update_fadcSpeed,mode=1,title="\Z14ADC5 speed",size={100,20},value=sc_fadcSpeed5 /////EDIT 360->390
+	popupMenu fadcSetting6,pos={620,390},proc=update_fadcSpeed,mode=1,title="\Z14ADC6 speed",size={100,20},value=sc_fadcSpeed6 /////EDIT 360->390
+	DrawText 550, 347, "\Z14Hz" /////EDIT 317->347
+	DrawText 750, 347, "\Z14Hz" /////EDIT 317->347
+	DrawText 550, 377, "\Z14Hz" /////EDIT 347->377
+	DrawText 750, 377, "\Z14Hz" /////EDIT 347->377
+	DrawText 550, 407, "\Z14Hz" /////EDIT 377->407
+	DrawText 750, 407, "\Z14Hz" /////EDIT 377->407
 
 	// identical to ScanController window
 	// all function calls are to ScanController functions
 	// instrument communication
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 15, 415, "Connect Instrument"
+	DrawText 15, 445, "Connect Instrument" /////EDIT 415->445
+	SetDrawEnv fsize=14, fstyle=1 
+	DrawText 265, 445, "Open GUI" /////EDIT 415->445
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 265, 415, "Open GUI"
-	SetDrawEnv fsize=14, fstyle=1
-	DrawText 515, 415, "Log Status"
-	ListBox sc_InstrFdac,pos={10,420},size={770,100},fsize=14,frame=2,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1, editStyle=1
+	DrawText 515, 445, "Log Status" /////EDIT 415->445
+	ListBox sc_InstrFdac,pos={10,450},size={770,100},fsize=14,frame=2,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1, editStyle=1 /////EDIT 420->450
 
 	// buttons
-	button connectfdac,pos={10,525},size={140,20},proc=sc_OpenInstrButton,title="Connect Instr"
-	button guifdac,pos={160,525},size={140,20},proc=sc_OpenGUIButton,title="Open All GUI"
-	button killaboutfdac, pos={310,525},size={160,20},proc=sc_controlwindows,title="Kill Sweep Controls"
-	button killgraphsfdac, pos={480,525},size={150,20},proc=sc_killgraphs,title="Close All Graphs"
-	button updatebuttonfdac, pos={640,525},size={140,20},proc=sc_updatewindow,title="Update"
+	button connectfdac,pos={10,555},size={140,20},proc=sc_OpenInstrButton,title="Connect Instr" /////EDIT 525-> 555
+	button guifdac,pos={160,555},size={140,20},proc=sc_OpenGUIButton,title="Open All GUI" /////EDIT 525-> 555
+	button killaboutfdac, pos={310,555},size={160,20},proc=sc_controlwindows,title="Kill Sweep Controls" /////EDIT 525-> 555
+	button killgraphsfdac, pos={480,555},size={150,20},proc=sc_killgraphs,title="Close All Graphs" /////EDIT 525-> 555
+	button updatebuttonfdac, pos={640,555},size={140,20},proc=sc_updatewindow,title="Update" /////EDIT 525-> 555
 
 	// helpful text
-	DrawText 10, 565, "Press Update to save changes."
+	DrawText 10, 595, "Press Update to save changes." /////EDIT 565-> 595
 endmacro
 
 	// set update speed for ADCs
@@ -1260,6 +1264,7 @@ function fdacCreateControlWaves(numDACCh,numADCCh)
 
 	variable/g sc_printfadc = 0
 	variable/g sc_saverawfadc = 0
+	variable/g sc_Filterfadc = 0 /////EDIT ADDED variable for filtering data
 
 	// clean up
 	killwaves fdacval0,fdacval1,fdacval2,fdacval3,fdacval4

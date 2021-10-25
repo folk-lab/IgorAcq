@@ -379,20 +379,19 @@ function NEWSaveWaves([msg,save_experiment,fastdac, wave_names])
 
 
 	// count up the number of data files to save
-	variable ii=0
+
 
 	//////////////////// non - fastdac save ////////////////////
 	if(save_type == 0)
 		variable Rawadd = sum(sc_RawRecord)
 		variable Calcadd = sum(sc_CalcRecord)
 		NonFastDacSave(msg)
-
 	//////////////////// fastdac save //////////////////////////
 	elseif(save_type == 1)
 		FastDacSave(msg)
-
 	//////////////////// wave_name save ////////////////////////
 	elseif(save_type == 2)
+		variable ii=0
 		// Check that all waves trying to save exist
 		for(ii=0;ii<itemsinlist(wave_names, ",");ii++)
 			wn = stringfromlist(ii, wave_names, ",")
@@ -779,18 +778,17 @@ end
 
 ///////////// I commented out h5name warning ////////////
 ///////////// remember to add back in ///////////////////
-function initcloseSaveFiles(hdf5_id)
+function initcloseSaveFiles(hdf5_id_list)
 	// close any files that were created for this dataset
-	string hdf5_id	
+	string hdf5_id_list	
 	variable i
-
+	variable hdf5_id
 	for (i=0;i<itemsinlist(hdf5_id_list);i++)
 		hdf5_id = str2num(stringFromList(i, hdf5_id_list))
-	
-		variable hdf5_id
+
 		HDF5CloseFile /Z hdf5_id // close HDF5 file
 		if (V_flag != 0)
-			//Print "HDF5CloseFile failed: ", h5name
+			Print "HDF5CloseFile failed"
 		endif
 		
 	endfor
@@ -866,6 +864,7 @@ function NEW_fd_record_values(S, rowNum, [AWG_list, linestart])
 end
 
 function fdRV_send_command_and_read(ScanVars, AWG_list, rowNum)
+	// Send 1D Sweep command to fastdac and record the raw data it returns ONLY
 	struct FD_ScanVars &ScanVars
 	struct fdAWG_list &AWG_list
 	variable rowNum
@@ -874,20 +873,20 @@ function fdRV_send_command_and_read(ScanVars, AWG_list, rowNum)
 	nvar sc_AWG_used
 	if(sc_AWG_used)  	// Do AWG_RAMP
 	   cmd_sent = fd_start_AWG_RAMP(ScanVars, AWG_list)
-	else				// DO normal INT_RAMP
+	else				// DO normal INT_RAMP  
 		cmd_sent = fd_start_INT_RAMP(ScanVars)
 	endif
 	totalByteReturn = ScanVars.numADCs*2*ScanVars.numptsx
 	sc_sleep(0.1) 	// Trying to get 0.2s of data per loop, will timeout on first loop without a bit of a wait first
 	variable looptime = 0
    looptime = fdRV_record_buffer(ScanVars, rowNum, totalByteReturn)
-
+	
    // update window
 	string endstr
 	endstr = readInstr(ScanVars.instrID)
 	endstr = sc_stripTermination(endstr,"\r\n")
 	if(fdacCheckResponse(endstr,cmd_sent,isString=1,expectedResponse="RAMP_FINISHED"))
-		fdRV_update_window(ScanVars, ScanVars.numADCs)
+		fdRV_update_window(ScanVars, ScanVars.numADCs)  /// TODO: Check this isn't slow
 		if(sc_AWG_used)  // Reset AWs back to zero (I don't see any reason the user would want them left at the final position of the AW)
 			rampmultiplefdac(ScanVars.instrID, AWG_list.AW_DACs, 0)
 		endif
@@ -898,7 +897,10 @@ end
 
 
 function fdRV_process_and_distribute()
-
+	variable fastdac_freq = 2000 // This needs to be filled
+//	resample/down=X
+	
+	
 end
 
 function NEW_EndScan()
