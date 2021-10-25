@@ -520,20 +520,20 @@ function FastDacSave(msg)
 
 		string hdfids
 		hdfids = addlistItem(num2str(calc_hdf5_id), hdfids)
-		if (sc_Saverawfadc == 48) //////// check variable == 48 for ticked
+		if (sc_Saverawfadc == 48) //////// check variable == 48 for ticked || MIGHT JUST BE 1 TO CHECK...
 			raw_hdf5_id = initOpenSaveFiles(1)
 			hdfids = addlistItem(num2str(raw_hdf5_id), hdfids)
 		endif
 		
 		// add Meta data to each file
-		initAddMetaFiles(hdfids, msg=msg)
+		addMetaFiles(hdfids, msg=msg)
 
 
 		// look for waves to save
 		ii=0
 		string str_2d = "", savename
 		do
-			if(fadcattr[ii][2] == 48) //checkbox checked
+			if(fadcattr[ii][2] == 48) //checkbox checked || MIGHT JUST BE 1 TO CHECK...
 				wn = fadcvalstr[ii][3]
 				if(sc_is2d)
 					wn += "_2d"
@@ -573,7 +573,7 @@ function FastDacSave(msg)
 			endif
 			ii+=1
 		while(ii<dimsize(fadcattr,0))
-		closeSaveFiles()
+		initcloseSaveFiles(hdfids) // close all files
 	endif
 end
 
@@ -688,10 +688,9 @@ function initOpenSaveFiles(RawSave)
 end
 
 
-function initAddMetaFiles(hdf5_id_list, [msg, logs_only])
-	// maunual_hdf5_id flag is passed, open file is
-	// assumed to exist and will add meta data to maunual_hdf5_id
-	// else, a 
+function addMetaFiles(hdf5_id_list, [msg, logs_only])
+	// meta data is created and added to the files in list
+	// hdf5_id_list
 	string msg
 	variable logs_only  // 1=Don't save any data to HDF
 	string hdf5_id_list
@@ -706,8 +705,7 @@ function initAddMetaFiles(hdf5_id_list, [msg, logs_only])
 	// Check that prettyJSONfmt actually returned a valid JSON.
 	sc_confirm_JSON(sweep_logs, name="sweep_logs")
 	sc_confirm_JSON(cconfig, name="cconfig")
-	
-	
+
 	// LOOP through the given hdf5_id in list
 	variable i
 	variable hdf5_id
@@ -776,7 +774,7 @@ function initSaveSingleWave(wn, hdf5_id)
 end
 
 
-///////////// I commented out h5name warning ////////////
+///////////// Commented out h5name warning ////////////
 ///////////// remember to add back in ///////////////////
 function initcloseSaveFiles(hdf5_id_list)
 	// close any files that were created for this dataset

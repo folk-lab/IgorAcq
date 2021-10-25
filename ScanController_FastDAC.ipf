@@ -1008,7 +1008,8 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	button updatefadc,pos={400,265},size={90,20},proc=update_fadc,title="Update ADC"
 	checkbox sc_PrintfadcBox,pos={500,265},proc=sc_CheckBoxClicked,value=sc_Printfadc,side=1,title="\Z14Print filenames "
 	checkbox sc_SavefadcBox,pos={620,265},proc=sc_CheckBoxClicked,value=sc_Saverawfadc,side=1,title="\Z14Save raw data "
-	checkbox sc_FilterfadcBox,pos={620,290},proc=sc_CheckBoxClicked,value=sc_Filterfadc,side=1,title="\Z14Filter data " /////EDIT ADDED
+	SetVariable sc_FilterfadcBox,pos={500,290},size={150,20},value=sc_Filterfadc,side=1,title="\Z14Filter data ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
+	DrawText 660,310, "\Z14Hz" /////EDIT ADDED
 	popupMenu fadcSetting1,pos={420,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC1 speed",size={100,20},value=sc_fadcSpeed1 /////EDIT 300->330
 	popupMenu fadcSetting2,pos={620,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC2 speed",size={100,20},value=sc_fadcSpeed2 /////EDIT 300->330
 	popupMenu fadcSetting3,pos={420,360},proc=update_fadcSpeed,mode=1,title="\Z14ADC3 speed",size={100,20},value=sc_fadcSpeed3 /////EDIT 330->360
