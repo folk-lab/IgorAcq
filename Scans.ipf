@@ -1656,6 +1656,7 @@ structure BD_ScanVars
    string channelsy
    
    variable direction		// For storing what direction to scan in (for scanRepeat)
+   
 endstructure
 
 
