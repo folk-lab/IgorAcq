@@ -591,7 +591,7 @@ function rampOutputFDAC(instrID,channel,output,[ramprate, ignore_lims]) // Units
 		// fdacvalstr[channel][1] = num2str(output)
 		// updatefdacWindow(channel)
 		output = getfdacOutput(instrID, devchannel)
-		updatefdacValStr(devchannel, output, update_oldValStr=1)
+		updatefdacValStr(channel, output, update_oldValStr=1)
 	else
 		resetfdacwindow(channel)
 		abort

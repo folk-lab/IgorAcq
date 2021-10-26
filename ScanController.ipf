@@ -803,7 +803,7 @@ function sc_CheckboxClicked(ControlName, Value)
 	variable value
 	string indexstring
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot, sc_measAsync
-	nvar sc_PrintRaw, sc_PrintCalc
+	nvar sc_PrintRaw, sc_PrintCalc, sc_resampleFreqCheckFadc
 	nvar/z sc_Printfadc, sc_Saverawfadc // FastDAC specific
 	variable index
 	string expr
@@ -840,6 +840,9 @@ function sc_CheckboxClicked(ControlName, Value)
 		sc_Printfadc = value
 	elseif(stringmatch(ControlName,"sc_SavefadcBox")) // FastDAC window
 		sc_Saverawfadc = value
+	elseif(stringmatch(ControlName,"sc_FilterfadcCheckBox")) // FastDAC window
+		sc_resampleFreqCheckFadc = value
+
 	endif
 end
 

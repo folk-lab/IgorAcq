@@ -1268,8 +1268,8 @@ function fdacCreateControlWaves(numDACCh,numADCCh)
 
 	variable/g sc_printfadc = 0
 	variable/g sc_saverawfadc = 0
-	variable/g sc_ResampleFreqCheckfadc = 0 /////EDIT ADDED variable for check of resampling
-	variable/g sc_ResampleFreqfadc = 100 /////EDIT ADDED variable for frequency of resampling data
+	variable/g sc_ResampleFreqCheckfadc = 0 // Whether to use resampling
+	variable/g sc_ResampleFreqfadc = 100 // Resampling frequency if using resampling
 
 
 	// clean up
