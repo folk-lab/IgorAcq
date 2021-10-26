@@ -92,7 +92,7 @@ end
 //////////////////////////////////////////////////////////////////////////////////////////
 
 function fd_Record_Values(S, PL, rowNum, [AWG_list, linestart])
-	struct FD_ScanVars &S
+	struct ScanVars &S
 	struct fdRV_processList &PL
 	variable rowNum, linestart
 	struct fdAWG_list &AWG_list
@@ -219,7 +219,7 @@ function fd_readvstime(instrID, channels, numpts, samplingFreq, numChannels, [sp
 end
 
 function fdRV_record_buffer(S, rowNum, totalByteReturn)
-   struct FD_ScanVars &S
+   struct ScanVars &S
    variable rowNum, totalByteReturn
 
    // hold incoming data chunks in string and distribute to data waves
@@ -314,7 +314,7 @@ end
 
 function fdRV_distribute_data(buffer, S, bytes_read, totalByteReturn, read_chunk, rowNum, direction)
   // add data to rawwaves and datawaves
-  struct FD_ScanVars &S
+  struct ScanVars &S
   string &buffer  // Passing by reference for speed of execution
   variable bytes_read, totalByteReturn, read_chunk, rowNum, direction
 
@@ -329,7 +329,7 @@ end
 
 
 function fdRV_update_window(S, numAdcs)
-  struct FD_ScanVars &S
+  struct ScanVars &S
   variable numADCs
 
   wave/T fdacvalstr
@@ -467,7 +467,7 @@ end
 function fdRV_check_ramp_start(S)
 	// Checks that DACs are at the start of the ramp. If not it will ramp there and wait the delay time, but
 	// will give the user a WARNING that this should have been done already in the top level scan function
-   struct FD_ScanVars &S
+   struct ScanVars &S
 
    variable i=0, require_ramp = 0, ch, sp, diff
    for(i=0;i<itemsinlist(S.channelsx);i++)
@@ -497,7 +497,7 @@ end
 
 
 function fdRV_Process_data(S, PL, rowNum)
-   struct FD_ScanVars &S
+   struct ScanVars &S
    struct fdRV_processList &PL
    variable rowNum
 
@@ -591,7 +591,7 @@ end
 
 function fdRV_do_filters_average(PL, SL, rowNum)
    struct fdRV_processList &PL
-   struct FD_ScanVars &SL
+   struct ScanVars &SL
    variable rowNum
 
    // apply filters

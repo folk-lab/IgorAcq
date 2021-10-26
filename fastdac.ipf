@@ -1942,7 +1942,7 @@ end
 
 
 function/s fd_start_AWG_RAMP(S, AWG_list)
-   struct FD_ScanVars &S
+   struct ScanVars &S
    struct fdAWG_list &AWG_list
 
    // AWG_RAMP,<number of waveforms>,<dac channel(s) to output waveform 0>,<dac channel(s) to output waveform n>,<dac channel(s) to ramp>,<adc channel(s)>,<initial dac voltage 1>,<…>,<initial dac voltage n>,<final dac voltage 1>,<…>,<final dac voltage n>,<# of waveform repetitions at each ramp step>,<# of ramp steps>
@@ -1979,7 +1979,7 @@ end
 function/s fd_start_INT_RAMP(S)
 	// build command and start ramp
 	// for now we only have to send one command to one device.
-	struct FD_ScanVars &S
+	struct ScanVars &S
 	
 	
 	string cmd = "", dacs="", adcs=""

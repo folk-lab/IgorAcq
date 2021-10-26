@@ -16,12 +16,11 @@ function test_scan_2d(fdID, startx, finx, channelsx, starty, finy, channelsy, nu
 	sc_openinstrconnections(0)
 
 	// Put info into scanVars struct (to more easily pass around later)
- 	struct FD_ScanVars Fsv
-	SF_init_FDscanVars(Fsv, fdID, startx, finx, channelsx, numpts, rampratex, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
+ 	struct ScanVars S
+ 	initFDscanVars(S, fdID, startx, finx, channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
 	   						 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs="", finxs="", startys="", finys="")
-
 	// Check scan is within limits
-	SFfd_pre_checks(Fsv)
+	SFfd_pre_checks(S)
 
    	// Set up AWG if using (TODO: For now we will ignore this)
 	struct fdAWG_list AWG
@@ -33,15 +32,15 @@ function test_scan_2d(fdID, startx, finx, channelsx, starty, finy, channelsy, nu
 	// endif
 
 	// Ramp to start of scan
-	SFfd_ramp_start(Fsv, ignore_lims=1)  // Ignore lims because already checked
+	SFfd_ramp_start(S, ignore_lims=1)  // Ignore lims because already checked
 
 	// Let gates settle
-	sc_sleep(Fsv.delayy)
+	sc_sleep(S.delayy)
 
 	// Get Labels for graphs
 	string x_label, y_label
-	x_label = GetLabel(Fsv.channelsx, fastdac=1)
-	y_label = GetLabel(Fsv.channelsy, fastdac=1)
+	x_label = GetLabel(S.channelsx, fastdac=1)
+	y_label = GetLabel(S.channelsy, fastdac=1)
 
 	// Initialize scan (create waves to store data, and open/arrange relevant graphs)
 	// TODO: Hopefully we can use a lot of the existing InitializeWaves() but this needs a major refactor
@@ -50,24 +49,24 @@ function test_scan_2d(fdID, startx, finx, channelsx, starty, finy, channelsy, nu
 	// Main Measurement loop
 	variable setpointy, sy, fy, i, j
 	string chy
-	for(i=0; i<Fsv.numptsy; i++)
+	for(i=0; i<S.numptsy; i++)
 		// Ramp slow axis
-		for(j=0; j<itemsinlist(Fsv.channelsy,","); j++) // For each y channel, move to next setpoint
-			sy = str2num(stringfromList(j, Fsv.startys, ","))
-			fy = str2num(stringfromList(j, Fsv.finys, ","))
-			chy = stringfromList(j, Fsv.channelsy, ",")
-			setpointy = sy + (i*(fy-sy)/(Fsv.numptsy-1))
-			RampMultipleFDac(Fsv.instrID, chy, setpointy, ramprate=Fsv.rampratey, ignore_lims=1)
+		for(j=0; j<itemsinlist(S.channelsy,","); j++) // For each y channel, move to next setpoint
+			sy = str2num(stringfromList(j, S.startys, ","))
+			fy = str2num(stringfromList(j, S.finys, ","))
+			chy = stringfromList(j, S.channelsy, ",")
+			setpointy = sy + (i*(fy-sy)/(S.numptsy-1))
+			RampMultipleFDac(S.instrID, chy, setpointy, ramprate=S.rampratey, ignore_lims=1)
 		endfor
 
 		// Ramp to start of fast axis
-		SFfd_ramp_start(Fsv, ignore_lims=1, x_only=1)
-		sc_sleep(Fsv.delayy)
+		SFfd_ramp_start(S, ignore_lims=1, x_only=1)
+		sc_sleep(S.delayy)
 
 		// Record fast axis
 		// fd_Record_Values(Fsv, PL, i, AWG_list = AWG)
 		// TODO: Mostly this will follow fd_record_values() but some changes need to be made
-		NEW_fd_record_values(Fsv, i)
+		NEW_fd_record_values(S, i)
 	endfor
 
 	// Save to HDF
@@ -833,7 +832,7 @@ end
 
 
 function NEW_fd_record_values(S, rowNum, [AWG_list, linestart])
-	struct FD_ScanVars &S
+	struct ScanVars &S
 	variable rowNum, linestart
 	struct fdAWG_list &AWG_list
 	// If passed AWG_list with AWG_list.use_AWG == 1 then it will run with the Arbitrary Wave Generator on
@@ -878,7 +877,7 @@ end
 
 function fdRV_send_command_and_read(ScanVars, AWG_list, rowNum)
 	// Send 1D Sweep command to fastdac and record the raw data it returns ONLY
-	struct FD_ScanVars &ScanVars
+	struct ScanVars &ScanVars
 	struct fdAWG_list &AWG_list
 	variable rowNum
 	string cmd_sent = ""

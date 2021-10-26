@@ -210,6 +210,9 @@ function setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy, sta
     endif
 end
 
+
+
+
 function initializeScan(S)
     // Opens instrument connection, initializes waves to store data, opens and tiles graphs, opens abort window.
     struct ScanVars &S
