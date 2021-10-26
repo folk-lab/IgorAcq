@@ -355,6 +355,7 @@ function NEWSaveWaves([msg,save_experiment,fastdac, wave_names])
 	else
 		msg=""
 	endif
+	
 
 	nvar sc_save_time
 	if (paramisdefault(save_experiment))
