@@ -987,11 +987,11 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	DrawText 220, 70, "Label"
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 287, 70, "Ramprate"
-	ListBox fdaclist,pos={10,75},size={360,270},fsize=14,frame=2,widths={30,70,100,65}
+	ListBox fdaclist,pos={10,75},size={360,300},fsize=14,frame=2,widths={30,70,100,65} ///// EDIT 270 -> 300
 	ListBox fdaclist,listwave=root:fdacvalstr,selwave=root:fdacattr,mode=1
-	Button updatefdac,pos={50,354},size={65,20},proc=update_fdac,title="Update"
-	Button fdacramp,pos={150,354},size={65,20},proc=update_fdac,title="Ramp"
-	Button fdacrampzero,pos={255,354},size={80,20},proc=update_fdac,title="Ramp all 0"
+	Button updatefdac,pos={50,384},size={65,20},proc=update_fdac,title="Update" /////EDIT 354 -> 384
+	Button fdacramp,pos={150,384},size={65,20},proc=update_fdac,title="Ramp" /////EDIT 354 -> 384
+	Button fdacrampzero,pos={255,384},size={80,20},proc=update_fdac,title="Ramp all 0" /////EDIT 354 -> 384
 	// ADC, 8 channels shown
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 405, 70, "Ch"
@@ -1008,8 +1008,11 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	button updatefadc,pos={400,265},size={90,20},proc=update_fadc,title="Update ADC"
 	checkbox sc_PrintfadcBox,pos={500,265},proc=sc_CheckBoxClicked,value=sc_Printfadc,side=1,title="\Z14Print filenames "
 	checkbox sc_SavefadcBox,pos={620,265},proc=sc_CheckBoxClicked,value=sc_Saverawfadc,side=1,title="\Z14Save raw data "
-	SetVariable sc_FilterfadcBox,pos={500,290},size={150,20},value=sc_Filterfadc,side=1,title="\Z14Filter data ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
-	DrawText 660,310, "\Z14Hz" /////EDIT ADDED
+	checkbox sc_FilterfadcCheckBox,pos={400,290},proc=sc_CheckBoxClicked,value=sc_ResampleFreqCheckfadc,side=1,title="\Z14Resample "
+	SetVariable sc_FilterfadcBox,pos={500,290},size={200,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resample Frequency ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
+	DrawText 705,310, "\Z14Hz" /////EDIT ADDED
+	//variable/g sc_ResampleFreqfadc = 100 /////EDIT ADDED variable for frequency of resampling data
+	//variable/g sc_ResampleFreqCheckfadc = 0
 	popupMenu fadcSetting1,pos={420,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC1 speed",size={100,20},value=sc_fadcSpeed1 /////EDIT 300->330
 	popupMenu fadcSetting2,pos={620,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC2 speed",size={100,20},value=sc_fadcSpeed2 /////EDIT 300->330
 	popupMenu fadcSetting3,pos={420,360},proc=update_fadcSpeed,mode=1,title="\Z14ADC3 speed",size={100,20},value=sc_fadcSpeed3 /////EDIT 330->360
@@ -1265,7 +1268,9 @@ function fdacCreateControlWaves(numDACCh,numADCCh)
 
 	variable/g sc_printfadc = 0
 	variable/g sc_saverawfadc = 0
-	variable/g sc_Filterfadc = 0 /////EDIT ADDED variable for filtering data
+	variable/g sc_ResampleFreqCheckfadc = 0 /////EDIT ADDED variable for check of resampling
+	variable/g sc_ResampleFreqfadc = 100 /////EDIT ADDED variable for frequency of resampling data
+
 
 	// clean up
 	killwaves fdacval0,fdacval1,fdacval2,fdacval3,fdacval4

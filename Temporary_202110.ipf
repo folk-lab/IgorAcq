@@ -793,6 +793,20 @@ function initcloseSaveFiles(hdf5_id_list)
 
 end
 
+
+function resampleWave(wave_name, freq_start, freq_end)
+	// takes a wave and resamples its frequency, freq_start
+	// to freq_end
+	wave wave_name
+	variable freq_start, freq_end
+	
+//	if (freq != 0)
+//		RatioFromNumber/V (freq_end / freq_start)
+//  		resample/UP=V_numerator/DOWN=V_denominator/N=101 wave_name
+//	endif
+
+end
+
 ////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////
 
