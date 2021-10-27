@@ -23,6 +23,7 @@
 
 
 function sc_fillfdacKeys(instrID,visa_address,numDACCh,numADCCh,[master])
+	// Puts FastDAC information into global sc_fdackeys which is a list of such entries for each connected FastDAC
 	string instrID, visa_address
 	variable numDACCh, numADCCh, master
 
@@ -33,29 +34,29 @@ function sc_fillfdacKeys(instrID,visa_address,numDACCh,numADCCh,[master])
 	endif
 
 	variable numDevices
-	svar/z fdackeys
-	if(!svar_exists(fdackeys))
-		string/g fdackeys = ""
+		svar/z sc_fdackeys
+	if(!svar_exists(sc_fdackeys))
+		string/g sc_fdackeys = ""
 		numDevices = 0
 	else
-		numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
+		numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
 	endif
 
 	variable i=0, deviceNum=numDevices+1
 	for(i=0;i<numDevices;i+=1)
-		if(cmpstr(instrID,stringbykey("name"+num2istr(i+1),fdackeys,":",","))==0)
+		if(cmpstr(instrID,stringbykey("name"+num2istr(i+1),sc_fdackeys,":",","))==0)
 			deviceNum = i+1
 			break
 		endif
 	endfor
 
-	fdackeys = replacenumberbykey("numDevices",fdackeys,deviceNum,":",",")
-	fdackeys = replacestringbykey("name"+num2istr(deviceNum),fdackeys,instrID,":",",")
-	fdackeys = replacestringbykey("visa"+num2istr(deviceNum),fdackeys,visa_address,":",",")
-	fdackeys = replacenumberbykey("numDACCh"+num2istr(deviceNum),fdackeys,numDACCh,":",",")
-	fdackeys = replacenumberbykey("numADCCh"+num2istr(deviceNum),fdackeys,numADCCh,":",",")
-	fdackeys = replacenumberbykey("master"+num2istr(deviceNum),fdackeys,master,":",",")
-	fdackeys = sortlist(fdackeys,",")
+	sc_fdackeys = replacenumberbykey("numDevices",sc_fdackeys,deviceNum,":",",")
+	sc_fdackeys = replacestringbykey("name"+num2istr(deviceNum),sc_fdackeys,instrID,":",",")
+	sc_fdackeys = replacestringbykey("visa"+num2istr(deviceNum),sc_fdackeys,visa_address,":",",")
+	sc_fdackeys = replacenumberbykey("numDACCh"+num2istr(deviceNum),sc_fdackeys,numDACCh,":",",")
+	sc_fdackeys = replacenumberbykey("numADCCh"+num2istr(deviceNum),sc_fdackeys,numADCCh,":",",")
+	sc_fdackeys = replacenumberbykey("master"+num2istr(deviceNum),sc_fdackeys,master,":",",")
+	sc_fdackeys = sortlist(sc_fdackeys,",")
 end
 
 
@@ -238,10 +239,9 @@ function fdRV_record_buffer(S, rowNum, totalByteReturn)
       totaldump = bytesSec*(stopmstimer(-2)-bufferDumpStart)*1e-6  // Expected amount of bytes in buffer
       if(totaldump-bytes_read < saveBuffer)  // if we aren't too far behind then update Raw 1D graphs
          fdRV_update_graphs() 
-         print "keeping up"
-//      endif
+//         print "keeping up"
 		else
-			printf "Too far behind! %d, %d\r" totaldump, bytes_read
+			printf "DEBUGGING: getting behind: Bytes Requested: %d, Expected Dump: %d, Bytes Read: %d\r" totalByteReturn, totaldump, bytes_read
 		endif
       fdRV_check_sweepstate(S.instrID)
    while(totalByteReturn-bytes_read > read_chunk)
@@ -827,10 +827,10 @@ end
 
 
 function initFastDAC()
-	// use the key:value list "fdackeys" to figure out the correct number of
-	// DAC/ADC channels to use. "fdackeys" is created when calling "openFastDACconnection".
-	svar fdackeys
-	if(!svar_exists(fdackeys))
+	// use the key:value list "sc_fdackeys" to figure out the correct number of
+	// DAC/ADC channels to use. "sc_fdackeys" is created when calling "openFastDACconnection".
+	svar sc_fdackeys
+	if(!svar_exists(sc_fdackeys))
 		print("[ERROR] \"initFastDAC\": No devices found!")
 		abort
 	endif
@@ -845,12 +845,12 @@ function initFastDAC()
 	// hardware limit (mV)
 	variable/g fdac_limit = 10000
 
-	variable i=0, numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
+	variable i=0, numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
 	variable numDACCh=0, numADCCh=0
 	for(i=0;i<numDevices+1;i+=1)
-		if(cmpstr(stringbykey("name"+num2istr(i+1),fdackeys,":",","),"")!=0)
-			numDACCh += str2num(stringbykey("numDACCh"+num2istr(i+1),fdackeys,":",","))
-			numADCCh += str2num(stringbykey("numADCCh"+num2istr(i+1),fdackeys,":",","))
+		if(cmpstr(stringbykey("name"+num2istr(i+1),sc_fdackeys,":",","),"")!=0)
+			numDACCh += str2num(stringbykey("numDACCh"+num2istr(i+1),sc_fdackeys,":",","))
+			numADCCh += str2num(stringbykey("numADCCh"+num2istr(i+1),sc_fdackeys,":",","))
 		endif
 	endfor
 
@@ -1046,27 +1046,27 @@ function update_fadcSpeed(s) : PopupMenuControl
 	struct wmpopupaction &s
 
 	string visa_address = ""
-	svar fdackeys
+	svar sc_fdackeys
 	if(s.eventcode == 2)
 		// a menu item has been selected
 		strswitch(s.ctrlname)
 			case "fadcSetting1":
-				visa_address = stringbykey("visa1",fdackeys,":",",")
+				visa_address = stringbykey("visa1",sc_fdackeys,":",",")
 				break
 			case "fadcSetting2":
-				visa_address = stringbykey("visa2",fdackeys,":",",")
+				visa_address = stringbykey("visa2",sc_fdackeys,":",",")
 				break
 			case "fadcSetting3":
-				visa_address = stringbykey("visa3",fdackeys,":",",")
+				visa_address = stringbykey("visa3",sc_fdackeys,":",",")
 				break
 			case "fadcSetting4":
-				visa_address = stringbykey("visa4",fdackeys,":",",")
+				visa_address = stringbykey("visa4",sc_fdackeys,":",",")
 				break
 			case "fadcSetting5":
-				visa_address = stringbykey("visa5",fdackeys,":",",")
+				visa_address = stringbykey("visa5",sc_fdackeys,":",",")
 				break
 			case "fadcSetting6":
-				visa_address = stringbykey("visa6",fdackeys,":",",")
+				visa_address = stringbykey("visa6",sc_fdackeys,":",",")
 				break
 		endswitch
 
@@ -1103,7 +1103,7 @@ end
 function update_all_fdac([option])
 	// Ramps or updates all FastDac outputs
 	string option // {"fdacramp": ramp all fastdacs to values currently in fdacvalstr, "fdacrampzero": ramp all to zero, "updatefdac": update fdacvalstr from what the dacs are currently at}
-	svar fdackeys
+	svar sc_fdackeys
 	wave/t fdacvalstr
 	wave/t old_fdacvalstr
 	nvar fd_ramprate
@@ -1116,11 +1116,11 @@ function update_all_fdac([option])
 	// Either ramp fastdacs or update fdacvalstr
 	variable i=0,j=0,output = 0, numDACCh = 0, startCh = 0, viRM = 0
 	string visa_address = "", tempnamestr = "fdac_window_resource"
-	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
+	variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
 	for(i=0;i<numDevices;i+=1)
-		numDACCh = str2num(stringbykey("numDACCh"+num2istr(i+1),fdackeys,":",","))
+		numDACCh = str2num(stringbykey("numDACCh"+num2istr(i+1),sc_fdackeys,":",","))
 		if(numDACCh > 0)
-			visa_address = stringbykey("visa"+num2istr(i+1),fdackeys,":",",")
+			visa_address = stringbykey("visa"+num2istr(i+1),sc_fdackeys,":",",")
 			viRM = openFastDACconnection(tempnamestr, visa_address, verbose=0)
 			nvar tempname = $tempnamestr
 			try
@@ -1171,7 +1171,7 @@ end
 
 function update_fdac(action) : ButtonControl
 	string action
-	svar fdackeys
+	svar sc_fdackeys
 	wave/t fdacvalstr
 	wave/t old_fdacvalstr
 	nvar fd_ramprate
@@ -1184,16 +1184,16 @@ end
 
 function update_fadc(action) : ButtonControl
 	string action
-	svar fdackeys
+	svar sc_fdackeys
 	variable i=0, j=0
 
 	string visa_address = "", tempnamestr = "fdac_window_resource"
-	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
+	variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
 	variable numADCCh = 0, startCh = 0, viRm = 0
 	for(i=0;i<numDevices;i+=1)
-		numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),fdackeys,":",","))
+		numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),sc_fdackeys,":",","))
 		if(numADCCh > 0)
-			visa_address = stringbykey("visa"+num2istr(i+1),fdackeys,":",",")
+			visa_address = stringbykey("visa"+num2istr(i+1),sc_fdackeys,":",",")
 			viRm = openFastDACconnection(tempnamestr, visa_address, verbose=0)
 			nvar tempname = $tempnamestr
 			try

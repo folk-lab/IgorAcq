@@ -843,7 +843,6 @@ function fdRV_send_command_and_read(ScanVars, AWG_list, rowNum)
 		cmd_sent = fd_start_INT_RAMP(ScanVars)
 	endif
 	
-	print(cmd_sent)
 	totalByteReturn = ScanVars.numADCs*2*ScanVars.numptsx
 	sc_sleep(0.1) 	// Trying to get 0.2s of data per loop, will timeout on first loop without a bit of a wait first
 	variable looptime = 0

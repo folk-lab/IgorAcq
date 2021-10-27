@@ -22,8 +22,8 @@
 function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh,master])
 	// instrID is the name of the global variable that will be used for communication
 	// visa_address is the VISA address string, i.e. ASRL1::INSTR
-	// Most FastDAC communication relies on the info in "fdackeys". Pass numDACCh and
-	// numADCCh to fill info into "fdackeys"
+	// Most FastDAC communication relies on the info in "sc_fdackeys". Pass numDACCh and
+	// numADCCh to fill info into "sc_fdackeys"
 	string instrID, visa_address
 	variable verbose, numDACCh, numADCCh, master
 	
@@ -56,7 +56,7 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 		master = 0
 	endif
 		
-	// fill info into "fdackeys"
+	// fill info into "sc_fdackeys"
 	if(!paramisdefault(numDACCh) && !paramisdefault(numADCCh))
 		sc_fillfdacKeys(instrID,visa_address,numDACCh,numADCCh,master=master)
 	endif
@@ -156,7 +156,7 @@ function getFADCmeasureFreq(instrID)
 	// NOTE: This assumes ALL recorded ADCs are on ONE fastdac. I.e. does not support measuring with multiple fastdacs
 	variable instrID
 	
-	svar fdackeys	
+	svar sc_fdackeys	
 	variable numadc, samplefreq
 	numadc = getnumfadc() 
 	if (numadc == 0)
@@ -198,13 +198,13 @@ function getFADCspeed(instrID)
 		abort
 	endif
 	
-	svar fdackeys
-	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",",")), i=0, numADCCh = 0, numDevice=0
+	svar sc_fdackeys
+	variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",",")), i=0, numADCCh = 0, numDevice=0
 	string instrAddress = getResourceAddress(instrID), deviceAddress = ""
 	for(i=0;i<numDevices;i+=1)
-		deviceAddress = stringbykey("visa"+num2istr(i+1),fdackeys,":",",")
+		deviceAddress = stringbykey("visa"+num2istr(i+1),sc_fdackeys,":",",")
 		if(cmpstr(deviceAddress,instrAddress) == 0)
-			numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),fdackeys,":",","))
+			numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),sc_fdackeys,":",","))
 			numDevice = i+1
 			break
 		endif
@@ -268,16 +268,16 @@ function getFADCChannelSingle(instrID,channel) // Units: mV
 	
 	variable instrID, channel
 	wave/t fadcvalstr
-	svar fdackeys
+	svar sc_fdackeys
 	
-	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
+	variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
 	variable i=0, devchannel = 0, startCh = 0, numADCCh = 0
 	string visa_address = "", err = "", instr_address = getResourceAddress(instrID)
 	for(i=0;i<numDevices;i+=1)
-		numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),fdackeys,":",","))
+		numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),sc_fdackeys,":",","))
 		if(startCh+numADCCh-1 >= channel)
 			// this is the device, now check that instrID is pointing at the same device
-			visa_address = stringbykey("visa"+num2istr(i+1),fdackeys,":",",")
+			visa_address = stringbykey("visa"+num2istr(i+1),sc_fdackeys,":",",")
 			if(cmpstr(visa_address, instr_address) == 0)
 				devchannel = channel-startCh
 				break
@@ -347,18 +347,18 @@ function/s getFDACStatus(instrID)
 	variable instrID
 	string  buffer = "", key = ""
 	wave/t fdacvalstr	
-	svar fdackeys
+	svar sc_fdackeys
 	
 	// find the correct fastdac
 	string visa = getresourceaddress(instrID)
-	variable i=0, dev = 0, numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
+	variable i=0, dev = 0, numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
 	variable adcChs = 0
 	for(i=0;i<numDevices;i+=1)
-		if(cmpstr(visa,stringbykey("visa"+num2istr(i+1),fdackeys,":",","))==0)
+		if(cmpstr(visa,stringbykey("visa"+num2istr(i+1),sc_fdackeys,":",","))==0)
 			dev = i+1
 			break
 		endif
-		adcChs += str2num(stringbykey("numADCCh"+num2istr(i+1),fdackeys,":",","))
+		adcChs += str2num(stringbykey("numADCCh"+num2istr(i+1),sc_fdackeys,":",","))
 	endfor
 	
 	buffer = addJSONkeyval(buffer, "visa_address", visa, addquotes=1)
@@ -366,13 +366,13 @@ function/s getFDACStatus(instrID)
 	buffer = addJSONkeyval(buffer, "MeasureFreq", num2str(getFADCmeasureFreq(instrID)), addquotes=0)
 
 	// DAC values
-	for(i=0;i<str2num(stringbykey("numDACCh"+num2istr(dev),fdackeys,":",","));i+=1)
+	for(i=0;i<str2num(stringbykey("numDACCh"+num2istr(dev),sc_fdackeys,":",","));i+=1)
 		sprintf key, "DAC%d{%s}", i, fdacvalstr[i][3]
 		buffer = addJSONkeyval(buffer, key, num2numstr(getfdacOutput(instrID,i)))
 	endfor
 
 	// ADC values
-	for(i=0;i<str2num(stringbykey("numADCCh"+num2istr(dev),fdackeys,":",","));i+=1)
+	for(i=0;i<str2num(stringbykey("numADCCh"+num2istr(dev),sc_fdackeys,":",","));i+=1)
 		buffer = addJSONkeyval(buffer, "ADC"+num2istr(i), num2numstr(getfadcChannel(instrID,adcChs+i)))
 	endfor
 	
@@ -440,13 +440,13 @@ function setFADCSpeed(instrID,speed,[loadCalibration]) // Units: Hz
 		abort
 	endif
 	
-	svar fdackeys
-	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",",")), i=0, numADCCh = 0, numDevice = 0
+	svar sc_fdackeys
+	variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",",")), i=0, numADCCh = 0, numDevice = 0
 	string instrAddress = getResourceAddress(instrID), deviceAddress = "", cmd = "", response = ""
 	for(i=0;i<numDevices;i+=1)
-		deviceAddress = stringbykey("visa"+num2istr(i+1),fdackeys,":",",")
+		deviceAddress = stringbykey("visa"+num2istr(i+1),sc_fdackeys,":",",")
 		if(cmpstr(deviceAddress,instrAddress) == 0)
-			numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),fdackeys,":",","))
+			numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),sc_fdackeys,":",","))
 			numDevice = i+1
 			break
 		endif
@@ -494,21 +494,21 @@ function rampOutputFDAC(instrID,channel,output,[ramprate, ignore_lims]) // Units
 	// channel must be the channel set by the GUI.
 	variable instrID, channel, output, ramprate, ignore_lims
 	wave/t fdacvalstr, old_fdacvalstr
-	svar fdackeys
+	svar sc_fdackeys
 	
 	if(paramIsDefault(ramprate))
 		nvar fd_ramprate
 		ramprate = fd_ramprate
 	endif
 	
-	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
+	variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
 	variable i=0, devchannel = 0, startCh = 0, numDACCh = 0
 	string deviceAddress = "", err = "", instrAddress = getResourceAddress(instrID)
 	for(i=0;i<numDevices;i+=1)
-		numDACCh =  str2num(stringbykey("numDACCh"+num2istr(i+1),fdackeys,":",","))
+		numDACCh =  str2num(stringbykey("numDACCh"+num2istr(i+1),sc_fdackeys,":",","))
 		if(startCh+numDACCh-1 >= channel)
 			// this is the device, now check that instrID is pointing at the same device
-			deviceAddress = stringbykey("visa"+num2istr(i+1),fdackeys,":",",")
+			deviceAddress = stringbykey("visa"+num2istr(i+1),sc_fdackeys,":",",")
 			if(cmpstr(deviceAddress,instrAddress) == 0)
 				devchannel = channel-startCh
 				break
@@ -731,14 +731,14 @@ function loadFadcCalibration(instrID,speed)
 	string regex = "", filelist = "", jstr=""
 	variable i=0,k=0
 	
-	svar fdackeys
-	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",",")), numADCCh=0, numDACCh=0,deviceNum=0
+	svar sc_fdackeys
+	variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",",")), numADCCh=0, numDACCh=0,deviceNum=0
 	string instrAddress = getResourceAddress(instrID), deviceAddress = ""
 	for(i=0;i<numDevices;i+=1)
-		deviceAddress = stringbykey("visa"+num2istr(i+1),fdackeys,":",",")
+		deviceAddress = stringbykey("visa"+num2istr(i+1),sc_fdackeys,":",",")
 		if(cmpstr(deviceAddress,instrAddress) == 0)
-			numDACCh = str2num(stringbykey("numDACCh"+num2istr(i+1),fdackeys,":",","))
-			numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),fdackeys,":",","))
+			numDACCh = str2num(stringbykey("numDACCh"+num2istr(i+1),sc_fdackeys,":",","))
+			numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),sc_fdackeys,":",","))
 			deviceNum = i+1
 			break
 		endif
@@ -810,8 +810,8 @@ function CalibrateFDAC(instrID)
 	
 	sc_openinstrconnections(0)
 	
-	svar/z fdackeys
-	if(!svar_exists(fdackeys))
+	svar/z sc_fdackeys
+	if(!svar_exists(sc_fdackeys))
 		print "[ERROR] \"fdacCalibrate\": Run initFastDAC() before calibration."
 		abort
 	endif
@@ -824,12 +824,12 @@ function CalibrateFDAC(instrID)
 		abort
 	endif
 	
-	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",",")), i=0, numDACCh=0, deviceNum=0
+	variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",",")), i=0, numDACCh=0, deviceNum=0
 	string instrAddress = getResourceAddress(instrID), deviceAddress = ""
 	for(i=0;i<numDevices;i+=1)
-		deviceAddress = stringbykey("visa"+num2istr(i+1),fdackeys,":",",")
+		deviceAddress = stringbykey("visa"+num2istr(i+1),sc_fdackeys,":",",")
 		if(cmpstr(deviceAddress,instrAddress) == 0)
-			numDACCh = str2num(stringbykey("numDACCh"+num2istr(i+1),fdackeys,":",","))
+			numDACCh = str2num(stringbykey("numDACCh"+num2istr(i+1),sc_fdackeys,":",","))
 			deviceNum = i+1
 			break
 		endif
@@ -903,19 +903,19 @@ function CalibrateFADC(instrID)
 	// Follow the instructions on screen.
 	variable instrID
 	
-	svar/z fdackeys
-	if(!svar_exists(fdackeys))
+	svar/z sc_fdackeys
+	if(!svar_exists(sc_fdackeys))
 		print "[ERROR] \"fadcCalibrate\": Run initFastDAC() before calibration."
 		abort
 	endif
 	
-	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",",")), i=0, numADCCh=0, numDACCh=0,deviceNum=0
+	variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",",")), i=0, numADCCh=0, numDACCh=0,deviceNum=0
 	string instrAddress = getResourceAddress(instrID), deviceAddress = ""
 	for(i=0;i<numDevices;i+=1)
-		deviceAddress = stringbykey("visa"+num2istr(i+1),fdackeys,":",",")
+		deviceAddress = stringbykey("visa"+num2istr(i+1),sc_fdackeys,":",",")
 		if(cmpstr(deviceAddress,instrAddress) == 0)
-			numDACCh = str2num(stringbykey("numDACCh"+num2istr(i+1),fdackeys,":",","))
-			numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),fdackeys,":",","))
+			numDACCh = str2num(stringbykey("numDACCh"+num2istr(i+1),sc_fdackeys,":",","))
+			numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),sc_fdackeys,":",","))
 			deviceNum = i+1
 			break
 		endif
@@ -979,7 +979,7 @@ function saveFadcCalibration(deviceAddress,deviceNum,numADCCh,result,adcSpeed)
 	string deviceAddress, result
 	variable deviceNum, numADCCh, adcSpeed
 	
-	svar/z fdackeys
+	svar/z sc_fdackeys
 	
 	// create JSON string
 	string buffer = "", zeroScale = "", fullScale = "", key = ""
@@ -1007,7 +1007,7 @@ function saveFdacCalibration(deviceAddress,deviceNum,numDACCh,result)
 	string deviceAddress, result
 	variable deviceNum, numDACCh
 	
-	svar/z fdackeys
+	svar/z sc_fdackeys
 	
 	// create JSON string
 	string buffer = "", offset = "", gain = "", key = ""
@@ -1110,7 +1110,7 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 	
 	ca_amp = paramisdefault(ca_amp) ? 9 : ca_amp
 	
-	svar fdackeys
+	svar sc_fdackeys
 	
 	// num ADC channels
 	channels = sortlist(channels,",",2)
@@ -1126,14 +1126,14 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 	numpts = numpts - mod(numpts,2)
 	
 	// resolve the ADC channel
-	variable numDevices = str2num(stringbykey("numDevices",fdacKeys,":",","))
+	variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
 	variable i=0, j=0, numADCCh=0, startCh=0, dev_adc=0, adcCh=0
 	string adcList=""
 	for(i=0;i<numChannels;i+=1)
 		adcCh = str2num(stringfromlist(i,channels,","))
 		startCh = 0
 		for(j=0;j<numDevices+1;j+=1)
-			numADCCh = str2num(stringbykey("numADCCh"+num2istr(j+1),fdacKeys,":",","))
+			numADCCh = str2num(stringbykey("numADCCh"+num2istr(j+1),sc_fdackeys,":",","))
 			if(startCh+numADCCh-1 >= adcCh)
 				// this is the device
 				if(i > 0 && dev_adc != j)
@@ -1517,8 +1517,8 @@ function fdLoadFromHDF(datnum, [no_check])
 	variable datnum, no_check
 	variable response
 	
-	svar fdackeys
-	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
+	svar sc_fdackeys
+	variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
 	if (numDevices !=1)
 		print "WARNING[fdLoadFromHDF]: Only tested to load 1 Fastdac, only first FastDAC will be loaded without code changes"
 	endif	
