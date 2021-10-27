@@ -5,6 +5,7 @@
 // Version 1.8 XXXX X, 2017
 // Version 2.0 May, 2018
 // Version 3.0 March, 2020
+// Version 4.0 Oct, 2021
 // Authors: Mohammad Samani, Nik Hartman, Christian Olsen, Tim Child
 
 // Updates in 2.0:
@@ -20,16 +21,43 @@
 //		-- Support for Fastdacs added (most Fastdac functions can be found in ScanController_Fastdac)
 //		-- Minor: Added Dat# to graphs
 
+// Updates in 4.0:
 
-///////////////////////////////
-////// utility functions //////
-///////////////////////////////
+// 		-- Improved support for FastDACs (mostly works with multiple fastDACs connected now, although cannot sweep multiple at the same time)
+// 		-- Significant refactoring of functions related to a Scan (i.e. initWaves, saveWaves etc) including opening graphs etc. 
+//			All scans functions work with a ScanVars Struct which contains information about the current scan (instead of many globals)
+// 		-- NOTE: Fully updated for the Fastdac related scans, only partially updated for other scans
 
+
+
+////////////////////////////////
+///////// utility functions ////
+////////////////////////////////
+
+function /S getHostName()
+	// find the name of the computer Igor is running on
+	// Used in saveing Config info
+	string platform = igorinfo(2)
+	string result, hostname, location
+
+	strswitch(platform)
+		case "Macintosh":
+			result = executeMacCmd("hostname")
+			splitstring /E="([a-zA-Z0-9\-]+).(.+)" result, hostname, location
+			return TrimString(LowerStr(hostname))
+		case "Windows":
+			hostname = executeWinCmd("hostname")
+			return TrimString(LowerStr(hostname))
+		default:
+			abort "What operating system are you running?! How?!"
+	endswitch
+end
 
 function /S executeWinCmd(command)
 	// run the shell command
 	// if logFile is selected, put output there
 	// otherwise, return output
+	// Used in getHostName()
 	string command
 	string dataPath = getExpPath("data", full=2)
 
@@ -68,8 +96,11 @@ function /S executeWinCmd(command)
 
 end
 
+
 function/S executeMacCmd(command)
 	// http://www.igorexchange.com/node/938
+	// Same purpose as executeWinCmd() for Mac environment
+	// Used in getHostName()
 	string command
 
 	string cmd
@@ -77,25 +108,6 @@ function/S executeMacCmd(command)
 	ExecuteScriptText /UNQ /Z /W=5.0 cmd
 
 	return S_value
-end
-
-function /S getHostName()
-	// find the name of the computer Igor is running on
-	string platform = igorinfo(2)
-	string result, hostname, location
-
-	strswitch(platform)
-		case "Macintosh":
-			result = executeMacCmd("hostname")
-			splitstring /E="([a-zA-Z0-9\-]+).(.+)" result, hostname, location
-			return TrimString(LowerStr(hostname))
-		case "Windows":
-			hostname = executeWinCmd("hostname")
-			return TrimString(LowerStr(hostname))
-		default:
-			abort "What operating system are you running?! How?!"
-	endswitch
-
 end
 
 function /S getExpPath(whichpath, [full])
@@ -220,14 +232,25 @@ function /S getExpPath(whichpath, [full])
 	endswitch
 end
 
-threadsafe function sc_check_NaNInf(num)
-	variable num
-	return numtype(num)
-end
 
-///////////////////////////////
-//// start scan controller ////
-///////////////////////////////
+/////////////////////////////////////
+///// Common ScanController ///////////
+/////////////////////////////////////
+// I.e. Applicable to both regular ScanController and ScanController_Fastdac
+
+// function sc_controlwindows(action)
+// 	string action
+// 	string openaboutwindows
+// 	variable ii
+
+// 	openaboutwindows = winlist("SweepControl*",";","WIN:64")
+// 	if(itemsinlist(openaboutwindows)>0)
+// 		for(ii=0;ii<itemsinlist(openaboutwindows);ii+=1)
+// 			killwindow $stringfromlist(ii,openaboutwindows)
+// 		endfor
+// 	endif
+// end
+
 
 function sc_openInstrConnections(print_cmd)
 	// open all VISA connections to instruments
@@ -252,6 +275,7 @@ function sc_openInstrConnections(print_cmd)
 	endfor
 end
 
+
 function sc_openInstrGUIs(print_cmd)
 	// open GUIs for instruments
 	// this is a simple as running through the list defined
@@ -275,6 +299,10 @@ function sc_openInstrGUIs(print_cmd)
 	endfor
 end
 
+
+
+
+
 function sc_checkBackup()
 	// the path `server` should point to /measurement-data
 	//     which has been mounted as a network drive on your measurement computer
@@ -296,7 +324,15 @@ function sc_checkBackup()
 	endif
 end
 
+
+
+////////////////////////////////////////////////////////////////
+///////////////// Slow ScanController ONLY /////////////////////
+////////////////////////////////////////////////////////////////
+// Slow == Not FastDAC compatible
+
 function InitScanController([configFile])
+	// Open the Slow ScanController window (not FastDAC)
 
 	string configFile // use this to point to a specific old config
 
@@ -388,212 +424,12 @@ function InitScanController([configFile])
 	sc_rebuildwindow()
 end
 
-/////////////////////////////
-//// configuration files ////
-/////////////////////////////
-
-function/s sc_createConfig()
-	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts, sc_Instr
-	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
-	nvar sc_PrintRaw, sc_PrintCalc, filenum, sc_cleanup
-	svar sc_hostname
-	variable refnum
-	string configfile
-	string configstr = "", tmpstr = ""
-
-	// information about the measurement computer
-	tmpstr = addJSONkeyval(tmpstr, "hostname", sc_hostname, addQuotes = 1)
-	string sysinfo = igorinfo(3)
-	tmpstr = addJSONkeyval(tmpstr, "OS", StringByKey("OS", sysinfo), addQuotes = 1)
-	tmpstr = addJSONkeyval(tmpstr, "IGOR_VERSION", StringByKey("IGORFILEVERSION", sysinfo), addQuotes = 1)
-	configstr = addJSONkeyval(configstr, "system_info", tmpstr)
-
-	// log instrument info
-	configstr = addJSONkeyval(configstr, "instruments", textWave2StrArray(sc_Instr))
-
-	// wave names
-	tmpstr = ""
-	tmpstr = addJSONkeyval(tmpstr, "raw", textWave2StrArray(sc_RawWaveNames))
-	tmpstr = addJSONkeyval(tmpstr, "calc", textWave2StrArray(sc_CalcWaveNames))
-	configstr = addJSONkeyval(configstr, "wave_names", tmpstr)
-
-	// record checkboxes
-	tmpstr = ""
-	tmpstr = addJSONkeyval(tmpstr, "raw", wave2BoolArray(sc_RawRecord))
-	tmpstr = addJSONkeyval(tmpstr, "calc", wave2BoolArray(sc_CalcRecord))
-	configstr = addJSONkeyval(configstr, "record_waves", tmpstr)
-
-	// plot checkboxes
-	tmpstr = ""
-	tmpstr = addJSONkeyval(tmpstr, "raw",  wave2BoolArray(sc_RawPlot))
-	tmpstr = addJSONkeyval(tmpstr, "calc",  wave2BoolArray(sc_CalcPlot))
-	configstr = addJSONkeyval(configstr, "plot_waves", tmpstr)
-
-	// async checkboxes
-	configstr = addJSONkeyval(configstr, "meas_async", wave2BoolArray(sc_measAsync))
-
-	// scripts
-	tmpstr = ""
-	tmpstr = addJSONkeyval(tmpstr, "raw", textWave2StrArray(sc_RawScripts))
-	tmpstr = addJSONkeyval(tmpstr, "calc", textWave2StrArray(sc_CalcScripts))
-	configstr = addJSONkeyval(configstr, "scripts", tmpstr)
-
-	// print_to_history
-	tmpstr = ""
-	tmpstr = addJSONkeyval(tmpstr, "raw", num2bool(sc_PrintRaw))
-	tmpstr = addJSONkeyval(tmpstr, "calc", num2bool(sc_PrintCalc))
-	configstr = addJSONkeyval(configstr, "print_to_history", tmpstr)
-
-
-	// FastDac if it exists
-	WAVE/Z fadcvalstr
-	if( WaveExists(fadcvalstr) )
-		variable i = 0
-		wave fadcattr
-		make/o/free/n=(dimsize(fadcattr, 0)) tempwave
-		
-		string fdinfo = ""
-		duplicate/o/free/r=[][0] fadcvalstr tempstrwave
-		fdinfo = addJSONkeyval(fdinfo, "ADCnums", textwave2strarray(tempstrwave))
-
-		duplicate/o/free/r=[][1] fadcvalstr tempstrwave
-		fdinfo = addJSONkeyval(fdinfo, "ADCvals", textwave2strarray(tempstrwave))
-		
-		tempwave = fadcattr[p][2]
-		for (i=0;i<numpnts(tempwave);i++)
-			tempwave[i] =	tempwave[i] == 48 ? 1 : 0
-		endfor
-
-		fdinfo = addJSONkeyval(fdinfo, "record", wave2boolarray(tempwave))
-		
-		duplicate/o/free/r=[][3] fadcvalstr tempstrwave
-		fdinfo = addJSONkeyval(fdinfo, "calc_name", textwave2strarray(tempstrwave))
-		
-		duplicate/o/free/r=[][4] fadcvalstr tempstrwave
-		fdinfo = addJSONkeyval(fdinfo, "calc_script", textwave2strarray(tempstrwave))
-
-
-		configstr = addJSONkeyval(configstr, "FastDAC", fdinfo)
-	endif
-
-	configstr = addJSONkeyval(configstr, "filenum", num2istr(filenum))
-	
-	configstr = addJSONkeyval(configstr, "cleanup", num2istr(sc_cleanup))
-
-	return configstr
-end
-
-function sc_saveConfig(configstr)
-	string configstr
-	svar sc_current_config
-
-	string filename = "sc" + num2istr(unixtime()) + ".json"
-	writetofile(prettyJSONfmt(configstr), filename, "config")
-	sc_current_config = filename
-end
-
-function sc_loadConfig(configfile)
-	string configfile
-	string jstr
-	nvar sc_PrintRaw, sc_PrintCalc
-	svar sc_current_config
-
-	// load JSON string from config file
-	printf "Loading configuration from: %s\n", configfile
-	sc_current_config = configfile
-	jstr = readtxtfile(configfile,"config")
-
-	// instruments
-	loadStrArray2textWave(getJSONvalue(jstr, "instruments"), "sc_Instr")
-
-	// waves
-	loadStrArray2textWave(getJSONvalue(jstr,"wave_names:raw"),"sc_RawWaveNames")
-	loadStrArray2textWave(getJSONvalue(jstr,"wave_names:calc"),"sc_CalcWaveNames")
-
-	// record checkboxes
-	loadBoolArray2wave(getJSONvalue(jstr,"record_waves:raw"),"sc_RawRecord")
-	loadBoolArray2wave(getJSONvalue(jstr,"record_waves:calc"),"sc_CalcRecord")
-
-	// plot checkboxes
-	loadBoolArray2wave(getJSONvalue(jstr,"plot_waves:raw"),"sc_RawPlot")
-	loadBoolArray2wave(getJSONvalue(jstr,"plot_waves:calc"),"sc_CalcPlot")
-
-	// async checkboxes
-	loadBoolArray2wave(getJSONvalue(jstr,"meas_async"),"sc_measAsync")
-
-	// print_to_history
-	loadBool2var(getJSONvalue(jstr,"print_to_history:raw"),"sc_PrintRaw")
-	loadBool2var(getJSONvalue(jstr,"print_to_history:calc"),"sc_PrintCalc")
-
-	// scripts
-	loadStrArray2textWave(getJSONvalue(jstr,"scripts:raw"),"sc_RawScripts")
-	loadStrArray2textWave(getJSONvalue(jstr,"scripts:calc"),"sc_CalcScripts")
-
-	//filenum
-	loadNum2var(getJSONvalue(jstr,"filenum"),"filenum")
-	
-	//cleanup
-	loadNum2var(getJSONvalue(jstr,"cleanup"),"sc_cleanup")
-
-	// reload ScanController window
-	sc_rebuildwindow()
-end
-
-/////////////////////
-//// main window ////
-/////////////////////
-
 function sc_rebuildwindow()
 	string cmd=""
 	getwindow/z ScanController wsizeRM
 	dowindow /k ScanController
 	sprintf cmd, "ScanController(%f,%f,%f,%f)", v_left,v_right,v_top,v_bottom
 	execute(cmd)
-end
-
-// In order to enable or disable a wave
-// call these two functions instead of messing with the waves sc_RawRecord and sc_CalcRecord directly
-function EnableScanControllerItem(wn)
-	string wn
-	ChangeScanControllerItemStatus(wn, 1)
-end
-
-function DisableScanControllerItem(wn)
-	string wn
-	ChangeScanControllerItemStatus(wn, 0)
-end
-
-function ChangeScanControllerItemStatus(wn, ison)
-	string wn
-	variable ison
-	string cmd
-	wave sc_RawRecord, sc_CalcRecord
-	wave /t sc_RawWaveNames, sc_CalcWaveNames
-	variable i=0, done=0
-	do
-		if (stringmatch(sc_RawWaveNames[i], wn))
-			sc_RawRecord[i]=ison
-			cmd = "CheckBox sc_RawRecordCheckBox" + num2istr(i) + " value=" + num2istr(ison)
-			execute(cmd)
-			done=1
-		endif
-		i+=1
-	while (i<numpnts( sc_RawWaveNames ) && !done)
-
-	i=0
-	do
-		if (stringmatch(sc_CalcWaveNames[i], wn))
-			sc_CalcRecord[i]=ison
-			cmd = "CheckBox sc_CalcRecordCheckBox" + num2istr(i) + " value=" + num2istr(ison)
-			execute(cmd)
-		endif
-		i+=1
-	while (i<numpnts( sc_CalcWaveNames ) && !done)
-
-	if (!done)
-		print "Error: Could not find the wave name specified."
-	endif
-	execute("doupdate")
 end
 
 Window ScanController(v_left,v_right,v_top,v_bottom) : Panel
@@ -698,6 +534,7 @@ Window ScanController(v_left,v_right,v_top,v_bottom) : Panel
 
 EndMacro
 
+
 function sc_OpenInstrButton(action) : Buttoncontrol
 	string action
 	sc_openInstrConnections(1)
@@ -719,7 +556,7 @@ function sc_killgraphs(action) : Buttoncontrol
 			killwindow $stringfromlist(ii,opengraphs)
 		endfor
 	endif
-	sc_controlwindows("") // Kill all open control windows
+//	sc_controlwindows("") // Kill all open control windows
 end
 
 function sc_updatewindow(action) : ButtonControl
@@ -846,802 +683,211 @@ function sc_CheckboxClicked(ControlName, Value)
 	endif
 end
 
-////////////////////////
-/// Initialize Waves ///
-////////////////////////
-
-function sc_checkAsyncScript(str)
-	// returns -1 if formatting is bad
-	// could be better
-	// returns position of first ( character if it is good
-	string str
-
-	variable i = 0, firstOP = 0, countOP = 0, countCP = 0
-	for(i=0; i<strlen(str); i+=1)
-
-		if( CmpStr(str[i], "(") == 0 )
-			countOP+=1 // count opening parentheses
-			if( firstOP==0 )
-				firstOP = i // record position of first (
-				continue
-			endif
-		endif
-
-		if( CmpStr(str[i], ")") == 0 )
-			countCP -=1 // count closing parentheses
-			continue
-		endif
-
-		if( CmpStr(str[i], ",") == 0 )
-			return -1 // stop on comma
-		endif
-
-	endfor
-
-	if( (countOP==1) && (countCP==-1) )
-		return firstOP
-	else
-		return -1
-	endif
-end
-
-function sc_findAsyncMeasurements()
-	// go through RawScripts and look for valid async measurements
-	//    wherever the meas_async box is checked in the window
-	nvar sc_is2d
-	wave /t sc_RawScripts, sc_RawWaveNames
-	wave sc_RawRecord, sc_RawPlot, sc_measAsync
-
-	// setup async folder
-	killdatafolder /z root:async // kill it if it exists
-	newdatafolder root:async // create an empty version
-
-	variable i = 0, idx = 0, measIdx=0, instrAsync=0
-	string script, strID, queryFunc, threadFolder
-	string /g sc_asyncFolders = ""
-	make /o/n=1 /WAVE sc_asyncRefs
 
 
-	for(i=0;i<numpnts(sc_RawScripts);i+=1)
+/////////////////////////////
+//// configuration files ////
+/////////////////////////////
 
-		if ( (sc_RawRecord[i] == 1) || (sc_RawPlot[i] == 1) )
-			// this is something that will be measured
+function/s sc_createConfig()
+	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts, sc_Instr
+	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
+	nvar sc_PrintRaw, sc_PrintCalc, filenum, sc_cleanup
+	svar sc_hostname
+	variable refnum
+	string configfile
+	string configstr = "", tmpstr = ""
 
-			if (sc_measAsync[i] == 1) // this is something that should be async
+	// information about the measurement computer
+	tmpstr = addJSONkeyval(tmpstr, "hostname", sc_hostname, addQuotes = 1)
+	string sysinfo = igorinfo(3)
+	tmpstr = addJSONkeyval(tmpstr, "OS", StringByKey("OS", sysinfo), addQuotes = 1)
+	tmpstr = addJSONkeyval(tmpstr, "IGOR_VERSION", StringByKey("IGORFILEVERSION", sysinfo), addQuotes = 1)
+	configstr = addJSONkeyval(configstr, "system_info", tmpstr)
 
-				script = sc_RawScripts[i]
-				idx = sc_checkAsyncScript(script) // check function format
+	// log instrument info
+	configstr = addJSONkeyval(configstr, "instruments", textWave2StrArray(sc_Instr))
 
-				if(idx!=-1) // fucntion is good, this will be recorded asynchronously
+	// wave names
+	tmpstr = ""
+	tmpstr = addJSONkeyval(tmpstr, "raw", textWave2StrArray(sc_RawWaveNames))
+	tmpstr = addJSONkeyval(tmpstr, "calc", textWave2StrArray(sc_CalcWaveNames))
+	configstr = addJSONkeyval(configstr, "wave_names", tmpstr)
 
-					// keep track of function names and instrIDs in folder structure
-					strID = script[idx+1,strlen(script)-2]
-					queryFunc = script[0,idx-1]
+	// record checkboxes
+	tmpstr = ""
+	tmpstr = addJSONkeyval(tmpstr, "raw", wave2BoolArray(sc_RawRecord))
+	tmpstr = addJSONkeyval(tmpstr, "calc", wave2BoolArray(sc_CalcRecord))
+	configstr = addJSONkeyval(configstr, "record_waves", tmpstr)
 
-					// creates root:async:instr1
-					sprintf threadFolder, "thread_%s", strID
-					if(DataFolderExists("root:async:"+threadFolder))
-						// add measurements to the thread directory for this instrument
+	// plot checkboxes
+	tmpstr = ""
+	tmpstr = addJSONkeyval(tmpstr, "raw",  wave2BoolArray(sc_RawPlot))
+	tmpstr = addJSONkeyval(tmpstr, "calc",  wave2BoolArray(sc_CalcPlot))
+	configstr = addJSONkeyval(configstr, "plot_waves", tmpstr)
 
-						svar qF = root:async:$(threadFolder):queryFunc
-						qF += ";"+queryFunc
-						svar wI = root:async:$(threadFolder):wavIdx
-						wI += ";" + num2str(measIdx)
-					else
-						instrAsync += 1
+	// async checkboxes
+	configstr = addJSONkeyval(configstr, "meas_async", wave2BoolArray(sc_measAsync))
 
-						// create a new thread directory for this instrument
-						newdatafolder root:async:$(threadFolder)
-						nvar instrID = $strID
-						variable /g root:async:$(threadFolder):instrID = instrID   // creates variable instrID in root:thread
-																	                          // that has the same value as $strID
-						string /g root:async:$(threadFolder):wavIdx = num2str(measIdx)
-						string /g root:async:$(threadFolder):queryFunc = queryFunc // creates string variable queryFunc in root:async:thread
-																                             // that has a value queryFunc="readInstr"
-						sc_asyncFolders += threadFolder + ";"
+	// scripts
+	tmpstr = ""
+	tmpstr = addJSONkeyval(tmpstr, "raw", textWave2StrArray(sc_RawScripts))
+	tmpstr = addJSONkeyval(tmpstr, "calc", textWave2StrArray(sc_CalcScripts))
+	configstr = addJSONkeyval(configstr, "scripts", tmpstr)
 
+	// print_to_history
+	tmpstr = ""
+	tmpstr = addJSONkeyval(tmpstr, "raw", num2bool(sc_PrintRaw))
+	tmpstr = addJSONkeyval(tmpstr, "calc", num2bool(sc_PrintCalc))
+	configstr = addJSONkeyval(configstr, "print_to_history", tmpstr)
 
-
-					endif
-
-					// fill wave reference(s)
-					redimension /n=(2*measIdx+2) sc_asyncRefs
-					wave w=$sc_rawWaveNames[i] // 1d wave
-					sc_asyncRefs[2*measIdx] = w
-					if(sc_is2d)
-						wave w2d=$(sc_rawWaveNames[i]+"2d") // 2d wave
-						sc_asyncRefs[2*measIdx+1] = w2d
-					endif
-					measIdx+=1
-
-				else
-					// measurement script is formatted wrong
-					sc_measAsync[i]=0
-					printf "[WARNING] Async scripts must be formatted: \"readFunc(instrID)\"\r\t%s is no good and will be read synchronously,\r", sc_RawScripts[i]
-				endif
-
-			endif
-		endif
-
-	endfor
-
-	if(instrAsync<2)
-		// no point in doing anyting async is only one instrument is capable of it
-		// will uncheck boxes automatically
-		make /o/n=(numpnts(sc_RawScripts)) sc_measAsync = 0
-	endif
-
-	// change state of check boxes based on what just happened here!
-	doupdate /W=ScanController
-	string cmd = ""
-	for(i=0;i<numpnts(sc_measAsync);i+=1)
-		sprintf cmd, "CheckBox sc_AsyncCheckBox%d,win=ScanController,value=%d", i, sc_measAsync[i]
-		execute(cmd)
-	endfor
-	doupdate /W=ScanController
-
-	if(sum(sc_measAsync)==0)
-		sc_asyncFolders = ""
-		KillDataFolder /Z root:async // don't need this
-		return 0
-	else
-		variable /g sc_numInstrThreads = ItemsInList(sc_asyncFolders, ";")
-		variable /g sc_numAvailThreads = threadProcessorCount
-		return sc_numInstrThreads
-	endif
-
-end
-
-function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_label, linecut, fastdac]) //linecut = 0,1 for false, true
-	variable start, fin, numpts, starty, finy, numptsy, linecut, fastdac
-	string x_label, y_label
-	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
-	wave/t sc_RawWaveNames, sc_CalcWaveNames, sc_RawScripts, sc_CalcScripts
-	variable i=0, j=0
-	string cmd = "", wn = "", wn2d="", s, script = "", script0 = "", script1 = ""
-	string/g sc_x_label, sc_y_label, activegraphs=""
-	variable/g sc_is2d, sc_scanstarttime = datetime
-	variable/g sc_startx, sc_finx, sc_numptsx, sc_starty, sc_finy, sc_numptsy
-	variable/g sc_abortsweep=0, sc_pause=0, sc_abortnosave=0
-	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, cmd1="",window_string=""
-	string cmd2=""
-	variable index, graphopen, graphopen2d
-	svar sc_colormap
-	variable/g fastdac_init = 0
-
-	if(paramisdefault(fastdac))
-		fastdac = 0
-		fastdac_init = 0
-	elseif(fastdac == 1)
-		fastdac_init = 1
-	else
-		// set fastdac = 1 if you want to use the fastdac!
-		print("[WARNING] \"InitializeWaves\": Pass fastdac = 1! Setting it to 0.")
-		fastdac = 0
-		fastdac_init = 0
-	endif
-
-	if(fastdac == 0)
-		//do some sanity checks on wave names: they should not start or end with numbers.
-		do
-			if (sc_RawRecord[i])
-				s = sc_RawWaveNames[i]
-				if (!((char2num(s[0]) >= 97 && char2num(s[0]) <= 122) || (char2num(s[0]) >= 65 && char2num(s[0]) <= 90)))
-					print "The first character of a wave name should be an alphabet a-z A-Z. The problematic wave name is " + s;
-					abort
-				endif
-				if (!((char2num(s[strlen(s)-1]) >= 97 && char2num(s[strlen(s)-1]) <= 122) || (char2num(s[strlen(s)-1]) >= 65 && char2num(s[strlen(s)-1]) <= 90)))
-					print "The last character of a wave name should be an alphabet a-z A-Z. The problematic wave name is " + s;
-					abort
-				endif
-			endif
-			i+=1
-		while (i<numpnts(sc_RawWaveNames))
-		i=0
-		do
-			if (sc_CalcRecord[i])
-				s = sc_CalcWaveNames[i]
-				if (!((char2num(s[0]) >= 97 && char2num(s[0]) <= 122) || (char2num(s[0]) >= 65 && char2num(s[0]) <= 90)))
-					print "The first character of a wave name should be an alphabet a-z A-Z. The problematic wave name is " + s;
-					abort
-				endif
-				if (!((char2num(s[strlen(s)-1]) >= 97 && char2num(s[strlen(s)-1]) <= 122) || (char2num(s[strlen(s)-1]) >= 65 && char2num(s[strlen(s)-1]) <= 90)))
-					print "The last character of a wave name should be an alphabet a-z A-Z. The problematic wave name is " + s;
-					abort
-				endif
-			endif
-			i+=1
-		while (i<numpnts(sc_CalcWaveNames))
-	endif
-	i=0
-
-	// Close all Resource Manager sessions
-	// and then reopen all instruemnt connections.
-	// VISA tents to drop the connections after being
-	// idle for a while.
-	killVISA()
-	sc_OpenInstrConnections(0)
-
-	// The status of the upcoming scan will be set when waves are initialized.
-	if(!paramisdefault(starty) && !paramisdefault(finy) && !paramisdefault(numptsy))
-		sc_is2d = 1
-		sc_startx = start
-		sc_finx = fin
-		sc_numptsx = numpts
-		sc_starty = starty
-		sc_finy = finy
-		sc_numptsy = numptsy
-		if(start==fin || starty==finy)
-			print "[WARNING]: Your start and end values are the same!"
-		endif
-	else
-		sc_is2d = 0
-		sc_startx = start
-		sc_finx = fin
-		sc_numptsx = numpts
-		if(start==fin)
-			print "[WARNING]: Your start and end values are the same!"
-		endif
-	endif
-
-	if(linecut == 1)
-		sc_is2d = 2
-		make/O/n=(numptsy) sc_linestart = NaN 						//To store first xvalue of each line of data
-		cmd = "setscale/I x " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + "sc_linestart"; execute(cmd)
-	endif
-
-	if(paramisdefault(x_label) || stringmatch(x_label,""))
-		sc_x_label=""
-	else
-		sc_x_label=x_label
-	endif
-
-	if(paramisdefault(y_label) || stringmatch(y_label,""))
-		sc_y_label=""
-	else
-		sc_y_label=y_label
-	endif
-
-	// create waves to hold x and y data (in case I want to save it)
-	// this is pretty useless if using readvstime
-	cmd = "make /o/n=(" + num2istr(sc_numptsx) + ") " + "sc_xdata" + "=NaN"; execute(cmd)
-	cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + "sc_xdata"; execute(cmd)
-	cmd = "sc_xdata" +" = x"; execute(cmd)
-	if(sc_is2d != 0)
-		cmd = "make /o/n=(" + num2istr(sc_numptsy) + ") " + "sc_ydata" + "=NaN"; execute(cmd)
-		cmd = "setscale/I x " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", \"\", " + "sc_ydata"; execute(cmd)
-		cmd = "sc_ydata" +" = x"; execute(cmd)
-	endif
-
-	if(fastdac == 0)
-		// Initialize waves for raw data
-		do
-			if (sc_RawRecord[i] == 1 && cmpstr(sc_RawWaveNames[i], "") || sc_RawPlot[i] == 1 && cmpstr(sc_RawWaveNames[i], ""))
-				wn = sc_RawWaveNames[i]
-				cmd = "make /o/n=(" + num2istr(sc_numptsx) + ") " + wn + "=NaN"
-				execute(cmd)
-				cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn
-				execute(cmd)
-				if(sc_is2d == 1)
-					// In case this is a 2D measurement
-					wn2d = wn + "2d"
-					cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd)
-					cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn2d; execute(cmd)
-					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
-				elseif(sc_is2d == 2)
-					// In case this is a 2D line cut measurement
-					wn2d = sc_RawWaveNames[i]+"2d"
-					cmd = "make /o/n=(1, " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd) //Makes 1 by y wave, x is redimensioned in recordline
-					cmd = "setscale /P x, 0, " + num2str((sc_finx-sc_startx)/sc_numptsx) + "," + wn2d; execute(cmd) //sets x scale starting from 0 but with delta correct
-					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)//Useful to see if top and bottom of scan are filled with NaNs
-				endif
-			endif
-			i+=1
-		while (i<numpnts(sc_RawWaveNames))
-
-		// Initialize waves for calculated data
-		i=0
-		do
-			if (sc_CalcRecord[i] == 1 && cmpstr(sc_CalcWaveNames[i], "") || sc_CalcPlot[i] == 1 && cmpstr(sc_CalcWaveNames[i], ""))
-				wn = sc_CalcWaveNames[i]
-				cmd = "make /o/n=(" + num2istr(sc_numptsx) + ") " + wn + "=NaN"
-				execute(cmd)
-				cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn
-				execute(cmd)
-				if(sc_is2d == 1)
-					// In case this is a 2D measurement
-					wn2d = wn + "2d"
-					cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd)
-					cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn2d; execute(cmd)
-					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
-				elseif(sc_is2d == 2)
-					// In case this is a 2D line cut measurement
-					wn2d = sc_CalcWaveNames[i]+"2d"
-					cmd = "make /o/n=(1, " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd) //Same as for Raw (see above)
-					cmd = "setscale /P x, 0, " + num2str((sc_finx-sc_startx)/sc_numptsx) + "," + wn2d; execute(cmd) //sets x scale starting from 0 but with delta correct
-					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
-				endif
-			endif
-			i+=1
-		while (i<numpnts(sc_CalcWaveNames))
-
-		sc_findAsyncMeasurements()
-
-	elseif(fastdac == 1)
-		// create waves for fastdac
-		wave/t fadcvalstr
+	// FastDac if it exists
+	WAVE/Z fadcvalstr
+	if( WaveExists(fadcvalstr) )
+		variable i = 0
 		wave fadcattr
-		string/g sc_fastadc = ""
-		string wn_raw = "", wn_raw2d = ""
-		i=0
-		do
-			if(fadcattr[i][2] == 48) // checkbox checked
-				sc_fastadc = addlistitem(fadcvalstr[i][0], sc_fastadc, ",", inf)  //Add adc_channel to list being recorded (inf to add at end)
-				wn = fadcvalstr[i][3]
-				cmd = "make/o/n=(" + num2istr(sc_numptsx) + ") " + wn + "=NaN"
-				execute(cmd)
-				cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn
-				execute(cmd)
-
-				wn_raw = "ADC"+num2istr(i)
-				cmd = "make/o/n=(" + num2istr(sc_numptsx) + ") " + wn_raw + "=NaN"
-				execute(cmd)
-				cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn_raw
-				execute(cmd)
-
-				if(sc_is2d > 0)  // Should work for linecut too I think?
-					// In case this is a 2D measurement
-					wn2d = wn + "_2d"
-					cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd)
-					cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn2d; execute(cmd)
-					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
-
-					wn_raw2d = wn_raw + "_2d"
-					cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn_raw2d + "=NaN"; execute(cmd)
-					cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn_raw2d; execute(cmd)
-					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn_raw2d; execute(cmd)
-				endif
-			endif
-			i++
-		while(i<dimsize(fadcvalstr,0))
-		sc_fastadc = sc_fastadc[0,strlen(sc_fastadc)-2]  // To chop off trailing comma
-	endif
-
-	// Find all open plots
-	graphlist = winlist("*",";","WIN:1")
-	j=0
-	for (i=0;i<itemsinlist(graphlist);i=i+1)
-		index = strsearch(graphlist,";",j)
-		graphname = graphlist[j,index-1]
-		setaxis/w=$graphname /a
-		getwindow $graphname wtitle
-		splitstring /e="(.*):(.*)" s_value, graphnum, plottitle
-		graphtitle+= plottitle+";"
-		graphnumlist+= graphnum+";"
-		j=index+1
-	endfor
-
-	nvar filenum
-
-	if(fastdac == 0)
-		//Initialize plots for raw data waves
-		i=0
-		do
-			if (sc_RawPlot[i] == 1 && cmpstr(sc_RawWaveNames[i], ""))
-				wn = sc_RawWaveNames[i]
-				graphopen = 0
-				graphopen2d = 0
-				for(j=0;j<ItemsInList(graphtitle);j=j+1)
-					if(stringmatch(wn,stringfromlist(j,graphtitle)))
-						graphopen = 1
-						activegraphs+= stringfromlist(j,graphnumlist)+";"
-						Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label	
-						if(sc_is2d == 0)
-							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label  // Can add something like current /nA as y_label for 1D only... if 2D sc_y_label will be for 2D plot
-						endif
-						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)					
-					endif
-					if(sc_is2d)
-						if(stringmatch(wn+"2d",stringfromlist(j,graphtitle)))
-							graphopen2d = 1
-							activegraphs+= stringfromlist(j,graphnumlist)+";"
-							Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
-							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
-							TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)	
-						endif
-					endif
-				endfor
-				if(graphopen && graphopen2d) //If both open do nothing
-				elseif(graphopen2d) //If only 2D is open then open 1D
-					display $wn
-					setwindow kwTopWin, graphicsTech=0
-					Label bottom, sc_x_label
-					if(sc_is2d == 0)
-						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
-					endif
-					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
-					activegraphs+= winname(0,1)+";"
-				elseif(graphopen) // If only 1D is open then open 2D
-					if(sc_is2d)
-						wn2d = wn + "2d"
-						display
-						setwindow kwTopWin, graphicsTech=0
-						appendimage $wn2d
-						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
-						colorscale /c/n=$sc_ColorMap /e/a=rc image=$wn2d
-						Label left, sc_y_label
-						Label bottom, sc_x_label
-						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
-						activegraphs+= winname(0,1)+";"
-					endif
-				else // Open Both
-					wn2d = wn + "2d"
-					display $wn
-					setwindow kwTopWin, graphicsTech=0
-					Label bottom, sc_x_label
-					if(sc_is2d == 0)
-						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
-					endif
-					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
-					activegraphs+= winname(0,1)+";"
-					if(sc_is2d)
-						display
-						setwindow kwTopWin, graphicsTech=0
-						appendimage $wn2d
-						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
-						colorscale /c/n=$sc_ColorMap /e/a=rc image=$wn2d
-						Label left, sc_y_label
-						Label bottom, sc_x_label
-						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
-						activegraphs+= winname(0,1)+";"
-					endif
-				endif
-			endif
-		i+= 1
-		while(i<numpnts(sc_RawWaveNames))
-
-		//Initialize plots for calculated data waves
-		i=0
-		do
-			if (sc_CalcPlot[i] == 1 && cmpstr(sc_CalcWaveNames[i], ""))
-				wn = sc_CalcWaveNames[i]
-				graphopen = 0
-				graphopen2d = 0
-				for(j=0;j<ItemsInList(graphtitle);j=j+1)
-					if(stringmatch(wn,stringfromlist(j,graphtitle)))
-						graphopen = 1
-						activegraphs+= stringfromlist(j,graphnumlist)+";"
-						Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
-						if(sc_is2d == 0)
-							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label 
-						endif
-						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
-					endif
-					if(sc_is2d)
-						if(stringmatch(wn+"2d",stringfromlist(j,graphtitle)))
-							graphopen2d = 1
-							activegraphs+= stringfromlist(j,graphnumlist)+";"
-							Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
-							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
-							TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
-						endif
-					endif
-				endfor
-				if(graphopen && graphopen2d)
-				elseif(graphopen2d) // If only 2D open then open 1D
-					display $wn
-					setwindow kwTopWin, graphicsTech=0
-					Label bottom, sc_x_label
-					if(sc_is2d == 0)
-						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
-					endif
-					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
-					activegraphs+= winname(0,1)+";"
-				elseif(graphopen) // If only 1D is open then open 2D
-					if(sc_is2d)
-						wn2d = wn + "2d"
-						display
-						appendimage $wn2d
-						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
-						colorscale /c/n=$sc_ColorMap /e/a=rc image=$wn2d
-						Label left, sc_y_label
-						setwindow kwTopWin, graphicsTech=0
-						Label bottom, sc_x_label
-						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
-						activegraphs+= winname(0,1)+";"
-					endif
-				else // open both
-					wn2d = wn + "2d"
-					display $wn
-					setwindow kwTopWin, graphicsTech=0
-					Label bottom, sc_x_label
-					if(sc_is2d == 0)
-						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
-					endif
-					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
-					activegraphs+= winname(0,1)+";"
-					if(sc_is2d)
-						display
-						setwindow kwTopWin, graphicsTech=0
-						appendimage $wn2d
-						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
-						colorscale /c/n=$sc_ColorMap /e/a=rc image=$wn2d
-						Label left, sc_y_label
-						Label bottom, sc_x_label
-						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
-						activegraphs+= winname(0,1)+";"
-					endif
-				endif
-			endif
-			i+= 1
-		while(i<numpnts(sc_CalcWaveNames))
-	
-	elseif(fastdac == 1)
-		// open plots for fastdac
-		i=0
-		do
-			if(fadcattr[i][2] == 48)
-				wn = fadcvalstr[i][3]
-				graphopen = 0
-				graphopen2d = 0
-				for(j=0;j<ItemsInList(graphtitle);j=j+1)
-					if(stringmatch(wn,stringfromlist(j,graphtitle)))
-						graphopen = 1
-						activegraphs+= stringfromlist(j,graphnumlist)+";"
-						Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
-						if(sc_is2d == 0)
-							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
-						endif
-						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
-					endif
-					if(sc_is2d)
-						if(stringmatch(wn+"_2d",stringfromlist(j,graphtitle)))
-							graphopen2d = 1
-							activegraphs+= stringfromlist(j,graphnumlist)+";"
-							Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
-							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
-							TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
-						endif
-					endif
-				endfor
-				if(graphopen && graphopen2d)
-				elseif(graphopen2d)  // If only 2D open then open 1D
-					display $wn
-					setwindow kwTopWin, graphicsTech=0
-					Label bottom, sc_x_label
-					if(sc_is2d == 0)
-						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
-					endif
-					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
-					activegraphs+= winname(0,1)+";"
-				elseif(graphopen) // If only 1D is open then open 2D
-					if(sc_is2d)
-						wn2d = wn + "_2d"
-						display
-						setwindow kwTopWin, graphicsTech=0
-						appendimage $wn2d
-						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
-						colorscale /c/n=$sc_ColorMap /e/a=rc image=$wn2d
-						Label left, sc_y_label
-						Label bottom, sc_x_label
-						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
-						activegraphs+= winname(0,1)+";"
-					endif
-				else // open both
-					wn2d = wn + "_2d"
-					display $wn
-					setwindow kwTopWin, graphicsTech=0
-					Label bottom, sc_x_label
-					if(sc_is2d == 0)
-						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
-					endif
-					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
-					activegraphs+= winname(0,1)+";"
-					if(sc_is2d)
-						display
-						setwindow kwTopWin, graphicsTech=0
-						appendimage $wn2d
-						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
-						colorscale /c/n=$sc_ColorMap /e/a=rc image=$wn2d
-						Label left, sc_y_label
-						Label bottom, sc_x_label
-						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
-						activegraphs+= winname(0,1)+";"
-					endif
-				endif
-			endif
-			i+= 1
-		while(i<dimsize(fadcvalstr,0))
-	endif
-	execute("abortmeasurementwindow()")
-
-	cmd1 = "TileWindows/O=1/A=(3,4) "
-	cmd2 = ""
-	// Tile graphs
-	for(i=0;i<itemsinlist(activegraphs);i=i+1)
-		window_string = stringfromlist(i,activegraphs)
-		cmd1+= window_string +","
-
-		cmd2 = "DoWindow/F " + window_string
-		execute(cmd2)
-	endfor
-	cmd1 += "SweepControl"
-	execute(cmd1)
-	doupdate
-end
- 
-function sc_controlwindows(action)
-	string action
-	string openaboutwindows
-	variable ii
-
-	openaboutwindows = winlist("SweepControl*",";","WIN:64")
-	if(itemsinlist(openaboutwindows)>0)
-		for(ii=0;ii<itemsinlist(openaboutwindows);ii+=1)
-			killwindow $stringfromlist(ii,openaboutwindows)
-		endfor
-	endif
-end
-
-/////////////////////////////
-/////  sweep controls   /////
-/////////////////////////////
-
-window abortmeasurementwindow() : Panel
-	//Silent 1 // building window
-	NewPanel /W=(500,700,870,750) /N=SweepControl// window size
-	ModifyPanel frameStyle=2
-	ModifyPanel fixedSize=1
-	SetDrawLayer UserBack
-	Button pausesweep, pos={10,15},size={110,20},proc=pausesweep,title="Pause"
-	Button stopsweep, pos={130,15},size={110,20},proc=stopsweep,title="Abort and Save"
-	Button stopsweepnosave, pos={250,15},size={110,20},proc=stopsweep,title="Abort"
-	DoUpdate /W=SweepControl /E=1
-endmacro
-
-function stopsweep(action) : Buttoncontrol
-	string action
-	nvar sc_abortsweep,sc_abortnosave
-
-	strswitch(action)
-		case "stopsweep":
-			sc_abortsweep = 1
-			print "[SCAN] Scan will abort and the incomplete dataset will be saved."
-			break
-		case "stopsweepnosave":
-			sc_abortnosave = 1
-			print "[SCAN] Scan will abort and dataset will not be saved."
-			break
-	endswitch
-end
-
-function pausesweep(action) : Buttoncontrol
-	string action
-	nvar sc_pause, sc_abortsweep
-
-	Button pausesweep,proc=resumesweep,title="Resume"
-	sc_pause=1
-	print "[SCAN] Scan paused by user."
-end
-
-function resumesweep(action) : Buttoncontrol
-	string action
-	nvar sc_pause
-
-	Button pausesweep,proc=pausesweep,title="Pause"
-	sc_pause = 0
-	print "Sweep resumed"
-end
-
-
-
-function sc_checksweepstate([fastdac])
-	variable fastdac
-	nvar /Z sc_abortsweep, sc_pause, sc_abortnosave
-	
-	if(paramisdefault(fastdac))
-		fastdac = 0
-	else
-		fastdac = 1
-	endif
-
-	if(NVAR_Exists(sc_abortsweep) && sc_abortsweep==1)
-		// If the Abort button is pressed during the scan, save existing data and stop the scan.
-		SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0, fastdac=fastdac)
-		dowindow /k SweepControl
-		sc_abortsweep=0
-		sc_abortnosave=0
-		sc_pause=0
-		abort "Measurement aborted by user. Data saved automatically."
-	elseif(NVAR_Exists(sc_abortnosave) && sc_abortnosave==1)
-		// Abort measurement without saving anything!
-		dowindow /k SweepControl
-		sc_abortnosave = 0
-		sc_abortsweep = 0
-		sc_pause=0
-		abort "Measurement aborted by user. Data not saved automatically. Run \"SaveWaves()\" if needed"
-	elseif(NVAR_Exists(sc_pause) && sc_pause==1)
-		// Pause sweep if button is pressed
-		do
-			if(sc_abortsweep)
-				SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0,fastdac=fastdac)
-				dowindow /k SweepControl
-				sc_abortsweep=0
-				sc_abortnosave=0
-				sc_pause=0
-				abort "Measurement aborted by user"
-			elseif(sc_abortnosave)
-				dowindow /k SweepControl
-				sc_abortsweep=0
-				sc_abortnosave=0
-				sc_pause=0
-				abort "Measurement aborted by user. Data NOT saved!"
-			endif
-		while(sc_pause)
-	endif
-end
-
-function sc_sleep(delay)
-	// sleep for delay seconds
-	// checks for keyboard interrupts in mstimer loop
-	variable delay
-	delay = delay*1e6 // convert to microseconds
-	variable start_time = stopMStimer(-2) // start the timer immediately
-	nvar sc_abortsweep, sc_pause
-
-	doupdate // do this just once during the sleep function
-	do
-		try
-			sc_checksweepstate()
-		catch
-			variable err = GetRTError(1)
-			string errMessage = GetErrMessage(err)
+		make/o/free/n=(dimsize(fadcattr, 0)) tempwave
 		
-			// reset sweep control parameters if igor about button is used
-			if(v_abortcode == -1)
-				sc_abortsweep = 0
-				sc_pause = 0
-			endif
-			
-			//silent abort
-			abortonvalue 1,10
-		endtry
-	while(stopMStimer(-2)-start_time < delay)
+		string fdinfo = ""
+		duplicate/o/free/r=[][0] fadcvalstr tempstrwave
+		fdinfo = addJSONkeyval(fdinfo, "ADCnums", textwave2strarray(tempstrwave))
 
-end
+		duplicate/o/free/r=[][1] fadcvalstr tempstrwave
+		fdinfo = addJSONkeyval(fdinfo, "ADCvals", textwave2strarray(tempstrwave))
+		
+		tempwave = fadcattr[p][2]
+		for (i=0;i<numpnts(tempwave);i++)
+			tempwave[i] =	tempwave[i] == 48 ? 1 : 0
+		endfor
 
-function asleep(s)
-  // Sleep function which allows user to abort or continue if sleep is longer than 2s
-	variable s
-	variable t1, t2
-	if (s > 2)
-		t1 = datetime
-		doupdate	
-		sleep/S/C=6/B/Q s
-		t2 = datetime-t1
-		if ((s-t2)>5)
-			printf "User continued, slept for %.0fs\r", t2
-		endif
-	else
-		sc_sleep(s)
+		fdinfo = addJSONkeyval(fdinfo, "record", wave2boolarray(tempwave))
+		
+		duplicate/o/free/r=[][3] fadcvalstr tempstrwave
+		fdinfo = addJSONkeyval(fdinfo, "calc_name", textwave2strarray(tempstrwave))
+		
+		duplicate/o/free/r=[][4] fadcvalstr tempstrwave
+		fdinfo = addJSONkeyval(fdinfo, "calc_script", textwave2strarray(tempstrwave))
+
+
+		configstr = addJSONkeyval(configstr, "FastDAC", fdinfo)
 	endif
+
+	configstr = addJSONkeyval(configstr, "filenum", num2istr(filenum))
+	
+	configstr = addJSONkeyval(configstr, "cleanup", num2istr(sc_cleanup))
+
+	return configstr
 end
 
-threadsafe function sc_sleep_noupdate(delay)
-	// sleep for delay seconds
-	variable delay
-	delay = delay*1e6 // convert to microseconds
-	variable start_time = stopMStimer(-2) // start the timer immediately
+function sc_saveConfig(configstr)
+	string configstr
+	svar sc_current_config
 
-	do
-		sleep /s 0.002
-	while(stopMStimer(-2)-start_time < delay)
-
+	string filename = "sc" + num2istr(unixtime()) + ".json"
+	writetofile(prettyJSONfmt(configstr), filename, "config")
+	sc_current_config = filename
 end
 
-/////////////////////////////
-////  read/record funcs  ////
-/////////////////////////////
+function sc_loadConfig(configfile)
+	string configfile
+	string jstr
+	nvar sc_PrintRaw, sc_PrintCalc
+	svar sc_current_config
+
+	// load JSON string from config file
+	printf "Loading configuration from: %s\n", configfile
+	sc_current_config = configfile
+	jstr = readtxtfile(configfile,"config")
+
+	// instruments
+	loadStrArray2textWave(getJSONvalue(jstr, "instruments"), "sc_Instr")
+
+	// waves
+	loadStrArray2textWave(getJSONvalue(jstr,"wave_names:raw"),"sc_RawWaveNames")
+	loadStrArray2textWave(getJSONvalue(jstr,"wave_names:calc"),"sc_CalcWaveNames")
+
+	// record checkboxes
+	loadBoolArray2wave(getJSONvalue(jstr,"record_waves:raw"),"sc_RawRecord")
+	loadBoolArray2wave(getJSONvalue(jstr,"record_waves:calc"),"sc_CalcRecord")
+
+	// plot checkboxes
+	loadBoolArray2wave(getJSONvalue(jstr,"plot_waves:raw"),"sc_RawPlot")
+	loadBoolArray2wave(getJSONvalue(jstr,"plot_waves:calc"),"sc_CalcPlot")
+
+	// async checkboxes
+	loadBoolArray2wave(getJSONvalue(jstr,"meas_async"),"sc_measAsync")
+
+	// print_to_history
+	loadBool2var(getJSONvalue(jstr,"print_to_history:raw"),"sc_PrintRaw")
+	loadBool2var(getJSONvalue(jstr,"print_to_history:calc"),"sc_PrintCalc")
+
+	// scripts
+	loadStrArray2textWave(getJSONvalue(jstr,"scripts:raw"),"sc_RawScripts")
+	loadStrArray2textWave(getJSONvalue(jstr,"scripts:calc"),"sc_CalcScripts")
+
+	//filenum
+	loadNum2var(getJSONvalue(jstr,"filenum"),"filenum")
+	
+	//cleanup
+	loadNum2var(getJSONvalue(jstr,"cleanup"),"sc_cleanup")
+
+	// reload ScanController window
+	sc_rebuildwindow()
+end
+
+
+
+// In order to enable or disable a wave
+// call these two functions instead of messing with the waves sc_RawRecord and sc_CalcRecord directly
+// function EnableScanControllerItem(wn)
+// 	string wn
+// 	ChangeScanControllerItemStatus(wn, 1)
+// end
+
+// function DisableScanControllerItem(wn)
+// 	string wn
+// 	ChangeScanControllerItemStatus(wn, 0)
+// end
+
+// function ChangeScanControllerItemStatus(wn, ison)
+// 	string wn
+// 	variable ison
+// 	string cmd
+// 	wave sc_RawRecord, sc_CalcRecord
+// 	wave /t sc_RawWaveNames, sc_CalcWaveNames
+// 	variable i=0, done=0
+// 	do
+// 		if (stringmatch(sc_RawWaveNames[i], wn))
+// 			sc_RawRecord[i]=ison
+// 			cmd = "CheckBox sc_RawRecordCheckBox" + num2istr(i) + " value=" + num2istr(ison)
+// 			execute(cmd)
+// 			done=1
+// 		endif
+// 		i+=1
+// 	while (i<numpnts( sc_RawWaveNames ) && !done)
+
+// 	i=0
+// 	do
+// 		if (stringmatch(sc_CalcWaveNames[i], wn))
+// 			sc_CalcRecord[i]=ison
+// 			cmd = "CheckBox sc_CalcRecordCheckBox" + num2istr(i) + " value=" + num2istr(ison)
+// 			execute(cmd)
+// 		endif
+// 		i+=1
+// 	while (i<numpnts( sc_CalcWaveNames ) && !done)
+
+// 	if (!done)
+// 		print "Error: Could not find the wave name specified."
+// 	endif
+// 	execute("doupdate")
+// end
+
+
+
+////////////////////////////////////////////
+/// Slow ScanController Recording Data /////
+////////////////////////////////////////////
+
 function RecordValues(i, j, [readvstime, fillnan])
 	// In a 1d scan, i is the index of the loop. j will be ignored.
 	// In a 2d scan, i is the index of the outer (slow) loop, and j is the index of the inner (fast) loop.
@@ -1827,9 +1073,799 @@ function RecordValues(i, j, [readvstime, fillnan])
 	endtry
 end
 
+
+
+
+function sc_checkAsyncScript(str)
+	// returns -1 if formatting is bad
+	// could be better
+	// returns position of first ( character if it is good
+	string str
+
+	variable i = 0, firstOP = 0, countOP = 0, countCP = 0
+	for(i=0; i<strlen(str); i+=1)
+
+		if( CmpStr(str[i], "(") == 0 )
+			countOP+=1 // count opening parentheses
+			if( firstOP==0 )
+				firstOP = i // record position of first (
+				continue
+			endif
+		endif
+
+		if( CmpStr(str[i], ")") == 0 )
+			countCP -=1 // count closing parentheses
+			continue
+		endif
+
+		if( CmpStr(str[i], ",") == 0 )
+			return -1 // stop on comma
+		endif
+
+	endfor
+
+	if( (countOP==1) && (countCP==-1) )
+		return firstOP
+	else
+		return -1
+	endif
+end
+
+function sc_findAsyncMeasurements()
+	// go through RawScripts and look for valid async measurements
+	//    wherever the meas_async box is checked in the window
+	nvar sc_is2d
+	wave /t sc_RawScripts, sc_RawWaveNames
+	wave sc_RawRecord, sc_RawPlot, sc_measAsync
+
+	// setup async folder
+	killdatafolder /z root:async // kill it if it exists
+	newdatafolder root:async // create an empty version
+
+	variable i = 0, idx = 0, measIdx=0, instrAsync=0
+	string script, strID, queryFunc, threadFolder
+	string /g sc_asyncFolders = ""
+	make /o/n=1 /WAVE sc_asyncRefs
+
+
+	for(i=0;i<numpnts(sc_RawScripts);i+=1)
+
+		if ( (sc_RawRecord[i] == 1) || (sc_RawPlot[i] == 1) )
+			// this is something that will be measured
+
+			if (sc_measAsync[i] == 1) // this is something that should be async
+
+				script = sc_RawScripts[i]
+				idx = sc_checkAsyncScript(script) // check function format
+
+				if(idx!=-1) // fucntion is good, this will be recorded asynchronously
+
+					// keep track of function names and instrIDs in folder structure
+					strID = script[idx+1,strlen(script)-2]
+					queryFunc = script[0,idx-1]
+
+					// creates root:async:instr1
+					sprintf threadFolder, "thread_%s", strID
+					if(DataFolderExists("root:async:"+threadFolder))
+						// add measurements to the thread directory for this instrument
+
+						svar qF = root:async:$(threadFolder):queryFunc
+						qF += ";"+queryFunc
+						svar wI = root:async:$(threadFolder):wavIdx
+						wI += ";" + num2str(measIdx)
+					else
+						instrAsync += 1
+
+						// create a new thread directory for this instrument
+						newdatafolder root:async:$(threadFolder)
+						nvar instrID = $strID
+						variable /g root:async:$(threadFolder):instrID = instrID   // creates variable instrID in root:thread
+																	                          // that has the same value as $strID
+						string /g root:async:$(threadFolder):wavIdx = num2str(measIdx)
+						string /g root:async:$(threadFolder):queryFunc = queryFunc // creates string variable queryFunc in root:async:thread
+																                             // that has a value queryFunc="readInstr"
+						sc_asyncFolders += threadFolder + ";"
+
+
+
+					endif
+
+					// fill wave reference(s)
+					redimension /n=(2*measIdx+2) sc_asyncRefs
+					wave w=$sc_rawWaveNames[i] // 1d wave
+					sc_asyncRefs[2*measIdx] = w
+					if(sc_is2d)
+						wave w2d=$(sc_rawWaveNames[i]+"2d") // 2d wave
+						sc_asyncRefs[2*measIdx+1] = w2d
+					endif
+					measIdx+=1
+
+				else
+					// measurement script is formatted wrong
+					sc_measAsync[i]=0
+					printf "[WARNING] Async scripts must be formatted: \"readFunc(instrID)\"\r\t%s is no good and will be read synchronously,\r", sc_RawScripts[i]
+				endif
+
+			endif
+		endif
+
+	endfor
+
+	if(instrAsync<2)
+		// no point in doing anyting async is only one instrument is capable of it
+		// will uncheck boxes automatically
+		make /o/n=(numpnts(sc_RawScripts)) sc_measAsync = 0
+	endif
+
+	// change state of check boxes based on what just happened here!
+	doupdate /W=ScanController
+	string cmd = ""
+	for(i=0;i<numpnts(sc_measAsync);i+=1)
+		sprintf cmd, "CheckBox sc_AsyncCheckBox%d,win=ScanController,value=%d", i, sc_measAsync[i]
+		execute(cmd)
+	endfor
+	doupdate /W=ScanController
+
+	if(sum(sc_measAsync)==0)
+		sc_asyncFolders = ""
+		KillDataFolder /Z root:async // don't need this
+		return 0
+	else
+		variable /g sc_numInstrThreads = ItemsInList(sc_asyncFolders, ";")
+		variable /g sc_numAvailThreads = threadProcessorCount
+		return sc_numInstrThreads
+	endif
+
+end
+
+// function InitializeWaves(start, fin, numpts, [starty, finy, numptsy, x_label, y_label, linecut, fastdac]) //linecut = 0,1 for false, true
+// 	variable start, fin, numpts, starty, finy, numptsy, linecut, fastdac
+// 	string x_label, y_label
+// 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
+// 	wave/t sc_RawWaveNames, sc_CalcWaveNames, sc_RawScripts, sc_CalcScripts
+// 	variable i=0, j=0
+// 	string cmd = "", wn = "", wn2d="", s, script = "", script0 = "", script1 = ""
+// 	string/g sc_x_label, sc_y_label, activegraphs=""
+// 	variable/g sc_is2d, sc_scanstarttime = datetime
+// 	variable/g sc_startx, sc_finx, sc_numptsx, sc_starty, sc_finy, sc_numptsy
+// 	variable/g sc_abortsweep=0, sc_pause=0, sc_abortnosave=0
+// 	string graphlist, graphname, plottitle, graphtitle="", graphnumlist="", graphnum, cmd1="",window_string=""
+// 	string cmd2=""
+// 	variable index, graphopen, graphopen2d
+// 	svar sc_colormap
+// 	variable/g fastdac_init = 0
+
+// 	if(paramisdefault(fastdac))
+// 		fastdac = 0
+// 		fastdac_init = 0
+// 	elseif(fastdac == 1)
+// 		fastdac_init = 1
+// 	else
+// 		// set fastdac = 1 if you want to use the fastdac!
+// 		print("[WARNING] \"InitializeWaves\": Pass fastdac = 1! Setting it to 0.")
+// 		fastdac = 0
+// 		fastdac_init = 0
+// 	endif
+
+// 	if(fastdac == 0)
+// 		//do some sanity checks on wave names: they should not start or end with numbers.
+// 		do
+// 			if (sc_RawRecord[i])
+// 				s = sc_RawWaveNames[i]
+// 				if (!((char2num(s[0]) >= 97 && char2num(s[0]) <= 122) || (char2num(s[0]) >= 65 && char2num(s[0]) <= 90)))
+// 					print "The first character of a wave name should be an alphabet a-z A-Z. The problematic wave name is " + s;
+// 					abort
+// 				endif
+// 				if (!((char2num(s[strlen(s)-1]) >= 97 && char2num(s[strlen(s)-1]) <= 122) || (char2num(s[strlen(s)-1]) >= 65 && char2num(s[strlen(s)-1]) <= 90)))
+// 					print "The last character of a wave name should be an alphabet a-z A-Z. The problematic wave name is " + s;
+// 					abort
+// 				endif
+// 			endif
+// 			i+=1
+// 		while (i<numpnts(sc_RawWaveNames))
+// 		i=0
+// 		do
+// 			if (sc_CalcRecord[i])
+// 				s = sc_CalcWaveNames[i]
+// 				if (!((char2num(s[0]) >= 97 && char2num(s[0]) <= 122) || (char2num(s[0]) >= 65 && char2num(s[0]) <= 90)))
+// 					print "The first character of a wave name should be an alphabet a-z A-Z. The problematic wave name is " + s;
+// 					abort
+// 				endif
+// 				if (!((char2num(s[strlen(s)-1]) >= 97 && char2num(s[strlen(s)-1]) <= 122) || (char2num(s[strlen(s)-1]) >= 65 && char2num(s[strlen(s)-1]) <= 90)))
+// 					print "The last character of a wave name should be an alphabet a-z A-Z. The problematic wave name is " + s;
+// 					abort
+// 				endif
+// 			endif
+// 			i+=1
+// 		while (i<numpnts(sc_CalcWaveNames))
+// 	endif
+// 	i=0
+
+// 	// Close all Resource Manager sessions
+// 	// and then reopen all instruemnt connections.
+// 	// VISA tents to drop the connections after being
+// 	// idle for a while.
+// 	killVISA()
+// 	sc_OpenInstrConnections(0)
+
+// 	// The status of the upcoming scan will be set when waves are initialized.
+// 	if(!paramisdefault(starty) && !paramisdefault(finy) && !paramisdefault(numptsy))
+// 		sc_is2d = 1
+// 		sc_startx = start
+// 		sc_finx = fin
+// 		sc_numptsx = numpts
+// 		sc_starty = starty
+// 		sc_finy = finy
+// 		sc_numptsy = numptsy
+// 		if(start==fin || starty==finy)
+// 			print "[WARNING]: Your start and end values are the same!"
+// 		endif
+// 	else
+// 		sc_is2d = 0
+// 		sc_startx = start
+// 		sc_finx = fin
+// 		sc_numptsx = numpts
+// 		if(start==fin)
+// 			print "[WARNING]: Your start and end values are the same!"
+// 		endif
+// 	endif
+
+// 	if(linecut == 1)
+// 		sc_is2d = 2
+// 		make/O/n=(numptsy) sc_linestart = NaN 						//To store first xvalue of each line of data
+// 		cmd = "setscale/I x " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + "sc_linestart"; execute(cmd)
+// 	endif
+
+// 	if(paramisdefault(x_label) || stringmatch(x_label,""))
+// 		sc_x_label=""
+// 	else
+// 		sc_x_label=x_label
+// 	endif
+
+// 	if(paramisdefault(y_label) || stringmatch(y_label,""))
+// 		sc_y_label=""
+// 	else
+// 		sc_y_label=y_label
+// 	endif
+
+// 	// create waves to hold x and y data (in case I want to save it)
+// 	// this is pretty useless if using readvstime
+// 	cmd = "make /o/n=(" + num2istr(sc_numptsx) + ") " + "sc_xdata" + "=NaN"; execute(cmd)
+// 	cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + "sc_xdata"; execute(cmd)
+// 	cmd = "sc_xdata" +" = x"; execute(cmd)
+// 	if(sc_is2d != 0)
+// 		cmd = "make /o/n=(" + num2istr(sc_numptsy) + ") " + "sc_ydata" + "=NaN"; execute(cmd)
+// 		cmd = "setscale/I x " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", \"\", " + "sc_ydata"; execute(cmd)
+// 		cmd = "sc_ydata" +" = x"; execute(cmd)
+// 	endif
+
+// 	if(fastdac == 0)
+// 		// Initialize waves for raw data
+// 		do
+// 			if (sc_RawRecord[i] == 1 && cmpstr(sc_RawWaveNames[i], "") || sc_RawPlot[i] == 1 && cmpstr(sc_RawWaveNames[i], ""))
+// 				wn = sc_RawWaveNames[i]
+// 				cmd = "make /o/n=(" + num2istr(sc_numptsx) + ") " + wn + "=NaN"
+// 				execute(cmd)
+// 				cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn
+// 				execute(cmd)
+// 				if(sc_is2d == 1)
+// 					// In case this is a 2D measurement
+// 					wn2d = wn + "2d"
+// 					cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd)
+// 					cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn2d; execute(cmd)
+// 					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
+// 				elseif(sc_is2d == 2)
+// 					// In case this is a 2D line cut measurement
+// 					wn2d = sc_RawWaveNames[i]+"2d"
+// 					cmd = "make /o/n=(1, " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd) //Makes 1 by y wave, x is redimensioned in recordline
+// 					cmd = "setscale /P x, 0, " + num2str((sc_finx-sc_startx)/sc_numptsx) + "," + wn2d; execute(cmd) //sets x scale starting from 0 but with delta correct
+// 					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)//Useful to see if top and bottom of scan are filled with NaNs
+// 				endif
+// 			endif
+// 			i+=1
+// 		while (i<numpnts(sc_RawWaveNames))
+
+// 		// Initialize waves for calculated data
+// 		i=0
+// 		do
+// 			if (sc_CalcRecord[i] == 1 && cmpstr(sc_CalcWaveNames[i], "") || sc_CalcPlot[i] == 1 && cmpstr(sc_CalcWaveNames[i], ""))
+// 				wn = sc_CalcWaveNames[i]
+// 				cmd = "make /o/n=(" + num2istr(sc_numptsx) + ") " + wn + "=NaN"
+// 				execute(cmd)
+// 				cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn
+// 				execute(cmd)
+// 				if(sc_is2d == 1)
+// 					// In case this is a 2D measurement
+// 					wn2d = wn + "2d"
+// 					cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd)
+// 					cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn2d; execute(cmd)
+// 					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
+// 				elseif(sc_is2d == 2)
+// 					// In case this is a 2D line cut measurement
+// 					wn2d = sc_CalcWaveNames[i]+"2d"
+// 					cmd = "make /o/n=(1, " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd) //Same as for Raw (see above)
+// 					cmd = "setscale /P x, 0, " + num2str((sc_finx-sc_startx)/sc_numptsx) + "," + wn2d; execute(cmd) //sets x scale starting from 0 but with delta correct
+// 					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
+// 				endif
+// 			endif
+// 			i+=1
+// 		while (i<numpnts(sc_CalcWaveNames))
+
+// 		sc_findAsyncMeasurements()
+
+// 	elseif(fastdac == 1)
+// 		// create waves for fastdac
+// 		wave/t fadcvalstr
+// 		wave fadcattr
+// 		string/g sc_fastadc = ""
+// 		string wn_raw = "", wn_raw2d = ""
+// 		i=0
+// 		do
+// 			if(fadcattr[i][2] == 48) // checkbox checked
+// 				sc_fastadc = addlistitem(fadcvalstr[i][0], sc_fastadc, ",", inf)  //Add adc_channel to list being recorded (inf to add at end)
+// 				wn = fadcvalstr[i][3]
+// 				cmd = "make/o/n=(" + num2istr(sc_numptsx) + ") " + wn + "=NaN"
+// 				execute(cmd)
+// 				cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn
+// 				execute(cmd)
+
+// 				wn_raw = "ADC"+num2istr(i)
+// 				cmd = "make/o/n=(" + num2istr(sc_numptsx) + ") " + wn_raw + "=NaN"
+// 				execute(cmd)
+// 				cmd = "setscale/I x " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", \"\", " + wn_raw
+// 				execute(cmd)
+
+// 				if(sc_is2d > 0)  // Should work for linecut too I think?
+// 					// In case this is a 2D measurement
+// 					wn2d = wn + "_2d"
+// 					cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd)
+// 					cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn2d; execute(cmd)
+// 					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)
+
+// 					wn_raw2d = wn_raw + "_2d"
+// 					cmd = "make /o/n=(" + num2istr(sc_numptsx) + ", " + num2istr(sc_numptsy) + ") " + wn_raw2d + "=NaN"; execute(cmd)
+// 					cmd = "setscale /i x, " + num2str(sc_startx) + ", " + num2str(sc_finx) + ", " + wn_raw2d; execute(cmd)
+// 					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn_raw2d; execute(cmd)
+// 				endif
+// 			endif
+// 			i++
+// 		while(i<dimsize(fadcvalstr,0))
+// 		sc_fastadc = sc_fastadc[0,strlen(sc_fastadc)-2]  // To chop off trailing comma
+// 	endif
+
+// 	// Find all open plots
+// 	graphlist = winlist("*",";","WIN:1")
+// 	j=0
+// 	for (i=0;i<itemsinlist(graphlist);i=i+1)
+// 		index = strsearch(graphlist,";",j)
+// 		graphname = graphlist[j,index-1]
+// 		setaxis/w=$graphname /a
+// 		getwindow $graphname wtitle
+// 		splitstring /e="(.*):(.*)" s_value, graphnum, plottitle
+// 		graphtitle+= plottitle+";"
+// 		graphnumlist+= graphnum+";"
+// 		j=index+1
+// 	endfor
+
+// 	nvar filenum
+
+// 	if(fastdac == 0)
+// 		//Initialize plots for raw data waves
+// 		i=0
+// 		do
+// 			if (sc_RawPlot[i] == 1 && cmpstr(sc_RawWaveNames[i], ""))
+// 				wn = sc_RawWaveNames[i]
+// 				graphopen = 0
+// 				graphopen2d = 0
+// 				for(j=0;j<ItemsInList(graphtitle);j=j+1)
+// 					if(stringmatch(wn,stringfromlist(j,graphtitle)))
+// 						graphopen = 1
+// 						activegraphs+= stringfromlist(j,graphnumlist)+";"
+// 						Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label	
+// 						if(sc_is2d == 0)
+// 							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label  // Can add something like current /nA as y_label for 1D only... if 2D sc_y_label will be for 2D plot
+// 						endif
+// 						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)					
+// 					endif
+// 					if(sc_is2d)
+// 						if(stringmatch(wn+"2d",stringfromlist(j,graphtitle)))
+// 							graphopen2d = 1
+// 							activegraphs+= stringfromlist(j,graphnumlist)+";"
+// 							Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
+// 							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+// 							TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)	
+// 						endif
+// 					endif
+// 				endfor
+// 				if(graphopen && graphopen2d) //If both open do nothing
+// 				elseif(graphopen2d) //If only 2D is open then open 1D
+// 					display $wn
+// 					setwindow kwTopWin, graphicsTech=0
+// 					Label bottom, sc_x_label
+// 					if(sc_is2d == 0)
+// 						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+// 					endif
+// 					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
+// 					activegraphs+= winname(0,1)+";"
+// 				elseif(graphopen) // If only 1D is open then open 2D
+// 					if(sc_is2d)
+// 						wn2d = wn + "2d"
+// 						display
+// 						setwindow kwTopWin, graphicsTech=0
+// 						appendimage $wn2d
+// 						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
+// 						colorscale /c/n=$sc_ColorMap /e/a=rc image=$wn2d
+// 						Label left, sc_y_label
+// 						Label bottom, sc_x_label
+// 						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
+// 						activegraphs+= winname(0,1)+";"
+// 					endif
+// 				else // Open Both
+// 					wn2d = wn + "2d"
+// 					display $wn
+// 					setwindow kwTopWin, graphicsTech=0
+// 					Label bottom, sc_x_label
+// 					if(sc_is2d == 0)
+// 						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+// 					endif
+// 					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
+// 					activegraphs+= winname(0,1)+";"
+// 					if(sc_is2d)
+// 						display
+// 						setwindow kwTopWin, graphicsTech=0
+// 						appendimage $wn2d
+// 						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
+// 						colorscale /c/n=$sc_ColorMap /e/a=rc image=$wn2d
+// 						Label left, sc_y_label
+// 						Label bottom, sc_x_label
+// 						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
+// 						activegraphs+= winname(0,1)+";"
+// 					endif
+// 				endif
+// 			endif
+// 		i+= 1
+// 		while(i<numpnts(sc_RawWaveNames))
+
+// 		//Initialize plots for calculated data waves
+// 		i=0
+// 		do
+// 			if (sc_CalcPlot[i] == 1 && cmpstr(sc_CalcWaveNames[i], ""))
+// 				wn = sc_CalcWaveNames[i]
+// 				graphopen = 0
+// 				graphopen2d = 0
+// 				for(j=0;j<ItemsInList(graphtitle);j=j+1)
+// 					if(stringmatch(wn,stringfromlist(j,graphtitle)))
+// 						graphopen = 1
+// 						activegraphs+= stringfromlist(j,graphnumlist)+";"
+// 						Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
+// 						if(sc_is2d == 0)
+// 							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label 
+// 						endif
+// 						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
+// 					endif
+// 					if(sc_is2d)
+// 						if(stringmatch(wn+"2d",stringfromlist(j,graphtitle)))
+// 							graphopen2d = 1
+// 							activegraphs+= stringfromlist(j,graphnumlist)+";"
+// 							Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
+// 							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+// 							TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
+// 						endif
+// 					endif
+// 				endfor
+// 				if(graphopen && graphopen2d)
+// 				elseif(graphopen2d) // If only 2D open then open 1D
+// 					display $wn
+// 					setwindow kwTopWin, graphicsTech=0
+// 					Label bottom, sc_x_label
+// 					if(sc_is2d == 0)
+// 						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+// 					endif
+// 					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
+// 					activegraphs+= winname(0,1)+";"
+// 				elseif(graphopen) // If only 1D is open then open 2D
+// 					if(sc_is2d)
+// 						wn2d = wn + "2d"
+// 						display
+// 						appendimage $wn2d
+// 						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
+// 						colorscale /c/n=$sc_ColorMap /e/a=rc image=$wn2d
+// 						Label left, sc_y_label
+// 						setwindow kwTopWin, graphicsTech=0
+// 						Label bottom, sc_x_label
+// 						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
+// 						activegraphs+= winname(0,1)+";"
+// 					endif
+// 				else // open both
+// 					wn2d = wn + "2d"
+// 					display $wn
+// 					setwindow kwTopWin, graphicsTech=0
+// 					Label bottom, sc_x_label
+// 					if(sc_is2d == 0)
+// 						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+// 					endif
+// 					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
+// 					activegraphs+= winname(0,1)+";"
+// 					if(sc_is2d)
+// 						display
+// 						setwindow kwTopWin, graphicsTech=0
+// 						appendimage $wn2d
+// 						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
+// 						colorscale /c/n=$sc_ColorMap /e/a=rc image=$wn2d
+// 						Label left, sc_y_label
+// 						Label bottom, sc_x_label
+// 						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
+// 						activegraphs+= winname(0,1)+";"
+// 					endif
+// 				endif
+// 			endif
+// 			i+= 1
+// 		while(i<numpnts(sc_CalcWaveNames))
+	
+// 	elseif(fastdac == 1)
+// 		// open plots for fastdac
+// 		i=0
+// 		do
+// 			if(fadcattr[i][2] == 48)
+// 				wn = fadcvalstr[i][3]
+// 				graphopen = 0
+// 				graphopen2d = 0
+// 				for(j=0;j<ItemsInList(graphtitle);j=j+1)
+// 					if(stringmatch(wn,stringfromlist(j,graphtitle)))
+// 						graphopen = 1
+// 						activegraphs+= stringfromlist(j,graphnumlist)+";"
+// 						Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
+// 						if(sc_is2d == 0)
+// 							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+// 						endif
+// 						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
+// 					endif
+// 					if(sc_is2d)
+// 						if(stringmatch(wn+"_2d",stringfromlist(j,graphtitle)))
+// 							graphopen2d = 1
+// 							activegraphs+= stringfromlist(j,graphnumlist)+";"
+// 							Label /W=$stringfromlist(j,graphnumlist) bottom,  sc_x_label
+// 							Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+// 							TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
+// 						endif
+// 					endif
+// 				endfor
+// 				if(graphopen && graphopen2d)
+// 				elseif(graphopen2d)  // If only 2D open then open 1D
+// 					display $wn
+// 					setwindow kwTopWin, graphicsTech=0
+// 					Label bottom, sc_x_label
+// 					if(sc_is2d == 0)
+// 						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+// 					endif
+// 					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
+// 					activegraphs+= winname(0,1)+";"
+// 				elseif(graphopen) // If only 1D is open then open 2D
+// 					if(sc_is2d)
+// 						wn2d = wn + "_2d"
+// 						display
+// 						setwindow kwTopWin, graphicsTech=0
+// 						appendimage $wn2d
+// 						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
+// 						colorscale /c/n=$sc_ColorMap /e/a=rc image=$wn2d
+// 						Label left, sc_y_label
+// 						Label bottom, sc_x_label
+// 						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
+// 						activegraphs+= winname(0,1)+";"
+// 					endif
+// 				else // open both
+// 					wn2d = wn + "_2d"
+// 					display $wn
+// 					setwindow kwTopWin, graphicsTech=0
+// 					Label bottom, sc_x_label
+// 					if(sc_is2d == 0)
+// 						Label /W=$stringfromlist(j,graphnumlist) left,  sc_y_label
+// 					endif
+// 					TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
+// 					activegraphs+= winname(0,1)+";"
+// 					if(sc_is2d)
+// 						display
+// 						setwindow kwTopWin, graphicsTech=0
+// 						appendimage $wn2d
+// 						modifyimage $wn2d ctab={*, *, $sc_ColorMap, 0}
+// 						colorscale /c/n=$sc_ColorMap /e/a=rc image=$wn2d
+// 						Label left, sc_y_label
+// 						Label bottom, sc_x_label
+// 						TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 "Dat"+num2str(filenum)
+// 						activegraphs+= winname(0,1)+";"
+// 					endif
+// 				endif
+// 			endif
+// 			i+= 1
+// 		while(i<dimsize(fadcvalstr,0))
+// 	endif
+// 	execute("abortmeasurementwindow()")
+
+// 	cmd1 = "TileWindows/O=1/A=(3,4) "
+// 	cmd2 = ""
+// 	// Tile graphs
+// 	for(i=0;i<itemsinlist(activegraphs);i=i+1)
+// 		window_string = stringfromlist(i,activegraphs)
+// 		cmd1+= window_string +","
+
+// 		cmd2 = "DoWindow/F " + window_string
+// 		execute(cmd2)
+// 	endfor
+// 	cmd1 += "SweepControl"
+// 	execute(cmd1)
+// 	doupdate
+// end
+ 
+
+////////////////////////////
+///// Sweep controls   /////
+////////////////////////////
+
+window abortmeasurementwindow() : Panel
+	//Silent 1 // building window
+	NewPanel /W=(500,700,870,750) /N=SweepControl// window size
+	ModifyPanel frameStyle=2
+	ModifyPanel fixedSize=1
+	SetDrawLayer UserBack
+	Button pausesweep, pos={10,15},size={110,20},proc=pausesweep,title="Pause"
+	Button stopsweep, pos={130,15},size={110,20},proc=stopsweep,title="Abort and Save"
+	Button stopsweepnosave, pos={250,15},size={110,20},proc=stopsweep,title="Abort"
+	DoUpdate /W=SweepControl /E=1
+endmacro
+
+function stopsweep(action) : Buttoncontrol
+	string action
+	nvar sc_abortsweep,sc_abortnosave
+
+	strswitch(action)
+		case "stopsweep":
+			sc_abortsweep = 1
+			print "[SCAN] Scan will abort and the incomplete dataset will be saved."
+			break
+		case "stopsweepnosave":
+			sc_abortnosave = 1
+			print "[SCAN] Scan will abort and dataset will not be saved."
+			break
+	endswitch
+end
+
+function pausesweep(action) : Buttoncontrol
+	string action
+	nvar sc_pause, sc_abortsweep
+
+	Button pausesweep,proc=resumesweep,title="Resume"
+	sc_pause=1
+	print "[SCAN] Scan paused by user."
+end
+
+function resumesweep(action) : Buttoncontrol
+	string action
+	nvar sc_pause
+
+	Button pausesweep,proc=pausesweep,title="Pause"
+	sc_pause = 0
+	print "Sweep resumed"
+end
+
+
+
+function sc_checksweepstate([fastdac])
+	variable fastdac
+	nvar /Z sc_abortsweep, sc_pause, sc_abortnosave
+	
+	if(paramisdefault(fastdac))
+		fastdac = 0
+	else
+		fastdac = 1
+	endif
+
+	if(NVAR_Exists(sc_abortsweep) && sc_abortsweep==1)
+		// If the Abort button is pressed during the scan, save existing data and stop the scan.
+//		SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0, fastdac=fastdac)
+		EndScan(save_experiment=0, aborting=1)  
+		dowindow /k SweepControl
+		sc_abortsweep=0
+		sc_abortnosave=0
+		sc_pause=0
+		abort "Measurement aborted by user. Data saved automatically."
+	elseif(NVAR_Exists(sc_abortnosave) && sc_abortnosave==1)
+		// Abort measurement without saving anything!
+		dowindow /k SweepControl
+		sc_abortnosave = 0
+		sc_abortsweep = 0
+		sc_pause=0
+		abort "Measurement aborted by user. Data not saved automatically. Run \"SaveWaves()\" if needed"
+	elseif(NVAR_Exists(sc_pause) && sc_pause==1)
+		// Pause sweep if button is pressed
+		do
+			if(sc_abortsweep)
+//				SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0,fastdac=fastdac)
+				EndScan(save_experiment=0, aborting=1) 
+				dowindow /k SweepControl
+				sc_abortsweep=0
+				sc_abortnosave=0
+				sc_pause=0
+				abort "Measurement aborted by user"
+			elseif(sc_abortnosave)
+				dowindow /k SweepControl
+				sc_abortsweep=0
+				sc_abortnosave=0
+				sc_pause=0
+				abort "Measurement aborted by user. Data NOT saved!"
+			endif
+		while(sc_pause)
+	endif
+end
+
+
+///////////////////////////////////////////////////////////////
+///////////////// Sleeps/Delays ///////////////////////////////
+///////////////////////////////////////////////////////////////
+
+
+function sc_sleep(delay)
+	// sleep for delay seconds
+	// checks for keyboard interrupts in mstimer loop
+	variable delay
+	delay = delay*1e6 // convert to microseconds
+	variable start_time = stopMStimer(-2) // start the timer immediately
+	nvar sc_abortsweep, sc_pause
+
+	doupdate // do this just once during the sleep function
+	do
+		try
+			sc_checksweepstate()
+		catch
+			variable err = GetRTError(1)
+			string errMessage = GetErrMessage(err)
+		
+			// reset sweep control parameters if igor about button is used
+			if(v_abortcode == -1)
+				sc_abortsweep = 0
+				sc_pause = 0
+			endif
+			
+			//silent abort
+			abortonvalue 1,10
+		endtry
+	while(stopMStimer(-2)-start_time < delay)
+
+end
+
+function asleep(s)
+  // Sleep function which allows user to abort or continue if sleep is longer than 2s
+	variable s
+	variable t1, t2
+	if (s > 2)
+		t1 = datetime
+		doupdate	
+		sleep/S/C=6/B/Q s
+		t2 = datetime-t1
+		if ((s-t2)>5)
+			printf "User continued, slept for %.0fs\r", t2
+		endif
+	else
+		sc_sleep(s)
+	endif
+end
+
+threadsafe function sc_sleep_noupdate(delay)
+	// sleep for delay seconds
+	variable delay
+	delay = delay*1e6 // convert to microseconds
+	variable start_time = stopMStimer(-2) // start the timer immediately
+
+	do
+		sleep /s 0.002
+	while(stopMStimer(-2)-start_time < delay)
+
+end
+
 ///////////////////////
 /// ASYNC handling ///
 //////////////////////
+// Slow ScanContoller ONLY
+
 
 function sc_ManageThreads(innerIndex, outerIndex, readvstime)
 	variable innerIndex, outerIndex, readvstime
@@ -1945,72 +1981,73 @@ function sc_KillThreads(tgID)
 end
 
 ////////////////////////
-////  save all data ////
+////  Data Saving   ////
 ////////////////////////
 
-function /s sc_createSweepLogs([msg])
-	string msg
-	string jstr = "", buffer = ""
-	nvar filenum, sweep_t_elapsed
-	svar sc_current_config, sc_hostname, sc_x_label, sc_y_label
+// function /s sc_createSweepLogs([msg])
+// 	// Returns a Json string of 
+// 	string msg
+// 	string jstr = "", buffer = ""
+// 	nvar filenum, sweep_t_elapsed
+// 	svar sc_current_config, sc_hostname, sc_x_label, sc_y_label
 
-	// information about this specific sweep
-	if(numtype(strlen(msg)) == 2) // if null (default or set as null)
-		msg = ""	
-	endif
-	jstr = addJSONkeyval(jstr, "comment", msg, addQuotes=1)
-	jstr = addJSONkeyval(jstr, "filenum", num2istr(filenum))
+// 	// information about this specific sweep
+// 	if(numtype(strlen(msg)) == 2) // if null (default or set as null)
+// 		msg = ""	
+// 	endif
+// 	jstr = addJSONkeyval(jstr, "comment", msg, addQuotes=1)
+// 	jstr = addJSONkeyval(jstr, "filenum", num2istr(filenum))
 	
-	buffer = addJSONkeyval(buffer, "x", sc_x_label, addQuotes=1)
-	buffer = addJSONkeyval(buffer, "y", sc_y_label, addQuotes=1)
-	jstr = addJSONkeyval(jstr, "axis_labels", buffer)
+// 	buffer = addJSONkeyval(buffer, "x", sc_x_label, addQuotes=1)
+// 	buffer = addJSONkeyval(buffer, "y", sc_y_label, addQuotes=1)
+// 	jstr = addJSONkeyval(jstr, "axis_labels", buffer)
 	
-	jstr = addJSONkeyval(jstr, "current_config", sc_current_config, addQuotes = 1)
-	jstr = addJSONkeyval(jstr, "time_completed", Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
-	jstr = addJSONkeyval(jstr, "time_elapsed", num2numStr(sweep_t_elapsed))
+// 	jstr = addJSONkeyval(jstr, "current_config", sc_current_config, addQuotes = 1)
+// 	jstr = addJSONkeyval(jstr, "time_completed", Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
+// 	jstr = addJSONkeyval(jstr, "time_elapsed", num2numStr(sweep_t_elapsed))
 
-	// instrument logs
-	// all log strings should be valid JSON objects
-	wave /t sc_Instr
-	variable i=0, j=0, addQuotes=0
-	string command="", val=""
-	string /G sc_log_buffer=""
-	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
-		sc_log_buffer=""
-		command = TrimString(sc_Instr[i][2])
-		if(strlen(command)>0)
-			Execute/Q/Z "sc_log_buffer="+command
-			if(V_flag!=0)
-				print "[ERROR] in sc_createSweepLogs: "+GetErrMessage(V_Flag,2)
-			endif
-			if(strlen(sc_log_buffer)!=0)
-				// need to get first key and value from sc_log_buffer
-				JSONSimple sc_log_buffer
-				wave/t t_tokentext
-				wave w_tokentype, w_tokensize, w_tokenparent
+// 	// instrument logs
+// 	// all log strings should be valid JSON objects
+// 	wave /t sc_Instr
+// 	variable i=0, j=0, addQuotes=0
+// 	string command="", val=""
+// 	string /G sc_log_buffer=""
+// 	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
+// 		sc_log_buffer=""
+// 		command = TrimString(sc_Instr[i][2])
+// 		if(strlen(command)>0)
+// 			Execute/Q/Z "sc_log_buffer="+command
+// 			if(V_flag!=0)
+// 				print "[ERROR] in sc_createSweepLogs: "+GetErrMessage(V_Flag,2)
+// 			endif
+// 			if(strlen(sc_log_buffer)!=0)
+// 				// need to get first key and value from sc_log_buffer
+// 				JSONSimple sc_log_buffer
+// 				wave/t t_tokentext
+// 				wave w_tokentype, w_tokensize, w_tokenparent
 	
-				for(j=1;j<numpnts(t_tokentext)-1;j+=1)
-					if ( w_tokentype[j]==3 && w_tokensize[j]>0 )
-						if( w_tokenparent[j]==0 )
-							if( w_tokentype[j+1]==3 )
-								val = "\"" + t_tokentext[j+1] + "\""
-							else
-								val = t_tokentext[j+1]
-							endif
-							jstr = addJSONkeyval(jstr, t_tokentext[j], val)
-							break
-						endif
-					endif
-				endfor
+// 				for(j=1;j<numpnts(t_tokentext)-1;j+=1)
+// 					if ( w_tokentype[j]==3 && w_tokensize[j]>0 )
+// 						if( w_tokenparent[j]==0 )
+// 							if( w_tokentype[j+1]==3 )
+// 								val = "\"" + t_tokentext[j+1] + "\""
+// 							else
+// 								val = t_tokentext[j+1]
+// 							endif
+// 							jstr = addJSONkeyval(jstr, t_tokentext[j], val)
+// 							break
+// 						endif
+// 					endif
+// 				endfor
 				
-			else
-				print "[WARNING] command failed to log anything: "+command+"\r"
-			endif
-		endif
-	endfor
+// 			else
+// 				print "[WARNING] command failed to log anything: "+command+"\r"
+// 			endif
+// 		endif
+// 	endfor
 
-	return jstr
-end
+// 	return jstr
+// end
 
 function saveExp()
 	SaveExperiment /P=data // save current experiment as .pxp
@@ -2052,253 +2089,253 @@ function sc_update_xdata()
 	sc_xdata = x  // set wave data equal to x scaling
 end
 
-function SaveWaves([msg,save_experiment,fastdac, wave_names])
-	// the message will be printed in the history, and will be saved in the HDF file corresponding to this scan
-	// save_experiment=1 to save the experiment file
-	// Use wave_names to manually save comma separated waves in HDF file with sweeplogs etc. 
-	string msg, wave_names					
-	variable save_experiment, fastdac
-	string his_str
-	nvar sc_is2d, sc_PrintRaw, sc_PrintCalc, sc_scanstarttime
-	svar sc_x_label, sc_y_label
-	string filename, wn, logs=""
-	nvar filenum
-	string filenumstr = ""
-	sprintf filenumstr, "%d", filenum
-	wave /t sc_RawWaveNames, sc_CalcWaveNames
-	wave sc_RawRecord, sc_CalcRecord
-	variable filecount = 0
+// function SaveWaves([msg,save_experiment,fastdac, wave_names])
+// 	// the message will be printed in the history, and will be saved in the HDF file corresponding to this scan
+// 	// save_experiment=1 to save the experiment file
+// 	// Use wave_names to manually save comma separated waves in HDF file with sweeplogs etc. 
+// 	string msg, wave_names					
+// 	variable save_experiment, fastdac
+// 	string his_str
+// 	nvar sc_is2d, sc_PrintRaw, sc_PrintCalc, sc_scanstarttime
+// 	svar sc_x_label, sc_y_label
+// 	string filename, wn, logs=""
+// 	nvar filenum
+// 	string filenumstr = ""
+// 	sprintf filenumstr, "%d", filenum
+// 	wave /t sc_RawWaveNames, sc_CalcWaveNames
+// 	wave sc_RawRecord, sc_CalcRecord
+// 	variable filecount = 0
 
-	variable save_type = 0
+// 	variable save_type = 0
 
-	if (!paramisdefault(msg))
-		print msg
-	else
-		msg=""
-	endif
+// 	if (!paramisdefault(msg))
+// 		print msg
+// 	else
+// 		msg=""
+// 	endif
 
-	save_type = 0
-	if(!paramisdefault(fastdac) && !paramisdefault(wave_names))
-		abort "ERROR[SaveWaves]: Can only save FastDAC waves OR wave_names, not both at same time"
-	elseif(fastdac == 1)
-		save_type = 1  // Save Fastdac_ScanController waves
-	elseif(!paramisDefault(wave_names))
-		save_type = 2  // Save given wave_names ONLY
-	else
-		save_type = 0  // Save normal ScanController waves
-	endif
+// 	save_type = 0
+// 	if(!paramisdefault(fastdac) && !paramisdefault(wave_names))
+// 		abort "ERROR[SaveWaves]: Can only save FastDAC waves OR wave_names, not both at same time"
+// 	elseif(fastdac == 1)
+// 		save_type = 1  // Save Fastdac_ScanController waves
+// 	elseif(!paramisDefault(wave_names))
+// 		save_type = 2  // Save given wave_names ONLY
+// 	else
+// 		save_type = 0  // Save normal ScanController waves
+// 	endif
 	
 	
-	// compare to earlier call of InitializeWaves
-	nvar fastdac_init
-	if(fastdac > fastdac_init && save_type != 2)
-		print("[ERROR] \"SaveWaves\": Trying to save fastDAC files, but they weren't initialized by \"InitializeWaves\"")
-		abort
-	elseif(fastdac < fastdac_init  && save_type != 2)
-		print("[ERROR] \"SaveWaves\": Trying to save non-fastDAC files, but they weren't initialized by \"InitializeWaves\"")
-		abort	
-	endif
+// 	// compare to earlier call of InitializeWaves
+// 	nvar fastdac_init
+// 	if(fastdac > fastdac_init && save_type != 2)
+// 		print("[ERROR] \"SaveWaves\": Trying to save fastDAC files, but they weren't initialized by \"InitializeWaves\"")
+// 		abort
+// 	elseif(fastdac < fastdac_init  && save_type != 2)
+// 		print("[ERROR] \"SaveWaves\": Trying to save non-fastDAC files, but they weren't initialized by \"InitializeWaves\"")
+// 		abort	
+// 	endif
 	
-	nvar sc_save_time
-	if (paramisdefault(save_experiment))
-		save_experiment = 1 // save the experiment by default
-	endif
+// 	nvar sc_save_time
+// 	if (paramisdefault(save_experiment))
+// 		save_experiment = 1 // save the experiment by default
+// 	endif
 		
 
-	KillDataFolder/z root:async // clean this up for next time
+// 	KillDataFolder/z root:async // clean this up for next time
 
-	if(save_type != 2)
-		// save timing variables
-		variable /g sweep_t_elapsed = datetime-sc_scanstarttime
-		printf "Time elapsed: %.2f s \r", sweep_t_elapsed
-		dowindow/k SweepControl // kill scan control window
-	else
-		variable /g sweep_t_elapsed = 0
-	endif
+// 	if(save_type != 2)
+// 		// save timing variables
+// 		variable /g sweep_t_elapsed = datetime-sc_scanstarttime
+// 		printf "Time elapsed: %.2f s \r", sweep_t_elapsed
+// 		dowindow/k SweepControl // kill scan control window
+// 	else
+// 		variable /g sweep_t_elapsed = 0
+// 	endif
 
-	// count up the number of data files to save
-	variable ii=0
-	if(save_type == 0)
-		// normal non-fastdac files
-		variable Rawadd = sum(sc_RawRecord)
-		variable Calcadd = sum(sc_CalcRecord)
+// 	// count up the number of data files to save
+// 	variable ii=0
+// 	if(save_type == 0)
+// 		// normal non-fastdac files
+// 		variable Rawadd = sum(sc_RawRecord)
+// 		variable Calcadd = sum(sc_CalcRecord)
 	
-		if(Rawadd+Calcadd > 0)
-			// there is data to save!
-			// save it and increment the filenumber
-			printf "saving all dat%d files...\r", filenum
+// 		if(Rawadd+Calcadd > 0)
+// 			// there is data to save!
+// 			// save it and increment the filenumber
+// 			printf "saving all dat%d files...\r", filenum
 	
-			nvar sc_rvt
-	   		if(sc_rvt==1)
-	   			sc_update_xdata() // update xdata wave
-			endif
+// 			nvar sc_rvt
+// 	   		if(sc_rvt==1)
+// 	   			sc_update_xdata() // update xdata wave
+// 			endif
 	
-			// Open up HDF5 files
-		 	// Save scan controller meta data in this function as well
-			initSaveFiles(msg=msg)
-			if(sc_is2d == 2) //If 2D linecut then need to save starting x values for each row of data
-				wave sc_linestart
-				filename = "dat" + filenumstr + "linestart"
-				duplicate sc_linestart $filename
-				savesinglewave("sc_linestart")
-			endif
-			// save raw data waves
-			ii=0
-			do
-				if (sc_RawRecord[ii] == 1)
-					wn = sc_RawWaveNames[ii]
-					if (sc_is2d)
-						wn += "2d"
-					endif
-					filename =  "dat" + filenumstr + wn
-					duplicate $wn $filename // filename is a new wavename and will become <filename.xxx>
-					if(sc_PrintRaw == 1)
-						print filename
-					endif
-					saveSingleWave(wn)
-				endif
-				ii+=1
-			while (ii < numpnts(sc_RawWaveNames))
+// 			// Open up HDF5 files
+// 		 	// Save scan controller meta data in this function as well
+// 			initSaveFiles(msg=msg)
+// 			if(sc_is2d == 2) //If 2D linecut then need to save starting x values for each row of data
+// 				wave sc_linestart
+// 				filename = "dat" + filenumstr + "linestart"
+// 				duplicate sc_linestart $filename
+// 				savesinglewave("sc_linestart")
+// 			endif
+// 			// save raw data waves
+// 			ii=0
+// 			do
+// 				if (sc_RawRecord[ii] == 1)
+// 					wn = sc_RawWaveNames[ii]
+// 					if (sc_is2d)
+// 						wn += "2d"
+// 					endif
+// 					filename =  "dat" + filenumstr + wn
+// 					duplicate $wn $filename // filename is a new wavename and will become <filename.xxx>
+// 					if(sc_PrintRaw == 1)
+// 						print filename
+// 					endif
+// 					saveSingleWave(wn)
+// 				endif
+// 				ii+=1
+// 			while (ii < numpnts(sc_RawWaveNames))
 	
-			//save calculated data waves
-			ii=0
-			do
-				if (sc_CalcRecord[ii] == 1)
-					wn = sc_CalcWaveNames[ii]
-					if (sc_is2d)
-						wn += "2d"
-					endif
-					filename =  "dat" + filenumstr + wn
-					duplicate $wn $filename
-					if(sc_PrintCalc == 1)
-						print filename
-					endif
-					saveSingleWave(wn)
-				endif
-				ii+=1
-			while (ii < numpnts(sc_CalcWaveNames))
-			closeSaveFiles()
-		endif
-	// Save Fastdac waves	
-	elseif(save_type == 1)
-		wave/t fadcvalstr
-		wave fadcattr
-		string wn_raw = ""
-		nvar sc_Printfadc
-		nvar sc_Saverawfadc
+// 			//save calculated data waves
+// 			ii=0
+// 			do
+// 				if (sc_CalcRecord[ii] == 1)
+// 					wn = sc_CalcWaveNames[ii]
+// 					if (sc_is2d)
+// 						wn += "2d"
+// 					endif
+// 					filename =  "dat" + filenumstr + wn
+// 					duplicate $wn $filename
+// 					if(sc_PrintCalc == 1)
+// 						print filename
+// 					endif
+// 					saveSingleWave(wn)
+// 				endif
+// 				ii+=1
+// 			while (ii < numpnts(sc_CalcWaveNames))
+// 			closeSaveFiles()
+// 		endif
+// 	// Save Fastdac waves	
+// 	elseif(save_type == 1)
+// 		wave/t fadcvalstr
+// 		wave fadcattr
+// 		string wn_raw = ""
+// 		nvar sc_Printfadc
+// 		nvar sc_Saverawfadc
 		
-		ii=0
-		do
-			if(fadcattr[ii][2] == 48)
-				filecount += 1
-			endif
-			ii+=1
-		while(ii<dimsize(fadcattr,0))
+// 		ii=0
+// 		do
+// 			if(fadcattr[ii][2] == 48)
+// 				filecount += 1
+// 			endif
+// 			ii+=1
+// 		while(ii<dimsize(fadcattr,0))
 		
-		if(filecount > 0)
-			// there is data to save!
-			// save it and increment the filenumber
-			printf "saving all dat%d files...\r", filenum
+// 		if(filecount > 0)
+// 			// there is data to save!
+// 			// save it and increment the filenumber
+// 			printf "saving all dat%d files...\r", filenum
 			
-			// Open up HDF5 files
-			// Save scan controller meta data in this function as well
-			initSaveFiles(msg=msg)
+// 			// Open up HDF5 files
+// 			// Save scan controller meta data in this function as well
+// 			initSaveFiles(msg=msg)
 			
-			// look for waves to save
-			ii=0
-			string str_2d = "", savename
-			do
-				if(fadcattr[ii][2] == 48) //checkbox checked
-					wn = fadcvalstr[ii][3]
-					if(sc_is2d)
-						wn += "_2d"
-					endif
-					filename = "dat"+filenumstr+wn
+// 			// look for waves to save
+// 			ii=0
+// 			string str_2d = "", savename
+// 			do
+// 				if(fadcattr[ii][2] == 48) //checkbox checked
+// 					wn = fadcvalstr[ii][3]
+// 					if(sc_is2d)
+// 						wn += "_2d"
+// 					endif
+// 					filename = "dat"+filenumstr+wn
 
-					duplicate $wn $filename   
+// 					duplicate $wn $filename   
 
-					if(sc_Printfadc)
-						print filename
-					endif
-					saveSingleWave(wn)
+// 					if(sc_Printfadc)
+// 						print filename
+// 					endif
+// 					saveSingleWave(wn)
 					
-					if(sc_Saverawfadc)
-						str_2d = ""  // Set 2d_str blank until check if sc_is2d
-						wn_raw = "ADC"+num2istr(ii)
-						if(sc_is2d)
-							wn_raw += "_2d"
-							str_2d = "_2d"  // Need to add _2d to name if wave is 2d only.
-						endif
-						filename = "dat"+filenumstr+fadcvalstr[ii][3]+str_2d+"_RAW"  // More easily identify which Raw wave for which Calc wave
-						savename = fadcvalstr[ii][3]+str_2d+"_RAW"
+// 					if(sc_Saverawfadc)
+// 						str_2d = ""  // Set 2d_str blank until check if sc_is2d
+// 						wn_raw = "ADC"+num2istr(ii)
+// 						if(sc_is2d)
+// 							wn_raw += "_2d"
+// 							str_2d = "_2d"  // Need to add _2d to name if wave is 2d only.
+// 						endif
+// 						filename = "dat"+filenumstr+fadcvalstr[ii][3]+str_2d+"_RAW"  // More easily identify which Raw wave for which Calc wave
+// 						savename = fadcvalstr[ii][3]+str_2d+"_RAW"
 
 
-						duplicate $wn_raw $filename  
+// 						duplicate $wn_raw $filename  
 
 
-						duplicate/O $wn_raw $savename  // To store in HDF with more easily identifiable name
-						if(sc_Printfadc)
-							print filename
-						endif
-						saveSingleWave(savename)
-					endif
-				endif
-				ii+=1
-			while(ii<dimsize(fadcattr,0))
-			closeSaveFiles()
-		endif
-	elseif(save_type == 2)
-		// Check that all waves trying to save exist
-		for(ii=0;ii<itemsinlist(wave_names, ",");ii++)
-			wn = stringfromlist(ii, wave_names, ",")
-			if (!exists(wn))
-				string err_msg	
-				sprintf err_msg, "WARNING[SaveWaves]: Wavename %s does not exist. No data saved\r", wn
-				abort err_msg
-			endif
-		endfor
+// 						duplicate/O $wn_raw $savename  // To store in HDF with more easily identifiable name
+// 						if(sc_Printfadc)
+// 							print filename
+// 						endif
+// 						saveSingleWave(savename)
+// 					endif
+// 				endif
+// 				ii+=1
+// 			while(ii<dimsize(fadcattr,0))
+// 			closeSaveFiles()
+// 		endif
+// 	elseif(save_type == 2)
+// 		// Check that all waves trying to save exist
+// 		for(ii=0;ii<itemsinlist(wave_names, ",");ii++)
+// 			wn = stringfromlist(ii, wave_names, ",")
+// 			if (!exists(wn))
+// 				string err_msg	
+// 				sprintf err_msg, "WARNING[SaveWaves]: Wavename %s does not exist. No data saved\r", wn
+// 				abort err_msg
+// 			endif
+// 		endfor
 		
-		// Only init Save file after we know that the waves exist
-		initSaveFiles(msg=msg, logs_only=1)
-		printf "Saving waves [%s] in dat%d.h5\r", wave_names, filenum
+// 		// Only init Save file after we know that the waves exist
+// 		initSaveFiles(msg=msg, logs_only=1)
+// 		printf "Saving waves [%s] in dat%d.h5\r", wave_names, filenum
 		
-		// Now save each wave
-		for(ii=0;ii<itemsinlist(wave_names, ",");ii++)
-			wn = stringfromlist(ii, wave_names, ",")
-			saveSingleWave(wn)
-		endfor
-		closeSaveFiles()
-	endif
+// 		// Now save each wave
+// 		for(ii=0;ii<itemsinlist(wave_names, ",");ii++)
+// 			wn = stringfromlist(ii, wave_names, ",")
+// 			saveSingleWave(wn)
+// 		endfor
+// 		closeSaveFiles()
+// 	endif
 	
-	if(save_experiment==1 & (datetime-sc_save_time)>180.0)
-		// save if sc_save_exp=1
-		// and if more than 3 minutes has elapsed since previous saveExp
-		// if the sweep was aborted sc_save_exp=0 before you get here
-		saveExp()
-		sc_save_time = datetime
-	endif
+// 	if(save_experiment==1 & (datetime-sc_save_time)>180.0)
+// 		// save if sc_save_exp=1
+// 		// and if more than 3 minutes has elapsed since previous saveExp
+// 		// if the sweep was aborted sc_save_exp=0 before you get here
+// 		saveExp()
+// 		sc_save_time = datetime
+// 	endif
 
-	// check if a path is defined to backup data
-	if(sc_checkBackup())
-		// copy data to server mount point
-		sc_copyNewFiles(filenum, save_experiment=save_experiment)
-	endif
+// 	// check if a path is defined to backup data
+// 	if(sc_checkBackup())
+// 		// copy data to server mount point
+// 		sc_copyNewFiles(filenum, save_experiment=save_experiment)
+// 	endif
 
-	// add info about scan to the scan history file in /config
-//	sc_saveFuncCall(getrtstackinfo(2))
+// 	// add info about scan to the scan history file in /config
+// //	sc_saveFuncCall(getrtstackinfo(2))
 	
-	// delete waves old waves, so only the newest 500 scans are stored in volatile memory
-	// turn on by setting sc_cleanup = 1
-//	nvar sc_cleanup
-//	if(sc_cleanup == 1)
-//		sc_cleanVolatileMemory()
-//	endif
+// 	// delete waves old waves, so only the newest 500 scans are stored in volatile memory
+// 	// turn on by setting sc_cleanup = 1
+// //	nvar sc_cleanup
+// //	if(sc_cleanup == 1)
+// //		sc_cleanVolatileMemory()
+// //	endif
 	
-	// increment filenum
-	if(Rawadd+Calcadd > 0 || filecount > 0  || save_type == 2)
-		filenum+=1
-	endif
-end
+// 	// increment filenum
+// 	if(Rawadd+Calcadd > 0 || filecount > 0  || save_type == 2)
+// 		filenum+=1
+// 	endif
+// end
 
 function sc_cleanVolatileMemory()
 	// delete old waves, so only the newest 500 scans are stored in volatile memory

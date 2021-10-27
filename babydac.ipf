@@ -629,7 +629,7 @@ function setOutputBD(instrID, channel, output, [ignore_lims]) // in mV
 	board_index = floor(channel/4)
 
 	// check for NAN and INF
-	if(sc_check_naninf(output) != 0)
+	if(numtype(output) != 0)
 		abort "trying to set voltage to NaN or Inf"
 	endif
 

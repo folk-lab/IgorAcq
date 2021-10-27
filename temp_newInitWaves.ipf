@@ -593,24 +593,31 @@ end
 
 
 
-function /s new_sc_createSweepLogs([S])
+function /s new_sc_createSweepLogs([S, comments])
 	// Creates a Json String which contains information about Scan
+    // Note: Comments is ignored unless ScanVars are not provided
 	Struct ScanVars &S
-	string jstr = "", buffer = ""
-	nvar filenum, sweep_t_elapsed
-	svar sc_current_config, sc_hostname, sc_x_label, sc_y_label
+    string comments
+	string jstr = ""
+	nvar filenum
+	svar sc_current_config
 
+    if (!paramisDefault(S))
+        comments = S.comments
+    endif
 
 	jstr = addJSONkeyval(jstr, "comment", S.comments, addQuotes=1)
 	jstr = addJSONkeyval(jstr, "filenum", num2istr(filenum))
-	
-	buffer = addJSONkeyval(buffer, "x", S.x_label, addQuotes=1)
-	buffer = addJSONkeyval(buffer, "y", S.y_label, addQuotes=1)
-	jstr = addJSONkeyval(jstr, "axis_labels", buffer)
-	
 	jstr = addJSONkeyval(jstr, "current_config", sc_current_config, addQuotes = 1)
 	jstr = addJSONkeyval(jstr, "time_completed", Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
-	jstr = addJSONkeyval(jstr, "time_elapsed", num2numStr(S.end_time-S.start_time))
+	
+    if (!paramisDefault(S))
+        string buffer = ""
+        buffer = addJSONkeyval(buffer, "x", S.x_label, addQuotes=1)
+        buffer = addJSONkeyval(buffer, "y", S.y_label, addQuotes=1)
+        jstr = addJSONkeyval(jstr, "axis_labels", buffer)
+        jstr = addJSONkeyval(jstr, "time_elapsed", num2numStr(S.end_time-S.start_time))
+    endif
 
     sc_instrumentLogs(jstr)  // Modifies the jstr to add Instrumt Status (from ScanController Window)
 	return jstr

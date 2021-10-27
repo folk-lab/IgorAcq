@@ -7,259 +7,259 @@
 ///////////////////////////// Save Waves ///////////////////////////
 ////////////////////////////////////////////////////////////////////
 
-function RenameSaveWaves([msg,save_experiment,fastdac, wave_names])
-	// the message will be printed in the history, and will be saved in the HDF file corresponding to this scan
-	// save_experiment=1 to save the experiment file
-	// Use wave_names to manually save comma separated waves in HDF file with sweeplogs etc.
-	string msg, wave_names
-	variable save_experiment, fastdac
-	string his_str
-	nvar sc_is2d, sc_PrintRaw, sc_PrintCalc, sc_scanstarttime
-	svar sc_x_label, sc_y_label
-	string filename, wn, logs=""
-	nvar filenum
-	string filenumstr = ""
-	sprintf filenumstr, "%d", filenum
-	wave /t sc_RawWaveNames, sc_CalcWaveNames
-	wave sc_RawRecord, sc_CalcRecord
-	variable filecount = 0
+// function RenameSaveWaves([msg,save_experiment,fastdac, wave_names])
+// 	// the message will be printed in the history, and will be saved in the HDF file corresponding to this scan
+// 	// save_experiment=1 to save the experiment file
+// 	// Use wave_names to manually save comma separated waves in HDF file with sweeplogs etc.
+// 	string msg, wave_names
+// 	variable save_experiment, fastdac
+// 	string his_str
+// 	nvar sc_is2d, sc_PrintRaw, sc_PrintCalc, sc_scanstarttime
+// 	svar sc_x_label, sc_y_label
+// 	string filename, wn, logs=""
+// 	nvar filenum
+// 	string filenumstr = ""
+// 	sprintf filenumstr, "%d", filenum
+// 	wave /t sc_RawWaveNames, sc_CalcWaveNames
+// 	wave sc_RawRecord, sc_CalcRecord
+// 	variable filecount = 0
 
-	variable save_type = 0
+// 	variable save_type = 0
 
-	if (!paramisdefault(msg))
-		print msg
-	else
-		msg=""
-	endif
+// 	if (!paramisdefault(msg))
+// 		print msg
+// 	else
+// 		msg=""
+// 	endif
 
-	save_type = 0
-	if(!paramisdefault(fastdac) && !paramisdefault(wave_names))
-		abort "ERROR[SaveWaves]: Can only save FastDAC waves OR wave_names, not both at same time"
-	elseif(fastdac == 1)
-		save_type = 1  // Save Fastdac_ScanController waves
-	elseif(!paramisDefault(wave_names))
-		save_type = 2  // Save given wave_names ONLY
-	else
-		save_type = 0  // Save normal ScanController waves
-	endif
-
-
-	// compare to earlier call of InitializeWaves
-	nvar fastdac_init
-	if(fastdac > fastdac_init && save_type != 2)
-		print("[ERROR] \"SaveWaves\": Trying to save fastDAC files, but they weren't initialized by \"InitializeWaves\"")
-		abort
-	elseif(fastdac < fastdac_init  && save_type != 2)
-		print("[ERROR] \"SaveWaves\": Trying to save non-fastDAC files, but they weren't initialized by \"InitializeWaves\"")
-		abort
-	endif
-
-	nvar sc_save_time
-	if (paramisdefault(save_experiment))
-		save_experiment = 1 // save the experiment by default
-	endif
+// 	save_type = 0
+// 	if(!paramisdefault(fastdac) && !paramisdefault(wave_names))
+// 		abort "ERROR[SaveWaves]: Can only save FastDAC waves OR wave_names, not both at same time"
+// 	elseif(fastdac == 1)
+// 		save_type = 1  // Save Fastdac_ScanController waves
+// 	elseif(!paramisDefault(wave_names))
+// 		save_type = 2  // Save given wave_names ONLY
+// 	else
+// 		save_type = 0  // Save normal ScanController waves
+// 	endif
 
 
-	KillDataFolder/z root:async // clean this up for next time
+// 	// compare to earlier call of InitializeWaves
+// 	nvar fastdac_init
+// 	if(fastdac > fastdac_init && save_type != 2)
+// 		print("[ERROR] \"SaveWaves\": Trying to save fastDAC files, but they weren't initialized by \"InitializeWaves\"")
+// 		abort
+// 	elseif(fastdac < fastdac_init  && save_type != 2)
+// 		print("[ERROR] \"SaveWaves\": Trying to save non-fastDAC files, but they weren't initialized by \"InitializeWaves\"")
+// 		abort
+// 	endif
 
-	if(save_type != 2)
-		// save timing variables
-		variable /g sweep_t_elapsed = datetime-sc_scanstarttime
-		printf "Time elapsed: %.2f s \r", sweep_t_elapsed
-		dowindow/k SweepControl // kill scan control window
-	else
-		variable /g sweep_t_elapsed = 0
-	endif
-
-	// count up the number of data files to save
-	variable ii=0
-	if(save_type == 0)
-		// normal non-fastdac files
-		variable Rawadd = sum(sc_RawRecord)
-		variable Calcadd = sum(sc_CalcRecord)
-
-		if(Rawadd+Calcadd > 0)
-			// there is data to save!
-			// save it and increment the filenumber
-			printf "saving all dat%d files...\r", filenum
-
-			nvar sc_rvt
-	   		if(sc_rvt==1)
-	   			sc_update_xdata() // update xdata wave
-			endif
-
-			// Open up HDF5 files
-		 	// Save scan controller meta data in this function as well
-			initSaveFiles(msg=msg)
-			if(sc_is2d == 2) //If 2D linecut then need to save starting x values for each row of data
-				wave sc_linestart
-				filename = "dat" + filenumstr + "linestart"
-				duplicate sc_linestart $filename
-				savesinglewave("sc_linestart")
-			endif
-			// save raw data waves
-			ii=0
-			do
-				if (sc_RawRecord[ii] == 1)
-					wn = sc_RawWaveNames[ii]
-					if (sc_is2d)
-						wn += "2d"
-					endif
-					filename =  "dat" + filenumstr + wn
-					duplicate $wn $filename // filename is a new wavename and will become <filename.xxx>
-					if(sc_PrintRaw == 1)
-						print filename
-					endif
-					saveSingleWave(wn)
-				endif
-				ii+=1
-			while (ii < numpnts(sc_RawWaveNames))
-
-			//save calculated data waves
-			ii=0
-			do
-				if (sc_CalcRecord[ii] == 1)
-					wn = sc_CalcWaveNames[ii]
-					if (sc_is2d)
-						wn += "2d"
-					endif
-					filename =  "dat" + filenumstr + wn
-					duplicate $wn $filename
-					if(sc_PrintCalc == 1)
-						print filename
-					endif
-					saveSingleWave(wn)
-				endif
-				ii+=1
-			while (ii < numpnts(sc_CalcWaveNames))
-			closeSaveFiles()
-		endif
-	// Save Fastdac waves
-	elseif(save_type == 1)
-		wave/t fadcvalstr
-		wave fadcattr
-		string wn_raw = ""
-		nvar sc_Printfadc
-		nvar sc_Saverawfadc
-
-		ii=0
-		do
-			if(fadcattr[ii][2] == 48)
-				filecount += 1
-			endif
-			ii+=1
-		while(ii<dimsize(fadcattr,0))
-
-		if(filecount > 0)
-			// there is data to save!
-			// save it and increment the filenumber
-			printf "saving all dat%d files...\r", filenum
-
-			// Open up HDF5 files
-			// Save scan controller meta data in this function as well
-			initSaveFiles(msg=msg)
-
-			// look for waves to save
-			ii=0
-			string str_2d = "", savename
-			do
-				if(fadcattr[ii][2] == 48) //checkbox checked
-					wn = fadcvalstr[ii][3]
-					if(sc_is2d)
-						wn += "_2d"
-					endif
-					filename = "dat"+filenumstr+wn
-
-					duplicate $wn $filename
-
-					if(sc_Printfadc)
-						print filename
-					endif
-					saveSingleWave(wn)
-
-					if(sc_Saverawfadc)
-						str_2d = ""  // Set 2d_str blank until check if sc_is2d
-						wn_raw = "ADC"+num2istr(ii)
-						if(sc_is2d)
-							wn_raw += "_2d"
-							str_2d = "_2d"  // Need to add _2d to name if wave is 2d only.
-						endif
-						filename = "dat"+filenumstr+fadcvalstr[ii][3]+str_2d+"_RAW"  // More easily identify which Raw wave for which Calc wave
-						savename = fadcvalstr[ii][3]+str_2d+"_RAW"
+// 	nvar sc_save_time
+// 	if (paramisdefault(save_experiment))
+// 		save_experiment = 1 // save the experiment by default
+// 	endif
 
 
-						duplicate $wn_raw $filename
+// 	KillDataFolder/z root:async // clean this up for next time
+
+// 	if(save_type != 2)
+// 		// save timing variables
+// 		variable /g sweep_t_elapsed = datetime-sc_scanstarttime
+// 		printf "Time elapsed: %.2f s \r", sweep_t_elapsed
+// 		dowindow/k SweepControl // kill scan control window
+// 	else
+// 		variable /g sweep_t_elapsed = 0
+// 	endif
+
+// 	// count up the number of data files to save
+// 	variable ii=0
+// 	if(save_type == 0)
+// 		// normal non-fastdac files
+// 		variable Rawadd = sum(sc_RawRecord)
+// 		variable Calcadd = sum(sc_CalcRecord)
+
+// 		if(Rawadd+Calcadd > 0)
+// 			// there is data to save!
+// 			// save it and increment the filenumber
+// 			printf "saving all dat%d files...\r", filenum
+
+// 			nvar sc_rvt
+// 	   		if(sc_rvt==1)
+// 	   			sc_update_xdata() // update xdata wave
+// 			endif
+
+// 			// Open up HDF5 files
+// 		 	// Save scan controller meta data in this function as well
+// 			initSaveFiles(msg=msg)
+// 			if(sc_is2d == 2) //If 2D linecut then need to save starting x values for each row of data
+// 				wave sc_linestart
+// 				filename = "dat" + filenumstr + "linestart"
+// 				duplicate sc_linestart $filename
+// 				savesinglewave("sc_linestart")
+// 			endif
+// 			// save raw data waves
+// 			ii=0
+// 			do
+// 				if (sc_RawRecord[ii] == 1)
+// 					wn = sc_RawWaveNames[ii]
+// 					if (sc_is2d)
+// 						wn += "2d"
+// 					endif
+// 					filename =  "dat" + filenumstr + wn
+// 					duplicate $wn $filename // filename is a new wavename and will become <filename.xxx>
+// 					if(sc_PrintRaw == 1)
+// 						print filename
+// 					endif
+// 					saveSingleWave(wn)
+// 				endif
+// 				ii+=1
+// 			while (ii < numpnts(sc_RawWaveNames))
+
+// 			//save calculated data waves
+// 			ii=0
+// 			do
+// 				if (sc_CalcRecord[ii] == 1)
+// 					wn = sc_CalcWaveNames[ii]
+// 					if (sc_is2d)
+// 						wn += "2d"
+// 					endif
+// 					filename =  "dat" + filenumstr + wn
+// 					duplicate $wn $filename
+// 					if(sc_PrintCalc == 1)
+// 						print filename
+// 					endif
+// 					saveSingleWave(wn)
+// 				endif
+// 				ii+=1
+// 			while (ii < numpnts(sc_CalcWaveNames))
+// 			closeSaveFiles()
+// 		endif
+// 	// Save Fastdac waves
+// 	elseif(save_type == 1)
+// 		wave/t fadcvalstr
+// 		wave fadcattr
+// 		string wn_raw = ""
+// 		nvar sc_Printfadc
+// 		nvar sc_Saverawfadc
+
+// 		ii=0
+// 		do
+// 			if(fadcattr[ii][2] == 48)
+// 				filecount += 1
+// 			endif
+// 			ii+=1
+// 		while(ii<dimsize(fadcattr,0))
+
+// 		if(filecount > 0)
+// 			// there is data to save!
+// 			// save it and increment the filenumber
+// 			printf "saving all dat%d files...\r", filenum
+
+// 			// Open up HDF5 files
+// 			// Save scan controller meta data in this function as well
+// 			initSaveFiles(msg=msg)
+
+// 			// look for waves to save
+// 			ii=0
+// 			string str_2d = "", savename
+// 			do
+// 				if(fadcattr[ii][2] == 48) //checkbox checked
+// 					wn = fadcvalstr[ii][3]
+// 					if(sc_is2d)
+// 						wn += "_2d"
+// 					endif
+// 					filename = "dat"+filenumstr+wn
+
+// 					duplicate $wn $filename
+
+// 					if(sc_Printfadc)
+// 						print filename
+// 					endif
+// 					saveSingleWave(wn)
+
+// 					if(sc_Saverawfadc)
+// 						str_2d = ""  // Set 2d_str blank until check if sc_is2d
+// 						wn_raw = "ADC"+num2istr(ii)
+// 						if(sc_is2d)
+// 							wn_raw += "_2d"
+// 							str_2d = "_2d"  // Need to add _2d to name if wave is 2d only.
+// 						endif
+// 						filename = "dat"+filenumstr+fadcvalstr[ii][3]+str_2d+"_RAW"  // More easily identify which Raw wave for which Calc wave
+// 						savename = fadcvalstr[ii][3]+str_2d+"_RAW"
 
 
-						duplicate/O $wn_raw $savename  // To store in HDF with more easily identifiable name
-						if(sc_Printfadc)
-							print filename
-						endif
-						saveSingleWave(savename)
-					endif
-				endif
-				ii+=1
-			while(ii<dimsize(fadcattr,0))
-			closeSaveFiles()
-		endif
-	elseif(save_type == 2)
-		// Check that all waves trying to save exist
-		for(ii=0;ii<itemsinlist(wave_names, ",");ii++)
-			wn = stringfromlist(ii, wave_names, ",")
-			if (!exists(wn))
-				string err_msg
-				sprintf err_msg, "WARNING[SaveWaves]: Wavename %s does not exist. No data saved\r", wn
-				abort err_msg
-			endif
-		endfor
+// 						duplicate $wn_raw $filename
 
-		// Only init Save file after we know that the waves exist
-		initSaveFiles(msg=msg, logs_only=1)
-		printf "Saving waves [%s] in dat%d.h5\r", wave_names, filenum
 
-		// Now save each wave
-		for(ii=0;ii<itemsinlist(wave_names, ",");ii++)
-			wn = stringfromlist(ii, wave_names, ",")
-			saveSingleWave(wn)
-		endfor
-		closeSaveFiles()
-	endif
+// 						duplicate/O $wn_raw $savename  // To store in HDF with more easily identifiable name
+// 						if(sc_Printfadc)
+// 							print filename
+// 						endif
+// 						saveSingleWave(savename)
+// 					endif
+// 				endif
+// 				ii+=1
+// 			while(ii<dimsize(fadcattr,0))
+// 			closeSaveFiles()
+// 		endif
+// 	elseif(save_type == 2)
+// 		// Check that all waves trying to save exist
+// 		for(ii=0;ii<itemsinlist(wave_names, ",");ii++)
+// 			wn = stringfromlist(ii, wave_names, ",")
+// 			if (!exists(wn))
+// 				string err_msg
+// 				sprintf err_msg, "WARNING[SaveWaves]: Wavename %s does not exist. No data saved\r", wn
+// 				abort err_msg
+// 			endif
+// 		endfor
 
-	if(save_experiment==1 & (datetime-sc_save_time)>180.0)
-		// save if sc_save_exp=1
-		// and if more than 3 minutes has elapsed since previous saveExp
-		// if the sweep was aborted sc_save_exp=0 before you get here
-		saveExp()
-		sc_save_time = datetime
-	endif
+// 		// Only init Save file after we know that the waves exist
+// 		initSaveFiles(msg=msg, logs_only=1)
+// 		printf "Saving waves [%s] in dat%d.h5\r", wave_names, filenum
 
-	// check if a path is defined to backup data
-	if(sc_checkBackup())
-		// copy data to server mount point
-		sc_copyNewFiles(filenum, save_experiment=save_experiment)
-	endif
+// 		// Now save each wave
+// 		for(ii=0;ii<itemsinlist(wave_names, ",");ii++)
+// 			wn = stringfromlist(ii, wave_names, ",")
+// 			saveSingleWave(wn)
+// 		endfor
+// 		closeSaveFiles()
+// 	endif
 
-	// add info about scan to the scan history file in /config
-//	sc_saveFuncCall(getrtstackinfo(2))
+// 	if(save_experiment==1 & (datetime-sc_save_time)>180.0)
+// 		// save if sc_save_exp=1
+// 		// and if more than 3 minutes has elapsed since previous saveExp
+// 		// if the sweep was aborted sc_save_exp=0 before you get here
+// 		saveExp()
+// 		sc_save_time = datetime
+// 	endif
 
-	// delete waves old waves, so only the newest 500 scans are stored in volatile memory
-	// turn on by setting sc_cleanup = 1
-//	nvar sc_cleanup
-//	if(sc_cleanup == 1)
-//		sc_cleanVolatileMemory()
-//	endif
+// 	// check if a path is defined to backup data
+// 	if(sc_checkBackup())
+// 		// copy data to server mount point
+// 		sc_copyNewFiles(filenum, save_experiment=save_experiment)
+// 	endif
 
-	// increment filenum
-	if(Rawadd+Calcadd > 0 || filecount > 0  || save_type == 2)
-		filenum+=1
-	endif
-end
+// 	// add info about scan to the scan history file in /config
+// //	sc_saveFuncCall(getrtstackinfo(2))
+
+// 	// delete waves old waves, so only the newest 500 scans are stored in volatile memory
+// 	// turn on by setting sc_cleanup = 1
+// //	nvar sc_cleanup
+// //	if(sc_cleanup == 1)
+// //		sc_cleanVolatileMemory()
+// //	endif
+
+// 	// increment filenum
+// 	if(Rawadd+Calcadd > 0 || filecount > 0  || save_type == 2)
+// 		filenum+=1
+// 	endif
+// end
 
 ////////////////////////////////////////////////////////////////////
 ///////////// Johanns attempt at breaking down savewaves()//////////
 ////////////////////////////////////////////////////////////////////
 
-function EndScan([S, save_experiment])
+function EndScan([S, save_experiment, aborting])
 	// Ends a scan:
 	// Closes sweepcontrol if open
 	// Save Metadata into HDF files
@@ -268,11 +268,18 @@ function EndScan([S, save_experiment])
 
 	Struct ScanVars &S
 	variable save_experiment
-
+	variable aborting
+	
 	nvar filenum
 
 	save_experiment = paramisDefault(save_experiment) ? 1 : save_experiment
+	if (aborting)
+		print "ERROR[EndScan]: Abort and save not implemented yet. Expect undefined behaviour"
+	endif
+
 	if(paramIsDefault(S))
+		abort "Not implemented yet"
+		// Also should leave a message or something in the HDF that indicates scan was aborted! 
 		loadLastScanVarsStruct(S)
 	else
 		saveAsLastScanVarsStruct(S)
@@ -284,9 +291,9 @@ function EndScan([S, save_experiment])
 	
 	if(S.using_fastdac == 0)
 		KillDataFolder/z root:async // clean this up for next time
-		NonFastDacSave(S.comments)  // TODO: Update this to new style using ScanVars
+		SaveToHDF(S, 0)
 	elseif(S.using_fastdac == 1)
-		FastDacSave(S)
+		SaveToHDF(S, 1)
 	else
 		abort "Don't understant S.using_fastdac != (1 | 0)"
 	endif
@@ -342,19 +349,20 @@ end
 
 
 // FastDac Save Function
-function FastDacSave(S)
+function SaveToHDF(S, fastdac)
 	Struct ScanVars &S
+	variable fastdac
 	
 	nvar filenum
 	printf "saving all dat%d files...\r", filenum
 
-	nvar sc_Saverawfadc
+	nvar/z sc_Saverawfadc
 	
 	// Open up HDF5 files
 	variable raw_hdf5_id, calc_hdf5_id
 	calc_hdf5_id = initOpenSaveFiles(0)
 	string hdfids = num2str(calc_hdf5_id)
-	if (sc_Saverawfadc == 1)
+	if (fastdac && sc_Saverawfadc == 1)
 		raw_hdf5_id = initOpenSaveFiles(1)
 		hdfids = addlistItem(num2str(raw_hdf5_id), hdfids, ";", INF)
 	endif
@@ -362,22 +370,30 @@ function FastDacSave(S)
 	// add Meta data to each file
 	addMetaFiles(hdfids, S=S)
 	
-	saveFastdacInfoWaves(hdfids, S)
+	if (fastdac)
+		// Save some fastdac specific waves (sweepgates etc)
+		saveFastdacInfoWaves(hdfids, S)
+	endif
 
 	// Save ScanWaves (e.g. x_array, y_array etc)
-	saveScanWaves(calc_hdf5_id, S, 0)
-	if (Sc_saveRawFadc == 1)
-		saveScanWaves(raw_hdf5_id, S, 1)
+	if(fastdac)
+		nvar sc_resampleFreqCheckFadc
+		saveScanWaves(calc_hdf5_id, S, sc_resampleFreqCheckFadc)  // Needs a different x_array size if filtered
+		if (Sc_saveRawFadc == 1)
+			saveScanWaves(raw_hdf5_id, S, 0)
+		endif
+	else
+		saveScanWaves(calc_hdf5_id, S, 0)
 	endif
 	
 	// Get waveList to save
 	string RawWaves, CalcWaves
 	if(S.is2d == 0)
-		RawWaves = get1DWaveNames(1, 1)
-		CalcWaves = get1DWaveNames(0, 1)
+		RawWaves = get1DWaveNames(1, fastdac)
+		CalcWaves = get1DWaveNames(0, fastdac)
 	elseif (S.is2d == 1)
-		RawWaves = get2DWaveNames(1, 1)
-		CalcWaves = get2DWaveNames(0, 1)
+		RawWaves = get2DWaveNames(1, fastdac)
+		CalcWaves = get2DWaveNames(0, fastdac)
 	else
 		abort "Not implemented"
 	endif
@@ -387,7 +403,7 @@ function FastDacSave(S)
 	
 	// Save to HDF	
 	saveWavesToHDF(CalcWaves, calc_hdf5_id)
-	if(sc_SaveRawFadc == 1)
+	if(fastdac && sc_SaveRawFadc == 1)
 		string rawSaveNames = getRawSaveNames(CalcWaves)
 		SaveWavesToHDF(RawWaves, raw_hdf5_id, saveNames=rawSaveNames)
 	endif
@@ -434,16 +450,18 @@ function saveFastdacInfoWaves(hdfids, S)
 end
 
 
-function LogsOnlySave(hdfid)
+function LogsOnlySave(hdfid, comments)
 	// Save current state of experiment (i.e. most of sweeplogs) but without any specific data from a scan
 	variable hdfid
+	string comments
 
 	abort "Not implemented again yet, need to think about what info to get from createSweepLogs etc"
 	make/o/free/t/n=1 attr_message = "True"
 	HDF5SaveData /A="Logs_Only" attr_message, hdfid, "/"
 
 	string jstr = ""
-	sc_instrumentLogs(jstr) // TODO: Save this jstr into HDF
+	jstr = new_sc_createSweepLogs(comments=comments)
+	// TODO: Save this jstr into HDF
 end
 
 
@@ -512,7 +530,11 @@ function SaveNamedWaves(wave_names, comments)
 	endfor
 
 	// Only init Save file after we know that the waves exist
-	initSaveFiles(msg=comments, logs_only=1)
+	variable hdfid
+	hdfid = initOpenSaveFiles(0) // Open HDF file (normal - non RAW)
+	LogsOnlySave(hdfid, comments)
+
+//	initSaveFiles(msg=comments, logs_only=1)
 	printf "Saving waves [%s] in dat%d.h5\r", wave_names, filenum
 
 	// Now save each wave
@@ -524,89 +546,89 @@ function SaveNamedWaves(wave_names, comments)
 end
 
 
-// Non FastDac Save Function
-function NonFastDacSave(msg)
-	string msg
-	wave/t fadcvalstr
-	wave fadcattr
-	string wn_raw = ""
-	nvar sc_Printfadc
-	nvar sc_Saverawfadc
-	nvar sc_is2d, sc_PrintCalc
-	nvar filenum
-	string filenumstr = ""
-	sprintf filenumstr, "%d", filenum
-	variable filecount = 0
-	variable ii=0, sc_PrintRaw
-	string wn, filename
-	wave /t sc_RawWaveNames, sc_CalcWaveNames
-	wave sc_RawRecord, sc_CalcRecord
-	
-	variable Rawadd = sum(sc_RawRecord)
-	variable Calcadd = sum(sc_CalcRecord)
-
-	if(Rawadd+Calcadd > 0)
-		// there is data to save!
-		// save it and increment the filenumber
-		printf "saving all dat%d files...\r", filenum
-
-		nvar sc_rvt
-   		if(sc_rvt==1)
-   			sc_update_xdata() // update xdata wave
-		endif
-
-		// Open up HDF5 files
-	 	// Save scan controller meta data in this function as well
-		initSaveFiles(msg=msg)
-		if(sc_is2d == 2) //If 2D linecut then need to save starting x values for each row of data
-			wave sc_linestart
-			filename = "dat" + filenumstr + "linestart"
-			duplicate sc_linestart $filename
-			savesinglewave("sc_linestart")
-		endif
-		
-//		wave arb_wavename
-//		arb_wavename = (condition) ? case_true : case_false
-//		sc_PrintRaw == 1 && print()
-		
-		// save raw data waves
-		ii=0
-		do
-			if (sc_RawRecord[ii] == 1)
-				wn = sc_RawWaveNames[ii]
-				if (sc_is2d)
-					wn += "2d"
-				endif
-				filename =  "dat" + filenumstr + wn
-				duplicate $wn $filename // filename is a new wavename and will become <filename.xxx>
-				if(sc_PrintRaw == 1)
-					print filename
-				endif
-				saveSingleWave(wn)
-			endif
-			ii+=1
-		while (ii < numpnts(sc_RawWaveNames))
-
-		//save calculated data waves
-		ii=0
-		do
-			if (sc_CalcRecord[ii] == 1)
-				wn = sc_CalcWaveNames[ii]
-				if (sc_is2d)
-					wn += "2d"
-				endif
-				filename =  "dat" + filenumstr + wn
-				duplicate $wn $filename
-				if(sc_PrintCalc == 1)
-					print filename
-				endif
-				saveSingleWave(wn)
-			endif
-			ii+=1
-		while (ii < numpnts(sc_CalcWaveNames))
-		closeSaveFiles()
-	endif
-end
+//// Non FastDac Save Function
+//function NonFastDacSave(msg)
+//	string msg
+//	wave/t fadcvalstr
+//	wave fadcattr
+//	string wn_raw = ""
+//	nvar sc_Printfadc
+//	nvar sc_Saverawfadc
+//	nvar sc_is2d, sc_PrintCalc
+//	nvar filenum
+//	string filenumstr = ""
+//	sprintf filenumstr, "%d", filenum
+//	variable filecount = 0
+//	variable ii=0, sc_PrintRaw
+//	string wn, filename
+//	wave /t sc_RawWaveNames, sc_CalcWaveNames
+//	wave sc_RawRecord, sc_CalcRecord
+//	
+//	variable Rawadd = sum(sc_RawRecord)
+//	variable Calcadd = sum(sc_CalcRecord)
+//
+//	if(Rawadd+Calcadd > 0)
+//		// there is data to save!
+//		// save it and increment the filenumber
+//		printf "saving all dat%d files...\r", filenum
+//
+//		nvar sc_rvt
+//   		if(sc_rvt==1)
+//   			sc_update_xdata() // update xdata wave
+//		endif
+//
+//		// Open up HDF5 files
+//	 	// Save scan controller meta data in this function as well
+//		initSaveFiles(msg=msg)
+//		if(sc_is2d == 2) //If 2D linecut then need to save starting x values for each row of data
+//			wave sc_linestart
+//			filename = "dat" + filenumstr + "linestart"
+//			duplicate sc_linestart $filename
+//			savesinglewave("sc_linestart")
+//		endif
+//		
+////		wave arb_wavename
+////		arb_wavename = (condition) ? case_true : case_false
+////		sc_PrintRaw == 1 && print()
+//		
+//		// save raw data waves
+//		ii=0
+//		do
+//			if (sc_RawRecord[ii] == 1)
+//				wn = sc_RawWaveNames[ii]
+//				if (sc_is2d)
+//					wn += "2d"
+//				endif
+//				filename =  "dat" + filenumstr + wn
+//				duplicate $wn $filename // filename is a new wavename and will become <filename.xxx>
+//				if(sc_PrintRaw == 1)
+//					print filename
+//				endif
+//				saveSingleWave(wn)
+//			endif
+//			ii+=1
+//		while (ii < numpnts(sc_RawWaveNames))
+//
+//		//save calculated data waves
+//		ii=0
+//		do
+//			if (sc_CalcRecord[ii] == 1)
+//				wn = sc_CalcWaveNames[ii]
+//				if (sc_is2d)
+//					wn += "2d"
+//				endif
+//				filename =  "dat" + filenumstr + wn
+//				duplicate $wn $filename
+//				if(sc_PrintCalc == 1)
+//					print filename
+//				endif
+//				saveSingleWave(wn)
+//			endif
+//			ii+=1
+//		while (ii < numpnts(sc_CalcWaveNames))
+//		closeSaveFiles()
+//	endif
+//end
 
 
 function initOpenSaveFiles(RawSave)	
@@ -689,18 +711,18 @@ function addMetaFiles(hdf5_id_list, [S, logs_only])
 end
 
 
-function saveScanWaves(hdfid, S, raw)
+function saveScanWaves(hdfid, S, filtered)
 	// Save x_array and y_array in HDF 
 	// Note: The x_array will have the right dimensions taking into account filtering
 	variable hdfid
 	Struct ScanVars &S
-	variable raw
+	variable filtered
 
 
-	if(raw)
-		make/o/free/N=(S.numptsx) sc_xarray
-	else
+	if(filtered)
 		make/o/free/N=(postFilterNumpts(S.numptsx, S.measureFreq)) sc_xarray
+	else
+		make/o/free/N=(S.numptsx) sc_xarray
 	endif
 
 	string cmd

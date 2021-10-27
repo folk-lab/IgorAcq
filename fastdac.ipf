@@ -1452,7 +1452,7 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 		
 		make /FREE /T /N=1 cconfig = prettyJSONfmt(sc_createconfig())
 		
-		string temp = sc_createSweepLogs(msg=comments)
+		string temp = new_sc_createSweepLogs(comments=comments)
 		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(temp)
 		
 		// Check that prettyJSONfmt actually returned a valid JSON.

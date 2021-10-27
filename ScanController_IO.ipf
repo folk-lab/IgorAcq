@@ -7,77 +7,77 @@ pragma rtGlobals=1		// Use modern global access method.
 /// SAVING EXPERIMENT DATA ///
 //////////////////////////////
 
-function initSaveFiles([msg, logs_only])
-	//// create/open HDF5 files
-	string msg
-	variable logs_only  // 1=Don't save any data to HDF
+// function initSaveFiles([msg, logs_only])
+// 	//// create/open HDF5 files
+// 	string msg
+// 	variable logs_only  // 1=Don't save any data to HDF
 	
-	if(paramisdefault(msg)) // save meta data
-		msg=""
-	endif
+// 	if(paramisdefault(msg)) // save meta data
+// 		msg=""
+// 	endif
 
 
 
-	nvar filenum
-	string filenumstr = ""
-	sprintf filenumstr, "%d", filenum
-	string /g h5name = "dat"+filenumstr+".h5"
+// 	nvar filenum
+// 	string filenumstr = ""
+// 	sprintf filenumstr, "%d", filenum
+// 	string /g h5name = "dat"+filenumstr+".h5"
 
 
-	// Open HDF5 file
-	variable /g hdf5_id
-	HDF5CreateFile /P=data hdf5_id as h5name
+// 	// Open HDF5 file
+// 	variable /g hdf5_id
+// 	HDF5CreateFile /P=data hdf5_id as h5name
 
-	if (logs_only != 1)
-		// save x and y arrays
-		nvar sc_is2d
-		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_xdata" , hdf5_id, "x_array"
-		if(sc_is2d == 1)
-			HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_ydata" , hdf5_id, "y_array"
-		elseif(sc_is2d == 2)
-			HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_ydata" , hdf5_id, "y_array"
-			HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_linestart", hdf5_id, "linestart"
-		endif
-	else // Make attr in HDF which makes it clear this was only to store Logs
-		make/o/free/t/n=1 attr_message = "True"
-		HDF5SaveData /A="Logs_Only" attr_message, hdf5_id, "/"
-	endif
+// 	if (logs_only != 1)
+// 		// save x and y arrays
+// 		nvar sc_is2d
+// 		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_xdata" , hdf5_id, "x_array"
+// 		if(sc_is2d == 1)
+// 			HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_ydata" , hdf5_id, "y_array"
+// 		elseif(sc_is2d == 2)
+// 			HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_ydata" , hdf5_id, "y_array"
+// 			HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_linestart", hdf5_id, "linestart"
+// 		endif
+// 	else // Make attr in HDF which makes it clear this was only to store Logs
+// 		make/o/free/t/n=1 attr_message = "True"
+// 		HDF5SaveData /A="Logs_Only" attr_message, hdf5_id, "/"
+// 	endif
 	
-	// Create metadata
-	// this just creates one big JSON string attribute for the group
-	// its... fine
-	variable /G meta_group_ID
-	HDF5CreateGroup/z hdf5_id, "metadata", meta_group_ID
-	if (V_flag != 0)
-			Print "HDF5OpenGroup Failed: ", "metadata"
-	endif
+// 	// Create metadata
+// 	// this just creates one big JSON string attribute for the group
+// 	// its... fine
+// 	variable /G meta_group_ID
+// 	HDF5CreateGroup/z hdf5_id, "metadata", meta_group_ID
+// 	if (V_flag != 0)
+// 			Print "HDF5OpenGroup Failed: ", "metadata"
+// 	endif
 
 
-	make /FREE /T /N=1 cconfig = prettyJSONfmt(sc_createconfig())
-	make /FREE /T /N=1 sweep_logs = prettyJSONfmt(sc_createSweepLogs(msg=msg))
+// 	make /FREE /T /N=1 cconfig = prettyJSONfmt(sc_createconfig())
+// 	make /FREE /T /N=1 sweep_logs = prettyJSONfmt(sc_createSweepLogs(msg=msg))
 	
-	// Check that prettyJSONfmt actually returned a valid JSON.
-	sc_confirm_JSON(sweep_logs, name="sweep_logs")
-	sc_confirm_JSON(cconfig, name="cconfig")
+// 	// Check that prettyJSONfmt actually returned a valid JSON.
+// 	sc_confirm_JSON(sweep_logs, name="sweep_logs")
+// 	sc_confirm_JSON(cconfig, name="cconfig")
 	
-	HDF5SaveData/z /A="sweep_logs" sweep_logs, hdf5_id, "metadata"
-	if (V_flag != 0)
-			Print "HDF5SaveData Failed: ", "sweep_logs"
-	endif
+// 	HDF5SaveData/z /A="sweep_logs" sweep_logs, hdf5_id, "metadata"
+// 	if (V_flag != 0)
+// 			Print "HDF5SaveData Failed: ", "sweep_logs"
+// 	endif
 	
-	HDF5SaveData/z /A="sc_config" cconfig, hdf5_id, "metadata"
-	if (V_flag != 0)
-			Print "HDF5SaveData Failed: ", "sc_config"
-	endif
+// 	HDF5SaveData/z /A="sc_config" cconfig, hdf5_id, "metadata"
+// 	if (V_flag != 0)
+// 			Print "HDF5SaveData Failed: ", "sc_config"
+// 	endif
 
-	HDF5CloseGroup /Z meta_group_id
-	if (V_flag != 0)
-		Print "HDF5CloseGroup Failed: ", "metadata"
-	endif
+// 	HDF5CloseGroup /Z meta_group_id
+// 	if (V_flag != 0)
+// 		Print "HDF5CloseGroup Failed: ", "metadata"
+// 	endif
 
-	// may as well save this config file, since we already have it
-	sc_saveConfig(cconfig[0])
-end
+// 	// may as well save this config file, since we already have it
+// 	sc_saveConfig(cconfig[0])
+// end
 
 
 function sc_confirm_JSON(jsonwave, [name])

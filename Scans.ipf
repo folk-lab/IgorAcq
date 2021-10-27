@@ -1471,7 +1471,7 @@ function SFbd_check_lims(S)
 				board_index = floor(channel/4)
 			
 				// check for NAN and INF
-				if(sc_check_naninf(output) != 0)
+				if(numtype(output) != 0)
 					abort "trying to set voltage to NaN or Inf"
 				endif
 			
