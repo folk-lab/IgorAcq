@@ -553,13 +553,15 @@ function rampOutputFDAC(instrID,channel,output,[ramprate, ignore_lims]) // Units
 			sprintf warn, "[WARNING] \"rampOutputfdac\": Output voltage must be within limit. Setting channel %d to %.3fmV\n", channel, output
 			print warn
 		endif
+	
+		// Check that ramprate is within software limit, otherwise use software limit
+		if (ramprate > str2num(fdacvalstr[channel][4]))
+			printf "[WARNING] \"rampOutputfdac\": Ramprate of %.0fmV/s requested for channel %d. Using max_ramprate of %.0fmV/s instead\n" ramprate, channel, str2num(fdacvalstr[channel][4])
+			ramprate = str2num(fdacvalstr[channel][4])
+		endif
 	endif 
 		
-	// Check that ramprate is within software limit, otherwise use software limit
-	if (ramprate > str2num(fdacvalstr[channel][4]))
-		printf "[WARNING] \"rampOutputfdac\": Ramprate of %.0fmV/s requested for channel %d. Using max_ramprate of %.0fmV/s instead\n" ramprate, channel, str2num(fdacvalstr[channel][4])
-		ramprate = str2num(fdacvalstr[channel][4])
-	endif
+
 		
 	// read current dac output and compare to window
 	variable currentoutput = getfdacOutput(instrID,devchannel)
