@@ -70,16 +70,15 @@ end
 function/S GetLabel(channels, [fastdac])
   // Returns Label name of given channel, defaults to BD# or FD#
   // Used to get x_label, y_label for init_waves 
+  // Note: Only takes channels as numbers
 	string channels
 	variable fastdac
 
 	variable i=0
-	variable nChannels
 	string channel, buffer, xlabelfriendly = ""
 	wave/t dacvalstr
 	wave/t fdacvalstr
-	nChannels = ItemsInList(channels, ",")
-	for(i=0;i<nChannels;i+=1)
+	for(i=0;i<ItemsInList(channels, ",");i+=1)
 		channel = StringFromList(i, channels, ",")
 
 		if (fastdac == 0)

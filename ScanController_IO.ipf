@@ -620,7 +620,7 @@ function/s num2numStr(val)
 	if(numtype(val)!=0)
 		return "null"
 	else
-		return num2str(val)
+		return num2str(val, "%.5f")
 	endif
 end
 
@@ -797,7 +797,7 @@ function /s prettyJSONfmt(jstr)
 	string jstr
 	string output="", key="", val=""
 
-	JSONSimple jstr
+	JSONSimple/z jstr
 	wave/t t_tokentext
 	wave w_tokentype, w_tokensize, w_tokenparent
 	variable i=0, indent=1
@@ -920,6 +920,7 @@ function /S escapeQuotes(str)
 		if( CmpStr(str[i], "\"" ) == 0 && escaped == 0)
 			// this is an unescaped quote
 			str = str[0,i-1] + "\\" + str[i,inf]
+//			str = str[0,i-1] + "\\" + str[i,inf]
 		endif
 		i+=1
 

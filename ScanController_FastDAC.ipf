@@ -116,7 +116,7 @@ function fd_Record_Values(S, PL, rowNum, [AWG_list, linestart])
 	endif
 
    // Check InitWaves was run with fastdac=1
-   fdRV_check_init()
+//   fdRV_check_init()
 
    // Check that checks have been carried out in main scan function where they belong
 	if(S.lims_checked != 1)
@@ -133,6 +133,8 @@ function fd_Record_Values(S, PL, rowNum, [AWG_list, linestart])
 	else				// DO normal INT_RAMP
 		cmd_sent = fd_start_INT_RAMP(S)
 	endif
+	print cmd_sent
+	
 	totalByteReturn = S.numADCs*2*S.numptsx
 	sc_sleep(0.1) 	// Trying to get 0.2s of data per loop, will timeout on first loop without a bit of a wait first
 	variable looptime = 0
@@ -224,7 +226,7 @@ function fdRV_record_buffer(S, rowNum, totalByteReturn)
 
    // hold incoming data chunks in string and distribute to data waves
    string buffer = ""
-   variable bytes_read = 0, plotUpdateTime = 15e-3, totaldump = 0,  saveBuffer = 1000
+   variable bytes_read = 0, plotUpdateTime = 15e-3, totaldump = 0,  saveBuffer = 2000
    variable bufferDumpStart = stopMSTimer(-2)
 
    variable bytesSec = roundNum(2*S.measureFreq*S.numADCs,0)
@@ -234,11 +236,13 @@ function fdRV_record_buffer(S, rowNum, totalByteReturn)
       fdRV_distribute_data(buffer, S, bytes_read, totalByteReturn, read_chunk, rowNum, S.direction) ///////////// TODO: Change THIS
       bytes_read += read_chunk
       totaldump = bytesSec*(stopmstimer(-2)-bufferDumpStart)*1e-6  // Expected amount of bytes in buffer
-      if(totaldump-bytes_read < saveBuffer)  // if we aren't too far behind
-         // we can update all plots
-         // should take ~15ms extra
-         fdRV_update_graphs()     ///////// TODO: UPDATE RAW 1D GRAPHS ONLY
-      endif
+      if(totaldump-bytes_read < saveBuffer)  // if we aren't too far behind then update Raw 1D graphs
+         fdRV_update_graphs() 
+         print "keeping up"
+//      endif
+		else
+			printf "Too far behind! %d, %d\r" totaldump, bytes_read
+		endif
       fdRV_check_sweepstate(S.instrID)
    while(totalByteReturn-bytes_read > read_chunk)
 
@@ -248,7 +252,7 @@ function fdRV_record_buffer(S, rowNum, totalByteReturn)
       fdRV_read_chunk(S.instrID, bytes_left, buffer)  // puts data into buffer
       fdRV_distribute_data(buffer, S, bytes_read, totalByteReturn, bytes_left, rowNum, S.direction)
       fdRV_check_sweepstate(S.instrID)
-      doupdate
+      fdRV_update_graphs() 
    endif
    variable looptime = (stopmstimer(-2)-bufferDumpStart)*1e-6
    return looptime
@@ -273,11 +277,11 @@ end
 
 function fdRV_update_graphs()
   // updates activegraphs which takes about 15ms
-  svar activegraphs
+  svar sc_rawGraphs1D
 
-  variable i, errCode = 0
-  for(i=0;i<itemsinlist(activegraphs,";");i+=1)
-    doupdate/w=$stringfromlist(i,activegraphs,";")
+  variable i
+  for(i=0;i<itemsinlist(sc_rawGraphs1D,";");i+=1)
+    doupdate/w=$stringfromlist(i,sc_rawGraphs1D,";")
   endfor
 end
 
@@ -313,7 +317,7 @@ end
 
 
 function fdRV_distribute_data(buffer, S, bytes_read, totalByteReturn, read_chunk, rowNum, direction)
-  // add data to rawwaves and datawaves
+  // add data to rawwaves
   struct ScanVars &S
   string &buffer  // Passing by reference for speed of execution
   variable bytes_read, totalByteReturn, read_chunk, rowNum, direction
@@ -374,34 +378,34 @@ function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart,[direction])
 			rawwave[colNumStart+k] = dataPoint
 			k += 1*direction
 		endfor
-		if(sc_is2d)
-			wave2d = wave1d+"_2d"
-			wave rawwave2d = $wave2d
-			rawwave2d[colNumStart,colNumStart+bytes/2][rowNum] = rawwave[p]   /// NOT TESTED
+//		if(sc_is2d)
+//			wave2d = wave1d+"_2d"
+//			wave rawwave2d = $wave2d
+////			rawwave2d[colNumStart,colNumStart+bytes/2][rowNum] = rawwave[p] /// NOT TESTED
 //			rawwave2d[][rowNum] = rawwave[p]
-		endif
+//		endif
 	endfor
 
-	// load calculated data into datawave
-	string script="", cmd=""
-	for(i=0;i<numADCCh;i+=1)
-		adcIndex = str2num(stringfromlist(i,adcList,","))
-		wave1d = fadcvalstr[adcIndex][3]
-		wave datawave = $wave1d
-		script = trimstring(fadcvalstr[adcIndex][4])
-		sprintf cmd, "%s = %s", wave1d, script
-		execute/q/z cmd
-		if(v_flag!=0)
-			print "[WARNING] \"sc_distribute_data\": Wave calculation falied! Error: "+GetErrMessage(V_Flag,2)
-		endif
-		if(sc_is2d)
-			wave2d = wave1d+"_2d"
-			wave datawave2d = $wave2d
-			datawave2d[colNumStart,colNumStart+bytes/2][rowNum] = datawave[p]  /// ALSO NOT TESTED
-//			datawave2d[][rowNum] = datawave[p]
-
-		endif
-	endfor
+//	// load calculated data into datawave
+//	string script="", cmd=""
+//	for(i=0;i<numADCCh;i+=1)
+//		adcIndex = str2num(stringfromlist(i,adcList,","))
+//		wave1d = fadcvalstr[adcIndex][3]
+//		wave datawave = $wave1d
+//		script = trimstring(fadcvalstr[adcIndex][4])
+//		sprintf cmd, "%s = %s", wave1d, script
+//		execute/q/z cmd
+//		if(v_flag!=0)
+//			print "[WARNING] \"sc_distribute_data\": Wave calculation falied! Error: "+GetErrMessage(V_Flag,2)
+//		endif
+////		if(sc_is2d)
+////			wave2d = wave1d+"_2d"
+////			wave datawave2d = $wave2d
+//////			datawave2d[colNumStart,colNumStart+bytes/2][rowNum] = datawave[p]  /// ALSO NOT TESTED
+////			datawave2d[][rowNum] = datawave[p]
+////
+////		endif
+//	endfor
 end
 
 function/s sc_samegraph(wave1,wave2)
@@ -453,15 +457,6 @@ end
 ////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////// CHECKS  /////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////
-
-function fdRV_check_init()
-	// Check initialize waves was called for fastDAC measurement
-  nvar fastdac_init
-  if(fastdac_init != 1)
-    print("[ERROR] \"RecordValues\": Trying to record fastDACs, but they weren't initialized by \"InitializeWaves\"")
-    abort
-  endif
-end
 
 
 function fdRV_check_ramp_start(S)
@@ -987,11 +982,11 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	DrawText 220, 70, "Label"
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 287, 70, "Ramprate"
-	ListBox fdaclist,pos={10,75},size={360,300},fsize=14,frame=2,widths={30,70,100,65} ///// EDIT 270 -> 300
+	ListBox fdaclist,pos={10,75},size={360,300},fsize=14,frame=2,widths={30,70,100,65} 
 	ListBox fdaclist,listwave=root:fdacvalstr,selwave=root:fdacattr,mode=1
-	Button updatefdac,pos={50,384},size={65,20},proc=update_fdac,title="Update" /////EDIT 354 -> 384
-	Button fdacramp,pos={150,384},size={65,20},proc=update_fdac,title="Ramp" /////EDIT 354 -> 384
-	Button fdacrampzero,pos={255,384},size={80,20},proc=update_fdac,title="Ramp all 0" /////EDIT 354 -> 384
+	Button updatefdac,pos={50,384},size={65,20},proc=update_fdac,title="Update" 
+	Button fdacramp,pos={150,384},size={65,20},proc=update_fdac,title="Ramp"
+	Button fdacrampzero,pos={255,384},size={80,20},proc=update_fdac,title="Ramp all 0" 
 	// ADC, 8 channels shown
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 405, 70, "Ch"
@@ -1010,42 +1005,40 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	checkbox sc_SavefadcBox,pos={620,265},proc=sc_CheckBoxClicked,value=sc_Saverawfadc,side=1,title="\Z14Save raw data "
 	checkbox sc_FilterfadcCheckBox,pos={400,290},proc=sc_CheckBoxClicked,value=sc_ResampleFreqCheckfadc,side=1,title="\Z14Resample "
 	SetVariable sc_FilterfadcBox,pos={500,290},size={200,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resample Frequency ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
-	DrawText 705,310, "\Z14Hz" /////EDIT ADDED
-	//variable/g sc_ResampleFreqfadc = 100 /////EDIT ADDED variable for frequency of resampling data
-	//variable/g sc_ResampleFreqCheckfadc = 0
-	popupMenu fadcSetting1,pos={420,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC1 speed",size={100,20},value=sc_fadcSpeed1 /////EDIT 300->330
-	popupMenu fadcSetting2,pos={620,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC2 speed",size={100,20},value=sc_fadcSpeed2 /////EDIT 300->330
-	popupMenu fadcSetting3,pos={420,360},proc=update_fadcSpeed,mode=1,title="\Z14ADC3 speed",size={100,20},value=sc_fadcSpeed3 /////EDIT 330->360
-	popupMenu fadcSetting4,pos={620,360},proc=update_fadcSpeed,mode=1,title="\Z14ADC4 speed",size={100,20},value=sc_fadcSpeed4 /////EDIT 330->360
-	popupMenu fadcSetting5,pos={420,390},proc=update_fadcSpeed,mode=1,title="\Z14ADC5 speed",size={100,20},value=sc_fadcSpeed5 /////EDIT 360->390
-	popupMenu fadcSetting6,pos={620,390},proc=update_fadcSpeed,mode=1,title="\Z14ADC6 speed",size={100,20},value=sc_fadcSpeed6 /////EDIT 360->390
-	DrawText 550, 347, "\Z14Hz" /////EDIT 317->347
-	DrawText 750, 347, "\Z14Hz" /////EDIT 317->347
-	DrawText 550, 377, "\Z14Hz" /////EDIT 347->377
-	DrawText 750, 377, "\Z14Hz" /////EDIT 347->377
-	DrawText 550, 407, "\Z14Hz" /////EDIT 377->407
-	DrawText 750, 407, "\Z14Hz" /////EDIT 377->407
+	DrawText 705,310, "\Z14Hz" 
+	popupMenu fadcSetting1,pos={420,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC1 speed",size={100,20},value=sc_fadcSpeed1 
+	popupMenu fadcSetting2,pos={620,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC2 speed",size={100,20},value=sc_fadcSpeed2 
+	popupMenu fadcSetting3,pos={420,360},proc=update_fadcSpeed,mode=1,title="\Z14ADC3 speed",size={100,20},value=sc_fadcSpeed3 
+	popupMenu fadcSetting4,pos={620,360},proc=update_fadcSpeed,mode=1,title="\Z14ADC4 speed",size={100,20},value=sc_fadcSpeed4 
+	popupMenu fadcSetting5,pos={420,390},proc=update_fadcSpeed,mode=1,title="\Z14ADC5 speed",size={100,20},value=sc_fadcSpeed5 
+	popupMenu fadcSetting6,pos={620,390},proc=update_fadcSpeed,mode=1,title="\Z14ADC6 speed",size={100,20},value=sc_fadcSpeed6 
+	DrawText 550, 347, "\Z14Hz" 
+	DrawText 750, 347, "\Z14Hz" 
+	DrawText 550, 377, "\Z14Hz" 
+	DrawText 750, 377, "\Z14Hz" 
+	DrawText 550, 407, "\Z14Hz" 
+	DrawText 750, 407, "\Z14Hz" 
 
 	// identical to ScanController window
 	// all function calls are to ScanController functions
 	// instrument communication
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 15, 445, "Connect Instrument" /////EDIT 415->445
+	DrawText 15, 445, "Connect Instrument" 
 	SetDrawEnv fsize=14, fstyle=1 
-	DrawText 265, 445, "Open GUI" /////EDIT 415->445
+	DrawText 265, 445, "Open GUI" 
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 515, 445, "Log Status" /////EDIT 415->445
-	ListBox sc_InstrFdac,pos={10,450},size={770,100},fsize=14,frame=2,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1, editStyle=1 /////EDIT 420->450
+	DrawText 515, 445, "Log Status" 
+	ListBox sc_InstrFdac,pos={10,450},size={770,100},fsize=14,frame=2,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1, editStyle=1
 
 	// buttons
-	button connectfdac,pos={10,555},size={140,20},proc=sc_OpenInstrButton,title="Connect Instr" /////EDIT 525-> 555
-	button guifdac,pos={160,555},size={140,20},proc=sc_OpenGUIButton,title="Open All GUI" /////EDIT 525-> 555
-	button killaboutfdac, pos={310,555},size={160,20},proc=sc_controlwindows,title="Kill Sweep Controls" /////EDIT 525-> 555
-	button killgraphsfdac, pos={480,555},size={150,20},proc=sc_killgraphs,title="Close All Graphs" /////EDIT 525-> 555
-	button updatebuttonfdac, pos={640,555},size={140,20},proc=sc_updatewindow,title="Update" /////EDIT 525-> 555
+	button connectfdac,pos={10,555},size={140,20},proc=sc_OpenInstrButton,title="Connect Instr" 
+	button guifdac,pos={160,555},size={140,20},proc=sc_OpenGUIButton,title="Open All GUI" 
+	button killaboutfdac, pos={310,555},size={160,20},proc=sc_controlwindows,title="Kill Sweep Controls" 
+	button killgraphsfdac, pos={480,555},size={150,20},proc=sc_killgraphs,title="Close All Graphs" 
+	button updatebuttonfdac, pos={640,555},size={140,20},proc=sc_updatewindow,title="Update" 
 
 	// helpful text
-	DrawText 10, 595, "Press Update to save changes." /////EDIT 565-> 595
+	DrawText 10, 595, "Press Update to save changes." 
 endmacro
 
 	// set update speed for ADCs

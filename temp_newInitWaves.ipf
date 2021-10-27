@@ -23,6 +23,7 @@ structure ScanVars
     string x_label
     string y_label
     variable using_fastdac // Set to 1 when using fastdac
+    string comments
 
     // ScanControllerInfo 
     // string activeGraphs
@@ -37,7 +38,7 @@ structure ScanVars
     string startys, finys
 endstructure
 
-function initFDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate, rampratex, delayx, starty, finy, channelsy, numptsy, rampratey, delayy, direction, startxs, finxs, startys, finys])
+function initFDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate, rampratex, delayx, starty, finy, channelsy, numptsy, rampratey, delayy, direction, startxs, finxs, startys, finys, y_label, comments])
     // Function to make setting up scanVars struct easier for FastDAC scans
     // PARAMETERS:
     // startx, finx, starty, finy -- Single start/fin point for all channelsx/channelsy
@@ -47,9 +48,10 @@ function initFDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
     variable instrID
     variable startx, finx, numptsx, delayx, rampratex
     variable starty, finy, numptsy, delayy, rampratey
-    string channelsx
-    string channelsy
+    string channelsx, channelsy
     string startxs, finxs, startys, finys
+    string  y_label
+    string comments
     variable direction, sweeprate
 
     // Handle Optional Parameters
@@ -67,12 +69,17 @@ function initFDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
     S.instrID = instrID
     S.adcList = SFfd_get_adcs()
     S.using_fastdac = 1
+    S.comments = comments
 
 	// For repeat scans 
     S.direction = paramisdefault(direction) ? 1 : direction
    	
    	// Sets channelsx, channelsy and is2d
     setChannels(S, channelsx, channelsy, fastdac=1)
+    
+   	// Get Labels for graphs
+	S.x_label = GetLabel(S.channelsx, fastdac=1)  // Uses channels as list of numbers only
+	S.y_label = GetLabel(S.channelsy, fastdac=1)  // TODO: Use the optional y_label if provided (need to check for null str etc)
 
    	// Sets starts/fins in FD string format
     setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
@@ -144,6 +151,11 @@ function initBDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
    	
    	// Sets channelsx, channelsy and is2d
     setChannels(S, channelsx, channelsy, fastdac=0)
+    
+   	// Get Labels for graphs
+	string x_label, y_label
+	S.x_label = GetLabel(S.channelsx, fastdac=0)  // Uses channels as list of numbers only
+	S.y_label = GetLabel(S.channelsy, fastdac=0) 
 end
 
 function setChannels(S, channelsx, channelsy, [fastdac])
@@ -172,16 +184,16 @@ function setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy, sta
     variable startx, finx, starty, finy
     string channelsx, startxs, finxs, channelsy, startys, finys
 
-	string starts, fins
+	string starts, fins  // Strings to modify in format_setpoints
     // Set X
    	if ((numtype(strlen(startxs)) != 0 || strlen(startxs) == 0) && (numtype(strlen(finxs)) != 0 || strlen(finxs) == 0))  // Then just a single start/end for channelsx
    		s.startx = startx
 		s.finx = finx	
-        SFfd_format_setpoints(startx, finx, S.channelsx, starts, fins)  
-		s.startxs = startxs
-		s.finxs = finxs
+        SFfd_format_setpoints(startx, finx, S.channelsx, starts, fins)  // Modifies starts, fins
+		s.startxs = starts
+		s.finxs = fins
 	elseif (!(numtype(strlen(startxs)) != 0 || strlen(startxs) == 0) && !(numtype(strlen(finxs)) != 0 || strlen(finxs) == 0))
-		SFfd_sanitize_setpoints(startxs, finxs, S.channelsx, starts, fins)
+		SFfd_sanitize_setpoints(startxs, finxs, S.channelsx, starts, fins)  // Modifies starts, fins
 		s.startx = str2num(StringFromList(0, starts, ","))
 		s.finx = str2num(StringFromList(0, fins, ","))
 		s.startxs = starts
@@ -255,9 +267,9 @@ function new_initializeWaves(S)
     for (i = 0; i<2; i++) // 0 = Calc, 1 = Raw
         wavenames = get1DWaveNames(i, S.using_fastdac)
         sanityCheckWavenames(wavenames)
-        numpts = (i) ? S.numptsx : postFilterNumpts(S.numptsx)  // Selects S.numptsx for i=1(Raw) and calculates numpts for i=0(Calc)
+        numpts = (i) ? S.numptsx : postFilterNumpts(S.numptsx, S.measureFreq)  // Selects S.numptsx for i=1(Raw) and calculates numpts for i=0(Calc)
         for (j=0; j<itemsinlist(wavenames);j++)
-            wn = stringFromList(i, wavenames)
+            wn = stringFromList(j, wavenames)
             init1DWave(wn, numpts, S.startx, S.finx)
             if (S.is2d == 1)
                 init2DWave(wn+"_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
@@ -278,84 +290,124 @@ function new_initializeWaves(S)
     // TODO: This is where x_array and y_array were made, but that should just be done in the savewaves part now
 end
 
-function postFilterNumpts(raw_numpts)
+function postFilterNumpts(raw_numpts, measureFreq)
     // Returns number of points that will exist after applying lowpass filter specified in ScanController_Fastdac
-    variable raw_numpts
-
-    // TODO: do this.
-
+    variable raw_numpts, measureFreq
+	
+	nvar boxChecked = sc_ResampleFreqCheckFadc
+	nvar targetFreq = sc_ResampleFreqFadc
+	if (boxChecked)
+	  	RatioFromNumber (targetFreq / measureFreq)
+	  	return ceil(raw_numpts*(V_numerator)/(V_denominator))  // TODO: Is this actually how many points are returned?
+	else
+		return raw_numpts
+	endif
 end
 
-function init1DWave(waveName, numpts, start, fin)
+function init1DWave(wn, numpts, start, fin)
     // Overwrites waveName with scaled wave from start to fin with numpts
-    string waveName
+    string wn
     variable numpts, start, fin
     string cmd
-    make/O/n=(numpts) $waveName = NaN  // TODO: can put in a cmd and execute if necessary
-    cmd = "setscale/I x " + num2str(start) + ", " + num2str(fin) + ", " + waveName; execute(cmd)
+    make/O/n=(numpts) $wn = NaN  // TODO: can put in a cmd and execute if necessary
+    cmd = "setscale/I x " + num2str(start) + ", " + num2str(fin) + ", " + wn; execute(cmd)
 end
 
-function init2DWave(waveName, numptsx, startx, finx, numptsy, starty, finy)
+function init2DWave(wn, numptsx, startx, finx, numptsy, starty, finy)
     // Overwrites waveName with scaled wave from start to fin with numpts
-    string waveName
+    string wn
     variable numptsx, startx, finx, numptsy, starty, finy
     string cmd
-    make/O/n=(numptsx, numptsy) $waveName = NaN  // TODO: can put in a cmd and execute if necessary
-    cmd = "setscale/I x " + num2str(startx) + ", " + num2str(finx) + ", " + waveName; execute(cmd)
-	cmd = "setscale/I y " + num2str(starty) + ", " + num2str(finy) + ", " + waveName; execute(cmd)
+    make/O/n=(numptsx, numptsy) $wn = NaN  // TODO: can put in a cmd and execute if necessary
+    cmd = "setscale/I x " + num2str(startx) + ", " + num2str(finx) + ", " + wn; execute(cmd)
+	cmd = "setscale/I y " + num2str(starty) + ", " + num2str(finy) + ", " + wn; execute(cmd)
 end
 
-function/t get1DWaveNames(raw, fastdac)
-    // Return a comma separated list of Raw or Calc wavenames (without any checks)
-    variable raw, fastdac  // 1 for True, 0 for False
-    string wavenames
+function/t getRecordedFastdacInfo(info_name)
+	// Return a list of strings for specified column in fadcattr based on whether "record" is ticked
+    string info_name  // ("calc_names", "raw_names", "calc_funcs", "inputs", "channels")
+    string return_list = ""
     variable i
     wave fadcattr
-    if (fastdac == 1) 
-        wave/t fadcvalstr
-        for (i = 0; i<dimsize(fadcvalstr, 0); i++)
-            if (fadcattr[i][2] == 48) // Checkbox checked
-                if (raw == 1)
-                    wavenames = addlistItem("ADC"+num2str(i), wavenames)  
-                else 
-                    wavenames = addlistItem(fadcvalstr[i][3], wavenames)  
-                endif
-            endif
-        endfor
+
+    wave/t fadcvalstr
+    for (i = 0; i<dimsize(fadcvalstr, 0); i++)
+        if (fadcattr[i][2] == 48) // Checkbox checked
+			strswitch(info_name)
+				case "calc_names":
+                return_list = addlistItem(fadcvalstr[i][3], return_list, ";", INF)  												
+					break
+				case "raw_names":
+                return_list = addlistItem("ADC"+num2str(i), return_list, ";", INF)  						
+					break
+				case "calc_funcs":
+                return_list = addlistItem(fadcvalstr[i][4], return_list, ";", INF)  						
+					break						
+				case "inputs":
+                return_list = addlistItem(fadcvalstr[i][1], return_list, ";", INF)  												
+					break						
+				case "channels":
+                return_list = addlistItem(fadcvalstr[i][0], return_list, ";", INF)  																		
+					break
+				default:
+					abort "bad name requested: " + info_name
+					break
+			endswitch						
+        endif
+    endfor
+    return return_list
+end
+
+
+
+function/t get1DWaveNames(raw, fastdac)
+    // Return a list of Raw or Calc wavenames (without any checks)
+    variable raw, fastdac  // 1 for True, 0 for False
+    
+    string wavenames
+	if (fastdac == 1)
+		if (raw == 1)
+			wavenames = getRecordedFastdacInfo("raw_names")
+		else
+			wavenames = getRecordedFastdacInfo("calc_names")
+		endif
     else  // Regular ScanController
         wave sc_RawRecord, sc_RawWaveNames
         wave sc_CalcRecord, sc_CalcWaveNames
         if (raw == 1)
-            // wave recordWave = sc_RawRecord
-            // wave waveNameWave = sc_RawWaveNames
             duplicate/free/o sc_RawRecord, recordWave
             duplicate/free/o/t sc_RawWaveNames, waveNameWave
         else
-            // wave recordWave = sc_CalcRecord
-            // wave waveNameWave = sc_CalcWaveNames
             duplicate/free/o sc_CalcRecord, recordWave
             duplicate/free/o/t sc_CalcWaveNames, waveNameWave
         endif
+        variable i=0
         for (i = 0; i<numpnts(waveNameWave); i++)     
             if (recordWave[i])
-                wavenames = addlistItem(waveNameWave[i], wavenames)
+                wavenames = addlistItem(waveNameWave[i], wavenames, ";", INF)
             endif
         endfor
     endif
-    return wavenames
+	return wavenames
 end
 
 function/t get2DWaveNames(raw, fastdac)
-    // Return a comma separated list of Raw or Calc wavenames (without any checks)
+    // Return a list of Raw or Calc wavenames (without any checks)
     variable raw, fastdac  // 1 for True, 0 for False
     string waveNames1D = get1DWaveNames(raw, fastdac)
-    string waveNames2D
+    string waveNames2D = ""
     variable i
     for (i = 0; i<ItemsInList(waveNames1D); i++)
-        waveNames2D = addlistItem(StringFromList(i, waveNames1D)+"_2d", waveNames2D)
+        waveNames2D = addlistItem(StringFromList(i, waveNames1D)+"_2d", waveNames2D, ";", INF)
     endfor
     return waveNames2D
 end
+
+function/t getCalcStrings()
+	
+
+end
+
 
 function sanityCheckWavenames(wavenames)
     // Take comma separated list of wavenames, and check they all make sense
@@ -372,54 +424,55 @@ function sanityCheckWavenames(wavenames)
             print "The first character of a wave name should be an alphabet a-z A-Z. The problematic wave name is " + s;
             abort
         endif
-        if (!((char2num(s[strlen(s)-1]) >= 97 && char2num(s[strlen(s)-1]) <= 122) || (char2num(s[strlen(s)-1]) >= 65 && char2num(s[strlen(s)-1]) <= 90)))
-            print "The last character of a wave name should be an alphabet a-z A-Z. The problematic wave name is " + s;
-            abort
-        endif
+////////////// Previously there was a check to prevent last character of wave name being a number
+////////////// This is not necessary for the fastdac, but maybe it needs to be reimplemented for ScanController??
+////////////// 2021/10  <-- If a significant amount of time has passed, remove all of this!
+//        if (!((char2num(s[strlen(s)-1]) >= 97 && char2num(s[strlen(s)-1]) <= 122) || (char2num(s[strlen(s)-1]) >= 65 && char2num(s[strlen(s)-1]) <= 90)))
+//            print "The last character of a wave name should be an alphabet a-z A-Z. The problematic wave name is " + s;
+//            abort
+//        endif
     endfor
 end
 
 function/t initializeGraphs(S)
     // Initialize graphs that are going to be recorded
+    // Returns list of Graphs that data is being plotted in
     struct ScanVars &S
-    string graphNames = getOpenGraphNames()
-    string graphTitles = getOpenGraphTitles()    
-    string graphNums = getOpenGraphNums()
+    string graphIDs = getOpenGraphIDs()
+
+	string/g sc_rawGraphs1D = ""  // So that fd_record_values knows which graphs to update while reading
 
     variable i, j, k
-    string graphName
-    for (i = 0; i<ItemsInList(graphNames); i++)
-        graphName = stringFromList(i, graphNames)
-        // TODO: Why do this?
-		setaxis/w=$graphname /a
-    endfor
-
     string waveNames, wn, title
-    string openGraphName
-    for (i = 0; i<2; i++)  // Raw = 0, Raw = 1
+    string openGraphID
+    for (i = 0; i<2; i++)  // Raw = 1, Calc = 0
         waveNames = get1DWaveNames(i, S.using_fastdac)
         for (j = 0; j<ItemsInList(waveNames); j++)  // Look through wavenames that are being recorded
             wn = StringFromList(j, waveNames)
-            openGraphName = graphExistsForWavename(wn)
-            if (cmpstr(openGraphName, "")) // Graph is already open (str != "")
-                setUpGraph1D(openGraphName, S.x_label)  // TODO: Add S.y_label if it is not null or empty
+            openGraphID = graphExistsForWavename(wn)
+            if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
+                setUpGraph1D(openGraphID, S.x_label)  // TODO: Add S.y_label if it is not null or empty
             else 
                 open1Dgraph(wn, S.x_label)
-                graphNames = addlistItem(winname(0,1), graphNames)
+                openGraphID = winname(0,1)
+                graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
             endif
+            if(i==1) // Raw waves
+            		sc_rawGraphs1D = addlistItem(openGraphID, sc_rawGraphs1D, ";", INF)
+            	endif
             if (S.is2d)
                 wn = wn+"_2d"
-                openGraphName = graphExistsForWavename(wn)
-                if (cmpstr(openGraphName, "")) // Graph is already open (str != "")
-                    setUpGraph2D(openGraphName, S.x_label, S.y_label)
+                openGraphID = graphExistsForWavename(wn)
+                if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
+                    setUpGraph2D(openGraphID, wn, S.x_label, S.y_label)
                 else 
                     open2Dgraph(wn, S.x_label, S.y_label)
-                    graphNames = addlistItem(winname(0,1), graphNames)
+                    graphIDs = addlistItem(winname(0,1), graphIDs, ";", INF)
                 endif
             endif
         endfor
     endfor
-    return graphNames
+    return graphIDs
 end
 
 function arrangeWindows(winNames)
@@ -431,7 +484,7 @@ function arrangeWindows(winNames)
     for (i = 0; i<itemsInList(winNames); i++)
         windowName = StringFromList(i, winNames)
         cmd += windowName+", "
-        doWindow/F windowName // Bring window to front 
+        doWindow/F $windowName // Bring window to front 
     endfor
     execute(cmd)
     doupdate
@@ -441,13 +494,14 @@ end
 function/t graphExistsForWavename(wn)
     // Checks if a graph is open containing wn, if so returns the graphTitle otherwise returns ""
     string wn
-    string graphTitles = getOpenGraphTitles()
+    string graphTitles = getOpenGraphTitles() 
+    string graphIDs = getOpenGraphIDs()
     string title
-    variable k
-    for (k = 0; k < ItemsInList(graphTitles); k++)  
-        title = StringFromList(k, graphTitles)
+    variable i
+    for (i = 0; i < ItemsInList(graphTitles); i++)  
+        title = StringFromList(i, graphTitles)
         if (stringMatch(wn, title))
-            return title  // TODO: Maybe this should return graphNum instead? 
+            return stringFromList(i, graphIDs)  
         endif
     endfor
     return ""
@@ -463,86 +517,104 @@ function open1Dgraph(wn, x_label)
 end
 
 function open2Dgraph(wn, x_label, y_label)
-    // Opens 2D graph for wn (where wn is just the 1D name)
+    // Opens 2D graph for wn
     string wn, x_label, y_label
-    string wn2d = wn+"_2d"
+    wave w = $wn
+    if (dimsize(w, 1) == 0)
+    	abort "Trying to open a 2D graph for a 1D wave"
+    endif
+    
     display
     setwindow kwTopWin, graphicsTech=0
-    appendimage $wn2d
-    setUpGraph2D(WinName(0,1), x_label, y_label)
+    appendimage $wn
+    setUpGraph2D(WinName(0,1), wn, x_label, y_label)
 end
 
-function setUpGraph1D(graphNumStr, x_label, [y_label])
-    string graphNumStr, x_label, y_label
+function setUpGraph1D(graphID, x_label, [y_label])
+    string graphID, x_label, y_label
     // Sets axis labels, datnum etc
-    Label /W=$graphNumStr bottom, x_label
+    setaxis/w=$graphID /a
+    Label /W=$graphID bottom, x_label
     if (!paramisDefault(y_label))
-        Label /W=$graphNumStr left, y_label
+        Label /W=$graphID left, y_label
     endif
-
     nvar filenum
-    TextBox /W=$graphNumStr/C/N=datnum/A=LT/X=1.0/Y=1.0/E=2 "Dat"+num2str(filenum)
+    TextBox /W=$graphID/C/N=datnum/A=LT/X=1.0/Y=1.0/E=2 "Dat"+num2str(filenum)
 end
 
-function setUpGraph2D(graphNumStr, x_label, y_label)
-    string graphNumStr, x_label, y_label
+function setUpGraph2D(graphID, wn, x_label, y_label)
+    string graphID, wn, x_label, y_label
     svar sc_ColorMap
     // Sets axis labels, datnum etc
-    Label /W=$graphNumStr bottom, x_label
-    Label /W=$graphNumStr left, y_label
+    Label /W=$graphID bottom, x_label
+    Label /W=$graphID left, y_label
 
-    modifyimage $graphNumStr ctab={*, *, $sc_ColorMap, 0}
-    colorscale /c/n=$sc_ColorMap /e/a=rc image=$graphNumStr
+    modifyimage /W=$graphID $wn ctab={*, *, $sc_ColorMap, 0}
+    colorscale /c/n=$sc_ColorMap /e/a=rc image=$wn
 
     nvar filenum
-    TextBox /W=$graphNumStr/C/N=datnum/A=LT/X=1.0/Y=1.0/E=2 "Dat"+num2str(filenum)
+    TextBox /W=$graphID/C/N=datnum/A=LT/X=1.0/Y=1.0/E=2 "Dat"+num2str(filenum)
+    
 end
 
-function/t getOpenGraphNames()
-	string graphlist = winlist("*",";","WIN:1")
-    string graphNames, graphName
-	variable i, j=0, index=0
-	for (i=0;i<itemsinlist(graphlist);i=i+1)
-		index = strsearch(graphlist,";",j)
-		graphname = graphlist[j,index-1]
-        graphnames += graphname+";"
-		j=index+1
-	endfor
-    return graphNames
-end
+//function/t getOpenGraphNames()
+//	// Returns list of full graph window names
+//	// e.g. "Graph1:testwave;Graph2:wave2" (where ";" separates the list)
+//	// Note: Can't use this to address a window directly
+//	string graphlist = winlist("*",";","WIN:1")
+//    string graphNames = "", graphName
+//	variable i, j=0, index=0
+//	for (i=0;i<itemsinlist(graphlist);i=i+1)
+//		index = strsearch(graphlist,";",j)
+//		graphname = graphlist[j,index-1]
+//        graphnames += graphname+";"
+//		j=index+1
+//	endfor
+//    return graphNames
+//end
 
 function/t getOpenGraphTitles()
+	// GraphTitle == name after the ":" in graph window names
+	// e.g. "Graph1:testwave" -> "testwave"
+	// Returns a list of GraphTitles
+	// Useful for checking which waves are displayed in a graph
 	string graphlist = winlist("*",";","WIN:1")
-    string graphTitles, graphName, plottitle
+    string graphTitles = "", graphName, graphNum, plottitle
 	variable i, j=0, index=0
 	for (i=0;i<itemsinlist(graphlist);i=i+1)
 		index = strsearch(graphlist,";",j)
 		graphname = graphlist[j,index-1]
 		getwindow $graphname wtitle
 		splitstring /e="(.*):(.*)" s_value, graphnum, plottitle
-		graphtitles+= plottitle+";"
+		graphTitles += plottitle+";"
 		j=index+1
 	endfor
     return graphTitles
 end
 
-function/t getOpenGraphNums()
+function/t getOpenGraphIDs()
+	// GraphID == name before the ":" in graph window names
+	// e.g. "Graph1:testwave" -> "Graph1"
+	// Returns a list of GraphIDs
+	// Use these to specify graph with /W=<graphID>
 	string graphlist = winlist("*",";","WIN:1")
-    string graphNums, graphName, graphNum
-    string wtitle
-	variable i, j=0, index=0
-	for (i=0;i<itemsinlist(graphlist);i=i+1)
-		index = strsearch(graphlist,";",j)
-		graphname = graphlist[j,index-1]
-		getwindow $graphname wtitle
-		splitstring /e="(.*):(.*)" s_value, graphnum, plottitle
-		graphNums+= graphnum+";"
-		j=index+1
-	endfor
-    return graphNums
+	return graphlist
+	
+//    string graphNums = "", graphName, graphNum
+//	variable i, j=0, index=0
+//	for (i=0;i<itemsinlist(graphlist);i=i+1)
+//		index = strsearch(graphlist,";",j)
+//		graphname = graphlist[j,index-1]
+//		getwindow $graphname wtitle
+//		splitstring /e="(.*):(.*)" s_value, graphnum, plottitle
+//		graphNums+= graphnum+";"
+//		j=index+1
+//	endfor
+//    return graphNums
 end
 
 function openAbortWindow()
     doWindow/k/z SweepControl  // Attempt to close previously open window just in case
-    doWindow SweepControl   // Open window
+    execute("abortmeasurementwindow()")
+    doWindow/F SweepControl   // Bring Sweepcontrol to the front
 end

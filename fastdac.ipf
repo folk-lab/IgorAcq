@@ -153,15 +153,10 @@ end
 
 function getFADCmeasureFreq(instrID)
 	// Calculates measurement frequency as sampleFreq/numadc 
-	// NOTE: This will not currently work if more than one fastdac is connected
+	// NOTE: This assumes ALL recorded ADCs are on ONE fastdac. I.e. does not support measuring with multiple fastdacs
 	variable instrID
 	
-	svar fdackeys
-	variable numDevices = str2num(stringbykey("numDevices",fdackeys,":",","))
-	if (numDevices != 1)
-		abort "ERROR[getFADCmeasureFreq]: This function only works for 1 fastdac currently"
-	endif
-	
+	svar fdackeys	
 	variable numadc, samplefreq
 	numadc = getnumfadc() 
 	if (numadc == 0)
@@ -533,7 +528,7 @@ function rampOutputFDAC(instrID,channel,output,[ramprate, ignore_lims]) // Units
 	
 	// check that output is within hardware limit
 	nvar fdac_limit
-	if(abs(output) > fdac_limit)
+	if(abs(output) > fdac_limit || numtype(output) != 0)
 		sprintf err, "[ERROR] \"rampOutputfdac\": Output voltage on channel %d outside hardware limit", channel
 		print err
 		resetfdacwindow(channel)
@@ -1061,18 +1056,18 @@ end
 // Calculate effective FastDac value
 // @optparams minVal, maxVal (units mV)
 
-function fdacChar2Num(c1, c2, [minVal, maxVal])
+function fdacChar2Num(c1, c2) //, [minVal, maxVal])
 	// Conversion of bytes to float
 	string c1, c2
-	variable minVal, maxVal
-	// Set default values for minVal & maxVal
-	if(paramisdefault(minVal))
-		minVal = -10000
-	endif
-	
-	if(paramisdefault(maxVal))
-		maxVal = 10000
-	endif
+	variable minVal = -10000, maxVal = 10000
+//	// Set default values for minVal & maxVal
+//	if(paramisdefault(minVal))
+//		minVal = -10000
+//	endif
+//	
+//	if(paramisdefault(maxVal))
+//		maxVal = 10000
+//	endif
 	// Check params for violation
 	if(strlen(c1) != 1 || strlen(c2) != 1)
 		print "[ERROR] strlen violation -- strings passed to fastDacChar2Num must be length 1"
