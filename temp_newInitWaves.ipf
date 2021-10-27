@@ -1,3 +1,8 @@
+
+/////////////////// ScanVars (sv_) ///////////////////////////////////////////
+/////////////// Struct for holding information about current scan ////////////
+//////////////////////////////////////////////////////////////////////////////
+
 // Structure to hold scan information (general to all scans)
 structure ScanVars
     variable instrID
@@ -38,6 +43,7 @@ structure ScanVars
     string startys, finys
 endstructure
 
+
 function initFDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate, rampratex, delayx, starty, finy, channelsy, numptsy, rampratey, delayy, direction, startxs, finxs, startys, finys, y_label, comments])
     // Function to make setting up scanVars struct easier for FastDAC scans
     // PARAMETERS:
@@ -75,23 +81,22 @@ function initFDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
     S.direction = paramisdefault(direction) ? 1 : direction
    	
    	// Sets channelsx, channelsy and is2d
-    setChannels(S, channelsx, channelsy, fastdac=1)
+    sv_setChannels(S, channelsx, channelsy, fastdac=1)
     
    	// Get Labels for graphs
 	S.x_label = GetLabel(S.channelsx, fastdac=1)  // Uses channels as list of numbers only
 	S.y_label = GetLabel(S.channelsy, fastdac=1)  // TODO: Use the optional y_label if provided (need to check for null str etc)
 
    	// Sets starts/fins in FD string format
-    setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
+    sv_setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
 	
 	// Set variables with some calculation
-    setNumptsSweeprate(S) 	// Checks that either numpts OR sweeprate was provided, and sets both in ScanVars accordingly
+    sv_setNumptsSweeprate(S) 	// Checks that either numpts OR sweeprate was provided, and sets both in ScanVars accordingly
                                     // Note: Valid for same start/fin points only (uses S.startx, S.finx NOT S.startxs, S.finxs)
-    setMeasureFreq(S) 		// Sets S.samplingFreq/measureFreq/numADCs	
-   
+    sv_setMeasureFreq(S) 		// Sets S.samplingFreq/measureFreq/numADCs	
 end
 
-function setNumptsSweeprate(S)
+function sv_setNumptsSweeprate(S)
 	Struct ScanVars &S
 	 // If NaN then set to zero so rest of logic works
    if(numtype(S.sweeprate) == 2)
@@ -110,13 +115,13 @@ function setNumptsSweeprate(S)
    endif
 end
 
-function setMeasureFreq(S)
+function sv_setMeasureFreq(S)
 	Struct ScanVars &S
    S.samplingFreq = getfadcSpeed(S.instrID)
    S.numADCs = getNumFADC()
    S.measureFreq = S.samplingFreq/S.numADCs  //Because sampling is split between number of ADCs being read //TODO: This needs to be adapted for multiple FastDacs
-
 end
+
 
 function initBDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate, delayx, rampratex, starty, finy, channelsy, numptsy, rampratey, delayy, direction])
     // Function to make setting up scanVars struct easier for FastDAC scans
@@ -150,7 +155,7 @@ function initBDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
     s.direction = paramisdefault(direction) ? 1 : direction
    	
    	// Sets channelsx, channelsy and is2d
-    setChannels(S, channelsx, channelsy, fastdac=0)
+    sv_setChannels(S, channelsx, channelsy, fastdac=0)
     
    	// Get Labels for graphs
 	string x_label, y_label
@@ -158,7 +163,7 @@ function initBDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
 	S.y_label = GetLabel(S.channelsy, fastdac=0) 
 end
 
-function setChannels(S, channelsx, channelsy, [fastdac])
+function sv_setChannels(S, channelsx, channelsy, [fastdac])
     // Set S.channelsx and S.channelys converting channel labels to numbers where necessary
     // Note: Also sets S.is2d
     struct ScanVars &S
@@ -178,7 +183,7 @@ function setChannels(S, channelsx, channelsy, [fastdac])
     endif
 end
 
-function setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
+function sv_setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
 
     struct ScanVars &S
     variable startx, finx, starty, finy
