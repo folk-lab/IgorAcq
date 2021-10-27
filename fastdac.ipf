@@ -376,11 +376,7 @@ function/s getFDACStatus(instrID)
 		buffer = addJSONkeyval(buffer, "ADC"+num2istr(i), num2numstr(getfadcChannel(instrID,adcChs+i)))
 	endfor
 	
-	// Sweep Lims
-	if (exists("sweepgates_x") == 1)  // Then the rest should exist too
-		savesinglewave("sweepgates_x")
-		savesinglewave("sweepgates_y")
-	endif
+
 	
 	// AWG info if used
 	nvar sc_AWG_used

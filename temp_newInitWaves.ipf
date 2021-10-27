@@ -323,7 +323,7 @@ function init2DWave(wn, numptsx, startx, finx, numptsy, starty, finy)
 	cmd = "setscale/I y " + num2str(starty) + ", " + num2str(finy) + ", " + wn; execute(cmd)
 end
 
-function/t getRecordedFastdacInfo(info_name)
+function/S getRecordedFastdacInfo(info_name)
 	// Return a list of strings for specified column in fadcattr based on whether "record" is ticked
     string info_name  // ("calc_names", "raw_names", "calc_funcs", "inputs", "channels")
     string return_list = ""
@@ -360,7 +360,7 @@ end
 
 
 
-function/t get1DWaveNames(raw, fastdac)
+function/S get1DWaveNames(raw, fastdac)
     // Return a list of Raw or Calc wavenames (without any checks)
     variable raw, fastdac  // 1 for True, 0 for False
     
@@ -391,7 +391,7 @@ function/t get1DWaveNames(raw, fastdac)
 	return wavenames
 end
 
-function/t get2DWaveNames(raw, fastdac)
+function/S get2DWaveNames(raw, fastdac)
     // Return a list of Raw or Calc wavenames (without any checks)
     variable raw, fastdac  // 1 for True, 0 for False
     string waveNames1D = get1DWaveNames(raw, fastdac)
@@ -401,11 +401,6 @@ function/t get2DWaveNames(raw, fastdac)
         waveNames2D = addlistItem(StringFromList(i, waveNames1D)+"_2d", waveNames2D, ";", INF)
     endfor
     return waveNames2D
-end
-
-function/t getCalcStrings()
-	
-
 end
 
 
@@ -434,7 +429,7 @@ function sanityCheckWavenames(wavenames)
     endfor
 end
 
-function/t initializeGraphs(S)
+function/S initializeGraphs(S)
     // Initialize graphs that are going to be recorded
     // Returns list of Graphs that data is being plotted in
     struct ScanVars &S
@@ -491,7 +486,7 @@ function arrangeWindows(winNames)
 end
 
 
-function/t graphExistsForWavename(wn)
+function/S graphExistsForWavename(wn)
     // Checks if a graph is open containing wn, if so returns the graphTitle otherwise returns ""
     string wn
     string graphTitles = getOpenGraphTitles() 
@@ -557,23 +552,7 @@ function setUpGraph2D(graphID, wn, x_label, y_label)
     
 end
 
-//function/t getOpenGraphNames()
-//	// Returns list of full graph window names
-//	// e.g. "Graph1:testwave;Graph2:wave2" (where ";" separates the list)
-//	// Note: Can't use this to address a window directly
-//	string graphlist = winlist("*",";","WIN:1")
-//    string graphNames = "", graphName
-//	variable i, j=0, index=0
-//	for (i=0;i<itemsinlist(graphlist);i=i+1)
-//		index = strsearch(graphlist,";",j)
-//		graphname = graphlist[j,index-1]
-//        graphnames += graphname+";"
-//		j=index+1
-//	endfor
-//    return graphNames
-//end
-
-function/t getOpenGraphTitles()
+function/S getOpenGraphTitles()
 	// GraphTitle == name after the ":" in graph window names
 	// e.g. "Graph1:testwave" -> "testwave"
 	// Returns a list of GraphTitles
@@ -592,29 +571,87 @@ function/t getOpenGraphTitles()
     return graphTitles
 end
 
-function/t getOpenGraphIDs()
+function/S getOpenGraphIDs()
 	// GraphID == name before the ":" in graph window names
 	// e.g. "Graph1:testwave" -> "Graph1"
 	// Returns a list of GraphIDs
 	// Use these to specify graph with /W=<graphID>
 	string graphlist = winlist("*",";","WIN:1")
 	return graphlist
-	
-//    string graphNums = "", graphName, graphNum
-//	variable i, j=0, index=0
-//	for (i=0;i<itemsinlist(graphlist);i=i+1)
-//		index = strsearch(graphlist,";",j)
-//		graphname = graphlist[j,index-1]
-//		getwindow $graphname wtitle
-//		splitstring /e="(.*):(.*)" s_value, graphnum, plottitle
-//		graphNums+= graphnum+";"
-//		j=index+1
-//	endfor
-//    return graphNums
 end
 
 function openAbortWindow()
     doWindow/k/z SweepControl  // Attempt to close previously open window just in case
     execute("abortmeasurementwindow()")
     doWindow/F SweepControl   // Bring Sweepcontrol to the front
+end
+
+
+
+function /s new_sc_createSweepLogs([S])
+	// Creates a Json String which contains information about Scan
+	Struct ScanVars &S
+	string jstr = "", buffer = ""
+	nvar filenum, sweep_t_elapsed
+	svar sc_current_config, sc_hostname, sc_x_label, sc_y_label
+
+
+	jstr = addJSONkeyval(jstr, "comment", S.comments, addQuotes=1)
+	jstr = addJSONkeyval(jstr, "filenum", num2istr(filenum))
+	
+	buffer = addJSONkeyval(buffer, "x", S.x_label, addQuotes=1)
+	buffer = addJSONkeyval(buffer, "y", S.y_label, addQuotes=1)
+	jstr = addJSONkeyval(jstr, "axis_labels", buffer)
+	
+	jstr = addJSONkeyval(jstr, "current_config", sc_current_config, addQuotes = 1)
+	jstr = addJSONkeyval(jstr, "time_completed", Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
+	jstr = addJSONkeyval(jstr, "time_elapsed", num2numStr(S.end_time-S.start_time))
+
+    sc_instrumentLogs(jstr)  // Modifies the jstr to add Instrumt Status (from ScanController Window)
+	return jstr
+end
+
+
+function sc_instrumentLogs(jstr)
+	// instrument logs (ScanController Window)
+	// all log strings should be valid JSON objects
+    string &jstr
+
+	wave /t sc_Instr
+	variable i=0, j=0, addQuotes=0
+	string command="", val=""
+	string /G sc_log_buffer=""
+	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
+		sc_log_buffer=""
+		command = TrimString(sc_Instr[i][2])
+		if(strlen(command)>0 && cmpstr(command[0], "/") !=0) // Command and not commented out
+			Execute/Q/Z "sc_log_buffer="+command
+			if(V_flag!=0)
+				print "[ERROR] in sc_createSweepLogs: "+GetErrMessage(V_Flag,2)
+			endif
+			if(strlen(sc_log_buffer)!=0)
+				// need to get first key and value from sc_log_buffer
+				JSONSimple sc_log_buffer
+				wave/t t_tokentext
+				wave w_tokentype, w_tokensize, w_tokenparent
+	
+				for(j=1;j<numpnts(t_tokentext)-1;j+=1)
+					if ( w_tokentype[j]==3 && w_tokensize[j]>0 )
+						if( w_tokenparent[j]==0 )
+							if( w_tokentype[j+1]==3 )
+								val = "\"" + t_tokentext[j+1] + "\""
+							else
+								val = t_tokentext[j+1]
+							endif
+							jstr = addJSONkeyval(jstr, t_tokentext[j], val)
+							break
+						endif
+					endif
+				endfor
+				
+			else
+				print "[WARNING] command failed to log anything: "+command+"\r"
+			endif
+		endif
+	endfor
 end

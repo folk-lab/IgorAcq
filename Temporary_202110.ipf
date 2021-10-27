@@ -360,8 +360,16 @@ function FastDacSave(S)
 	endif
 	
 	// add Meta data to each file
-	addMetaFiles(hdfids, msg=S.comments)
+	addMetaFiles(hdfids, S=S)
+	
+	saveFastdacInfoWaves(hdfids, S)
 
+	// Save ScanWaves (e.g. x_array, y_array etc)
+	saveScanWaves(calc_hdf5_id, S, 0)
+	if (Sc_saveRawFadc == 1)
+		saveScanWaves(raw_hdf5_id, S, 1)
+	endif
+	
 	// Get waveList to save
 	string RawWaves, CalcWaves
 	if(S.is2d == 0)
@@ -384,8 +392,60 @@ function FastDacSave(S)
 		SaveWavesToHDF(RawWaves, raw_hdf5_id, saveNames=rawSaveNames)
 	endif
 	initcloseSaveFiles(hdfids) // close all files
-	
 end
+
+
+function saveFastdacInfoWaves(hdfids, S)
+	string hdfids
+	Struct ScanVars &S
+	
+	variable i = 0
+
+	make/o/N=(3, itemsinlist(s.channelsx, ",")) sweepgates_x = 0
+	for (i=0; i<itemsinlist(s.channelsx, ","); i++)
+		sweepgates_x[0][i] = str2num(stringfromList(i, s.channelsx, ","))
+		sweepgates_x[1][i] = str2num(stringfromlist(i, s.startxs, ","))
+		sweepgates_x[2][i] = str2num(stringfromlist(i, s.finxs, ","))
+	endfor
+	
+	if (S.is2d)  // Also Y info
+		make/o/N=(3, itemsinlist(s.channelsy, ",")) sweepgates_y = 0
+		for (i=0; i<itemsinlist(s.channelsy, ","); i++)
+			sweepgates_y[0][i] = str2num(stringfromList(i, s.channelsy, ","))
+			sweepgates_y[1][i] = str2num(stringfromlist(i, s.startys, ","))
+			sweepgates_y[2][i] = str2num(stringfromlist(i, s.finys, ","))
+		endfor
+	else
+		make/o sweepgates_y = {{NaN, NaN, NaN}}
+	endif
+	
+	variable hdfid
+	for(i=0; i<itemsInList(hdfids); i++)
+		hdfid = str2num(stringFromList(i, hdfids))
+		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 /Z sweepgates_x, hdfid
+		if (V_flag != 0)
+			Print "HDF5SaveData failed on sweepgates_x"
+		endif
+		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 /Z sweepgates_y, hdfid
+		if (V_flag != 0)
+			Print "HDF5SaveData failed on sweepgates_y"
+		endif
+	endfor
+end
+
+
+function LogsOnlySave(hdfid)
+	// Save current state of experiment (i.e. most of sweeplogs) but without any specific data from a scan
+	variable hdfid
+
+	abort "Not implemented again yet, need to think about what info to get from createSweepLogs etc"
+	make/o/free/t/n=1 attr_message = "True"
+	HDF5SaveData /A="Logs_Only" attr_message, hdfid, "/"
+
+	string jstr = ""
+	sc_instrumentLogs(jstr) // TODO: Save this jstr into HDF
+end
+
 
 function/t getRawSaveNames(baseNames)
 	// Returns baseName +"_RAW" for baseName in baseNames
@@ -577,19 +637,14 @@ function initOpenSaveFiles(RawSave)
 end
 
 
-function addMetaFiles(hdf5_id_list, [msg, logs_only])
+function addMetaFiles(hdf5_id_list, [S, logs_only])
 	// meta data is created and added to the files in list
-	// hdf5_id_list
-	string msg
-	variable logs_only  // 1=Don't save any data to HDF
 	string hdf5_id_list
-	
-	if(paramisdefault(msg)) // save meta data
-		msg=""
-	endif
+	Struct ScanVars &S
+	variable logs_only  // 1=Don't save any data to HDF
 	
 	make /FREE /T /N=1 cconfig = prettyJSONfmt(sc_createconfig())
-	make /FREE /T /N=1 sweep_logs = prettyJSONfmt(sc_createSweepLogs(msg=msg))
+	make /FREE /T /N=1 sweep_logs = prettyJSONfmt(new_sc_createSweepLogs(S=S))
 	
 	// Check that prettyJSONfmt actually returned a valid JSON.
 	sc_confirm_JSON(sweep_logs, name="sweep_logs")
@@ -600,52 +655,74 @@ function addMetaFiles(hdf5_id_list, [msg, logs_only])
 	variable hdf5_id
 	for (i=0;i<itemsinlist(hdf5_id_list);i++)
 		hdf5_id = str2num(stringFromList(i, hdf5_id_list))
-	
 
-	if (logs_only != 1)
-		// save x and y arrays
-		nvar sc_is2d
-		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_xdata" , hdf5_id, "x_array"
-		if(sc_is2d == 1)
-			HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_ydata" , hdf5_id, "y_array"
-		elseif(sc_is2d == 2)
-			HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_ydata" , hdf5_id, "y_array"
-			HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_linestart", hdf5_id, "linestart"
+		
+		// Create metadata
+		// this just creates one big JSON string attribute for the group
+		// its... fine
+		variable /G meta_group_ID
+		HDF5CreateGroup/z hdf5_id, "metadata", meta_group_ID
+		if (V_flag != 0)
+				Print "HDF5OpenGroup Failed: ", "metadata"
 		endif
-	else // Make attr in HDF which makes it clear this was only to store Logs
-		make/o/free/t/n=1 attr_message = "True"
-		HDF5SaveData /A="Logs_Only" attr_message, hdf5_id, "/"
-	endif
-	
-	// Create metadata
-	// this just creates one big JSON string attribute for the group
-	// its... fine
-	variable /G meta_group_ID
-	HDF5CreateGroup/z hdf5_id, "metadata", meta_group_ID
-	if (V_flag != 0)
-			Print "HDF5OpenGroup Failed: ", "metadata"
-	endif
 
-	
-	HDF5SaveData/z /A="sweep_logs" sweep_logs, hdf5_id, "metadata"
-	if (V_flag != 0)
-			Print "HDF5SaveData Failed: ", "sweep_logs"
-	endif
-	
-	HDF5SaveData/z /A="sc_config" cconfig, hdf5_id, "metadata"
-	if (V_flag != 0)
-			Print "HDF5SaveData Failed: ", "sc_config"
-	endif
+		
+		HDF5SaveData/z /A="sweep_logs" sweep_logs, hdf5_id, "metadata"
+		if (V_flag != 0)
+				Print "HDF5SaveData Failed: ", "sweep_logs"
+		endif
+		
+		HDF5SaveData/z /A="sc_config" cconfig, hdf5_id, "metadata"
+		if (V_flag != 0)
+				Print "HDF5SaveData Failed: ", "sc_config"
+		endif
 
-	HDF5CloseGroup /Z meta_group_id
-	if (V_flag != 0)
-		Print "HDF5CloseGroup Failed: ", "metadata"
-	endif
+		HDF5CloseGroup /Z meta_group_id
+		if (V_flag != 0)
+			Print "HDF5CloseGroup Failed: ", "metadata"
+		endif
 
-	// may as well save this config file, since we already have it
-	sc_saveConfig(cconfig[0])
-	
+		// may as well save this config file, since we already have it
+		sc_saveConfig(cconfig[0])
+		
 	endfor
+end
+
+
+function saveScanWaves(hdfid, S, raw)
+	// Save x_array and y_array in HDF 
+	// Note: The x_array will have the right dimensions taking into account filtering
+	variable hdfid
+	Struct ScanVars &S
+	variable raw
+
+
+	if(raw)
+		make/o/free/N=(S.numptsx) sc_xarray
+	else
+		make/o/free/N=(postFilterNumpts(S.numptsx, S.measureFreq)) sc_xarray
+	endif
+
+	string cmd
+	setscale/I x S.startx, S.finx, sc_xarray
+	// cmd = "setscale/I x " + num2str(S.startx) + ", " + num2str(S.finx) + ", \"\", " + "sc_xdata"; execute(cmd)
+	// cmd = "sc_xdata" +" = x"; execute(cmd)
+	HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 sc_xarray, hdfid, "x_array"
+
+	if (S.is2d)
+		make/o/free/N=(S.numptsy) sc_yarray
+		
+		setscale/I x S.starty, S.finy, sc_yarray
+		// cmd = "setscale/I x " + num2str(S.starty) + ", " + num2str(S.finy) + ", \"\", " + "sc_ydata"; execute(cmd)
+		// cmd = "sc_ydata" +" = x"; execute(cmd)
+		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 sc_yarray, hdfid, "y_array"
+	endif
+
+	// save x and y arrays
+	if(S.is2d == 2)
+		abort "Not implemented again yet, need to figure out how/where to get linestarts from"
+		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_linestart", hdfid, "linestart"
+	endif
 end
 
 
@@ -828,22 +905,4 @@ function fdRV_process_and_distribute(ScanVars, AWG_list, rowNum)
 		endif
 	endfor	
 	doupdate // Update all the graphs with their new data
-end
-
-function NEW_EndScan()
-
-	// Close Abort window
-	// Saving Requirements
-	// If filtering:
-	// Save RAW data in a separate HDF (something like datXXX_RAW.h5)
-	//		(along with sweep logs etc)
-	//		(then delete from igor experiment)
-	// Save filtered/calc'd data in the normal datXXX.h5
-	// 		(with same sweep logs etc)
-	// 		(Make a copy in Igor like usual (e.g. datXXX_cscurrent)
-	// If not filtering -- Save like normal
-
-	// Save experiment
-
-	// Anything else that SaveWaves() does?
 end
