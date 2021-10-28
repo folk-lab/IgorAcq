@@ -92,9 +92,73 @@ end
 //////////////////////////// Taking Data and processing //////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
 
-function fd_Record_Values(S, PL, rowNum, [AWG_list, linestart])
+
+
+function postFilterNumpts(raw_numpts, measureFreq)
+    // Returns number of points that will exist after applying lowpass filter specified in ScanController_Fastdac
+    variable raw_numpts, measureFreq
+	
+	nvar boxChecked = sc_ResampleFreqCheckFadc
+	nvar targetFreq = sc_ResampleFreqFadc
+	if (boxChecked)
+	  	RatioFromNumber (targetFreq / measureFreq)
+	  	return ceil(raw_numpts*(V_numerator)/(V_denominator))  // TODO: Is this actually how many points are returned?
+	else
+		return raw_numpts
+	endif
+end
+
+function/S getRecordedFastdacInfo(info_name)
+	// Return a list of strings for specified column in fadcattr based on whether "record" is ticked
+    string info_name  // ("calc_names", "raw_names", "calc_funcs", "inputs", "channels")
+    string return_list = ""
+    variable i
+    wave fadcattr
+
+    wave/t fadcvalstr
+    for (i = 0; i<dimsize(fadcvalstr, 0); i++)
+        if (fadcattr[i][2] == 48) // Checkbox checked
+			strswitch(info_name)
+				case "calc_names":
+                return_list = addlistItem(fadcvalstr[i][3], return_list, ";", INF)  												
+					break
+				case "raw_names":
+                return_list = addlistItem("ADC"+num2str(i), return_list, ";", INF)  						
+					break
+				case "calc_funcs":
+                return_list = addlistItem(fadcvalstr[i][4], return_list, ";", INF)  						
+					break						
+				case "inputs":
+                return_list = addlistItem(fadcvalstr[i][1], return_list, ";", INF)  												
+					break						
+				case "channels":
+                return_list = addlistItem(fadcvalstr[i][0], return_list, ";", INF)  																		
+					break
+				default:
+					abort "bad name requested: " + info_name
+					break
+			endswitch						
+        endif
+    endfor
+    return return_list
+end
+
+
+function resampleWaves(w, measureFreq, targetFreq)
+	// takes a list of wave names and resamples each, from measureFreq
+	// to targetFreq (which should be lower than measureFreq)
+	Wave w
+	variable measureFreq, targetFreq
+	
+	RatioFromNumber (targetFreq / measureFreq)
+	resample/UP=(V_numerator)/DOWN=(V_denominator)/N=101 w
+  		// TODO: Need to test N more (simple testing suggests we may need >200 in some cases!)
+  		// TODO: Need to decide what to do with end effect. Possibly /E=2 (set edges to 0) and then turn those zeros to NaNs? 
+  		// TODO: Or maybe /E=3 is safest (repeat edges). The default /E=0 (bounce) is awful.
+end
+
+function NEW_fd_record_values(S, rowNum, [AWG_list, linestart])
 	struct ScanVars &S
-	struct fdRV_processList &PL
 	variable rowNum, linestart
 	struct fdAWG_list &AWG_list
 	// If passed AWG_list with AWG_list.use_AWG == 1 then it will run with the Arbitrary Wave Generator on
@@ -104,63 +168,120 @@ function fd_Record_Values(S, PL, rowNum, [AWG_list, linestart])
 	variable/g sc_AWG_used = 0  // Global so that this can be used in SaveWaves() to save AWG info if used
 	if(!paramisdefault(AWG_list) && AWG_list.use_AWG == 1)  // TODO: Does this work?
 		sc_AWG_used = 1
-
 		if(rowNum == 0)
 			print "fd_Record_Values: Using AWG"
 		endif
 	endif
-	
+
 	// Check if this is a linecut scan and update centers if it is
 	if(!paramIsDefault(linestart))
+		abort "Not Implemented again yet, should update something in ScanVars probably"
 		wave sc_linestart
 		sc_linestart[rowNum] = linestart
 	endif
 
-   // Check InitWaves was run with fastdac=1
-//   fdRV_check_init()
+	if (rowNum == 0 && S.start_time == 0)
+		S.start_time = datetime
+	endif
+
 
    // Check that checks have been carried out in main scan function where they belong
 	if(S.lims_checked != 1)
-		abort "ERROR[fd_record_values]: FD_ScanVars.lims_checked != 1. Probably called before limits/ramprates/sweeprates have been checked in the main Scan Function!"
+	 	abort "ERROR[fd_record_values]: FD_ScanVars.lims_checked != 1. Probably called before limits/ramprates/sweeprates have been checked in the main Scan Function!"
 	endif
 
-   // Check that DACs are at start of ramp (will set if necessary but will give warning if it needs to)
+   	// Check that DACs are at start of ramp (will set if necessary but will give warning if it needs to)
 	fdRV_check_ramp_start(S)
 
+	// Send command and read values
+	fdRV_send_command_and_read(S, AWG_list, rowNum) 
+	S.end_time = datetime  
+	
+	// Process 1D read and distribute
+	fdRV_process_and_distribute(S, AWG_list, rowNum) 
+	
+	// // check abort/pause status
+	// fdRV_check_sweepstate(S.instrID)
+	// return looptime
+end
+
+function fdRV_send_command_and_read(ScanVars, AWG_list, rowNum)
+	// Send 1D Sweep command to fastdac and record the raw data it returns ONLY
+	struct ScanVars &ScanVars
+	struct fdAWG_list &AWG_list
+	variable rowNum
 	string cmd_sent = ""
 	variable totalByteReturn
+	nvar sc_AWG_used
 	if(sc_AWG_used)  	// Do AWG_RAMP
-	   cmd_sent = fd_start_AWG_RAMP(S, AWG_list)
-	else				// DO normal INT_RAMP
-		cmd_sent = fd_start_INT_RAMP(S)
+	   cmd_sent = fd_start_AWG_RAMP(ScanVars, AWG_list)
+	else				// DO normal INT_RAMP  
+		cmd_sent = fd_start_INT_RAMP(ScanVars)
 	endif
-	print cmd_sent
 	
-	totalByteReturn = S.numADCs*2*S.numptsx
+	totalByteReturn = ScanVars.numADCs*2*ScanVars.numptsx
 	sc_sleep(0.1) 	// Trying to get 0.2s of data per loop, will timeout on first loop without a bit of a wait first
 	variable looptime = 0
-   looptime = fdRV_record_buffer(S, rowNum, totalByteReturn)
-
+   looptime = fdRV_record_buffer(ScanVars, rowNum, totalByteReturn)
+	
    // update window
 	string endstr
-	endstr = readInstr(S.instrID)
+	endstr = readInstr(ScanVars.instrID)
 	endstr = sc_stripTermination(endstr,"\r\n")
 	if(fdacCheckResponse(endstr,cmd_sent,isString=1,expectedResponse="RAMP_FINISHED"))
-		fdRV_update_window(S, S.numADCs)
+		fdRV_update_window(ScanVars, ScanVars.numADCs)  /// TODO: Check this isn't slow
 		if(sc_AWG_used)  // Reset AWs back to zero (I don't see any reason the user would want them left at the final position of the AW)
-			rampmultiplefdac(S.instrID, AWG_list.AW_DACs, 0)
+			rampmultiplefdac(ScanVars.instrID, AWG_list.AW_DACs, 0)
 		endif
 	endif
 
-	// Post processing
-	fdRV_Process_data(S, PL, rowNum)
-	doupdate
-
-	// check abort/pause status
-	fdRV_check_sweepstate(S.instrID)
-//	printf "LOOPTIME: %.2f\r", looptime				//DEBUG
-	return looptime
+	// fdRV_check_sweepstate(S.instrID)
 end
+
+
+function fdRV_process_and_distribute(ScanVars, AWG_list, rowNum)
+	// Get 1D wave names, duplicate each wave then resample and copy into calc wave (and do calc string)
+	struct ScanVars &ScanVars
+	struct fdAWG_list &AWG_list
+	variable rowNum
+		
+	// Get all raw 1D wave names in a list
+	string RawWaveNames1D = get1DWaveNames(1, 1)
+	string CalcWaveNames1D = get1DwaveNames(0, 1)
+	string CalcStrings = getRecordedFastdacInfo("calc_funcs")
+	if (itemsinList(RawWaveNames1D) != itemsinList(CalCWaveNames1D))
+		abort "Different number of raw wave names compared to calc wave names"
+	endif
+
+	nvar sc_ResampleFreqCheckfadc
+	nvar sc_ResampleFreqfadc
+	
+	variable i = 0
+	string rwn, cwn
+	string calc_string
+	for (i=0; i<itemsinlist(RawWaveNames1D); i++)
+		rwn = StringFromList(i, RawWaveNames1D)
+		cwn = StringFromList(i, CalcWaveNames1D)		
+		calc_string = StringFromList(i, CalcStrings)
+		duplicate/o $rwn sc_tempwave
+	
+		if (sc_ResampleFreqCheckfadc != 0)
+			resampleWaves(sc_tempwave, ScanVars.measureFreq, sc_ResampleFreqfadc)
+		endif
+		calc_string = ReplaceString(rwn, calc_string, "sc_tempwave")
+		
+		execute("sc_tempwave ="+calc_string)
+		execute(cwn+" = sc_tempwave")
+		
+		if (ScanVars.is2d)
+			cwn = cwn+"_2d"
+			wave w = $cwn
+			w[][rowNum] = sc_tempwave[p]		
+		endif
+	endfor	
+	doupdate // Update all the graphs with their new data
+end
+
 
 
 function fd_readvstime(instrID, channels, numpts, samplingFreq, numChannels, [spectrum_analyser])
