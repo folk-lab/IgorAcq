@@ -5,8 +5,8 @@
 // Version 1.8 XXXX X, 2017
 // Version 2.0 May, 2018
 // Version 3.0 March, 2020
-// Version 4.0 Oct, 2021
-// Authors: Mohammad Samani, Nik Hartman, Christian Olsen, Tim Child
+// Version 4.0 Oct, 2021 -- Tim Child, Johann Drayne
+// Authors: Mohammad Samani, Nik Hartman, Christian Olsen, Tim Child, Johann Drayne
 
 // Updates in 2.0:
 
@@ -1554,6 +1554,10 @@ function RecordValues(i, j, [readvstime, fillnan])
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
 	nvar sc_abortsweep, sc_pause, sc_scanstarttime
 	variable ii = 0
+	
+	
+	abort "Not reimplemented yet. Needs to use ScanVars etc similar to fastdac, and be tested"
+	//TODO: DO this
 
 	//// setup all sorts of logic so we can store values correctly ////
 
