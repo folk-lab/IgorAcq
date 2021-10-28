@@ -263,7 +263,7 @@ function/s getJSONvalue(jstr, key)
 	
 	key_length = itemsinlist(key,":")
 
-	JSONSimple jstr
+	JSONSimple/z jstr
 	wave/t t_tokentext
 	wave w_tokentype, w_tokensize
 
