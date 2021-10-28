@@ -543,7 +543,7 @@ function setLS370heaterpower(instrID,heater,output) //Units: mW
 	svar ls_label
 
 	// check for NAN and INF
-	if(sc_check_naninf(output) != 0)
+	if(numtype(output) != 0)
 		abort "trying to set power to NaN or Inf"
 	endif
 
@@ -650,7 +650,7 @@ function setLS370tempSetpoint(instrID,temp) // Units: mK
 	nvar temp_set
 
 	// check for NAN and INF
-	if(sc_check_naninf(temp) != 0)
+	if(numtype(temp) != 0)
 		abort "trying to set temperarture to NaN or Inf"
 	endif
 	
@@ -672,7 +672,7 @@ function setLS370PIDparameters(instrID,p,i,d) // Units: No units
 	svar ls_label
 
 	// check for NAN and INF
-	if(sc_check_naninf(p) != 0 || sc_check_naninf(i) != 0 || sc_check_naninf(d) != 0)
+	if(numtype(p) != 0 || numtype(i) != 0 || numtype(d) != 0)
 		abort "trying to set PID parameters to NaN or Inf"
 	endif
 
@@ -721,7 +721,7 @@ function setLS370temp(instrID,setpoint,[maxcurrent]) //Units: mK, mA
 	endif
 
 	// check for NAN and INF
-	if(sc_check_naninf(setpoint) != 0)
+	if(numtype(setpoint) != 0)
 		abort "trying to set setpoint to NaN or Inf"
 	endif
 	
