@@ -510,76 +510,77 @@ function ScanFastDAC(instrID, start, fin, channels, [numpts, sweeprate, ramprate
 	endif
 end
 
-//
-//function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, numptsy, [numpts, sweeprate, bdID, rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, RCcutoff, numAverage, notch, nosave, use_AWG])
-//	// 2D Scan for FastDAC only OR FastDAC on fast axis and BabyDAC on slow axis
-//	// Note: Must provide numptsx OR sweeprate in optional parameters instead
-//	// Note: To ramp with babyDAC on slow axis provide the BabyDAC variable in bdID
-//	// Note: channels should be a comma-separated string ex: "0,4,5"
-//	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, rampratex, rampratey, delayy, RCcutoff, numAverage, nosave, use_AWG
-//	string channelsx, channelsy, comments, notch, startxs, finxs, startys, finys
-//	variable i=0, j=0
-//
-//	// Reconnect instruments
-//	sc_openinstrconnections(0)
-//
-//	// Set defaults
-//	nvar fd_ramprate
-//	rampratex = paramisdefault(rampratex) ? fd_ramprate : rampratex
-//	rampratey = ParamIsDefault(rampratey) ? fd_ramprate : rampratey
-//	delayy = ParamIsDefault(delayy) ? 0.01 : delayy
-//	notch = selectstring(paramisdefault(notch), notch, "")
-//   comments = selectstring(paramisdefault(comments), comments, "")
-//   startxs = selectstring(paramisdefault(startxs), startxs, "")
-//   finxs = selectstring(paramisdefault(finxs), finxs, "")
-//   startys = selectstring(paramisdefault(startys), startys, "")
-//   finys = selectstring(paramisdefault(finys), finys, "")
-//   variable use_bd = paramisdefault(bdid) ? 0 : 1 		// Whether using both FD and BD or just FD
-//   
-//   if (!paramisdefault(bdID) && (!paramisdefault(startys) || !paramisdefault(finys)))
-//   		abort "NotImplementedError: Cannot do virtual sweep with Babydacs"
-//   	endif
-//   
-//   // Set sc_scanVars struct
-// 	struct FD_ScanVars Fsv
-// 	if(use_bd == 0)  	// if not using BabyDAC then fully init FDscanVars
-//	   SF_init_FDscanVars(Fsv, fdID, startx, finx, channelsx, numpts, rampratex, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
-//	   						 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys)
-//	else  				// Using BabyDAC for Y axis so init x in FD_ScanVars, and init y in BD_ScanVars
+
+function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, numptsy, [numpts, sweeprate, bdID, rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave, use_AWG])
+	// 2D Scan for FastDAC only OR FastDAC on fast axis and BabyDAC on slow axis
+	// Note: Must provide numptsx OR sweeprate in optional parameters instead
+	// Note: To ramp with babyDAC on slow axis provide the BabyDAC variable in bdID
+	// Note: channels should be a comma-separated string ex: "0,4,5"
+	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, rampratex, rampratey, delayy, nosave, use_AWG
+	string channelsx, channelsy, comments, startxs, finxs, startys, finys
+	variable i=0, j=0
+
+	// Set defaults
+	nvar fd_ramprate
+	rampratex = paramisdefault(rampratex) ? fd_ramprate : rampratex
+	rampratey = ParamIsDefault(rampratey) ? fd_ramprate : rampratey
+	delayy = ParamIsDefault(delayy) ? 0.01 : delayy
+   comments = selectstring(paramisdefault(comments), comments, "")
+   startxs = selectstring(paramisdefault(startxs), startxs, "")
+   finxs = selectstring(paramisdefault(finxs), finxs, "")
+   startys = selectstring(paramisdefault(startys), startys, "")
+   finys = selectstring(paramisdefault(finys), finys, "")
+   variable use_bd = paramisdefault(bdid) ? 0 : 1 		// Whether using both FD and BD or just FD
+
+   if (!paramisdefault(bdID) && (!paramisdefault(startys) || !paramisdefault(finys)))
+   		abort "NotImplementedError: Cannot do virtual sweep with Babydacs"
+   	endif
+
+	// Reconnect instruments
+	sc_openinstrconnections(0)
+
+	// Put info into scanVars struct (to more easily pass around later)
+ 	struct ScanVars S
+ 	if (use_bd == 0)
+	 	initFDscanVars(S, fdID, startx, finx, channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
+		   						 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys, comments=comments)
+	
+	else  				// Using BabyDAC for Y axis so init x in FD_ScanVars, and init y in BD_ScanVars
+		abort "Not implemented again yet"
 //	   SF_init_FDscanVars(Fsv, fdID, startx, finx, channelsx, numpts, rampratex, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, startxs=startxs, finxs=finxs)
 //		struct BD_ScanVars Bsv
 //		SF_init_BDscanVars(Bsv, bdID, starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey)
-//	endif
-//   
-//   // Set ProcessList Struct
-//   struct fdRV_ProcessList PL
-//   SFfd_init_ProcessList(PL, RCcutoff, numAverage, notch)
-//   
-//   // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
-//   SFfd_pre_checks(Fsv)  
-//   if(use_bd == 1)
+	endif
+      
+   // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
+   SFfd_pre_checks(S)  
+   if(use_bd == 1)
 //   		SFbd_pre_checks(Bsv)
-//   	endif
-//   	
-//   	// If using AWG then get that now and check it
-//	struct fdAWG_list AWG
-//	if(use_AWG)	
-//		fdAWG_get_global_AWG_list(AWG)
-//		SFawg_set_and_precheck(AWG, Fsv)  // Note: sets SV.numptsx here and AWG.use_AWG = 1 if pass checks
-//	else  // Don't use AWG
-//		AWG.use_AWG = 0  	// This is the default, but just putting here explicitly
-//	endif
-//   
-//   // Ramp to start without checks
-//   SFfd_ramp_start(Fsv, ignore_lims=1)
-//   if(use_bd == 1)
+   	endif
+   	
+   	// If using AWG then get that now and check it
+	struct fdAWG_list AWG
+	if(use_AWG)	
+		fdAWG_get_global_AWG_list(AWG)
+		SFawg_set_and_precheck(AWG, S)  // Note: sets SV.numptsx here and AWG.use_AWG = 1 if pass checks
+	else  // Don't use AWG
+		AWG.use_AWG = 0  	// This is the default, but just putting here explicitly
+	endif
+   
+   // Ramp to start without checks
+   SFfd_ramp_start(S, ignore_lims=1)
+   if(use_bd == 1)
 //   		SFbd_ramp_start(Bsv, ignore_lims=1)
-//   	endif
-//   	
-//   	// Let gates settle
-//	sc_sleep(Fsv.delayy)
-//
+   	endif
+   	
+   	// Let gates settle
+	sc_sleep(S.delayy)
+
 //	// Get Labels for waves
+	if(use_bd == 1)
+		abort "Need to implement"
+		// Something like S.y_label = BDS.y_label
+	endif
 //	string x_label, y_label
 //	x_label = GetLabel(Fsv.channelsx, fastdac=1)
 //	if (use_bd == 0) // If using FastDAC on slow axis
@@ -587,41 +588,45 @@ end
 //	else // If using BabyDAC on slow axislabels
 //		y_label = GetLabel(Bsv.channelsy, fastdac=0)
 //	endif
-//
-//	// Make waves												// Note: Using just starty, finy because initwaves doesn't care if it's FD/BD
+
+	// Make waves												// Note: Using just starty, finy because initwaves doesn't care if it's FD/BD
 //	InitializeWaves(Fsv.startx, Fsv.finx, Fsv.numptsx, starty=starty, finy=finy, numptsy=Fsv.numptsy, x_label=x_label, y_label=y_label, fastdac=1)
-//
-//	// Main measurement loop
-//	variable setpointy, sy, fy
-//	string chy
-//	for(i=0; i<Fsv.numptsy; i++)
-//		// Ramp slow axis
-//		if(use_bd == 0)
-//			for(j=0; j<itemsinlist(Fsv.channelsy,","); j++)
-//				sy = str2num(stringfromList(j, Fsv.startys, ","))
-//				fy = str2num(stringfromList(j, Fsv.finys, ","))
-//				chy = stringfromList(j, Fsv.channelsy, ",")
-//				setpointy = sy + (i*(fy-sy)/(Fsv.numptsy-1))	
-//				RampMultipleFDac(Fsv.instrID, chy, setpointy, ramprate=Fsv.rampratey, ignore_lims=1)
-//			endfor
-//		else // If using BabyDAC on slow axislabels
-//			setpointy = starty + (i*(finy-starty)/(Fsv.numptsy-1))	
+	initializeScan(S)
+
+	// Main measurement loop
+	variable setpointy, sy, fy
+	string chy
+	for(i=0; i<S.numptsy; i++)
+		// Ramp slow axis
+		if(use_bd == 0)
+			for(j=0; j<itemsinlist(S.channelsy,","); j++)
+				sy = str2num(stringfromList(j, S.startys, ","))
+				fy = str2num(stringfromList(j, S.finys, ","))
+				chy = stringfromList(j, S.channelsy, ",")
+				setpointy = sy + (i*(fy-sy)/(S.numptsy-1))	
+				RampMultipleFDac(S.instrID, chy, setpointy, ramprate=S.rampratey, ignore_lims=1)
+			endfor
+		else // If using BabyDAC on slow axislabels
+			setpointy = starty + (i*(finy-starty)/(S.numptsy-1))	
+			abort "Not implemented"
 //			RampMultipleBD(Bsv.instrID, Bsv.channelsy, setpointy, ramprate=Bsv.rampratey, ignore_lims=1)
-//		endif
-//		// Ramp to start of fast axis
-//		SFfd_ramp_start(Fsv, ignore_lims=1, x_only=1)
-//		sc_sleep(Fsv.delayy)
-//		// Record fast axis
+		endif
+		// Ramp to start of fast axis
+		SFfd_ramp_start(S, ignore_lims=1, x_only=1)
+		sc_sleep(S.delayy)
+		// Record fast axis
+		NEW_Fd_record_values(S, i, AWG_list=AWG)
 //		fd_Record_Values(Fsv, PL, i, AWG_list = AWG)
-//	endfor
-//
-//	// Save by default
-//	if (nosave == 0)
+	endfor
+
+	// Save by default
+	if (nosave == 0)
+		EndScan(S=S)
 //  		SaveWaves(msg=comments, fastdac=1)
-//  	else
-//  		dowindow /k SweepControl
-//	endif
-//end
+  	else
+  		dowindow /k SweepControl
+	endif
+end
 //
 ////function/T ScanFastDAC2DLineCut(fdID, width, minx, maxx, channelsx, starty, finy, channelsy, numptsy, [x1, y1, x2, y2, cs_wname, cs_gate, channelsxfast, fastch_ratio, slope, y_int, numpts, sweeprate, bdID, rampratex, rampratey, delayy, comments, RCcutoff, numAverage, notch, nosave, use_AWG])
 ////	// /T because it returns the final slope and gradient in a ';' separated list
@@ -1579,17 +1584,17 @@ function SFawg_check_AWG_list(AWG, Fsv)
 end
 
 
-function SFawg_set_and_precheck(AWG, Fsv)
+function SFawg_set_and_precheck(AWG, S)
 	struct fdAWG_List &AWG
-	struct ScanVars &Fsv
+	struct ScanVars &S
 
 	
 	// Set numptsx in Scan s.t. it is a whole number of full cycles
-	AWG.numSteps = round(Fsv.numptsx/(AWG.waveLen*AWG.numCycles))  
-	Fsv.numptsx = (AWG.numSteps*AWG.waveLen*AWG.numCycles)
+	AWG.numSteps = round(S.numptsx/(AWG.waveLen*AWG.numCycles))  
+	S.numptsx = (AWG.numSteps*AWG.waveLen*AWG.numCycles)
 	
 	// Check AWG for clashes/exceeding lims etc
-	SFawg_check_AWG_list(AWG, Fsv)	
+	SFawg_check_AWG_list(AWG, S)	
 	AWG.use_AWG = 1
 	
 	// Save numSteps in AWG_list for sweeplogs later
