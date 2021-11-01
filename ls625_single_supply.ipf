@@ -172,7 +172,7 @@ function setLS625current(instrID,output) // Units: A
 	nvar apt = $("amps_per_tesla_"+ls625_lookupVarName(instrID))
 	
 	// check for NAN and INF
-	if(sc_check_naninf(output) != 0)
+	if(numtype(output) != 0)
 		abort "trying to set output to NaN or Inf"
 	endif
 
@@ -221,7 +221,7 @@ function setLS625rate(instrID,output) // Units: mT/min
 	string cmd
 	
 	// check for NAN and INF
-	if(sc_check_naninf(output) != 0)
+	if(numtype(output) != 0)
 		abort "trying to set ramp rate to NaN or Inf"
 	endif
 

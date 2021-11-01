@@ -1426,6 +1426,7 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 		// save data to "data/spectrum/"
 		nvar sanum
 		string filename = "spectrum_"+datestring+"_dat"+num2str(sanum)+".h5"
+		sanum+=1
 		variable/g hdf5_id = 0
 		// create empty HDF5 container
 		HDF5CreateFile/p=spectrum hdf5_id as filename

@@ -1427,7 +1427,7 @@ function /s new_sc_createSweepLogs([S, comments])
         comments = S.comments
     endif
 
-	jstr = addJSONkeyval(jstr, "comment", S.comments, addQuotes=1)
+	jstr = addJSONkeyval(jstr, "comment", comments, addQuotes=1)
 	jstr = addJSONkeyval(jstr, "filenum", num2istr(filenum))
 	jstr = addJSONkeyval(jstr, "current_config", sc_current_config, addQuotes = 1)
 	jstr = addJSONkeyval(jstr, "time_completed", Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
