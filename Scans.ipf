@@ -871,85 +871,78 @@ end
 //end
 //
 //
-//function ScanfastDACRepeat(instrID, start, fin, channels, numptsy, [numptsx, sweeprate, delay, ramprate, alternate, starts, fins, comments, RCcutoff, numAverage, notch, nosave, use_awg])
-//	// 1D repeat scan for FastDAC
-//	// Note: to alternate scan direction set alternate=1
-//	// Note: Ramprate is only for ramping gates between scans
-//	variable instrID, start, fin, numptsy, numptsx, sweeprate, delay, ramprate, alternate, RCcutoff, numAverage, nosave, use_awg
-//	string channels, comments, notch, starts, fins
-//	variable i=0, j=0
-//
-//	// Reconnect instruments
-//	sc_openinstrconnections(0)
-//
-//   // Set defaults
-//   nvar fd_ramprate
-//   ramprate = paramisdefault(ramprate) ? fd_ramprate : ramprate
-//   delay = ParamIsDefault(delay) ? 0.5 : delay
-//   notch = selectstring(paramisdefault(notch), notch, "")
-//   comments = selectstring(paramisdefault(comments), comments, "")
-//   starts = selectstring(paramisdefault(starts), starts, "")
-//   fins = selectstring(paramisdefault(fins), fins, "")
-//
-//   // Set sc_ScanVars struct
-//   struct FD_ScanVars SV
-//   SF_init_FDscanVars(SV, instrID, start, fin, channels, numptsx, ramprate, delayy=delay, sweeprate=sweeprate,  \
-//                     numptsy=numptsy, direction=1, startxs=starts, finxs=fins)
-//
-//   // Set ProcessList struct
-//   struct fdRV_ProcessList PL
-//   SFfd_init_ProcessList(PL, RCcutoff, numAverage, notch)  // Puts values into PL.<name>
-//
-//   // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
-//   SFfd_pre_checks(SV)  
-//
-//   	// If using AWG then get that now and check it
-//	struct fdAWG_list AWG
-//	if(use_AWG)	
-//		fdAWG_get_global_AWG_list(AWG)
-//		SFawg_set_and_precheck(AWG, SV)  // Note: sets SV.numptsx here and AWG.use_AWG = 1 if pass checks
-//	else  // Don't use AWG
-//		AWG.use_AWG = 0  	// This is the default, but just putting here explicitly
-//	endif
-//
-//   // Ramp to start without checks since checked above
-//   SFfd_ramp_start(SV, ignore_lims = 1)
-//
-//	// Let gates settle
-//	sc_sleep(SV.delayy)
-//
-//	// Get labels for waves
-//	string x_label, y_label
-//	x_label = GetLabel(SV.channelsx, fastdac=1)
-//	y_label = "Repeats"
-//
-//	// Make waves
-//	InitializeWaves(SV.startx, SV.finx, SV.numptsx, x_label=x_label, y_label=y_label, starty=1, finy=SV.numptsy, numptsy=SV.numptsy, fastdac=1)
-//
-//	// Main measurement loop
-//	variable d=1
-//	for (j=0; j<numptsy; j++)
-//      SV.direction = d  // Will determine direction of scan in fd_Record_Values
-//      
-//		// Ramp to start of fast axis
-//		SFfd_ramp_start(SV, ignore_lims=1, x_only=1)
-//		sc_sleep(SV.delayy)
-//		
-//		// Record values for 1D sweep
-//		fd_Record_Values(SV,PL,j, AWG_list = AWG)
-//		
-//		if (alternate!=0) // If want to alternate scan scandirection for next row
-//			d = d*-1
-//		endif
-//	endfor
-//   
-//	// Save by default
-//	if (nosave == 0)
-//  		SaveWaves(msg=comments, fastdac=1)
-//  	else
-//  		dowindow /k SweepControl
-//	endif
-//end
+function ScanfastDACRepeat(instrID, start, fin, channels, numptsy, [numptsx, sweeprate, delay, ramprate, alternate, starts, fins, comments, nosave, use_awg])
+	// 1D repeat scan for FastDAC
+	// Note: to alternate scan direction set alternate=1
+	// Note: Ramprate is only for ramping gates between scans
+	variable instrID, start, fin, numptsy, numptsx, sweeprate, delay, ramprate, alternate, nosave, use_awg
+	string channels, comments, starts, fins
+	variable i=0, j=0
+
+	// Reconnect instruments
+	sc_openinstrconnections(0)
+
+	// Set defaults
+	nvar fd_ramprate
+	ramprate = paramisdefault(ramprate) ? fd_ramprate : ramprate
+	delay = ParamIsDefault(delay) ? 0.5 : delay
+	comments = selectstring(paramisdefault(comments), comments, "")
+	starts = selectstring(paramisdefault(starts), starts, "")
+	fins = selectstring(paramisdefault(fins), fins, "")
+
+	// Set sc_ScanVars struct
+	struct ScanVars S
+	initFDscanVars(S, instrID, start, fin, channels, numptsx=numptsx, rampratex=ramprate, delayy=delay, sweeprate=sweeprate,  \
+					numptsy=numptsy, direction=1, startxs=starts, finxs=fins, y_label="Repeats")
+
+	// Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
+	SFfd_pre_checks(S)  
+
+  	// If using AWG then get that now and check it
+	struct fdAWG_list AWG
+	if(use_AWG)	
+		fdAWG_get_global_AWG_list(AWG)
+		abort "Not Implemented yet"
+		SFawg_set_and_precheck(AWG, S)  // Note: sets S.numptsx here and AWG.use_AWG = 1 if pass checks
+	else  // Don't use AWG
+		AWG.use_AWG = 0  	// This is the default, but just putting here explicitly
+	endif
+
+	// Ramp to start without checks since checked above
+	SFfd_ramp_start(S, ignore_lims = 1)
+
+	// Let gates settle
+	sc_sleep(S.delayy)
+
+	// Init Scan
+	initializeScan(S)
+
+	// Main measurement loop
+	variable d=1
+	for (j=0; j<numptsy; j++)
+		S.direction = d  // Will determine direction of scan in fd_Record_Values
+
+		// Ramp to start of fast axis
+		SFfd_ramp_start(S, ignore_lims=1, x_only=1)
+		sc_sleep(S.delayy)
+
+		// Record values for 1D sweep
+		fd_Record_Values(S,PL,j, AWG_list = AWG)
+		NEW_Fd_record_values(S, j, AWG_List = AWG)
+
+		if (alternate!=0) // If want to alternate scan scandirection for next row
+			d = d*-1
+		endif
+	endfor
+
+	// Save by default
+	if (nosave == 0)
+		EndScan(S=S)
+		// SaveWaves(msg=comments, fastdac=1)
+	else
+		dowindow /k SweepControl
+	endif
+end
 //
 ////function ScanSRSFreq(instrID, start, fin, numpts, delay, [comments, nosave]) //Units: Hz
 ////	// sweep SRS output freq
