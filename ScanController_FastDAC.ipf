@@ -184,7 +184,6 @@ function NEW_fd_record_values(S, rowNum, [AWG_list, linestart])
 		S.start_time = datetime
 	endif
 
-
    // Check that checks have been carried out in main scan function where they belong
 	if(S.lims_checked != 1)
 	 	abort "ERROR[fd_record_values]: FD_ScanVars.lims_checked != 1. Probably called before limits/ramprates/sweeprates have been checked in the main Scan Function!"

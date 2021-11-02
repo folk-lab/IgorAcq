@@ -512,9 +512,9 @@ function initializeScan(S)
     // Open Abort window
     openAbortWindow()
 
-	// Make waves for storing sweepgates, starts, ends for both x and y
-    // TODO: Move this into InitScan()???
-	// SFfd_create_sweepgate_save_info(S)
+    // Save struct to globals
+    S.start_time = datetime
+    saveAsLastScanVarsStruct(S)
 end
 
 
@@ -2877,8 +2877,9 @@ function EndScan([S, save_experiment, aborting])
 		abort "Not implemented yet"
 		// Also should leave a message or something in the HDF that indicates scan was aborted! 
 		loadLastScanVarsStruct(S)
+		S.end_time = (aborting) ? datetime : S.end_time
 	else
-		saveAsLastScanVarsStruct(S)
+		saveAsLastScanVarsStruct(S)  // I.e save the ScanVars including end_time and any other changed values in case saving fails (which it often does)
 	endif
 
 	dowindow/k SweepControl // kill scan control window
@@ -2913,12 +2914,51 @@ end
 function loadLastScanVarsStruct(S)
 	Struct ScanVars &S
 	// TODO: Make these (note: can't just use StructPut/Get because they only work for numeric entries, not strings...
+	wave/T t = sc_lastScanVarsStrings
+	wave v = sc_lastScanVarsVariables
+	
+	// Load String parts
+	S.channelsx = t[0]
+	S.channelsy = t[1]
+	S.x_label = t[2]
+	S.y_label = t[3]
+	S.comments = t[4]
+	S.adcList = t[5]
+	S.startxs = t[6]
+	S.finxs = t[7]
+	S.startys = t[8]
+	S.finys = t[9]
+
+	// Load Variable parts
+	S.instrID = v[0]
+	S.lims_checked = v[1]
+	S.startx = v[2]
+	S.finx = v[3]
+	S.numptsx = v[4]
+	S.rampratex = v[5]
+	S.delayx = v[6]
+	S.is2d = v[7]
+	S.starty = v[8]
+	S.finy = v[9]
+	S.numptsy = v[10]
+	S.rampratey = v[11]
+	S.delayy = v[12]
+	S.direction = v[13]
+	S.start_time = v[14]
+	S.end_time = v[15]
+	S.using_fastdac = v[16]
+	S.numADCs = v[17]
+	S.samplingFreq = v[18]
+	S.measureFreq = v[19]
+	S.sweeprate = v[20]
+
 end
 	
 function saveAsLastScanVarsStruct(S)
 	Struct ScanVars &S
 	// TODO: Make these (note: can't just use StructPut/Get because they only work for numeric entries, not strings...
-	
+	make/o/T sc_lastScanVarsStrings = {S.channelsx, S.channelsy, S.x_label, S.y_label, S.comments, S.adcList, S.startxs, S.finxs, S.startys, S.finys}
+	make/o sc_lastScanVarsVariables = {S.instrID, S.lims_checked, S.startx, S.finx, S.numptsx, S.rampratex, S.delayx, S.is2d, S.starty, S.finy, S.numptsy, S.rampratey, S.delayy, S.direction, S.start_time, S.end_time, S.using_fastdac, S.numADCs, S.samplingFreq, S.measureFreq, S.sweeprate}
 end
 
 function initOpenSaveFiles(RawSave)	
