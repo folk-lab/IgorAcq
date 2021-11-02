@@ -766,51 +766,69 @@ function/S initializeGraphs(S)
     // Initialize graphs that are going to be recorded
     // Returns list of Graphs that data is being plotted in
     struct ScanVars &S
-    string graphIDs = getOpenGraphIDs()
 
-	string/g sc_rawGraphs1D = ""  // So that fd_record_values knows which graphs to update while reading
+	 string/g sc_rawGraphs1D = ""  // So that fd_record_values knows which graphs to update while reading
 
-    variable i, j, k
-    string waveNames, wn, title
-    string openGraphID
+    string graphIDs = ""
+    variable i
+    string waveNames
+    string buffer
     for (i = 0; i<2; i++)  // Raw = 1, Calc = 0
         waveNames = get1DWaveNames(i, S.using_fastdac)
-        for (j = 0; j<ItemsInList(waveNames); j++)  // Look through wavenames that are being recorded
-            wn = StringFromList(j, waveNames)
-            openGraphID = graphExistsForWavename(wn)
-            if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-                setUpGraph1D(openGraphID, S.x_label)  // TODO: Add S.y_label if it is not null or empty
-            else 
-                open1Dgraph(wn, S.x_label)
-                openGraphID = winname(0,1)
-                graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
-            endif
-            if(i==1) // Raw waves
-            		sc_rawGraphs1D = addlistItem(openGraphID, sc_rawGraphs1D, ";", INF)
-            	endif
-            if (S.is2d)
-                wn = wn+"_2d"
-                openGraphID = graphExistsForWavename(wn)
-                if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-                    setUpGraph2D(openGraphID, wn, S.x_label, S.y_label)
-                else 
-                    open2Dgraph(wn, S.x_label, S.y_label)
-                    graphIDs = addlistItem(winname(0,1), graphIDs, ";", INF)
-                endif
-            endif
-        endfor
+        buffer = initializeGraphsForWavenames(waveNames, S.x_label, is2d=S.is2d, y_label=S.y_label)
+        if(i==1) // Raw waves
+	        sc_rawGraphs1D = buffer
+        endif
+        graphIDs = addListItem(buffer, graphIDs, ";", INF)
     endfor
     return graphIDs
 end
 
-function arrangeWindows(winNames)
+
+function/S initializeGraphsForWavenames(wavenames, x_label, [is2d, y_label])
+	// Ensures a graph is open and tiles graphs for each wave in comma separated wavenames
+	// Returns list of graphIDs of active graphs
+	string wavenames, x_label, y_label
+	variable is2d
+	
+	y_label = selectString(paramisDefault(y_label), y_label, "")
+
+	string wn, openGraphID, graphIDs = ""
+	variable i
+	for (i = 0; i<ItemsInList(waveNames); i++)  // Look through wavenames that are being recorded
+	    wn = StringFromList(i, waveNames)
+	    openGraphID = graphExistsForWavename(wn)
+	    if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
+	        setUpGraph1D(openGraphID, x_label)  // TODO: Add S.y_label if it is not null or empty
+	    else 
+	        open1Dgraph(wn, x_label)
+	        openGraphID = winname(0,1)
+	        graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
+	    endif
+
+	    if (is2d)
+	        wn = wn+"_2d"
+	        openGraphID = graphExistsForWavename(wn)
+	        if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
+	            setUpGraph2D(openGraphID, wn, x_label, y_label)
+	        else 
+	            open2Dgraph(wn, x_label, y_label)
+	            graphIDs = addlistItem(winname(0,1), graphIDs, ";", INF)
+	        endif
+	    endif
+	endfor
+	return graphIDs
+end
+
+
+function arrangeWindows(graphIDs)
     // Tile Graphs and/or windows etc
-    string winNames
+    string graphIDs
     string cmd, windowName
     cmd = "TileWindows/O=1/A=(3,4) "  
     variable i
-    for (i = 0; i<itemsInList(winNames); i++)
-        windowName = StringFromList(i, winNames)
+    for (i = 0; i<itemsInList(graphIDs); i++)
+        windowName = StringFromList(i, graphIDs)
         cmd += windowName+", "
         doWindow/F $windowName // Bring window to front 
     endfor
@@ -916,7 +934,7 @@ end
 
 function openAbortWindow()
     // Opens the window which allows for pausing/aborting/abort+saving a scan
-    variable/g sc_abortsweep=0, sc_pause=0  // Make sure these are initialized
+    variable/g sc_abortsweep=0, sc_pause=0, sc_abortnosave=0 // Make sure these are initialized
     doWindow/k/z SweepControl  // Attempt to close previously open window just in case
     execute("abortmeasurementwindow()")
     doWindow/F SweepControl   // Bring Sweepcontrol to the front 
@@ -1746,7 +1764,7 @@ function New_RecordValues(S, i, j, [readvstime, fillnan])
 	catch
 		variable err = GetRTError(1)
 		
-		// reset sweep control parameters if igor about button is used
+		// reset sweep control parameters if igor abort button is used
 		if(v_abortcode == -1)
 			sc_abortsweep = 0
 			sc_pause = 0
@@ -2632,20 +2650,19 @@ function sc_checksweepstate([fastdac])
 	
 	if(NVAR_Exists(sc_abortsweep) && sc_abortsweep==1)
 		// If the Abort button is pressed during the scan, save existing data and stop the scan.
-//		SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0, fastdac=fastdac)
 		EndScan(save_experiment=0, aborting=1)  
 		dowindow /k SweepControl
-		sc_abortsweep=0
-		sc_abortnosave=0
-		sc_pause=0
+//		sc_abortsweep=0
+//		sc_abortnosave=0
+//		sc_pause=0
 		abort "Measurement aborted by user. Data saved automatically."
 	elseif(NVAR_Exists(sc_abortnosave) && sc_abortnosave==1)
 		// Abort measurement without saving anything!
 		dowindow /k SweepControl
-		sc_abortnosave = 0
-		sc_abortsweep = 0
-		sc_pause=0
-		abort "Measurement aborted by user. Data not saved automatically. Run \"SaveWaves()\" if needed"
+//		sc_abortnosave = 0
+//		sc_abortsweep = 0
+//		sc_pause=0
+		abort "Measurement aborted by user. Data not saved automatically. Run \"EndScan(abort=1)\" if needed"
 	elseif(NVAR_Exists(sc_pause) && sc_pause==1)
 		// Pause sweep if button is pressed
 		do
@@ -2653,9 +2670,9 @@ function sc_checksweepstate([fastdac])
 //				SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0,fastdac=fastdac)
 				EndScan(save_experiment=0, aborting=1) 
 				dowindow /k SweepControl
-				sc_abortsweep=0
-				sc_abortnosave=0
-				sc_pause=0
+//				sc_abortsweep=0
+//				sc_abortnosave=0
+//				sc_pause=0
 				abort "Measurement aborted by user"
 			elseif(sc_abortnosave)
 				dowindow /k SweepControl
@@ -2890,7 +2907,7 @@ function EndScan([S, save_experiment, aborting])
 	if(S_.using_fastdac == 0)
 		KillDataFolder/z root:async // clean this up for next time
 		SaveToHDF(S_, 0)
-	elseif(S.using_fastdac == 1)
+	elseif(S_.using_fastdac == 1)
 		SaveToHDF(S_, 1)
 	else
 		abort "Don't understant S.using_fastdac != (1 | 0)"

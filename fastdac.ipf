@@ -1101,12 +1101,12 @@ end
 //// Spectrum Analyzer ////
 //////////////////////////
 
-function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,ca_amp, nosave])
+function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,ca_amp,plot_linear,nosave])
 	// channels must a comma seperated string, refering
 	// to the numbering in the ScanControllerFastDAC window.
 	// scanlength is in sec
 	// if linear is set to 1, the spectrum will be plotted on a linear scale
-	variable instrID, scanlength, numAverage, nosave, ca_amp
+	variable instrID, scanlength, numAverage, plot_linear, nosave, ca_amp
 	string channels, comments
 	string datestring = strTime()
 	
@@ -1159,12 +1159,14 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 		endfor
 	endfor
 	
+	string wavenames = ""
 	// generate waves to hold time series data
 	string wn = "", wn_lin = ""
 	for(i=0;i<numChannels;i+=1)
 		wn = "timeSeriesADC"+stringfromlist(i,channels,",")
 		make/o/n=(numpts) $wn = nan
 		setscale/i x, 0, scanlength, $wn
+		wavenames = addListItem(wn, wavenames, ";", INF)
 	endfor
 	
 	// create waves for final fft output
@@ -1172,143 +1174,23 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 		wn = "fftADC"+stringfromlist(i,channels,",")
 		make/o/n=(numpts/2) $wn = nan
 		setscale/i x, 0, measureFreq/(2.0), $wn
-		
+		if (!plot_linear)
+			wavenames = addListItem(wn, wavenames, ";", INF)
+		endif
+				
 		wn_lin = "fftADClin"+stringfromlist(i,channels,",")
 		make/o/n=(numpts/2) $wn_lin = nan
 		setscale/i x, 0, measureFreq/(2.0), $wn_lin
-		
+		if(plot_linear)
+			wavenames = addListItem(wn_lin, wavenames, ";", INF)
+		endif
 	endfor
 	
-	// find all open plots
-	string graphlist = winlist("*",";","WIN:1"), graphname = "", graphtitle="", graphnumlist=""
-	string plottitle="", graphnum=""			
-	j=0
-	variable index
-	for (i=0;i<itemsinlist(graphlist);i=i+1)
-		index = strsearch(graphlist,";",j)
-		graphname = graphlist[j,index-1]
-//		setaxis/w=$graphname /a
-		getwindow $graphname wtitle
-		splitstring /e="(.*):(.*)" s_value, graphnum, plottitle
-		graphtitle+= plottitle+"|"  // Use a weird separator so that it doesn't clash with ':' or ';' or ',' which all get used in graph names
-		graphnumlist+= graphnum+";"
-		j=index+1
-	endfor
-
-	// open plots and distribute on screen
-//	variable graphopen=0
-//	string openplots=""
-//	string num
-//	string match_str
-//	for(i=0;i<itemsinlist(channels,",");i+=1)
-//		num = stringfromlist(i,channels,",")
-//		wn = "timeSeriesADC"+num
-//		graphopen=0
-//		for(j=0;j<itemsinlist(graphtitle, "|");j+=1)
-//			sprintf match_str, "*%s*", wn
-//			if(stringmatch(stringfromlist(j,graphtitle, "|"), match_str))
-//				graphopen = 1
-//				openplots+= stringfromlist(j,graphnumlist)+";"
-//				label /w=$stringfromlist(j,graphnumlist) bottom,  "time [s]"
-//				TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 datestring
-//			endif
-//		endfor
-//		if(!graphopen)
-//			display $wn
-//			setwindow kwTopWin, graphicsTech=0
-//			label bottom, "time [s]"
-//			TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 datestring
-//			openplots+= winname(0,1)+";"
-//		endif
-//		
-//		wn = "fftADC"+num
-//		graphopen=0
-//		for(j=0;j<itemsinlist(graphtitle, "|");j+=1)
-//			sprintf match_str, "*%s*", wn
-//			if(stringmatch(stringfromlist(j,graphtitle, "|"), match_str))
-//				graphopen = 1
-//				openplots+= stringfromlist(j,graphnumlist)+";"
-//				label /w=$stringfromlist(j,graphnumlist) bottom,  "frequency [Hz]"
-//				if(linear)
-//					label/w=$stringfromlist(j,graphnumlist) left, "Spectrum [V/sqrt(Hz)]"
-//				else
-//					label/w=$stringfromlist(j,graphnumlist) left, "Spectrum [dBV/sqrt(Hz)]"
-//				endif
-//				TextBox/W=$stringfromlist(j,graphnumlist)/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 datestring
-//			endif
-//		endfor
-//		if(!graphopen)
-//			display $wn
-//			setwindow kwTopWin, graphicsTech=0
-//			label bottom, "frequency [Hz]"
-//			if(linear)
-//				label left, "Spectrum [V/sqrt(Hz)]"
-//			else
-//				label left, "Spectrum [dBV/sqrt(Hz)]"
-//			endif
-//			TextBox/W=$stringfromlist(j,graphnumlist,",")/C/N=datnum/A=LT/X=1.00/Y=1.00/E=2 datestring
-//			openplots+= winname(0,1)+";"
-//		endif
-//	endfor
-//
-//	// tile windows
-//	string cmd1, cmd2, window_string
-//	sprintf cmd1, "TileWindows/O=1/A=(%d,1) ", numChannels*2 
-//	cmd2 = ""
-//	// Tile graphs
-//	for(i=0;i<itemsinlist(openplots);i=i+1)
-//		window_string = stringfromlist(i,openplots)
-//		cmd1+= window_string +","
-//		cmd2 = "DoWindow/F " + window_string
-//		execute(cmd2)
-//	endfor
-//	execute(cmd1)
+	string y_label = selectString(plot_linear, "Spectrum [dBnA/sqrt(Hz)]", "Spectrum [nA/sqrt(Hz)]")
+	string graphIDs = initializeGraphsForWavenames(wavenames, "Frequency /Hz", is2d=0, y_label=y_label)
+	arrangeWindows(graphIDs)
 
 	for(i=0;i<numAverage;i+=1)
-//		// set up and execute command
-//		// SPEC_ANA,adcCh,numpts
-//		string cmd = ""
-//		sprintf cmd, "SPEC_ANA,%s,%s\r", replacestring(",",channels,""), num2istr(numpts)
-//		writeInstr(instrID,cmd)
-//		
-//		variable bytesSec = roundNum(2*samplingFreq,0)
-//		variable read_chunk = roundNum(numChannels*bytesSec/50,0) - mod(roundNum(numChannels*bytesSec/50,0),numChannels*2)
-//		if(read_chunk < 50)
-//			read_chunk = 50 - mod(50,numChannels*2) // 50 or 48
-//		endif
-//		
-//		// read incoming data
-//		string buffer=""
-//		variable bytes_read = 0, bytes_left = 0, totalbytesreturn = numChannels*numpts*2, saveBuffer = 1000, totaldump = 0
-//		variable bufferDumpStart = stopMSTimer(-2)
-//		
-//		//print bytesSec, read_chunk, totalbytesreturn
-//		do
-//			fdRV_read_chunk(instrID, read_chunk, buffer)
-//			// add data to datawave
-//			specAna_distribute_data(buffer,read_chunk,channels,bytes_read/(2*numChannels))
-//			bytes_read += read_chunk
-//			totaldump = bytesSec*(stopmstimer(-2)-bufferDumpStart)*1e-6
-//			if(totaldump-bytes_read < saveBuffer)
-////				for(j=0;j<itemsinlist(openplots,",");j+=1)
-////					doupdate/w=$stringfromlist(j,openplots,",")
-////				endfor
-//			endif
-//		while(totalbytesreturn-bytes_read > read_chunk)
-//		// do one last read if any data left to read
-//		bytes_left = totalbytesreturn-bytes_read
-//		if(bytes_left > 0)
-//			buffer = readInstr(instrID,read_bytes=bytes_left,binary=1)
-//			specAna_distribute_data(buffer,bytes_left,channels,bytes_read/(2*numChannels))
-//			doupdate
-//		endif
-//		
-//		buffer = readInstr(instrID,read_term="\n")
-//		buffer = sc_stripTermination(buffer,"\r\n")
-//		if(!fdacCheckResponse(buffer,cmd,isString=1,expectedResponse="READ_FINISHED"))
-//			print "[ERROR] \"fdacSpectrumAnalyzer\": Error during read. Not all data recived!"
-//			abort
-//		endif
 		
 		fd_readvstime(instrID, channels, numpts, samplingFreq, numChannels, spectrum_analyser=1)
 		
@@ -1436,6 +1318,10 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 		
 		// save data to "data/spectrum/"
 		nvar sanum
+		if(!NVAR_Exists(sanum))
+			variable/g sanum=1
+		endif
+		
 		string filename = "spectrum_"+datestring+"_dat"+num2str(sanum)+".h5"
 		sanum+=1
 		variable/g hdf5_id = 0
