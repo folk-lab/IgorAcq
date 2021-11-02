@@ -533,7 +533,11 @@ function new_initializeWaves(S)
     for (i = 0; i<2; i++) // 0 = Calc, 1 = Raw
         wavenames = get1DWaveNames(i, S.using_fastdac)
         sanityCheckWavenames(wavenames)
-        numpts = (i) ? S.numptsx : postFilterNumpts(S.numptsx, S.measureFreq)  // Selects S.numptsx for i=1(Raw) and calculates numpts for i=0(Calc)
+        if (S.using_fastdac)
+	        numpts = (i) ? S.numptsx : postFilterNumpts(S.numptsx, S.measureFreq)  // Selects S.numptsx for i=1(Raw) and calculates numpts for i=0(Calc)
+	     else
+	     	numpts = S.numptsx
+	     endif
         for (j=0; j<itemsinlist(wavenames);j++)
             wn = stringFromList(j, wavenames)
             init1DWave(wn, numpts, S.startx, S.finx)
@@ -2967,14 +2971,18 @@ function initcloseSaveFiles(hdf5_id_list)
 	endfor
 end
 
-function addMetaFiles(hdf5_id_list, [S, logs_only])
+function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 	// meta data is created and added to the files in list
-	string hdf5_id_list
+	string hdf5_id_list, comments
 	Struct ScanVars &S
 	variable logs_only  // 1=Don't save any data to HDF
 	
 	make /FREE /T /N=1 cconfig = prettyJSONfmt(sc_createconfig())
-	make /FREE /T /N=1 sweep_logs = prettyJSONfmt(new_sc_createSweepLogs(S=S))
+	if (!logs_only)
+		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(new_sc_createSweepLogs(S=S))
+	else
+		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(new_sc_createSweepLogs(comments = comments))
+	endif
 	
 	// Check that prettyJSONfmt actually returned a valid JSON.
 	sc_confirm_JSON(sweep_logs, name="sweep_logs")
@@ -3183,8 +3191,9 @@ function LogsOnlySave(hdfid, comments)
 	HDF5SaveData /A="Logs_Only" attr_message, hdfid, "/"
 
 	string jstr = ""
-	jstr = new_sc_createSweepLogs(comments=comments)
-	// TODO: Save this jstr into HDF
+//	jstr = prettyJSONfmt(new_sc_createSweepLogs(comments=comments))
+	addMetaFiles(num2str(hdfid), logs_only=1, comments=comments)
+	initcloseSaveFiles(num2str(hdfid))
 end
 
 
@@ -3255,7 +3264,8 @@ function SaveNamedWaves(wave_names, comments)
 	// Only init Save file after we know that the waves exist
 	variable hdfid
 	hdfid = initOpenSaveFiles(0) // Open HDF file (normal - non RAW)
-	LogsOnlySave(hdfid, comments)
+	addMetaFiles(num2str(hdfid), logs_only=1, comments=comments)
+
 
 //	initSaveFiles(msg=comments, logs_only=1)
 	printf "Saving waves [%s] in dat%d.h5\r", wave_names, filenum
@@ -3263,9 +3273,9 @@ function SaveNamedWaves(wave_names, comments)
 	// Now save each wave
 	for(ii=0;ii<itemsinlist(wave_names, ",");ii++)
 		wn = stringfromlist(ii, wave_names, ",")
-		saveSingleWave(wn)
+		initSaveSingleWave(wn, hdfid)
 	endfor
-	closeSaveFiles()
+	initcloseSaveFiles(num2str(hdfid))
 end
 
 
