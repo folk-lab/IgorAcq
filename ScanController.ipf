@@ -2914,8 +2914,6 @@ function EndScan([S, save_experiment, aborting])
 
 	// add info about scan to the scan history file in /config
 	//	sc_saveFuncCall(getrtstackinfo(2))
-
-	filenum+=1
 end
 
 function loadLastScanVarsStruct(S)
@@ -2958,6 +2956,9 @@ end
 function initcloseSaveFiles(hdf5_id_list)
 	// close any files that were created for this dataset
 	string hdf5_id_list	
+	
+	nvar filenum
+	
 	variable i
 	variable hdf5_id
 	for (i=0;i<itemsinlist(hdf5_id_list);i++)
@@ -2969,6 +2970,7 @@ function initcloseSaveFiles(hdf5_id_list)
 		endif
 		
 	endfor
+	filenum+=1
 end
 
 function addMetaFiles(hdf5_id_list, [S, logs_only, comments])

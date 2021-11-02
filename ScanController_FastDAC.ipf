@@ -102,7 +102,7 @@ function postFilterNumpts(raw_numpts, measureFreq)
 	nvar targetFreq = sc_ResampleFreqFadc
 	if (boxChecked)
 	  	RatioFromNumber (targetFreq / measureFreq)
-	  	return ceil(raw_numpts*(V_numerator)/(V_denominator))  // TODO: Is this actually how many points are returned?
+	  	return round(raw_numpts*(V_numerator)/(V_denominator))  // TODO: Is this actually how many points are returned?
 	else
 		return raw_numpts
 	endif

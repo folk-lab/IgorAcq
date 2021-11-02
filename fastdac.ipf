@@ -568,6 +568,15 @@ function rampOutputFDAC(instrID,channel,output,[ramprate, ignore_lims]) // Units
 	// read current dac output and compare to window
 	variable currentoutput = getfdacOutput(instrID,devchannel)
 	
+	if (abs(output-currentOutput) < 0.32)  // If trying to step smaller than min dac step (rounded up a little from 0.30517)
+		if (abs(output-currentOutput) > 0.32/2)  // If closer to next dac step do that
+			output = currentOutput+sign(output-currentOutput)*0.32
+		else
+			print "WARNING: Trying to step < 0.5*Dac step, nothing will happen"
+		endif
+	endif
+			
+	
 	// ramp channel to output
 	variable delay = abs(output-currentOutput)/ramprate
 	string cmd = "", response = ""

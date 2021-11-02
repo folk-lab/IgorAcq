@@ -465,6 +465,8 @@ function ScanFastDAC(instrID, start, fin, channels, [numpts, sweeprate, ramprate
    comments = selectstring(paramisdefault(comments), comments, "")
    starts = selectstring(paramisdefault(starts), starts, "")
    fins = selectstring(paramisdefault(fins), fins, "")
+   x_label = selectString(paramisdefault(x_label), x_label, "")
+   y_label = selectString(paramisdefault(y_label), y_label, "")   
  
    // Set sc_ScanVars struct
    struct ScanVars S
