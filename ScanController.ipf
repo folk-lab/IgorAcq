@@ -2628,12 +2628,6 @@ function sc_checksweepstate([fastdac])
 	variable fastdac
 	nvar /Z sc_abortsweep, sc_pause, sc_abortnosave
 	
-	if(paramisdefault(fastdac))
-		fastdac = 0
-	else
-		fastdac = 1
-	endif
-
 	if(NVAR_Exists(sc_abortsweep) && sc_abortsweep==1)
 		// If the Abort button is pressed during the scan, save existing data and stop the scan.
 //		SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0, fastdac=fastdac)
@@ -2924,6 +2918,7 @@ end
 function saveAsLastScanVarsStruct(S)
 	Struct ScanVars &S
 	// TODO: Make these (note: can't just use StructPut/Get because they only work for numeric entries, not strings...
+	
 end
 
 function initOpenSaveFiles(RawSave)	

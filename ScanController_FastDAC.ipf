@@ -360,6 +360,7 @@ function fdRV_record_buffer(S, rowNum, totalByteReturn)
       totaldump = bytesSec*(stopmstimer(-2)-bufferDumpStart)*1e-6  // Expected amount of bytes in buffer
       if(totaldump-bytes_read < saveBuffer)  // if we aren't too far behind then update Raw 1D graphs
          fdRV_update_graphs() 
+         sc_checksweepstate(fastdac=1)
 //         print "keeping up"
 		else
 			printf "DEBUGGING: getting behind: Bytes Requested: %d, Expected Dump: %d, Bytes Read: %d\r" totalByteReturn, totaldump, bytes_read
