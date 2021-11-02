@@ -915,9 +915,11 @@ end
 
 
 function openAbortWindow()
+    // Opens the window which allows for pausing/aborting/abort+saving a scan
+    variable/g sc_abortsweep=0, sc_pause=0  // Make sure these are initialized
     doWindow/k/z SweepControl  // Attempt to close previously open window just in case
     execute("abortmeasurementwindow()")
-    doWindow/F SweepControl   // Bring Sweepcontrol to the front
+    doWindow/F SweepControl   // Bring Sweepcontrol to the front 
 end
 
 ////////////////////////////////////////////////////////////////
@@ -2857,40 +2859,39 @@ end
 
 function EndScan([S, save_experiment, aborting])
 	// Ends a scan:
+	// Saves/Loads current/last ScanVars from global waves
 	// Closes sweepcontrol if open
 	// Save Metadata into HDF files
 	// Saves Measured data into HDF files
 	// Saves experiment
 
-	Struct ScanVars &S
+	Struct ScanVars &S  // Note: May not exist so can't be relied upon later
 	variable save_experiment
 	variable aborting
 	
 	nvar filenum
 
 	save_experiment = paramisDefault(save_experiment) ? 1 : save_experiment
-	if (aborting)
-		print "ERROR[EndScan]: Abort and save not implemented yet. Expect undefined behaviour"
-	endif
-
-	if(paramIsDefault(S))
-		abort "Not implemented yet"
-		// Also should leave a message or something in the HDF that indicates scan was aborted! 
-		loadLastScanVarsStruct(S)
-		S.end_time = (aborting) ? datetime : S.end_time
-	else
+	if(!paramIsDefault(S))
 		saveAsLastScanVarsStruct(S)  // I.e save the ScanVars including end_time and any other changed values in case saving fails (which it often does)
+	endif
+	
+	Struct ScanVars S_ // Note: This will definitely exist for the rest of this function
+	loadLastScanVarsStruct(S_)
+	if (aborting)
+		S_.end_time = datetime
+		S_.comments = "aborted, " + S_.comments
 	endif
 
 	dowindow/k SweepControl // kill scan control window
-	printf "Time elapsed: %.2f s \r", (S.end_time-S.start_time)
+	printf "Time elapsed: %.2f s \r", (S_.end_time-S_.start_time)
 	HDF5CloseFile/A 0 //Make sure any previously opened HDFs are closed (may be left open if Igor crashes)
 	
-	if(S.using_fastdac == 0)
+	if(S_.using_fastdac == 0)
 		KillDataFolder/z root:async // clean this up for next time
-		SaveToHDF(S, 0)
+		SaveToHDF(S_, 0)
 	elseif(S.using_fastdac == 1)
-		SaveToHDF(S, 1)
+		SaveToHDF(S_, 1)
 	else
 		abort "Don't understant S.using_fastdac != (1 | 0)"
 	endif
