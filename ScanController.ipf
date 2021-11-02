@@ -296,9 +296,12 @@ function initFDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
     string comments
     variable direction, sweeprate
 	
+	channelsy = selectString(paramIsDefault(channelsy), channelsy, "")
+	startys = selectString(paramIsDefault(startys), startys, "")
+	finys = selectString(paramIsDefault(finys), finys, "")
 	x_label = selectString((paramIsDefault(x_label) || numtype(strlen(x_label)) == 2), x_label, "")
 	y_label = selectString((paramIsDefault(y_label) || numtype(strlen(y_label)) == 2), y_label, "")	
-
+	
     // Handle Optional Parameters
     S.numptsx = paramisdefault(numptsx) ? NaN : numptsx
     S.rampratex = paramisDefault(rampratex) ? NaN : rampratex

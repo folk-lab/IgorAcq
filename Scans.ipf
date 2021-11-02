@@ -30,7 +30,6 @@ function ReadVsTime(delay, [comments]) // Units: s
 		i+=1
 	while (1)
 	EndScan(S=S)
-//	SaveWaves(msg=comments)
 end
 //
 //function ReadVsTimeFastdac(instrID, duration, [y_label, comments]) // Units: s 
@@ -1308,16 +1307,16 @@ function SFfd_check_same_device(S)
 	struct ScanVars &s
 	wave fadcattr
 	wave/t fadcvalstr
-	svar fdacKeys
+	svar sc_fdacKeys
 	
 	// check that all DAC channels are on the same device
 	variable numRampCh = itemsinlist(S.channelsx,","),i=0,j=0,dev_dac=0,dacCh=0,startCh=0
-	variable numDevices = str2num(stringbykey("numDevices",fdacKeys,":",",")),numDACCh=0
+	variable numDevices = str2num(stringbykey("numDevices",sc_fdacKeys,":",",")),numDACCh=0
 	for(i=0;i<numRampCh;i+=1)
 		dacCh = str2num(stringfromlist(i,S.channelsx,","))
 		startCh = 0
 		for(j=0;j<numDevices;j+=1)
-			numDACCh = str2num(stringbykey("numDACCh"+num2istr(j+1),fdacKeys,":",","))
+			numDACCh = str2num(stringbykey("numDACCh"+num2istr(j+1),sc_fdacKeys,":",","))
 			if(startCh+numDACCh-1 >= dacCh)
 				// this is the device
 				if(i > 0 && dev_dac != j)
@@ -1338,7 +1337,7 @@ function SFfd_check_same_device(S)
 		adcCh = str2num(stringfromList(i, S.adcList, ","))
 		startCh = 0
 		for(j=0;j<numDevices+1;j+=1)
-			numADCCh = str2num(stringbykey("numADCCh"+num2istr(j+1),fdacKeys,":",","))
+			numADCCh = str2num(stringbykey("numADCCh"+num2istr(j+1),sc_fdacKeys,":",","))
 			if(startCh+numADCCh-1 >= adcCh)
 				// this is the device
 				if(i > 0 && dev_adc != j)
