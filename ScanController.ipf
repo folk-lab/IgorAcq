@@ -327,7 +327,7 @@ function initFDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
     
    	// Get Labels for graphs
    	S.x_label = selectString(strlen(x_label) > 0, GetLabel(S.channelsx, fastdac=1), x_label)  // Uses channels as list of numbers, and only if x_label not passed in
-   	S.x_label = selectString(strlen(y_label) > 0, GetLabel(S.channelsy, fastdac=1), y_label)   		
+   	S.y_label = selectString(strlen(y_label) > 0, GetLabel(S.channelsy, fastdac=1), y_label)   		
 
    	// Sets starts/fins in FD string format
     sv_setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
@@ -407,7 +407,7 @@ function initBDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
    	// Get Labels for graphs
   	// Get Labels for graphs
    	S.x_label = selectString(strlen(x_label) > 0, GetLabel(S.channelsx, fastdac=0), x_label)  // Uses channels as list of numbers, and only if x_label not passed in
-   	S.x_label = selectString(strlen(y_label) > 0, GetLabel(S.channelsy, fastdac=0), y_label) 
+   	S.y_label = selectString(strlen(y_label) > 0, GetLabel(S.channelsy, fastdac=0), y_label) 
    	
 end
 

@@ -897,8 +897,11 @@ function ScanfastDACRepeat(instrID, start, fin, channels, numptsy, [numptsx, swe
 	// Set sc_ScanVars struct
 	struct ScanVars S
 	initFDscanVars(S, instrID, start, fin, channels, numptsx=numptsx, rampratex=ramprate, delayy=delay, sweeprate=sweeprate,  \
-					numptsy=numptsy, direction=1, startxs=starts, finxs=fins, y_label="Repeats")
-
+					numptsy=numptsy, direction=1, startxs=starts, finxs=fins, y_label="Repeats", comments=comments)
+	S.is2d = 1 // Doesn't otherwise get detected because of no y channels
+	S.starty = 1
+	S.finy = numptsy
+	
 	// Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
 	SFfd_pre_checks(S)  
 
