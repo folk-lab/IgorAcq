@@ -280,7 +280,7 @@ structure ScanVars
 endstructure
 
 
-function initFDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate, rampratex, delayx, starty, finy, channelsy, numptsy, rampratey, delayy, direction, startxs, finxs, startys, finys, y_label, comments])
+function initFDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate, rampratex, delayx, starty, finy, channelsy, numptsy, rampratey, delayy, direction, startxs, finxs, startys, finys, x_label, y_label, comments])
     // Function to make setting up scanVars struct easier for FastDAC scans
     // PARAMETERS:
     // startx, finx, starty, finy -- Single start/fin point for all channelsx/channelsy
@@ -292,9 +292,12 @@ function initFDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
     variable starty, finy, numptsy, delayy, rampratey
     string channelsx, channelsy
     string startxs, finxs, startys, finys
-    string  y_label
+    string  x_label, y_label
     string comments
     variable direction, sweeprate
+	
+	x_label = selectString((paramIsDefault(x_label) || numtype(strlen(x_label)) == 2), x_label, "")
+	y_label = selectString((paramIsDefault(y_label) || numtype(strlen(y_label)) == 2), y_label, "")	
 
     // Handle Optional Parameters
     S.numptsx = paramisdefault(numptsx) ? NaN : numptsx
@@ -320,8 +323,8 @@ function initFDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
     sv_setChannels(S, channelsx, channelsy, fastdac=1)
     
    	// Get Labels for graphs
-	S.x_label = GetLabel(S.channelsx, fastdac=1)  // Uses channels as list of numbers only
-	S.y_label = GetLabel(S.channelsy, fastdac=1)  // TODO: Use the optional y_label if provided (need to check for null str etc)
+   	S.x_label = selectString(strlen(x_label) > 0, GetLabel(S.channelsx, fastdac=1), x_label)  // Uses channels as list of numbers, and only if x_label not passed in
+   	S.x_label = selectString(strlen(y_label) > 0, GetLabel(S.channelsy, fastdac=1), y_label)   		
 
    	// Sets starts/fins in FD string format
     sv_setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
@@ -359,7 +362,7 @@ function sv_setMeasureFreq(S)
 end
 
 
-function initBDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate, delayx, rampratex, starty, finy, channelsy, numptsy, rampratey, delayy, direction])
+function initBDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate, delayx, rampratex, starty, finy, channelsy, numptsy, rampratey, delayy, direction, x_label, y_label])
     // Function to make setting up scanVars struct easier for FastDAC scans
     // PARAMETERS:
     // startx, finx, starty, finy -- Single start/fin point for all channelsx/channelsy
@@ -372,6 +375,11 @@ function initBDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
     string channelsx
     string channelsy
     variable direction, sweeprate
+    string x_label, y_label
+
+	x_label = selectString((paramIsDefault(x_label) || numtype(strlen(x_label)) == 2), x_label, "")
+	y_label = selectString((paramIsDefault(y_label) || numtype(strlen(y_label)) == 2), y_label, "")
+	channelsy = selectString(paramisdefault(channelsy), channelsy, "")
 
     // Handle Optional Parameters
     s.numptsx = paramisdefault(numptsx) ? NaN : numptsx
@@ -394,9 +402,10 @@ function initBDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
     sv_setChannels(S, channelsx, channelsy, fastdac=0)
     
    	// Get Labels for graphs
-	string x_label, y_label
-	S.x_label = GetLabel(S.channelsx, fastdac=0)  // Uses channels as list of numbers only
-	S.y_label = GetLabel(S.channelsy, fastdac=0) 
+  	// Get Labels for graphs
+   	S.x_label = selectString(strlen(x_label) > 0, GetLabel(S.channelsx, fastdac=0), x_label)  // Uses channels as list of numbers, and only if x_label not passed in
+   	S.x_label = selectString(strlen(y_label) > 0, GetLabel(S.channelsy, fastdac=0), y_label) 
+   	
 end
 
 function sv_setChannels(S, channelsx, channelsy, [fastdac])
@@ -569,7 +578,7 @@ function/S get1DWaveNames(raw, fastdac)
     // Return a list of Raw or Calc wavenames (without any checks)
     variable raw, fastdac  // 1 for True, 0 for False
     
-    string wavenames
+    string wavenames = ""
 	if (fastdac == 1)
 		if (raw == 1)
 			wavenames = getRecordedFastdacInfo("raw_names")
@@ -1540,6 +1549,208 @@ end
 /// Slow ScanController Recording Data /////
 ////////////////////////////////////////////
 
+function New_RecordValues(S, i, j, [readvstime, fillnan])
+	// In a 1d scan, i is the index of the loop. j will be ignored.
+	// In a 2d scan, i is the index of the outer (slow) loop, and j is the index of the inner (fast) loop.
+
+	// readvstime works only in 1d and rescales (grows) the wave at each index
+
+	// fillnan=1 skips any read or calculation functions entirely and fills point [i,j] with nan
+	Struct ScanVars &S
+	variable i, j, readvstime, fillnan
+	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts
+	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
+	nvar sc_abortsweep, sc_pause, sc_scanstarttime
+	variable ii = 0
+	
+	////// TEMPORARY FIX
+	variable sc_is2d = S.is2d
+	variable sc_startx = S.startx
+	variable sc_finx = S.finx
+	variable sc_numptsx = S.numptsx
+	variable sc_starty = S.starty
+	variable sc_finy = S.finy
+	variable sc_numptsy = S.numptsy
+
+	if (i==0 && j==0)
+		print "WARNING[New_RecordValues]: This is just a temporary fix for RecordValues!! It needs re-writing"	
+	endif
+//	abort "Not reimplemented yet. Needs to use ScanVars etc similar to fastdac, and be tested"
+	//TODO: DO this
+
+	//// setup all sorts of logic so we can store values correctly ////
+
+	variable innerindex, outerindex
+	if (sc_is2d == 1 || sc_is2d == 2) //1 is normal 2D, 2 is Line2D
+		// 2d
+		innerindex = j
+		outerindex = i
+	else
+		// 1d
+		innerindex = i
+		outerindex = i // meaningless
+	endif
+
+	// Set readvstime to 0 if it's not defined
+	if(paramisdefault(readvstime))
+		readvstime=0
+	endif
+
+	if(innerindex==0 && outerindex==0)
+		variable/g sc_rvt = readvstime // needed for rescaling in SaveWaves()
+	endif
+
+	if(readvstime==1 && sc_is2d)
+		abort "NOT IMPLEMENTED: Read vs Time is currently only supported for 1D sweeps."
+	endif
+
+	//// fill NaNs? ////
+
+	if(paramisdefault(fillnan))
+		fillnan = 0 // defaults to 0
+	elseif(fillnan==1)
+		fillnan = 1 // again, obvious
+	else
+		fillnan=0   // if something other than 1, assume default
+	endif
+
+	//// Setup and run async data collection ////
+	wave sc_measAsync
+	if( (sum(sc_measAsync) > 1) && (fillnan==0) && (sc_is2d != 2))
+		variable tgID = sc_ManageThreads(innerindex, outerindex, readvstime) // start threads, wait, collect data
+		sc_KillThreads(tgID) // Terminate threads
+	endif
+
+	//// Read sync data ( or fill NaN) ////
+	variable /g sc_tmpVal
+	variable dx			//For 2Dline
+	wave sc_linestart, sc_xdata 	//For 2Dline  
+	string script = "", cmd = ""
+	ii=0
+	do
+		if ((sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1) && sc_measAsync[ii]==0)
+			wave wref1d = $sc_RawWaveNames[ii]
+
+			// Redimension waves if readvstime is set to 1
+			if (readvstime == 1)
+				redimension /n=(innerindex+1) wref1d
+				setscale/I x 0,  datetime - sc_scanstarttime, wref1d
+			endif
+
+			if(fillnan == 0)
+				script = TrimString(sc_RawScripts[ii])
+				sprintf cmd, "%s = %s", "sc_tmpVal", script
+				Execute/Q/Z cmd
+				if(V_flag!=0)
+					print "[ERROR] \"RecordValues\": Using "+script+" raises an error: "+GetErrMessage(V_Flag,2)
+				endif
+			else
+				sc_tmpval = NaN
+			endif
+			wref1d[innerindex] = sc_tmpval
+
+			if (sc_is2d == 1)
+				// 2D Wave
+				wave wref2d = $sc_RawWaveNames[ii] + "2d"
+				wref2d[innerindex][outerindex] = wref1d[innerindex]
+			elseif (sc_is2d == 2 && fillnan == 0)
+				//2D line wave
+				FindValue/V=0/T=(inf) wref1D 	//Finds the first non NaN and stores position in V_value (V=value, T=tolerance)
+				if(innerindex == V_value)		//records the x value of the first notNaN for all line2D graphs  
+					sc_linestart[outerindex] = sc_xdata[innerindex]
+				endif
+				wave wref2d = $sc_RawWaveNames[ii] + "2d"
+				if(dimsize(wref2d, 0)-1 < innerindex-V_value) //Does 2D line wave need larger x range?
+					dx = dimdelta(wref2d, 0) 																//saves delta x of original to put back in
+					make/o/n=(dimsize(wref2d,0)+1, dimsize(wref2d,1)) temp2Dwave = NaN 			//Make new larger wave 	
+					temp2Dwave[0,dimsize(wref2d,0)-1][0,dimsize(wref2d,1)-1] = wref2d[p][q] 	//copy over old values with NaNs everywhere else
+					duplicate/O temp2Dwave wref2d															//Put back into old wave
+					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + nameofwave(wref2d); execute(cmd) //Sets Y scale again
+					cmd = "setscale /P x, 0, " + num2str(dx) + ", " + nameofwave(wref2d); execute(cmd) //Sets x scale again (starts at 0 but with correct delta)
+					killwaves temp2Dwave																	//Clear mess
+				endif	
+				wref2d[innerindex-(V_value)][outerindex] = wref1d[innerindex] 	//Using V_value from FindValue a few lines up
+			endif
+			
+		endif
+		ii+=1
+	while (ii < numpnts(sc_RawWaveNames))
+
+	//// Calculate interpreted numbers and store them in calculated waves ////
+	ii=0
+	cmd = ""
+	do
+		if ( (sc_CalcRecord[ii] == 1) || (sc_CalcPlot[ii] == 1) )
+			wave wref1d = $sc_CalcWaveNames[ii] // this is the 1D wave I am filling
+
+			// Redimension waves if readvstimeis set to 1
+			if (readvstime == 1)
+				redimension /n=(innerindex+1) wref1d
+				setscale/I x 0, datetime - sc_scanstarttime, wref1d
+			endif
+
+			if(fillnan == 0)
+				script = TrimString(sc_CalcScripts[ii])
+				// Allow the use of the keyword '[i]' in calculated fields where i is the inner loop's current index
+				script = ReplaceString("[i]", script, "["+num2istr(innerindex)+"]")
+				sprintf cmd, "%s = %s", "sc_tmpVal", script
+				Execute/Q/Z cmd
+				if(V_flag!=0)
+					print "[ERROR] in RecordValues (calc): "+GetErrMessage(V_Flag,2)
+				endif
+			elseif(fillnan == 1)
+				sc_tmpval = NaN
+			endif
+			wref1d[innerindex] = sc_tmpval
+
+			if (sc_is2d == 1)
+				wave wref2d = $sc_CalcWaveNames[ii] + "2d"
+				wref2d[innerindex][outerindex] = wref1d[innerindex]
+			elseif (sc_is2d == 2 && fillnan == 0)
+				//2D line wave
+				FindValue/V=0/T=(inf) wref1D 	//Finds the first non NaN and stores position in V_value (V=value, T=tolerance)
+				
+				if(innerindex == V_value)		//records the x value of the first notNaN for all line2D graphs  
+					sc_linestart[outerindex] = sc_xdata[innerindex]
+				endif
+				wave wref2d = $sc_CalcWaveNames[ii] + "2d"
+				if(dimsize(wref2d, 0)-1 < innerindex-V_value && v_value != -1) //Does 2D line wave need larger x range?
+					dx = dimdelta(wref2d, 0)
+					make/o/n=(dimsize(wref2d,0)+1, dimsize(wref2d,1)) temp2Dwave = NaN 			//Make new larger wave 	
+					temp2Dwave[0,dimsize(wref2d,0)-1][0,dimsize(wref2d,1)-1] = wref2d[p][q] 	//copy over old values with NaNs everywhere else
+					duplicate/O temp2Dwave wref2d															//Put back into old wave
+					cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + nameofwave(wref2d); execute(cmd) //Sets Y scale again
+					cmd = "setscale /P x, 0, " + num2str(dx) + ", " + nameofwave(wref2d); execute(cmd) //Sets x scale again (starts at 0 but with correct delta)
+					killwaves temp2Dwave																	//Clear mess
+				endif
+				if (v_value != -1 && V_value < innerindex) //don't fill a NaN or if V_value is actually from previous line of data (because it will try index out of range)
+					wref2d[innerindex-(V_value)][outerindex] = wref1d[innerindex] 	//Using V_value from FindValue a few lines up 	
+				endif
+			endif
+		endif
+		ii+=1
+	while (ii < numpnts(sc_CalcWaveNames))
+
+	// check abort/pause status
+	try
+		sc_checksweepstate()
+	catch
+		variable err = GetRTError(1)
+		
+		// reset sweep control parameters if igor about button is used
+		if(v_abortcode == -1)
+			sc_abortsweep = 0
+			sc_pause = 0
+		endif
+		
+		//silent abort
+		abortonvalue 1,10 
+	endtry
+end
+
+
+
+
 function RecordValues(i, j, [readvstime, fillnan])
 	// In a 1d scan, i is the index of the loop. j will be ignored.
 	// In a 2d scan, i is the index of the outer (slow) loop, and j is the index of the inner (fast) loop.
@@ -1554,6 +1765,7 @@ function RecordValues(i, j, [readvstime, fillnan])
 	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
 	nvar sc_abortsweep, sc_pause, sc_scanstarttime
 	variable ii = 0
+	
 	
 	
 	abort "Not reimplemented yet. Needs to use ScanVars etc similar to fastdac, and be tested"

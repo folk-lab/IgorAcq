@@ -6,25 +6,32 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 function AAScans()
 end
-//
-//function ReadVsTime(delay, [comments]) // Units: s
-//	variable delay
-//	string comments
-//	variable i=0
-//
-//	if (paramisdefault(comments))
-//		comments=""
-//	endif
-//
+
+function ReadVsTime(delay, [comments]) // Units: s
+	variable delay
+	string comments
+	variable i=0
+
+	if (paramisdefault(comments))
+		comments=""
+	endif
+	
+	Struct ScanVars S
+	initBDscanVars(S, 0, 0, 1, "", numptsx=1, delayx=delay, x_label="time /s")
+	initializeScan(S)
+
 //	InitializeWaves(0, 1, 1, x_label="time (s)")
-//	nvar sc_scanstarttime // Global variable set when InitializeWaves is called
-//	do
-//		asleep(delay)
-//		RecordValues(i, 0,readvstime=1)
-//		i+=1
-//	while (1)
+
+	variable/g sc_scanstarttime = datetime
+	do
+		asleep(delay)
+		New_RecordValues(S, i, 0,readvstime=1)
+		doupdate
+		i+=1
+	while (1)
+	EndScan(S=S)
 //	SaveWaves(msg=comments)
-//end
+end
 //
 //function ReadVsTimeFastdac(instrID, duration, [y_label, comments]) // Units: s 
 //	variable instrID, duration
@@ -439,15 +446,15 @@ end
 ////	endif
 ////end
 //
-function ScanFastDAC(instrID, start, fin, channels, [numpts, sweeprate, ramprate, delay, starts, fins, y_label, comments, RCcutoff, numAverage, notch, use_AWG, nosave]) //Units: mV
+function ScanFastDAC(instrID, start, fin, channels, [numpts, sweeprate, ramprate, delay, starts, fins, x_label, y_label, comments, use_AWG, nosave]) //Units: mV
 	// sweep one or more FastDac channels from start to fin using either numpnts or sweeprate /mV/s
 	// Note: ramprate is for ramping to beginning of scan ONLY
 	// Note: Delay is the wait after rampoint to start position ONLY
 	// channels should be a comma-separated string ex: "0,4,5"
 	// use_AWG is option to use Arbitrary Wave Generator. AWG
 	// starts/fins are overwrite start/fin and are used to provide a start/fin for EACH channel in channels 
-	variable instrID, start, fin, numpts, sweeprate, ramprate, delay, RCcutoff, numAverage, nosave, use_AWG
-	string channels, comments, notch, y_label, starts, fins
+	variable instrID, start, fin, numpts, sweeprate, ramprate, delay, nosave, use_AWG
+	string channels, comments, x_label, y_label, starts, fins
 
    // Reconnect instruments
    sc_openinstrconnections(0)
@@ -456,16 +463,14 @@ function ScanFastDAC(instrID, start, fin, channels, [numpts, sweeprate, ramprate
    nvar fd_ramprate
    ramprate = paramisdefault(ramprate) ? fd_ramprate : ramprate
    delay = ParamIsDefault(delay) ? 0.01 : delay
-   notch = selectstring(paramisdefault(notch), notch, "")
    comments = selectstring(paramisdefault(comments), comments, "")
    starts = selectstring(paramisdefault(starts), starts, "")
    fins = selectstring(paramisdefault(fins), fins, "")
-
+ 
    // Set sc_ScanVars struct
    struct ScanVars S
 //   SF_init_FDscanVars(S, instrID, start, fin, channels, numpts, ramprate, startxs=starts, finxs=fins, delayy=delay, sweeprate=sweeprate)  // Note: Stored as SV.startx etc
-   initFDscanVars(S, instrID, start, fin, channels, numptsx=numpts, sweeprate=sweeprate, rampratex=ramprate, delayy=delay, startxs=starts, finxs=fins, y_label=y_label, comments=comments)
-	
+   initFDscanVars(S, instrID, start, fin, channels, numptsx=numpts, sweeprate=sweeprate, rampratex=ramprate, delayy=delay, startxs=starts, finxs=fins, x_label=x_label, y_label=y_label, comments=comments)
 //   // Set ProcessList struct
 //   struct fdRV_ProcessList PL
 //   SFfd_init_ProcessList(PL, RCcutoff, numAverage, notch)  // Puts values into PL.<name>
@@ -927,7 +932,6 @@ function ScanfastDACRepeat(instrID, start, fin, channels, numptsy, [numptsx, swe
 		sc_sleep(S.delayy)
 
 		// Record values for 1D sweep
-		fd_Record_Values(S,PL,j, AWG_list = AWG)
 		NEW_Fd_record_values(S, j, AWG_List = AWG)
 
 		if (alternate!=0) // If want to alternate scan scandirection for next row
