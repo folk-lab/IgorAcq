@@ -381,16 +381,18 @@ function/s getFDACStatus(instrID)
 	// AWG info if used
 	nvar sc_AWG_used
 	if(sc_AWG_used == 1)
-		buffer = addJSONkeyval(buffer, "AWG", add_AWG_status())  //NOTE: AW saved in add_AWG_status()
+		print "WARNING: Not saving AWG status, needs to be implemented"
+//		buffer = addJSONkeyval(buffer, "AWG", add_AWG_status())  //NOTE: AW saved in add_AWG_status()
 	endif
 	
 	return addJSONkeyval("", "FastDAC "+num2istr(dev), buffer)
 end
 
 
-function/s add_AWG_status()
+function/s add_AWG_status(hdfid)
 	// Function to be called from getFDACstatus() to add a section with information about the AWG used
 	// Also adds AWs used to HDF
+	variable hdfid
 	
 	string buffer = ""// For storing JSON to return
 	
@@ -414,7 +416,7 @@ function/s add_AWG_status()
 	for(i=0;i<AWG.numWaves;i++)
 		// Get IGOR AW
 		wn = fdAWG_get_AWG_wave(str2num(stringfromlist(i, AWG.AW_waves, ",")))
-		savesinglewave(wn)
+		initsaveSingleWave(wn, hdfid)
 	endfor
 	return buffer
 end
