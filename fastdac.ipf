@@ -1308,12 +1308,14 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 		HDF5CreateFile/p=spectrum hdfid as filename
 		sanum+=1  // So next opened file will get a new num
 
-		// save the spectrum
+		// save the data to HDF
+		string buffer
+		Make/t/free names = {log_freq_wavenames, lin_freq_wavenames, time_wavenames, signal_wavenames}
 		for(i=0;i<numChannels;i+=1)
-			initsaveSingleWave(StringFromList(i, log_freq_wavenames), hdfid)
-			initsaveSingleWave(StringFromList(i, lin_freq_wavenames), hdfid)
-			initsaveSingleWave(StringFromList(i, time_wavenames), hdfid)
-			initsaveSingleWave(StringFromList(i, signal_wavenames), hdfid)  // The full 2D timeseries
+			for(j=0;j<numpnts(names);j++)
+				buffer = StringFromList(i, names[j])
+				initsaveSingleWave(buffer, hdfid, saveName=buffer[9,strlen(buffer)-1])  // Save with "Spectrum_" stripped off the beginning
+			endfor
 		endfor
 		
 		// Add Config and Sweeplogs to HDF
