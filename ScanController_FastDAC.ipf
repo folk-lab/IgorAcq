@@ -151,7 +151,7 @@ function resampleWaves(w, measureFreq, targetFreq)
 	variable measureFreq, targetFreq
 	
 	RatioFromNumber (targetFreq / measureFreq)
-	resample/UP=(V_numerator)/DOWN=(V_denominator)/N=101 w
+	resample/UP=(V_numerator)/DOWN=(V_denominator)/N=201 w
   		// TODO: Need to test N more (simple testing suggests we may need >200 in some cases!)
   		// TODO: Need to decide what to do with end effect. Possibly /E=2 (set edges to 0) and then turn those zeros to NaNs? 
   		// TODO: Or maybe /E=3 is safest (repeat edges). The default /E=0 (bounce) is awful.
