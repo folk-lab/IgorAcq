@@ -64,6 +64,74 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 	return localRM
 end
 
+
+//////////////////////////////////
+////////// Utility ///////////////
+//////////////////////////////////
+
+function checkInstrIDmatchesDevice(instrID, device)
+	// checks instrID is the correct Visa address for device number
+	// e.g. if instrID is to FD1, but if when checking DevChannels device 2 was returned, this will fail
+	variable instrID, device
+
+	string instrAddress = getResourceAddress(instrID)
+	svar sc_fdacKeys
+	string deviceAddress = stringbykey("visa"+num2istr(device), sc_fdacKeys, ":", ",") 
+	if (cmpstr(deviceAddress, instrAddress) != 0)
+		string buffer
+		sprintf buffer, "ERROR[checkInstrIDmatchesDevice]: (instrID %d => %s) != device %d => %s", instrID, instrAddress, device, deviceAddress 
+		abort buffer
+	endif
+	return 1
+end
+
+
+
+function/S getDevChannels(channels, device, [adc])
+	// Convert from absolute channel number to device channel number (i.e. DAC 9 is actually FastDAC2s 1 channel)
+	// Returns device number in device variable
+	// Note: Comma separated list
+	// Note: Must be channel NUMBERS
+	// Note: Error thrown if not all channels are on the same device
+	string channels // DACs or ADCs to check
+	variable adc  // Whether we are checking DACs or ADCs
+	variable &device // Returns device number in device (starting from 1)
+
+	svar sc_fdacKeys  // Holds info about connected FastDACs
+	
+	variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
+	device = -1 // Init invalid (so can set when first channel is found)
+	variable i=0, j=0, numCh=0, startCh=0, Ch=0
+	string dev_channels=""
+	for(i=0;i<itemsInList(channels);i+=1)
+		ch = str2num(stringfromlist(i,channels,","))  // Looking for where this channel lives
+		
+		startCh = 0
+		for(j=0;j<numDevices+1;j+=1)  // Cycle through connected devices
+			if(!adc) // Looking at DACs
+				numCh = str2num(stringbykey("numDACCh"+num2istr(j+1),sc_fdackeys,":",","))
+			else  // Looking at ADCs
+				numCh = str2num(stringbykey("numADCCh"+num2istr(j+1),sc_fdackeys,":",","))
+			endif
+
+			if(startCh+numCh-1 >= Ch)
+				// this is the device
+				if(device <= 0)
+					device = j+1  // +1 to account for device numbering starting from 1 not zero
+				elseif (j+1 != device)
+					abort "ERROR[getDevChannels]: Channels are distributed across multiple devices. Not implemented"
+				endif
+				dev_channels = addlistitem(num2istr(Ch),dev_channels,",",INF)  // Add to list of Device Channels
+				break
+			endif
+			startCh += numCh
+		endfor
+	endfor
+
+	return dev_channels
+end
+
+
 ///////////////////////
 //// PID functions ////
 ///////////////////////
@@ -1110,15 +1178,8 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 	string channels, comments
 	string datestring = strTime()
 	
-	
-	if(paramisdefault(comments))
-		comments = ""
-	endif
-	
-	if(paramisdefault(numAverage))
-		numAverage = 1
-	endif
-	
+	comments = selectString(paramisdefault(comments), comments, "")	
+	numAverage = paramisDefault(numAverage) ? 1 : numAverage
 	ca_amp = paramisdefault(ca_amp) ? 9 : ca_amp
 	
 	svar sc_fdackeys
@@ -1132,259 +1193,136 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 	variable measureFreq = samplingFreq/(numChannels)  // sampling split between channels
 	variable numpts = RoundNum(scanlength*measureFreq,0)
 	
-	// make sure numpts is even
-	// otherwise FFT will fail
+	// make sure numpts is even otherwise FFT will fail
 	numpts = numpts - mod(numpts,2)
 	
-	// resolve the ADC channel
-	variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
-	variable i=0, j=0, numADCCh=0, startCh=0, dev_adc=0, adcCh=0
-	string adcList=""
-	for(i=0;i<numChannels;i+=1)
-		adcCh = str2num(stringfromlist(i,channels,","))
-		startCh = 0
-		for(j=0;j<numDevices+1;j+=1)
-			numADCCh = str2num(stringbykey("numADCCh"+num2istr(j+1),sc_fdackeys,":",","))
-			if(startCh+numADCCh-1 >= adcCh)
-				// this is the device
-				if(i > 0 && dev_adc != j)
-					print "[ERROR] \"fdacSpectrumAnalyzer\": All ADC channels must be on the same device!"
-					abort
-				endif
-				dev_adc = j
-				adcList = addlistitem(num2istr(adcCh),adcList,",",itemsinlist(adcList,","))
-				break
-			endif
-			startCh += numADCCh
-		endfor
-	endfor
-	
+	// check ADC channels are on FD
+	variable device
+	string dev_channels = getDevChannels(channels, device, adc=1)
+	checkInstrIDmatchesDevice(instrID, device) // Aborts if channels aren't on instrID
+
+	// generate waves to hold time series data (This is where data is distributed to in fd_readvstime)
+	string wn = ""
+	variable i
 	string time_wavenames = ""
-	string freq_wavenames = ""
-	// generate waves to hold time series data
-	string wn = "", wn_lin = ""
 	for(i=0;i<numChannels;i+=1)
-		wn = "timeSeriesADC"+stringfromlist(i,channels,",")
+		wn = "spectrum_timeSeriesADC"+stringfromlist(i,channels,",")
 		make/o/n=(numpts) $wn = nan
 		setscale/i x, 0, scanlength, $wn
 		time_wavenames = addListItem(wn, time_wavenames, ";", INF)
 	endfor
-	
-	// create waves for final fft output
+
+	// generate waves to hold time series signal in nA
+	string signal_wavenames = ""
 	for(i=0;i<numChannels;i+=1)
-		wn = "fftADC"+stringfromlist(i,channels,",")
-		make/o/n=(numpts/2) $wn = nan
-		setscale/i x, 0, measureFreq/(2.0), $wn
-		if (!plot_linear)
-			freq_wavenames = addListItem(wn, freq_wavenames, ";", INF)
-		endif
-				
-		wn_lin = "fftADClin"+stringfromlist(i,channels,",")
-		make/o/n=(numpts/2) $wn_lin = nan
-		setscale/i x, 0, measureFreq/(2.0), $wn_lin
-		if(plot_linear)
-			freq_wavenames = addListItem(wn_lin, freq_wavenames, ";", INF)
-		endif
+		wn = "spectrum_signal"+num2istr(i)
+		make/o/n=(numpts) $wn = nan
+		setscale/i x, 0, scanlength, $wn
+		signal_wavenames = addListItem(wn, signal_wavenames, ";", INF)
 	endfor
 	
-	string graphIDs, all_graphIDs = ""
+	// create waves for final fft output
+	string wn_lin = ""
+	string log_freq_wavenames = ""
+	string lin_freq_wavenames = ""
+	for(i=0;i<numChannels;i+=1)
+		wn = "spectrum_fftADC"+stringfromlist(i,channels,",")
+		make/o/n=(numpts/2) $wn = nan
+		setscale/i x, 0, measureFreq/(2.0), $wn
+		log_freq_wavenames = addListItem(wn, log_freq_wavenames, ";", INF)
+				
+		wn_lin = "spectrum_fftADClin"+stringfromlist(i,channels,",")
+		make/o/n=(numpts/2) $wn_lin = nan
+		setscale/i x, 0, measureFreq/(2.0), $wn_lin
+		lin_freq_wavenames = addListItem(wn_lin, lin_freq_wavenames, ";", INF)
+	endfor
 	
+	// Dispaly Graphs 
+	string graphIDs, all_graphIDs = ""
 	graphIDs = initializeGraphsForWavenames(time_wavenames, "Time /s", is2d=0, y_label="Current /nA", spectrum=1)
 	all_graphIDs = all_graphIDs+graphIDs
 		
+	string plot_freq_wavenames = selectString(plot_linear, log_freq_wavenames, lin_freq_wavenames)	
 	string y_label = selectString(plot_linear, "Spectrum [dBnA/sqrt(Hz)]", "Spectrum [nA/sqrt(Hz)]")
-	graphIDs = initializeGraphsForWavenames(freq_wavenames, "Frequency /Hz", is2d=0, y_label=y_label, spectrum=1)
+	graphIDs = initializeGraphsForWavenames(plot_freq_wavenames, "Frequency /Hz", is2d=0, y_label=y_label, spectrum=1)
 	all_graphIDs = all_graphIDs+graphIDs
-	
 	arrangeWindows(all_graphIDs)
 
+	// Take measurements
+	variable j
 	for(i=0;i<numAverage;i+=1)
-		
+		// Send command and distribute data to "spectrum_timeSeriesADC#"
 		fd_readvstime(instrID, channels, numpts, samplingFreq, numChannels, spectrum_analyser=1)
 		
 		// convert time series to spectrum
-		variable bandwidth = measureFreq/2.0
-		string fftnames = ""
-		string fftnamelin = ""
-		string ffttemps = ""
-		string ffttemplin = ""
 		for(j=0;j<numChannels;j+=1)
-			ffttemps = "ffttempADC"+stringfromlist(j,channels,",")
-			ffttemplin = "ffttempADClin"+stringfromlist(j,channels,",")
-			wn = "timeSeriesADC"+stringfromlist(j,channels,",")
-		
-			wave timewn= $wn
-			variable le=dimsize(timewn,0)
-			Make/N=(le,numAverage)/D/O signal
-			signal[][i]=timewn[p]*1.0e-3*10^-ca_amp*1e9
+			// Get wave with new data 
+			wave timewn = $stringFromList(j, time_wavenames)
 
-			duplicate/o timewn, fftinput
+			// Copy into 2D waves for saving
+			variable le=dimsize(timewn,0)
+			Make/N=(le,numAverage)/D/O signal // TODO: I'm pretty sure this is wrong, this is being overwritten constantly
+			signal[][i]=timewn[p]*1.0e-3*10^-ca_amp*1e9  // Add to full 2D time series for saving later
+
+			// Convert to nA 
+			duplicate/o/free timewn, fftinput
 			fftinput = fftinput*1.0e-3*10^-ca_amp*1e9  // mV -> V -> A -> nA
+
+			// Save nA version to Signal#
+			wave signal = $stringfromList(j, signal_wavenames)
+			signal[][i] = fftinput[p]
+
+			// Calculate log spectrum
+			wave fftw = calculate_spectrum(fftinput)
 			
-			
-			// USING PERIODOGRAM INSTEAD OF FFT /////
-			DSPPeriodogram/PARS/DBR=1/NODC=1 fftinput 
-			wave w_Periodogram
-			
-			duplicate/o w_Periodogram, $ffttemps
-			wave fftwn = $ffttemps
-			fftwn = fftwn+10*log(scanlength)
-			setscale/i x, 0, bandwidth, fftwn
-			
-			// Calculate linear for integrated
-			
-			DSPPeriodogram/PARS/NODC=1 fftinput
-			wave w_Periodogram
-			duplicate/o w_Periodogram, $ffttemplin
-			wave fftwnlin = $ffttemplin
-			fftwnlin = fftwnlin*scanlength
-			
-			setscale/i x, 0, bandwidth, fftwnlin
-			
-			////////////////////////////////////////
-			
-			///// USING FFT /////////////////////////////
-//			fft/out=3/dest=$ffttemps fftinput
-//			wave fftwn = $ffttemps
-//			setscale/i x, 0, bandwidth, fftwn
-//
-////			fftwn = fftwn/sqrt(bandwidth)
-//			if(linear)
-//				fftwn = fftwn/sqrt(bandwidth)
-//			else
-//				fftwn = 20*log(fftwn/sqrt(bandwidth))
-//			endif
-			////////////////////////////////////////////// 
-			
-			fftnames = "fftADC"+stringfromlist(j,channels,",")
-			fftnamelin = "fftADClin"+stringfromlist(j,channels,",")
-			
-			wave fftwave = $fftnames
-			wave fftwavelin = $fftnamelin
-			if(i==0)
-				fftwave = fftwn
-				fftwavelin = fftwnlin
-			else
-				fftwave = fftwave*i + fftwn  // So weighting of rows is correct when averaging
+			// Calculate linear spectrum
+			wave fftwlin = calculate_spectrum(fftinput, linear=1)
+
+			// Add to averaged waves
+			wave fftwave = $stringFromList(j, log_freq_wavenames)
+			wave fftwavelin = $stringFromList(j, lin_freq_wavenames)
+			if(i==0) // If first pass, initialize waves
+				fftwave = fftw
+				fftwavelin = fftwlin
+			else  // Else add and average
+				fftwave = fftwave*i + fftw  // So weighting of rows is correct when averaging
 				fftwave = fftwave/(i+1)      // ""
 				
-				fftwavelin = fftwavelin*i + fftwnlin
+				fftwavelin = fftwavelin*i + fftwlin
 				fftwavelin = fftwavelin/(i+1)
 			endif
-			
 		endfor
-//		if(!linear)
-//			fftwn = 20*log(fftwn)
-//		endif
 	endfor	
 	
-//	// close the time series plots
-//	for(j=0;j<numChannels;j+=1)
-//		killwindow/z $stringfromlist(j,openplots,",")
-//	endfor
-//	openplots = ""
-		
-	// display fft plots
-//	for(i=0;i<numChannels;i+=1)
-//		fftnames = "fftADC"+stringfromlist(i,channels,",")
-//		wave fftwave = $fftnames
-//		setscale/i x, 0, bandwidth, fftwave
-//		display fftwave
-//		label bottom, "frequency [Hz]"
-//		if(linear)
-//			label left, "Spectrum [V/sqrt(Hz)]"
-//		else
-//			label left, "Spectrum [dBV/sqrt(Hz)]"
-//		endif
-//		openplots+= winname(0,1)+","
-//	endfor
-	
-	// tile windows
-//	cmd1 = "TileWindows/O=1/A=(3,4) "+openplots
-//	execute(cmd1)
-	
-	// try to scale y axis in plot is linear scale
-//	if(linear)
-//		variable searchStart = 0, maxpeak = 0, cutoff = 0.1
-//		for(i=0;i<numChannels;i+=1)
-//			fftnames = "fftADC"+stringfromlist(i,channels,",")
-//			wave fftwave = $fftnames
-//			searchStart = 1.0
-//			maxpeak = 0
-//			do
-//				findpeak/q/r=(searchStart,bandwidth/2.0)/i/m=(cutoff) fftwave
-//				if(abs(v_peakval) > abs(maxpeak))
-//					maxpeak = v_peakval
-//				endif
-//				searchStart = v_peakloc+1.0
-//			while(v_flag == 0)
-//			setaxis/w=$stringfromlist(i,openplots,",") left 0.0,maxpeak
-//		endfor
-//	endif
-	
 	if (nosave == 0)
-		
 		// save data to "data/spectrum/"
 		nvar sanum
 		if(!NVAR_Exists(sanum))
 			variable/g sanum=1
 		endif
-		
+
 		string filename = "spectrum_"+datestring+"_dat"+num2str(sanum)+".h5"
-		sanum+=1
-		variable/g hdf5_id = 0
+
 		// create empty HDF5 container
-		HDF5CreateFile/p=spectrum hdf5_id as filename
+		variable hdfid
+		HDF5CreateFile/p=spectrum hdfid as filename
+		sanum+=1  // So next opened file will get a new num
+
 		// save the spectrum
 		for(i=0;i<numChannels;i+=1)
-			fftnames = "fftADC"+stringfromlist(i,channels,",")
-			fftnamelin = "fftADClin"+stringfromlist(i,channels,",")
-			HDF5SaveData/IGOR=-1/WRIT=1/Z $fftnames , hdf5_id
-			HDF5SaveData/IGOR=-1/WRIT=1/Z $fftnamelin , hdf5_id
-			if (V_flag != 0)
-				print "HDF5SaveData failed: ", wn
-				return 0
-			endif
-			wn = "timeSeriesADC"+stringfromlist(i,channels,",")
-			savesinglewave(wn)
-			savesinglewave("signal")
+			initsaveSingleWave(StringFromList(i, log_freq_wavenames), hdfid)
+			initsaveSingleWave(StringFromList(i, lin_freq_wavenames), hdfid)
+			initsaveSingleWave(StringFromList(i, time_wavenames), hdfid)
+			initsaveSingleWave(StringFromList(i, signal_wavenames), hdfid)  // The full 2D timeseries
 		endfor
-		// Create metadata
-		// this just creates one big JSON string attribute for the group
-		// its... fine
-		variable /G meta_group_ID
-		HDF5CreateGroup hdf5_id, "metadata", meta_group_ID
-	
 		
-		make /FREE /T /N=1 cconfig = prettyJSONfmt(sc_createconfig())
-		
-		string temp = new_sc_createSweepLogs(comments=comments)
-		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(temp)
-		
-		// Check that prettyJSONfmt actually returned a valid JSON.
-		sc_confirm_JSON(sweep_logs, name="sweep_logs")
-		sc_confirm_JSON(cconfig, name="cconfig")
-		
-		HDF5SaveData /A="sweep_logs" sweep_logs, hdf5_id, "metadata"
-		HDF5SaveData /A="sc_config" cconfig, hdf5_id, "metadata"
-	
-		HDF5CloseGroup /Z meta_group_id
-		if (V_flag != 0)
-			Print "HDF5CloseGroup Failed: ", "metadata"
-		endif
-	
-		// may as well save this config file, since we already have it
-		sc_saveConfig(cconfig[0])
-		
-		// close HDF5 container
-		HDF5CloseFile/Z hdf5_id
-		if (v_flag != 0)
-			print "HDF5CloseFile failed: ", filename
-		else
-			print "saving all spectra to file: "+filename
-		endif
+		// Add Config and Sweeplogs to HDF
+		addMetaFiles(num2str(hdfid), logs_only=1, comments=comments)
+
+		initcloseSaveFiles(num2str(hdfid))
 	endif
 end
+
 
 function specAna_distribute_data(buffer,bytes,channels,colNumStart)
 	string buffer, channels
@@ -1394,7 +1332,7 @@ function specAna_distribute_data(buffer,bytes,channels,colNumStart)
 	string wave1d = "", s1="", s2=""
 	for(i=0;i<numChannels;i+=1)
 		// load data into wave
-		wave1d = "timeSeriesADC"+stringfromlist(i,channels,",")
+		wave1d = "spectrum_timeSeriesADC"+stringfromlist(i,channels,",")
 		wave timewave = $wave1d
 		k = 0
 		for(j=0;j<bytes;j+=2*numChannels)
@@ -1406,6 +1344,38 @@ function specAna_distribute_data(buffer,bytes,channels,colNumStart)
 			k += 1
 		endfor
 	endfor
+end
+
+function/WAVE calculate_spectrum(time_series, [scan_duration, linear])
+	// Takes time series data and returns power spectrum
+	wave time_series  // Time series (in correct units -- i.e. check that it's in nA first)
+	variable scan_duration // If passing a wave which does not have Time as x-axis, this will be used to rescale
+	variable linear // Whether to return with linear scale (or log scale)
+
+	duplicate/free time_series tseries
+	if (scan_duration)
+		setscale/i x, 0, scan_duration, tseries
+	else
+		scan_duration = DimDelta(time_series, 0) * DimSize(time_series, 0)
+	endif
+
+	// Built in powerspectrum function
+	wave w_Periodogram
+	wave powerspec
+	if (!linear)  // Use log scale
+		DSPPeriodogram/PARS/DBR=1/NODC=1 tseries  
+		duplicate/free w_Periodogram, powerspec
+		powerspec = powerspec+10*log(scan_duration)  // TODO: What is this part doing, why is it here?  
+	else  // Use linear scale
+		DSPPeriodogram/PARS/NODC=1 tseries
+		duplicate/free w_Periodogram, powerspec
+		powerspec = powerspec*scan_duration  // TODO: What is this part doing, why is it here?  
+	endif
+
+	variable bandwidth = (1.0/DimDelta(tseries,0))/2.0  // measureFreq/2 (Over 2 because of nyquist)
+	setscale/i x, 0, bandwidth, powerspec  // TODO: Is this necessary? Doesn't W_periodogram already have this x-axis?
+
+	return powerspec
 end
 
 

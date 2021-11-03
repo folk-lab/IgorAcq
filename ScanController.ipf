@@ -33,7 +33,7 @@
 ////////////////////////////////
 ///////// utility functions ////
 ////////////////////////////////
-
+wave
 function /S getHostName()
 	// find the name of the computer Igor is running on
 	// Used in saveing Config info
@@ -3026,18 +3026,16 @@ function initOpenSaveFiles(RawSave)
 
 	variable hdf5_id
 	HDF5CreateFile /P=data hdf5_id as h5name // Open HDF5 file
+	filenum += 1  // So next created file gets a new num
 	if (V_Flag !=0)
 		abort "Failed to open save file. Probably need to run `filenum+=1` so that it isn't trying to create an existing file. And then run EndScan(...) again"
 	endif	
 	return hdf5_id
-
 end
 
 function initcloseSaveFiles(hdf5_id_list)
 	// close any files that were created for this dataset
 	string hdf5_id_list	
-	
-	nvar filenum
 	
 	variable i
 	variable hdf5_id
@@ -3050,7 +3048,6 @@ function initcloseSaveFiles(hdf5_id_list)
 		endif
 		
 	endfor
-	filenum+=1
 end
 
 function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
