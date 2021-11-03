@@ -132,7 +132,7 @@ function /S getExpPath(whichpath, [full])
 
 	// get relative path to data
 	string temp1, temp2, temp3
-	SplitString/E="([\w\s\-\:]+)(?i)(local[\s\_]measurement[\s\_]data)([\w\s\-\:]+)" S_path, temp1, temp2, temp3
+	SplitString/E="([\w\s\-\:]+)(?i)(local[\s\_\-]measurement[\s\_\-]data)([\w\s\-\:]+)" S_path, temp1, temp2, temp3
 
 	string platform = igorinfo(2), separatorStr=""
 	if(cmpstr(platform,"Windows")==0)
@@ -2914,7 +2914,7 @@ function EndScan([S, save_experiment, aborting])
 	variable aborting
 	
 	nvar filenum
-
+	variable current_filenum = filenum
 	save_experiment = paramisDefault(save_experiment) ? 1 : save_experiment
 	if(!paramIsDefault(S))
 		saveAsLastScanVarsStruct(S)  // I.e save the ScanVars including end_time and any other changed values in case saving fails (which it often does)
@@ -2949,7 +2949,7 @@ function EndScan([S, save_experiment, aborting])
 	endif
 
 	if(sc_checkBackup())  	// check if a path is defined to backup data
-		sc_copyNewFiles(filenum, save_experiment=save_experiment)		// copy data to server mount point
+		sc_copyNewFiles(current_filenum, save_experiment=save_experiment)		// copy data to server mount point (nvar filenum gets incremented after HDF is opened)
 	endif
 
 	// add info about scan to the scan history file in /config
