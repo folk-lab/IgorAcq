@@ -635,14 +635,14 @@ function rampOutputFDAC(instrID,channel,output,[ramprate, ignore_lims]) // Units
 		
 	// read current dac output and compare to window
 	variable currentoutput = getfdacOutput(instrID,devchannel)
-	
-	if (abs(output-currentOutput) < 0.32)  // If trying to step smaller than min dac step (rounded up a little from 0.30517)
-		if (abs(output-currentOutput) > 0.32/2)  // If closer to next dac step do that
-			output = currentOutput+sign(output-currentOutput)*0.32
-		else
-//			print "WARNING: Trying to step < 0.5*Dac step, nothing will happen"
-		endif
-	endif
+//	
+//	if (abs(output-currentOutput) < 0.32)  // If trying to step smaller than min dac step (rounded up a little from 0.30517)
+//		if (abs(output-currentOutput) > 0.32/2)  // If closer to next dac step do that
+//			output = currentOutput+sign(output-currentOutput)*0.32
+//		else
+////			print "WARNING: Trying to step < 0.5*Dac step, nothing will happen"
+//		endif
+//	endif
 			
 	
 	// ramp channel to output
@@ -1380,6 +1380,7 @@ function/WAVE calculate_spectrum(time_series, [scan_duration, linear])
 		// TODO: I'm not sure this is correct, but I don't know what should be done to fix it -- TIM
 		powerspec = powerspec*scan_duration  // This is supposed to be so that the powerspec is independent of scan_duration
 	endif
+	powerspec[0] = NaN
 	return powerspec
 end
 
@@ -1399,6 +1400,7 @@ function plot_PowerSpectrum(w, [scan_duration, linear, powerspec_name])
 
 	string y_label = selectString(linear, "Spectrum [dBnA/sqrt(Hz)]", "Spectrum [nA/sqrt(Hz)]")
 	initializeGraphsForWavenames(NameOfWave(tempwave), "Frequency /Hz", is2d=0, y_label=y_label, spectrum=1)
+	 doWindow/F $winName(0,1)
 end
 
 //////////////////////////////////

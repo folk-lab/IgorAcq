@@ -3026,7 +3026,6 @@ function initOpenSaveFiles(RawSave)
 
 	variable hdf5_id
 	HDF5CreateFile /P=data hdf5_id as h5name // Open HDF5 file
-	filenum += 1  // So next created file gets a new num
 	if (V_Flag !=0)
 		abort "Failed to open save file. Probably need to run `filenum+=1` so that it isn't trying to create an existing file. And then run EndScan(...) again"
 	endif	
@@ -3176,6 +3175,7 @@ function SaveToHDF(S, fastdac)
 		raw_hdf5_id = initOpenSaveFiles(1)
 		hdfids = addlistItem(num2str(raw_hdf5_id), hdfids, ";", INF)
 	endif
+	filenum += 1  // So next created file gets a new num (setting here so that when saving fails, it doesn't try to overwrite next save)
 	
 	// add Meta data to each file
 	addMetaFiles(hdfids, S=S)

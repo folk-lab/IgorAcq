@@ -145,7 +145,7 @@ end
 
 
 function resampleWaves(w, measureFreq, targetFreq)
-	// takes a list of wave names and resamples each, from measureFreq
+	// resamples wave w from measureFreq
 	// to targetFreq (which should be lower than measureFreq)
 	Wave w
 	variable measureFreq, targetFreq
@@ -273,14 +273,20 @@ function fdRV_process_and_distribute(ScanVars, AWG_list, rowNum)
 		execute(cwn+" = sc_tempwave")
 		
 		if (ScanVars.is2d)
+			// Copy 1D raw into 2D
+			wave raw1d = $rwn
+			wave raw2d = $rwn+"_2d"
+			raw2d[][rowNum] = raw1d[p]
+			
+			// Copy 1D calc into 2D
 			cwn = cwn+"_2d"
-			wave w = $cwn
-			w[][rowNum] = sc_tempwave[p]		
+			wave calc2d = $cwn
+			calc2d[][rowNum] = sc_tempwave[p]		
 		endif
 	endfor	
 	doupdate // Update all the graphs with their new data
 end
-
+mod
 
 
 function fd_readvstime(instrID, channels, numpts, samplingFreq, numChannels, [spectrum_analyser])
