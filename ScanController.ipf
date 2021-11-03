@@ -472,6 +472,9 @@ function sv_setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy, 
         else
             abort "Something wrong with Y part. Note: If either of startys/finys is provided, both must be provided"
         endif
+    else
+    	S.startys = ""
+    	S.finys = ""
     endif
 end
 
@@ -779,17 +782,18 @@ function/S initializeGraphs(S)
         if(i==1) // Raw waves
 	        sc_rawGraphs1D = buffer
         endif
-        graphIDs = addListItem(buffer, graphIDs, ";", INF)
+        graphIDs = graphIDs + buffer
     endfor
     return graphIDs
 end
 
 
-function/S initializeGraphsForWavenames(wavenames, x_label, [is2d, y_label])
+function/S initializeGraphsForWavenames(wavenames, x_label, [is2d, y_label, spectrum])
 	// Ensures a graph is open and tiles graphs for each wave in comma separated wavenames
 	// Returns list of graphIDs of active graphs
+	// Spectrum = 1 to use SAnum instead of filenum in plot
 	string wavenames, x_label, y_label
-	variable is2d
+	variable is2d, spectrum
 	
 	y_label = selectString(paramisDefault(y_label), y_label, "")
 
@@ -799,22 +803,24 @@ function/S initializeGraphsForWavenames(wavenames, x_label, [is2d, y_label])
 	    wn = StringFromList(i, waveNames)
 	    openGraphID = graphExistsForWavename(wn)
 	    if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-	        setUpGraph1D(openGraphID, x_label)  // TODO: Add S.y_label if it is not null or empty
+	        setUpGraph1D(openGraphID, x_label, spectrum=spectrum, y_label=y_label)  // TODO: Add S.y_label if it is not null or empty
 	    else 
-	        open1Dgraph(wn, x_label)
+	        open1Dgraph(wn, x_label, y_label=y_label, spectrum=spectrum, y_label=y_label)
 	        openGraphID = winname(0,1)
-	        graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
 	    endif
+       graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
+
 
 	    if (is2d)
 	        wn = wn+"_2d"
 	        openGraphID = graphExistsForWavename(wn)
 	        if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-	            setUpGraph2D(openGraphID, wn, x_label, y_label)
+	            setUpGraph2D(openGraphID, wn, x_label, y_label, spectrum=spectrum)
 	        else 
-	            open2Dgraph(wn, x_label, y_label)
-	            graphIDs = addlistItem(winname(0,1), graphIDs, ";", INF)
+	            open2Dgraph(wn, x_label, y_label, spectrum=spectrum)
+	            openGraphID = winname(0,1)
 	        endif
+           graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
 	    endif
 	endfor
 	return graphIDs
@@ -853,18 +859,23 @@ function/S graphExistsForWavename(wn)
     return ""
 end
 
-function open1Dgraph(wn, x_label)
+function open1Dgraph(wn, x_label, [y_label, spectrum])
     // Opens 1D graph for wn
-    string wn, x_label
+    string wn, x_label, y_label
+    variable spectrum
+    
+    y_label = selectString(paramIsDefault(y_label), y_label, "")
+    
     display $wn
     setWindow kwTopWin, graphicsTech=0
     
-    setUpGraph1D(WinName(0,1), x_label)
+    setUpGraph1D(WinName(0,1), x_label, y_label=y_label, spectrum=spectrum)
 end
 
-function open2Dgraph(wn, x_label, y_label)
+function open2Dgraph(wn, x_label, y_label, [spectrum])
     // Opens 2D graph for wn
     string wn, x_label, y_label
+    variable spectrum
     wave w = $wn
     if (dimsize(w, 1) == 0)
     	abort "Trying to open a 2D graph for a 1D wave"
@@ -873,23 +884,33 @@ function open2Dgraph(wn, x_label, y_label)
     display
     setwindow kwTopWin, graphicsTech=0
     appendimage $wn
-    setUpGraph2D(WinName(0,1), wn, x_label, y_label)
+    setUpGraph2D(WinName(0,1), wn, x_label, y_label, spectrum=spectrum)
 end
 
-function setUpGraph1D(graphID, x_label, [y_label])
+function setUpGraph1D(graphID, x_label, [y_label, spectrum])
     string graphID, x_label, y_label
+    variable spectrum
     // Sets axis labels, datnum etc
     setaxis/w=$graphID /a
     Label /W=$graphID bottom, x_label
     if (!paramisDefault(y_label))
         Label /W=$graphID left, y_label
     endif
-    nvar filenum
-    TextBox /W=$graphID/C/N=datnum/A=LT/X=1.0/Y=1.0/E=2 "Dat"+num2str(filenum)
+
+    variable num
+    if (spectrum)
+		nvar sanum
+		num = sanum
+	else
+		nvar filenum
+		num = filenum
+	endif
+    TextBox /W=$graphID/C/N=datnum/A=LT/X=1.0/Y=1.0/E=2 "Dat"+num2str(num)
 end
 
-function setUpGraph2D(graphID, wn, x_label, y_label)
+function setUpGraph2D(graphID, wn, x_label, y_label, [spectrum])
     string graphID, wn, x_label, y_label
+    variable spectrum
     svar sc_ColorMap
     // Sets axis labels, datnum etc
     Label /W=$graphID bottom, x_label
@@ -898,8 +919,15 @@ function setUpGraph2D(graphID, wn, x_label, y_label)
     modifyimage /W=$graphID $wn ctab={*, *, $sc_ColorMap, 0}
     colorscale /c/n=$sc_ColorMap /e/a=rc image=$wn
 
-    nvar filenum
-    TextBox /W=$graphID/C/N=datnum/A=LT/X=1.0/Y=1.0/E=2 "Dat"+num2str(filenum)
+    variable num
+    if (spectrum)
+		nvar sanum
+		num = sanum
+	else
+		nvar filenum
+		num = filenum
+	endif
+    TextBox /W=$graphID/C/N=datnum/A=LT/X=1.0/Y=1.0/E=2 "Dat"+num2str(num)
     
 end
 
@@ -2644,24 +2672,23 @@ end
 
 
 
-function sc_checksweepstate([fastdac])
-	variable fastdac
+function sc_checksweepstate()
 	nvar /Z sc_abortsweep, sc_pause, sc_abortnosave
 	
 	if(NVAR_Exists(sc_abortsweep) && sc_abortsweep==1)
 		// If the Abort button is pressed during the scan, save existing data and stop the scan.
 		EndScan(save_experiment=0, aborting=1)  
 		dowindow /k SweepControl
-//		sc_abortsweep=0
-//		sc_abortnosave=0
-//		sc_pause=0
+		sc_abortsweep=0
+		sc_abortnosave=0
+		sc_pause=0
 		abort "Measurement aborted by user. Data saved automatically."
 	elseif(NVAR_Exists(sc_abortnosave) && sc_abortnosave==1)
 		// Abort measurement without saving anything!
 		dowindow /k SweepControl
-//		sc_abortnosave = 0
-//		sc_abortsweep = 0
-//		sc_pause=0
+		sc_abortnosave = 0
+		sc_abortsweep = 0
+		sc_pause=0
 		abort "Measurement aborted by user. Data not saved automatically. Run \"EndScan(abort=1)\" if needed"
 	elseif(NVAR_Exists(sc_pause) && sc_pause==1)
 		// Pause sweep if button is pressed
@@ -2670,9 +2697,9 @@ function sc_checksweepstate([fastdac])
 //				SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0,fastdac=fastdac)
 				EndScan(save_experiment=0, aborting=1) 
 				dowindow /k SweepControl
-//				sc_abortsweep=0
-//				sc_abortnosave=0
-//				sc_pause=0
+				sc_abortsweep=0
+				sc_abortnosave=0
+				sc_pause=0
 				abort "Measurement aborted by user"
 			elseif(sc_abortnosave)
 				dowindow /k SweepControl

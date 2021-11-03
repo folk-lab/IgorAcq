@@ -572,7 +572,7 @@ function rampOutputFDAC(instrID,channel,output,[ramprate, ignore_lims]) // Units
 		if (abs(output-currentOutput) > 0.32/2)  // If closer to next dac step do that
 			output = currentOutput+sign(output-currentOutput)*0.32
 		else
-			print "WARNING: Trying to step < 0.5*Dac step, nothing will happen"
+//			print "WARNING: Trying to step < 0.5*Dac step, nothing will happen"
 		endif
 	endif
 			
@@ -1159,14 +1159,15 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 		endfor
 	endfor
 	
-	string wavenames = ""
+	string time_wavenames = ""
+	string freq_wavenames = ""
 	// generate waves to hold time series data
 	string wn = "", wn_lin = ""
 	for(i=0;i<numChannels;i+=1)
 		wn = "timeSeriesADC"+stringfromlist(i,channels,",")
 		make/o/n=(numpts) $wn = nan
 		setscale/i x, 0, scanlength, $wn
-		wavenames = addListItem(wn, wavenames, ";", INF)
+		time_wavenames = addListItem(wn, time_wavenames, ";", INF)
 	endfor
 	
 	// create waves for final fft output
@@ -1175,20 +1176,27 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 		make/o/n=(numpts/2) $wn = nan
 		setscale/i x, 0, measureFreq/(2.0), $wn
 		if (!plot_linear)
-			wavenames = addListItem(wn, wavenames, ";", INF)
+			freq_wavenames = addListItem(wn, freq_wavenames, ";", INF)
 		endif
 				
 		wn_lin = "fftADClin"+stringfromlist(i,channels,",")
 		make/o/n=(numpts/2) $wn_lin = nan
 		setscale/i x, 0, measureFreq/(2.0), $wn_lin
 		if(plot_linear)
-			wavenames = addListItem(wn_lin, wavenames, ";", INF)
+			freq_wavenames = addListItem(wn_lin, freq_wavenames, ";", INF)
 		endif
 	endfor
 	
+	string graphIDs, all_graphIDs = ""
+	
+	graphIDs = initializeGraphsForWavenames(time_wavenames, "Time /s", is2d=0, y_label="Current /nA", spectrum=1)
+	all_graphIDs = all_graphIDs+graphIDs
+		
 	string y_label = selectString(plot_linear, "Spectrum [dBnA/sqrt(Hz)]", "Spectrum [nA/sqrt(Hz)]")
-	string graphIDs = initializeGraphsForWavenames(wavenames, "Frequency /Hz", is2d=0, y_label=y_label)
-	arrangeWindows(graphIDs)
+	graphIDs = initializeGraphsForWavenames(freq_wavenames, "Frequency /Hz", is2d=0, y_label=y_label, spectrum=1)
+	all_graphIDs = all_graphIDs+graphIDs
+	
+	arrangeWindows(all_graphIDs)
 
 	for(i=0;i<numAverage;i+=1)
 		
