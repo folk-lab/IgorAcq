@@ -1361,26 +1361,45 @@ function/WAVE calculate_spectrum(time_series, [scan_duration, linear])
 		scan_duration = DimDelta(time_series, 0) * DimSize(time_series, 0)
 	endif
 
+	variable last_val = dimSize(time_series,0)-1
+	if (mod(dimsize(time_series, 0), 2) != 0)  // ODD number of points, must be EVEN to do powerspec
+		last_val = last_val - 1
+	endif
+		
+	
 	// Built in powerspectrum function
 	wave w_Periodogram
 	wave powerspec
 	if (!linear)  // Use log scale
-		DSPPeriodogram/PARS/DBR=1/NODC=1 tseries  
+		DSPPeriodogram/PARS/DBR=1/NODC=1/R=[0,(last_val)] tseries  
 		duplicate/free w_Periodogram, powerspec
-		powerspec = powerspec+10*log(scan_duration)  // TODO: What is this part doing, why is it here?  
+		powerspec = powerspec+10*log(scan_duration)  // This is so that the powerspec is independent of scan_duration
 	else  // Use linear scale
-		DSPPeriodogram/PARS/NODC=1 tseries
+		DSPPeriodogram/PARS/NODC=1/R=[0, (last_val)] tseries
 		duplicate/free w_Periodogram, powerspec
-		powerspec = powerspec*scan_duration  // TODO: What is this part doing, why is it here?  
+		// TODO: I'm not sure this is correct, but I don't know what should be done to fix it -- TIM
+		powerspec = powerspec*scan_duration  // This is supposed to be so that the powerspec is independent of scan_duration
 	endif
-
-	variable bandwidth = (1.0/DimDelta(tseries,0))/2.0  // measureFreq/2 (Over 2 because of nyquist)
-	setscale/i x, 0, bandwidth, powerspec  // TODO: Is this necessary? Doesn't W_periodogram already have this x-axis?
-
 	return powerspec
 end
 
+function plot_PowerSpectrum(w, [scan_duration, linear, powerspec_name])
+	wave w
+	variable scan_duration, linear
+	string powerspec_name // Wavename to save powerspectrum in (useful if you want to display more than one at a time)
+	
+	wave powerspec = calculate_spectrum(w, scan_duration=scan_duration, linear=linear)
+	
+	if(!paramIsDefault(powerspec_name))
+		duplicate/o powerspec $powerspec_name
+		wave tempwave = $powerspec_name
+	else
+		duplicate/o powerspec tempwave
+	endif
 
+	string y_label = selectString(linear, "Spectrum [dBnA/sqrt(Hz)]", "Spectrum [nA/sqrt(Hz)]")
+	initializeGraphsForWavenames(NameOfWave(tempwave), "Frequency /Hz", is2d=0, y_label=y_label, spectrum=1)
+end
 
 //////////////////////////////////
 ///// Load FastDACs from HDF /////
