@@ -7,19 +7,223 @@
 // The Fast DAC extention will open a seperate "Fast DAC window" that holds all the information
 // nessesary to run a Fast DAC measurement. Any "normal" measurements should still be set up in
 // the standard ScanController window.
-// It is the users job to add the fastdac=1 flag to initWaves() and SaveWaves()
 //
 // This driver also provides a spectrum analyzer method. See the Spectrum Analyzer section at the bottom.
 // As for everyting else, you must open a connection to a FastDAC and run "InitFastDAC" before you can use the
 // spectrum analyzer method.
 //
 // Written by Christian Olsen and Tim Child, 2020-03-27
-//
+// Massive refactoring by Tim Child 2021-11
 
 /////////////////////
 //// Util  //////////
 /////////////////////
+function checkInstrIDmatchesDevice(instrID, device)
+	// checks instrID is the correct Visa address for device number
+	// e.g. if instrID is to FD1, but if when checking DevChannels device 2 was returned, this will fail
+	variable instrID, device
 
+	string instrAddress = getResourceAddress(instrID)
+	svar sc_fdacKeys
+	string deviceAddress = stringbykey("visa"+num2istr(device), sc_fdacKeys, ":", ",") 
+	if (cmpstr(deviceAddress, instrAddress) != 0)
+		string buffer
+		sprintf buffer, "ERROR[checkInstrIDmatchesDevice]: (instrID %d => %s) != device %d => %s", instrID, instrAddress, device, deviceAddress 
+		abort buffer
+	endif
+	return 1
+end
+
+
+function getDeviceNumber(instrID)
+	// Returns which connected FastDAC instrID points to (e.g. 1, 2 etc)
+	variable instrID
+
+	svar sc_fdackeys
+	variable numDevices = getNumDevices(), i=0, numADCCh = 0, numDevice=-1
+	string instrAddress = getResourceAddress(instrID), deviceAddress = ""
+	for(i=0;i<numDevices;i+=1)
+		deviceAddress = getDeviceResourceAddress(i+1)
+		if(cmpstr(deviceAddress,instrAddress) == 0)
+			numDevice = i+1
+			break
+		endif
+	endfor
+	if (numDevice < 0)
+		abort "ERROR[getDeviceNumber]: Device not found for given instrID"
+	endif
+	return numDevice
+end
+
+
+function getNumDevices()
+	// Returns number of connected FastDACs
+	svar sc_fdacKeys
+	return str2num(stringbykey("numDevices",sc_fdackeys,":",","))
+end
+
+
+function/S getDeviceResourceAddress(device)
+	// Get visa address from device number (has to be it's own function because this returns a string)
+	variable device
+	if(device > getNumDevices())
+		string buffer
+		sprintf buffer,  "ERROR[getDeviceInfoDeviceNum]: Asking for device %d, but only %d devices connected\r", device, getNumDevices()
+		abort buffer
+	endif
+
+	svar sc_fdacKeys
+	return stringByKey("visa"+num2str(device), sc_fdacKeys, ":", ",")
+end
+
+
+function getDeviceInfoDeviceNum(device, info)
+	// Returns the value for selected info of numbered fastDAC device (i.e. 1, 2 etc)
+	variable device
+	string info
+
+	svar sc_fdacKeys
+
+	if(device > getNumDevices())
+		string buffer
+		sprintf buffer,  "ERROR[getDeviceInfoDeviceNum]: Asking for device %d, but only %d devices connected\r", device, getNumDevices()
+		abort buffer
+	endif
+
+	string cmd
+	strswitch (info)
+		case "master":
+			cmd = "master"
+			break
+		case "name":
+			cmd = "name"
+			break
+		case "numADC":
+			cmd = "numADCch"
+			break
+		case "numDAC":
+			cmd = "numDACch"
+			break
+		default:
+			abort "ERROR[getDeviceInfo]: Requested info (" + info + ") not understood"
+			break
+	endswitch
+	return str2num(stringByKey(cmd+num2str(device), sc_fdacKeys, ":", ","))
+end
+
+function getDeviceInfo(instrID, info)
+	// Returns the value for selected info of fastDAC pointed to by instrID
+	// Basically a nice way to interact with sc_fdacKeys
+	variable instrID
+	string info
+
+	variable deviceNum = getDeviceNumber(instrID)
+	return getDeviceInfoDeviceNum(deviceNum, info)
+end
+
+
+function/S getDeviceChannels(channels, device, [adc])
+	// Convert from absolute channel number to device channel number (i.e. DAC 9 is actually FastDAC2s 1 channel)
+	// Returns device number in device variable
+	// Note: Comma separated list
+	// Note: Must be channel NUMBERS
+	// Note: Error thrown if not all channels are on the same device
+	string channels // DACs or ADCs to check
+	variable adc  // Whether we are checking DACs or ADCs
+	variable &device // Returns device number in device (starting from 1)
+
+	svar sc_fdacKeys  // Holds info about connected FastDACs
+	
+	assertSeparatorType(channels, ",")
+
+	variable numDevices = getNumDevices()
+	device = -1 // Init invalid (so can set when first channel is found)
+	variable i=0, j=0, numCh=0, startCh=0, Ch=0
+	string dev_channels=""
+	for(i=0;i<itemsInList(channels);i+=1)
+		ch = str2num(stringfromlist(i,channels,","))  // Looking for where this channel lives
+		startCh = 0
+		for(j=0;j<numDevices+1;j+=1)  // Cycle through connected devices
+			if(!adc) // Looking at DACs
+				numCh = getDeviceInfoDeviceNum(j+1, "numDAC")
+			else  // Looking at ADCs
+				numCh = getDeviceInfoDeviceNum(j+1, "numADC")
+			endif
+
+			if(startCh+numCh-1 >= Ch)
+				// this is the device
+				if(device <= 0)
+					device = j+1  // +1 to account for device numbering starting from 1 not zero
+				elseif (j+1 != device)
+					abort "ERROR[getDeviceChannels]: Channels are distributed across multiple devices. Not implemented"
+				endif
+				dev_channels = addlistitem(num2istr(Ch),dev_channels,",",INF)  // Add to list of Device Channels
+				break
+			endif
+			startCh += numCh
+		endfor
+	endfor
+
+	return dev_channels
+end
+
+
+function getDeviceChannelStart(instrID, [adc])
+	// Returns first channel number for given instrID (i.e. if second Fastdac, first DAC is probably channel 8)
+	variable instrID
+	variable adc // set to 1 if checking where ADCs start instead
+	
+	string ch_request = selectString(adc, "numDAC", "numADC")
+
+	variable numDevices = getNumDevices()
+	variable devNum = getDeviceNumber(instrID)
+
+	variable startCh = 0
+	variable valid = 0 // Set to 1 when device is found
+	variable i
+	for(i=0; i<numDevices; i++)
+		if (devNum == i+1) // If this is the device (i+1 because device numbering starts at 1)
+			valid = 1
+			break
+		endif
+		startCh += getDeviceInfo(i+1, ch_request)
+	endfor
+
+	if(!valid)
+		abort "ERROR[getDeviceChannelStart]: Device not found"
+	endif
+
+	return startCh
+end
+
+
+function fdacCheckResponse(response,command,[isString,expectedResponse])
+	// Checks response (that fastdac returns at the end of most commands) meets expected response (e.g. "RAMP_FINISHED")
+	string response, command, expectedResponse
+	variable isString
+
+	if(paramisdefault(expectedResponse))
+		expectedResponse = ""
+	endif
+
+	variable errorCheck = 0
+	string err="",callingfunc = getrtStackInfo(2)
+	// FastDAC will return "NOP" if the commands isn't understood
+	if(cmpstr(response,"NOP") == 0)
+		sprintf err, "[ERROR] \"%s\": Command not understood! Command: %s", callingfunc, command
+		print err
+	elseif(numtype(str2num(response)) != 0 && !isString)
+		sprintf err, "[ERROR] \"%s\": Bad response: %s", callingfunc, response
+		print err
+	elseif(cmpstr(response,expectedResponse) != 0 && isString)
+		sprintf err, "[ERROR] \"%s\": Bad response: %s", callingfunc, response
+		print err
+	else
+		errorCheck = 1
+	endif
+
+	return errorCheck
+end
 
 
 function sc_fillfdacKeys(instrID,visa_address,numDACCh,numADCCh,[master])
@@ -57,34 +261,6 @@ function sc_fillfdacKeys(instrID,visa_address,numDACCh,numADCCh,[master])
 	sc_fdackeys = replacenumberbykey("numADCCh"+num2istr(deviceNum),sc_fdackeys,numADCCh,":",",")
 	sc_fdackeys = replacenumberbykey("master"+num2istr(deviceNum),sc_fdackeys,master,":",",")
 	sc_fdackeys = sortlist(sc_fdackeys,",")
-end
-
-
-function fdacCheckResponse(response,command,[isString,expectedResponse])
-	string response, command, expectedResponse
-	variable isString
-
-	if(paramisdefault(expectedResponse))
-		expectedResponse = ""
-	endif
-
-	variable errorCheck = 0
-	string err="",callingfunc = getrtStackInfo(2)
-	// FastDAC will return "NOP" if the commands isn't understood
-	if(cmpstr(response,"NOP") == 0)
-		sprintf err, "[ERROR] \"%s\": Command not understood! Command: %s", callingfunc, command
-		print err
-	elseif(numtype(str2num(response)) != 0 && !isString)
-		sprintf err, "[ERROR] \"%s\": Bad response: %s", callingfunc, response
-		print err
-	elseif(cmpstr(response,expectedResponse) != 0 && isString)
-		sprintf err, "[ERROR] \"%s\": Bad response: %s", callingfunc, response
-		print err
-	else
-		errorCheck = 1
-	endif
-
-	return errorCheck
 end
 
 
@@ -284,23 +460,33 @@ function fdRV_process_and_distribute(ScanVars, rowNum)
 end
 
 
-function fd_readvstime(instrID, channels, numpts, samplingFreq, [spectrum_analyser])
-	//	Just measures for a fixed number of points without ramping anything
-	// Args:
-	// spectrum_analyser: whether to send data to timeSeriesADC# instead of waves in initialize waves
+function fd_readvstime(instrID, channels, numpts, samplingFreq, [spectrum_analyser, named_waves])
+	//	Just measures for a fixed number of points without ramping anything, stores in ADC# or timeSeriesADC# if spectrum_analyser set
 	variable instrID, numpts, samplingFreq, spectrum_analyser
 	string channels
+	string named_waves // Named waves to store raw data in (; separated same length as channels)
 	
 	assertSeparatorType(channels, ";")
-	
 	variable numChannels = itemsInList(channels)
 	if (numChannels == 0)
 		abort "ERROR[fd_readvstime]: No channels selected to record"
 	endif
+
+	// If storing in named_waves, check they make sense
+	if (!paramisDefault(named_waves))
+		assertSeparatorType(named_waves, ";")
+		if (itemsInList(channels) != itemsInList(named_waves))
+			abort "ERROR[fd_readvstime]: named_waves provided but length doesn't match channels"
+		endif
+	else
+		named_waves = ""
+	endif
 	
 	string cmd = ""
-	sprintf cmd, "SPEC_ANA,%s,%s\r", replacestring(";",channels,""), num2istr(numpts)
-	print(cmd) // DEBUGGING
+	channels = replaceString(";", channels, "")
+	channels = replaceString(" ", channels, "")
+	sprintf cmd, "SPEC_ANA,%s,%s\r", channels, num2istr(numpts)
+	// print(cmd) // DEBUGGING
 	writeInstr(instrID,cmd)
 	
 	variable bytesSec = roundNum(2*samplingFreq,0)
@@ -321,7 +507,7 @@ function fd_readvstime(instrID, channels, numpts, samplingFreq, [spectrum_analys
 		if (spectrum_analyser)
 			specAna_distribute_data(buffer,read_chunk,channels,bytes_read/(2*numChannels))	  // TODO: Somehow this works for any speed
 		else
-			sc_distribute_data(buffer, channels, read_chunk, 0, bytes_read/(2*numChannels))    // TODO: And this does not!! But they are basically the same!
+			sc_distribute_data(buffer, channels, read_chunk, 0, bytes_read/(2*numChannels), named_waves = named_waves)    // TODO: And this does not!! But they are basically the same!
 		endif
 		bytes_read += read_chunk
 		totaldump = bytesSec*(stopmstimer(-2)-bufferDumpStart)*1e-6
@@ -339,7 +525,7 @@ function fd_readvstime(instrID, channels, numpts, samplingFreq, [spectrum_analys
 		if (spectrum_analyser)
 			specAna_distribute_data(buffer,bytes_left,channels,bytes_read/(2*numChannels))
 		else
-			sc_distribute_data(buffer, channels, bytes_left, 0, bytes_read/(2*numChannels))
+			sc_distribute_data(buffer, channels, bytes_left, 0, bytes_read/(2*numChannels), named_waves = named_waves)
 		endif					
 		doupdate
 	endif
@@ -484,21 +670,33 @@ function fdRV_update_window(S, numAdcs)
   endfor
 end
 
-function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart,[direction])
+function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart,[direction, named_waves])
 	string &buffer, adcList  //passing buffer by reference for speed of execution
 	variable bytes, rowNum, colNumStart, direction
+	string named_waves
 	wave/t fadcvalstr
 
 	direction = paramisdefault(direction) ? 1 : direction
-//	if (!(direction == 1 || direction == -1))  // Abort if direction is not 1 or -1
-//		abort "ERROR[sc_distribute_data]: Direction must be 1 or -1"
-//	endif
+	if (!(direction == 1 || direction == -1))  // Abort if direction is not 1 or -1
+		abort "ERROR[sc_distribute_data]: Direction must be 1 or -1"
+	endif
 
-	variable i=0, j=0, k=0, numADCCh = itemsinlist(adcList), dataPoint
+	variable i, numADCCh = itemsinlist(adcList)
+	string waveslist
+	if (!paramisDefault(named_waves) && strlen(named_waves) > 0)
+		waveslist = named_waves
+	else
+		for(i=0;i<numADCCh;i++)
+			waveslist = addListItem("ADC"+stringFromList(i, adcList), waveslist, ";", INF)
+		endfor
+	endif
+
+	variable j, k, dataPoint
 	string wave1d, s1, s2
 	// load data into raw wave
 	for(i=0;i<numADCCh;i+=1)
-		wave1d = "ADC"+stringfromlist(i,adcList)
+		// wave1d = "ADC"+stringfromlist(i,adcList)
+		wave1d = stringFromList(i, waveslist)
 		wave rawwave = $wave1d
 		k = 0
 		for(j=0;j<bytes;j+=numADCCh*2)

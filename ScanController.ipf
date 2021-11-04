@@ -2959,6 +2959,10 @@ function EndScan([S, save_experiment, aborting])
 		S_.end_time = datetime
 		S_.comments = "aborted, " + S_.comments
 	endif
+	if (S_.end_time == 0) // Should have already been set, but if not, this is likely a good guess and prevents a stupid number being saved
+		S_.end_time = datetime
+		S_.comments = "end_time guessed, "+S_.comments
+	endif
 
 	dowindow/k SweepControl // kill scan control window
 	printf "Time elapsed: %.2f s \r", (S_.end_time-S_.start_time)
