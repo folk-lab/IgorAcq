@@ -197,51 +197,47 @@ function NEW_fd_record_values(S, rowNum, [AWG_list, linestart])
 	S.end_time = datetime  
 	
 	// Process 1D read and distribute
-	fdRV_process_and_distribute(S, AWG_list, rowNum) 
+	fdRV_process_and_distribute(S, rowNum) 
 	
-	// // check abort/pause status
-	// fdRV_check_sweepstate(S.instrID)
 	// return looptime
 end
 
-function fdRV_send_command_and_read(ScanVars, AWG_list, rowNum)
+function fdRV_send_command_and_read(S, AWG_list, rowNum)
 	// Send 1D Sweep command to fastdac and record the raw data it returns ONLY
-	struct ScanVars &ScanVars
+	struct ScanVars &S
 	struct fdAWG_list &AWG_list
 	variable rowNum
 	string cmd_sent = ""
 	variable totalByteReturn
 	nvar sc_AWG_used
 	if(sc_AWG_used)  	// Do AWG_RAMP
-	   cmd_sent = fd_start_AWG_RAMP(ScanVars, AWG_list)
+	   cmd_sent = fd_start_AWG_RAMP(S, AWG_list)
 	else				// DO normal INT_RAMP  
-		cmd_sent = fd_start_INT_RAMP(ScanVars)
+		cmd_sent = fd_start_INT_RAMP(S)
 	endif
 	
-	totalByteReturn = ScanVars.numADCs*2*ScanVars.numptsx
+	totalByteReturn = S.numADCs*2*S.numptsx
 	sc_sleep(0.1) 	// Trying to get 0.2s of data per loop, will timeout on first loop without a bit of a wait first
 	variable looptime = 0
-   looptime = fdRV_record_buffer(ScanVars, rowNum, totalByteReturn)
+   looptime = fdRV_record_buffer(S, rowNum, totalByteReturn)
 	
    // update window
 	string endstr
-	endstr = readInstr(ScanVars.instrID)
+	endstr = readInstr(S.instrID)
 	endstr = sc_stripTermination(endstr,"\r\n")
 	if(fdacCheckResponse(endstr,cmd_sent,isString=1,expectedResponse="RAMP_FINISHED"))
-		fdRV_update_window(ScanVars, ScanVars.numADCs)  /// TODO: Check this isn't slow
+		fdRV_update_window(S, S.numADCs) 
 		if(sc_AWG_used)  // Reset AWs back to zero (I don't see any reason the user would want them left at the final position of the AW)
-			rampmultiplefdac(ScanVars.instrID, AWG_list.AW_DACs, 0)
+			rampmultiplefdac(S.instrID, AWG_list.AW_DACs, 0)
 		endif
 	endif
 
-	// fdRV_check_sweepstate(S.instrID)
 end
 
 
-function fdRV_process_and_distribute(ScanVars, AWG_list, rowNum)
+function fdRV_process_and_distribute(ScanVars, rowNum)
 	// Get 1D wave names, duplicate each wave then resample and copy into calc wave (and do calc string)
 	struct ScanVars &ScanVars
-	struct fdAWG_list &AWG_list
 	variable rowNum
 		
 	// Get all raw 1D wave names in a list
@@ -286,18 +282,25 @@ function fdRV_process_and_distribute(ScanVars, AWG_list, rowNum)
 	endfor	
 	doupdate // Update all the graphs with their new data
 end
-mod
 
 
-function fd_readvstime(instrID, channels, numpts, samplingFreq, numChannels, [spectrum_analyser])
+function fd_readvstime(instrID, channels, numpts, samplingFreq, [spectrum_analyser])
 	//	Just measures for a fixed number of points without ramping anything
 	// Args:
 	// spectrum_analyser: whether to send data to timeSeriesADC# instead of waves in initialize waves
-	variable instrID, numpts, samplingFreq, spectrum_analyser, numChannels
+	variable instrID, numpts, samplingFreq, spectrum_analyser
 	string channels
 	
+	assertSeparatorType(channels, ";")
+	
+	variable numChannels = itemsInList(channels)
+	if (numChannels == 0)
+		abort "ERROR[fd_readvstime]: No channels selected to record"
+	endif
+	
 	string cmd = ""
-	sprintf cmd, "SPEC_ANA,%s,%s\r", replacestring(",",channels,""), num2istr(numpts)
+	sprintf cmd, "SPEC_ANA,%s,%s\r", replacestring(";",channels,""), num2istr(numpts)
+	print(cmd) // DEBUGGING
 	writeInstr(instrID,cmd)
 	
 	variable bytesSec = roundNum(2*samplingFreq,0)
@@ -316,15 +319,17 @@ function fd_readvstime(instrID, channels, numpts, samplingFreq, numChannels, [sp
 		fdRV_read_chunk(instrID, read_chunk, buffer)
 		// add data to datawave
 		if (spectrum_analyser)
-			specAna_distribute_data(buffer,read_chunk,channels,bytes_read/(2*numChannels))
+			specAna_distribute_data(buffer,read_chunk,channels,bytes_read/(2*numChannels))	  // TODO: Somehow this works for any speed
 		else
-			sc_distribute_data(buffer, channels, read_chunk, 0, bytes_read/(2*numChannels))
+			sc_distribute_data(buffer, channels, read_chunk, 0, bytes_read/(2*numChannels))    // TODO: And this does not!! But they are basically the same!
 		endif
 		bytes_read += read_chunk
 		totaldump = bytesSec*(stopmstimer(-2)-bufferDumpStart)*1e-6
 		if(totaldump-bytes_read < saveBuffer)
 			fdRV_check_sweepstate(instrID)
-			doupdate
+			fdRV_update_graphs() // Only updates sc_RawGraphs1D
+		else
+			print "DEBUGGING[fd_readvstime]: Getting behind!"
 		endif
 	while(totalbytesreturn-bytes_read > read_chunk)
 	// do one last read if any data left to read
@@ -335,7 +340,7 @@ function fd_readvstime(instrID, channels, numpts, samplingFreq, numChannels, [sp
 			specAna_distribute_data(buffer,bytes_left,channels,bytes_read/(2*numChannels))
 		else
 			sc_distribute_data(buffer, channels, bytes_left, 0, bytes_read/(2*numChannels))
-		endif
+		endif					
 		doupdate
 	endif
 	
@@ -456,7 +461,7 @@ function fdRV_distribute_data(buffer, S, bytes_read, totalByteReturn, read_chunk
   elseif (direction == -1)
     col_num_start = (totalByteReturn-bytes_read)/(2*S.numADCs)-1
   endif
-  sc_distribute_data(buffer,S.adclist,read_chunk,rowNum,col_num_start, direction=direction)
+  sc_distribute_data(buffer,replaceString(",", S.adclist, ";"),read_chunk,rowNum,col_num_start, direction=direction)
 end
 
 
@@ -483,19 +488,17 @@ function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart,[direction])
 	string &buffer, adcList  //passing buffer by reference for speed of execution
 	variable bytes, rowNum, colNumStart, direction
 	wave/t fadcvalstr
-	nvar sc_is2d
 
 	direction = paramisdefault(direction) ? 1 : direction
-	if (!(direction == 1 || direction == -1))  // Abort if direction is not 1 or -1
-		abort "ERROR[sc_distribute_data]: Direction must be 1 or -1"
-	endif
+//	if (!(direction == 1 || direction == -1))  // Abort if direction is not 1 or -1
+//		abort "ERROR[sc_distribute_data]: Direction must be 1 or -1"
+//	endif
 
-	variable i=0, j=0, k=0, numADCCh = itemsinlist(adcList,","), adcIndex=0, dataPoint=0
-	string wave1d = "", wave2d = "", s1, s2
+	variable i=0, j=0, k=0, numADCCh = itemsinlist(adcList), dataPoint
+	string wave1d, s1, s2
 	// load data into raw wave
 	for(i=0;i<numADCCh;i+=1)
-		adcIndex = str2num(stringfromlist(i,adcList,","))
-		wave1d = "ADC"+num2istr(str2num(stringfromlist(i,adcList,",")))
+		wave1d = "ADC"+stringfromlist(i,adcList)
 		wave rawwave = $wave1d
 		k = 0
 		for(j=0;j<bytes;j+=numADCCh*2)
@@ -506,34 +509,7 @@ function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart,[direction])
 			rawwave[colNumStart+k] = dataPoint
 			k += 1*direction
 		endfor
-//		if(sc_is2d)
-//			wave2d = wave1d+"_2d"
-//			wave rawwave2d = $wave2d
-////			rawwave2d[colNumStart,colNumStart+bytes/2][rowNum] = rawwave[p] /// NOT TESTED
-//			rawwave2d[][rowNum] = rawwave[p]
-//		endif
 	endfor
-
-//	// load calculated data into datawave
-//	string script="", cmd=""
-//	for(i=0;i<numADCCh;i+=1)
-//		adcIndex = str2num(stringfromlist(i,adcList,","))
-//		wave1d = fadcvalstr[adcIndex][3]
-//		wave datawave = $wave1d
-//		script = trimstring(fadcvalstr[adcIndex][4])
-//		sprintf cmd, "%s = %s", wave1d, script
-//		execute/q/z cmd
-//		if(v_flag!=0)
-//			print "[WARNING] \"sc_distribute_data\": Wave calculation falied! Error: "+GetErrMessage(V_Flag,2)
-//		endif
-////		if(sc_is2d)
-////			wave2d = wave1d+"_2d"
-////			wave datawave2d = $wave2d
-//////			datawave2d[colNumStart,colNumStart+bytes/2][rowNum] = datawave[p]  /// ALSO NOT TESTED
-////			datawave2d[][rowNum] = datawave[p]
-////
-////		endif
-//	endfor
 end
 
 function/s sc_samegraph(wave1,wave2)

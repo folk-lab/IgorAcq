@@ -33,7 +33,36 @@
 ////////////////////////////////
 ///////// utility functions ////
 ////////////////////////////////
-wave
+
+function assertSeparatorType(list_string, assert_separator)
+	// If the list_string does not include <assert_separator> but does include the other common separator between "," and ";" then 
+	// an error is raised
+	string list_string, assert_separator
+	if (strsearch(list_string, assert_separator, 0) < 0)  // Does not contain desired separator (maybe only one item)
+		string buffer
+		strswitch (assert_separator)
+			case ",":
+				if (strsearch(list_string, ";", 0) >= 0)
+					sprintf buffer, "ERROR[assertSeparatorType]: Expected separator = %s     Found separator = ;\r", assert_separator
+					abort buffer
+				endif
+				break
+			case ";":
+				if (strsearch(list_string, ",", 0) >= 0)
+					sprintf buffer, "ERROR[assertSeparatorType]: Expected separator = %s     Found separator = ,\r", assert_separator
+					abort buffer
+				endif
+				break
+			default:
+				if (strsearch(list_string, ",", 0) >= 0 || strsearch(list_string, ";", 0) >= 0)
+					sprintf buffer, "ERROR[assertSeparatorType]: Expected separator = %s     Found separator = , or ;\r", assert_separator
+					abort buffer
+				endif
+				break
+		endswitch		
+	endif
+end
+
 function /S getHostName()
 	// find the name of the computer Igor is running on
 	// Used in saveing Config info
@@ -299,8 +328,12 @@ function initFDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
 	channelsy = selectString(paramIsDefault(channelsy), channelsy, "")
 	startys = selectString(paramIsDefault(startys), startys, "")
 	finys = selectString(paramIsDefault(finys), finys, "")
-	x_label = selectString((paramIsDefault(x_label) || numtype(strlen(x_label)) == 2), x_label, "")
 	y_label = selectString((paramIsDefault(y_label) || numtype(strlen(y_label)) == 2), y_label, "")	
+
+	startxs = selectString(paramIsDefault(startxs), startxs, "")
+	finxs = selectString(paramIsDefault(finxs), finxs, "")
+	x_label = selectString((paramIsDefault(x_label) || numtype(strlen(x_label)) == 2), x_label, "")
+
 	
     // Handle Optional Parameters
     S.numptsx = paramisdefault(numptsx) ? NaN : numptsx
@@ -315,7 +348,7 @@ function initFDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
 
 	// Set Variables in Struct
     S.instrID = instrID
-    S.adcList = SFfd_get_adcs()
+    S.adcList = getRecordedFastdacInfo("channels")
     S.using_fastdac = 1
     S.comments = comments
 

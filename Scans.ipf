@@ -31,37 +31,42 @@ function ReadVsTime(delay, [comments]) // Units: s
 	while (1)
 	EndScan(S=S)
 end
-//
-//function ReadVsTimeFastdac(instrID, duration, [y_label, comments]) // Units: s 
-//	variable instrID, duration
-//	string comments, y_label
-//	
-//	comments = selectstring(paramisdefault(comments), comments, "")
-//	y_label = selectstring(paramisdefault(y_label), y_label, "Not Set")
-//
-//	wave fadcattr
-//	variable i=0
-//
-//	string channels = ""
-//	for(i=0;i<dimsize(fadcattr, 0);i++)
-//		if(fadcattr[i][2] == 48) // checkbox checked
-//			channels = addlistitem(num2str(i), channels, ",")
-//		endif
-//	endfor
-//	
-//	if(itemsinlist(channels, ",") == 0)
-//		abort "[ERROR] \"ReadVsTimeFastdac\": No ADC channels selected"
-//	endif
-//
-//	variable measure_freq = getfadcmeasurefreq(instrID)
-//	variable numpts = round(measure_freq*duration)
-//
+
+
+function ReadVsTimeFastdac(instrID, duration, [y_label, comments, nosave]) // Units: s 
+	variable instrID, duration, nosave
+	string comments, y_label
+	
+	comments = selectstring(paramisdefault(comments), comments, "")
+	y_label = selectstring(paramisdefault(y_label), y_label, "Not Set")
+
+	wave fadcattr
+	variable i=0
+
+	string channels = getRecordedFastdacInfo("channels")  // Get ADCs ticked to record
+	
+	if(itemsinlist(channels, ",") == 0)
+		abort "[ERROR] \"ReadVsTimeFastdac\": No ADC channels selected"
+	endif
+
+	Struct ScanVars S
+	initFDscanVars(S, instrID, 0, duration, "", x_label="time /s", y_label="Current /nA", comments=comments)
+	S.numptsx = round(S.measureFreq*duration)
+	
+	initializeScan(S)
+	S.start_time = datetime
+
 //	InitializeWaves(0, duration, numpts, x_label="Time /s", y_label=y_label ,fastdac=1)
 //	nvar sc_scanstarttime // Global variable set when InitializeWaves is called
-//	fd_readvstime(instrID, channels, numpts, getfadcspeed(instrid), itemsinlist(channels, ","))
+	fd_readvstime(S.instrID, channels, S.numptsx, S.instrID)
+	fdRV_process_and_distribute(S, 0)  // Update calculated wave
+
+	if (!nosave)	
+		EndScan(S=S)
+	endif
 //	SaveWaves(msg=comments, fastdac=1)
-//end
-//
+end
+
 //
 //
 //function ReadVsTimeUntil(delay,readtime, [comments])
@@ -1131,21 +1136,6 @@ end
 /////////////////////////////////////////////////////////////////////////////////////
 
 
-function/s SFfd_get_adcs()	
-	wave fadcattr
-	wave/t fadcvalstr
-	variable adcCh=0
-	string  adcList = ""
-	variable i = 0
-	for(i=0;i<dimsize(fadcattr,0);i+=1)
-		if(fadcattr[i][2] == 48)
-			adcCh = str2num(fadcvalstr[i][0])
-			adcList = addlistitem(num2istr(adcCh),adcList,",",itemsinlist(adcList,","))	
-		endif
-	endfor
-	return adcList
-end
-	
 
 function SFfd_pre_checks(S)
    struct ScanVars &S

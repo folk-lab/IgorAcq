@@ -1185,8 +1185,9 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 	svar sc_fdackeys
 	
 	// num ADC channels
-	channels = sortlist(channels,",",2)
-	variable numChannels = itemsinlist(channels,",")
+	channels = ReplaceString(",", channels, ";")  // Convert to Igor standard list separator
+	channels = sortlist(channels,";",2)
+	variable numChannels = itemsinlist(channels)
 	
 	// calculate number of points needed
 	variable samplingFreq = getfadcSpeed(instrID)
@@ -1206,7 +1207,7 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 	variable i
 	string time_wavenames = ""
 	for(i=0;i<numChannels;i+=1)
-		wn = "spectrum_timeSeriesADC"+stringfromlist(i,channels,",")
+		wn = "spectrum_timeSeriesADC"+stringfromlist(i,channels)
 		make/o/n=(numpts) $wn = nan
 		setscale/i x, 0, scanlength, $wn
 		time_wavenames = addListItem(wn, time_wavenames, ";", INF)
@@ -1216,7 +1217,7 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 	string signal_wavenames = ""
 	for(i=0;i<numChannels;i+=1)
 		wn = "spectrum_signal"+num2istr(i)
-		make/o/n=(numpts) $wn = nan
+		make/o/n=(numAverage, numpts) $wn = nan
 		setscale/i x, 0, scanlength, $wn
 		signal_wavenames = addListItem(wn, signal_wavenames, ";", INF)
 	endfor
@@ -1226,12 +1227,12 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 	string log_freq_wavenames = ""
 	string lin_freq_wavenames = ""
 	for(i=0;i<numChannels;i+=1)
-		wn = "spectrum_fftADC"+stringfromlist(i,channels,",")
+		wn = "spectrum_fftADC"+stringfromlist(i,channels)
 		make/o/n=(numpts/2) $wn = nan
 		setscale/i x, 0, measureFreq/(2.0), $wn
 		log_freq_wavenames = addListItem(wn, log_freq_wavenames, ";", INF)
 				
-		wn_lin = "spectrum_fftADClin"+stringfromlist(i,channels,",")
+		wn_lin = "spectrum_fftADClin"+stringfromlist(i,channels)
 		make/o/n=(numpts/2) $wn_lin = nan
 		setscale/i x, 0, measureFreq/(2.0), $wn_lin
 		lin_freq_wavenames = addListItem(wn_lin, lin_freq_wavenames, ";", INF)
@@ -1240,6 +1241,7 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 	// Dispaly Graphs 
 	string graphIDs, all_graphIDs = ""
 	graphIDs = initializeGraphsForWavenames(time_wavenames, "Time /s", is2d=0, y_label="Current /nA", spectrum=1)
+	string/g sc_rawGraphs1D = graphIDs  // Tells which graphs to update during tight loop of reading buffer
 	all_graphIDs = all_graphIDs+graphIDs
 		
 	string plot_freq_wavenames = selectString(plot_linear, log_freq_wavenames, lin_freq_wavenames)	
@@ -1252,7 +1254,7 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 	variable j
 	for(i=0;i<numAverage;i+=1)
 		// Send command and distribute data to "spectrum_timeSeriesADC#"
-		fd_readvstime(instrID, channels, numpts, samplingFreq, numChannels, spectrum_analyser=1)
+		fd_readvstime(instrID, channels, numpts, samplingFreq, spectrum_analyser=1)
 		
 		// convert time series to spectrum
 		for(j=0;j<numChannels;j+=1)
@@ -1318,6 +1320,14 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 			endfor
 		endfor
 		
+		// Copy data to IGOR
+		string wns = selectString(plot_linear, log_freq_wavenames, lin_freq_wavenames)
+		for(i=0;i<numChannels;i+=1)
+			wn = StringFromList(i, wns)
+			sprintf buffer, "Spectrum%d_%d", sanum, i
+			duplicate $wn $buffer
+		endfor
+		
 		// Add Config and Sweeplogs to HDF
 		addMetaFiles(num2str(hdfid), logs_only=1, comments=comments)
 
@@ -1330,11 +1340,11 @@ function specAna_distribute_data(buffer,bytes,channels,colNumStart)
 	string buffer, channels
 	variable bytes, colNumStart
 	
-	variable i=0, j=0, k=0, datapoint=0, numChannels = itemsinlist(channels,",")
-	string wave1d = "", s1="", s2=""
+	variable i=0, j=0, k=0, datapoint=0, numChannels = itemsinlist(channels)
+	string wave1d, s1, s2
 	for(i=0;i<numChannels;i+=1)
 		// load data into wave
-		wave1d = "spectrum_timeSeriesADC"+stringfromlist(i,channels,",")
+		wave1d = "spectrum_timeSeriesADC"+stringfromlist(i,channels)
 		wave timewave = $wave1d
 		k = 0
 		for(j=0;j<bytes;j+=2*numChannels)
