@@ -809,10 +809,12 @@ function/S initializeGraphs(S)
     variable i
     string waveNames
     string buffer
-    for (i = 0; i<2; i++)  // Raw = 1, Calc = 0
-        waveNames = get1DWaveNames(i, S.using_fastdac)
+    variable raw
+    for (i = 0; i<2; i++)  // i = 0, 1
+        raw = !i
+        waveNames = get1DWaveNames(raw, S.using_fastdac)
         buffer = initializeGraphsForWavenames(waveNames, S.x_label, is2d=S.is2d, y_label=S.y_label)
-        if(i==1) // Raw waves
+        if(raw==1) // Raw waves
 	        sc_rawGraphs1D = buffer
         endif
         graphIDs = graphIDs + buffer

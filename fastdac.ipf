@@ -1149,7 +1149,9 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 	variable j
 	for(i=0;i<numAverage;i+=1)
 		// Send command and distribute data to "spectrum_timeSeriesADC#"
-		fd_readvstime(instrID, channels, numpts, samplingFreq, spectrum_analyser=1)
+//		fd_readvstime(instrID, channels, numpts, samplingFreq, spectrum_analyser=1)
+		fd_readvstime(instrID, channels, numpts, samplingFreq, named_waves = time_wavenames)
+		
 		
 		// convert time series to spectrum
 		for(j=0;j<numChannels;j+=1)
@@ -1230,28 +1232,6 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 	endif
 end
 
-
-function specAna_distribute_data(buffer,bytes,channels,colNumStart)
-	string buffer, channels
-	variable bytes, colNumStart
-	
-	variable i=0, j=0, k=0, datapoint=0, numChannels = itemsinlist(channels)
-	string wave1d, s1, s2
-	for(i=0;i<numChannels;i+=1)
-		// load data into wave
-		wave1d = "spectrum_timeSeriesADC"+stringfromlist(i,channels)
-		wave timewave = $wave1d
-		k = 0
-		for(j=0;j<bytes;j+=2*numChannels)
-		// convert to floating point
-			s1 = buffer[j + (i*2)]
-			s2 = buffer[j + (i*2) + 1]
-			datapoint = fdacChar2Num(s1, s2)
-			timewave[colNumStart+k] = dataPoint
-			k += 1
-		endfor
-	endfor
-end
 
 function/WAVE calculate_spectrum(time_series, [scan_duration, linear])
 	// Takes time series data and returns power spectrum

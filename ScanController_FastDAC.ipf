@@ -134,14 +134,14 @@ function/S getDeviceChannels(channels, device, [adc])
 
 	svar sc_fdacKeys  // Holds info about connected FastDACs
 	
-	assertSeparatorType(channels, ",")
+	assertSeparatorType(channels, ";")
 
 	variable numDevices = getNumDevices()
 	device = -1 // Init invalid (so can set when first channel is found)
 	variable i=0, j=0, numCh=0, startCh=0, Ch=0
 	string dev_channels=""
 	for(i=0;i<itemsInList(channels);i+=1)
-		ch = str2num(stringfromlist(i,channels,","))  // Looking for where this channel lives
+		ch = str2num(stringfromlist(i,channels))  // Looking for where this channel lives
 		startCh = 0
 		for(j=0;j<numDevices+1;j+=1)  // Cycle through connected devices
 			if(!adc) // Looking at DACs
@@ -157,7 +157,7 @@ function/S getDeviceChannels(channels, device, [adc])
 				elseif (j+1 != device)
 					abort "ERROR[getDeviceChannels]: Channels are distributed across multiple devices. Not implemented"
 				endif
-				dev_channels = addlistitem(num2istr(Ch),dev_channels,",",INF)  // Add to list of Device Channels
+				dev_channels = addlistitem(num2istr(Ch),dev_channels,";",INF)  // Add to list of Device Channels
 				break
 			endif
 			startCh += numCh
@@ -460,9 +460,9 @@ function fdRV_process_and_distribute(ScanVars, rowNum)
 end
 
 
-function fd_readvstime(instrID, channels, numpts, samplingFreq, [spectrum_analyser, named_waves])
+function fd_readvstime(instrID, channels, numpts, samplingFreq, [named_waves])
 	//	Just measures for a fixed number of points without ramping anything, stores in ADC# or timeSeriesADC# if spectrum_analyser set
-	variable instrID, numpts, samplingFreq, spectrum_analyser
+	variable instrID, numpts, samplingFreq
 	string channels
 	string named_waves // Named waves to store raw data in (; separated same length as channels)
 	
@@ -486,7 +486,7 @@ function fd_readvstime(instrID, channels, numpts, samplingFreq, [spectrum_analys
 	channels = replaceString(";", channels, "")
 	channels = replaceString(" ", channels, "")
 	sprintf cmd, "SPEC_ANA,%s,%s\r", channels, num2istr(numpts)
-	// print(cmd) // DEBUGGING
+//	print(cmd) // DEBUGGING
 	writeInstr(instrID,cmd)
 	
 	variable bytesSec = roundNum(2*samplingFreq,0)
@@ -500,15 +500,12 @@ function fd_readvstime(instrID, channels, numpts, samplingFreq, [spectrum_analys
 	variable bytes_read = 0, bytes_left = 0, totalbytesreturn = numChannels*numpts*2, saveBuffer = 1000, totaldump = 0
 	variable bufferDumpStart = stopMSTimer(-2)
 	
-	//print bytesSec, read_chunk, totalbytesreturn
+	//print bytesSec, read_chunk, totalbytesreturn  // DEBUGGING
 	do
 		fdRV_read_chunk(instrID, read_chunk, buffer)
 		// add data to datawave
-		if (spectrum_analyser)
-			specAna_distribute_data(buffer,read_chunk,channels,bytes_read/(2*numChannels))	  // TODO: Somehow this works for any speed
-		else
-			sc_distribute_data(buffer, channels, read_chunk, 0, bytes_read/(2*numChannels), named_waves = named_waves)    // TODO: And this does not!! But they are basically the same!
-		endif
+		sc_distribute_data(buffer, channels, read_chunk, 0, bytes_read/(2*numChannels), named_waves = named_waves)
+
 		bytes_read += read_chunk
 		totaldump = bytesSec*(stopmstimer(-2)-bufferDumpStart)*1e-6
 		if(totaldump-bytes_read < saveBuffer)
@@ -522,11 +519,7 @@ function fd_readvstime(instrID, channels, numpts, samplingFreq, [spectrum_analys
 	bytes_left = totalbytesreturn-bytes_read
 	if(bytes_left > 0)
 		buffer = readInstr(instrID,read_bytes=bytes_left,binary=1)
-		if (spectrum_analyser)
-			specAna_distribute_data(buffer,bytes_left,channels,bytes_read/(2*numChannels))
-		else
-			sc_distribute_data(buffer, channels, bytes_left, 0, bytes_read/(2*numChannels), named_waves = named_waves)
-		endif					
+		sc_distribute_data(buffer, channels, bytes_left, 0, bytes_read/(2*numChannels), named_waves = named_waves)
 		doupdate
 	endif
 	
@@ -676,13 +669,14 @@ function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart,[direction, 
 	string named_waves
 	wave/t fadcvalstr
 
+	variable i
 	direction = paramisdefault(direction) ? 1 : direction
 	if (!(direction == 1 || direction == -1))  // Abort if direction is not 1 or -1
 		abort "ERROR[sc_distribute_data]: Direction must be 1 or -1"
 	endif
 
-	variable i, numADCCh = itemsinlist(adcList)
-	string waveslist
+	variable numADCCh = itemsinlist(adcList)
+	string waveslist = ""
 	if (!paramisDefault(named_waves) && strlen(named_waves) > 0)
 		waveslist = named_waves
 	else
@@ -695,7 +689,6 @@ function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart,[direction, 
 	string wave1d, s1, s2
 	// load data into raw wave
 	for(i=0;i<numADCCh;i+=1)
-		// wave1d = "ADC"+stringfromlist(i,adcList)
 		wave1d = stringFromList(i, waveslist)
 		wave rawwave = $wave1d
 		k = 0
