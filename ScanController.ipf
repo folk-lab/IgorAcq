@@ -549,7 +549,6 @@ function initializeScan(S)
     openAbortWindow()
 
     // Save struct to globals
-    S.start_time = datetime
     saveAsLastScanVarsStruct(S)
 end
 
@@ -1537,6 +1536,7 @@ function /s new_sc_createSweepLogs([S, comments])
         buffer = addJSONkeyval(buffer, "y", S.y_label, addQuotes=1)
         jstr = addJSONkeyval(jstr, "axis_labels", buffer)
         jstr = addJSONkeyval(jstr, "time_elapsed", num2numStr(S.end_time-S.start_time))
+        jstr = addJSONkeyval(jstr, "sweeprate", num2numStr(S.sweeprate))    
     endif
 
     sc_instrumentLogs(jstr)  // Modifies the jstr to add Instrumt Status (from ScanController Window)
@@ -3042,7 +3042,7 @@ function saveAsLastScanVarsStruct(S)
 	Struct ScanVars &S
 	// TODO: Make these (note: can't just use StructPut/Get because they only work for numeric entries, not strings...
 	make/o/T sc_lastScanVarsStrings = {S.channelsx, S.channelsy, S.x_label, S.y_label, S.comments, S.adcList, S.startxs, S.finxs, S.startys, S.finys}
-	make/o sc_lastScanVarsVariables = {S.instrID, S.lims_checked, S.startx, S.finx, S.numptsx, S.rampratex, S.delayx, S.is2d, S.starty, S.finy, S.numptsy, S.rampratey, S.delayy, S.direction, S.start_time, S.end_time, S.using_fastdac, S.numADCs, S.samplingFreq, S.measureFreq, S.sweeprate}
+	make/o/d sc_lastScanVarsVariables = {S.instrID, S.lims_checked, S.startx, S.finx, S.numptsx, S.rampratex, S.delayx, S.is2d, S.starty, S.finy, S.numptsy, S.rampratey, S.delayy, S.direction, S.start_time, S.end_time, S.using_fastdac, S.numADCs, S.samplingFreq, S.measureFreq, S.sweeprate}
 end
 
 function initOpenSaveFiles(RawSave)	
