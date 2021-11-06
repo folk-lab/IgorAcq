@@ -500,6 +500,8 @@ function fd_readvstime(instrID, channels, numpts, samplingFreq, [named_waves])
 	variable bytes_read = 0, bytes_left = 0, totalbytesreturn = numChannels*numpts*2, saveBuffer = 1000, totaldump = 0
 	variable bufferDumpStart = stopMSTimer(-2)
 	
+	read_chunk = (totalbytesreturn > read_chunk) ? read_chunk : totalbytesreturn
+	
 	//print bytesSec, read_chunk, totalbytesreturn  // DEBUGGING
 	do
 		fdRV_read_chunk(instrID, read_chunk, buffer)

@@ -1135,7 +1135,7 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 	
 	// Dispaly Graphs 
 	string graphIDs, all_graphIDs = ""
-	graphIDs = initializeGraphsForWavenames(time_wavenames, "Time /s", is2d=0, y_label="Current /nA", spectrum=1)
+	graphIDs = initializeGraphsForWavenames(time_wavenames, "Time /s", is2d=0, y_label="ADC /mV", spectrum=1)
 	string/g sc_rawGraphs1D = graphIDs  // Tells which graphs to update during tight loop of reading buffer
 	all_graphIDs = all_graphIDs+graphIDs
 		
@@ -1191,6 +1191,7 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 				fftwavelin = fftwavelin/(i+1)
 			endif
 		endfor
+		doupdate
 	endfor	
 	
 	if (nosave == 0)
@@ -1761,7 +1762,7 @@ function/s fd_start_INT_RAMP(S)
 	
 	string cmd = "", dacs="", adcs=""
 	dacs = replacestring(",",S.channelsx,"")
-	adcs = replacestring(",",S.adclist,"")
+	adcs = replacestring(";",S.adclist,"")
 	
 	string starts, fins, temp
 	if(S.direction == 1)
