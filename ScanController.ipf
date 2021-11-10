@@ -3171,6 +3171,7 @@ function saveScanWaves(hdfid, S, filtered)
 
 	string cmd
 	setscale/I x S.startx, S.finx, sc_xarray
+	sc_xarray = x
 	// cmd = "setscale/I x " + num2str(S.startx) + ", " + num2str(S.finx) + ", \"\", " + "sc_xdata"; execute(cmd)
 	// cmd = "sc_xdata" +" = x"; execute(cmd)
 	HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 sc_xarray, hdfid, "x_array"
@@ -3181,6 +3182,7 @@ function saveScanWaves(hdfid, S, filtered)
 		setscale/I x S.starty, S.finy, sc_yarray
 		// cmd = "setscale/I x " + num2str(S.starty) + ", " + num2str(S.finy) + ", \"\", " + "sc_ydata"; execute(cmd)
 		// cmd = "sc_ydata" +" = x"; execute(cmd)
+		sc_yarray = x
 		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 sc_yarray, hdfid, "y_array"
 	endif
 
