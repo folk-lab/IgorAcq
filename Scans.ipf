@@ -58,7 +58,7 @@ function ReadVsTimeFastdac(instrID, duration, [y_label, comments, nosave]) // Un
 
 //	InitializeWaves(0, duration, numpts, x_label="Time /s", y_label=y_label ,fastdac=1)
 //	nvar sc_scanstarttime // Global variable set when InitializeWaves is called
-	fd_readvstime(S.instrID, channels, S.numptsx, S.instrID)
+	fd_readvstime(S.instrID, channels, S.numptsx, S.samplingFreq)
 	fdRV_process_and_distribute(S, 0)  // Update calculated wave
 
 	if (!nosave)	
