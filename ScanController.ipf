@@ -398,7 +398,7 @@ function sv_setMeasureFreq(S)
 end
 
 
-function initBDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate, delayx, rampratex, starty, finy, channelsy, numptsy, rampratey, delayy, direction, x_label, y_label])
+function initBDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate, delayx, rampratex, starty, finy, channelsy, numptsy, rampratey, delayy, direction, x_label, y_label, comments])
     // Function to make setting up scanVars struct easier for FastDAC scans
     // PARAMETERS:
     // startx, finx, starty, finy -- Single start/fin point for all channelsx/channelsy
@@ -412,21 +412,24 @@ function initBDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
     string channelsy
     variable direction, sweeprate
     string x_label, y_label
+    string comments
 
 	x_label = selectString((paramIsDefault(x_label) || numtype(strlen(x_label)) == 2), x_label, "")
 	y_label = selectString((paramIsDefault(y_label) || numtype(strlen(y_label)) == 2), y_label, "")
 	channelsy = selectString(paramisdefault(channelsy), channelsy, "")
-
+	
     // Handle Optional Parameters
+    S.comments = selectString(paramIsDefault(comments), comments, "")
     s.numptsx = paramisdefault(numptsx) ? NaN : numptsx
     s.rampratex = paramisDefault(rampratex) ? NaN : rampratex
     s.delayx = paramisDefault(delayx) ? NaN : delayx
 
     s.sweeprate = paramisdefault(sweeprate) ? NaN : sweeprate  // TODO: Should this be different?
 
-	s.numptsy = paramisdefault(numptsy) ? NaN : numptsy
+	 s.numptsy = paramisdefault(numptsy) ? NaN : numptsy
     s.rampratey = paramisdefault(rampratey) ? NaN : rampratey
     s.delayy = paramisdefault(delayy) ? NaN : delayy
+    
 
 	// Set Variables in Struct
     s.instrID = instrID
@@ -441,6 +444,14 @@ function initBDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
   	// Get Labels for graphs
    	S.x_label = selectString(strlen(x_label) > 0, GetLabel(S.channelsx, fastdac=0), x_label)  // Uses channels as list of numbers, and only if x_label not passed in
    	S.y_label = selectString(strlen(y_label) > 0, GetLabel(S.channelsy, fastdac=0), y_label) 
+   	
+   	
+   	// Used for Fastdac
+   	S.startxs = ""
+   	S.finxs = ""
+   	S.startys = ""
+   	S.finys = ""
+   	S.adcList = ""
    	
 end
 

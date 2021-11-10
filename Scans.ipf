@@ -475,11 +475,7 @@ function ScanFastDAC(instrID, start, fin, channels, [numpts, sweeprate, ramprate
  
    // Set sc_ScanVars struct
    struct ScanVars S
-//   SF_init_FDscanVars(S, instrID, start, fin, channels, numpts, ramprate, startxs=starts, finxs=fins, delayy=delay, sweeprate=sweeprate)  // Note: Stored as SV.startx etc
    initFDscanVars(S, instrID, start, fin, channels, numptsx=numpts, sweeprate=sweeprate, rampratex=ramprate, delayy=delay, startxs=starts, finxs=fins, x_label=x_label, y_label=y_label, comments=comments)
-//   // Set ProcessList struct
-//   struct fdRV_ProcessList PL
-//   SFfd_init_ProcessList(PL, RCcutoff, numAverage, notch)  // Puts values into PL.<name>
 
    // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
    SFfd_pre_checks(S)  

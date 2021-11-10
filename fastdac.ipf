@@ -1112,7 +1112,7 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 	string signal_wavenames = ""
 	for(i=0;i<numChannels;i+=1)
 		wn = "spectrum_signal"+num2istr(i)
-		make/o/n=(numAverage, numpts) $wn = nan
+		make/o/n=(numpts, numAverage) $wn = nan
 		setscale/i x, 0, scanlength, $wn
 		signal_wavenames = addListItem(wn, signal_wavenames, ";", INF)
 	endfor
@@ -1202,11 +1202,10 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 		endif
 
 		string filename = "spectrum_"+datestring+"_dat"+num2str(sanum)+".h5"
-
+		printf "Saving: %s\r" filename
 		// create empty HDF5 container
 		variable hdfid
 		HDF5CreateFile/p=spectrum hdfid as filename
-		sanum+=1  // So next opened file will get a new num
 
 		// save the data to HDF
 		string buffer
@@ -1225,6 +1224,8 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 			sprintf buffer, "Spectrum%d_%d", sanum, i
 			duplicate $wn $buffer
 		endfor
+
+		sanum+=1  // So next opened file will get a new num
 		
 		// Add Config and Sweeplogs to HDF
 		addMetaFiles(num2str(hdfid), logs_only=1, comments=comments)

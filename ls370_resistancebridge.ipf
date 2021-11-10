@@ -518,6 +518,9 @@ function setLS370loggersSchedule(instrID, schedule)
 		case "fast":
 			payload = LS370getLoggingScheduleFromConfig("fast")
 			break
+		case "slow":
+			payload = LS370getLoggingScheduleFromConfig("slow")
+			break
 		default:
 			abort "Not a valid option"
 	endswitch 
