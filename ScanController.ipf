@@ -3262,7 +3262,7 @@ function SaveToHDF(S, fastdac)
 	endif
 	
 	// Copy waves in Experiment
-	createWavesCopyIgor(CalcWaves)
+	createWavesCopyIgor(CalcWaves, filenum-1)  // -1 because already incremented filenum after opening HDF file
 	
 	// Save to HDF	
 	saveWavesToHDF(CalcWaves, calc_hdf5_id)
@@ -3355,21 +3355,19 @@ function saveWavesToHDF(wavesList, hdfID, [saveNames])
 	endfor
 end
 
-function createWavesCopyIgor(wavesList, [saveNames])
+function createWavesCopyIgor(wavesList, filenum, [saveNames])
 	// Duplicate each wave with prefix datXXX so that it's easily accessible in Igor
 	string wavesList, saveNames
+	variable filenum
 
 	saveNames = selectString(paramIsDefault(saveNames), saveNames, wavesList)	
 	
-	nvar filenum
-	string filenumstr = num2str(filenum)
-		
 	variable i	
 	string wn, saveName
 	for (i=0; i<itemsInList(wavesList); i++)
 		wn = stringFromList(i, wavesList)
 		saveName = stringFromList(i, saveNames)
-		saveName = "dat"+filenumstr+saveName
+		saveName = "dat"+num2str(filenum)+saveName
 		duplicate $wn $saveName
 	endfor
 end
