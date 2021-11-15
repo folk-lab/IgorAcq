@@ -350,7 +350,7 @@ function initFDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
     S.instrID = instrID
     S.adcList = getRecordedFastdacInfo("channels")
     S.using_fastdac = 1
-    S.comments = comments
+    S.comments = selectString(paramIsDefault(comments), comments, "")
 
 	// For repeat scans 
     S.direction = paramisdefault(direction) ? 1 : direction
@@ -413,19 +413,23 @@ function initBDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
     variable direction, sweeprate
     string x_label, y_label
     string comments
-
+    
+	// Handle Optional Parameters
 	x_label = selectString((paramIsDefault(x_label) || numtype(strlen(x_label)) == 2), x_label, "")
 	y_label = selectString((paramIsDefault(y_label) || numtype(strlen(y_label)) == 2), y_label, "")
 	channelsy = selectString(paramisdefault(channelsy), channelsy, "")
 	
-    // Handle Optional Parameters
     S.comments = selectString(paramIsDefault(comments), comments, "")
+    S.startx = startx
+    S.finx = finx
     s.numptsx = paramisdefault(numptsx) ? NaN : numptsx
     s.rampratex = paramisDefault(rampratex) ? NaN : rampratex
     s.delayx = paramisDefault(delayx) ? NaN : delayx
 
     s.sweeprate = paramisdefault(sweeprate) ? NaN : sweeprate  // TODO: Should this be different?
-
+	
+	s.starty = starty
+	S.finy = finy
 	 s.numptsy = paramisdefault(numptsy) ? NaN : numptsy
     s.rampratey = paramisdefault(rampratey) ? NaN : rampratey
     s.delayy = paramisdefault(delayy) ? NaN : delayy
@@ -441,7 +445,6 @@ function initBDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
     sv_setChannels(S, channelsx, channelsy, fastdac=0)
     
    	// Get Labels for graphs
-  	// Get Labels for graphs
    	S.x_label = selectString(strlen(x_label) > 0, GetLabel(S.channelsx, fastdac=0), x_label)  // Uses channels as list of numbers, and only if x_label not passed in
    	S.y_label = selectString(strlen(y_label) > 0, GetLabel(S.channelsy, fastdac=0), y_label) 
    	
@@ -3218,7 +3221,7 @@ function SaveToHDF(S, fastdac)
 	nvar filenum
 	printf "saving all dat%d files...\r", filenum
 
-	nvar/z sc_Saverawfadc
+	nvar/z sc_Saverawfadc  // From ScanControllerFastDAC window 
 	
 	// Open up HDF5 files
 	variable raw_hdf5_id, calc_hdf5_id
@@ -3262,6 +3265,9 @@ function SaveToHDF(S, fastdac)
 	endif
 	
 	// Copy waves in Experiment
+	if (!S.using_fastdac)
+		createWavesCopyIgor(RawWaves, filenum-1)  // -1 because already incremented filenum after opening HDF file
+	endif
 	createWavesCopyIgor(CalcWaves, filenum-1)  // -1 because already incremented filenum after opening HDF file
 	
 	// Save to HDF	
