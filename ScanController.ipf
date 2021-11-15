@@ -1735,6 +1735,7 @@ function New_RecordValues(S, i, j, [readvstime, fillnan])
 			// Redimension waves if readvstime is set to 1
 			if (readvstime == 1)
 				redimension /n=(innerindex+1) wref1d
+				wref1d[innerindex] = NaN  // Prevents graph updating with a zero
 				setscale/I x 0,  datetime - sc_scanstarttime, wref1d
 			endif
 
