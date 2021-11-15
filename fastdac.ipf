@@ -941,6 +941,7 @@ function CalibrateFADC(instrID)
 	response = sc_stripTermination(response,"\r\n")
 	if(fdacCheckResponse(response,cmd,isString=1,expectedResponse="CALIBRATION_FINISHED") && calibrationFail == 0)
 		// all good, calibration complete
+		rampMultipleFDAC(instrID, "0,1,2,3", 0, ramprate=100000)
 		savefadccalibration(deviceAddress,deviceNum,numADCCh,result,adcSpeed)
 		ask_user("ADC calibration complete! Result has been written to file on \"config\" path.", type=0)
 	else
