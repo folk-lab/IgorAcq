@@ -1734,6 +1734,9 @@ function/s fd_start_AWG_RAMP(S, AWG_list)
    // Response:
    //
    // <(2500 * waveform length) samples from ADC0>RAMP_FINISHED
+	
+	assertSeparatorType(S.channelsx, ";")
+	assertSeparatorType(S.ADCList, ";")	
 
 	string starts, fins, temp
 	if(S.direction == 1)
@@ -1747,8 +1750,8 @@ function/s fd_start_AWG_RAMP(S, AWG_list)
 	endif
 
    string cmd = "", dacs="", adcs=""
-   dacs = replacestring(",",S.channelsx,"")
-	adcs = replacestring(",",S.adclist,"")
+   dacs = replacestring(";",S.channelsx,"")
+	adcs = replacestring(";",S.adclist,"")
    // OPERATION, #N AWs, AW_dacs, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF Wave cycles per step, # ramp steps
    // Note: AW_dacs is formatted (dacs_for_wave0, dacs_for_wave1, .... e.g. '01,23' for Dacs 0,1 to output wave0, Dacs 2,3 to output wave1)
 	sprintf cmd, "AWG_RAMP,%d,%s,%s,%s,%s,%s,%d,%d\r", AWG_list.numWaves, AWG_list.AW_dacs, dacs, adcs, starts, fins, AWG_list.numCycles, AWG_list.numSteps
@@ -1761,9 +1764,11 @@ function/s fd_start_INT_RAMP(S)
 	// for now we only have to send one command to one device.
 	struct ScanVars &S
 	
+	assertSeparatorType(S.channelsx, ";")
+	assertSeparatorType(S.ADCList, ";")	
 	
 	string cmd = "", dacs="", adcs=""
-	dacs = replacestring(",",S.channelsx,"")
+	dacs = replacestring(";",S.channelsx,"")
 	adcs = replacestring(";",S.adclist,"")
 	
 	string starts, fins, temp

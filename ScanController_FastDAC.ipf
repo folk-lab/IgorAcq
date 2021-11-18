@@ -763,7 +763,7 @@ function fdRV_check_ramp_start(S)
 
    variable i=0, require_ramp = 0, ch, sp, diff
    for(i=0;i<itemsinlist(S.channelsx);i++)
-      ch = str2num(stringfromlist(i, S.channelsx, ","))
+      ch = str2num(stringfromlist(i, S.channelsx, ";"))
       if(S.direction == 1)
 	      sp = str2num(stringfromlist(i, S.startxs, ","))
 	   elseif(S.direction == -1)

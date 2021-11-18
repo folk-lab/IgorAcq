@@ -106,6 +106,7 @@ end
 
 function/s SF_get_channels(channels, [fastdac])
 	// Returns channels as numbers string whether numbers or labels passed
+	// Note: Takes comma separated list, returns ";" separated list (because this is usually where conversion from user input to backend happens)
 	string channels
 	variable fastdac
 	
@@ -128,7 +129,7 @@ function/s SF_get_channels(channels, [fastdac])
 					ch = fdacvalstr[V_value][0]
 				endif
 			endif
-			new_channels = addlistitem(ch, new_channels, ",", INF)
+			new_channels = addlistitem(ch, new_channels, ";", INF)
 		endfor
 	else  // Babydac
 		wave/t dacvalstr
@@ -146,10 +147,10 @@ function/s SF_get_channels(channels, [fastdac])
 					ch = dacvalstr[V_value][0]
 				endif
 			endif
-			new_channels = addlistitem(ch, new_channels, ",", INF)
+			new_channels = addlistitem(ch, new_channels, ";", INF)
 		endfor
 	endif
-	new_channels = new_channels[0,strlen(new_channels)-2]  // Remove comma at end (DESTROYS LIMIT CHECKING OTHERWISE)
+	new_channels = new_channels[0,strlen(new_channels)-2]  // Remove ";" at end (BREAKS LIMIT CHECKING OTHERWISE)
 	return new_channels
 end
 	

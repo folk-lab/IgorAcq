@@ -303,6 +303,7 @@ structure ScanVars
     variable numADCs
     variable samplingFreq, measureFreq
     variable sweeprate
+    variable bdID // For using BabyDAC on Y-axis of Fastdac Scan
     string adcList
     string startxs, finxs
     string startys, finys
@@ -446,7 +447,11 @@ function initBDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
     
    	// Get Labels for graphs
    	S.x_label = selectString(strlen(x_label) > 0, GetLabel(S.channelsx, fastdac=0), x_label)  // Uses channels as list of numbers, and only if x_label not passed in
-   	S.y_label = selectString(strlen(y_label) > 0, GetLabel(S.channelsy, fastdac=0), y_label) 
+   	if (S.is2d)
+	   	S.y_label = selectString(strlen(y_label) > 0, GetLabel(S.channelsy, fastdac=0), y_label) 
+	else
+		S.y_label = y_label
+	endif
    	
    	
    	// Used for Fastdac
@@ -843,7 +848,9 @@ function/S initializeGraphsForWavenames(wavenames, x_label, [is2d, y_label, spec
 	string wavenames, x_label, y_label
 	variable is2d, spectrum
 	
-	y_label = selectString(paramisDefault(y_label), y_label, "")
+	string y_label_2d = selectString(paramisDefault(y_label), y_label, "")
+	string y_label_1d = selectString(is2d, y_label, "")  // Only use the y_label for 1D graphs if the scan is 1D (otherwise gets confused with y sweep gate)
+
 
 	string wn, openGraphID, graphIDs = ""
 	variable i
@@ -851,9 +858,9 @@ function/S initializeGraphsForWavenames(wavenames, x_label, [is2d, y_label, spec
 	    wn = StringFromList(i, waveNames)
 	    openGraphID = graphExistsForWavename(wn)
 	    if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-	        setUpGraph1D(openGraphID, x_label, spectrum=spectrum, y_label=y_label)  // TODO: Add S.y_label if it is not null or empty
+	        setUpGraph1D(openGraphID, x_label, spectrum=spectrum, y_label=y_label_1d)  // TODO: Add S.y_label if it is not null or empty
 	    else 
-	        open1Dgraph(wn, x_label, y_label=y_label, spectrum=spectrum, y_label=y_label)
+	        open1Dgraph(wn, x_label, y_label=y_label, spectrum=spectrum, y_label=y_label_1d)
 	        openGraphID = winname(0,1)
 	    endif
        graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
@@ -863,9 +870,9 @@ function/S initializeGraphsForWavenames(wavenames, x_label, [is2d, y_label, spec
 	        wn = wn+"_2d"
 	        openGraphID = graphExistsForWavename(wn)
 	        if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-	            setUpGraph2D(openGraphID, wn, x_label, y_label, spectrum=spectrum)
+	            setUpGraph2D(openGraphID, wn, x_label, y_label_2d, spectrum=spectrum)
 	        else 
-	            open2Dgraph(wn, x_label, y_label, spectrum=spectrum)
+	            open2Dgraph(wn, x_label, y_label_2d, spectrum=spectrum)
 	            openGraphID = winname(0,1)
 	        endif
            graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
@@ -898,8 +905,8 @@ function/S graphExistsForWavename(wn)
     string graphIDs = getOpenGraphIDs()
     string title
     variable i
-    for (i = 0; i < ItemsInList(graphTitles); i++)  
-        title = StringFromList(i, graphTitles)
+    for (i = 0; i < ItemsInList(graphTitles, "|"); i++)  // Stupid separator to avoid clashing with all the normal separators Igor uses in title names  
+        title = StringFromList(i, graphTitles, "|")
         if (stringMatch(wn, title))
             return stringFromList(i, graphIDs)  
         endif
@@ -936,14 +943,19 @@ function open2Dgraph(wn, x_label, y_label, [spectrum])
 end
 
 function setUpGraph1D(graphID, x_label, [y_label, spectrum])
+    // Sets up the axis labels, and datnum for a 1D graph
     string graphID, x_label, y_label
     variable spectrum
+    
+    // Handle Defaults
+    y_label = selectString(paramIsDefault(y_label), y_label, "")
+    
+    
     // Sets axis labels, datnum etc
     setaxis/w=$graphID /a
     Label /W=$graphID bottom, x_label
-    if (!paramisDefault(y_label))
-        Label /W=$graphID left, y_label
-    endif
+
+    Label /W=$graphID left, y_label
 
     variable num
     if (spectrum)
@@ -992,7 +1004,8 @@ function/S getOpenGraphTitles()
 		graphname = graphlist[j,index-1]
 		getwindow $graphname wtitle
 		splitstring /e="(.*):(.*)" s_value, graphnum, plottitle
-		graphTitles += plottitle+";"
+		graphTitles = AddListItem(plottitle, graphTitles, "|", INF) // Use a stupid separator so that it doesn't clash with ", ; :" that Igor uses in title strings 
+//		graphTitles += plottitle+"|" 
 		j=index+1
 	endfor
     return graphTitles
@@ -1550,7 +1563,14 @@ function /s new_sc_createSweepLogs([S, comments])
         buffer = addJSONkeyval(buffer, "y", S.y_label, addQuotes=1)
         jstr = addJSONkeyval(jstr, "axis_labels", buffer)
         jstr = addJSONkeyval(jstr, "time_elapsed", num2numStr(S.end_time-S.start_time))
-        jstr = addJSONkeyval(jstr, "sweeprate", num2numStr(S.sweeprate))    
+        jstr = addJsonKeyval(jstr, "x_channels", ReplaceString(";", S.channelsx, ","))
+        if (S.is2d)   
+	        jstr = addJsonKeyval(jstr, "y_channels", ReplaceString(";", S.channelsy, ","))        
+	     endif
+        if (S.using_fastdac)
+   	        jstr = addJSONkeyval(jstr, "sweeprate", num2numStr(S.sweeprate))  	        
+   	        jstr = addJSONkeyval(jstr, "measureFreq", num2numStr(S.measureFreq))   	           	        
+   	     endif
     endif
 
     sc_instrumentLogs(jstr)  // Modifies the jstr to add Instrumt Status (from ScanController Window)
@@ -3108,8 +3128,9 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 	string hdf5_id_list, comments
 	Struct ScanVars &S
 	variable logs_only  // 1=Don't save any data to HDF
+	make/Free/T/N=1 cconfig = {""}
+	cconfig = prettyJSONfmt(sc_createconfig())
 	
-	make /FREE /T /N=1 cconfig = prettyJSONfmt(sc_createconfig())
 	if (!logs_only)
 		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(new_sc_createSweepLogs(S=S))
 	else
@@ -3293,7 +3314,7 @@ function saveFastdacInfoWaves(hdfids, S)
 		sweepgates_x[2][i] = str2num(stringfromlist(i, s.finxs, ","))
 	endfor
 	
-	if (S.is2d)  // Also Y info
+	if (S.is2d && !S.bdID)  // Also Y info (if not using BabyDAC for y-axis)
 		make/o/N=(3, itemsinlist(s.channelsy, ",")) sweepgates_y = 0
 		for (i=0; i<itemsinlist(s.channelsy, ","); i++)
 			sweepgates_y[0][i] = str2num(stringfromList(i, s.channelsy, ","))
