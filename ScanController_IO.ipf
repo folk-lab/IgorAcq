@@ -796,11 +796,18 @@ function /s prettyJSONfmt(jstr)
 	// this could be much prettier
 	string jstr
 	string output="", key="", val=""
+	
+	// Force Igor to clear out this before calling JSONSimple because JSONSimple does sort of work, but throws an error which prevents it from clearing out whatever was left in from the last call
+	make/o/T t_tokentext = {""}  
 
 	JSONSimple/z jstr
-	wave/t t_tokentext
 	wave w_tokentype, w_tokensize, w_tokenparent
 	variable i=0, indent=1
+	
+	// Because JSONSimple is shit, it leaves a random number of empty cells at the end sometimes. So remove them
+	FindValue /TEXT="" t_tokentext
+	Redimension/N=(V_row) t_tokentext
+
 
 	output+="{\n"
 	for(i=1;i<numpnts(t_tokentext)-1;i+=1)
