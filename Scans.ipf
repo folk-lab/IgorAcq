@@ -7,28 +7,31 @@
 function AAScans()
 end
 
-function ReadVsTime(delay, [comments]) // Units: s
-	variable delay
-	string comments
+function ReadVsTime(delay, [y_label, max_time, comments]) // Units: s
+	variable delay, max_time
+	string y_label, comments
 	variable i=0
 
-	if (paramisdefault(comments))
-		comments=""
-	endif
+	comments = selectString(paramIsDefault(comments), comments, "")
+	y_label = selectString(paramIsDefault(y_label), y_label, "")	
+	max_time = paramIsDefault(max_time) ? INF : max_time
 	
 	Struct ScanVars S
-	initBDscanVars(S, 0, 0, 1, "", numptsx=0, delayx=delay, x_label="time /s")
+	initBDscanVars(S, 0, 0, 1, "", numptsx=0, delayx=delay, x_label="time /s", y_label=y_label)
 	initializeScan(S)
 
 //	InitializeWaves(0, 1, 1, x_label="time (s)")
-
+	
 	variable/g sc_scanstarttime = datetime
+	S.start_time = datetime
 	do
 		asleep(delay)
 		New_RecordValues(S, i, 0,readvstime=1)
 		doupdate
 		i+=1
-	while (1)
+	while (datetime-S.start_time < max_time)
+
+	S.end_time = datetime
 	EndScan(S=S)
 end
 
@@ -122,6 +125,7 @@ function ScanBabyDAC(instrID, start, fin, channels, numpts, delay, ramprate, [y_
    // Make waves
 //	InitializeWaves(SV.startx, SV.finx, SV.numptsx, x_label=x_label)
 	initializeScan(SV)
+	SV.start_time = datetime
 
 
    // Main measurement loop
@@ -556,16 +560,24 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 		   						 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys, comments=comments)
 	
 	else  				// Using BabyDAC for Y axis so init x in FD_ScanVars, and init y in BD_ScanVars
-		abort "Not implemented again yet"
-//	   SF_init_FDscanVars(Fsv, fdID, startx, finx, channelsx, numpts, rampratex, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, startxs=startxs, finxs=finxs)
-//		struct BD_ScanVars Bsv
-//		SF_init_BDscanVars(Bsv, bdID, starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey)
+		initFDscanVars(S, fdID, startx, finx, channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
+		   						rampratey=rampratey, startxs=startxs, finxs=finxs, comments=comments)
+		S.bdID = bdID
+       s.is2d = 1
+		S.starty = starty
+		S.finy = finy
+		S.channelsy = SF_get_channels(channelsy, fastdac=0)
+		S.y_label = GetLabel(S.channelsy, fastdac=0)
 	endif
       
    // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
-   SFfd_pre_checks(S)  
+
    if(use_bd == 1)
 //   		SFbd_pre_checks(Bsv)
+		SFfd_pre_checks(S, x_only=1)
+		SFbd_check_lims(S, y_only=1)
+   	else
+   	   SFfd_pre_checks(S)  
    	endif
    	
    	// If using AWG then get that now and check it
@@ -578,29 +590,18 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 	endif
    
    // Ramp to start without checks
-   SFfd_ramp_start(S, ignore_lims=1)
+
    if(use_bd == 1)
-//   		SFbd_ramp_start(Bsv, ignore_lims=1)
+	   SFfd_ramp_start(S, x_only=1, ignore_lims=1)
+	   SFbd_ramp_start(S, y_only=1, ignore_lims=1)
+   	else
+   	   SFfd_ramp_start(S, ignore_lims=1)
    	endif
    	
    	// Let gates settle
 	sc_sleep(S.delayy)
 
-//	// Get Labels for waves
-	if(use_bd == 1)
-		abort "Need to implement"
-		// Something like S.y_label = BDS.y_label
-	endif
-//	string x_label, y_label
-//	x_label = GetLabel(Fsv.channelsx, fastdac=1)
-//	if (use_bd == 0) // If using FastDAC on slow axis
-//		y_label = GetLabel(Fsv.channelsy, fastdac=1)
-//	else // If using BabyDAC on slow axislabels
-//		y_label = GetLabel(Bsv.channelsy, fastdac=0)
-//	endif
-
-	// Make waves												// Note: Using just starty, finy because initwaves doesn't care if it's FD/BD
-//	InitializeWaves(Fsv.startx, Fsv.finx, Fsv.numptsx, starty=starty, finy=finy, numptsy=Fsv.numptsy, x_label=x_label, y_label=y_label, fastdac=1)
+	// Initialize waves and graphs
 	initializeScan(S)
 
 	// Main measurement loop
@@ -616,23 +617,21 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 				setpointy = sy + (i*(fy-sy)/(S.numptsy-1))	
 				RampMultipleFDac(S.instrID, chy, setpointy, ramprate=S.rampratey, ignore_lims=1)
 			endfor
-		else // If using BabyDAC on slow axislabels
+		else // If using BabyDAC on slow axis
 			setpointy = starty + (i*(finy-starty)/(S.numptsy-1))	
-			abort "Not implemented"
-//			RampMultipleBD(Bsv.instrID, Bsv.channelsy, setpointy, ramprate=Bsv.rampratey, ignore_lims=1)
+			RampMultipleBD(S.bdID, S.channelsy, setpointy, ramprate=S.rampratey, ignore_lims=1)
 		endif
 		// Ramp to start of fast axis
 		SFfd_ramp_start(S, ignore_lims=1, x_only=1)
 		sc_sleep(S.delayy)
+		
 		// Record fast axis
 		NEW_Fd_record_values(S, i, AWG_list=AWG)
-//		fd_Record_Values(Fsv, PL, i, AWG_list = AWG)
 	endfor
 
 	// Save by default
 	if (nosave == 0)
 		EndScan(S=S)
-//  		SaveWaves(msg=comments, fastdac=1)
   	else
   		dowindow /k SweepControl
 	endif
@@ -1136,8 +1135,10 @@ end
 
 
 
-function SFfd_pre_checks(S)
+function SFfd_pre_checks(S, [x_only, y_only])
    struct ScanVars &S
+   variable x_only, y_only  // Whether to only check specific axis (e.g. if other axis is a babydac or something else)
+   
 	SFfd_check_same_device(S) // Checks DACs and ADCs are on same device
 	SFfd_check_ramprates(S)	// Check ramprates of x and y
 	SFfd_check_lims(S)			// Check within software lims for x and y
@@ -1153,7 +1154,7 @@ function SFfd_ramp_start(S, [ignore_lims, x_only, y_only])
 	variable i, setpoint
 	// If x exists ramp them to start
 	if(numtype(strlen(s.channelsx)) == 0 && strlen(s.channelsx) != 0 && y_only != 1)  // If not NaN and not ""
-		for(i=0;i<itemsinlist(S.channelsx,",");i+=1)
+		for(i=0;i<itemsinlist(S.channelsx,";");i+=1)
 			if(S.direction == 1)
 				setpoint = str2num(stringfromlist(i,S.startxs,","))
 			elseif(S.direction == -1)
@@ -1161,14 +1162,14 @@ function SFfd_ramp_start(S, [ignore_lims, x_only, y_only])
 			else
 				abort "ERROR[SFfd_ramp_start]: S.direction not set to 1 or -1"
 			endif
-			rampOutputfdac(S.instrID,str2num(stringfromlist(i,S.channelsx,",")),setpoint,ramprate=S.rampratex, ignore_lims=ignore_lims)			
+			rampOutputfdac(S.instrID,str2num(stringfromlist(i,S.channelsx,";")),setpoint,ramprate=S.rampratex, ignore_lims=ignore_lims)			
 		endfor
 	endif  
 	
 	// If y exists ramp them to start
 	if(numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0 && x_only != 1)  // If not NaN and not "" and not x only
-		for(i=0;i<itemsinlist(S.channelsy,",");i+=1)
-			rampOutputfdac(S.instrID,str2num(stringfromlist(i,S.channelsy,",")),str2num(stringfromlist(i,S.startys,",")),ramprate=S.rampratey, ignore_lims=ignore_lims)
+		for(i=0;i<itemsinlist(S.channelsy,";");i+=1)
+			rampOutputfdac(S.instrID,str2num(stringfromlist(i,S.channelsy,";")),str2num(stringfromlist(i,S.startys,",")),ramprate=S.rampratey, ignore_lims=ignore_lims)
 		endfor
 	endif
   
@@ -1189,6 +1190,7 @@ function SFfd_check_ramprates(S)
   wave/T fdacvalstr
   svar activegraphs
 
+
 	variable kill_graphs = 0
 	// Check x's won't be swept to fast by calculated sweeprate for each channel in x ramp
 	// Should work for different start/fin values for x
@@ -1196,9 +1198,9 @@ function SFfd_check_ramprates(S)
 	string question
 
 	if(!numtype(strlen(s.channelsx)) == 0 == 0 && strlen(s.channelsx) != 0)  // if s.Channelsx != (null or "")
-		for(i=0;i<itemsinlist(S.channelsx,",");i+=1)
+		for(i=0;i<itemsinlist(S.channelsx,";");i+=1)
 			eff_ramprate = abs(str2num(stringfromlist(i,S.startxs,","))-str2num(stringfromlist(i,S.finxs,",")))*(S.measureFreq/S.numptsx)
-			channel = str2num(stringfromlist(i, S.channelsx, ","))
+			channel = str2num(stringfromlist(i, S.channelsx, ";"))
 			if(eff_ramprate > str2num(fdacvalstr[channel][4])*1.05 || s.rampratex > str2num(fdacvalstr[channel][4])*1.05)  // Allow 5% too high for convenience
 				// we are going too fast
 				sprintf question, "DAC channel %d will be ramped at (%.1f mV/s or %.1f mV/s), software limit is set to %s mV/s. Continue?", channel, eff_ramprate, s.rampratex, fdacvalstr[channel][4]
@@ -1213,8 +1215,8 @@ function SFfd_check_ramprates(S)
   
 	// if Y channels exist, then check against rampratey (not sweeprate because only change on slow axis)	
 	if(numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0  && kill_graphs == 0)  // if s.Channelsy != (NaN or "") and not killing graphs yet 
-		for(i=0;i<itemsinlist(S.channelsy,",");i+=1)
-			channel = str2num(stringfromlist(i, S.channelsy, ","))
+		for(i=0;i<itemsinlist(S.channelsy,";");i+=1)
+			channel = str2num(stringfromlist(i, S.channelsy, ";"))
 			if(s.rampratey > str2num(fdacvalstr[channel][4]))
 				sprintf question, "DAC channel %d will be ramped at %.1f mV/s, software limit is set to %s mV/s. Continue?", channel, S.rampratey, fdacvalstr[channel][4]
 				answer = ask_user(question, type=1)
@@ -1244,7 +1246,6 @@ function SFfd_check_lims(S)
 	struct ScanVars &S
 
 	wave/T fdacvalstr
-	svar activegraphs
 	variable answer, i, k
 	
 	// Make single list out of X's and Y's (checking if each exists first)
@@ -1285,9 +1286,6 @@ function SFfd_check_lims(S)
 			if(answer == 2)
 				print("[ERROR] \"RecordValues\": User abort!")
 				dowindow/k SweepControl // kill scan control window
-				for(k=0;k<itemsinlist(activegraphs,";");k+=1)
-					dowindow/k $stringfromlist(k,activegraphs,";")
-				endfor
 				abort
 			endif
 		endif
@@ -1295,60 +1293,32 @@ function SFfd_check_lims(S)
 end
 
 
-function SFfd_check_same_device(S)
+function SFfd_check_same_device(S, [x_only, y_only])
 	// Checks all rampChs and ADCs (selected in fd_scancontroller window)
 	// are on the same device. 
 	struct ScanVars &s
-	wave fadcattr
-	wave/t fadcvalstr
-	svar sc_fdacKeys
+	variable x_only, y_only // whether to check only one axis (e.g. other is babydac)
 	
-	// check that all DAC channels are on the same device
-	variable numRampCh = itemsinlist(S.channelsx,","),i=0,j=0,dev_dac=0,dacCh=0,startCh=0
-	variable numDevices = str2num(stringbykey("numDevices",sc_fdacKeys,":",",")),numDACCh=0
-	for(i=0;i<numRampCh;i+=1)
-		dacCh = str2num(stringfromlist(i,S.channelsx,","))
-		startCh = 0
-		for(j=0;j<numDevices;j+=1)
-			numDACCh = str2num(stringbykey("numDACCh"+num2istr(j+1),sc_fdacKeys,":",","))
-			if(startCh+numDACCh-1 >= dacCh)
-				// this is the device
-				if(i > 0 && dev_dac != j)
-					print "[ERROR] \"sc_checkfdacDevice\": All DAC channels must be on the same device!"
-					abort
-				else
-					dev_dac = j
-					break
-				endif
-			endif
-			startCh += numDACCh
-		endfor
-	endfor
-	
-	// check that all adc channels are on the same device
-	variable q=0,numReadCh=0,h=0,dev_adc=0,adcCh=0,numADCCh=0
-	for(i=0;i<itemsinlist(S.adcList, ",");i+=1)
-		adcCh = str2num(stringfromList(i, S.adcList, ","))
-		startCh = 0
-		for(j=0;j<numDevices+1;j+=1)
-			numADCCh = str2num(stringbykey("numADCCh"+num2istr(j+1),sc_fdacKeys,":",","))
-			if(startCh+numADCCh-1 >= adcCh)
-				// this is the device
-				if(i > 0 && dev_adc != j)
-					print "[ERROR] \"sc_checkfdacDevice\": All ADC channels must be on the same device!"
-					abort
-				elseif(j != dev_dac)
-					print "[ERROR] \"sc_checkfdacDevice\": DAC & ADC channels must be on the same device!"
-					abort
-				else
-					dev_adc = j
-					break
-				endif
-			endif
-			startCh += numADCCh
-		endfor
-	endfor
-	return dev_adc
+	variable device_dacs
+	variable device_buffer
+	string channels
+	if (!y_only)
+		channels = getDeviceChannels(S.channelsx, device_dacs)  // Throws error if not all channels on one FastDAC
+	endif
+	if (!x_only)
+		channels = getDeviceChannels(S.channelsy, device_buffer)
+		if (device_dacs > 0 && device_buffer > 0 && device_buffer != device_dacs)
+			abort "ERROR[SFfd_check_same_device]: X channels and Y channels are not on same device"  // TODO: Maybe this should raise an error?
+		elseif (device_dacs <= 0 && device_buffer > 0)
+			device_dacs = device_buffer
+		endif
+	endif
+
+	channels = getDeviceChannels(s.AdcList, device_buffer, adc=1)  // Raises error if ADCs aren't on same device
+	if (device_dacs > 0 && device_buffer != device_dacs)
+		abort "ERROR[SFfd_check_same_device]: ADCs are not on the same device as DACs"  // TODO: Maybe should only raise error if x channels not on same device as ADCs?
+	endif	
+	return device_buffer // Return adc device number
 end
 
 
@@ -1386,7 +1356,11 @@ function SFfd_sanitize_setpoints(start_list, fin_list, channels, starts, fins)
 	
 	string buffer
 	
-	if (itemsinlist(channels, ",") != itemsinlist(start_list, ",") || itemsinlist(channels, ",") != itemsinlist(fin_list, ","))
+	assertSeparatorType(channels, ";")  // ";" because already a processed value (e.g. labels -> numbers already happened)
+	assertSeparatorType(start_list, ",")  // "," because entered by user
+	assertSeparatorType(fin_list, ",")	// "," because entered by user
+	
+	if (itemsinlist(channels, ";") != itemsinlist(start_list, ",") || itemsinlist(channels, ";") != itemsinlist(fin_list, ","))
 		sprintf buffer, "length of start_list/fin_list/channels not equal!!! start_list:(%s), fin_list:(%s), channels:(%s)\r", start_list, fin_list, channels
 		abort buffer
 	endif
@@ -1396,36 +1370,36 @@ function SFfd_sanitize_setpoints(start_list, fin_list, channels, starts, fins)
 end
 
 
-function SFbd_check_lims(S)
+function SFbd_check_lims(S, [x_only, y_only])
 	// check that start and end values are within software limits
    struct ScanVars &S
+   variable x_only, y_only  // Whether to only check one axis (e.g. other is a fastdac)
 	
 	// Make single list out of X's and Y's (checking if each exists first)
 	string all_channels = "", outputs = ""
-	if(numtype(strlen(s.channelsx)) == 0 && strlen(s.channelsx) != 0)  // If not NaN and not ""
-		all_channels = addlistitem(S.channelsx, all_channels, ";")
+	if(!y_only && numtype(strlen(s.channelsx)) == 0 && strlen(s.channelsx) != 0)  // If not NaN and not ""
+		all_channels = addlistitem(S.channelsx, all_channels, "|")
 		outputs = addlistitem(num2str(S.startx), outputs, ",")
 		outputs = addlistitem(num2str(S.finx), outputs, ",")
 	endif
 
-	if(numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0)  // If not NaN and not ""
-		all_channels = addlistitem(S.channelsy, all_channels, ";")
+	if(!x_only && numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0)  // If not NaN and not ""
+		all_channels = addlistitem(S.channelsy, all_channels, "|")
 		outputs = addlistitem(num2str(S.starty), outputs, ",")
 		outputs = addlistitem(num2str(S.finy), outputs, ",")
 	endif
 	
 
 	wave/T dacvalstr
-	svar activegraphs
 	wave bd_range_span, bd_range_high, bd_range_low
 
 	variable board_index, sw_limit
 	variable answer, i, j, k, channel, output, kill_graphs = 0
 	string channels, abort_msg = "", question
-	for(i=0;i<itemsinlist(all_channels, ";");i++)  		// channelsx then channelsy if it exists
-		channels = stringfromlist(i, all_channels, ";")
-		for(j=0;j<itemsinlist(channels, ",");j++)			// each channel from channelsx/channelsy
-			channel = str2num(stringfromlist(j, channels, ","))
+	for(i=0;i<itemsinlist(all_channels, "|");i++)  		// channelsx then channelsy if it exists
+		channels = stringfromlist(i, all_channels, "|")
+		for(j=0;j<itemsinlist(channels, ";");j++)			// each channel from channelsx/channelsy
+			channel = str2num(stringfromlist(j, channels, ";"))
 			for(k=0;k<2;k++)  									// Start/Fin for each channel
 				output = str2num(stringfromlist(2*i+k, outputs, ","))  // 2 per channelsx/channelsy
 				// Check that the DAC board is initialized
@@ -1448,7 +1422,7 @@ function SFbd_check_lims(S)
 				// if outside, ask user if want to continue anyway
 				sw_limit = str2num(dacvalstr[channel][2])
 				if(abs(output) > sw_limit)
-					sprintf question, "DAC channel %s will be ramped outside software limits. Continue?", stringfromlist(i,channels,",")
+					sprintf question, "DAC channel %s will be ramped outside software limits. Continue?", stringfromlist(i,channels,";")
 					answer = ask_user(question, type=1)
 					if(answer == 2)
 						sprintf abort_msg "User aborted"
@@ -1471,6 +1445,7 @@ function SFbd_check_lims(S)
 
 	if(kill_graphs == 1)
 		dowindow/k SweepControl // kill scan control window
+		svar activegraphs  // TODO: I don't think this is updated any more, maybe graphs can't be easily killed?
 		for(k=0;k<itemsinlist(activegraphs,";");k+=1)
 			dowindow/k $stringfromlist(k,activegraphs,";")
 		endfor		
@@ -1479,20 +1454,21 @@ function SFbd_check_lims(S)
 end
 
 
-function SFbd_ramp_start(S, [ignore_lims])
+function SFbd_ramp_start(S, [x_only, y_only, ignore_lims])
 	// move DAC channels to starting point
+	// x_only/y_only to only try ramping x/y to start (e.g. y_only=1 when using a babydac for y-axis of a fastdac scan)
 	struct ScanVars &S
-	variable ignore_lims
+	variable x_only, y_only, ignore_lims
 
-	variable i
+	variable instrID = (S.bdID) ? S.bdID : S.instrID  // Use S.bdID if it is present  
 	// If x exists ramp them to start
-	if(numtype(strlen(s.channelsx)) == 0 && strlen(s.channelsx) != 0)  // If not NaN and not ""
-		RampMultipleBD(S.instrID, S.channelsx, S.startx, ramprate=S.rampratex, ignore_lims=ignore_lims)
+	if(!y_only && numtype(strlen(s.channelsx)) == 0 && strlen(s.channelsx) != 0)  // If not NaN and not ""
+		RampMultipleBD(instrID, S.channelsx, S.startx, ramprate=S.rampratex, ignore_lims=ignore_lims)
 	endif  
 	
 	// If y exists ramp them to start
-	if(numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0)  // If not NaN and not ""
-		RampMultipleBD(S.instrID, S.channelsy, S.starty, ramprate=S.rampratey, ignore_lims=ignore_lims)
+	if(!x_only && numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0)  // If not NaN and not ""
+		RampMultipleBD(instrID, S.channelsy, S.starty, ramprate=S.rampratey, ignore_lims=ignore_lims)
 	endif
 end
 
