@@ -342,7 +342,7 @@ function NEW_fd_record_values(S, rowNum, [AWG_list, linestart])
 
 	// Check if AWG_list passed with use_AWG = 1
 	variable/g sc_AWG_used = 0  // Global so that this can be used in SaveWaves() to save AWG info if used
-	if(!paramisdefault(AWG_list) && AWG_list.use_AWG == 1)  // TODO: Does this work?
+	if(!paramisdefault(AWG_list) && AWG_list.use_AWG == 1)  
 		sc_AWG_used = 1
 		if(rowNum == 0)
 			print "fd_Record_Values: Using AWG"
@@ -393,9 +393,24 @@ function fdRV_send_command_and_read(S, AWG_list, rowNum)
 	endif
 	
 	totalByteReturn = S.numADCs*2*S.numptsx
-	sc_sleep(0.1) 	// Trying to get 0.2s of data per loop, will timeout on first loop without a bit of a wait first
-	variable looptime = 0
-   looptime = fdRV_record_buffer(S, rowNum, totalByteReturn)
+	variable entered_panic_mode = 0
+	try
+   		entered_panic_mode = fdRV_record_buffer(S, rowNum, totalByteReturn)
+   	catch  // One more chance to do the sweep again if it failed for some reason (likely buffer overflow)
+		variable errCode = GetRTError(1)  // Clear the error
+		if (v_AbortCode != 10)  // 10 is returned when user clicks abort button mid sweep
+			printf "WARNING[fdRV_send_command_and_read]: Error during sweep at row %d. Attempting once more without updating graphs.\r" rowNum
+			stopFDACsweep(S.instrID)   // Make sure the previous scan is stopped
+			if(sc_AWG_used)  	// Start AWG ramp again
+		   		cmd_sent = fd_start_AWG_RAMP(S, AWG_list)
+			else				// Start INT ramp again 
+				cmd_sent = fd_start_INT_RAMP(S)
+			endif
+			entered_panic_mode = fdRV_record_buffer(S, rowNum, totalByteReturn, record_only=1)  // Try again to record the sweep
+		else
+			abortonvalue 1,10  // Continue to raise the code which specifies user clicked abort button mid sweep
+		endif
+	endtry	
 	
    // update window
 	string endstr
@@ -533,31 +548,47 @@ function fd_readvstime(instrID, channels, numpts, samplingFreq, [named_waves])
 	endif
 end
 
-function fdRV_record_buffer(S, rowNum, totalByteReturn)
+function fdRV_record_buffer(S, rowNum, totalByteReturn, [record_only])
+	// Returns whether recording entered into panic_mode during sweep
    struct ScanVars &S
    variable rowNum, totalByteReturn
+   variable record_only // If set, then graphs will not be updated until all data has been read 
 
    // hold incoming data chunks in string and distribute to data waves
    string buffer = ""
-   variable bytes_read = 0, plotUpdateTime = 15e-3, totaldump = 0,  saveBuffer = 2000
+   variable bytes_read = 0, totaldump = 0 
+   variable saveBuffer = 1000 // Allow getting up to 1000 bytes behind. (Note: Buffer size is 4096 bytes and cannot be changed in Igor)
    variable bufferDumpStart = stopMSTimer(-2)
 
    variable bytesSec = roundNum(2*S.measureFreq*S.numADCs,0)
    variable read_chunk = fdRV_get_read_chunk_size(S.numADCs, S.numptsx, bytesSec, totalByteReturn)
+   variable panic_mode = record_only  // If Igor gets behind on reading at any point, it will go into panic mode and focus all efforts on clearing buffer.
+   variable expected_bytes_in_buffer = 0 // For storing how many bytes are expected to be waiting in buffer
    do
       fdRV_read_chunk(S.instrID, read_chunk, buffer)  // puts data into buffer
-      fdRV_distribute_data(buffer, S, bytes_read, totalByteReturn, read_chunk, rowNum, S.direction) ///////////// TODO: Change THIS
-      bytes_read += read_chunk
-      totaldump = bytesSec*(stopmstimer(-2)-bufferDumpStart)*1e-6  // Expected amount of bytes in buffer
-      if(totaldump-bytes_read < saveBuffer)  // if we aren't too far behind then update Raw 1D graphs
-         fdRV_update_graphs() 
-         fdRV_check_sweepstate(S.instrID)
-         
-//         print "keeping up"
-		else
-			printf "DEBUGGING: getting behind: Bytes Requested: %d, Expected Dump: %d, Bytes Read: %d\r" totalByteReturn, totaldump, bytes_read
-		endif
+      fdRV_distribute_data(buffer, S, bytes_read, totalByteReturn, read_chunk, rowNum, S.direction)
       fdRV_check_sweepstate(S.instrID)
+
+      bytes_read += read_chunk      
+      expected_bytes_in_buffer = fdRV_expected_bytes_in_buffer(bufferDumpStart, bytesSec, bytes_read)      
+      if(!panic_mode && expected_bytes_in_buffer < saveBuffer)  // if we aren't too far behind then update Raw 1D graphs
+         fdRV_update_graphs() 
+	      expected_bytes_in_buffer = fdRV_expected_bytes_in_buffer(bufferDumpStart, bytesSec, bytes_read)  // Basically checking how long graph updates took
+			if (expected_bytes_in_buffer > 4096)
+         		printf "ERROR[fdRV_record_buffer]: After updating graphs, buffer is expected to overflow... Expected buffer size = %d (max = 4096). Bytes read so far = %d\r" expected_bytes_in_buffer, bytes_read
+         elseif (expected_bytes_in_buffer > 2500)
+				printf "WARNING[fdRV_record_buffer]: Last graph update resulted in buffer becoming close to full (%d of 4096 bytes). Entering panic_mode (no more graph updates)\r", expected_bytes_in_buffer
+				panic_mode = 1         
+         	endif
+		else
+			if (expected_bytes_in_buffer > 1000)
+				printf "DEBUGGING: getting behind: Expecting %d bytes in buffer (max 4096)\r" expected_bytes_in_buffer		
+				if (panic_mode == 0)
+					panic_mode = 1
+					printf "WARNING[fdRV_record_buffer]: Getting behind on reading buffer, entering panic mode (no more graph updates until end of sweep)\r"				
+				endif			
+			endif
+		endif
    while(totalByteReturn-bytes_read > read_chunk)
 
    // do one last read if any data left to read
@@ -565,19 +596,30 @@ function fdRV_record_buffer(S, rowNum, totalByteReturn)
    if(bytes_left > 0)
       fdRV_read_chunk(S.instrID, bytes_left, buffer)  // puts data into buffer
       fdRV_distribute_data(buffer, S, bytes_read, totalByteReturn, bytes_left, rowNum, S.direction)
-      fdRV_check_sweepstate(S.instrID)
-      fdRV_update_graphs() 
    endif
-   variable looptime = (stopmstimer(-2)-bufferDumpStart)*1e-6
-   return looptime
+   
+   fdRV_check_sweepstate(S.instrID)
+   fdRV_update_graphs() 
+   return panic_mode
+end
+
+function fdRV_expected_bytes_in_buffer(start_time, bytes_per_sec, total_bytes_read)
+	// Calculates how many bytes are expected to be in the buffer right now
+	variable start_time  // Time at which command was sent to Fastdac
+	variable bytes_per_sec  // How many bytes is fastdac returning per second (2*sampling rate)
+	variable total_bytes_read  // How many bytes have been read so far
+	
+	return round(bytes_per_sec*(stopmstimer(-2)-start_time)*1e-6 - total_bytes_read)
 end
 
 function fdRV_get_read_chunk_size(numADCs, numpts, bytesSec, totalByteReturn)
   // Returns the size of chunks that should be read at a time
   variable numADCs, numpts, bytesSec, totalByteReturn
 
+  variable read_duration = 0.5  // Make readchunk s.t. it nominally take this time to fill
+  variable chunksize = (round(bytesSec*read_duration) - mod(round(bytesSec*read_duration),numADCs*2))  
+
   variable read_chunk=0
-  variable chunksize = (round(bytesSec/5) - mod(round(bytesSec/5),numADCs*2))
   if(chunksize < 50)
     chunksize = 50 - mod(50,numADCs*2)
   endif
@@ -591,6 +633,7 @@ end
 
 function fdRV_update_graphs()
   // updates activegraphs which takes about 15ms
+  // ONLY update 1D graphs for speed (if this takes too long, the buffer will overflow)
   svar sc_rawGraphs1D
 
   variable i
@@ -610,10 +653,10 @@ function fdRV_check_sweepstate(instrID)
   	catch
 		errCode = GetRTError(1)
 		stopFDACsweep(instrID)
-		if(v_abortcode == -1)
-				sc_abortsweep = 0
-				sc_pause = 0
-		endif
+//		if(v_abortcode == -1)  // If user abort
+//				sc_abortsweep = 0
+//				sc_pause = 0
+//		endif
 		abortonvalue 1,10
 	endtry
 end
@@ -631,7 +674,7 @@ end
 
 
 function fdRV_distribute_data(buffer, S, bytes_read, totalByteReturn, read_chunk, rowNum, direction)
-  // add data to rawwaves
+	// Distribute data to 1D waves only (for speed)
   struct ScanVars &S
   string &buffer  // Passing by reference for speed of execution
   variable bytes_read, totalByteReturn, read_chunk, rowNum, direction
@@ -666,6 +709,7 @@ function fdRV_update_window(S, numAdcs)
 end
 
 function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart,[direction, named_waves])
+	// Distribute data to 1D waves only (for speed)
 	string &buffer, adcList  //passing buffer by reference for speed of execution
 	variable bytes, rowNum, colNumStart, direction
 	string named_waves
