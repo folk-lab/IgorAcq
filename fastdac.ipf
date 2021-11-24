@@ -344,18 +344,16 @@ function/s getFDACStatus(instrID)
 	// AWG info if used
 	nvar sc_AWG_used
 	if(sc_AWG_used == 1)
-		print "WARNING: Not saving AWG status, needs to be implemented"
-//		buffer = addJSONkeyval(buffer, "AWG", add_AWG_status())  //NOTE: AW saved in add_AWG_status()
+		buffer = addJSONkeyval(buffer, "AWG", add_AWG_status())  //NOTE: AW saved in add_AWG_status()
 	endif
 	
 	return addJSONkeyval("", "FastDAC "+num2istr(device), buffer)
 end
 
 
-function/s add_AWG_status(hdfid)
+function/s add_AWG_status()
 	// Function to be called from getFDACstatus() to add a section with information about the AWG used
 	// Also adds AWs used to HDF
-	variable hdfid
 	
 	string buffer = ""// For storing JSON to return
 	
@@ -373,14 +371,7 @@ function/s add_AWG_status(hdfid)
 	buffer = addJSONkeyval(buffer, "numCycles", num2str(AWG.numCycles), addquotes=0)				// How many full cycles of the AWs per DAC step
 	buffer = addJSONkeyval(buffer, "numSteps", num2str(AWG.numSteps), addquotes=0)				// How many DAC steps for the full ramp
 
-	// Add AWs used to HDF file
-	variable i
-	string wn
-	for(i=0;i<AWG.numWaves;i++)
-		// Get IGOR AW
-		wn = fdAWG_get_AWG_wave(str2num(stringfromlist(i, AWG.AW_waves, ",")))
-		initsaveSingleWave(wn, hdfid)
-	endfor
+
 	return buffer
 end
 ///////////////////////
@@ -574,9 +565,9 @@ function RampMultipleFDAC(InstrID, channels, setpoint, [ramprate, ignore_lims])
 	nvar fd_ramprate
 	ramprate = paramIsDefault(ramprate) ? fd_ramprate : ramprate
 	
-	variable i=0, channel, nChannels = ItemsINList(channels, ",")
+	variable i=0, channel, nChannels = ItemsInList(channels, ";")
 	for(i=0;i<nChannels;i+=1)
-		channel = str2num(StringFromList(i, channels, ","))
+		channel = str2num(StringFromList(i, channels, ";"))
 		rampOutputfdac(instrID, channel, setpoint, ramprate=ramprate, ignore_lims=ignore_lims)
 	endfor
 end
@@ -908,7 +899,7 @@ function CalibrateFADC(instrID)
 	string question = ""
 	sprintf question, "Connect the DAC channel 0-%d --> ADC channel 0-%d. Press YES to continue", numADCCh-1, numADCCh-1
 	user_response = ask_user(question,type=1)
-	if(user_response == 0)
+	if(user_response != 1)
 		print "[ERROR] \"fadcCalibrate\": User abort!"
 		abort
 	endif
@@ -941,7 +932,7 @@ function CalibrateFADC(instrID)
 	response = sc_stripTermination(response,"\r\n")
 	if(fdacCheckResponse(response,cmd,isString=1,expectedResponse="CALIBRATION_FINISHED") && calibrationFail == 0)
 		// all good, calibration complete
-		rampMultipleFDAC(instrID, "0,1,2,3", 0, ramprate=100000)
+		rampMultipleFDAC(instrID, "0,1,2,3", 0, ramprate=10000)
 		savefadccalibration(deviceAddress,deviceNum,numADCCh,result,adcSpeed)
 		ask_user("ADC calibration complete! Result has been written to file on \"config\" path.", type=0)
 	else
@@ -1471,7 +1462,7 @@ function fdAWG_reset_init()
 	fdAWG_set_global_AWG_list(S)
 end
 
-function fdAWG_setup_AWG(instrID, [AWs, DACs, numCycles])
+function fdAWG_setup_AWG(instrID, [AWs, DACs, numCycles, verbose])
 	// Function which initializes AWG_List s.t. selected DACs will use selected AWs when called in fd_Record_Values
 	// Required because fd_Record_Values needs to know the total number of samples it will get back, which is calculated from values in AWG_list
 	// IGOR AWs must be set in a separate function (which should reset AWG_List.initialized to 0)
@@ -1480,14 +1471,18 @@ function fdAWG_setup_AWG(instrID, [AWs, DACs, numCycles])
 	variable instrID  // For printing information about frequency etc
 	string AWs, DACs  // CSV for AWs to select which AWs (0,1) to use. // CSV sets for DACS e.g. "02, 1" for DACs 0, 2 to output AW0, and DAC 1 to output AW1
 	variable numCycles // How many full waves to execute for each ramp step
+	variable verbose  // Whether to print setup of AWG
 	
 	struct fdAWG_List S
 	fdAWG_get_global_AWG_list(S)
 	
-	DACs = SF_get_channels(DACs, fastdac=1)  // Convert from label to numbers
+	// Note: This needs to be changed if using same AW on multiple DACs
+	DACs = SF_get_channels(DACs, fastdac=1)  // Convert from label to numbers 
+	DACs = ReplaceString(";", DACs, ",")  
+	/////////////////
 	
 	S.AW_Waves = selectstring(paramisdefault(AWs), AWs, S.AW_Waves)
-	S.AW_DACs = selectstring(paramisdefault(DACs), DACs, S.AW_Dacs)
+	S.AW_DACs = selectstring(paramisdefault(DACs), DACs, S.AW_Dacs)  // Formatted 01,23  == wave 0 on channels 0 and 1, wave 1 on channels 2 and 3
 	S.numCycles = paramisDefault(numCycles) ? S.numCycles : numCycles
 	
 	S.numWaves = itemsinlist(AWs, ",")
@@ -1540,10 +1535,10 @@ function fdAWG_setup_AWG(instrID, [AWs, DACs, numCycles])
 
 	variable awFreq = 1/(s.waveLen/S.measureFreq)
 	variable duration_per_step = s.waveLen/S.measureFreq*S.numCycles
-	
-	printf "\r\rAWG set with:\r\tAWFreq = %.2fHz\r\tMin Samples for step = %d\r\tCycles per step = %d\r\tDuration per step = %.3fs\r\tnumADCs = %d\r\tSamplingFreq = %.1f/s\r\tMeasureFreq = %.1f/s\rOutputs are:\r%s\r",\
+	if (verbose)
+		printf "\r\rAWG set with:\r\tAWFreq = %.2fHz\r\tMin Samples for step = %d\r\tCycles per step = %d\r\tDuration per step = %.3fs\r\tnumADCs = %d\r\tSamplingFreq = %.1f/s\r\tMeasureFreq = %.1f/s\rOutputs are:\r%s\r",\
   									awFreq,											min_samples,			S.numCycles,						duration_per_step,		S.numADCs, 		S.samplingFreq,					S.measureFreq,						buffer											
-
+	endif
    
 end
 

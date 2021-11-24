@@ -610,10 +610,10 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 	for(i=0; i<S.numptsy; i++)
 		// Ramp slow axis
 		if(use_bd == 0)
-			for(j=0; j<itemsinlist(S.channelsy,","); j++)
+			for(j=0; j<itemsinlist(S.channelsy,";"); j++)
 				sy = str2num(stringfromList(j, S.startys, ","))
 				fy = str2num(stringfromList(j, S.finys, ","))
-				chy = stringfromList(j, S.channelsy, ",")
+				chy = stringfromList(j, S.channelsy, ";")
 				setpointy = sy + (i*(fy-sy)/(S.numptsy-1))	
 				RampMultipleFDac(S.instrID, chy, setpointy, ramprate=S.rampratey, ignore_lims=1)
 			endfor
@@ -914,7 +914,6 @@ function ScanfastDACRepeat(instrID, start, fin, channels, numptsy, [numptsx, swe
 	struct fdAWG_list AWG
 	if(use_AWG)	
 		fdAWG_get_global_AWG_list(AWG)
-		abort "Not Implemented yet"
 		SFawg_set_and_precheck(AWG, S)  // Note: sets S.numptsx here and AWG.use_AWG = 1 if pass checks
 	else  // Don't use AWG
 		AWG.use_AWG = 0  	// This is the default, but just putting here explicitly
@@ -1481,6 +1480,10 @@ function SFawg_check_AWG_list(AWG, Fsv)
 	string AWdacs  // Used for storing all DACS for 1 channel  e.g. "123" = Dacs 1,2,3
 	string err_msg
 	variable i=0, j=0
+	
+	// Assert separators are correct
+	assertSeparatorType(AWG.AW_DACs, ",")
+	assertSeparatorType(AWG.AW_waves, ",")
 		
 	// Check initialized
 	if(AWG.initialized == 0)
@@ -1511,12 +1514,12 @@ function SFawg_check_AWG_list(AWG, Fsv)
 	
 	// Check no overlap between DACs for sweeping, and DACs for AWG
 	string channel // Single DAC channel
-	string FDchannels = addlistitem(Fsv.Channelsy, Fsv.Channelsx, ",") // combine channels lists
+	string FDchannels = addlistitem(Fsv.Channelsy, Fsv.Channelsx, ";") // combine channels lists
 	for(i=0;i<itemsinlist(AWG.AW_Dacs, ",");i++)
 		AWdacs = stringfromlist(i, AWG.AW_Dacs, ",")
 		for(j=0;j<strlen(AWdacs);j++)
 			channel = AWdacs[j]
-			if(findlistitem(channel, FDchannels, ",") != -1)
+			if(findlistitem(channel, FDchannels, ";") != -1)
 				abort "ERROR[SFawg_check_AWG_list]: Trying to use same DAC channel for FD scan and AWG at the same time"
 			endif
 		endfor
