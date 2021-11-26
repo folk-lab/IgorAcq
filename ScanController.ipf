@@ -361,7 +361,11 @@ function initFDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
     
    	// Get Labels for graphs
    	S.x_label = selectString(strlen(x_label) > 0, GetLabel(S.channelsx, fastdac=1), x_label)  // Uses channels as list of numbers, and only if x_label not passed in
-   	S.y_label = selectString(strlen(y_label) > 0, GetLabel(S.channelsy, fastdac=1), y_label)   		
+   	if (S.is2d)
+   		S.y_label = selectString(strlen(y_label) > 0, GetLabel(S.channelsy, fastdac=1), y_label) 
+   	else
+   		S.y_label = y_label
+   	endif  		
 
    	// Sets starts/fins in FD string format
     sv_setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
@@ -848,7 +852,8 @@ function/S initializeGraphsForWavenames(wavenames, x_label, [is2d, y_label, spec
 	string wavenames, x_label, y_label
 	variable is2d, spectrum
 	
-	string y_label_2d = selectString(paramisDefault(y_label), y_label, "")
+	y_label = selectString(paramisDefault(y_label), y_label, "")
+	string y_label_2d = y_label
 	string y_label_1d = selectString(is2d, y_label, "")  // Only use the y_label for 1D graphs if the scan is 1D (otherwise gets confused with y sweep gate)
 
 
@@ -3296,6 +3301,8 @@ function SaveToHDF(S, fastdac)
 	if(fastdac && sc_SaveRawFadc == 1)
 		string rawSaveNames = getRawSaveNames(CalcWaves)
 		SaveWavesToHDF(RawWaves, raw_hdf5_id, saveNames=rawSaveNames)
+	else
+		saveWavesToHDF(RawWaves, calc_hdf5_id)	// Save all regular ScanController waves in the main hdf file (they are small anyway)
 	endif
 	initcloseSaveFiles(hdfids) // close all files
 end
@@ -3436,11 +3443,13 @@ function SaveNamedWaves(wave_names, comments)
 	// Only init Save file after we know that the waves exist
 	variable hdfid
 	hdfid = initOpenSaveFiles(0) // Open HDF file (normal - non RAW)
+	filenum += 1  // So next created file gets a new num (setting here so that when saving fails, it doesn't try to overwrite next save)
+	
 	addMetaFiles(num2str(hdfid), logs_only=1, comments=comments)
 
 
 //	initSaveFiles(msg=comments, logs_only=1)
-	printf "Saving waves [%s] in dat%d.h5\r", wave_names, filenum
+	printf "Saving waves [%s] in dat%d.h5\r", wave_names, filenum-1
 
 	// Now save each wave
 	for(ii=0;ii<itemsinlist(wave_names, ",");ii++)

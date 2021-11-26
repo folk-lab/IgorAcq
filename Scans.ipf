@@ -17,7 +17,7 @@ function ReadVsTime(delay, [y_label, max_time, comments]) // Units: s
 	max_time = paramIsDefault(max_time) ? INF : max_time
 	
 	Struct ScanVars S
-	initBDscanVars(S, 0, 0, 1, "", numptsx=0, delayx=delay, x_label="time /s", y_label=y_label)
+	initBDscanVars(S, 0, 0, 1, "", numptsx=0, delayx=delay, x_label="time /s", y_label=y_label, comments=comments)
 	initializeScan(S)
 
 //	InitializeWaves(0, 1, 1, x_label="time (s)")
@@ -30,8 +30,8 @@ function ReadVsTime(delay, [y_label, max_time, comments]) // Units: s
 		doupdate
 		i+=1
 	while (datetime-S.start_time < max_time)
-
 	S.end_time = datetime
+	S.numptsx = i  // TODO: Should it be i or i-1?
 	EndScan(S=S)
 end
 
