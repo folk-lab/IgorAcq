@@ -2989,7 +2989,7 @@ function EndScan([S, save_experiment, aborting])
 	variable aborting
 	
 	nvar filenum
-	variable current_filenum = filenum
+	variable current_filenum = filenum  // Because filenum gets incremented in SaveToHDF (to avoid clashing filenums when Igor crashes during saving)
 	save_experiment = paramisDefault(save_experiment) ? 1 : save_experiment
 	if(!paramIsDefault(S))
 		saveAsLastScanVarsStruct(S)  // I.e save the ScanVars including end_time and any other changed values in case saving fails (which it often does)
@@ -3427,7 +3427,7 @@ function SaveNamedWaves(wave_names, comments)
 	string wave_names, comments
 	
 	nvar filenum
-
+	variable current_filenum = filenum
 	variable ii=0
 	string wn
 	// Check that all waves trying to save exist
@@ -3457,6 +3457,11 @@ function SaveNamedWaves(wave_names, comments)
 		initSaveSingleWave(wn, hdfid)
 	endfor
 	initcloseSaveFiles(num2str(hdfid))
+	
+	if(sc_checkBackup())  	// check if a path is defined to backup data
+		sc_copyNewFiles(current_filenum, save_experiment=0)		// copy data to server mount point (nvar filenum gets incremented after HDF is opened)
+	endif	
+	
 end
 
 
