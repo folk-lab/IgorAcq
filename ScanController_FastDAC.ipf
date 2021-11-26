@@ -477,6 +477,7 @@ end
 
 function fd_readvstime(instrID, channels, numpts, samplingFreq, [named_waves])
 	//	Just measures for a fixed number of points without ramping anything, stores in ADC# or timeSeriesADC# if spectrum_analyser set
+	// TODO: Update to new fd_send_command_and_read (also should use the ScanVars struct etc)
 	variable instrID, numpts, samplingFreq
 	string channels
 	string named_waves // Named waves to store raw data in (; separated same length as channels)
@@ -529,7 +530,7 @@ function fd_readvstime(instrID, channels, numpts, samplingFreq, [named_waves])
 			fdRV_check_sweepstate(instrID)
 			fdRV_update_graphs() // Only updates sc_RawGraphs1D
 		else
-			print "DEBUGGING[fd_readvstime]: Getting behind!"
+//			print "DEBUGGING[fd_readvstime]: Getting behind!"
 		endif
 	while(totalbytesreturn-bytes_read > read_chunk)
 	// do one last read if any data left to read
@@ -577,15 +578,15 @@ function fdRV_record_buffer(S, rowNum, totalByteReturn, [record_only])
 			if (expected_bytes_in_buffer > 4096)
          		printf "ERROR[fdRV_record_buffer]: After updating graphs, buffer is expected to overflow... Expected buffer size = %d (max = 4096). Bytes read so far = %d\r" expected_bytes_in_buffer, bytes_read
          elseif (expected_bytes_in_buffer > 2500)
-				printf "WARNING[fdRV_record_buffer]: Last graph update resulted in buffer becoming close to full (%d of 4096 bytes). Entering panic_mode (no more graph updates)\r", expected_bytes_in_buffer
+//				printf "WARNING[fdRV_record_buffer]: Last graph update resulted in buffer becoming close to full (%d of 4096 bytes). Entering panic_mode (no more graph updates)\r", expected_bytes_in_buffer
 				panic_mode = 1         
          	endif
 		else
 			if (expected_bytes_in_buffer > 1000)
-				printf "DEBUGGING: getting behind: Expecting %d bytes in buffer (max 4096)\r" expected_bytes_in_buffer		
+//				printf "DEBUGGING: getting behind: Expecting %d bytes in buffer (max 4096)\r" expected_bytes_in_buffer		
 				if (panic_mode == 0)
 					panic_mode = 1
-					printf "WARNING[fdRV_record_buffer]: Getting behind on reading buffer, entering panic mode (no more graph updates until end of sweep)\r"				
+//					printf "WARNING[fdRV_record_buffer]: Getting behind on reading buffer, entering panic mode (no more graph updates until end of sweep)\r"				
 				endif			
 			endif
 		endif
