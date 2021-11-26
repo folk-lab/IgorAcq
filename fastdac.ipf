@@ -660,6 +660,9 @@ function fd_get_numpts_from_sweeprate(fd, start, fin, sweeprate)
 	variable numpts, adcspeed, numadc = 0, i
 	numadc = getNumFADC()
 	adcspeed = getfadcspeed(fd)
+	if (start == fin)
+		abort "ERROR[fd_get_numpts_from_sweeprate]: Start == Fin so can't calculate numpts"
+	endif
 	numpts = round(abs(fin-start)*(adcspeed/numadc)/sweeprate)   // distance * steps per second / sweeprate
 	return numpts
 end
@@ -670,6 +673,9 @@ function fd_get_sweeprate_from_numpts(fd, start, fin, numpts)
 	variable sweeprate, adcspeed, numadc = 0, i
 	numadc = getNumFADC()
 	adcspeed = getfadcspeed(fd)
+	if (numpts == 0)
+		abort "ERROR[fd_get_numpts_from_sweeprate]: numpts = 0 so can't calculate sweeprate"
+	endif
 	sweeprate = round(abs(fin-start)*(adcspeed/numadc)/numpts)   // distance * steps per second / numpts
 	return sweeprate
 end

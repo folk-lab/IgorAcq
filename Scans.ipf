@@ -31,7 +31,7 @@ function ReadVsTime(delay, [y_label, max_time, comments]) // Units: s
 		i+=1
 	while (datetime-S.start_time < max_time)
 	S.end_time = datetime
-	S.numptsx = i  // TODO: Should it be i or i-1?
+	S.numptsx = i 
 	EndScan(S=S)
 end
 
