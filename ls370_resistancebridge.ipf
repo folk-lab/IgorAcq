@@ -1008,17 +1008,19 @@ function/s getLS370Status(instrID)
 	string instrID
 
 	svar ls_system
-	string channelLabel="", stillLabel="", ch_idx=""
+	string channelLabel="", stillLabel="", ch_idx="", file_name = ""
 	if(cmpstr(ls_system,"bfsmall") == 0)
 		channelLabel = "ld_mc,ld_50K,ld_4K,ld_magnet,ld_still"
 		stillLabel = "ld_still_heater"
 //		ch_idx = "6,1,2,4,5"
 		ch_idx = "mc,50k,4k,magnet,still"
+		file_name = "LDLoggingSchedules.txt"
 	elseif(cmpstr(ls_system,"bfbig") == 0)
 		channelLabel = "xld_50K,xld_4K,xld_magnet,xld_still,xld_mc"
 		stillLabel = "xld_still_heater"
 //		ch_idx = "1,2,3,5,6"
 		ch_idx = "50k,4k,magnet,still,mc"
+		file_name = "XLDLoggingSchedules.txt"
 	else
 		print "[ERROR] \"getLSStatus\": pass the system id as instrID: \"ld\" or \"xld\"."
 	endif
@@ -1036,7 +1038,8 @@ function/s getLS370Status(instrID)
 
 	// Load "LakeshoreConfig.txt" in setup folder.
 	svar ls_label
-	string file_name = "LakeshoreConfig.txt"
+//	string file_name = "LakeshoreConfig.txt"
+
 	jstr = readtxtfile(file_name,"setup")
 	if(cmpstr(jstr,"")==0)
 		abort file_name + " not found!"
@@ -1050,16 +1053,17 @@ function/s getLS370Status(instrID)
 	string searchStr="", statement="", timestamp="", temp="", tempBuffer="", channel_label
 	variable i=0
 	for(i=0;i<itemsinlist(channelLabel,",");i+=1)
-		sprintf searchStr, "loggingschedules:default:channels:%s:max", stringfromlist(i,ch_idx,",")
+		sprintf searchStr, "default:channels:%s:max", stringfromlist(i,channelLabel,",")
 		
-//		timestamp = sc_SQLtimestamp(str2num(getJSONvalue(jstr,searchStr)))		
+		timestamp = sc_SQLtimestamp(str2num(getJSONvalue(jstr,searchStr)))		
 //		timestamp = sc_SQLtimestamp(3600) // Temporarily allow any old measurement of temp
 //		timestamp = sc_SQLtimestamp(1) // Temporarily always request new
-//		
-//		sprintf statement, "SELECT temperature_k FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, temp_schema, stringfromlist(i,channelLabel,","), timestamp
-//		temp = requestSQLValue(statement)
+		
+		sprintf statement, "SELECT temperature_k FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, temp_schema, stringfromlist(i,channelLabel,","), timestamp
+		temp = requestSQLValue(statement)
+
 //		print temp
-		temp = "" // TEMPORARY FIX
+//		temp = "" // TEMPORARY FIX
 		
 		if(cmpstr(temp,"") == 0)
 			temp = num2str(getLS370temp(instrID,stringfromlist(i,LSkeys,",")))

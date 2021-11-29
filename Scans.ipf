@@ -1,3 +1,6 @@
+
+
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////// Scans /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -939,48 +942,48 @@ function ScanfastDACRepeat(instrID, start, fin, channels, numptsy, [numptsx, swe
 	endif
 end
 
-function ScanSRSFreq(instrID, start, fin, numpts, delay, [comments, nosave]) //Units: Hz
-	// sweep SRS output freq
-	variable instrID, start, fin, numpts, delay, nosave
-	string comments
-
-   // Reconnect instruments
-   //sc_openinstrconnections(0)
-
-   // Set defaults
-   comments = selectstring(paramisdefault(comments), comments, "")
-
-	// Ramp to start without checks because checked above
-	SetSRSFrequency(instrID, start)
-
-   // Let things settle
-	sc_sleep(1.0)
-
-   // Get labels for waves
-   string x_label
-   x_label = "Freq [Hz]"
-
-   // Make waves
-	InitializeWaves(start, fin, numpts, x_label=x_label)
-
-   // Main measurement loop
-	variable i=0, j=0, setpoint
-	do
-		setpoint = start + (i*(fin-start)/(numpts-1))
-		SetSRSFrequency(instrID, setpoint)
-		sc_sleep(delay)
-		RecordValues(i, 0)
-		i+=1
-	while (i<numpts)
-
-   // Save by default
-   if (nosave == 0)
-  		SaveWaves(msg=comments)
-  	else
-  		dowindow /k SweepControl
-	endif
-end
-
+//function ScanSRSFreq(instrID, start, fin, numpts, delay, [comments, nosave]) //Units: Hz
+//	// sweep SRS output freq
+//	variable instrID, start, fin, numpts, delay, nosave
+//	string comments
+//
+//   // Reconnect instruments
+//   //sc_openinstrconnections(0)
+//
+//   // Set defaults
+//   comments = selectstring(paramisdefault(comments), comments, "")
+//
+//	// Ramp to start without checks because checked above
+//	SetSRSFrequency(instrID, start)
+//
+//   // Let things settle
+//	sc_sleep(1.0)
+//
+//   // Get labels for waves
+//   string x_label
+//   x_label = "Freq [Hz]"
+//
+//   // Make waves
+//	InitializeWaves(start, fin, numpts, x_label=x_label)
+//
+//   // Main measurement loop
+//	variable i=0, j=0, setpoint
+//	do
+//		setpoint = start + (i*(fin-start)/(numpts-1))
+//		SetSRSFrequency(instrID, setpoint)
+//		sc_sleep(delay)
+//		RecordValues(i, 0)
+//		i+=1
+//	while (i<numpts)
+//
+//   // Save by default
+//   if (nosave == 0)
+//  		SaveWaves(msg=comments)
+//  	else
+//  		dowindow /k SweepControl
+//	endif
+//end
+//
 
 //function MeasurevsTemp(instrID, numpts, delay, [comments]) 
 //	variable instrID, numpts, delay
@@ -1460,7 +1463,7 @@ function SFbd_check_lims(S)
 	for(i=0;i<itemsinlist(all_channels, ";");i++)  		// channelsx then channelsy if it exists
 		channels = stringfromlist(i, all_channels, ";")
 		for(j=0;j<itemsinlist(channels, ",");j++)			// each channel from channelsx/channelsy
-			channel = str2num(stringfromlist(i, channels, ","))
+			channel = str2num(stringfromlist(j, channels, ","))
 			for(k=0;k<2;k++)  									// Start/Fin for each channel
 				output = str2num(stringfromlist(2*i+k, outputs, ","))  // 2 per channelsx/channelsy
 				// Check that the DAC board is initialized

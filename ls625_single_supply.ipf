@@ -4,11 +4,11 @@
 // Driver communicates over serial.
 // Procedure written by Christian Olsen 2017-03-15
 // Updated to VISA by Christian Olsen, 2018-05-xx
-// Nik -- Rewritten without window to handle an arbitrary number of 
+// Nik -- Rewritten without window to handle an arbitrary number of
 //         LS controllers connected to the same system 01-XX-2019
 
 // If you want to write a vector magnet driver, use this procedure to provide
-//   communiction with the magnet supplies, write another procedure 
+//   communiction with the magnet supplies, write another procedure
 //   to handle GUI/axes/angles...
 
 ////////////////////////////
@@ -19,15 +19,15 @@ function openLS625connection(instrVarName, visa_address, amps_per_tesla, max_fie
 	// instrID is the name of the global variable that will be used for communication
 	// visa_address is the VISA address string, i.e. ASRL1::INSTR
 	// hold is not used here, it is included to match the IPS driver
-	
+
 	/////   amps_per_tesla, max_field, max_ramprate /////
 	/////        in A/T, mT, mT/min
 	// LD50 (AMI vector):
 	//    x -- 55.4939, 1000, 154.287
 	//    y -- 55.2181, 1000, 155.058
 	//    z -- 9.95025, 6000, 1159.57
-	
-	
+
+
 	//////////////////////////////////////////////////////////////////////////////////
 	//// This part is added my Manab : XLD system AMI magnet specifications
 	/////////////////////////////////////////////////////////////////////////////////
@@ -39,29 +39,29 @@ function openLS625connection(instrVarName, visa_address, amps_per_tesla, max_fie
 	//////////Performance test result////////////////
 	//// Sweep rate used: 0 to 8T: 100 mT/min
 	/// Sweep rate used: 8 to 9T: 87.78 mT/min
-	
-	
+
+
 	//// amps_per_tesla, max_field, max_ramprate////
 	///////   in A/T, mT, mT/min
 	///// z -- 9.57 , 9000, 362
-	
-	
+
+
 	string instrVarName, visa_address
 	variable amps_per_tesla, max_field, max_ramprate, verbose, hold
-	
+
 	if(paramisdefault(verbose))
 		verbose=1
 	elseif(verbose!=1)
 		verbose=0
 	endif
-	
+
 	variable localRM
 	variable status = viOpenDefaultRM(localRM) // open local copy of resource manager
 	if(status < 0)
 		VISAerrormsg("open LS625 connection:", localRM, status)
 		abort
 	endif
-	
+
 	string comm = ""
 	sprintf comm, "name=LS625,instrID=%s,visa_address=%s" instrVarName, visa_address
 	string options = "baudrate=57600,databits=7,stopbits=1,parity=1,test_query=*IDN?"
@@ -69,7 +69,7 @@ function openLS625connection(instrVarName, visa_address, amps_per_tesla, max_fie
 	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
 
 	nvar localID = $(instrVarName)
-	
+
 	svar/z ls625_names
 	if(!svar_exists(ls625_names))
 		string /g ls625_names = AddListItem(instrVarName, "")
@@ -89,7 +89,7 @@ function openLS625connection(instrVarName, visa_address, amps_per_tesla, max_fie
 			ls625_visaIDs = AddListItem(num2istr(localID), ls625_visaIDs)
 		endif
 	endif
-	
+
 	variable /g $("amps_per_tesla_"+instrVarName) = amps_per_tesla
 	variable /g $("max_field_"+instrVarName) = max_field
 	variable /g $("max_ramprate_"+instrVarName) = max_ramprate
@@ -98,7 +98,7 @@ end
 
 function /s ls625_lookupVarName(instrID)
 	variable instrID
-	
+
 	svar ls625_names, ls625_visaIDs
 	variable idx = WhichListItem(num2istr(instrID), ls625_visaIDs)
 	if(idx>-1)
@@ -106,7 +106,7 @@ function /s ls625_lookupVarName(instrID)
 	else
 		abort "[ERROR]: Could not find global variables matching ls625 instrument name"
 	endif
-		
+
 end
 
 ////////////////////////
@@ -118,7 +118,7 @@ threadsafe function getLS625current(instrID) // Units: A
 	variable current
 
 	current = str2num(queryInstr(instrID,"RDGI?\r\n", read_term = "\r\n"))
-	
+
 	return current
 end
 
@@ -126,7 +126,7 @@ function getLS625field(instrID) // Units: mT
 	variable instrID
 	nvar apt = $("amps_per_tesla_"+ls625_lookupVarName(instrID))
 	variable field, current
-	
+
 	current = getLS625current(instrID)
 	field = roundNum(current/apt*1000,5)
 
@@ -170,7 +170,7 @@ function setLS625current(instrID,output) // Units: A
 	string cmd
 	nvar maxf = $("max_field_"+ls625_lookupVarName(instrID))
 	nvar apt = $("amps_per_tesla_"+ls625_lookupVarName(instrID))
-	
+
 	// check for NAN and INF
 	if(sc_check_naninf(output) != 0)
 		abort "trying to set output to NaN or Inf"
@@ -183,7 +183,7 @@ function setLS625current(instrID,output) // Units: A
 		cmd = "SETI "+num2str(output)
 		writeInstr(instrID, cmd+"\r\n")
 	endif
-	
+
 end
 
 function setLS625field(instrID,output) // Units: mT
@@ -209,7 +209,7 @@ function setLS625fieldWait(instrID,output)
 	setLS625field(instrID,output)
 	variable start_time = stopmsTimer(-2)
 	do
-		asleep(0.05)
+		asleep(2.1)
 	while(getLS625rampStatus(instrID) && (stopmstimer(-2)-start_time) < 3600e6)  //Max wait for an hour
 end
 
@@ -219,7 +219,7 @@ function setLS625rate(instrID,output) // Units: mT/min
 	nvar apt = $("amps_per_tesla_"+ls625_lookupVarName(instrID))
 	variable ramprate_amps
 	string cmd
-	
+
 	// check for NAN and INF
 	if(sc_check_naninf(output) != 0)
 		abort "trying to set ramp rate to NaN or Inf"
@@ -235,7 +235,7 @@ function setLS625rate(instrID,output) // Units: mT/min
 		writeInstr(instrID,cmd+"\r\n")
 		return 1
 	endif
-	
+
 end
 
 //////////////////
