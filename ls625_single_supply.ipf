@@ -209,7 +209,7 @@ function setLS625fieldWait(instrID,output)
 	setLS625field(instrID,output)
 	variable start_time = stopmsTimer(-2)
 	do
-		asleep(2.1)
+		asleep(0.05)
 	while(getLS625rampStatus(instrID) && (stopmstimer(-2)-start_time) < 3600e6)  //Max wait for an hour
 end
 

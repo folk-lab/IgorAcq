@@ -583,7 +583,7 @@ end
 function setLS370heaterRange(instrID, max_current_mA)
 	string instrID
 	variable max_current_mA
-	svar ls_label
+	svar ls_label  
 	
 	string command, response
 	variable true_val

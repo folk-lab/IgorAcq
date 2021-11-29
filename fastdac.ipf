@@ -48,8 +48,8 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 	
 	string comm = ""
 	sprintf comm, "name=FastDAC,instrID=%s,visa_address=%s" instrID, visa_address
-// 	string options = "baudrate=1750000,databits=8,stopbits=1,parity=0,test_query=*IDN?"
-	string options = "baudrate=57600,databits=8,stopbits=1,parity=0,test_query=*IDN?" // Use this option if using USB fdac
+ 	string options = "baudrate=1750000,databits=8,stopbits=1,parity=0,test_query=*IDN?"
+	//string options = "baudrate=57600,databits=8,stopbits=1,parity=0,test_query=*IDN?" // Use this option if using USB fdac
 	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
 	
 	if(paramisdefault(master))
@@ -1233,7 +1233,7 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 			
 			
 			// USING PERIODOGRAM INSTEAD OF FFT /////
-			DSPPeriodogram/PARS/DBR=1/NODC=1 fftinput 
+			DSPPeriodogram/PARS/DBR=1/NODC=2 fftinput 
 			wave w_Periodogram
 			
 			duplicate/o w_Periodogram, $ffttemps
@@ -1243,7 +1243,7 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 			
 			// Calculate linear for integrated
 			
-			DSPPeriodogram/PARS/NODC=1 fftinput
+			DSPPeriodogram/PARS/NODC=2 fftinput
 			wave w_Periodogram
 			duplicate/o w_Periodogram, $ffttemplin
 			wave fftwnlin = $ffttemplin
@@ -1363,7 +1363,8 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 		
 		make /FREE /T /N=1 cconfig = prettyJSONfmt(sc_createconfig())
 		
-		string temp = sc_createSweepLogs(msg=comments)
+//		string temp = sc_createSweepLogs(msg=comments)
+string temp="temporary"
 		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(temp)
 		
 		// Check that prettyJSONfmt actually returned a valid JSON.
