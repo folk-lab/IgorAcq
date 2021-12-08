@@ -383,16 +383,16 @@ function setFADCSpeed(instrID,speed,[loadCalibration]) // Units: Hz
 		abort
 	endif
 	
-	// TOOD: refactor with getDeviceInfo()/getDeviceChannels() etc
-
-	svar sc_fdackeys
+//	svar sc_fdackeys
 	// variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",",")), i=0, numADCCh = 0, numDevice = 0
-	variable numDevices = 
-	string instrAddress = getResourceAddress(instrID), deviceAddress = "", cmd = "", response = ""
+	variable numDevices = getNumDevices()
+	string instrAddress = getResourceAddress(instrID)
+	variable i, numADCCh, numDevice	
+	string deviceAddress = "", cmd = "", response = ""
 	for(i=0;i<numDevices;i+=1)
-		deviceAddress = stringbykey("visa"+num2istr(i+1),sc_fdackeys,":",",")
+		deviceAddress = getDeviceResourceAddress(i+1)
 		if(cmpstr(deviceAddress,instrAddress) == 0)
-			numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),sc_fdackeys,":",","))
+			numADCCh = getDeviceInfoDeviceNum(i+1, "numADCCh")
 			numDevice = i+1
 			break
 		endif

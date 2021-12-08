@@ -66,7 +66,9 @@ end
 function/S getDeviceResourceAddress(device_num)  // TODO: Rename to getFastdacVisaAddress(device_num)
 	// Get visa address from device number (has to be it's own function because this returns a string)
 	variable device_num
-	if(device_num > getNumDevices())
+	if(device_num == 0)
+		abort "ERROR[getDeviceResourceAddress]: device_num starts from 1 not 0"
+	elseif(device_num > getNumDevices()+1)
 		string buffer
 		sprintf buffer,  "ERROR[getDeviceInfoDeviceNum]: Asking for device %d, but only %d devices connected\r", device_num, getNumDevices()
 		abort buffer
@@ -131,6 +133,7 @@ function/S getRecordedFastdacInfo(info_name)  // TODO: Rename if prepending some
     variable i
     wave fadcattr
 
+	 string return_list = ""
     wave/t fadcvalstr
     for (i = 0; i<dimsize(fadcvalstr, 0); i++)
         if (fadcattr[i][2] == 48) // Checkbox checked
@@ -409,7 +412,7 @@ function fdRV_send_command_and_read(S, AWG_list, rowNum)
 	endstr = sc_stripTermination(endstr,"\r\n")
 	if(fdacCheckResponse(endstr,cmd_sent,isString=1,expectedResponse="RAMP_FINISHED"))
 		fdRV_update_window(S, S.numADCs) 
-		if(sc_AWG_used)  // Reset AWs back to zero (I don't see any reason the user would want them left at the final position of the AW)
+		if(AWG_list.use_awg == 1)  // Reset AWs back to zero (I don't see any reason the user would want them left at the final position of the AW)
 			rampmultiplefdac(S.instrID, AWG_list.AW_DACs, 0)
 		endif
 	endif
@@ -698,16 +701,17 @@ function fdRV_update_window(S, numAdcs)
   for(i=0;i<itemsinlist(S.channelsx,",");i+=1)
     channel = stringfromlist(i,S.channelsx,",")
 	device_channel = getDeviceChannels(channel, device_num)  // Get channel for specific fastdac (and device_num of that fastdac)
-	if (getDeviceResourceAddress(device_num) != getResourceAddress(S.instrID))
+	if (cmpstr(getDeviceResourceAddress(device_num), getResourceAddress(S.instrID)) != 0)
 		print("ERROR[fdRV_update_window]: channel device address doesn't match instrID address")
 	else
-		updatefdacValStr(str2num(channel), getFDACOutput(S.instrID, str2num(device_channel), update_oldValStr=1)
+		updatefdacValStr(str2num(channel), getFDACOutput(S.instrID, str2num(device_channel)), update_oldValStr=1)
 	endif
   endfor
 
+  variable channel_num
   for(i=0;i<numADCs;i+=1)
-    channel = str2num(stringfromlist(i,S.adclist,","))
-    getfadcChannel(S.instrID,channel)  // This updates the window when called
+    channel_num = str2num(stringfromlist(i,S.adclist,","))
+    getfadcChannel(S.instrID,channel_num)  // This updates the window when called
   endfor
 end
 
