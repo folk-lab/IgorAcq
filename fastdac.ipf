@@ -170,11 +170,10 @@ end
 function getNumFADC() 
 	// Returns how many ADCs are set to be recorded
 	// Note: Gets this info from ScanController_Fastdac
-
 	string adcs = getRecordedFastdacInfo("channels")
 	variable numadc = itemsInList(adcs)
 	if(numadc == 0)
-		print "WARNING: No ADCs set to record. Behaviour may be unpredictable"
+		print "WARNING[getNumFADC]: No ADCs set to record. Behaviour may be unpredictable"
 	endif
 		
 	return numadc
@@ -206,7 +205,7 @@ function getFADCspeed(instrID)
 		if(!fdacCheckResponse(compare,cmd))
 			abort
 		elseif(str2num(compare) != str2num(response)) // Ensure ADC channels all have same conversion time
-			print "[WARNING] \"getfadcSpeed\": ADC channels 0 & "+num2istr(i)+" have different conversion times!"
+			print "WARNING[getfadcSpeed]: ADC channels 0 & "+num2istr(i)+" have different conversion times!"
 		endif
 	endfor
 	
@@ -302,18 +301,6 @@ function getFDACOutput(instrID,channel) // Units: mV
 	endif
 end
 
-function updateFdacValStr(channel, value, [update_oldValStr])
-	// Update the global string(s) which store FastDAC values. Update the oldValStr if you know that is the current DAC output.
-	variable channel, value, update_oldValStr
-
-	wave/t fdacvalstr
-	fdacvalstr[channel][1] = num2str(value)
-	if (update_oldValStr != 0)
-		wave/t old_fdacvalstr
-		old_fdacvalstr[channel] = num2str(value)
-	endif
-end
-
 function/s getFDACStatus(instrID)
 	variable instrID
 	string  buffer = "", key = ""
@@ -351,7 +338,7 @@ function/s getFDACStatus(instrID)
 end
 
 
-function/s add_AWG_status()
+function/s add_AWG_status()  // TODO: rename to get_AWG_status()
 	// Function to be called from getFDACstatus() to add a section with information about the AWG used
 	// Also adds AWs used to HDF
 	
@@ -371,13 +358,13 @@ function/s add_AWG_status()
 	buffer = addJSONkeyval(buffer, "numCycles", num2str(AWG.numCycles), addquotes=0)				// How many full cycles of the AWs per DAC step
 	buffer = addJSONkeyval(buffer, "numSteps", num2str(AWG.numSteps), addquotes=0)				// How many DAC steps for the full ramp
 
-
 	return buffer
 end
+
+
 ///////////////////////
 //// Set functions ////
 ///////////////////////
-
 
 function setFADCSpeed(instrID,speed,[loadCalibration]) // Units: Hz
 	// set the ADC speed in Hz
@@ -396,8 +383,11 @@ function setFADCSpeed(instrID,speed,[loadCalibration]) // Units: Hz
 		abort
 	endif
 	
+	// TOOD: refactor with getDeviceInfo()/getDeviceChannels() etc
+
 	svar sc_fdackeys
-	variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",",")), i=0, numADCCh = 0, numDevice = 0
+	// variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",",")), i=0, numADCCh = 0, numDevice = 0
+	variable numDevices = 
 	string instrAddress = getResourceAddress(instrID), deviceAddress = "", cmd = "", response = ""
 	for(i=0;i<numDevices;i+=1)
 		deviceAddress = stringbykey("visa"+num2istr(i+1),sc_fdackeys,":",",")
@@ -457,6 +447,8 @@ function rampOutputFDAC(instrID,channel,output,[ramprate, ignore_lims]) // Units
 		ramprate = fd_ramprate
 	endif
 	
+	// TOOD: refactor with getDeviceInfo()/getDeviceChannels() etc
+
 	variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
 	variable i=0, devchannel = 0, startCh = 0, numDACCh = 0
 	string deviceAddress = "", err = "", instrAddress = getResourceAddress(instrID)
@@ -517,19 +509,8 @@ function rampOutputFDAC(instrID,channel,output,[ramprate, ignore_lims]) // Units
 		endif
 	endif 
 		
-
-		
 	// read current dac output and compare to window
 	variable currentoutput = getfdacOutput(instrID,devchannel)
-//	
-//	if (abs(output-currentOutput) < 0.32)  // If trying to step smaller than min dac step (rounded up a little from 0.30517)
-//		if (abs(output-currentOutput) > 0.32/2)  // If closer to next dac step do that
-//			output = currentOutput+sign(output-currentOutput)*0.32
-//		else
-////			print "WARNING: Trying to step < 0.5*Dac step, nothing will happen"
-//		endif
-//	endif
-			
 	
 	// ramp channel to output
 	variable delay = abs(output-currentOutput)/ramprate
@@ -556,6 +537,7 @@ function rampOutputFDAC(instrID,channel,output,[ramprate, ignore_lims]) // Units
 	endif
 end
 
+
 function RampMultipleFDAC(InstrID, channels, setpoint, [ramprate, ignore_lims])
 	variable InstrID, setpoint, ramprate, ignore_lims
 	string channels
@@ -572,130 +554,10 @@ function RampMultipleFDAC(InstrID, channels, setpoint, [ramprate, ignore_lims])
 	endfor
 end
 
-	
-function ResetFdacCalibration(instrID,channel)
-	variable instrID, channel
-	
-	string cmd="", response="", err=""
-	sprintf cmd, "DAC_RESET_CAL,%d\r", channel
-	response = queryInstr(instrID,cmd,read_term="\n")
-	response = sc_stripTermination(response,"\r\n")
-	if(fdacCheckResponse(response,cmd,isString=1,expectedResponse="CALIBRATION_RESET"))
-		// all good
-	else
-		sprintf err, "[ERROR] \"fdacResetCalibration\": Reset of DAC channel %d failed! - Response from Fastdac was %s", channel, response
-		print err
-		abort
-	endif 
-end
 
-function/s setFdacCalibrationOffset(instrID,channel,offset)
-	variable instrID, channel, offset
-	
-	string cmd="", response="", err="",result=""
-	sprintf cmd, "DAC_OFFSET_ADJ,%d,%.6f\r", channel, offset
-	response = queryInstr(instrID,cmd,read_term="\n")
-	result = sc_stripTermination(response,"\r\n")
-	
-	// response is formatted like this: "channel,offsetStepsize,offsetRegister"
-	response = readInstr(instrID,read_term="\n")
-	response = sc_stripTermination(response,"\r\n")
-	
-	if(fdacCheckResponse(response,cmd,isString=1,expectedResponse="CALIBRATION_FINISHED"))
-		return result
-	else
-		sprintf err, "[ERROR] \"fdacResetCalibrationOffset\": Calibrating offset on DAC channel %d failed!", channel
-		print err
-		abort
-	endif
-end
-
-function/s setFdacCalibrationGain(instrID,channel,offset)
-	variable instrID, channel, offset
-	
-	string cmd="", response="", err="",result=""
-	sprintf cmd, "DAC_GAIN_ADJ,%d,%.6f\r", channel, offset
-	response = queryInstr(instrID,cmd,read_term="\n")
-	result = sc_stripTermination(response,"\r\n")
-	
-	// response is formatted like this: "channel,offsetStepsize,offsetRegister"
-	response = readInstr(instrID,read_term="\n")
-	response = sc_stripTermination(response,"\r\n")
-	
-	if(fdacCheckResponse(response,cmd,isString=1,expectedResponse="CALIBRATION_FINISHED"))
-		return result
-	else
-		sprintf err, "[ERROR] \"fdacResetCalibrationGain\": Calibrating gain of DAC channel %d failed!", channel
-		print err
-		abort
-	endif
-end
-
-function updateFadcCalibration(instrID,channel,zeroScale,fullScale)
-	variable instrID,channel,zeroScale,fullScale
-	
-	string cmd="", response="", err=""
-	sprintf cmd, "WRITE_ADC_CAL,%d,%d,%d\r", channel, zeroScale, fullScale
-	response = queryInstr(instrID,cmd,read_term="\n")
-	response = sc_stripTermination(response,"\r\n")
-	
-	if(fdacCheckResponse(response,cmd,isString=1,expectedResponse="CALIBRATION_CHANGED"))
-		// all good!
-	else
-		sprintf err, "[ERROR] \"updatefadcCalibration\": Updating calibration of ADC channel %d failed!", channel
-		print err
-		abort
-	endif
-end
-
-
-///////////////////
-//// Utilities ////
-///////////////////
-
-
-function fd_get_numpts_from_sweeprate(fd, start, fin, sweeprate)
-/// Convert sweeprate in mV/s to numptsx for fdacrecordvalues
-	variable fd, start, fin, sweeprate
-	variable numpts, adcspeed, numadc = 0, i
-	numadc = getNumFADC()
-	adcspeed = getfadcspeed(fd)
-	if (start == fin)
-		abort "ERROR[fd_get_numpts_from_sweeprate]: Start == Fin so can't calculate numpts"
-	endif
-	numpts = round(abs(fin-start)*(adcspeed/numadc)/sweeprate)   // distance * steps per second / sweeprate
-	return numpts
-end
-
-function fd_get_sweeprate_from_numpts(fd, start, fin, numpts)
-	// Convert numpts into sweeprate in mV/s
-	variable fd, start, fin, numpts
-	variable sweeprate, adcspeed, numadc = 0, i
-	numadc = getNumFADC()
-	adcspeed = getfadcspeed(fd)
-	if (numpts == 0)
-		abort "ERROR[fd_get_numpts_from_sweeprate]: numpts = 0 so can't calculate sweeprate"
-	endif
-	sweeprate = round(abs(fin-start)*(adcspeed/numadc)/numpts)   // distance * steps per second / numpts
-	return sweeprate
-end
-
-
-
-function ClearFdacBuffer(instrID)
-	variable instrID
-	
-	variable count=0, total = 0
-	string buffer=""
-	writeInstr(instrID,"STOP\r")
-	total = -5 //Stop command makes fastdac return a 5 character string
-	do 
-		viRead(instrID, buffer, 2000, count)
-		total += count
-	while(count != 0)
-	printf "Cleared %d bytes of data from buffer\r", total
-end
-
+/////////////////////////////////////////////////////////////////////////////////////
+//////////////////////// Calibration /////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
 function loadFadcCalibration(instrID,speed)
 	variable instrID,speed
 	
@@ -1008,36 +870,142 @@ function saveFdacCalibration(deviceAddress,deviceNum,numDACCh,result)
 	writetofile(prettyJSONfmt(buffer),filename,"config")
 end
 
+function ResetFdacCalibration(instrID,channel)
+	variable instrID, channel
+	
+	string cmd="", response="", err=""
+	sprintf cmd, "DAC_RESET_CAL,%d\r", channel
+	response = queryInstr(instrID,cmd,read_term="\n")
+	response = sc_stripTermination(response,"\r\n")
+	if(fdacCheckResponse(response,cmd,isString=1,expectedResponse="CALIBRATION_RESET"))
+		// all good
+	else
+		sprintf err, "[ERROR] \"fdacResetCalibration\": Reset of DAC channel %d failed! - Response from Fastdac was %s", channel, response
+		print err
+		abort
+	endif 
+end
 
-function stopFDACsweep(instrID)
-	variable instrID
+function/s setFdacCalibrationOffset(instrID,channel,offset)
+	variable instrID, channel, offset
 	
-	// stop the current sweep
-	writeInstr(instrID,"STOP\r")
+	string cmd="", response="", err="",result=""
+	sprintf cmd, "DAC_OFFSET_ADJ,%d,%.6f\r", channel, offset
+	response = queryInstr(instrID,cmd,read_term="\n")
+	result = sc_stripTermination(response,"\r\n")
 	
-	// clear the buffer
-	ClearfdacBuffer(instrID)
+	// response is formatted like this: "channel,offsetStepsize,offsetRegister"
+	response = readInstr(instrID,read_term="\n")
+	response = sc_stripTermination(response,"\r\n")
+	
+	if(fdacCheckResponse(response,cmd,isString=1,expectedResponse="CALIBRATION_FINISHED"))
+		return result
+	else
+		sprintf err, "[ERROR] \"fdacResetCalibrationOffset\": Calibrating offset on DAC channel %d failed!", channel
+		print err
+		abort
+	endif
+end
+
+function/s setFdacCalibrationGain(instrID,channel,offset)
+	variable instrID, channel, offset
+	
+	string cmd="", response="", err="",result=""
+	sprintf cmd, "DAC_GAIN_ADJ,%d,%.6f\r", channel, offset
+	response = queryInstr(instrID,cmd,read_term="\n")
+	result = sc_stripTermination(response,"\r\n")
+	
+	// response is formatted like this: "channel,offsetStepsize,offsetRegister"
+	response = readInstr(instrID,read_term="\n")
+	response = sc_stripTermination(response,"\r\n")
+	
+	if(fdacCheckResponse(response,cmd,isString=1,expectedResponse="CALIBRATION_FINISHED"))
+		return result
+	else
+		sprintf err, "[ERROR] \"fdacResetCalibrationGain\": Calibrating gain of DAC channel %d failed!", channel
+		print err
+		abort
+	endif
+end
+
+function updateFadcCalibration(instrID,channel,zeroScale,fullScale)
+	variable instrID,channel,zeroScale,fullScale
+	
+	string cmd="", response="", err=""
+	sprintf cmd, "WRITE_ADC_CAL,%d,%d,%d\r", channel, zeroScale, fullScale
+	response = queryInstr(instrID,cmd,read_term="\n")
+	response = sc_stripTermination(response,"\r\n")
+	
+	if(fdacCheckResponse(response,cmd,isString=1,expectedResponse="CALIBRATION_CHANGED"))
+		// all good!
+	else
+		sprintf err, "[ERROR] \"updatefadcCalibration\": Updating calibration of ADC channel %d failed!", channel
+		print err
+		abort
+	endif
 end
 
 
-// Given two strings of length 1
-//  - c1 (higher order) and
-//  - c2 lower order
-// Calculate effective FastDac value
-// @optparams minVal, maxVal (units mV)
+///////////////////
+//// Utilities ////
+///////////////////
+function fd_get_numpts_from_sweeprate(fd, start, fin, sweeprate)
+/// Convert sweeprate in mV/s to numptsx for fdacrecordvalues
+	variable fd, start, fin, sweeprate
+	variable numpts, adcspeed, numadc = 0, i
+	numadc = getNumFADC()
+	adcspeed = getfadcspeed(fd)
+	if (start == fin)
+		abort "ERROR[fd_get_numpts_from_sweeprate]: Start == Fin so can't calculate numpts"
+	endif
+	numpts = round(abs(fin-start)*(adcspeed/numadc)/sweeprate)   // distance * steps per second / sweeprate
+	return numpts
+end
 
-function fdacChar2Num(c1, c2) //, [minVal, maxVal])
+function fd_get_sweeprate_from_numpts(fd, start, fin, numpts)
+	// Convert numpts into sweeprate in mV/s
+	variable fd, start, fin, numpts
+	variable sweeprate, adcspeed, numadc = 0, i
+	numadc = getNumFADC()
+	adcspeed = getfadcspeed(fd)
+	if (numpts == 0)
+		abort "ERROR[fd_get_numpts_from_sweeprate]: numpts = 0 so can't calculate sweeprate"
+	endif
+	sweeprate = round(abs(fin-start)*(adcspeed/numadc)/numpts)   // distance * steps per second / numpts
+	return sweeprate
+end
+
+function ClearFdacBuffer(instrID)
+	// Stops any sweeps which might be running and clears the buffer
+	variable instrID
+	
+	variable count=0, total = 0
+	string buffer=""
+	writeInstr(instrID,"STOP\r")
+	total = -5 //Stop command makes fastdac return a 5 character string
+	do 
+		viRead(instrID, buffer, 2000, count)  // TODO: Can I set a shorter timeout here? Annoying to wait a long time for the last viRead which is empty
+		total += count
+	while(count != 0)
+	printf "Cleared %d bytes of data from buffer\r", total
+end
+
+function stopFDACsweep(instrID)  
+	// Stops sweep and clears buffer 
+	variable instrID
+	ClearfdacBuffer(instrID)
+end
+
+function fdacChar2Num(c1, c2)
 	// Conversion of bytes to float
+	//
+	// Given two strings of length 1
+	//  - c1 (higher order) and
+	//  - c2 lower order
+	// Calculate effective FastDac value
 	string c1, c2
 	variable minVal = -10000, maxVal = 10000
-//	// Set default values for minVal & maxVal
-//	if(paramisdefault(minVal))
-//		minVal = -10000
-//	endif
-//	
-//	if(paramisdefault(maxVal))
-//		maxVal = 10000
-//	endif
+
 	// Check params for violation
 	if(strlen(c1) != 1 || strlen(c2) != 1)
 		print "[ERROR] strlen violation -- strings passed to fastDacChar2Num must be length 1"
@@ -1149,7 +1117,6 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 		// Send command and distribute data to "spectrum_timeSeriesADC#"
 //		fd_readvstime(instrID, channels, numpts, samplingFreq, spectrum_analyser=1)
 		fd_readvstime(instrID, channels, numpts, samplingFreq, named_waves = time_wavenames)
-		
 		
 		// convert time series to spectrum
 		for(j=0;j<numChannels;j+=1)
@@ -1366,7 +1333,6 @@ function get_fastdacs_from_hdf(datnum, [fastdac_num])
 	endfor
 	JSONXOP_Release /A  //Clear all stored JSON strings
 end
-
 
 function fdLoadAskUser()
 	variable/g fd_load_answer
@@ -1722,169 +1688,7 @@ function fdAWG_clear_wave(instrID, wave_num)
 end
 
 
-function/s fd_start_AWG_RAMP(S, AWG_list)
-   struct ScanVars &S
-   struct fdAWG_list &AWG_list
-
-   // AWG_RAMP,<number of waveforms>,<dac channel(s) to output waveform 0>,<dac channel(s) to output waveform n>,<dac channel(s) to ramp>,<adc channel(s)>,<initial dac voltage 1>,<…>,<initial dac voltage n>,<final dac voltage 1>,<…>,<final dac voltage n>,<# of waveform repetitions at each ramp step>,<# of ramp steps>
-   //
-   // Example:
-   //
-   // AWG_RAMP,2,012,345,67,0,-1000,1000,-2000,2000,50,50
-   //
-   // Response:
-   //
-   // <(2500 * waveform length) samples from ADC0>RAMP_FINISHED
-	
-	assertSeparatorType(S.channelsx, ";")
-	assertSeparatorType(S.ADCList, ";")	
-
-	string starts, fins, temp
-	if(S.direction == 1)
-		starts = S.startxs
-		fins = S.finxs
-	elseif(S.direction == -1)
-		starts = S.finxs
-		fins = S.startxs
-	else
-		abort "ERROR[fdRV_start_INT_RAMP]: S.direction must be 1 or -1, not " + num2str(S.direction)
-	endif
-
-   string cmd = "", dacs="", adcs=""
-   dacs = replacestring(";",S.channelsx,"")
-	adcs = replacestring(";",S.adclist,"")
-   // OPERATION, #N AWs, AW_dacs, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF Wave cycles per step, # ramp steps
-   // Note: AW_dacs is formatted (dacs_for_wave0, dacs_for_wave1, .... e.g. '01,23' for Dacs 0,1 to output wave0, Dacs 2,3 to output wave1)
-	sprintf cmd, "AWG_RAMP,%d,%s,%s,%s,%s,%s,%d,%d\r", AWG_list.numWaves, AWG_list.AW_dacs, dacs, adcs, starts, fins, AWG_list.numCycles, AWG_list.numSteps
-	writeInstr(S.instrID,cmd)
-	return cmd
-end
-
-function/s fd_start_INT_RAMP(S)
-	// build command and start ramp
-	// for now we only have to send one command to one device.
-	struct ScanVars &S
-	
-	assertSeparatorType(S.channelsx, ";")
-	assertSeparatorType(S.ADCList, ";")	
-	
-	string cmd = "", dacs="", adcs=""
-	dacs = replacestring(";",S.channelsx,"")
-	adcs = replacestring(";",S.adclist,"")
-	
-	string starts, fins, temp
-	if(S.direction == 1)
-		starts = S.startxs
-		fins = S.finxs
-	elseif(S.direction == -1)
-		starts = S.finxs
-		fins = S.startxs
-	else
-		abort "ERROR[fdRV_start_INT_RAMP]: S.direction must be 1 or -1, not " + num2str(S.direction)
-	endif
-		
-	// OPERATION, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF STEPS
-	sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, starts, fins, S.numptsx
-	writeInstr(S.instrID,cmd)
-	return cmd
-end
-
-function fd_readChunk(fdid, adc_channels, numpts)
-	// Reads numpnts data without ramping anywhere, does not update graphs or anything, just returns full waves in 
-	// waves named fd_readChunk_# where # is 0, 1 etc for ADC0, 1 etc
-	variable fdid, numpts
-	string adc_channels
-
-	adc_channels = replaceString(",", adc_channels, ";")  // Going to list with this separator later anyway
-	adc_channels = replaceString(" ", adc_channels, "")  // Remove blank spaces
-	variable i
-	string wn, ch
-	string wavenames = ""
-	for(i=0; i<itemsInList(adc_channels); i++)
-		ch = stringFromList(i, adc_channels)
-		wn = "fd_readChunk_"+ch // Use this to not clash with possibly initialized raw waves
-		make/o/n=(numpts) $wn = NaN
-		wavenames = addListItem(wn, wavenames, ";", INF)
-	endfor
-	fd_readvstime(fdid, adc_channels, numpts, getfadcSpeed(fdid), named_waves = wavenames)
-
-	
-	// variable samplingFreq = getFADCspeed(fdid)
-	// variable numChannels = itemsinlist(adc_channels, ",")
-	
-	// string channels
-	// channels = replacestring(",", adc_channels, "")
-	// channels = replacestring(" ", channels, "")
-	
-	// string cmd = ""
-	// sprintf cmd, "SPEC_ANA,%s,%s\r", channels, num2str(numpts)
-	// writeInstr(fdID,cmd)
-
-	// variable bytesSec = roundNum(2*samplingFreq,0)
-	// variable read_chunk = roundNum(numChannels*bytesSec,0)
-	// if(read_chunk < 50)
-	// 	read_chunk = 50 - mod(50,numChannels*2) // usually 50 or 48
-	// endif
-	
-	// // read incoming data
-	// string buffer=""
-	// variable bytes_read = 0, bytes_left = 0, totalbytesreturn = numChannels*numpts*2
-	// variable bufferDumpStart = stopMSTimer(-2)
-	// string full_buffer=""
-	
-	// if (read_chunk > totalbytesreturn)
-	// 	read_chunk = totalbytesreturn
-	// endif
-	
-	// do
-	// 	buffer = readInstr(fdid, read_bytes=read_chunk, binary=1)
-	// 	// If failed, abort
-	// 	if (cmpstr(buffer, "NaN") == 0)
-	// 		stopFDACsweep(fdid)
-	// 		print "ERROR [fd_readChunk]: Read failed"
-	// 		abort
-	// 	endif
-		
-	// 	full_buffer += buffer
-	// 	bytes_read += read_chunk
-	// while(totalbytesreturn-bytes_read > read_chunk)
-	// // do one last read if any data left to read
-	// bytes_left = totalbytesreturn-bytes_read
-	// if(bytes_left > 0)
-	// 	buffer = readInstr(fdid,read_bytes=bytes_left,binary=1)
-	// 	full_buffer += buffer
-	// endif
-	
-	// buffer = readInstr(fdid,read_term="\n")
-	// buffer = sc_stripTermination(buffer,"\r\n")
-	// if(!fdacCheckResponse(buffer,cmd,isString=1,expectedResponse="READ_FINISHED"))
-	// 	print "[ERROR] \"fd_readChunk\": Error during read. Not all data recived!"
-	// 	abort
-	// endif
-	
-	// variable i=0, j=0, k=0, datapoint
-	// string s1, s2
-	// string wn
-	// for(i=0;i<numChannels;i++)
-	// 	sprintf wn "fd_readChunk_%s", channels[i]
-	// 	make/o/n=(numpts) $wn
-	// 	wave w = $wn
-	// 	k=0
-	// 	for(j=0; j<totalbytesreturn;j+=numchannels*2)
-	// 		s1 = full_buffer[j + (i*2)]
-	// 		s2 = full_buffer[j + (i*2) + 1]
-	// 		datapoint = fdacChar2Num(s1, s2)
-	// 		w[k] = dataPoint
-	// 		k += 1
-	// 	endfor
-	// endfor
-	
-	// if(verbose)
-	// 	print "Stationary sweep waves created with names \"fd_readChunk_#\""
-	// endif
-end
-
-function fdAWG_make_multi_square_wave(instrID, v0, vP, vM, v0len, vPlen, vMlen, wave_num, [ramplen])
+function fdAWG_make_multi_square_wave(instrID, v0, vP, vM, v0len, vPlen, vMlen, wave_num, [ramplen])  // TODO: move this to Tim's igor procedures
    // Make square waves with form v0, +vP, v0, -vM (useful for Tim's Entropy)
    // Stores copy of wave in Igor (accessible by fdAWG_get_AWG_wave(wave_num))
    // Note: Need to call, fdAWG_setup_AWG() after making new wave
@@ -1988,15 +1792,78 @@ function fdAWG_make_multi_square_wave(instrID, v0, vP, vM, v0len, vPlen, vMlen, 
 end
 
 
+////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////// FastDAC Sweeps /////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
+
+function/s fd_start_sweep(S, [AWG_list])
+	Struct ScanVars &S
+	Struct fdAWG_list &AWG_List
+	// Starts either a regular sweep (INT_RAMP in arduino) or sweep with the arbitrary wave generator on (AWG_RAMP in arduino)
+	assertSeparatorType(S.channelsx, ";")
+	assertSeparatorType(S.ADCList, ";")	
+
+	string starts, fins, temp
+	if(S.direction == 1)
+		starts = S.startxs
+		fins = S.finxs
+	elseif(S.direction == -1)
+		starts = S.finxs
+		fins = S.startxs
+	else
+		abort "ERROR[fd_start_sweep]: S.direction must be 1 or -1, not " + num2str(S.direction)
+	endif
+
+   string cmd = "", dacs="", adcs=""
+   dacs = replacestring(";",S.channelsx,"")
+	adcs = replacestring(";",S.adclist,"")
+	
+	// TODO: Check this is a valid way to check if AWG_list is passed
+	if (!paramisDefault(AWG_list) && AWG_List.use_AWG == 1)  
+		// Example:
+		// AWG_RAMP,2,012,345,67,0,-1000,1000,-2000,2000,50,50
+		// Response:
+		// <(2500 * waveform length) samples from ADC0>RAMP_FINISHED
+		//
+		// OPERATION, #N AWs, AW_dacs, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF Wave cycles per step, # ramp steps
+		// Note: AW_dacs is formatted (dacs_for_wave0, dacs_for_wave1, .... e.g. '01,23' for Dacs 0,1 to output wave0, Dacs 2,3 to output wave1)
+		sprintf cmd, "AWG_RAMP,%d,%s,%s,%s,%s,%s,%d,%d\r", AWG_list.numWaves, AWG_list.AW_dacs, dacs, adcs, starts, fins, AWG_list.numCycles, AWG_list.numSteps
+	else 
+		// OPERATION, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF STEPS
+		sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, starts, fins, S.numptsx
+	endif
+	writeInstr(S.instrID,cmd)
+	return cmd
+end
+
+function fd_readChunk(fdid, adc_channels, numpts)
+	// Reads numpnts data without ramping anywhere, does not update graphs or anything, just returns full waves in 
+	// waves named fd_readChunk_# where # is 0, 1 etc for ADC0, 1 etc
+	variable fdid, numpts
+	string adc_channels
+
+	adc_channels = replaceString(",", adc_channels, ";")  // Going to list with this separator later anyway
+	adc_channels = replaceString(" ", adc_channels, "")  // Remove blank spaces
+	variable i
+	string wn, ch
+	string wavenames = ""
+	for(i=0; i<itemsInList(adc_channels); i++)
+		ch = stringFromList(i, adc_channels)
+		wn = "fd_readChunk_"+ch // Use this to not clash with possibly initialized raw waves
+		make/o/n=(numpts) $wn = NaN
+		wavenames = addListItem(wn, wavenames, ";", INF)
+	endfor
+	fd_readvstime(fdid, adc_channels, numpts, getfadcSpeed(fdid), named_waves = wavenames)
+end
+
+
 
 
 //////////////////////////////////////
 ///////////// Structs ////////////////
 //////////////////////////////////////
 
-
-
-structure fdAWG_list
+Structure fdAWG_list
 	// Note: Variables must come after all strings/waves/etc so that structPut will save them!!
 
 	// strings/waves/etc //
@@ -2039,14 +1906,16 @@ function fdAWG_set_global_AWG_list(S)
 	// Function to store values from AWG_list to global variables/strings/waves
 	// StructPut ONLY stores VARIABLES so have to store other parts separately
 	struct fdAWG_list &S
-	
-	// Store String parts
+
+	// TODO: switch to storing in a single text wave (not sure if structPut can store into a text wave)
+
+	// Store String parts  
 	string/g fdAWG_globals_AW_Waves = S.AW_waves
 	string/g fdAWG_globals_AW_dacs = S.AW_dacs
 	
 	// Store variable parts
 //	make/o fdAWG_globals_stuct_vars
-	string/g fdAWG_globals_stuct_vars
+	string/g fdAWG_globals_stuct_vars 
 	structPut/S S, fdAWG_globals_stuct_vars
 end
 
@@ -2055,6 +1924,8 @@ function fdAWG_get_global_AWG_list(S)
 	// Function to get global values for AWG_list that were stored using set_global_AWG_list()
 	// StructPut ONLY gets VARIABLES
 	struct fdAWG_list &S
+
+	// TODO: Switch to loading from a single text wave (not sure if structGet can load from text wave)
 	
 	// Get variable parts
 //	wave fdAWG_globals_stuct_vars

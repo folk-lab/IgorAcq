@@ -18,17 +18,17 @@
 /////////////////////
 //// Util  //////////
 /////////////////////
-function checkInstrIDmatchesDevice(instrID, device)
+function checkInstrIDmatchesDevice(instrID, device_num)
 	// checks instrID is the correct Visa address for device number
 	// e.g. if instrID is to FD1, but if when checking DevChannels device 2 was returned, this will fail
-	variable instrID, device
+	variable instrID, device_num
 
 	string instrAddress = getResourceAddress(instrID)
 	svar sc_fdacKeys
-	string deviceAddress = stringbykey("visa"+num2istr(device), sc_fdacKeys, ":", ",") 
+	string deviceAddress = stringbykey("visa"+num2istr(device_num), sc_fdacKeys, ":", ",") 
 	if (cmpstr(deviceAddress, instrAddress) != 0)
 		string buffer
-		sprintf buffer, "ERROR[checkInstrIDmatchesDevice]: (instrID %d => %s) != device %d => %s", instrID, instrAddress, device, deviceAddress 
+		sprintf buffer, "ERROR[checkInstrIDmatchesDevice]: (instrID %d => %s) != device %d => %s", instrID, instrAddress, device_num, deviceAddress 
 		abort buffer
 	endif
 	return 1
@@ -63,30 +63,31 @@ function getNumDevices()
 end
 
 
-function/S getDeviceResourceAddress(device)
+function/S getDeviceResourceAddress(device_num)  // TODO: Rename to getFastdacVisaAddress(device_num)
 	// Get visa address from device number (has to be it's own function because this returns a string)
-	variable device
-	if(device > getNumDevices())
+	variable device_num
+	if(device_num > getNumDevices())
 		string buffer
-		sprintf buffer,  "ERROR[getDeviceInfoDeviceNum]: Asking for device %d, but only %d devices connected\r", device, getNumDevices()
+		sprintf buffer,  "ERROR[getDeviceInfoDeviceNum]: Asking for device %d, but only %d devices connected\r", device_num, getNumDevices()
 		abort buffer
 	endif
 
 	svar sc_fdacKeys
-	return stringByKey("visa"+num2str(device), sc_fdacKeys, ":", ",")
+	return stringByKey("visa"+num2str(device_num), sc_fdacKeys, ":", ",")
 end
 
 
-function getDeviceInfoDeviceNum(device, info)
+function getDeviceInfoDeviceNum(device_num, info)
 	// Returns the value for selected info of numbered fastDAC device (i.e. 1, 2 etc)
-	variable device
+	// Valid requests ('master', 'name', 'numADC', 'numDAC')
+	variable device_num
 	string info
 
 	svar sc_fdacKeys
 
-	if(device > getNumDevices())
+	if(device_num > getNumDevices())
 		string buffer
-		sprintf buffer,  "ERROR[getDeviceInfoDeviceNum]: Asking for device %d, but only %d devices connected\r", device, getNumDevices()
+		sprintf buffer,  "ERROR[getDeviceInfoDeviceNum]: Asking for device %d, but only %d devices connected\r", device_num, getNumDevices()
 		abort buffer
 	endif
 
@@ -108,8 +109,9 @@ function getDeviceInfoDeviceNum(device, info)
 			abort "ERROR[getDeviceInfo]: Requested info (" + info + ") not understood"
 			break
 	endswitch
-	return str2num(stringByKey(cmd+num2str(device), sc_fdacKeys, ":", ","))
+	return str2num(stringByKey(cmd+num2str(device_num), sc_fdacKeys, ":", ","))
 end
+
 
 function getDeviceInfo(instrID, info)
 	// Returns the value for selected info of fastDAC pointed to by instrID
@@ -119,6 +121,42 @@ function getDeviceInfo(instrID, info)
 
 	variable deviceNum = getDeviceNumber(instrID)
 	return getDeviceInfoDeviceNum(deviceNum, info)
+end
+
+
+function/S getRecordedFastdacInfo(info_name)  // TODO: Rename if prepending something which implies fd anyway
+	// Return a list of strings for specified column in fadcattr based on whether "record" is ticked
+	// Valid info_name ("calc_names", "raw_names", "calc_funcs", "inputs", "channels")
+    string info_name 
+    variable i
+    wave fadcattr
+
+    wave/t fadcvalstr
+    for (i = 0; i<dimsize(fadcvalstr, 0); i++)
+        if (fadcattr[i][2] == 48) // Checkbox checked
+			strswitch(info_name)
+				case "calc_names":
+                return_list = addlistItem(fadcvalstr[i][3], return_list, ";", INF)  												
+					break
+				case "raw_names":
+                return_list = addlistItem("ADC"+num2str(i), return_list, ";", INF)  						
+					break
+				case "calc_funcs":
+                return_list = addlistItem(fadcvalstr[i][4], return_list, ";", INF)  						
+					break						
+				case "inputs":
+                return_list = addlistItem(fadcvalstr[i][1], return_list, ";", INF)  												
+					break						
+				case "channels":
+                return_list = addlistItem(fadcvalstr[i][0], return_list, ";", INF)  																		
+					break
+				default:
+					abort "bad name requested: " + info_name
+					break
+			endswitch						
+        endif
+    endfor
+    return return_list
 end
 
 
@@ -226,7 +264,7 @@ function fdacCheckResponse(response,command,[isString,expectedResponse])
 end
 
 
-function sc_fillfdacKeys(instrID,visa_address,numDACCh,numADCCh,[master])
+function sc_fillfdacKeys(instrID,visa_address,numDACCh,numADCCh,[master])  // TODO: Rename? scfd_...? Or will this end up in scancontroller?
 	// Puts FastDAC information into global sc_fdackeys which is a list of such entries for each connected FastDAC
 	string instrID, visa_address
 	variable numDACCh, numADCCh, master
@@ -269,8 +307,7 @@ end
 //////////////////////////////////////////////////////////////////////////////////////////
 
 
-
-function postFilterNumpts(raw_numpts, measureFreq)
+function postFilterNumpts(raw_numpts, measureFreq)  // TODO: Rename to NumptsAfterFilter
     // Returns number of points that will exist after applying lowpass filter specified in ScanController_Fastdac
     variable raw_numpts, measureFreq
 	
@@ -284,42 +321,6 @@ function postFilterNumpts(raw_numpts, measureFreq)
 	endif
 end
 
-function/S getRecordedFastdacInfo(info_name)
-	// Return a list of strings for specified column in fadcattr based on whether "record" is ticked
-    string info_name  // ("calc_names", "raw_names", "calc_funcs", "inputs", "channels")
-    string return_list = ""
-    variable i
-    wave fadcattr
-
-    wave/t fadcvalstr
-    for (i = 0; i<dimsize(fadcvalstr, 0); i++)
-        if (fadcattr[i][2] == 48) // Checkbox checked
-			strswitch(info_name)
-				case "calc_names":
-                return_list = addlistItem(fadcvalstr[i][3], return_list, ";", INF)  												
-					break
-				case "raw_names":
-                return_list = addlistItem("ADC"+num2str(i), return_list, ";", INF)  						
-					break
-				case "calc_funcs":
-                return_list = addlistItem(fadcvalstr[i][4], return_list, ";", INF)  						
-					break						
-				case "inputs":
-                return_list = addlistItem(fadcvalstr[i][1], return_list, ";", INF)  												
-					break						
-				case "channels":
-                return_list = addlistItem(fadcvalstr[i][0], return_list, ";", INF)  																		
-					break
-				default:
-					abort "bad name requested: " + info_name
-					break
-			endswitch						
-        endif
-    endfor
-    return return_list
-end
-
-
 function resampleWaves(w, measureFreq, targetFreq)
 	// resamples wave w from measureFreq
 	// to targetFreq (which should be lower than measureFreq)
@@ -328,12 +329,12 @@ function resampleWaves(w, measureFreq, targetFreq)
 	
 	RatioFromNumber (targetFreq / measureFreq)
 	resample/UP=(V_numerator)/DOWN=(V_denominator)/N=201 w
-  		// TODO: Need to test N more (simple testing suggests we may need >200 in some cases!)
-  		// TODO: Need to decide what to do with end effect. Possibly /E=2 (set edges to 0) and then turn those zeros to NaNs? 
-  		// TODO: Or maybe /E=3 is safest (repeat edges). The default /E=0 (bounce) is awful.
+	// TODO: Need to test N more (simple testing suggests we may need >200 in some cases!)
+	// TODO: Need to decide what to do with end effect. Possibly /E=2 (set edges to 0) and then turn those zeros to NaNs? 
+	// TODO: Or maybe /E=3 is safest (repeat edges). The default /E=0 (bounce) is awful.
 end
 
-function NEW_fd_record_values(S, rowNum, [AWG_list, linestart])
+function NEW_fd_record_values(S, rowNum, [AWG_list, linestart])  // TODO: Rename to fd_record_values
 	struct ScanVars &S
 	variable rowNum, linestart
 	struct fdAWG_list &AWG_list
@@ -341,24 +342,18 @@ function NEW_fd_record_values(S, rowNum, [AWG_list, linestart])
 	// Note: Only works for 1 FastDAC! Not sure what implementation will look like for multiple yet
 
 	// Check if AWG_list passed with use_AWG = 1
-	variable/g sc_AWG_used = 0  // Global so that this can be used in SaveWaves() to save AWG info if used
+	variable/g sc_AWG_used = 0  // Global so that this can be used in SaveWaves() to save AWG info if used  // TODO: Remove reliance on global variable here
 	if(!paramisdefault(AWG_list) && AWG_list.use_AWG == 1)  
 		sc_AWG_used = 1
-		if(rowNum == 0)
-			print "fd_Record_Values: Using AWG"
-		endif
 	endif
 
-	// Check if this is a linecut scan and update centers if it is
-	if(!paramIsDefault(linestart))
-		abort "Not Implemented again yet, should update something in ScanVars probably"
-		wave sc_linestart
-		sc_linestart[rowNum] = linestart
-	endif
-
-	if (rowNum == 0 && S.start_time == 0)
-		S.start_time = datetime
-	endif
+	// TODO: Remove everything to do with linecut scans (Pretty sure only I (Tim) used them, and noone else does, and I don't any more)
+	// // Check if this is a linecut scan and update centers if it is
+	// if(!paramIsDefault(linestart))
+	// 	abort "Not Implemented again yet, should update something in ScanVars probably"
+	// 	wave sc_linestart
+	// 	sc_linestart[rowNum] = linestart
+	// endif
 
    // Check that checks have been carried out in main scan function where they belong
 	if(S.lims_checked != 1)
@@ -366,7 +361,13 @@ function NEW_fd_record_values(S, rowNum, [AWG_list, linestart])
 	endif
 
    	// Check that DACs are at start of ramp (will set if necessary but will give warning if it needs to)
+	   // This is to avoid the fastdac instantly changing gates significantly when the sweep command is sent
 	fdRV_check_ramp_start(S)
+
+	// If beginning of scan, record start time
+	if (rowNum == 0 && S.start_time == 0)  
+		S.start_time = datetime 
+	endif
 
 	// Send command and read values
 	fdRV_send_command_and_read(S, AWG_list, rowNum) 
@@ -374,8 +375,6 @@ function NEW_fd_record_values(S, rowNum, [AWG_list, linestart])
 	
 	// Process 1D read and distribute
 	fdRV_process_and_distribute(S, rowNum) 
-	
-	// return looptime
 end
 
 function fdRV_send_command_and_read(S, AWG_list, rowNum)
@@ -385,27 +384,19 @@ function fdRV_send_command_and_read(S, AWG_list, rowNum)
 	variable rowNum
 	string cmd_sent = ""
 	variable totalByteReturn
-	nvar sc_AWG_used
-	if(sc_AWG_used)  	// Do AWG_RAMP
-	   cmd_sent = fd_start_AWG_RAMP(S, AWG_list)
-	else				// DO normal INT_RAMP  
-		cmd_sent = fd_start_INT_RAMP(S)
-	endif
+
+	cmd_sent = fd_start_sweep(S, AWG_list=AWG_list)
 	
 	totalByteReturn = S.numADCs*2*S.numptsx
 	variable entered_panic_mode = 0
 	try
    		entered_panic_mode = fdRV_record_buffer(S, rowNum, totalByteReturn)
-   	catch  // One more chance to do the sweep again if it failed for some reason (likely buffer overflow)
+   	catch  // One chance to do the sweep again if it failed for some reason (likely from a buffer overflow)
 		variable errCode = GetRTError(1)  // Clear the error
 		if (v_AbortCode != 10)  // 10 is returned when user clicks abort button mid sweep
 			printf "WARNING[fdRV_send_command_and_read]: Error during sweep at row %d. Attempting once more without updating graphs.\r" rowNum
 			stopFDACsweep(S.instrID)   // Make sure the previous scan is stopped
-			if(sc_AWG_used)  	// Start AWG ramp again
-		   		cmd_sent = fd_start_AWG_RAMP(S, AWG_list)
-			else				// Start INT ramp again 
-				cmd_sent = fd_start_INT_RAMP(S)
-			endif
+			cmd_sent = fd_start_sweep(S, AWG_list=AWG_list)
 			entered_panic_mode = fdRV_record_buffer(S, rowNum, totalByteReturn, record_only=1)  // Try again to record the sweep
 		else
 			abortonvalue 1,10  // Continue to raise the code which specifies user clicked abort button mid sweep
@@ -691,26 +682,39 @@ end
 
 
 function fdRV_update_window(S, numAdcs)
+	// Update the DAC and ADC values in the FastDAC window (e.g. at the end of a sweep)
   struct ScanVars &S
   variable numADCs
+  // Note: This does not yet support multiple fastdacs
+
+  assertSeparatorType(S.channelsx, ",")
+  assertSeparatorType(S.finxs, ",")
+  assertSeparatorType(S.adcList, ",")
 
   wave/T fdacvalstr
 
-  variable i, channel
+  variable i, device_num
+  string channel, device_channel
   for(i=0;i<itemsinlist(S.channelsx,",");i+=1)
-    channel = str2num(stringfromlist(i,S.channelsx,","))
-    fdacvalstr[channel][1] = stringfromlist(i,S.finxs,",")
-    // updatefdacWindow(channel)
-    updateOldFDacStr(channel)
+    channel = stringfromlist(i,S.channelsx,",")
+	device_channel = getDeviceChannels(channel, device_num)  // Get channel for specific fastdac (and device_num of that fastdac)
+	if (getDeviceResourceAddress(device_num) != getResourceAddress(S.instrID))
+		print("ERROR[fdRV_update_window]: channel device address doesn't match instrID address")
+	else
+		updatefdacValStr(str2num(channel), getFDACOutput(S.instrID, str2num(device_channel), update_oldValStr=1)
+	endif
   endfor
+
   for(i=0;i<numADCs;i+=1)
     channel = str2num(stringfromlist(i,S.adclist,","))
-    getfadcChannel(S.instrID,channel)
+    getfadcChannel(S.instrID,channel)  // This updates the window when called
   endfor
 end
 
-function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart,[direction, named_waves])
+
+function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart,[direction, named_waves])  // TODO: rename
 	// Distribute data to 1D waves only (for speed)
+	// Note: This distribute data can be called within the 1D sweep, updating 2D waves should only be done outside of fastdac sweeps because it can be slow
 	string &buffer, adcList  //passing buffer by reference for speed of execution
 	variable bytes, rowNum, colNumStart, direction
 	string named_waves
@@ -750,51 +754,6 @@ function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart,[direction, 
 	endfor
 end
 
-function/s sc_samegraph(wave1,wave2)
-	// Return list of graphs which contain both waves
-	string wave1,wave2
-
-	string graphs1="",graphs2=""
-	graphs1 = sc_findgraphs(wave1)
-	graphs2 = sc_findgraphs(wave2)
-
-	variable graphLen1 = itemsinlist(graphs1,","), graphLen2 = itemsinlist(graphs2,","), result=0, i=0, j=0
-	string testitem="",graphlist="", graphitem=""
-	graphlist=addlistItem("result:0",graphlist,",",0)
-	if(graphLen1 > 0 && graphLen2 > 0)
-		for(i=0;i<graphLen1;i+=1)
-			testitem = stringfromlist(i,graphs1,",")
-			for(j=0;j<graphLen2;j+=1)
-				if(cmpstr(testitem,stringfromlist(j,graphs2,",")) == 0)
-					result += 1
-					graphlist = replaceStringbykey("result",graphlist,num2istr(result),":",",")
-					sprintf graphitem, "graph%d:%s",result-1,testitem
-					graphlist = addlistitem(graphitem,graphlist,",",result)
-				endif
-			endfor
-		endfor
-	endif
-
-	return graphlist
-end
-
-function/s sc_findgraphs(inputwave)
-	// Return list of graphs which contain inputwave
-	string inputwave
-	string opengraphs = winlist("*",",","WIN:1"), waveslist = "", graphlist = "", graphname = ""
-	variable i=0, j=0
-	for(i=0;i<itemsinlist(opengraphs,",");i+=1)
-		sprintf graphname, "WIN:%s", stringfromlist(i,opengraphs,",")
-		waveslist = wavelist("*",",",graphname)
-		for(j=0;j<itemsinlist(waveslist,",");j+=1)
-			if(cmpstr(inputwave,stringfromlist(j,waveslist,",")) == 0)
-				graphlist = addlistItem(stringfromlist(i,opengraphs,","),graphlist,",")
-			endif
-		endfor
-	endfor
-	return graphlist
-end
-
 
 ////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////// CHECKS  /////////////////////////////////////////////////////////
@@ -804,6 +763,7 @@ end
 function fdRV_check_ramp_start(S)
 	// Checks that DACs are at the start of the ramp. If not it will ramp there and wait the delay time, but
 	// will give the user a WARNING that this should have been done already in the top level scan function
+	// Note: This only works for a single fastdac sweeping at once
    struct ScanVars &S
 
    variable i=0, require_ramp = 0, ch, sp, diff
@@ -833,30 +793,28 @@ end
 ///////////////////////////////////////////////////////////////////////////////////////
 
 
-function sc_lastrow(rowNum)
-	variable rowNum
+// TODO: Is this used? 
 
-	nvar sc_is2d, sc_numptsy
-	variable check = 0
-	if(sc_is2d)
-		check = sc_numptsy-1
-	else
-		check = sc_numptsy
-	endif
+// function sc_lastrow(rowNum)
+// 	variable rowNum
 
-	if(rowNum != check)
-		return 0
-	elseif(rowNum == check)
-		return 1
-	else
-		return 0
-	endif
-end
+// 	nvar sc_is2d, sc_numptsy
+// 	variable check = 0
+// 	if(sc_is2d)
+// 		check = sc_numptsy-1
+// 	else
+// 		check = sc_numptsy
+// 	endif
 
+// 	if(rowNum != check)
+// 		return 0
+// 	elseif(rowNum == check)
+// 		return 1
+// 	else
+// 		return 0
+// 	endif
+// end
 
-/////////////////////////////////////////////////////////////////////////////////
-////////////////////// SCAN INFORMATION /////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////
 
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -870,14 +828,27 @@ function resetfdacwindow(fdacCh)
 	fdacvalstr[fdacCh][1] = old_fdacvalstr[fdacCh]
 end
 
-//function updatefdacWindow(fdacCh)
-function updateOldFDacStr(fdacCh)
+function updateOldFDacStr(fdacCh)  // TODO: rename to updateOldFdacValStr
 	variable fdacCh
 	wave/t fdacvalstr, old_fdacvalstr
 
 	old_fdacvalstr[fdacCh] = fdacvalstr[fdacCh][1]
 end
 
+function updateFdacValStr(channel, value, [update_oldValStr])
+	// Update the global string(s) which store FastDAC values. Update the oldValStr if you know that is the current DAC output.
+	variable channel, value, update_oldValStr
+
+	// TODO: Add checks here
+	// check value is valid (not NaN or inf)
+	// check channel_num is valid (i.e. within total number of fastdac DAC channels)
+	wave/t fdacvalstr
+	fdacvalstr[channel][1] = num2str(value)
+	if (update_oldValStr != 0)
+		wave/t old_fdacvalstr
+		old_fdacvalstr[channel] = num2str(value)
+	endif
+end
 
 function initFastDAC()
 	// use the key:value list "sc_fdackeys" to figure out the correct number of
@@ -1165,6 +1136,8 @@ function update_all_fdac([option])
 		option = "fdacramp"
 	endif
 
+	// TOOD: refactor with getDeviceInfo()/getDeviceChannels() etc
+
 	// open temporary connection to FastDACs
 	// Either ramp fastdacs or update fdacvalstr
 	variable i=0,j=0,output = 0, numDACCh = 0, startCh = 0, viRM = 0
@@ -1239,6 +1212,8 @@ function update_fadc(action) : ButtonControl
 	string action
 	svar sc_fdackeys
 	variable i=0, j=0
+
+	// TOOD: refactor with getDeviceInfo()/getDeviceChannels() etc
 
 	string visa_address = "", tempnamestr = "fdac_window_resource"
 	variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
@@ -1363,3 +1338,53 @@ function fdacSetGUIinteraction(numDevices)
 			endif
 	endswitch
 end
+
+
+
+
+// TODO: Are these even used?
+
+// function/s sc_samegraph(wave1,wave2)
+// 	// Return list of graphs which contain both waves
+// 	string wave1,wave2
+
+// 	string graphs1="",graphs2=""
+// 	graphs1 = sc_findgraphs(wave1)
+// 	graphs2 = sc_findgraphs(wave2)
+
+// 	variable graphLen1 = itemsinlist(graphs1,","), graphLen2 = itemsinlist(graphs2,","), result=0, i=0, j=0
+// 	string testitem="",graphlist="", graphitem=""
+// 	graphlist=addlistItem("result:0",graphlist,",",0)
+// 	if(graphLen1 > 0 && graphLen2 > 0)
+// 		for(i=0;i<graphLen1;i+=1)
+// 			testitem = stringfromlist(i,graphs1,",")
+// 			for(j=0;j<graphLen2;j+=1)
+// 				if(cmpstr(testitem,stringfromlist(j,graphs2,",")) == 0)
+// 					result += 1
+// 					graphlist = replaceStringbykey("result",graphlist,num2istr(result),":",",")
+// 					sprintf graphitem, "graph%d:%s",result-1,testitem
+// 					graphlist = addlistitem(graphitem,graphlist,",",result)
+// 				endif
+// 			endfor
+// 		endfor
+// 	endif
+
+// 	return graphlist
+// end
+
+// function/s sc_findgraphs(inputwave)
+// 	// Return list of graphs which contain inputwave
+// 	string inputwave
+// 	string opengraphs = winlist("*",",","WIN:1"), waveslist = "", graphlist = "", graphname = ""
+// 	variable i=0, j=0
+// 	for(i=0;i<itemsinlist(opengraphs,",");i+=1)
+// 		sprintf graphname, "WIN:%s", stringfromlist(i,opengraphs,",")
+// 		waveslist = wavelist("*",",",graphname)
+// 		for(j=0;j<itemsinlist(waveslist,",");j+=1)
+// 			if(cmpstr(inputwave,stringfromlist(j,waveslist,",")) == 0)
+// 				graphlist = addlistItem(stringfromlist(i,opengraphs,","),graphlist,",")
+// 			endif
+// 		endfor
+// 	endfor
+// 	return graphlist
+// end
