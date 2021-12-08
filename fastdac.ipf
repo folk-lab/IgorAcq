@@ -392,7 +392,7 @@ function setFADCSpeed(instrID,speed,[loadCalibration]) // Units: Hz
 	for(i=0;i<numDevices;i+=1)
 		deviceAddress = getDeviceResourceAddress(i+1)
 		if(cmpstr(deviceAddress,instrAddress) == 0)
-			numADCCh = getDeviceInfoDeviceNum(i+1, "numADCCh")
+			numADCCh = getDeviceInfoDeviceNum(i+1, "numADC")
 			numDevice = i+1
 			break
 		endif
