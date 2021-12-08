@@ -66,7 +66,9 @@ end
 function/S getDeviceResourceAddress(device_num)  // TODO: Rename to getFastdacVisaAddress(device_num)
 	// Get visa address from device number (has to be it's own function because this returns a string)
 	variable device_num
-	if(device_num > getNumDevices())
+	if(device_num == 0)
+		abort "ERROR[getDeviceResourceAddress]: device_num starts from 1 not 0"
+	elseif(device_num > getNumDevices()+1)
 		string buffer
 		sprintf buffer,  "ERROR[getDeviceInfoDeviceNum]: Asking for device %d, but only %d devices connected\r", device_num, getNumDevices()
 		abort buffer
@@ -131,6 +133,7 @@ function/S getRecordedFastdacInfo(info_name)  // TODO: Rename if prepending some
     variable i
     wave fadcattr
 
+	 string return_list = ""
     wave/t fadcvalstr
     for (i = 0; i<dimsize(fadcvalstr, 0); i++)
         if (fadcattr[i][2] == 48) // Checkbox checked
@@ -409,7 +412,7 @@ function fdRV_send_command_and_read(S, AWG_list, rowNum)
 	endstr = sc_stripTermination(endstr,"\r\n")
 	if(fdacCheckResponse(endstr,cmd_sent,isString=1,expectedResponse="RAMP_FINISHED"))
 		fdRV_update_window(S, S.numADCs) 
-		if(sc_AWG_used)  // Reset AWs back to zero (I don't see any reason the user would want them left at the final position of the AW)
+		if(AWG_list.use_awg == 1)  // Reset AWs back to zero (I don't see any reason the user would want them left at the final position of the AW)
 			rampmultiplefdac(S.instrID, AWG_list.AW_DACs, 0)
 		endif
 	endif
@@ -698,16 +701,17 @@ function fdRV_update_window(S, numAdcs)
   for(i=0;i<itemsinlist(S.channelsx,",");i+=1)
     channel = stringfromlist(i,S.channelsx,",")
 	device_channel = getDeviceChannels(channel, device_num)  // Get channel for specific fastdac (and device_num of that fastdac)
-	if (getDeviceResourceAddress(device_num) != getResourceAddress(S.instrID))
+	if (cmpstr(getDeviceResourceAddress(device_num), getResourceAddress(S.instrID)) != 0)
 		print("ERROR[fdRV_update_window]: channel device address doesn't match instrID address")
 	else
-		updatefdacValStr(str2num(channel), getFDACOutput(S.instrID, str2num(device_channel), update_oldValStr=1)
+		updatefdacValStr(str2num(channel), getFDACOutput(S.instrID, str2num(device_channel)), update_oldValStr=1)
 	endif
   endfor
 
+  variable channel_num
   for(i=0;i<numADCs;i+=1)
-    channel = str2num(stringfromlist(i,S.adclist,","))
-    getfadcChannel(S.instrID,channel)  // This updates the window when called
+    channel_num = str2num(stringfromlist(i,S.adclist,","))
+    getfadcChannel(S.instrID,channel_num)  // This updates the window when called
   endfor
 end
 
@@ -883,8 +887,9 @@ function initFastDAC()
 
 	variable/g num_fdacs = 0
 	if(oldinit == -1)
-		string/g sc_fadcSpeed1="2538",sc_fadcSpeed2="2538",sc_fadcSpeed3="2538"
-		string/g sc_fadcSpeed4="2538",sc_fadcSpeed5="2538",sc_fadcSpeed6="2538"
+		string speeds = "372;2538;6061;12195"
+		string/g sc_fadcSpeed1=speeds,sc_fadcSpeed2=speeds,sc_fadcSpeed3=speeds
+		string/g sc_fadcSpeed4=speeds,sc_fadcSpeed5=speeds,sc_fadcSpeed6=speeds
 	endif
 
 	// create GUI window
@@ -1219,9 +1224,11 @@ function update_fadc(action) : ButtonControl
 	variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
 	variable numADCCh = 0, startCh = 0, viRm = 0
 	for(i=0;i<numDevices;i+=1)
-		numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),sc_fdackeys,":",","))
+		numADCch = getDeviceInfoDeviceNum(i+1, "numADC")
+//		numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),sc_fdackeys,":",","))
 		if(numADCCh > 0)
-			visa_address = stringbykey("visa"+num2istr(i+1),sc_fdackeys,":",",")
+			visa_address = getDeviceResourceAddress(i+1)
+//			visa_address = stringbykey("visa"+num2istr(i+1),sc_fdackeys,":",",")
 			viRm = openFastDACconnection(tempnamestr, visa_address, verbose=0)
 			nvar tempname = $tempnamestr
 			try
@@ -1250,15 +1257,16 @@ function update_fadc(action) : ButtonControl
 	sc_OpenInstrConnections(0)
 end
 
+
 function fdacCreateControlWaves(numDACCh,numADCCh)
 	variable numDACCh,numADCCh
 
 	// create waves for DAC part
 	make/o/t/n=(numDACCh) fdacval0 = "0"				// Channel
 	make/o/t/n=(numDACCh) fdacval1 = "0"				// Output /mV
-	make/o/t/n=(numDACCh) fdacval2 = "-10000,10000"	// Limits /mV
+	make/o/t/n=(numDACCh) fdacval2 = "-1000,1000"	// Limits /mV
 	make/o/t/n=(numDACCh) fdacval3 = ""					// Labels
-	make/o/t/n=(numDACCh) fdacval4 = "1000"			// Ramprate limit /mV/s
+	make/o/t/n=(numDACCh) fdacval4 = "10000"			// Ramprate limit /mV/s
 	variable i=0
 	for(i=0;i<numDACCh;i+=1)
 		fdacval0[i] = num2istr(i)
