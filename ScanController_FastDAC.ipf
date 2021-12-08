@@ -887,8 +887,9 @@ function initFastDAC()
 
 	variable/g num_fdacs = 0
 	if(oldinit == -1)
-		string/g sc_fadcSpeed1="2538",sc_fadcSpeed2="2538",sc_fadcSpeed3="2538"
-		string/g sc_fadcSpeed4="2538",sc_fadcSpeed5="2538",sc_fadcSpeed6="2538"
+		string speeds = "372;2538;6061;12195"
+		string/g sc_fadcSpeed1=speeds,sc_fadcSpeed2=speeds,sc_fadcSpeed3=speeds
+		string/g sc_fadcSpeed4=speeds,sc_fadcSpeed5=speeds,sc_fadcSpeed6=speeds
 	endif
 
 	// create GUI window
@@ -1223,9 +1224,11 @@ function update_fadc(action) : ButtonControl
 	variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
 	variable numADCCh = 0, startCh = 0, viRm = 0
 	for(i=0;i<numDevices;i+=1)
-		numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),sc_fdackeys,":",","))
+		numADCch = getDeviceInfoDeviceNum(i+1, "numADC")
+//		numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),sc_fdackeys,":",","))
 		if(numADCCh > 0)
-			visa_address = stringbykey("visa"+num2istr(i+1),sc_fdackeys,":",",")
+			visa_address = getDeviceResourceAddress(i+1)
+//			visa_address = stringbykey("visa"+num2istr(i+1),sc_fdackeys,":",",")
 			viRm = openFastDACconnection(tempnamestr, visa_address, verbose=0)
 			nvar tempname = $tempnamestr
 			try
@@ -1254,15 +1257,16 @@ function update_fadc(action) : ButtonControl
 	sc_OpenInstrConnections(0)
 end
 
+
 function fdacCreateControlWaves(numDACCh,numADCCh)
 	variable numDACCh,numADCCh
 
 	// create waves for DAC part
 	make/o/t/n=(numDACCh) fdacval0 = "0"				// Channel
 	make/o/t/n=(numDACCh) fdacval1 = "0"				// Output /mV
-	make/o/t/n=(numDACCh) fdacval2 = "-10000,10000"	// Limits /mV
+	make/o/t/n=(numDACCh) fdacval2 = "-1000,1000"	// Limits /mV
 	make/o/t/n=(numDACCh) fdacval3 = ""					// Labels
-	make/o/t/n=(numDACCh) fdacval4 = "1000"			// Ramprate limit /mV/s
+	make/o/t/n=(numDACCh) fdacval4 = "10000"			// Ramprate limit /mV/s
 	variable i=0
 	for(i=0;i<numDACCh;i+=1)
 		fdacval0[i] = num2istr(i)
