@@ -63,6 +63,11 @@ function assertSeparatorType(list_string, assert_separator)
 	endif
 end
 
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////  System Functions /////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 function /S getHostName()
 	// find the name of the computer Igor is running on
 	// Used in saveing Config info
@@ -268,45 +273,41 @@ end
 // I.e. Applicable to both regular ScanController and ScanController_Fastdac
 
 
-// Structure to hold scan information (general to all scans)  (prefix "sv_" for private functions which are specifically for this)
+// Structure to hold scan information (general to all scans)  
 structure ScanVars
     variable instrID
     
-    variable lims_checked // Flag that gets set to 1 after checks on software limits/ramprates etc has been carried out
+    variable lims_checked // Flag that gets set to 1 after checks on software limits/ramprates etc has been carried out (particularly important for fastdac scans which has no limit checking for the sweep)
 
     string channelsx
     variable startx, finx, numptsx, rampratex
-    variable delayx
+    variable delayx  // delay after each step for Slow scans (has no effect for Fastdac scans)
 
     // For 2D scans
     variable is2d
     string channelsy 
     variable starty, finy, numptsy, rampratey 
-    variable delayy
+    variable delayy  // delay after each step in y-axis (e.g. settling time after x-axis has just been ramped from fin to start quickly)
 
     // For scanRepeat
-    variable direction
+    variable direction  // Allows controlling scan from start -> fin or fin -> start (with 1 or -1)
 
     // Other useful info
     variable start_time // Should be recorded right before measurements begin (e.g. after all checks are carried out)
     variable end_time // Should be recorded right after measurements end (e.g. before getting sweeplogs etc)
-    string x_label
-    string y_label
+    string x_label // String to show as x_label of scan (otherwise defaults to gates that are being swept)
+    string y_label  // String to show as y_label of scan (for 2D this defaults to gates that are being swept)
     variable using_fastdac // Set to 1 when using fastdac
-    string comments
-
-    // ScanControllerInfo 
-    // string activeGraphs
-
+    string comments  // Additional comments to save in HDF sweeplogs (easy place to put keyword flags for later analysis)
 
     // Specific to Fastdac 
-    variable numADCs
-    variable samplingFreq, measureFreq
-    variable sweeprate
+    variable numADCs  // How many ADCs are being recorded 
+    variable samplingFreq, measureFreq  // measureFreq = samplingFreq/numADCs 
+    variable sweeprate  // How fast to sweep in mV/s (easier to specify than numpts for fastdac scans)
     variable bdID // For using BabyDAC on Y-axis of Fastdac Scan
-    string adcList
-    string startxs, finxs
-    string startys, finys
+    string adcList 
+    string startxs, finxs  // If sweeping from different start/end points for each DAC channel
+    string startys, finys  // Similar for Y-axis
 endstructure
 
 
