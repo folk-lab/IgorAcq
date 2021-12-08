@@ -831,11 +831,17 @@ function/S initializeGraphs(S)
     variable i
     string waveNames
     string buffer
+	string ylabel
     variable raw
     for (i = 0; i<2; i++)  // i = 0, 1
         raw = !i
         waveNames = get1DWaveNames(raw, S.using_fastdac)
-        buffer = initializeGraphsForWavenames(waveNames, S.x_label, is2d=S.is2d, y_label=S.y_label)
+		if (S.is2d == 0 && raw == 1)
+			ylabel = "ADC /mV"
+		else
+			ylabel = S.y_label
+		endif
+        buffer = initializeGraphsForWavenames(waveNames, S.x_label, is2d=S.is2d, y_label=ylabel)
         if(raw==1) // Raw waves
 	        sc_rawGraphs1D = buffer
         endif
@@ -863,7 +869,7 @@ function/S initializeGraphsForWavenames(wavenames, x_label, [is2d, y_label, spec
 	    wn = StringFromList(i, waveNames)
 	    openGraphID = graphExistsForWavename(wn)
 	    if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-	        setUpGraph1D(openGraphID, x_label, spectrum=spectrum, y_label=y_label_1d)  // TODO: Add S.y_label if it is not null or empty
+	        setUpGraph1D(openGraphID, x_label, spectrum=spectrum, y_label=y_label_1d)  
 	    else 
 	        open1Dgraph(wn, x_label, y_label=y_label, spectrum=spectrum, y_label=y_label_1d)
 	        openGraphID = winname(0,1)
