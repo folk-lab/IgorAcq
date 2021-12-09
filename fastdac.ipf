@@ -1116,6 +1116,7 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 	for(i=0;i<numAverage;i+=1)
 		// Send command and distribute data to "spectrum_timeSeriesADC#"
 //		fd_readvstime(instrID, channels, numpts, samplingFreq, spectrum_analyser=1)
+		
 		fd_readvstime(instrID, channels, numpts, samplingFreq, named_waves = time_wavenames)
 		
 		// convert time series to spectrum
@@ -1828,7 +1829,9 @@ function/s fd_start_sweep(S, [AWG_list])
 		// OPERATION, #N AWs, AW_dacs, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF Wave cycles per step, # ramp steps
 		// Note: AW_dacs is formatted (dacs_for_wave0, dacs_for_wave1, .... e.g. '01,23' for Dacs 0,1 to output wave0, Dacs 2,3 to output wave1)
 		sprintf cmd, "AWG_RAMP,%d,%s,%s,%s,%s,%s,%d,%d\r", AWG_list.numWaves, AWG_list.AW_dacs, dacs, adcs, starts, fins, AWG_list.numCycles, AWG_list.numSteps
-	else 
+	elseif (S.readVsTime == 1)
+		sprintf cmd, "SPEC_ANA,%s,%s\r", adcs, num2istr(S.numptsx)
+	else
 		// OPERATION, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF STEPS
 		sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, starts, fins, S.numptsx
 	endif

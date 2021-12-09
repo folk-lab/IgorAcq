@@ -350,14 +350,6 @@ function NEW_fd_record_values(S, rowNum, [AWG_list, linestart])  // TODO: Rename
 		sc_AWG_used = 1
 	endif
 
-	// TODO: Remove everything to do with linecut scans (Pretty sure only I (Tim) used them, and noone else does, and I don't any more)
-	// // Check if this is a linecut scan and update centers if it is
-	// if(!paramIsDefault(linestart))
-	// 	abort "Not Implemented again yet, should update something in ScanVars probably"
-	// 	wave sc_linestart
-	// 	sc_linestart[rowNum] = linestart
-	// endif
-
    // Check that checks have been carried out in main scan function where they belong
 	if(S.lims_checked != 1)
 	 	abort "ERROR[fd_record_values]: FD_ScanVars.lims_checked != 1. Probably called before limits/ramprates/sweeprates have been checked in the main Scan Function!"
@@ -469,79 +461,80 @@ function fdRV_process_and_distribute(ScanVars, rowNum)
 end
 
 
-function fd_readvstime(instrID, channels, numpts, samplingFreq, [named_waves])
-	//	Just measures for a fixed number of points without ramping anything, stores in ADC# or timeSeriesADC# if spectrum_analyser set
-	// TODO: Update to new fd_send_command_and_read (also should use the ScanVars struct etc)
-	variable instrID, numpts, samplingFreq
-	string channels
-	string named_waves // Named waves to store raw data in (; separated same length as channels)
+// function fd_readvstime(instrID, channels, numpts, samplingFreq, [named_waves])  // TODO: Remove this function (New_fd_recordValues(S, 0) with S.readVsTime = 1)
+// 	//	Just measures for a fixed number of points without ramping anything, stores in ADC# or timeSeriesADC# if spectrum_analyser set
+// 	// TODO: Update to new fd_send_command_and_read (also should use the ScanVars struct etc)
+// 	variable instrID, numpts, samplingFreq
+// 	string channels
+// 	string named_waves // Named waves to store raw data in (; separated same length as channels)
 	
-	assertSeparatorType(channels, ";")
-	variable numChannels = itemsInList(channels)
-	if (numChannels == 0)
-		abort "ERROR[fd_readvstime]: No channels selected to record"
-	endif
+// 	assertSeparatorType(channels, ";")
 
-	// If storing in named_waves, check they make sense
-	if (!paramisDefault(named_waves))
-		assertSeparatorType(named_waves, ";")
-		if (itemsInList(channels) != itemsInList(named_waves))
-			abort "ERROR[fd_readvstime]: named_waves provided but length doesn't match channels"
-		endif
-	else
-		named_waves = ""
-	endif
-	
-	string cmd = ""
-	channels = replaceString(";", channels, "")
-	channels = replaceString(" ", channels, "")
-	sprintf cmd, "SPEC_ANA,%s,%s\r", channels, num2istr(numpts)
-//	print(cmd) // DEBUGGING
-	writeInstr(instrID,cmd)
-	
-	variable bytesSec = roundNum(2*samplingFreq,0)
-	variable read_chunk = roundNum(numChannels*bytesSec/50,0) - mod(roundNum(numChannels*bytesSec/50,0),numChannels*2)
-	if(read_chunk < 50)
-		read_chunk = 50 - mod(50,numChannels*2) // 50 or 48
-	endif
-	
-	// read incoming data
-	string buffer=""
-	variable bytes_read = 0, bytes_left = 0, totalbytesreturn = numChannels*numpts*2, saveBuffer = 1000, totaldump = 0
-	variable bufferDumpStart = stopMSTimer(-2)
-	
-	read_chunk = (totalbytesreturn > read_chunk) ? read_chunk : totalbytesreturn
-	
-	//print bytesSec, read_chunk, totalbytesreturn  // DEBUGGING
-	do
-		fdRV_read_chunk(instrID, read_chunk, buffer)
-		// add data to datawave
-		sc_distribute_data(buffer, channels, read_chunk, 0, bytes_read/(2*numChannels), named_waves = named_waves)
+// 	variable numChannels = itemsInList(channels)
+// 	if (numChannels == 0)
+// 		abort "ERROR[fd_readvstime]: No channels selected to record"
+// 	endif
 
-		bytes_read += read_chunk
-		totaldump = bytesSec*(stopmstimer(-2)-bufferDumpStart)*1e-6
-		if(totaldump-bytes_read < saveBuffer)
-			fdRV_check_sweepstate(instrID)
-			fdRV_update_graphs() // Only updates sc_RawGraphs1D
-		else
-//			print "DEBUGGING[fd_readvstime]: Getting behind!"
-		endif
-	while(totalbytesreturn-bytes_read > read_chunk)
-	// do one last read if any data left to read
-	bytes_left = totalbytesreturn-bytes_read
-	if(bytes_left > 0)
-		buffer = readInstr(instrID,read_bytes=bytes_left,binary=1)
-		sc_distribute_data(buffer, channels, bytes_left, 0, bytes_read/(2*numChannels), named_waves = named_waves)
-		doupdate
-	endif
+// 	// If storing in named_waves, check they make sense
+// 	if (!paramisDefault(named_waves))
+// 		assertSeparatorType(named_waves, ";")
+// 		if (itemsInList(channels) != itemsInList(named_waves))
+// 			abort "ERROR[fd_readvstime]: named_waves provided but length doesn't match channels"
+// 		endif
+// 	else
+// 		named_waves = ""
+// 	endif
 	
-	buffer = readInstr(instrID,read_term="\n")
-	buffer = sc_stripTermination(buffer,"\r\n")
-	if(!fdacCheckResponse(buffer,cmd,isString=1,expectedResponse="READ_FINISHED"))
-		print "[ERROR] \"fd_readvstime\": Error during read. Not all data recived!"
-		abort
-	endif
-end
+// 	string cmd = ""
+// 	channels = replaceString(";", channels, "")
+// 	channels = replaceString(" ", channels, "")
+// 	sprintf cmd, "SPEC_ANA,%s,%s\r", channels, num2istr(numpts)
+// //	print(cmd) // DEBUGGING
+// 	writeInstr(instrID,cmd)
+	
+// 	variable bytesSec = roundNum(2*samplingFreq,0)
+// 	variable read_chunk = roundNum(numChannels*bytesSec/50,0) - mod(roundNum(numChannels*bytesSec/50,0),numChannels*2)
+// 	if(read_chunk < 50)
+// 		read_chunk = 50 - mod(50,numChannels*2) // 50 or 48
+// 	endif
+	
+// 	// read incoming data
+// 	string buffer=""
+// 	variable bytes_read = 0, bytes_left = 0, totalbytesreturn = numChannels*numpts*2, saveBuffer = 1000, totaldump = 0
+// 	variable bufferDumpStart = stopMSTimer(-2)
+	
+// 	read_chunk = (totalbytesreturn > read_chunk) ? read_chunk : totalbytesreturn
+	
+// 	//print bytesSec, read_chunk, totalbytesreturn  // DEBUGGING
+// 	do
+// 		fdRV_read_chunk(instrID, read_chunk, buffer)
+// 		// add data to datawave
+// 		sc_distribute_data(buffer, channels, read_chunk, 0, bytes_read/(2*numChannels), named_waves = named_waves)
+
+// 		bytes_read += read_chunk
+// 		totaldump = bytesSec*(stopmstimer(-2)-bufferDumpStart)*1e-6
+// 		if(totaldump-bytes_read < saveBuffer)
+// 			fdRV_check_sweepstate(instrID)
+// 			fdRV_update_graphs() // Only updates sc_RawGraphs1D
+// 		else
+// //			print "DEBUGGING[fd_readvstime]: Getting behind!"
+// 		endif
+// 	while(totalbytesreturn-bytes_read > read_chunk)
+// 	// do one last read if any data left to read
+// 	bytes_left = totalbytesreturn-bytes_read
+// 	if(bytes_left > 0)
+// 		buffer = readInstr(instrID,read_bytes=bytes_left,binary=1)
+// 		sc_distribute_data(buffer, channels, bytes_left, 0, bytes_read/(2*numChannels), named_waves = named_waves)
+// 		doupdate
+// 	endif
+	
+// 	buffer = readInstr(instrID,read_term="\n")
+// 	buffer = sc_stripTermination(buffer,"\r\n")
+// 	if(!fdacCheckResponse(buffer,cmd,isString=1,expectedResponse="READ_FINISHED"))
+// 		print "[ERROR] \"fd_readvstime\": Error during read. Not all data recived!"
+// 		abort
+// 	endif
+// end
 
 function fdRV_record_buffer(S, rowNum, totalByteReturn, [record_only])
 	// Returns whether recording entered into panic_mode during sweep
