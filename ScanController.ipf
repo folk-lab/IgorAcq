@@ -127,7 +127,6 @@ function /S executeWinCmd(command)
 	DeleteFile /P=data /Z=1 batchFile // delete batch file
 	DeleteFile /P=data /Z=1 logFile   // delete batch file
 	return result
-
 end
 
 
@@ -143,6 +142,7 @@ function/S executeMacCmd(command)
 
 	return S_value
 end
+
 
 function /S getExpPath(whichpath, [full])
 	// whichpath determines which path will be returned (data, config)
@@ -292,6 +292,9 @@ structure ScanVars
     // For scanRepeat
     variable direction  // Allows controlling scan from start -> fin or fin -> start (with 1 or -1)
 
+	// For ReadVsTime
+	variable readVsTime // Set to 1 if doing a readVsTime
+
     // Other useful info
     variable start_time // Should be recorded right before measurements begin (e.g. after all checks are carried out)
     variable end_time // Should be recorded right after measurements end (e.g. before getting sweeplogs etc)
@@ -377,32 +380,6 @@ function initFDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
     sv_setMeasureFreq(S) 		// Sets S.samplingFreq/measureFreq/numADCs	
 end
 
-function sv_setNumptsSweeprate(S)
-	Struct ScanVars &S
-	 // If NaN then set to zero so rest of logic works
-   if(numtype(S.sweeprate) == 2)
-   		S.sweeprate = 0
-   	endif
-   
-   // Chose which input to use for numpts of scan
-   if (S.numptsx == 0 && S.sweeprate == 0)
-      abort "ERROR[ScanFastDac]: User must provide either numpts OR sweeprate for scan [neither provided]"
-   elseif (S.numptsx!=0 && S.sweeprate!=0)
-      abort "ERROR[ScanFastDac]: User must provide either numpts OR sweeprate for scan [both provided]"
-   elseif (S.numptsx!=0) // If numpts provided, just use that
-      S.sweeprate = fd_get_sweeprate_from_numpts(S.instrID, S.startx, S.finx, S.numptsx)
-   elseif (S.sweeprate!=0) // If sweeprate provided calculate numpts required
-      S.numptsx = fd_get_numpts_from_sweeprate(S.instrID, S.startx, S.finx, S.sweeprate)
-   endif
-end
-
-function sv_setMeasureFreq(S)
-	Struct ScanVars &S
-   S.samplingFreq = getfadcSpeed(S.instrID)
-   S.numADCs = getNumFADC()
-   S.measureFreq = S.samplingFreq/S.numADCs  //Because sampling is split between number of ADCs being read //TODO: This needs to be adapted for multiple FastDacs
-end
-
 
 function initBDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate, delayx, rampratex, starty, finy, channelsy, numptsy, rampratey, delayy, direction, x_label, y_label, comments])
     // Function to make setting up scanVars struct easier for FastDAC scans
@@ -436,11 +413,10 @@ function initBDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
 	
 	s.starty = starty
 	S.finy = finy
-	 s.numptsy = paramisdefault(numptsy) ? NaN : numptsy
+	s.numptsy = paramisdefault(numptsy) ? NaN : numptsy
     s.rampratey = paramisdefault(rampratey) ? NaN : rampratey
     s.delayy = paramisdefault(delayy) ? NaN : delayy
     
-
 	// Set Variables in Struct
     s.instrID = instrID
 
@@ -458,7 +434,6 @@ function initBDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
 		S.y_label = y_label
 	endif
    	
-   	
    	// Used for Fastdac
    	S.startxs = ""
    	S.finxs = ""
@@ -467,6 +442,35 @@ function initBDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
    	S.adcList = ""
    	
 end
+
+
+function sv_setNumptsSweeprate(S)
+	Struct ScanVars &S
+	 // If NaN then set to zero so rest of logic works
+   if(numtype(S.sweeprate) == 2)
+   		S.sweeprate = 0
+   	endif
+   
+   // Chose which input to use for numpts of scan
+   if (S.numptsx == 0 && S.sweeprate == 0)
+      abort "ERROR[ScanFastDac]: User must provide either numpts OR sweeprate for scan [neither provided]"
+   elseif (S.numptsx!=0 && S.sweeprate!=0)
+      abort "ERROR[ScanFastDac]: User must provide either numpts OR sweeprate for scan [both provided]"
+   elseif (S.numptsx!=0) // If numpts provided, just use that
+      S.sweeprate = fd_get_sweeprate_from_numpts(S.instrID, S.startx, S.finx, S.numptsx)
+   elseif (S.sweeprate!=0) // If sweeprate provided calculate numpts required
+      S.numptsx = fd_get_numpts_from_sweeprate(S.instrID, S.startx, S.finx, S.sweeprate)
+   endif
+end
+
+
+function sv_setMeasureFreq(S)
+	Struct ScanVars &S
+   S.samplingFreq = getfadcSpeed(S.instrID)
+   S.numADCs = getNumFADC()
+   S.measureFreq = S.samplingFreq/S.numADCs  //Because sampling is split between number of ADCs being read //TODO: This needs to be adapted for multiple FastDacs
+end
+
 
 function sv_setChannels(S, channelsx, channelsy, [fastdac])
     // Set S.channelsx and S.channelys converting channel labels to numbers where necessary
@@ -487,6 +491,7 @@ function sv_setChannels(S, channelsx, channelsy, [fastdac])
        s.is2d = 1
     endif
 end
+
 
 function sv_setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
 
@@ -536,20 +541,9 @@ function sv_setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy, 
 end
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-/////////////////////////////////////////////////////////// This chunk should probably go somewhere else
-
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////// Standard Scan Functions (setting up and ending) //////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 function initializeScan(S)
     // Opens instrument connection, initializes waves to store data, opens and tiles graphs, opens abort window.
@@ -577,7 +571,7 @@ function initializeScan(S)
 end
 
 
-function new_initializeWaves(S)
+function new_initializeWaves(S)  // TODO: rename
     // Initializes the waves necessary for recording scan
 	//  Need 1D and 2D waves for the raw data coming from the fastdac (2D for storing, not necessarily displaying)
 	// 	Need 2D waves for either the raw data, or filtered data if a filter is set
@@ -619,14 +613,16 @@ function new_initializeWaves(S)
     // TODO: This is where x_array and y_array were made, but that should just be done in the savewaves part now
 end
 
+
 function init1DWave(wn, numpts, start, fin)
     // Overwrites waveName with scaled wave from start to fin with numpts
     string wn
     variable numpts, start, fin
     string cmd
-    make/O/n=(numpts) $wn = NaN  // TODO: can put in a cmd and execute if necessary
+    make/O/n=(numpts) $wn = NaN  
     cmd = "setscale/I x " + num2str(start) + ", " + num2str(fin) + ", " + wn; execute(cmd)
 end
+
 
 function init2DWave(wn, numptsx, startx, finx, numptsy, starty, finy)
     // Overwrites waveName with scaled wave from start to fin with numpts
@@ -637,7 +633,6 @@ function init2DWave(wn, numptsx, startx, finx, numptsy, starty, finy)
     cmd = "setscale/I x " + num2str(startx) + ", " + num2str(finx) + ", " + wn; execute(cmd)
 	cmd = "setscale/I y " + num2str(starty) + ", " + num2str(finy) + ", " + wn; execute(cmd)
 end
-
 
 
 function/S get1DWaveNames(raw, fastdac)
@@ -699,122 +694,8 @@ function sanityCheckWavenames(wavenames)
             print "The first character of a wave name should be an alphabet a-z A-Z. The problematic wave name is " + s;
             abort
         endif
-////////////// Previously there was a check to prevent last character of wave name being a number
-////////////// This is not necessary for the fastdac, but maybe it needs to be reimplemented for ScanController??
-////////////// 2021/10  <-- If a significant amount of time has passed, remove all of this!
-//        if (!((char2num(s[strlen(s)-1]) >= 97 && char2num(s[strlen(s)-1]) <= 122) || (char2num(s[strlen(s)-1]) >= 65 && char2num(s[strlen(s)-1]) <= 90)))
-//            print "The last character of a wave name should be an alphabet a-z A-Z. The problematic wave name is " + s;
-//            abort
-//        endif
     endfor
 end
-
-//////////////////////////////////////////////////////////////////////////////////////////////// End of chunk which should probably be moved
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// function sc_controlwindows(action)
-// 	string action
-// 	string openaboutwindows
-// 	variable ii
-
-// 	openaboutwindows = winlist("SweepControl*",";","WIN:64")
-// 	if(itemsinlist(openaboutwindows)>0)
-// 		for(ii=0;ii<itemsinlist(openaboutwindows);ii+=1)
-// 			killwindow $stringfromlist(ii,openaboutwindows)
-// 		endfor
-// 	endif
-// end
-
-
-function sc_openInstrConnections(print_cmd)
-	// open all VISA connections to instruments
-	// this is a simple as running through the list defined
-	//     in the scancontroller window
-	variable print_cmd
-	wave /T sc_Instr
-
-	variable i=0
-	string command = ""
-	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
-		command = TrimString(sc_Instr[i][0])
-		if(strlen(command)>0)
-			if(print_cmd==1)
-				print ">>> "+command
-			endif
-			execute/Q/Z command
-			if(V_flag!=0)
-				print "[ERROR] in sc_openInstrConnections: "+GetErrMessage(V_Flag,2)
-			endif
-		endif
-	endfor
-end
-
-
-function sc_openInstrGUIs(print_cmd)
-	// open GUIs for instruments
-	// this is a simple as running through the list defined
-	//     in the scancontroller window
-	variable print_cmd
-	wave /T sc_Instr
-
-	variable i=0
-	string command = ""
-	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
-		command = TrimString(sc_Instr[i][1])
-		if(strlen(command)>0)
-			if(print_cmd==1)
-				print ">>> "+command
-			endif
-			execute/Q/Z command
-			if(V_flag!=0)
-				print "[ERROR] in sc_openInstrGUIs: "+GetErrMessage(V_Flag,2)
-			endif
-		endif
-	endfor
-end
-
-
-
-
-
-function sc_checkBackup()
-	// the path `server` should point to /measurement-data
-	//     which has been mounted as a network drive on your measurement computer
-	// if it is, backups will be created in an appropriate directory
-	//      qdot-server.phas.ubc.ca/measurement-data/<hostname>/<username>/<exp>
-	svar sc_hostname
-
-	GetFileFolderInfo/Z/Q/P=server  // Check if data path is definded
-	if(v_flag != 0 || v_isfolder != 1)
-		print "[WARNING] Only saving local copies of data. See sc_checkBackup()."
-		return 0
-	else
-		// this should also create the path if it does not exist
-		string sp = S_path
-		newpath /C/O/Q backup_data sp+sc_hostname+":"+getExpPath("data", full=1)
-		newpath /C/O/Q backup_config sp+sc_hostname+":"+getExpPath("config", full=1)
-		
-		return 1
-	endif
-end
-
-
-
 
 /////////////////////////////////////////////////////////////////////////////
 //////////////////////////// Opening and Layout out Graphs /////////////////////
@@ -837,7 +718,7 @@ function/S initializeGraphs(S)
     for (i = 0; i<2; i++)  // i = 0, 1
         raw = !i
         waveNames = get1DWaveNames(raw, S.using_fastdac)
-		if (S.is2d == 0 && raw == 1)
+		if (S.is2d == 0 && raw == 1 && S.using_fastdac)
 			ylabel = "ADC /mV"
 		else
 			ylabel = S.y_label
@@ -1041,6 +922,81 @@ function openAbortWindow()
     doWindow/F SweepControl   // Bring Sweepcontrol to the front 
 end
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////// Common Scancontroller Functions /////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+function sc_openInstrConnections(print_cmd)
+	// open all VISA connections to instruments
+	// this is a simple as running through the list defined
+	//     in the scancontroller window
+	variable print_cmd
+	wave /T sc_Instr
+
+	variable i=0
+	string command = ""
+	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
+		command = TrimString(sc_Instr[i][0])
+		if(strlen(command)>0)
+			if(print_cmd==1)
+				print ">>> "+command
+			endif
+			execute/Q/Z command
+			if(V_flag!=0)
+				print "[ERROR] in sc_openInstrConnections: "+GetErrMessage(V_Flag,2)
+			endif
+		endif
+	endfor
+end
+
+
+function sc_openInstrGUIs(print_cmd)
+	// open GUIs for instruments 
+	// this is a simple as running through the list defined
+	//     in the scancontroller window
+	variable print_cmd
+	wave /T sc_Instr
+
+	variable i=0
+	string command = ""
+	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
+		command = TrimString(sc_Instr[i][1])
+		if(strlen(command)>0)
+			if(print_cmd==1)
+				print ">>> "+command
+			endif
+			execute/Q/Z command
+			if(V_flag!=0)
+				print "[ERROR] in sc_openInstrGUIs: "+GetErrMessage(V_Flag,2)
+			endif
+		endif
+	endfor
+end
+
+
+function sc_checkBackup()
+	// the path `server` should point to /measurement-data
+	//     which has been mounted as a network drive on your measurement computer
+	// if it is, backups will be created in an appropriate directory
+	//      qdot-server.phas.ubc.ca/measurement-data/<hostname>/<username>/<exp>
+	svar sc_hostname
+
+	GetFileFolderInfo/Z/Q/P=server  // Check if data path is definded
+	if(v_flag != 0 || v_isfolder != 1)
+		print "WARNING[sc_checkBackup]: Only saving local copies of data"
+		return 0
+	else
+		// this should also create the path if it does not exist
+		string sp = S_path
+		newpath /C/O/Q backup_data sp+sc_hostname+":"+getExpPath("data", full=1)
+		newpath /C/O/Q backup_config sp+sc_hostname+":"+getExpPath("config", full=1)
+		return 1
+	endif
+end
+
+
+
 ////////////////////////////////////////////////////////////////
 ///////////////// Slow ScanController ONLY /////////////////////
 ////////////////////////////////////////////////////////////////
@@ -1048,7 +1004,6 @@ end
 
 function InitScanController([configFile])
 	// Open the Slow ScanController window (not FastDAC)
-
 	string configFile // use this to point to a specific old config
 
 	GetFileFolderInfo/Z/Q/P=data  // Check if data path is definded
@@ -1399,11 +1354,6 @@ function sc_CheckboxClicked(ControlName, Value)
 end
 
 
-
-/////////////////////////////
-//// configuration files ////
-/////////////////////////////
-
 function/s sc_createConfig()
 	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts, sc_Instr
 	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
@@ -1494,6 +1444,7 @@ function/s sc_createConfig()
 	return configstr
 end
 
+
 function sc_saveConfig(configstr)
 	string configstr
 	svar sc_current_config
@@ -1502,6 +1453,7 @@ function sc_saveConfig(configstr)
 	writetofile(prettyJSONfmt(configstr), filename, "config")
 	sc_current_config = filename
 end
+
 
 function sc_loadConfig(configfile)
 	string configfile
@@ -1550,8 +1502,11 @@ function sc_loadConfig(configfile)
 	sc_rebuildwindow()
 end
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////// Sweeplogs /////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-function /s new_sc_createSweepLogs([S, comments])
+function /s new_sc_createSweepLogs([S, comments])  // TODO: Rename
 	// Creates a Json String which contains information about Scan
     // Note: Comments is ignored unless ScanVars are not provided
 	Struct ScanVars &S
@@ -1634,58 +1589,11 @@ function sc_instrumentLogs(jstr)
 end
 
 
-// In order to enable or disable a wave
-// call these two functions instead of messing with the waves sc_RawRecord and sc_CalcRecord directly
-// function EnableScanControllerItem(wn)
-// 	string wn
-// 	ChangeScanControllerItemStatus(wn, 1)
-// end
-
-// function DisableScanControllerItem(wn)
-// 	string wn
-// 	ChangeScanControllerItemStatus(wn, 0)
-// end
-
-// function ChangeScanControllerItemStatus(wn, ison)
-// 	string wn
-// 	variable ison
-// 	string cmd
-// 	wave sc_RawRecord, sc_CalcRecord
-// 	wave /t sc_RawWaveNames, sc_CalcWaveNames
-// 	variable i=0, done=0
-// 	do
-// 		if (stringmatch(sc_RawWaveNames[i], wn))
-// 			sc_RawRecord[i]=ison
-// 			cmd = "CheckBox sc_RawRecordCheckBox" + num2istr(i) + " value=" + num2istr(ison)
-// 			execute(cmd)
-// 			done=1
-// 		endif
-// 		i+=1
-// 	while (i<numpnts( sc_RawWaveNames ) && !done)
-
-// 	i=0
-// 	do
-// 		if (stringmatch(sc_CalcWaveNames[i], wn))
-// 			sc_CalcRecord[i]=ison
-// 			cmd = "CheckBox sc_CalcRecordCheckBox" + num2istr(i) + " value=" + num2istr(ison)
-// 			execute(cmd)
-// 		endif
-// 		i+=1
-// 	while (i<numpnts( sc_CalcWaveNames ) && !done)
-
-// 	if (!done)
-// 		print "Error: Could not find the wave name specified."
-// 	endif
-// 	execute("doupdate")
-// end
-
-
-
 ////////////////////////////////////////////
 /// Slow ScanController Recording Data /////
 ////////////////////////////////////////////
 
-function New_RecordValues(S, i, j, [readvstime, fillnan])
+function New_RecordValues(S, i, j, [readvstime, fillnan])  // TODO: Rename
 	// In a 1d scan, i is the index of the loop. j will be ignored.
 	// In a 2d scan, i is the index of the outer (slow) loop, and j is the index of the inner (fast) loop.
 
@@ -1699,6 +1607,8 @@ function New_RecordValues(S, i, j, [readvstime, fillnan])
 	nvar sc_abortsweep, sc_pause, sc_scanstarttime
 	variable ii = 0
 	
+	readvstime = paramIsDefault(readvstime) ? 0 : readvstime
+
 	////// TEMPORARY FIX
 	variable sc_is2d = S.is2d
 	variable sc_startx = S.startx
@@ -1708,28 +1618,15 @@ function New_RecordValues(S, i, j, [readvstime, fillnan])
 	variable sc_finy = S.finy
 	variable sc_numptsy = S.numptsy
 
-	if (i==0 && j==0)
-		print "WARNING[New_RecordValues]: This is just a temporary fix for RecordValues!! It needs re-writing"	
-	endif
-//	abort "Not reimplemented yet. Needs to use ScanVars etc similar to fastdac, and be tested"
-	//TODO: DO this
-
 	//// setup all sorts of logic so we can store values correctly ////
-
 	variable innerindex, outerindex
-	if (sc_is2d == 1 || sc_is2d == 2) //1 is normal 2D, 2 is Line2D
+	if (s.is2d == 1) //1 is normal 2D
 		// 2d
 		innerindex = j
 		outerindex = i
 	else
 		// 1d
 		innerindex = i
-		outerindex = i // meaningless
-	endif
-
-	// Set readvstime to 0 if it's not defined
-	if(paramisdefault(readvstime))
-		readvstime=0
 	endif
 
 	if(innerindex==0 && outerindex==0)
@@ -1888,7 +1785,7 @@ end
 
 
 
-function RecordValues(i, j, [readvstime, fillnan])
+function RecordValues(i, j, [readvstime, fillnan])  // TODO: Remove
 	// In a 1d scan, i is the index of the loop. j will be ignored.
 	// In a 2d scan, i is the index of the outer (slow) loop, and j is the index of the inner (fast) loop.
 
