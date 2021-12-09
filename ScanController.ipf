@@ -291,6 +291,7 @@ structure ScanVars
 
     // For scanRepeat
     variable direction  // Allows controlling scan from start -> fin or fin -> start (with 1 or -1)
+    variable duration   // Can specify duration of scan rather than numpts or sweeprate
 
 	// For ReadVsTime
 	variable readVsTime // Set to 1 if doing a readVsTime
@@ -319,7 +320,7 @@ function saveAsLastScanVarsStruct(S)  // TODO: rename to setLastScanVars
 	Struct ScanVars &S
 	// TODO: Make these (note: can't just use StructPut/Get because they only work for numeric entries, not strings...
 	make/o/T sc_lastScanVarsStrings = {S.channelsx, S.channelsy, S.x_label, S.y_label, S.comments, S.adcList, S.startxs, S.finxs, S.startys, S.finys, S.raw_wave_names}
-	make/o/d sc_lastScanVarsVariables = {S.instrID, S.lims_checked, S.startx, S.finx, S.numptsx, S.rampratex, S.delayx, S.is2d, S.starty, S.finy, S.numptsy, S.rampratey, S.delayy, S.direction, S.readVsTime, S.start_time, S.end_time, S.using_fastdac, S.numADCs, S.samplingFreq, S.measureFreq, S.sweeprate, S.bdID}
+	make/o/d sc_lastScanVarsVariables = {S.instrID, S.lims_checked, S.startx, S.finx, S.numptsx, S.rampratex, S.delayx, S.is2d, S.starty, S.finy, S.numptsy, S.rampratey, S.delayy, S.direction, S.duration, S.readVsTime, S.start_time, S.end_time, S.using_fastdac, S.numADCs, S.samplingFreq, S.measureFreq, S.sweeprate, S.bdID}
 end
 
 
@@ -357,15 +358,16 @@ function loadLastScanVarsStruct(S)   // TODO: Rename to loadLastScanVars
 	S.rampratey = v[11]
 	S.delayy = v[12]
 	S.direction = v[13]
-	S.readVsTime = v[14]
-	S.start_time = v[15]
-	S.end_time = v[16]
-	S.using_fastdac = v[17]
-	S.numADCs = v[18]
-	S.samplingFreq = v[19]
-	S.measureFreq = v[20]
-	S.sweeprate = v[21]
-	S.bdID = v[22]
+	S.duration = v[14]
+	S.readVsTime = v[15]
+	S.start_time = v[16]
+	S.end_time = v[17]
+	S.using_fastdac = v[18]
+	S.numADCs = v[19]
+	S.samplingFreq = v[20]
+	S.measureFreq = v[21]
+	S.sweeprate = v[22]
+	S.bdID = v[23]
 end
 	
 
@@ -392,6 +394,7 @@ function initFDscanVars(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
 	finys = selectString(paramIsDefault(finys), finys, "")
 	y_label = selectString((paramIsDefault(y_label) || numtype(strlen(y_label)) == 2), y_label, "")	
 
+	channelsx = selectString(paramIsDefault(channelsx), channelsx, "")
 	startxs = selectString(paramIsDefault(startxs), startxs, "")
 	finxs = selectString(paramIsDefault(finxs), finxs, "")
 	x_label = selectString((paramIsDefault(x_label) || numtype(strlen(x_label)) == 2), x_label, "")
@@ -435,10 +438,13 @@ function initFDscanVars(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
     sv_setMeasureFreq(S) 		// Sets S.samplingFreq/measureFreq/numADCs	
     sv_setNumptsSweeprate(S) 	// Checks that either numpts OR sweeprate OR duration was provided, and sets ScanVars accordingly
                                 // Note: Valid for start/fin only (uses S.startx, S.finx NOT S.startxs, S.finxs)
+
+	// Set empty string just to not raise nullstring errors
+	S.raw_wave_names = ""	// This should be overridden afterwards if necessary
 end
 
 
-function initBDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate, delayx, rampratex, starty, finy, channelsy, numptsy, rampratey, delayy, direction, x_label, y_label, comments])
+function initBDscanVars(S, instrID, startx, finx, [channelsx, numptsx, sweeprate, delayx, rampratex, starty, finy, channelsy, numptsy, rampratey, delayy, direction, x_label, y_label, comments])
     // Function to make setting up scanVars struct easier for FastDAC scans
     // PARAMETERS:
     // startx, finx, starty, finy -- Single start/fin point for all channelsx/channelsy
@@ -456,6 +462,8 @@ function initBDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
     
 	// Handle Optional Parameters
 	x_label = selectString((paramIsDefault(x_label) || numtype(strlen(x_label)) == 2), x_label, "")
+	channelsx = selectString(paramisdefault(channelsx), channelsx, "")
+	
 	y_label = selectString((paramIsDefault(y_label) || numtype(strlen(y_label)) == 2), y_label, "")
 	channelsy = selectString(paramisdefault(channelsy), channelsy, "")
 	
@@ -497,6 +505,7 @@ function initBDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
    	S.startys = ""
    	S.finys = ""
    	S.adcList = ""
+	S.raw_wave_names = ""	
 end
 
 
@@ -2844,21 +2853,19 @@ end
 /// Slow ScanController Recording Data /////
 ////////////////////////////////////////////
 
-function New_RecordValues(S, i, j, [readvstime, fillnan])  // TODO: Rename
+function New_RecordValues(S, i, j, [fillnan])  // TODO: Rename
 	// In a 1d scan, i is the index of the loop. j will be ignored.
 	// In a 2d scan, i is the index of the outer (slow) loop, and j is the index of the inner (fast) loop.
-	// readvstime works only in 1d and rescales (grows) the wave at each index
 	// fillnan=1 skips any read or calculation functions entirely and fills point [i,j] with nan  (i.e. if intending to record only a subset of a larger array this effectively skips the places that should not be read)
 	Struct ScanVars &S
-	variable i, j, readvstime, fillnan
+	variable i, j, fillnan
 	variable ii = 0
 	
-	readvstime = paramIsDefault(readvstime) ? 0 : readvstime
 	fillnan = paramisdefault(fillnan) ? 0 : fillnan
 
 	// Set Scan start_time on first measurement if not already set
 	if (i == 0 && j == 0 && S.start_time == 0)
-		S.start_time == datetime
+		S.start_time = datetime
 	endif
 
 	// Figure out which way to index waves
@@ -2871,7 +2878,8 @@ function New_RecordValues(S, i, j, [readvstime, fillnan])  // TODO: Rename
 		// 1d
 		innerindex = i
 	endif
-
+	
+	// readvstime works only in 1d and rescales (grows) the wave at each index
 	if(S.readVsTime == 1 && S.is2d)
 		abort "ERROR[New_RecordValues]: Not valid to readvstime in 2D"
 	endif
@@ -2879,7 +2887,7 @@ function New_RecordValues(S, i, j, [readvstime, fillnan])  // TODO: Rename
 	//// Setup and run async data collection ////
 	wave sc_measAsync
 	if( (sum(sc_measAsync) > 1) && (fillnan==0))
-		variable tgID = sc_ManageThreads(innerindex, outerindex, readvstime) // start threads, wait, collect data
+		variable tgID = sc_ManageThreads(innerindex, outerindex, S.readvstime) // start threads, wait, collect data
 		sc_KillThreads(tgID) // Terminate threads
 	endif
 

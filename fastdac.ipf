@@ -197,17 +197,18 @@ function getFADCspeed(instrID)
 	variable numDevice = getDeviceNumber(instrID)
 	variable numADCs = getDeviceInfo(instrID, "numADC")
 
-	variable i
-	for(i=1;i<numADCs;i+=1)  // Start from 1 because 0th channel already checked
-		cmd  = command+","+num2istr(i)
-		compare = queryInstr(instrID,cmd+"\r",read_term="\n")
-		compare = sc_stripTermination(compare,"\r\n")
-		if(!fdacCheckResponse(compare,cmd))
-			abort
-		elseif(str2num(compare) != str2num(response)) // Ensure ADC channels all have same conversion time
-			print "WARNING[getfadcSpeed]: ADC channels 0 & "+num2istr(i)+" have different conversion times!"
-		endif
-	endfor
+//	// Note: This extra check takes ~45ms (15ms per read)
+//	variable i
+//	for(i=1;i<numADCs;i+=1)  // Start from 1 because 0th channel already checked
+//		cmd  = command+","+num2istr(i)
+//		compare = queryInstr(instrID,cmd+"\r",read_term="\n")
+//		compare = sc_stripTermination(compare,"\r\n")
+//		if(!fdacCheckResponse(compare,cmd))
+//			abort
+//		elseif(str2num(compare) != str2num(response)) // Ensure ADC channels all have same conversion time
+//			print "WARNING[getfadcSpeed]: ADC channels 0 & "+num2istr(i)+" have different conversion times!"
+//		endif
+//	endfor
 	
 	return 1.0/(str2num(response)*1.0e-6) // return value in Hz
 end
@@ -234,10 +235,11 @@ end
 
 function getFADCvalue(fdid, channel, [len_avg])
 	// Same as FADCchannel except it also applies the Calc Function before returning
+	// Note: Min read time is ~60ms because of having to check SamplingFreq a couple of times -- Could potentially be optimized further if necessary
 	variable fdid, channel, len_avg
 	
 	len_avg = paramisdefault(len_avg) ? 0.05 : len_avg
-	
+
 	variable/g fd_val_mv = getFADCchannel(fdid, channel, len_avg=len_avg)  // Must be global so can use execute
 	variable/g fd_val_real
 	wave/t fadcvalstr
@@ -246,6 +248,7 @@ function getFADCvalue(fdid, channel, [len_avg])
 	string cmd = replaceString("ADC"+num2str(channel), func, "fd_val_mv")
 	sprintf cmd, "fd_val_real = %s", cmd
 	execute/q/z cmd
+
 	return fd_val_real
 end
 
@@ -955,7 +958,7 @@ function fd_get_numpts_from_sweeprate(start, fin, sweeprate, measureFreq)
 	if (start == fin)
 		abort "ERROR[fd_get_numpts_from_sweeprate]: Start == Fin so can't calculate numpts"
 	endif
-	numpts = round(abs(fin-start)*measureFreq/sweeprate)   // distance * steps per second / sweeprate
+	variable numpts = round(abs(fin-start)*measureFreq/sweeprate)   // distance * steps per second / sweeprate
 	return numpts
 end
 
@@ -965,7 +968,7 @@ function fd_get_sweeprate_from_numpts(start, fin, numpts, measureFreq)
 	if (numpts == 0)
 		abort "ERROR[fd_get_numpts_from_sweeprate]: numpts = 0 so can't calculate sweeprate"
 	endif
-	sweeprate = round(abs(fin-start)*measureFreq/numpts)   // distance * steps per second / numpts
+	variable sweeprate = round(abs(fin-start)*measureFreq/numpts)   // distance * steps per second / numpts
 	return sweeprate
 end
 
@@ -1024,16 +1027,15 @@ end
 ///////////////////////// Spectrum Analyzer //////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 
-function FDacSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,ca_amp,plot_linear,nosave])
+function FDacSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,plot_linear,nosave])
 	// scanlength is in sec
 	// if linear is set to 1, the spectrum will be plotted on a linear scale
-	variable instrID, scanlength, numAverage, plot_linear, nosave, ca_amp
-	string channels, comments
+	variable instrID, scanlength, numAverage, plot_linear, nosave
+	string comments
 	string datestring = strTime()
 	
 	comments = selectString(paramisdefault(comments), comments, "")	
 	numAverage = paramisDefault(numAverage) ? 1 : numAverage
-	ca_amp = paramisdefault(ca_amp) ? 9 : ca_amp
 	
 	Struct ScanVars S
 
@@ -1061,7 +1063,7 @@ function FDacSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,ca_amp,pl
 	endfor
 
 	if (!nosave)
-		EndScan(S) // TODO: Additionally save spectrum to HDF (how?)
+		EndScan(S=S) // TODO: Additionally save spectrum to HDF (how?)
 	endif
 end
 // TODO: Finish new Fdacspectrumanalyser then remove these comments
@@ -1815,25 +1817,28 @@ function/s fd_start_sweep(S, [AWG_list])
 	// readvstime sweep (SPEC_ANA in arduino)
 	Struct ScanVars &S
 	Struct fdAWG_list &AWG_List
-	assertSeparatorType(S.channelsx, ";")
-	assertSeparatorType(S.ADCList, ";")	
 
-	string starts, fins, temp
-	if(S.direction == 1)
-		starts = S.startxs
-		fins = S.finxs
-	elseif(S.direction == -1)
-		starts = S.finxs
-		fins = S.startxs
-	else
-		abort "ERROR[fd_start_sweep]: S.direction must be 1 or -1, not " + num2str(S.direction)
+	assertSeparatorType(S.ADCList, ";")	
+	string adcs = replacestring(";",S.adclist,"")
+
+	if (!S.readVsTime)
+		assertSeparatorType(S.channelsx, ";")
+		string starts, fins, temp
+		if(S.direction == 1)
+			starts = S.startxs
+			fins = S.finxs
+		elseif(S.direction == -1)
+			starts = S.finxs
+			fins = S.startxs
+		else
+			abort "ERROR[fd_start_sweep]: S.direction must be 1 or -1, not " + num2str(S.direction)
+		endif
+
+	   string dacs = replacestring(";",S.channelsx,"")
 	endif
 
-   string cmd = "", dacs="", adcs=""
-   dacs = replacestring(";",S.channelsx,"")
-	adcs = replacestring(";",S.adclist,"")
-	
-	// TODO: Check this is a valid way to check if AWG_list is passed
+	string cmd = ""
+
 	if (!paramisDefault(AWG_list) && AWG_List.use_AWG == 1)  
 		// Example:
 		// AWG_RAMP,2,012,345,67,0,-1000,1000,-2000,2000,50,50
@@ -1875,10 +1880,15 @@ function fd_readChunk(fdid, adc_channels, numpts)
 	// fd_readvstime(fdid, adc_channels, numpts, getfadcSpeed(fdid), named_waves = wavenames)
 
 	Struct ScanVars S
-	initFDscanVars(S, fdid, 0, numpts, numptsx=numpts)
-	S.adcList = adc_channels  // Recording specified channels, not ticked boxes in ScanController_Fastdac
-	S.readVsTime = 1  // No ramping
-	S.raw_wave_names = wavenames  // Override the waves the rawdata gets saved to
+//	initFDscanVars(S, fdid, 0, numpts, numptsx=numpts)
+	S.numptsx = numpts
+	S.instrID = fdid
+	S.readVsTime = 1  					// No ramping
+	S.adcList = adc_channels  		// Recording specified channels, not ticked boxes in ScanController_Fastdac
+	S.numADCs = itemsInList(S.adcList)
+	S.samplingFreq = getFADCspeed(S.instrID)
+	S.raw_wave_names = wavenames  	// Override the waves the rawdata gets saved to
+
 
 	new_fd_record_values(S, 0, skip_data_distribution=1)
 end

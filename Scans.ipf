@@ -17,14 +17,15 @@ function ReadVsTime(delay, [y_label, max_time, comments]) // Units: s
 	max_time = paramIsDefault(max_time) ? INF : max_time
 	
 	Struct ScanVars S
-	initBDscanVars(S, 0, 0, 1, "", numptsx=0, delayx=delay, x_label="time /s", y_label=y_label, comments=comments)
+	initBDscanVars(S, 0, 0, 1, numptsx=0, delayx=delay, x_label="time /s", y_label=y_label, comments=comments)
 	initializeScan(S)
+	S.readVsTime = 1
 
 	variable/g sc_scanstarttime = datetime
 	S.start_time = datetime
 	do
 		asleep(delay)
-		New_RecordValues(S, i, 0,readvstime=1)
+		New_RecordValues(S, i, 0)
 		doupdate
 		i+=1
 	while (datetime-S.start_time < max_time)
@@ -67,23 +68,24 @@ end
 
 function ReadVsTimeUntil(delay,readtime, [y_label, comments])
 	variable delay, readtime
-	string comments
+	string y_label, comments
 
 	comments = selectstring(paramisdefault(comments), comments, "")
 	y_label = selectstring(paramisdefault(y_label), y_label, "")
 	
 	Struct ScanVars S
-	initBDscanVars(S, 0, 0, 1, "", numptsx=0, delayx=delay, x_label="time /s", y_label=y_label, comments=comments)
+	initBDscanVars(S, 0, 0, 1, numptsx=0, delayx=delay, x_label="time /s", y_label=y_label, comments=comments)
 	initializeScan(S)
+	S.readVsTime = 1
 
-	nvar sc_scanstarttime // Global variable set when InitializeWaves is called
 	variable i=0
 	do
 		sc_sleep(delay)
-		RecordValues(i, 0,readvstime=1)
+		new_RecordValues(S, i, 0)  // Note: Extends waves because readvstime
 		i+=1
-	while(datetime-sc_scanstarttime < readtime)
-	SaveWaves(msg=comments)
+	while(datetime-S.start_time < readtime)
+	
+	EndScan(S=S)
 end
 
 
@@ -102,7 +104,7 @@ function ScanBabyDAC(instrID, start, fin, channels, numpts, delay, ramprate, [y_
 
    // Set sc_ScanVars struct
    struct ScanVars SV
-   InitBDscanVars(SV, instrID, start, fin, channels, numptsx=numpts, delayx=delay, rampratex=ramprate, comments=comments, y_label=y_label)
+   InitBDscanVars(SV, instrID, start, fin, channelsx=channels, numptsx=numpts, delayx=delay, rampratex=ramprate, comments=comments, y_label=y_label)
 
    // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
 //   SFbd_pre_checks(SV)  
@@ -477,7 +479,7 @@ function ScanFastDAC(instrID, start, fin, channels, [numpts, sweeprate, ramprate
  
    // Set sc_ScanVars struct
    struct ScanVars S
-   initFDscanVars(S, instrID, start, fin, channels, numptsx=numpts, sweeprate=sweeprate, rampratex=ramprate, delayy=delay, startxs=starts, finxs=fins, x_label=x_label, y_label=y_label, comments=comments)
+   initFDscanVars(S, instrID, start, fin, channelsx=channels, numptsx=numpts, sweeprate=sweeprate, rampratex=ramprate, delayy=delay, startxs=starts, finxs=fins, x_label=x_label, y_label=y_label, comments=comments)
 
    // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
    SFfd_pre_checks(S)  
@@ -551,11 +553,11 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 	// Put info into scanVars struct (to more easily pass around later)
  	struct ScanVars S
  	if (use_bd == 0)
-	 	initFDscanVars(S, fdID, startx, finx, channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
+	 	initFDscanVars(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
 		   						 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys, comments=comments)
 	
 	else  				// Using BabyDAC for Y axis so init x in FD_ScanVars, and init y in BD_ScanVars
-		initFDscanVars(S, fdID, startx, finx, channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
+		initFDscanVars(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
 		   						rampratey=rampratey, startxs=startxs, finxs=finxs, comments=comments)
 		S.bdID = bdID
        s.is2d = 1
@@ -654,7 +656,7 @@ function ScanfastDACRepeat(instrID, start, fin, channels, numptsy, [numptsx, swe
 
 	// Set sc_ScanVars struct
 	struct ScanVars S
-	initFDscanVars(S, instrID, start, fin, channels, numptsx=numptsx, rampratex=ramprate, delayy=delay, sweeprate=sweeprate,  \
+	initFDscanVars(S, instrID, start, fin, channelsx=channels, numptsx=numptsx, rampratex=ramprate, delayy=delay, sweeprate=sweeprate,  \
 					numptsy=numptsy, direction=1, startxs=starts, finxs=fins, y_label="Repeats", comments=comments)
 	S.is2d = 1 // Doesn't otherwise get detected because of no y channels
 	S.starty = 1
@@ -774,7 +776,7 @@ function StepTempScanSomething()
 
 	make/o targettemps =  {300, 275, 250, 225, 200, 175, 150, 125, 100, 75, 50, 40, 30, 20}
 	make/o heaterranges = {10, 3.1, 3.1, 3.1, 3.1, 3.1, 3.1, 3.1, 3.1, 3.1, 1, 1, 1, 1}
-	setLS370exclusivereader(ls370,"bfsmall_mc")   // TODO: Is the string required now?
+	setLS370exclusivereader(ls370,"mc") 
 
 	variable i=0
 	do
@@ -790,14 +792,13 @@ function StepTempScanSomething()
 	while ( i<numpnts(targettemps) )
 
 	// kill temperature control
-	turnoffLS370MCheater(ls370)
+	setLS370heaterOff(ls370)
+	
 	resetLS370exclusivereader(ls370)
 	sc_sleep(60.0*30)
 
 	// 	SCAN HERE for base temp
 end
-
-
 
 
 /////////////////////////////////////////////////////////////////////////////////////
@@ -1012,7 +1013,7 @@ end
 
 
 function SFbd_pre_checks(S)
-  struct BD_ScanVars &S
+  struct ScanVars &S
 //	SFbd_check_ramprates(S)	 	// Check ramprates of x and y
 	SFbd_check_lims(S)			// Check within software lims for x and y
 	S.lims_checked = 1  		// So record_values knows that limits have been checked!

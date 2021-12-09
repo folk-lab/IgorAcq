@@ -1059,7 +1059,7 @@ EndMacro
 
 
 ////////////////////////
-///// ACD readings /////
+///// ADC readings /////
 ////////////////////////
 
 threadsafe function bdReading2Voltage(byte1, byte2, byte3)

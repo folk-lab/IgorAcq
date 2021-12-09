@@ -345,20 +345,22 @@ function NEW_fd_record_values(S, rowNum, [AWG_list, linestart, skip_data_distrib
 	// If passed AWG_list with AWG_list.use_AWG == 1 then it will run with the Arbitrary Wave Generator on
 	// Note: Only works for 1 FastDAC! Not sure what implementation will look like for multiple yet
 
-	// Check if AWG_list passed with use_AWG = 1
-	variable/g sc_AWG_used = 0  // Global so that this can be used in SaveWaves() to save AWG info if used  // TODO: Remove reliance on global variable here
-	if(!paramisdefault(AWG_list) && AWG_list.use_AWG == 1)  
-		sc_AWG_used = 1
-	endif
-
+	// Check if AWG is going to be used
+	Struct fdAWG_list AWG  // Note: Default has AWG.use_awg = 0
+	if(!paramisdefault(AWG_list))  // If AWG_list passed, then overwrite default
+		AWG = AWG_list
+	endif 
+		 
    // Check that checks have been carried out in main scan function where they belong
-	if(S.lims_checked != 1)
+	if(S.lims_checked != 1 && S.readVsTime != 1)  // No limits to check if doing a readVsTime
 	 	abort "ERROR[fd_record_values]: FD_ScanVars.lims_checked != 1. Probably called before limits/ramprates/sweeprates have been checked in the main Scan Function!"
 	endif
 
    	// Check that DACs are at start of ramp (will set if necessary but will give warning if it needs to)
 	   // This is to avoid the fastdac instantly changing gates significantly when the sweep command is sent
-	fdRV_check_ramp_start(S)
+	if (!S.readVsTime)
+		fdRV_check_ramp_start(S)
+	endif
 
 	// If beginning of scan, record start time
 	if (rowNum == 0 && S.start_time == 0)  
@@ -366,7 +368,7 @@ function NEW_fd_record_values(S, rowNum, [AWG_list, linestart, skip_data_distrib
 	endif
 
 	// Send command and read values
-	fdRV_send_command_and_read(S, AWG_list, rowNum) 
+	fdRV_send_command_and_read(S, AWG, rowNum) 
 	S.end_time = datetime  
 	
 	// Process 1D read and distribute
@@ -381,6 +383,11 @@ function fdRV_send_command_and_read(S, AWG_list, rowNum)
 	string cmd_sent = ""
 	variable totalByteReturn
 
+	// Check some minimum requirements
+	if (S.samplingFreq == 0 || S.numADCs == 0 || S.numptsx == 0)
+		abort "ERROR[fdRV_send_command_and_read]: Not enough info in ScanVars to run scan"
+	endif
+	
 	cmd_sent = fd_start_sweep(S, AWG_list=AWG_list)
 	
 	totalByteReturn = S.numADCs*2*S.numptsx
@@ -398,18 +405,22 @@ function fdRV_send_command_and_read(S, AWG_list, rowNum)
 			abortonvalue 1,10  // Continue to raise the code which specifies user clicked abort button mid sweep
 		endif
 	endtry	
-	
-   // update window
+
 	string endstr
 	endstr = readInstr(S.instrID)
-	endstr = sc_stripTermination(endstr,"\r\n")
-	if(fdacCheckResponse(endstr,cmd_sent,isString=1,expectedResponse="RAMP_FINISHED"))
+	endstr = sc_stripTermination(endstr,"\r\n")	
+	if (S.readVsTime)
+		fdacCheckResponse(endstr,cmd_sent,isString=1,expectedResponse="READ_FINISHED")
+		// No need to update DACs
+	else
+		fdacCheckResponse(endstr,cmd_sent,isString=1,expectedResponse="RAMP_FINISHED")
+	   // update DAC values in window (request values from FastDAC directly in case ramp failed)
 		fdRV_update_window(S, S.numADCs) 
-		if(AWG_list.use_awg == 1)  // Reset AWs back to zero (I don't see any reason the user would want them left at the final position of the AW)
-			rampmultiplefdac(S.instrID, AWG_list.AW_DACs, 0)
-		endif
 	endif
-
+	
+	if(AWG_list.use_awg == 1)  // Reset AWs back to zero (no reason to leave at end of AW)
+		rampmultiplefdac(S.instrID, AWG_list.AW_DACs, 0)
+	endif
 end
 
 
@@ -549,13 +560,13 @@ function fdRV_record_buffer(S, rowNum, totalByteReturn, [record_only])
    variable saveBuffer = 1000 // Allow getting up to 1000 bytes behind. (Note: Buffer size is 4096 bytes and cannot be changed in Igor)
    variable bufferDumpStart = stopMSTimer(-2)
 
-   variable bytesSec = roundNum(2*S.measureFreq*S.numADCs,0)
+   variable bytesSec = roundNum(2*S.samplingFreq,0)
    variable read_chunk = fdRV_get_read_chunk_size(S.numADCs, S.numptsx, bytesSec, totalByteReturn)
    variable panic_mode = record_only  // If Igor gets behind on reading at any point, it will go into panic mode and focus all efforts on clearing buffer.
    variable expected_bytes_in_buffer = 0 // For storing how many bytes are expected to be waiting in buffer
    do
       fdRV_read_chunk(S.instrID, read_chunk, buffer)  // puts data into buffer
-      fdRV_distribute_data(buffer, S, bytes_read, totalByteReturn, read_chunk, rowNum, S.direction)
+      fdRV_distribute_data(buffer, S, bytes_read, totalByteReturn, read_chunk, rowNum)
       fdRV_check_sweepstate(S.instrID)
 
       bytes_read += read_chunk      
@@ -584,11 +595,13 @@ function fdRV_record_buffer(S, rowNum, totalByteReturn, [record_only])
    variable bytes_left = totalByteReturn-bytes_read
    if(bytes_left > 0)
       fdRV_read_chunk(S.instrID, bytes_left, buffer)  // puts data into buffer
-      fdRV_distribute_data(buffer, S, bytes_read, totalByteReturn, bytes_left, rowNum, S.direction)
+      fdRV_distribute_data(buffer, S, bytes_read, totalByteReturn, bytes_left, rowNum)
    endif
    
    fdRV_check_sweepstate(S.instrID)
+//   variable st = stopMSTimer(-2)
    fdRV_update_graphs() 
+//   printf "fdRV_update_graphs took %.2f ms\r", (stopMSTimer(-2) - st)/1000
    return panic_mode
 end
 
@@ -662,11 +675,13 @@ function fdRV_read_chunk(instrID, read_chunk, buffer)
 end
 
 
-function fdRV_distribute_data(buffer, S, bytes_read, totalByteReturn, read_chunk, rowNum, direction)
+function fdRV_distribute_data(buffer, S, bytes_read, totalByteReturn, read_chunk, rowNum)
 	// Distribute data to 1D waves only (for speed)
   struct ScanVars &S
   string &buffer  // Passing by reference for speed of execution
-  variable bytes_read, totalByteReturn, read_chunk, rowNum, direction
+  variable bytes_read, totalByteReturn, read_chunk, rowNum
+
+ 	variable direction = S.direction == 0 ? 1 : S.direction  // Default to forward
 
   variable col_num_start
   if (direction == 1)
@@ -674,7 +689,7 @@ function fdRV_distribute_data(buffer, S, bytes_read, totalByteReturn, read_chunk
   elseif (direction == -1)
     col_num_start = (totalByteReturn-bytes_read)/(2*S.numADCs)-1
   endif
-  sc_distribute_data(buffer,replaceString(",", S.adclist, ";"),read_chunk,rowNum,col_num_start, direction=direction, named_waves=S.raw_wave_names)
+  sc_distribute_data(buffer,S.adcList,read_chunk,rowNum,col_num_start, direction=direction, named_waves=S.raw_wave_names)
 end
 
 
@@ -686,7 +701,7 @@ function fdRV_update_window(S, numAdcs)
 
   assertSeparatorType(S.channelsx, ",")
   assertSeparatorType(S.finxs, ",")
-  assertSeparatorType(S.adcList, ",")
+  assertSeparatorType(S.adcList, ";")
 
   wave/T fdacvalstr
 
@@ -704,8 +719,8 @@ function fdRV_update_window(S, numAdcs)
 
   variable channel_num
   for(i=0;i<numADCs;i+=1)
-    channel_num = str2num(stringfromlist(i,S.adclist,","))
-    getfadcChannel(S.instrID,channel_num)  // This updates the window when called
+    channel_num = str2num(stringfromlist(i,S.adclist,";"))
+    getfadcChannel(S.instrID,channel_num, len_avg=0.001)  // This updates the window when called
   endfor
 end
 
