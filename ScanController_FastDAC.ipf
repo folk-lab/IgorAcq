@@ -337,9 +337,10 @@ function resampleWaves(w, measureFreq, targetFreq)
 	// TODO: Or maybe /E=3 is safest (repeat edges). The default /E=0 (bounce) is awful.
 end
 
-function NEW_fd_record_values(S, rowNum, [AWG_list, linestart])  // TODO: Rename to fd_record_values
+function NEW_fd_record_values(S, rowNum, [AWG_list, linestart, skip_data_distribution])  // TODO: Rename to fd_record_values
 	struct ScanVars &S
 	variable rowNum, linestart
+	variable skip_data_distribution // For recording data without doing any calculation or distribution of data
 	struct fdAWG_list &AWG_list
 	// If passed AWG_list with AWG_list.use_AWG == 1 then it will run with the Arbitrary Wave Generator on
 	// Note: Only works for 1 FastDAC! Not sure what implementation will look like for multiple yet
@@ -673,7 +674,7 @@ function fdRV_distribute_data(buffer, S, bytes_read, totalByteReturn, read_chunk
   elseif (direction == -1)
     col_num_start = (totalByteReturn-bytes_read)/(2*S.numADCs)-1
   endif
-  sc_distribute_data(buffer,replaceString(",", S.adclist, ";"),read_chunk,rowNum,col_num_start, direction=direction)
+  sc_distribute_data(buffer,replaceString(",", S.adclist, ";"),read_chunk,rowNum,col_num_start, direction=direction, named_waves=S.raw_wave_names)
 end
 
 
@@ -725,7 +726,11 @@ function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart,[direction, 
 
 	variable numADCCh = itemsinlist(adcList)
 	string waveslist = ""
-	if (!paramisDefault(named_waves) && strlen(named_waves) > 0)
+	if (!paramisDefault(named_waves) && strlen(named_waves) > 0)  // Use specified wavenames instead of default ADC#
+		assertSeparatorType(named_waves, ";")
+		if (itemsInList(named_waves) != numADCch)
+			abort "ERROR[sc_distribute_data]: wrong number of named_waves for numADCch being recorded"
+		endif
 		waveslist = named_waves
 	else
 		for(i=0;i<numADCCh;i++)

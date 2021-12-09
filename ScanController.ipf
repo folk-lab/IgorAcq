@@ -311,13 +311,14 @@ structure ScanVars
     string adcList 
     string startxs, finxs  // If sweeping from different start/end points for each DAC channel
     string startys, finys  // Similar for Y-axis
+	string raw_wave_names  // Names of waves to store raw data in (defaults to ADC# for each ADC)
 endstructure
 
 
 function saveAsLastScanVarsStruct(S)  // TODO: rename to setLastScanVars
 	Struct ScanVars &S
 	// TODO: Make these (note: can't just use StructPut/Get because they only work for numeric entries, not strings...
-	make/o/T sc_lastScanVarsStrings = {S.channelsx, S.channelsy, S.x_label, S.y_label, S.comments, S.adcList, S.startxs, S.finxs, S.startys, S.finys}
+	make/o/T sc_lastScanVarsStrings = {S.channelsx, S.channelsy, S.x_label, S.y_label, S.comments, S.adcList, S.startxs, S.finxs, S.startys, S.finys, S.raw_wave_names}
 	make/o/d sc_lastScanVarsVariables = {S.instrID, S.lims_checked, S.startx, S.finx, S.numptsx, S.rampratex, S.delayx, S.is2d, S.starty, S.finy, S.numptsy, S.rampratey, S.delayy, S.direction, S.readVsTime, S.start_time, S.end_time, S.using_fastdac, S.numADCs, S.samplingFreq, S.measureFreq, S.sweeprate, S.bdID}
 end
 
@@ -339,6 +340,7 @@ function loadLastScanVarsStruct(S)   // TODO: Rename to loadLastScanVars
 	S.finxs = t[7]
 	S.startys = t[8]
 	S.finys = t[9]
+	S.raw_wave_names = t[10]
 
 	// Load Variable parts
 	S.instrID = v[0]
@@ -367,7 +369,7 @@ function loadLastScanVarsStruct(S)   // TODO: Rename to loadLastScanVars
 end
 	
 
-function initFDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate, rampratex, delayx, starty, finy, channelsy, numptsy, rampratey, delayy, direction, startxs, finxs, startys, finys, x_label, y_label, comments])
+function initFDscanVars(S, instrID, startx, finx, [channelsx, numptsx, sweeprate, duration, rampratex, delayx, starty, finy, channelsy, numptsy, rampratey, delayy, direction, startxs, finxs, startys, finys, x_label, y_label, comments])
     // Function to make setting up scanVars struct easier for FastDAC scans
     // PARAMETERS:
     // startx, finx, starty, finy -- Single start/fin point for all channelsx/channelsy
@@ -377,11 +379,13 @@ function initFDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
     variable instrID
     variable startx, finx, numptsx, delayx, rampratex
     variable starty, finy, numptsy, delayy, rampratey
+	variable sweeprate  // If start != fin numpts will be calculated based on sweeprate
+	variable duration   // numpts will be caluculated to achieve duration
     string channelsx, channelsy
     string startxs, finxs, startys, finys
     string  x_label, y_label
     string comments
-    variable direction, sweeprate
+    variable direction
 	
 	channelsy = selectString(paramIsDefault(channelsy), channelsy, "")
 	startys = selectString(paramIsDefault(startys), startys, "")
@@ -400,7 +404,7 @@ function initFDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
 
     S.sweeprate = paramisdefault(sweeprate) ? NaN : sweeprate  // TODO: Should this be different?
 
-	 S.numptsy = paramisdefault(numptsy) ? NaN : numptsy
+	S.numptsy = paramisdefault(numptsy) ? NaN : numptsy
     S.rampratey = paramisdefault(rampratey) ? NaN : rampratey
     S.delayy = paramisdefault(delayy) ? NaN : delayy
 
@@ -428,9 +432,9 @@ function initFDscanVars(S, instrID, startx, finx, channelsx, [numptsx, sweeprate
     sv_setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
 	
 	// Set variables with some calculation
-    sv_setNumptsSweeprate(S) 	// Checks that either numpts OR sweeprate was provided, and sets both in ScanVars accordingly
-                                    // Note: Valid for same start/fin points only (uses S.startx, S.finx NOT S.startxs, S.finxs)
     sv_setMeasureFreq(S) 		// Sets S.samplingFreq/measureFreq/numADCs	
+    sv_setNumptsSweeprate(S) 	// Checks that either numpts OR sweeprate OR duration was provided, and sets ScanVars accordingly
+                                // Note: Valid for start/fin only (uses S.startx, S.finx NOT S.startxs, S.finxs)
 end
 
 
@@ -504,14 +508,22 @@ function sv_setNumptsSweeprate(S)
    	endif
    
    // Chose which input to use for numpts of scan
-   if (S.numptsx == 0 && S.sweeprate == 0)
-      abort "ERROR[ScanFastDac]: User must provide either numpts OR sweeprate for scan [neither provided]"
-   elseif (S.numptsx!=0 && S.sweeprate!=0)
-      abort "ERROR[ScanFastDac]: User must provide either numpts OR sweeprate for scan [both provided]"
-   elseif (S.numptsx!=0) // If numpts provided, just use that
-      S.sweeprate = fd_get_sweeprate_from_numpts(S.instrID, S.startx, S.finx, S.numptsx)
-   elseif (S.sweeprate!=0) // If sweeprate provided calculate numpts required
-      S.numptsx = fd_get_numpts_from_sweeprate(S.instrID, S.startx, S.finx, S.sweeprate)
+	if (S.numptsx == 0 && S.sweeprate == 0 && S.duration == 0)
+	    abort "ERROR[ScanFastDac]: User must provide either numpts OR sweeprate OR duration for scan (none provided)"
+	elseif ((S.numptsx!=0 + S.sweeprate!=0 + S.duration!=0) > 1)
+	    abort "ERROR[ScanFastDac]: User must provide either numpts OR sweeprate OR duration for scan (more than 1 provided)"
+	elseif (S.numptsx!=0) // If numpts provided, just use that
+	    S.sweeprate = fd_get_sweeprate_from_numpts(S.startx, S.finx, S.numptsx, S.measureFreq)
+		S.duration = S.numptsx/S.measureFreq
+	elseif (S.sweeprate!=0) // If sweeprate provided calculate numpts required
+    	S.numptsx = fd_get_numpts_from_sweeprate(S.startx, S.finx, S.sweeprate, S.measureFreq)
+		S.duration = S.numptsx/S.measureFreq
+	elseif (S.duration!=0)  // If duration provided, calculate numpts required
+		S.numptsx = S.measureFreq*S.duration
+		S.sweeprate = fd_get_sweeprate_from_numpts(S.startx, S.finx, S.numptsx, S.measureFreq)
+		if (numtype(S.sweeprate) != 0)  // TODO: Is this the right check? (For a start=fin=0 scan)
+			S.sweeprate = NaN
+		endif
    endif
 end
 

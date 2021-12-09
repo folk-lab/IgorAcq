@@ -949,29 +949,23 @@ end
 ///////////////////
 //// Utilities ////
 ///////////////////
-function fd_get_numpts_from_sweeprate(fd, start, fin, sweeprate)
+function fd_get_numpts_from_sweeprate(start, fin, sweeprate, measureFreq)
 /// Convert sweeprate in mV/s to numptsx for fdacrecordvalues
-	variable fd, start, fin, sweeprate
-	variable numpts, adcspeed, numadc = 0, i
-	numadc = getNumFADC()
-	adcspeed = getfadcspeed(fd)
+	variable start, fin, sweeprate, measureFreq
 	if (start == fin)
 		abort "ERROR[fd_get_numpts_from_sweeprate]: Start == Fin so can't calculate numpts"
 	endif
-	numpts = round(abs(fin-start)*(adcspeed/numadc)/sweeprate)   // distance * steps per second / sweeprate
+	numpts = round(abs(fin-start)*measureFreq/sweeprate)   // distance * steps per second / sweeprate
 	return numpts
 end
 
-function fd_get_sweeprate_from_numpts(fd, start, fin, numpts)
+function fd_get_sweeprate_from_numpts(start, fin, numpts, measureFreq)
 	// Convert numpts into sweeprate in mV/s
-	variable fd, start, fin, numpts
-	variable sweeprate, adcspeed, numadc = 0, i
-	numadc = getNumFADC()
-	adcspeed = getfadcspeed(fd)
+	variable start, fin, numpts, measureFreq
 	if (numpts == 0)
 		abort "ERROR[fd_get_numpts_from_sweeprate]: numpts = 0 so can't calculate sweeprate"
 	endif
-	sweeprate = round(abs(fin-start)*(adcspeed/numadc)/numpts)   // distance * steps per second / numpts
+	sweeprate = round(abs(fin-start)*measureFreq/numpts)   // distance * steps per second / numpts
 	return sweeprate
 end
 
@@ -1026,13 +1020,11 @@ function fdacChar2Num(c1, c2)
 	return (((b1*2^8 + b2)*(maxVal-minVal)/(2^16 - 1))+minVal)
 end
 
-///////////////////////////
-//// Spectrum Analyzer ////
-//////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////// Spectrum Analyzer //////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
 
-function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,ca_amp,plot_linear,nosave])
-	// channels must a comma seperated string, refering
-	// to the numbering in the ScanControllerFastDAC window.
+function FDacSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,ca_amp,plot_linear,nosave])
 	// scanlength is in sec
 	// if linear is set to 1, the spectrum will be plotted on a linear scale
 	variable instrID, scanlength, numAverage, plot_linear, nosave, ca_amp
@@ -1043,162 +1035,181 @@ function FDacSpectrumAnalyzer(instrID,channels,scanlength,[numAverage,comments,c
 	numAverage = paramisDefault(numAverage) ? 1 : numAverage
 	ca_amp = paramisdefault(ca_amp) ? 9 : ca_amp
 	
-	svar sc_fdackeys
-	
-	// num ADC channels
-	channels = ReplaceString(",", channels, ";")  // Convert to Igor standard list separator
-	channels = sortlist(channels,";",2)
-	variable numChannels = itemsinlist(channels)
-	
-	// calculate number of points needed
-	variable samplingFreq = getfadcSpeed(instrID)
-	variable measureFreq = samplingFreq/(numChannels)  // sampling split between channels
-	variable numpts = RoundNum(scanlength*measureFreq,0)
-	
-	// make sure numpts is even otherwise FFT will fail
-	numpts = numpts - mod(numpts,2)
-	
-	// check ADC channels are on FD
-	variable device
-	string dev_channels = getDeviceChannels(channels, device, adc=1)
-	checkInstrIDmatchesDevice(instrID, device) // Aborts if channels aren't on instrID
+	Struct ScanVars S
 
-	// generate waves to hold time series data (This is where data is distributed to in fd_readvstime)
-	string wn = ""
+
+	// Initialize ScanVars
+	initFDscanVars(S, instrID, 0, scanlength, duration=scanlength, x_label="Time /s", y_label="ylabel for spectrum?")
+	S.readVsTime = 1
+
+	// Check things like ADCs on same device
+	SFfd_pre_checks(S)
+
+	// Initialize graphs and waves
+	initializeScan(S)
+
+	// Record data
+	string wavenames = getRecordedFastdacInfo("calc names")  // ";" separated list of recorded calculated waves
 	variable i
-	string time_wavenames = ""
-	for(i=0;i<numChannels;i+=1)
-		wn = "spectrum_timeSeriesADC"+stringfromlist(i,channels)
-		make/o/n=(numpts) $wn = nan
-		setscale/i x, 0, scanlength, $wn
-		time_wavenames = addListItem(wn, time_wavenames, ";", INF)
+	for (i=0; i<numAverage; i++)
+		NEW_Fd_record_values(S, i)		
+		// TODO: Might need to think about how to set time axis on next sweeps (i.e. S.start_time will not be the beginning of each sweep)
+
+		// TODO: Caluculate spectrum from wavenames
+		// TODO: Average spectrum with existing (if i!=0)	
+
 	endfor
 
-	// generate waves to hold time series signal in nA
-	string signal_wavenames = ""
-	for(i=0;i<numChannels;i+=1)
-		wn = "spectrum_signal"+num2istr(i)
-		make/o/n=(numpts, numAverage) $wn = nan
-		setscale/i x, 0, scanlength, $wn
-		signal_wavenames = addListItem(wn, signal_wavenames, ";", INF)
-	endfor
-	
-	// create waves for final fft output
-	string wn_lin = ""
-	string log_freq_wavenames = ""
-	string lin_freq_wavenames = ""
-	for(i=0;i<numChannels;i+=1)
-		wn = "spectrum_fftADC"+stringfromlist(i,channels)
-		make/o/n=(numpts/2) $wn = nan
-		setscale/i x, 0, measureFreq/(2.0), $wn
-		log_freq_wavenames = addListItem(wn, log_freq_wavenames, ";", INF)
-				
-		wn_lin = "spectrum_fftADClin"+stringfromlist(i,channels)
-		make/o/n=(numpts/2) $wn_lin = nan
-		setscale/i x, 0, measureFreq/(2.0), $wn_lin
-		lin_freq_wavenames = addListItem(wn_lin, lin_freq_wavenames, ";", INF)
-	endfor
-	
-	// Dispaly Graphs 
-	string graphIDs, all_graphIDs = ""
-	graphIDs = initializeGraphsForWavenames(time_wavenames, "Time /s", is2d=0, y_label="ADC /mV", spectrum=1)
-	string/g sc_rawGraphs1D = graphIDs  // Tells which graphs to update during tight loop of reading buffer
-	all_graphIDs = all_graphIDs+graphIDs
-		
-	string plot_freq_wavenames = selectString(plot_linear, log_freq_wavenames, lin_freq_wavenames)	
-	string y_label = selectString(plot_linear, "Spectrum [dBnA/sqrt(Hz)]", "Spectrum [nA/sqrt(Hz)]")
-	graphIDs = initializeGraphsForWavenames(plot_freq_wavenames, "Frequency /Hz", is2d=0, y_label=y_label, spectrum=1)
-	all_graphIDs = all_graphIDs+graphIDs
-	arrangeWindows(all_graphIDs)
-
-	// Take measurements
-	variable j
-	for(i=0;i<numAverage;i+=1)
-		// Send command and distribute data to "spectrum_timeSeriesADC#"
-//		fd_readvstime(instrID, channels, numpts, samplingFreq, spectrum_analyser=1)
-		
-		fd_readvstime(instrID, channels, numpts, samplingFreq, named_waves = time_wavenames)
-		
-		// convert time series to spectrum
-		for(j=0;j<numChannels;j+=1)
-			// Get wave with new data 
-			wave timewn = $stringFromList(j, time_wavenames)
-
-			// Copy into 2D waves for saving
-			variable le=dimsize(timewn,0)
-			Make/N=(le,numAverage)/D/O signal // TODO: I'm pretty sure this is wrong, this is being overwritten constantly
-			signal[][i]=timewn[p]*1.0e-3*10^-ca_amp*1e9  // Add to full 2D time series for saving later
-
-			// Convert to nA 
-			duplicate/o/free timewn, fftinput
-			fftinput = fftinput*1.0e-3*10^-ca_amp*1e9  // mV -> V -> A -> nA
-
-			// Save nA version to Signal#
-			wave signal = $stringfromList(j, signal_wavenames)
-			signal[][i] = fftinput[p]
-
-			// Calculate log spectrum
-			wave fftw = calculate_spectrum(fftinput)
-			
-			// Calculate linear spectrum
-			wave fftwlin = calculate_spectrum(fftinput, linear=1)
-
-			// Add to averaged waves
-			wave fftwave = $stringFromList(j, log_freq_wavenames)
-			wave fftwavelin = $stringFromList(j, lin_freq_wavenames)
-			if(i==0) // If first pass, initialize waves
-				fftwave = fftw
-				fftwavelin = fftwlin
-			else  // Else add and average
-				fftwave = fftwave*i + fftw  // So weighting of rows is correct when averaging
-				fftwave = fftwave/(i+1)      // ""
-				
-				fftwavelin = fftwavelin*i + fftwlin
-				fftwavelin = fftwavelin/(i+1)
-			endif
-		endfor
-		doupdate
-	endfor	
-	
-	if (nosave == 0)
-		// save data to "data/spectrum/"
-		nvar sanum
-		if(!NVAR_Exists(sanum))
-			variable/g sanum=1
-		endif
-
-		string filename = "spectrum_"+datestring+"_dat"+num2str(sanum)+".h5"
-		printf "Saving: %s\r" filename
-		// create empty HDF5 container
-		variable hdfid
-		HDF5CreateFile/p=spectrum hdfid as filename
-
-		// save the data to HDF
-		string buffer
-		Make/t/free names = {log_freq_wavenames, lin_freq_wavenames, time_wavenames, signal_wavenames}
-		for(i=0;i<numChannels;i+=1)
-			for(j=0;j<numpnts(names);j++)
-				buffer = StringFromList(i, names[j])
-				initsaveSingleWave(buffer, hdfid, saveName=buffer[9,strlen(buffer)-1])  // Save with "Spectrum_" stripped off the beginning
-			endfor
-		endfor
-		
-		// Copy data to IGOR
-		string wns = selectString(plot_linear, log_freq_wavenames, lin_freq_wavenames)
-		for(i=0;i<numChannels;i+=1)
-			wn = StringFromList(i, wns)
-			sprintf buffer, "Spectrum%d_%d", sanum, i
-			duplicate $wn $buffer
-		endfor
-
-		sanum+=1  // So next opened file will get a new num
-		
-		// Add Config and Sweeplogs to HDF
-		addMetaFiles(num2str(hdfid), logs_only=1, comments=comments)
-
-		initcloseSaveFiles(num2str(hdfid))
+	if (!nosave)
+		EndScan(S) // TODO: Additionally save spectrum to HDF (how?)
 	endif
 end
+// TODO: Finish new Fdacspectrumanalyser then remove these comments
+/////////////////////////// Below is the old FdacSpectrumAnalyser which needs to be rewritten into above!
+// 	svar sc_fdackeys
+	
+	
+// 	// check ADC channels are on FD
+// 	variable device
+// 	string dev_channels = getDeviceChannels(channels, device, adc=1)
+// 	checkInstrIDmatchesDevice(instrID, device) // Aborts if channels aren't on instrID
+
+// 	// generate waves to hold time series data (This is where data is distributed to in fd_readvstime)
+// 	string wn = ""
+// 	variable i
+// 	string time_wavenames = ""
+// 	for(i=0;i<numChannels;i+=1)
+// 		wn = "spectrum_timeSeriesADC"+stringfromlist(i,channels)
+// 		make/o/n=(numpts) $wn = nan
+// 		setscale/i x, 0, scanlength, $wn
+// 		time_wavenames = addListItem(wn, time_wavenames, ";", INF)
+// 	endfor
+
+// 	// generate waves to hold time series signal in nA
+// 	string signal_wavenames = ""
+// 	for(i=0;i<numChannels;i+=1)
+// 		wn = "spectrum_signal"+num2istr(i)
+// 		make/o/n=(numpts, numAverage) $wn = nan
+// 		setscale/i x, 0, scanlength, $wn
+// 		signal_wavenames = addListItem(wn, signal_wavenames, ";", INF)
+// 	endfor
+	
+// 	// create waves for final fft output
+// 	string wn_lin = ""
+// 	string log_freq_wavenames = ""
+// 	string lin_freq_wavenames = ""
+// 	for(i=0;i<numChannels;i+=1)
+// 		wn = "spectrum_fftADC"+stringfromlist(i,channels)
+// 		make/o/n=(numpts/2) $wn = nan
+// 		setscale/i x, 0, measureFreq/(2.0), $wn
+// 		log_freq_wavenames = addListItem(wn, log_freq_wavenames, ";", INF)
+				
+// 		wn_lin = "spectrum_fftADClin"+stringfromlist(i,channels)
+// 		make/o/n=(numpts/2) $wn_lin = nan
+// 		setscale/i x, 0, measureFreq/(2.0), $wn_lin
+// 		lin_freq_wavenames = addListItem(wn_lin, lin_freq_wavenames, ";", INF)
+// 	endfor
+	
+// 	// Dispaly Graphs 
+// 	string graphIDs, all_graphIDs = ""
+// 	graphIDs = initializeGraphsForWavenames(time_wavenames, "Time /s", is2d=0, y_label="ADC /mV", spectrum=1)
+// 	string/g sc_rawGraphs1D = graphIDs  // Tells which graphs to update during tight loop of reading buffer
+// 	all_graphIDs = all_graphIDs+graphIDs
+		
+// 	string plot_freq_wavenames = selectString(plot_linear, log_freq_wavenames, lin_freq_wavenames)	
+// 	string y_label = selectString(plot_linear, "Spectrum [dBnA/sqrt(Hz)]", "Spectrum [nA/sqrt(Hz)]")
+// 	graphIDs = initializeGraphsForWavenames(plot_freq_wavenames, "Frequency /Hz", is2d=0, y_label=y_label, spectrum=1)
+// 	all_graphIDs = all_graphIDs+graphIDs
+// 	arrangeWindows(all_graphIDs)
+
+// 	// Take measurements
+// 	variable j
+// 	for(i=0;i<numAverage;i+=1)
+// 		// Send command and distribute data to "spectrum_timeSeriesADC#"
+// //		fd_readvstime(instrID, channels, numpts, samplingFreq, spectrum_analyser=1)
+
+// 		fd_readvstime(instrID, channels, numpts, samplingFreq, named_waves = time_wavenames)
+		
+// 		// convert time series to spectrum
+// 		for(j=0;j<numChannels;j+=1)
+// 			// Get wave with new data 
+// 			wave timewn = $stringFromList(j, time_wavenames)
+
+// 			// Copy into 2D waves for saving
+// 			variable le=dimsize(timewn,0)
+// 			Make/N=(le,numAverage)/D/O signal // TODO: I'm pretty sure this is wrong, this is being overwritten constantly
+// 			signal[][i]=timewn[p]*1.0e-3*10^-ca_amp*1e9  // Add to full 2D time series for saving later
+
+// 			// Convert to nA 
+// 			duplicate/o/free timewn, fftinput
+// 			fftinput = fftinput*1.0e-3*10^-ca_amp*1e9  // mV -> V -> A -> nA
+
+// 			// Save nA version to Signal#
+// 			wave signal = $stringfromList(j, signal_wavenames)
+// 			signal[][i] = fftinput[p]
+
+// 			// Calculate log spectrum
+// 			wave fftw = calculate_spectrum(fftinput)
+			
+// 			// Calculate linear spectrum
+// 			wave fftwlin = calculate_spectrum(fftinput, linear=1)
+
+// 			// Add to averaged waves
+// 			wave fftwave = $stringFromList(j, log_freq_wavenames)
+// 			wave fftwavelin = $stringFromList(j, lin_freq_wavenames)
+// 			if(i==0) // If first pass, initialize waves
+// 				fftwave = fftw
+// 				fftwavelin = fftwlin
+// 			else  // Else add and average
+// 				fftwave = fftwave*i + fftw  // So weighting of rows is correct when averaging
+// 				fftwave = fftwave/(i+1)      // ""
+				
+// 				fftwavelin = fftwavelin*i + fftwlin
+// 				fftwavelin = fftwavelin/(i+1)
+// 			endif
+// 		endfor
+// 		doupdate
+// 	endfor	
+	
+// 	if (nosave == 0)
+// 		// save data to "data/spectrum/"
+// 		nvar sanum
+// 		if(!NVAR_Exists(sanum))
+// 			variable/g sanum=1
+// 		endif
+
+// 		string filename = "spectrum_"+datestring+"_dat"+num2str(sanum)+".h5"
+// 		printf "Saving: %s\r" filename
+// 		// create empty HDF5 container
+// 		variable hdfid
+// 		HDF5CreateFile/p=spectrum hdfid as filename
+
+// 		// save the data to HDF
+// 		string buffer
+// 		Make/t/free names = {log_freq_wavenames, lin_freq_wavenames, time_wavenames, signal_wavenames}
+// 		for(i=0;i<numChannels;i+=1)
+// 			for(j=0;j<numpnts(names);j++)
+// 				buffer = StringFromList(i, names[j])
+// 				initsaveSingleWave(buffer, hdfid, saveName=buffer[9,strlen(buffer)-1])  // Save with "Spectrum_" stripped off the beginning
+// 			endfor
+// 		endfor
+		
+// 		// Copy data to IGOR
+// 		string wns = selectString(plot_linear, log_freq_wavenames, lin_freq_wavenames)
+// 		for(i=0;i<numChannels;i+=1)
+// 			wn = StringFromList(i, wns)
+// 			sprintf buffer, "Spectrum%d_%d", sanum, i
+// 			duplicate $wn $buffer
+// 		endfor
+
+// 		sanum+=1  // So next opened file will get a new num
+		
+// 		// Add Config and Sweeplogs to HDF
+// 		addMetaFiles(num2str(hdfid), logs_only=1, comments=comments)
+
+// 		initcloseSaveFiles(num2str(hdfid))
+// 	endif
+// end
 
 
 function/WAVE calculate_spectrum(time_series, [scan_duration, linear])
@@ -1798,9 +1809,12 @@ end
 /////////////////////////////////////////////////////////////////////////////////////////
 
 function/s fd_start_sweep(S, [AWG_list])
+	// Starts one of:
+	// regular sweep (INT_RAMP in arduino) 
+	// sweep with arbitrary wave generator on (AWG_RAMP in arduino)
+	// readvstime sweep (SPEC_ANA in arduino)
 	Struct ScanVars &S
 	Struct fdAWG_list &AWG_List
-	// Starts either a regular sweep (INT_RAMP in arduino) or sweep with the arbitrary wave generator on (AWG_RAMP in arduino)
 	assertSeparatorType(S.channelsx, ";")
 	assertSeparatorType(S.ADCList, ";")	
 
@@ -1856,7 +1870,17 @@ function fd_readChunk(fdid, adc_channels, numpts)
 		make/o/n=(numpts) $wn = NaN
 		wavenames = addListItem(wn, wavenames, ";", INF)
 	endfor
-	fd_readvstime(fdid, adc_channels, numpts, getfadcSpeed(fdid), named_waves = wavenames)
+
+	// TODO: Replace this with new_fd_record_values() // Note: needs to not overwrite ADC# waves
+	// fd_readvstime(fdid, adc_channels, numpts, getfadcSpeed(fdid), named_waves = wavenames)
+
+	Struct ScanVars S
+	initFDscanVars(S, fdid, 0, numpts, numptsx=numpts)
+	S.adcList = adc_channels  // Recording specified channels, not ticked boxes in ScanController_Fastdac
+	S.readVsTime = 1  // No ramping
+	S.raw_wave_names = wavenames  // Override the waves the rawdata gets saved to
+
+	new_fd_record_values(S, 0, skip_data_distribution=1)
 end
 
 
