@@ -36,29 +36,6 @@ function ReadVsTime(delay, [y_label, max_time, comments]) // Units: s
 end
 
 
-function ReadVsTimeUntil(delay,readtime, [y_label, comments])
-	variable delay, readtime
-	string y_label, comments
-
-	comments = selectstring(paramisdefault(comments), comments, "")
-	y_label = selectstring(paramisdefault(y_label), y_label, "")
-	
-	Struct ScanVars S
-	initBDscanVars(S, 0, 0, 1, numptsx=0, delayx=delay, x_label="time /s", y_label=y_label, comments=comments)
-	initializeScan(S)
-	S.readVsTime = 1
-
-	variable i=0
-	do
-		sc_sleep(delay)
-		new_RecordValues(S, i, 0)  // Note: Extends waves because readvstime
-		i+=1
-	while(datetime-S.start_time < readtime)
-	S.numptsx = i  
-	EndScan(S=S)
-end
-
-
 function ScanBabyDAC(instrID, start, fin, channels, numpts, delay, ramprate, [y_label, comments, nosave]) //Units: mV
 	// sweep one or more babyDAC channels
 	// channels should be a comma-separated string ex: "0, 4, 5" or "LABEL1,LABEL2" 
