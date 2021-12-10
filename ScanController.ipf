@@ -1492,6 +1492,8 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	variable aborting
 	string additional_wavenames // Any additional wavenames to be saved in the DatHDF (and copied in Igor)
 	
+	additional_wavenames = SelectString(ParamIsDefault(additional_wavenames), additional_wavenames, "")
+	
 	nvar filenum
 	variable current_filenum = filenum  // Because filenum gets incremented in SaveToHDF (to avoid clashing filenums when Igor crashes during saving)
 	save_experiment = paramisDefault(save_experiment) ? 1 : save_experiment

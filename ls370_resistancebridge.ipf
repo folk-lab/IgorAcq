@@ -1196,122 +1196,122 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 	
 	if(gets == 1)
 //		print 	"COMMAND: getLS370analogData(ls370, channel=\"still\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370analogData(ls370, channel="still")
 //		endif
 //		
 //		print 	"COMMAND: getLS370analogParameters(ls370, channel=\"still\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370analogParameters(ls370, channel="still")
 //		endif
 //		
 //		print 	"COMMAND: getLS370temp(ls370, \"mc\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370temp(ls370, "mc")
 //		endif
 //		
 //		print 	"COMMAND: getLS370temp(ls370, \"still\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370temp(ls370, "still")
 //		endif		
 //		
 //		print 	"COMMAND: getLS370temp(ls370, \"4k\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370temp(ls370, "4k")
 //		endif		
 //		
 //		print 	"COMMAND: getLS370temp(ls370, \"magnet\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370temp(ls370, "magnet")
 //		endif
 //		
 //		print 	"COMMAND: getLS370temp(ls370, \"50k\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370temp(ls370, "50k")
 //		endif	
 //		
 //		print 	"COMMAND: getLS370controllerInfo(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370controllerInfo(ls370)
 //		endif	
 //		
 //		print 	"COMMAND: getLS370controllerInfo(ls370, all=1)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370controllerInfo(ls370, all=1)
 //		endif	
 //		
 //		print 	"COMMAND: getLS370loggersSchedule(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370loggersSchedule(ls370)
 //		endif	
 //		
 //		print 	"COMMAND: getLS370heaterpower(ls370 ,\"mc\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370heaterpower(ls370 ,"mc")
 //		endif	
 //		
 //		print 	"COMMAND: getLS370heaterpower(ls370 ,\"still\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370heaterpower(ls370 ,"still")
 //		endif	
 //		   
 //		// TODO: Is return in mA or A?
 //		print 	"COMMAND: getLS370heaterrange(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370heaterrange(ls370)
 //		endif	
 //		
 //		print 	"COMMAND: getLS370controlmode(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370controlmode(ls370)
 //		endif	
 //		   
 //		print 	"COMMAND: getLS370controlParameters(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370controlParameters(ls370)
 //		endif	
 //		   
 //		print 	"COMMAND: getLS370PIDtemp(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370PIDtemp(ls370)
 //		endif	
 //		   
 //		print 	"COMMAND: getLS370PIDparameters(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370PIDparameters(ls370)
 //		endif	
 //		   
 ////////		print 	"COMMAND: \r"
-////////		ans = ask_continue(ask)
+////////		ans = test_lakeshore_ask_continue(ask)
 ////////		if(ans == 1)
 ////////			printf "RETURN: %f\r\r", getLS370tempDB(ls370,plate, [max_age])
 ////////		endif			
 //		
 //		print 	"COMMAND: getLS370status(ls370, max_age_s=0)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370status(ls370, max_age_s=0)
 //		endif	
 //		
 ////////		print 	"COMMAND: getLS370status(ls370, max_age_s=3000)\r"
-////////		ans = ask_continue(ask)
+////////		ans = test_lakeshore_ask_continue(ask)
 ////////		if(ans == 1)
 ////////		   printf "RETURN: %s\r\r", getLS370status(ls370, max_age_s=3000)
 ////////		endif	
@@ -1319,62 +1319,62 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 	
 	if(sets == 1)
 //		print 	"COMMAND: setLS370analogOutputParameters(ls370, channel=\"still\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370analogOutputParameters(ls370, channel="still")
 //		endif
 //
 //		print 	"COMMAND: getLS370analogParameters(ls370, channel=\"still\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370analogParameters(ls370, channel="still")
 //		endif
 ////////			
 /////////////////////// LOGGING SCHEDULES ////////////////////////////////////////////////
 //		print 	"COMMAND: setLS370loggersSchedule(ls370, \"default\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370loggersSchedule(ls370, "default")
 //		endif	
 //		
 //		print 	"COMMAND: getLS370loggersSchedule(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370loggersSchedule(ls370)
 //		endif	
 //		
 //		print 	"COMMAND: setLS370loggersSchedule(ls370, \"mc_exclusive\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370loggersSchedule(ls370, "mc_exclusive")
 //		endif	
 //		
 //		print 	"COMMAND: getLS370loggersSchedule(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370loggersSchedule(ls370)
 //		endif	
 //			
 //		print 	"COMMAND: setLS370loggersSchedule(ls370, \"still_exclusive\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370loggersSchedule(ls370, "still_exclusive")
 //		endif	
 //		
 //		print 	"COMMAND: getLS370loggersSchedule(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370loggersSchedule(ls370)
 //		endif		
 //		
 //		print 	"COMMAND: setLS370loggersSchedule(ls370, \"using_magnet\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370loggersSchedule(ls370, "using_magnet")
 //		endif	
 //		
 //		print 	"COMMAND: getLS370loggersSchedule(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370loggersSchedule(ls370)
 //		endif	
@@ -1383,25 +1383,25 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 
 /////////////////////// HEATER POWERS //////////////////////////////////////////
 //		print 	"COMMAND: setLS370heaterpower(ls370,\"mc\",1)  //1mW heat\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370heaterpower(ls370,"mc",1)  //1mW heat
 //		endif	
 //	
 //		print 	"COMMAND: getLS370heaterpower(ls370 ,\"mc\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370heaterpower(ls370 ,"mc")
 //		endif	
 //	
 //		print 	"COMMAND: setLS370heaterpower(ls370,\"still\",1)  //1mW heat\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370heaterpower(ls370,"still",1)  //1mW heat
 //		endif	
 //			
 //		print 	"COMMAND: getLS370heaterpower(ls370 ,\"still\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370heaterpower(ls370 ,"still")
 //		endif	
@@ -1410,13 +1410,13 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 
 /////////////////////// HEATER RANGES //////////////////////////////////////////
 //		print 	"COMMAND: setLS370heaterRange(ls370, 5)  //5mA max\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370heaterRange(ls370, 5)  //5mA max
 //		endif	
 //		
 //		print 	"COMMAND: getLS370heaterrange(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370heaterrange(ls370)
 //		endif	
@@ -1425,37 +1425,37 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 
 /////////////////////// CONTROL MODES //////////////////////////////////////////		
 //		print 	"COMMAND: setLS370controlMode(ls370, 1)  //PID\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370controlMode(ls370, 1)  //PID
 //		endif	
 //
 //		print 	"COMMAND: getLS370controlmode(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370controlmode(ls370)
 //		endif	
 //		
 //		print 	"COMMAND: setLS370controlMode(ls370, 3)  //PID\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370controlMode(ls370, 3)  //PID
 //		endif	
 //
 //		print 	"COMMAND: getLS370controlmode(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370controlmode(ls370)
 //		endif	
 //			
 //		print 	"COMMAND: setLS370controlMode(ls370, 4)  //off\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370controlMode(ls370, 4)  //off
 //		endif	
 //		
 //		print 	"COMMAND: getLS370controlmode(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370controlmode(ls370)
 //		endif	
@@ -1463,37 +1463,37 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 /////////////////////// END OF CONTROL MODES //////////////////////////////////////////		
 			
 		print 	"COMMAND: setLS370controlParameters(ls370) //sets defaults (can be adapted later to give more control)\r"
-		ans = ask_continue(ask)
+		ans = test_lakeshore_ask_continue(ask)
 		if(ans == 1)
 			setLS370controlParameters(ls370) //sets defaults (can be adapted later to give more control)
 		endif	
 		
 		print 	"COMMAND: getLS370controlParameters(ls370)\r"
-		ans = ask_continue(ask)
+		ans = test_lakeshore_ask_continue(ask)
 		if(ans == 1)
 		   printf "RETURN: %s\r\r", getLS370controlParameters(ls370)
 		endif	
 /////////////////////// PID PARAMS //////////////////////////////////////////		
 //		print 	"COMMAND: setLS370tempSetpoint(ls370,100) //100mK\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370tempSetpoint(ls370,100) //100mK
 //		endif	
 //		
 //		print 	"COMMAND: getLS370PIDtemp(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370PIDtemp(ls370)
 //		endif	
 //
 //		print 	"COMMAND: setLS370PIDparameters(ls370,10,5,0)  // p,i,d: 10, 5, 0\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370PIDparameters(ls370,10,5,0)  // p,i,d: 10, 5, 0
 //		endif	
 //
 //		print 	"COMMAND: getLS370PIDparameters(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370PIDparameters(ls370)
 //		endif	
@@ -1502,7 +1502,7 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 /////////////////////// END OF PID PARAMS //////////////////////////////////////////		
 ////////			
 //		print 	"COMMAND: setLS370heaterOff(ls370)	// mc off\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370heaterOff(ls370)	// mc off
 //		endif	
@@ -1513,25 +1513,25 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 
 ////////			
 //		print 	"COMMAND: setLS370temp(ls370,100,maxcurrent=3.1)  //100mK max 3.1mA\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370temp(ls370,100,maxcurrent=3.1)  //100mK max 3.1mA
 //		endif	
 //
 //		print 	"COMMAND: getLS370heaterrange(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370heaterrange(ls370)
 //		endif	
 //			
 //		print 	"COMMAND: setLS370temp(ls370,200)  //100mK max current set automatically (should be 3.1 or 10)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370temp(ls370,200)  //100mK max current set automatically (should be 3.1 or 10)
 //		endif	
 //
 //		print 	"COMMAND: getLS370heaterrange(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370heaterrange(ls370)
 //		endif	
@@ -1541,37 +1541,37 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 
 /////////////////////// EXCLUSIVE READERS //////////////////////////////////////////		
 //		print 	"COMMAND: setLS370exclusivereader(ls370,\"mc\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370exclusivereader(ls370,"mc")
 //		endif	
 //
 //		print 	"COMMAND: getLS370loggersSchedule(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370loggersSchedule(ls370)
 //		endif	
 //		
 //		print 	"COMMAND: setLS370exclusivereader(ls370,\"still\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370exclusivereader(ls370,"still")
 //		endif	
 //			
 //		print 	"COMMAND: getLS370loggersSchedule(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370loggersSchedule(ls370)
 //		endif	
 //			
 //		print 	"COMMAND: resetLS370exclusivereader(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			resetLS370exclusivereader(ls370)
 //		endif	
 //
 //		print 	"COMMAND: getLS370loggersSchedule(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370loggersSchedule(ls370)
 //		endif	
@@ -1605,13 +1605,15 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 	
 end
 
-function ask_continue(ask)
+
+
+function test_lakeshore_ask_continue(ask)
 	variable ask
 	
 	variable ans
 	if(ask ==1)
-		abort "WARNING: ask user has failed"
-		// ans = ask_user("Send command?", type=2)
+//		abort "WARNING: ask user has failed"
+		ans = ask_user("Send command?", type=2)
 		if (ans == 3)
 			abort
 		endif
