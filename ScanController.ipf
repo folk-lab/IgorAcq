@@ -335,9 +335,14 @@ endstructure
 
 function saveAsLastScanVarsStruct(S)  // TODO: rename to setLastScanVars
 	Struct ScanVars &S
-	// TODO: Make these (note: can't just use StructPut/Get because they only work for numeric entries, not strings...
+	
+	variable st = S.start_time
+	S.start_time = st == 0 ? datetime : S.start_time  // Temporarily make a start_time so at least something is saved in case of abort	 
+	
 	make/o/T sc_lastScanVarsStrings = {S.channelsx, S.channelsy, S.x_label, S.y_label, S.comments, S.adcList, S.startxs, S.finxs, S.startys, S.finys, S.raw_wave_names}
 	make/o/d sc_lastScanVarsVariables = {S.instrID, S.lims_checked, S.startx, S.finx, S.numptsx, S.rampratex, S.delayx, S.is2d, S.starty, S.finy, S.numptsy, S.rampratey, S.delayy, S.direction, S.duration, S.readVsTime, S.start_time, S.end_time, S.using_fastdac, S.numADCs, S.samplingFreq, S.measureFreq, S.sweeprate, S.bdID}
+	
+	S.start_time = st  // Restore to whatever it was before	
 end
 
 
@@ -1130,11 +1135,11 @@ function sc_checksweepstate()
 	
 	if(NVAR_Exists(sc_abortsweep) && sc_abortsweep==1)
 		// If the Abort button is pressed during the scan, save existing data and stop the scan.
-		EndScan(save_experiment=0, aborting=1)  
 		dowindow /k SweepControl
 		sc_abortsweep=0
 		sc_abortnosave=0
 		sc_pause=0
+		EndScan(save_experiment=0, aborting=1)  
 		abort "Measurement aborted by user. Data saved automatically."
 	elseif(NVAR_Exists(sc_abortnosave) && sc_abortnosave==1)
 		// Abort measurement without saving anything!
@@ -1148,11 +1153,11 @@ function sc_checksweepstate()
 		do
 			if(sc_abortsweep)
 //				SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0,fastdac=fastdac)
-				EndScan(save_experiment=0, aborting=1) 
 				dowindow /k SweepControl
 				sc_abortsweep=0
 				sc_abortnosave=0
 				sc_pause=0
+				EndScan(save_experiment=0, aborting=1) 
 				abort "Measurement aborted by user"
 			elseif(sc_abortnosave)
 				dowindow /k SweepControl
@@ -1172,10 +1177,11 @@ end
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Note: Slow ScanContoller ONLY
 
-function sc_ManageThreads(innerIndex, outerIndex, readvstime)
+function sc_ManageThreads(innerIndex, outerIndex, readvstime, is2d, start_time)
 	variable innerIndex, outerIndex, readvstime
+	variable is2d, start_time
 	svar sc_asyncFolders
-	nvar sc_is2d, sc_scanstarttime, sc_numAvailThreads, sc_numInstrThreads
+	nvar sc_numAvailThreads, sc_numInstrThreads
 	wave /WAVE sc_asyncRefs
 
 	variable tgID = ThreadGroupCreate(min(sc_numInstrThreads, sc_numAvailThreads)) // open threads
@@ -1196,8 +1202,8 @@ function sc_ManageThreads(innerIndex, outerIndex, readvstime)
 
 		// start thread
 		threadstart tgID, threadIndex-1, sc_Worker(sc_asyncRefs, innerindex, outerindex, \
-																 StringFromList(i, sc_asyncFolders, ";"), sc_is2d, \
-																 readvstime, sc_scanstarttime)
+																 StringFromList(i, sc_asyncFolders, ";"), is2d, \
+																 readvstime, start_time)
 	endfor
 
 	// wait for all threads to finish and get the rest of the data
@@ -2134,7 +2140,7 @@ function New_RecordValues(S, i, j, [fillnan])  // TODO: Rename
 	//// Setup and run async data collection ////
 	wave sc_measAsync
 	if( (sum(sc_measAsync) > 1) && (fillnan==0))
-		variable tgID = sc_ManageThreads(innerindex, outerindex, S.readvstime) // start threads, wait, collect data
+		variable tgID = sc_ManageThreads(innerindex, outerindex, S.readvstime, S.is2d, S.start_time) // start threads, wait, collect data
 		sc_KillThreads(tgID) // Terminate threads
 	endif
 
@@ -2144,7 +2150,7 @@ function New_RecordValues(S, i, j, [fillnan])  // TODO: Rename
 	variable /g sc_tmpVal  // Used when evaluating measurement scripts from ScanController window
 	string script = "", cmd = ""
 	ii=0
-	do
+	do // TODO: Ideally rewrite this to use get1dWaveNames() but need to be careful about only updating sc_measAsync == 0 ones here...
 		if ((sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1) && sc_measAsync[ii]==0)
 			wave wref1d = $sc_RawWaveNames[ii]
 
@@ -2169,12 +2175,13 @@ function New_RecordValues(S, i, j, [fillnan])  // TODO: Rename
 
 			if (S.is2d == 1)
 				// 2D Wave
-				wave wref2d = $sc_RawWaveNames[ii] + "2d"
+				wave wref2d = $sc_RawWaveNames[ii] + "_2d"
 				wref2d[innerindex][outerindex] = wref1d[innerindex]
 			endif
 		endif
 		ii+=1
 	while (ii < numpnts(sc_RawWaveNames))
+
 
 	//// Calculate interpreted numbers and store them in calculated waves ////
 	ii=0
@@ -2204,7 +2211,7 @@ function New_RecordValues(S, i, j, [fillnan])  // TODO: Rename
 			wref1d[innerindex] = sc_tmpval
 
 			if (S.is2d == 1)
-				wave wref2d = $sc_CalcWaveNames[ii] + "2d"
+				wave wref2d = $sc_CalcWaveNames[ii] + "_2d"
 				wref2d[innerindex][outerindex] = wref1d[innerindex]
 			endif
 		endif

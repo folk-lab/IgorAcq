@@ -371,7 +371,9 @@ function NEW_fd_record_values(S, rowNum, [AWG_list, linestart, skip_data_distrib
 	S.end_time = datetime  
 	
 	// Process 1D read and distribute
-	fdRV_process_and_distribute(S, rowNum) 
+	if (!skip_data_distribution)
+		fdRV_process_and_distribute(S, rowNum) 
+	endif
 end
 
 function fdRV_send_command_and_read(S, AWG_list, rowNum)

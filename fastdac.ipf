@@ -1796,7 +1796,6 @@ function fd_readChunk(fdid, adc_channels, numpts)
 	S.samplingFreq = getFADCspeed(S.instrID)
 	S.raw_wave_names = wavenames  	// Override the waves the rawdata gets saved to
 
-
 	new_fd_record_values(S, 0, skip_data_distribution=1)
 end
 
