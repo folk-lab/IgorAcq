@@ -806,12 +806,11 @@ function/S initializeGraphs(S)
 end
 
 
-function/S initializeGraphsForWavenames(wavenames, x_label, [is2d, y_label, spectrum])
+function/S initializeGraphsForWavenames(wavenames, x_label, [is2d, y_label])
 	// Ensures a graph is open and tiles graphs for each wave in comma separated wavenames
 	// Returns list of graphIDs of active graphs
-	// Spectrum = 1 to use SAnum instead of filenum in plot
 	string wavenames, x_label, y_label
-	variable is2d, spectrum
+	variable is2d
 	
 	y_label = selectString(paramisDefault(y_label), y_label, "")
 	string y_label_2d = y_label
@@ -824,9 +823,9 @@ function/S initializeGraphsForWavenames(wavenames, x_label, [is2d, y_label, spec
 	    wn = StringFromList(i, waveNames)
 	    openGraphID = graphExistsForWavename(wn)
 	    if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-	        setUpGraph1D(openGraphID, x_label, spectrum=spectrum, y_label=y_label_1d)  
+	        setUpGraph1D(openGraphID, x_label, y_label=y_label_1d)  
 	    else 
-	        open1Dgraph(wn, x_label, y_label=y_label, spectrum=spectrum, y_label=y_label_1d)
+	        open1Dgraph(wn, x_label, y_label=y_label, y_label=y_label_1d)
 	        openGraphID = winname(0,1)
 	    endif
        graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
@@ -836,9 +835,9 @@ function/S initializeGraphsForWavenames(wavenames, x_label, [is2d, y_label, spec
 	        wn = wn+"_2d"
 	        openGraphID = graphExistsForWavename(wn)
 	        if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-	            setUpGraph2D(openGraphID, wn, x_label, y_label_2d, spectrum=spectrum)
+	            setUpGraph2D(openGraphID, wn, x_label, y_label_2d)
 	        else 
-	            open2Dgraph(wn, x_label, y_label_2d, spectrum=spectrum)
+	            open2Dgraph(wn, x_label, y_label_2d)
 	            openGraphID = winname(0,1)
 	        endif
            graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
@@ -881,24 +880,22 @@ function/S graphExistsForWavename(wn)
 end
 
 
-function open1Dgraph(wn, x_label, [y_label, spectrum])
+function open1Dgraph(wn, x_label, [y_label])
     // Opens 1D graph for wn
     string wn, x_label, y_label
-    variable spectrum
     
     y_label = selectString(paramIsDefault(y_label), y_label, "")
     
     display $wn
     setWindow kwTopWin, graphicsTech=0
     
-    setUpGraph1D(WinName(0,1), x_label, y_label=y_label, spectrum=spectrum)
+    setUpGraph1D(WinName(0,1), x_label, y_label=y_label)
 end
 
 
-function open2Dgraph(wn, x_label, y_label, [spectrum])
+function open2Dgraph(wn, x_label, y_label)
     // Opens 2D graph for wn
     string wn, x_label, y_label
-    variable spectrum
     wave w = $wn
     if (dimsize(w, 1) == 0)
     	abort "Trying to open a 2D graph for a 1D wave"
@@ -907,14 +904,13 @@ function open2Dgraph(wn, x_label, y_label, [spectrum])
     display
     setwindow kwTopWin, graphicsTech=0
     appendimage $wn
-    setUpGraph2D(WinName(0,1), wn, x_label, y_label, spectrum=spectrum)
+    setUpGraph2D(WinName(0,1), wn, x_label, y_label)
 end
 
 
-function setUpGraph1D(graphID, x_label, [y_label, spectrum])
+function setUpGraph1D(graphID, x_label, [y_label])
     // Sets up the axis labels, and datnum for a 1D graph
     string graphID, x_label, y_label
-    variable spectrum
     
     // Handle Defaults
     y_label = selectString(paramIsDefault(y_label), y_label, "")
@@ -926,21 +922,14 @@ function setUpGraph1D(graphID, x_label, [y_label, spectrum])
 
     Label /W=$graphID left, y_label
 
-    variable num
-    if (spectrum)
-		nvar sanum
-		num = sanum
-	else
-		nvar filenum
-		num = filenum
-	endif
-    TextBox /W=$graphID/C/N=datnum/A=LT/X=1.0/Y=1.0/E=2 "Dat"+num2str(num)
+	nvar filenum
+	
+    TextBox /W=$graphID/C/N=datnum/A=LT/X=1.0/Y=1.0/E=2 "Dat"+num2str(filenum)
 end
 
 
-function setUpGraph2D(graphID, wn, x_label, y_label, [spectrum])
+function setUpGraph2D(graphID, wn, x_label, y_label)
     string graphID, wn, x_label, y_label
-    variable spectrum
     svar sc_ColorMap
     // Sets axis labels, datnum etc
     Label /W=$graphID bottom, x_label
@@ -949,15 +938,8 @@ function setUpGraph2D(graphID, wn, x_label, y_label, [spectrum])
     modifyimage /W=$graphID $wn ctab={*, *, $sc_ColorMap, 0}
     colorscale /c/n=$sc_ColorMap /e/a=rc image=$wn
 
-    variable num
-    if (spectrum)
-		nvar sanum
-		num = sanum
-	else
-		nvar filenum
-		num = filenum
-	endif
-    TextBox /W=$graphID/C/N=datnum/A=LT/X=1.0/Y=1.0/E=2 "Dat"+num2str(num)
+	nvar filenum
+    TextBox /W=$graphID/C/N=datnum/A=LT/X=1.0/Y=1.0/E=2 "Dat"+num2str(filenum)
     
 end
 
@@ -1061,7 +1043,7 @@ function sc_checkBackup()
 
 	GetFileFolderInfo/Z/Q/P=server  // Check if data path is definded
 	if(v_flag != 0 || v_isfolder != 1)
-		print "WARNING[sc_checkBackup]: Only saving local copies of data"
+		print "WARNING[sc_checkBackup]: Only saving local copies of data. Set a server path with \"NewPath server\" (only to folder which contains \"local-measurement-data\")"
 		return 0
 	else
 		// this should also create the path if it does not exist
@@ -1498,7 +1480,7 @@ end
 /////////////////////////  Data/Experiment Saving   ////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-function EndScan([S, save_experiment, aborting])
+function EndScan([S, save_experiment, aborting, additional_wavenames])
 	// Ends a scan:
 	// Saves/Loads current/last ScanVars from global waves
 	// Closes sweepcontrol if open
@@ -1509,6 +1491,7 @@ function EndScan([S, save_experiment, aborting])
 	Struct ScanVars &S  // Note: May not exist so can't be relied upon later
 	variable save_experiment
 	variable aborting
+	string additional_wavenames // Any additional wavenames to be saved in the DatHDF (and copied in Igor)
 	
 	nvar filenum
 	variable current_filenum = filenum  // Because filenum gets incremented in SaveToHDF (to avoid clashing filenums when Igor crashes during saving)
@@ -1534,12 +1517,8 @@ function EndScan([S, save_experiment, aborting])
 	
 	if(S_.using_fastdac == 0)
 		KillDataFolder/z root:async // clean this up for next time
-		SaveToHDF(S_, 0)
-	elseif(S_.using_fastdac == 1)
-		SaveToHDF(S_, 1)
-	else
-		abort "Don't understant S.using_fastdac != (1 | 0)"
 	endif
+	SaveToHDF(S_, additional_wavenames=additional_wavenames)
 
 	nvar sc_save_time
 	if(save_experiment==1 & (datetime-sc_save_time)>180.0)
@@ -1801,10 +1780,10 @@ function initSaveSingleWave(wn, hdf5_id, [saveName])  // TODO: Rename
 end
 
 
-function SaveToHDF(S, fastdac)
+function SaveToHDF(S, [additional_wavenames])
 	// Save last measurement described by S to HDF (inluding meta data etc)
 	Struct ScanVars &S
-	variable fastdac
+	string additional_wavenames  // Any additional waves to save in HDF (note: ; separated list)
 	
 	nvar filenum
 	printf "saving all dat%d files...\r", filenum
@@ -1815,7 +1794,7 @@ function SaveToHDF(S, fastdac)
 	variable raw_hdf5_id, calc_hdf5_id
 	calc_hdf5_id = initOpenSaveFiles(0)
 	string hdfids = num2str(calc_hdf5_id)
-	if (fastdac && sc_Saverawfadc == 1)
+	if (S.using_fastdac && sc_Saverawfadc == 1)
 		raw_hdf5_id = initOpenSaveFiles(1)
 		hdfids = addlistItem(num2str(raw_hdf5_id), hdfids, ";", INF)
 	endif
@@ -1824,13 +1803,13 @@ function SaveToHDF(S, fastdac)
 	// add Meta data to each file
 	addMetaFiles(hdfids, S=S)
 	
-	if (fastdac)
+	if (S.using_fastdac)
 		// Save some fastdac specific waves (sweepgates etc)
 		saveFastdacInfoWaves(hdfids, S)
 	endif
 
 	// Save ScanWaves (e.g. x_array, y_array etc)
-	if(fastdac)
+	if(S.using_fastdac)
 		nvar sc_resampleFreqCheckFadc
 		saveScanWaves(calc_hdf5_id, S, sc_resampleFreqCheckFadc)  // Needs a different x_array size if filtered
 		if (Sc_saveRawFadc == 1)
@@ -1843,25 +1822,34 @@ function SaveToHDF(S, fastdac)
 	// Get waveList to save
 	string RawWaves, CalcWaves
 	if(S.is2d == 0)
-		RawWaves = get1DWaveNames(1, fastdac)
-		CalcWaves = get1DWaveNames(0, fastdac)
+		RawWaves = get1DWaveNames(1, S.using_fastdac)
+		CalcWaves = get1DWaveNames(0, S.using_fastdac)
 	elseif (S.is2d == 1)
-		RawWaves = get2DWaveNames(1, fastdac)
-		CalcWaves = get2DWaveNames(0, fastdac)
+		RawWaves = get2DWaveNames(1, S.using_fastdac)
+		CalcWaves = get2DWaveNames(0, S.using_fastdac)
 	else
 		abort "Not implemented"
 	endif
+	if (S.using_fastdac)  // Figure out better names for the raw data for fastdac scans (before adding additional_wavenames)
+		string rawSaveNames = getRawSaveNames(CalcWaves)  
+	endif
+
+	// Add additional_wavenames to CalcWaves
+	if (!paramIsDefault(additional_wavenames) && strlen(additional_wavenames) > 0)
+		assertSeparatorType(additional_wavenames, ";")
+		CalcWaves += additional_wavenames
+		// TODO: Check this adds the correct ; between strings
+	endif
 	
 	// Copy waves in Experiment
-	if (!S.using_fastdac)
+	if (!S.using_fastdac) // Duplicate all Slow ScanController waves
 		createWavesCopyIgor(RawWaves, filenum-1)  // -1 because already incremented filenum after opening HDF file
 	endif
 	createWavesCopyIgor(CalcWaves, filenum-1)  // -1 because already incremented filenum after opening HDF file
 	
 	// Save to HDF	
-	saveWavesToHDF(CalcWaves, calc_hdf5_id)
-	if(fastdac && sc_SaveRawFadc == 1)
-		string rawSaveNames = getRawSaveNames(CalcWaves)
+	saveWavesToHDF(CalcWaves, calc_hdf5_id)  // Includes saving additional_wavenmaes
+	if(S.using_fastdac && sc_SaveRawFadc == 1)
 		SaveWavesToHDF(RawWaves, raw_hdf5_id, saveNames=rawSaveNames)
 	else
 		saveWavesToHDF(RawWaves, calc_hdf5_id)	// Save all regular ScanController waves in the main hdf file (they are small anyway)
@@ -2964,6 +2952,8 @@ function New_RecordValues(S, i, j, [fillnan])  // TODO: Rename
 		ii+=1
 	while (ii < numpnts(sc_CalcWaveNames))
 
+	S.end_time = datetime // Updates each loop
+
 	// check abort/pause status
 	nvar sc_abortsweep, sc_pause, sc_scanstarttime
 	try
@@ -2981,3 +2971,443 @@ function New_RecordValues(S, i, j, [fillnan])  // TODO: Rename
 	endtry
 end
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////// Pre Scan Checks ///////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+function SFfd_pre_checks(S, [x_only, y_only])
+   struct ScanVars &S
+   variable x_only, y_only  // Whether to only check specific axis (e.g. if other axis is a babydac or something else)
+   
+	SFfd_check_same_device(S) 	// Checks DACs and ADCs are on same device
+	SFfd_check_ramprates(S)	 	// Check ramprates of x and y
+	SFfd_check_lims(S)			// Check within software lims for x and y
+	S.lims_checked = 1  		// So record_values knows that limits have been checked!
+end
+
+
+function SFfd_ramp_start(S, [ignore_lims, x_only, y_only])
+	// move DAC channels to starting point
+	struct ScanVars &S
+	variable ignore_lims, x_only, y_only
+
+	variable i, setpoint
+	// If x exists ramp them to start
+	if(numtype(strlen(s.channelsx)) == 0 && strlen(s.channelsx) != 0 && y_only != 1)  // If not NaN and not ""
+		for(i=0;i<itemsinlist(S.channelsx,";");i+=1)
+			if(S.direction == 1)
+				setpoint = str2num(stringfromlist(i,S.startxs,","))
+			elseif(S.direction == -1)
+				setpoint = str2num(stringfromlist(i,S.finxs,","))
+			else
+				abort "ERROR[SFfd_ramp_start]: S.direction not set to 1 or -1"
+			endif
+			rampOutputfdac(S.instrID,str2num(stringfromlist(i,S.channelsx,";")),setpoint,ramprate=S.rampratex, ignore_lims=ignore_lims)			
+		endfor
+	endif  
+	
+	// If y exists ramp them to start
+	if(numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0 && x_only != 1)  // If not NaN and not "" and not x only
+		for(i=0;i<itemsinlist(S.channelsy,";");i+=1)
+			rampOutputfdac(S.instrID,str2num(stringfromlist(i,S.channelsy,";")),str2num(stringfromlist(i,S.startys,",")),ramprate=S.rampratey, ignore_lims=ignore_lims)
+		endfor
+	endif
+  
+end
+
+
+function SFfd_set_measureFreq(S)
+   struct ScanVars &S
+   S.samplingFreq = getfadcSpeed(S.instrID)
+   S.numADCs = getNumFADC()
+   S.measureFreq = S.samplingFreq/S.numADCs  //Because sampling is split between number of ADCs being read //TODO: This needs to be adapted for multiple FastDacs
+end
+
+function SFfd_check_ramprates(S)
+  // check if effective ramprate is higher than software limits
+  struct ScanVars &S
+
+  wave/T fdacvalstr
+  svar activegraphs
+
+
+	variable kill_graphs = 0
+	// Check x's won't be swept to fast by calculated sweeprate for each channel in x ramp
+	// Should work for different start/fin values for x
+	variable eff_ramprate, answer, i, k, channel
+	string question
+
+	if(!numtype(strlen(s.channelsx)) == 0 == 0 && strlen(s.channelsx) != 0)  // if s.Channelsx != (null or "")
+		for(i=0;i<itemsinlist(S.channelsx,";");i+=1)
+			eff_ramprate = abs(str2num(stringfromlist(i,S.startxs,","))-str2num(stringfromlist(i,S.finxs,",")))*(S.measureFreq/S.numptsx)
+			channel = str2num(stringfromlist(i, S.channelsx, ";"))
+			if(eff_ramprate > str2num(fdacvalstr[channel][4])*1.05 || s.rampratex > str2num(fdacvalstr[channel][4])*1.05)  // Allow 5% too high for convenience
+				// we are going too fast
+				sprintf question, "DAC channel %d will be ramped at Sweeprate: %.1f mV/s and Ramprate: %.1f mV/s, software limit is set to %s mV/s. Continue?", channel, eff_ramprate, s.rampratex, fdacvalstr[channel][4]
+				answer = ask_user(question, type=1)
+				if(answer == 2)
+					kill_graphs = 1
+					break
+				endif
+			endif
+		endfor
+	endif
+  
+	// if Y channels exist, then check against rampratey (not sweeprate because only change on slow axis)	
+	if(numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0  && kill_graphs == 0)  // if s.Channelsy != (NaN or "") and not killing graphs yet 
+		for(i=0;i<itemsinlist(S.channelsy,";");i+=1)
+			channel = str2num(stringfromlist(i, S.channelsy, ";"))
+			if(s.rampratey > str2num(fdacvalstr[channel][4]))
+				sprintf question, "DAC channel %d will be ramped at %.1f mV/s, software limit is set to %s mV/s. Continue?", channel, S.rampratey, fdacvalstr[channel][4]
+				answer = ask_user(question, type=1)
+				if(answer == 2)
+					kill_graphs = 1
+					break
+				endif
+			endif
+		endfor
+	endif
+
+	if(kill_graphs == 1)  // If user selected do not continue, then kill graphs and abort
+		print("[ERROR] \"RecordValues\": User abort!")
+		dowindow/k SweepControl // kill scan control window
+		for(k=0;k<itemsinlist(activegraphs,";");k+=1)
+			dowindow/k $stringfromlist(k,activegraphs,";")
+		endfor
+		abort
+	endif
+  
+end
+
+
+
+function SFfd_check_lims(S)
+	// check that start and end values are within software limits
+	struct ScanVars &S
+
+	wave/T fdacvalstr
+	variable answer, i, k
+	
+	// Make single list out of X's and Y's (checking if each exists first)
+	string channels = "", starts = "", fins = ""
+	if(numtype(strlen(s.channelsx)) == 0 && strlen(s.channelsx) != 0)  // If not NaN and not ""
+		channels = addlistitem(S.channelsx, channels, ",")
+		starts = addlistitem(S.startxs, starts, ",")
+		fins = addlistitem(S.finxs, fins, ",")
+	endif
+	if(numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0)  // If not NaN and not ""
+		channels = addlistitem(S.channelsy, channels, ",")
+		starts = addlistitem(S.startys, starts, ",")
+		fins = addlistitem(S.finys, fins, ",")
+	endif
+
+	// Check channels were concatenated correctly (Seems unnecessary, but possibly killed my device because of this...)
+	if(stringmatch(channels, "*,,*") == 1)
+		abort "ERROR[SFfd_check_lims]: Channels list contains ',,' which means something has gone wrong and limit checking WONT WORK!!"
+	endif
+
+	// Check that start/fin for each channel will stay within software limits
+	string softLimitPositive = "", softLimitNegative = "", expr = "(-?[[:digit:]]+)\\s*,\\s*([[:digit:]]+)", question
+	variable startval = 0, finval = 0
+	string buffer
+	for(i=0;i<itemsinlist(channels,",");i+=1)
+		splitstring/e=(expr) fdacvalstr[str2num(stringfromlist(i,channels,","))][2], softLimitNegative, softLimitPositive
+ 		if(!numtype(str2num(softLimitNegative)) == 0 || !numtype(str2num(softLimitPositive)) == 0)
+ 			sprintf buffer, "No Lower or Upper Limit found for Channel %s. Low limit = %s. High limit = %s, Limit string = %s\r", stringfromlist(i,channels,","), softLimitNegative, softLimitPositive, fdacvalstr[str2num(stringfromlist(i,channels,","))][2]
+ 			abort buffer
+ 		endif
+ 		
+		startval = str2num(stringfromlist(i,starts,","))
+		finval = str2num(stringfromlist(i,fins,","))
+		if(startval < str2num(softLimitNegative) || startval > str2num(softLimitPositive) || finval < str2num(softLimitNegative) || finval > str2num(softLimitPositive))
+			// we are outside limits
+			sprintf question, "DAC channel %s will be ramped outside software limits. Continue?", stringfromlist(i,channels,",")
+			answer = ask_user(question, type=1)
+			if(answer == 2)
+				print("[ERROR] \"RecordValues\": User abort!")
+				dowindow/k SweepControl // kill scan control window
+				abort
+			endif
+		endif
+	endfor		
+end
+
+
+function SFfd_check_same_device(S, [x_only, y_only])
+	// Checks all rampChs and ADCs (selected in fd_scancontroller window)
+	// are on the same device. 
+	struct ScanVars &s
+	variable x_only, y_only // whether to check only one axis (e.g. other is babydac)
+	
+	variable device_dacs
+	variable device_buffer
+	string channels
+	if (!y_only)
+		channels = getDeviceChannels(S.channelsx, device_dacs)  // Throws error if not all channels on one FastDAC
+	endif
+	if (!x_only)
+		channels = getDeviceChannels(S.channelsy, device_buffer)
+		if (device_dacs > 0 && device_buffer > 0 && device_buffer != device_dacs)
+			abort "ERROR[SFfd_check_same_device]: X channels and Y channels are not on same device"  // TODO: Maybe this should raise an error?
+		elseif (device_dacs <= 0 && device_buffer > 0)
+			device_dacs = device_buffer
+		endif
+	endif
+
+	channels = getDeviceChannels(s.AdcList, device_buffer, adc=1)  // Raises error if ADCs aren't on same device
+	if (device_dacs > 0 && device_buffer != device_dacs)
+		abort "ERROR[SFfd_check_same_device]: ADCs are not on the same device as DACs"  // TODO: Maybe should only raise error if x channels not on same device as ADCs?
+	endif	
+	return device_buffer // Return adc device number
+end
+
+
+function SFfd_format_setpoints(start, fin, channels, starts, fins)
+	// Returns strings in starts and fins in the format that fdacRecordValues takes
+	// e.g. fd_format_setpoints(-10, 10, "1,2,3", s, f) will make string s = "-10,-10,-10" and string f = "10,10,10"
+	variable start, fin
+	string channels, &starts, &fins
+	
+	variable i
+	starts = ""
+	fins = ""
+	for(i=0; i<itemsInList(channels, ","); i++)
+		starts = addlistitem(num2str(start), starts, ",", INF)
+		fins = addlistitem(num2str(fin), fins, ",", INF)
+	endfor
+	starts = starts[0,strlen(starts)-2] // Remove comma at end
+	fins = fins[0,strlen(fins)-2]	 		// Remove comma at end
+end
+
+
+function SFbd_pre_checks(S)
+  struct ScanVars &S
+//	SFbd_check_ramprates(S)	 	// Check ramprates of x and y
+	SFbd_check_lims(S)			// Check within software lims for x and y
+	S.lims_checked = 1  		// So record_values knows that limits have been checked!
+end
+
+
+function SFfd_sanitize_setpoints(start_list, fin_list, channels, starts, fins)
+	// Makes sure starts/fins make sense for number of channels and have no bad formatting
+	// Modifies the starts/fins strings passed in
+	string start_list, fin_list, channels
+	string &starts, &fins
+	
+	string buffer
+	
+	assertSeparatorType(channels, ";")  // ";" because already a processed value (e.g. labels -> numbers already happened)
+	assertSeparatorType(start_list, ",")  // "," because entered by user
+	assertSeparatorType(fin_list, ",")	// "," because entered by user
+	
+	if (itemsinlist(channels, ";") != itemsinlist(start_list, ",") || itemsinlist(channels, ";") != itemsinlist(fin_list, ","))
+		sprintf buffer, "length of start_list/fin_list/channels not equal!!! start_list:(%s), fin_list:(%s), channels:(%s)\r", start_list, fin_list, channels
+		abort buffer
+	endif
+	
+	starts = replaceString(" ", start_list, "")
+	fins = replaceString(" ", fin_list, "")
+end
+
+
+function SFbd_check_lims(S, [x_only, y_only])
+	// check that start and end values are within software limits
+   struct ScanVars &S
+   variable x_only, y_only  // Whether to only check one axis (e.g. other is a fastdac)
+	
+	// Make single list out of X's and Y's (checking if each exists first)
+	string all_channels = "", outputs = ""
+	if(!y_only && numtype(strlen(s.channelsx)) == 0 && strlen(s.channelsx) != 0)  // If not NaN and not ""
+		all_channels = addlistitem(S.channelsx, all_channels, "|")
+		outputs = addlistitem(num2str(S.startx), outputs, ",")
+		outputs = addlistitem(num2str(S.finx), outputs, ",")
+	endif
+
+	if(!x_only && numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0)  // If not NaN and not ""
+		all_channels = addlistitem(S.channelsy, all_channels, "|")
+		outputs = addlistitem(num2str(S.starty), outputs, ",")
+		outputs = addlistitem(num2str(S.finy), outputs, ",")
+	endif
+	
+
+	wave/T dacvalstr
+	wave bd_range_span, bd_range_high, bd_range_low
+
+	variable board_index, sw_limit
+	variable answer, i, j, k, channel, output, kill_graphs = 0
+	string channels, abort_msg = "", question
+	for(i=0;i<itemsinlist(all_channels, "|");i++)  		// channelsx then channelsy if it exists
+		channels = stringfromlist(i, all_channels, "|")
+		for(j=0;j<itemsinlist(channels, ";");j++)			// each channel from channelsx/channelsy
+			channel = str2num(stringfromlist(j, channels, ";"))
+			for(k=0;k<2;k++)  									// Start/Fin for each channel
+				output = str2num(stringfromlist(2*i+k, outputs, ","))  // 2 per channelsx/channelsy
+				// Check that the DAC board is initialized
+				bdGetBoard(channel)
+				board_index = floor(channel/4)
+			
+				// check for NAN and INF
+				if(numtype(output) != 0)
+					abort "trying to set voltage to NaN or Inf"
+				endif
+			
+				// Check that the voltage is valid
+				if(output > bd_range_high[board_index] || output < bd_range_low[board_index])
+					sprintf abort_msg, "voltage out of DAC range, %.3fmV", output
+					kill_graphs = 1
+					break
+				endif
+			
+				// check that the voltage is within software limits
+				// if outside, ask user if want to continue anyway
+				sw_limit = str2num(dacvalstr[channel][2])
+				if(abs(output) > sw_limit)
+					sprintf question, "DAC channel %s will be ramped outside software limits. Continue?", stringfromlist(i,channels,";")
+					answer = ask_user(question, type=1)
+					if(answer == 2)
+						sprintf abort_msg "User aborted"
+						kill_graphs = 1
+						break
+					endif
+				endif
+				if(kill_graphs == 1)  // Don't bother checking the rest
+					break
+				endif
+			endfor
+			if(kill_graphs == 1)  // Don't bother checking the rest
+				break
+			endif
+		endfor
+		if(kill_graphs == 1)  // Don't bother checking the rest
+			break
+		endif
+	endfor
+
+	if(kill_graphs == 1)
+		dowindow/k SweepControl // kill scan control window
+		svar activegraphs  // TODO: I don't think this is updated any more, maybe graphs can't be easily killed?
+		for(k=0;k<itemsinlist(activegraphs,";");k+=1)
+			dowindow/k $stringfromlist(k,activegraphs,";")
+		endfor		
+		abort abort_msg
+	endif
+end
+
+
+function SFbd_ramp_start(S, [x_only, y_only, ignore_lims])
+	// move DAC channels to starting point
+	// x_only/y_only to only try ramping x/y to start (e.g. y_only=1 when using a babydac for y-axis of a fastdac scan)
+	struct ScanVars &S
+	variable x_only, y_only, ignore_lims
+
+	variable instrID = (S.bdID) ? S.bdID : S.instrID  // Use S.bdID if it is present  
+	// If x exists ramp them to start
+	if(!y_only && numtype(strlen(s.channelsx)) == 0 && strlen(s.channelsx) != 0)  // If not NaN and not ""
+		RampMultipleBD(instrID, S.channelsx, S.startx, ramprate=S.rampratex, ignore_lims=ignore_lims)
+	endif  
+	
+	// If y exists ramp them to start
+	if(!x_only && numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0)  // If not NaN and not ""
+		RampMultipleBD(instrID, S.channelsy, S.starty, ramprate=S.rampratey, ignore_lims=ignore_lims)
+	endif
+end
+
+
+function SFawg_check_AWG_list(AWG, Fsv)
+	// Check that AWG and FastDAC ScanValues don't have any clashing DACs and check AWG within limits etc
+	struct fdAWG_List &AWG
+	struct ScanVars &Fsv
+	
+	string AWdacs  // Used for storing all DACS for 1 channel  e.g. "123" = Dacs 1,2,3
+	string err_msg
+	variable i=0, j=0
+	
+	// Assert separators are correct
+	assertSeparatorType(AWG.AW_DACs, ",")
+	assertSeparatorType(AWG.AW_waves, ",")
+		
+	// Check initialized
+	if(AWG.initialized == 0)
+		abort "ERROR[SFawg_check_AWG_list]: AWG_List needs to be initialized. Maybe something changed since last use!"
+	endif
+	
+	// Check numADCs hasn't changed since setting up waves
+	if(AWG.numADCs != getNumFADC())
+		abort "ERROR[SFawg_check_AWG_list]: Number of ADCs being measured has changed since setting up AWG, this will change AWG frequency. Set up AWG again to continue"
+	endif
+	
+	// Check measureFreq hasn't change since setting up waves
+	if(AWG.measureFreq != Fsv.measureFreq  || AWG.samplingFreq != Fsv.samplingFreq)
+		sprintf err_msg, "ERROR[SFawg_check_AWG_list]: MeasureFreq has changed from %.2f/s to %.2f/s since setting up AWG. Set up AWG again to continue", AWG.measureFreq, Fsv.measureFreq
+		abort err_msg
+	endif
+	
+	// Check numSteps is an integer and not zero
+	if(AWG.numSteps != trunc(AWG.numSteps) || AWG.numSteps == 0)
+		abort "ERROR[SFawg_check_AWG_list]: numSteps must be an integer, not " + num2str(AWG.numSteps)
+	endif
+			
+	// Check there are DACs set for each AW_wave (i.e. if using 2 AWs, need at least 1 DAC for each)
+	if(itemsInList(AWG.AW_waves, ",") != (itemsinlist(AWG.AW_Dacs,",")))
+		sprintf err_msg "ERROR[SFawg_check_AWG_list]: Number of AWs doesn't match sets of AW_Dacs. AW_Waves: %s; AW_Dacs: %s", AWG.AW_waves, AWG.AW_Dacs
+		abort err_msg
+	endif	
+	
+	// Check no overlap between DACs for sweeping, and DACs for AWG
+	string channel // Single DAC channel
+	string FDchannels = addlistitem(Fsv.Channelsy, Fsv.Channelsx, ";") // combine channels lists
+	for(i=0;i<itemsinlist(AWG.AW_Dacs, ",");i++)
+		AWdacs = stringfromlist(i, AWG.AW_Dacs, ",")
+		for(j=0;j<strlen(AWdacs);j++)
+			channel = AWdacs[j]
+			if(findlistitem(channel, FDchannels, ";") != -1)
+				abort "ERROR[SFawg_check_AWG_list]: Trying to use same DAC channel for FD scan and AWG at the same time"
+			endif
+		endfor
+	endfor
+
+	// Check that all setpoints for each AW_Dac will stay within software limits
+	wave/T fdacvalstr	
+	string softLimitPositive = "", softLimitNegative = "", expr = "(-?[[:digit:]]+),([[:digit:]]+)", question
+	variable setpoint, answer, ch_num
+	for(i=0;i<itemsinlist(AWG.AW_Dacs,",");i+=1)
+		AWdacs = stringfromlist(i, AWG.AW_Dacs, ",")
+		string wn = fdAWG_get_AWG_wave(str2num(stringfromlist(i, AWG.AW_Waves, ",")))  // Get IGOR wave of AW#
+		wave w = $wn
+		duplicate/o/r=[0][] w setpoints  							// Just get setpoints part
+		for(j=0;j<strlen(AWdacs);j++)  // Check for each DAC that will be outputting this wave
+			ch_num = str2num(AWdacs[j])
+			splitstring/e=(expr) fdacvalstr[ch_num][2], softLimitNegative, softLimitPositive
+			for(j=0;j<numpnts(setpoints);j++)	// Check against each setpoint in AW
+				if(setpoint < str2num(softLimitNegative) || setpoint > str2num(softLimitPositive))
+					// we are outside limits
+					sprintf question, "DAC channel %s will be ramped outside software limits. Continue?", AWdacs[j]
+					answer = ask_user(question, type=1)
+					if(answer == 2)
+						print("ERROR[SFawg_check_AWG_list]: User abort!")
+						abort
+					endif
+				endif
+			endfor
+		endfor
+	endfor		
+end
+
+
+function SFawg_set_and_precheck(AWG, S)
+	struct fdAWG_List &AWG
+	struct ScanVars &S
+
+	
+	// Set numptsx in Scan s.t. it is a whole number of full cycles
+	AWG.numSteps = round(S.numptsx/(AWG.waveLen*AWG.numCycles))  
+	S.numptsx = (AWG.numSteps*AWG.waveLen*AWG.numCycles)
+	
+	// Check AWG for clashes/exceeding lims etc
+	SFawg_check_AWG_list(AWG, S)	
+	AWG.use_AWG = 1
+	
+	// Save numSteps in AWG_list for sweeplogs later
+	fdAWG_set_global_AWG_list(AWG)
+end
+	

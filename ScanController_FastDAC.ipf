@@ -125,7 +125,6 @@ function getDeviceInfo(instrID, info)
 	return getDeviceInfoDeviceNum(deviceNum, info)
 end
 
-
 function/S getRecordedFastdacInfo(info_name)  // TODO: Rename if prepending something which implies fd anyway
 	// Return a list of strings for specified column in fadcattr based on whether "record" is ticked
 	// Valid info_name ("calc_names", "raw_names", "calc_funcs", "inputs", "channels")
