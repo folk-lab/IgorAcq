@@ -26,7 +26,6 @@
 // 		-- Improved support for FastDACs (mostly works with multiple fastDACs connected now, although cannot sweep multiple at the same time)
 // 		-- Significant refactoring of functions related to a Scan (i.e. initWaves, saveWaves etc) including opening graphs etc. 
 //			All scans functions work with a ScanVars Struct which contains information about the current scan (instead of many globals)
-// 		-- NOTE: Fully updated for the Fastdac related scans, only partially updated for other scans
 
 
 ////////////////////////////////
@@ -3180,10 +3179,11 @@ function SFfd_format_setpoints(start, fin, channels, starts, fins)
 end
 
 
-function SFbd_pre_checks(S)
+function SFbd_pre_checks(S, [x_only, y_only])
   struct ScanVars &S
+  variable x_only, y_only
 //	SFbd_check_ramprates(S)	 	// Check ramprates of x and y
-	SFbd_check_lims(S)			// Check within software lims for x and y
+	SFbd_check_lims(S, x_only=x_only, y_only=y_only)			// Check within software lims for x and y
 	S.lims_checked = 1  		// So record_values knows that limits have been checked!
 end
 

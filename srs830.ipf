@@ -6,7 +6,7 @@
 // Still a test driver, use InitSRS.
 // Units: mV, nA or Hz
 // Written by Christian/Nik, 2018-05-01
-// Modified by Tim Child, 2020-03
+// Modified by Tim Child to add more set/get commands, 2020-03
 
 /////////////////////////
 /// SRS specific COMM ///

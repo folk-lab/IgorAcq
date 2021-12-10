@@ -1,5 +1,12 @@
+#pragma TextEncoding = "UTF-8"
+#pragma rtGlobals=1		// Use modern global access method
+
+// Standard Scan Functions for both BabyDAC and FastDAC scans
+// Written by Tim Child, 2021-11
+
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////// Standard Scans /////////////////////////////////////////////////////////////////////////
+//////////////////////////////// Standard Scancontroller (Slow) Scans /////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 function ReadVsTime(delay, [y_label, max_time, comments]) // Units: s
 	variable delay, max_time
@@ -100,14 +107,13 @@ function ScanBabyDAC(instrID, start, fin, channels, numpts, delay, ramprate, [y_
 end
 
 
-function ScanBabyDACUntil(instrID, start, fin, channels, numpts, delay, ramprate, checkwave, value, [operator, comments, nosave])
+function ScanBabyDACUntil(instrID, start, fin, channels, numpts, delay, ramprate, checkwave, value, [operator, y_label, comments, nosave])
 	// sweep one or more babyDAC channels until checkwave < (or >) value
 	// channels should be a comma-separated string ex: "0, 4, 5"
 	// operator is "<" or ">", meaning end on "checkwave[i] < value" or "checkwave[i] > value"
 	variable instrID, start, fin, numpts, delay, ramprate, value, nosave
-	string channels, operator, checkwave, comments
+	string channels, operator, checkwave, y_label, comments
 	string x_label
-	variable i=0, j=0, setpoint
 
 	// Set defaults
 	comments = selectstring(paramisdefault(comments), comments, "")
@@ -178,8 +184,8 @@ function ScanBabyDAC2D(instrID, startx, finx, channelsx, numptsx, delayx, rampra
 	
 	// Initialize ScanVars
 	struct ScanVars S
-	InitBDscanVars(S, instrID, start, fin, channelsx=channels, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
-							starty=staty, finy=finy, channelsy=channelsy, numptsy=numptsy, delayy=delayy, rampratey=rampratey, \
+	InitBDscanVars(S, instrID, startx, finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
+							starty=starty, finy=finy, channelsy=channelsy, numptsy=numptsy, delayy=delayy, rampratey=rampratey, \
 	 						comments=comments)
 
 	// Check software limits and ramprate limits
@@ -238,7 +244,7 @@ function ScanBabyDACRepeat(instrID, startx, finx, channelsx, numptsx, delayx, ra
 	
 	// Initialize ScanVars
 	struct ScanVars S
-	InitBDscanVars(S, instrID, start, fin, channelsx=channels, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
+	InitBDscanVars(S, instrID, startx, finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
 							starty=1, finy=numptsy, numptsy=numptsy, delayy=delayy, y_label="Repeats", comments=comments)
 
 	// Check software limits and ramprate limits
@@ -282,7 +288,7 @@ function ScanBabyDACRepeat(instrID, startx, finx, channelsx, numptsx, delayx, ra
   
 	// Save by default
 	if (nosave == 0)
-		SaveWaves(msg=comments)
+		EndScan(S=S)
 	else
 		dowindow /k SweepControl
 	endif
@@ -302,8 +308,8 @@ function ScanBabyDAC_SRSAmplitude(babydacID, srsID, startx, finx, channelsx, num
 	
 	// Initialize ScanVars
 	struct ScanVars S
-	InitBDscanVars(S, babydacID, start, fin, channelsx=channels, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
-							starty=staty, finy=finy, channelsy=channelsy, numptsy=numptsy, delayy=delayy, rampratey=rampratey, \
+	InitBDscanVars(S, babydacID, startx, finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
+							starty=starty, finy=finy, numptsy=numptsy, delayy=delayy, \
 	 						y_label="SRS Amplitude", comments=comments)
 
 	// Check software limits and ramprate limits
@@ -339,20 +345,16 @@ function ScanBabyDAC_SRSAmplitude(babydacID, srsID, startx, finx, channelsx, num
   
 	// Save by default
 	if (nosave == 0)
-		 SaveWaves(msg=comments)
+		EndScan(S=S)
 	else
 		 dowindow /k SweepControl
 	endif
 end
 
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////// Standard FastDAC Scans ///////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-
 function ReadVsTimeFastdac(instrID, duration, [y_label, comments, nosave]) // Units: s 
 	variable instrID, duration, nosave
 	string comments, y_label
@@ -460,7 +462,7 @@ function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate,
 
 	// Initialize ScanVars
 	struct ScanVars S  // Note, more like a BD scan if going slow
-	initBDscanVars(S, instrID, start, fin, channelsx=channels, numptsx=numpts, delayx=delayx, rampratex=ramprate, comments=comments, y_label=y_label)  
+	initBDscanVars(S, instrID, start, fin, channelsx=channels, numptsx=numpts, delayx=delay, rampratex=ramprate, comments=comments, y_label=y_label)  
 	S.using_fastdac = 0 // Explicitly showing that this is not a normal fastDac scan
 
 	// Check limits (not as much to check when using FastDAC slow)
