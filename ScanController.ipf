@@ -62,206 +62,224 @@ function assertSeparatorType(list_string, assert_separator)
 end
 
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////  System Functions /////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-function /S getHostName()
-	// find the name of the computer Igor is running on
-	// Used in saveing Config info
-	string platform = igorinfo(2)
-	string result, hostname, location
-
-	strswitch(platform)
-		case "Macintosh":
-			result = executeMacCmd("hostname")
-			splitstring /E="([a-zA-Z0-9\-]+).(.+)" result, hostname, location
-			return TrimString(LowerStr(hostname))
-		case "Windows":
-			hostname = executeWinCmd("hostname")
-			return TrimString(LowerStr(hostname))
-		default:
-			abort "What operating system are you running?! How?!"
-	endswitch
-end
-
-function /S executeWinCmd(command)
-	// run the shell command
-	// if logFile is selected, put output there
-	// otherwise, return output
-	// Used in getHostName()
-	string command
-	string dataPath = getExpPath("data", full=2)
-
-	// open batch file to store command
-	variable batRef
-	string batchFile = "_execute_cmd.bat"
-	string batchFull = datapath + batchFile
-	Open/P=data batRef as batchFile	// overwrites previous batchfile
-
-	// setup log file paths
-	string logFile = "_execute_cmd.log"
-	string logFull = datapath + logFile
-
-	// write command to batch file and close
-	fprintf batRef,"cmd/c \"%s > \"%s\"\"\r", command, logFull
-	Close batRef
-
-	// execute batch file with output directed to logFile
-	ExecuteScriptText /Z /W=5.0 /B "\"" + batchFull + "\""
-
-	string outputLine, result = ""
-	variable logRef
-	Open/P=data logRef as logFile
-	do
-		FReadLine logRef, outputLine
-		if( strlen(outputLine) == 0 )
-			break
-		endif
-		result += outputLine
-	while( 1 )
-	Close logRef
-
-	DeleteFile /P=data /Z=1 batchFile // delete batch file
-	DeleteFile /P=data /Z=1 logFile   // delete batch file
-	return result
+function/s strTime()
+	// Returns the current time in YYYY-MM-DD;HH-MM-SS format
+	string datetime_str
+	string time_str
+	time_str = secs2time(datetime, 3)
+	sprintf time_str "%s-%s-%s", time_str[0,1], time_str[3,4], time_str[6,7]
+	sprintf datetime_str "%s_%s" secs2Date(datetime, -2), time_str
+	return datetime_str
 end
 
 
-function/S executeMacCmd(command)
-	// http://www.igorexchange.com/node/938
-	// Same purpose as executeWinCmd() for Mac environment
-	// Used in getHostName()
-	string command
-
-	string cmd
-	sprintf cmd, "do shell script \"%s\"", command
-	ExecuteScriptText /UNQ /Z /W=5.0 cmd
-
-	return S_value
+function unixTime()
+	// returns the current unix time in seconds
+	return DateTime - date2secs(1970,1,1) - date2secs(-1,-1,-1)
 end
 
 
-function /S getExpPath(whichpath, [full])
-	// whichpath determines which path will be returned (data, config)
-	// lmd always gives the path to local_measurement_data
-	// if full==0, the path relative to local_measurement_data is returned in Unix style
-	// if full==1, the path relative to local_measurement_data is returned in colon-separated igor style
-	// if full==2, the full path on the local machine is returned in native style
-	// if full==3, the full path is returned in colon-separated igor format
+function roundNum(number,decimalplace) 
+    // to return integers, decimalplace=0
+	variable number, decimalplace
+	variable multiplier
+	multiplier = 10^decimalplace
+	return round(number*multiplier)/multiplier
+end
 
-	string whichpath
-	variable full
 
-	if(paramisdefault(full))
-		full=0
-	endif
+function AppendValue(thewave, thevalue)
+    // Extend wave to add a value
+	wave thewave
+	variable thevalue
+	Redimension /N=(numpnts(thewave)+1) thewave
+	thewave[numpnts(thewave)-1] = thevalue
+end
 
-	pathinfo data // get path info
-	if(V_flag == 0) // check if path is defined
-		abort "data path is not defined!\n"
-	endif
 
-	// get relative path to data
-	string temp1, temp2, temp3
-	SplitString/E="([\w\s\-\:]+)(?i)(local[\s\_\-]measurement[\s\_\-]data)([\w\s\-\:]+)" S_path, temp1, temp2, temp3
+function AppendString(thewave, thestring)
+    // Extendt text wave to add a value
+	wave/t thewave
+	string thestring
+	Redimension /N=(numpnts(thewave)+1) thewave
+	thewave[numpnts(thewave)-1] = thestring
+end
 
-	string platform = igorinfo(2), separatorStr=""
-	if(cmpstr(platform,"Windows")==0)
-		separatorStr="*"
+
+function prompt_user(promptTitle,promptStr)
+    // Popup a user prompt to enter a value
+	string promptTitle, promptStr
+
+	variable x=0
+	prompt x, promptStr
+	doprompt promptTitle, x
+	if(v_flag == 0)
+		return x
 	else
-		separatorStr="/"
+		return nan
 	endif
+end
 
-	strswitch(whichpath)
-		case "lmd":
-			// returns path to local_measurement_data on local machine
-			// always assumes you want the full path
-			if(full==2)
-				return ParseFilePath(5, temp1+temp2+":", separatorStr, 0, 0)
-			elseif(full==3)
-				return temp1+temp2+":"
-			else
-				return ""
+
+function ask_user(question, [type])
+    // Popup a confirmation window to user
+	//type = 0,1,2 for OK, Yes/No, Yes/No/Cancel returns are V_flag = 1: Yes, 2: No, 3: Cancel
+	string question
+	variable type
+	type = paramisdefault(type) ? 1 : type
+	doalert type, question
+	return V_flag
+end
+
+
+function/S GetLabel(channels, [fastdac])
+  // Returns Label name of given channel, defaults to BD# or FD#
+  // Used to get x_label, y_label for init_waves 
+  // Note: Only takes channels as numbers
+	string channels
+	variable fastdac
+
+	variable i=0
+	string channel, buffer, xlabelfriendly = ""
+	wave/t dacvalstr
+	wave/t fdacvalstr
+	for(i=0;i<ItemsInList(channels, ",");i+=1)
+		channel = StringFromList(i, channels, ",")
+
+		if (fastdac == 0)
+			buffer = dacvalstr[str2num(channel)][3] // Grab name from dacvalstr
+			if (cmpstr(buffer, "") == 0)
+				buffer = "BD"+channel
 			endif
-		case "data":
-			// returns path to data relative to local_measurement_data
-			if(full==0)
-				return ReplaceString(":", temp3[1,inf], "/")
-			elseif(full==1)
-				return temp3[1,inf]
-			elseif(full==2)
-				return ParseFilePath(5, temp1+temp2+temp3, separatorStr, 0, 0)
-			elseif(full==3)
-				return S_path
-			else
-				return ""
+		elseif (fastdac == 1)
+			buffer = fdacvalstr[str2num(channel)][3] // Grab name from fdacvalstr
+			if (cmpstr(buffer, "") == 0)
+				buffer = "FD"+channel
 			endif
-		case "config":
-			if(full==0)
-				return ReplaceString(":", temp3[1,inf], "/")+"config/"
-			elseif(full==1)
-				return temp3[1,inf]+"config:"
-			elseif(full==2)
-				if(cmpstr(platform,"Windows")==0)
-					return ParseFilePath(5, temp1+temp2+temp3+"config:", separatorStr, 0, 0)
-				else
-					return ParseFilePath(5, temp1+temp2+temp3, separatorStr, 0, 0)+"config/"
+		else
+			abort "\"GetLabel\": Fastdac flag must be 0 or 1"
+		endif
+
+		if (cmpstr(xlabelfriendly, "") != 0)
+			buffer = ", "+buffer
+		endif
+		xlabelfriendly += buffer
+	endfor
+	return xlabelfriendly + " (mV)"
+end
+
+
+function/s SF_get_channels(channels, [fastdac])
+	// Returns channels as numbers string whether numbers or labels passed
+	// Note: Takes comma separated list, returns ";" separated list (because this is usually where conversion from user input to backend happens)
+	string channels
+	variable fastdac
+	
+	string new_channels = "", err_msg
+	variable i = 0
+	string ch
+	if(fastdac == 1)
+		wave/t fdacvalstr
+		for(i=0;i<itemsinlist(channels, ",");i++)
+			ch = stringfromlist(i, channels, ",")
+			ch = removeLeadingWhitespace(ch)
+			ch = removeTrailingWhiteSpace(ch)
+			if(numtype(str2num(ch)) != 0)
+				duplicate/o/free/t/r=[][3] fdacvalstr fdacnames
+				findvalue/RMD=[][3]/TEXT=ch/TXOP=5 fdacnames
+				if(V_Value == -1)  // Not found
+					sprintf err_msg "ERROR[SF_get_channesl]:No FastDAC channel found with name %s", ch
+					abort err_msg
+				else  // Replace with DAC number
+					ch = fdacvalstr[V_value][0]
 				endif
-			elseif(full==3)
-				return S_path+"config:"
-			else
-				return ""
 			endif
-		case "backup_data":
-			// returns full path to the backup-data directory
-			// always assumes you want the full path
-			
-			pathinfo backup_data // get path info
-			if(V_flag == 0) // check if path is defined
-				abort "backup_data path is not defined!\n"
-			endif
-			
-			if(full==2)
-				return ParseFilePath(5, S_path, separatorStr, 0, 0)
-			elseif(full==3)
-				return S_path
-			else // full=0 or 1
-				return ""
-			endif
-		case "backup_config":
-			// returns full path to the backup-data directory
-			// always assumes you want the full path
-			
-			pathinfo backup_config // get path info
-			if(V_flag == 0) // check if path is defined
-				abort "backup_config path is not defined!\n"
-			endif
-			
-			if(full==2)
-				return ParseFilePath(5, S_path, separatorStr, 0, 0)
-			elseif(full==3)
-				return S_path
-			else // full=0 or 1
-				return ""
-			endif
-		case "setup":
-			if(full==0)
-				return ReplaceString(":", temp3[1,inf], "/")+"setup/"
-			elseif(full==1)
-				return temp3[1,inf]+"config:"
-			elseif(full==2)
-				if(cmpstr(platform,"Windows")==0)
-					return ParseFilePath(5, temp1+temp2+temp3+"setup:", separatorStr, 0, 0)
-				else
-					return ParseFilePath(5, temp1+temp2+temp3, separatorStr, 0, 0)+"setup/"
+			new_channels = addlistitem(ch, new_channels, ";", INF)
+		endfor
+	else  // Babydac
+		wave/t dacvalstr
+		for(i=0;i<itemsinlist(channels, ",");i++)
+			ch = stringfromlist(i, channels, ",")
+			ch = removeLeadingWhitespace(ch)
+			ch = removeTrailingWhiteSpace(ch)
+			if(numtype(str2num(ch)) != 0)
+				duplicate/o/free/t/r=[][3] dacvalstr dacnames
+				findvalue/RMD=[][3]/TEXT=ch/TXOP=0 dacnames
+				if(V_Value == -1)  // Not found
+					sprintf err_msg "ERROR[SF_get_channesl]:No BabyDAC channel found with name %s", ch
+					abort err_msg
+				else  // Replace with DAC number
+					ch = dacvalstr[V_value][0]
 				endif
-			elseif(full==3)
-				return S_path+"setup:"
-			else
-				return ""
 			endif
-	endswitch
+			new_channels = addlistitem(ch, new_channels, ";", INF)
+		endfor
+	endif
+	new_channels = new_channels[0,strlen(new_channels)-2]  // Remove ";" at end (BREAKS LIMIT CHECKING OTHERWISE)
+	return new_channels
+end
+
+
+///////////////////////////////////////////////////////////////
+///////////////// Sleeps/Delays ///////////////////////////////
+///////////////////////////////////////////////////////////////
+function sc_sleep(delay)
+	// sleep for delay seconds
+	// checks for abort window interrupts in mstimer loop (i.e. This works well within Slow Scancontroller measurements, otherwise this locks up IGOR)
+	variable delay
+	delay = delay*1e6 // convert to microseconds
+	variable start_time = stopMStimer(-2) // start the timer immediately
+	nvar sc_abortsweep, sc_pause
+
+	doupdate // do this just once during the sleep function
+	do
+		try
+			sc_checksweepstate()
+		catch
+			variable err = GetRTError(1)
+			string errMessage = GetErrMessage(err)
+		
+			// reset sweep control parameters if igor about button is used
+			if(v_abortcode == -1)
+				sc_abortsweep = 0
+				sc_pause = 0
+			endif
+			
+			//silent abort
+			abortonvalue 1,10
+		endtry
+	while(stopMStimer(-2)-start_time < delay)
+end
+
+
+function asleep(s)
+  	// Sleep function which allows user to abort or continue if sleep is longer than 2s
+	variable s
+	variable t1, t2
+	if (s > 2)
+		t1 = datetime
+		doupdate	
+		sleep/S/C=6/B/Q s
+		t2 = datetime-t1
+		if ((s-t2)>5)
+			printf "User continued, slept for %.0fs\r", t2
+		endif
+	else
+		sc_sleep(s)
+	endif
+end
+
+
+threadsafe function sc_sleep_noupdate(delay)
+	// sleep for delay seconds
+	variable delay
+	delay = delay*1e6 // convert to microseconds
+	variable start_time = stopMStimer(-2) // start the timer immediately
+
+	do
+		sleep /s 0.002
+	while(stopMStimer(-2)-start_time < delay)
+
 end
 
 
@@ -1148,68 +1166,6 @@ function sc_checksweepstate()
 end
 
 
-///////////////////////////////////////////////////////////////
-///////////////// Sleeps/Delays ///////////////////////////////
-///////////////////////////////////////////////////////////////
-function sc_sleep(delay)
-	// sleep for delay seconds
-	// checks for abort window interrupts in mstimer loop (i.e. This works well within Slow Scancontroller measurements, otherwise this locks up IGOR)
-	variable delay
-	delay = delay*1e6 // convert to microseconds
-	variable start_time = stopMStimer(-2) // start the timer immediately
-	nvar sc_abortsweep, sc_pause
-
-	doupdate // do this just once during the sleep function
-	do
-		try
-			sc_checksweepstate()
-		catch
-			variable err = GetRTError(1)
-			string errMessage = GetErrMessage(err)
-		
-			// reset sweep control parameters if igor about button is used
-			if(v_abortcode == -1)
-				sc_abortsweep = 0
-				sc_pause = 0
-			endif
-			
-			//silent abort
-			abortonvalue 1,10
-		endtry
-	while(stopMStimer(-2)-start_time < delay)
-end
-
-
-function asleep(s)
-  	// Sleep function which allows user to abort or continue if sleep is longer than 2s
-	variable s
-	variable t1, t2
-	if (s > 2)
-		t1 = datetime
-		doupdate	
-		sleep/S/C=6/B/Q s
-		t2 = datetime-t1
-		if ((s-t2)>5)
-			printf "User continued, slept for %.0fs\r", t2
-		endif
-	else
-		sc_sleep(s)
-	endif
-end
-
-
-threadsafe function sc_sleep_noupdate(delay)
-	// sleep for delay seconds
-	variable delay
-	delay = delay*1e6 // convert to microseconds
-	variable start_time = stopMStimer(-2) // start the timer immediately
-
-	do
-		sleep /s 0.002
-	while(stopMStimer(-2)-start_time < delay)
-
-end
-
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////// ASYNC handling ///////////////////////////////////////////////////////////////
@@ -1536,443 +1492,6 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 end
 
 
-function initOpenSaveFiles(RawSave)	
-	//open a file and return its ID based on RawSave
-	// Rawsave = 0 to open normal hdf5
-	// Rawsave = 1 to open _RAW hdf5
-	// returns the hdf5_id
-	variable RawSave
-	nvar filenum
-	string filenumstr = ""
-	sprintf filenumstr, "%d", filenum
-	string h5name
-
-
-	if (RawSave == 0)
-		h5name = "dat"+filenumstr+".h5"
-	elseif (RawSave == 1)
-		h5name = "dat"+filenumstr+"_RAW"+".h5"
-	endif
-
-	variable hdf5_id
-	HDF5CreateFile /P=data hdf5_id as h5name // Open HDF5 file
-	if (V_Flag !=0)
-		abort "Failed to open save file. Probably need to run `filenum+=1` so that it isn't trying to create an existing file. And then run EndScan(...) again"
-	endif	
-	return hdf5_id
-end
-
-
-function initcloseSaveFiles(hdf5_id_list)  // TODO: rename
-	// close any files that were created for this dataset
-	string hdf5_id_list	
-	
-	variable i
-	variable hdf5_id
-	for (i=0;i<itemsinlist(hdf5_id_list);i++)
-		hdf5_id = str2num(stringFromList(i, hdf5_id_list))
-
-		HDF5CloseFile /Z hdf5_id // close HDF5 file
-		if (V_flag != 0)
-			Print "HDF5CloseFile failed"
-		endif
-		
-	endfor
-end
-
-
-/////////////////////////////////////////////////////// Sweeplogs /////////////////////////////////////////////////////////////////////////////
-function /s new_sc_createSweepLogs([S, comments])  // TODO: Rename
-	// Creates a Json String which contains information about Scan
-    // Note: Comments is ignored unless ScanVars are not provided
-	Struct ScanVars &S
-    string comments
-	string jstr = ""
-	nvar filenum
-	svar sc_current_config
-
-    if (!paramisDefault(S))
-        comments = S.comments
-    endif
-
-	jstr = addJSONkeyval(jstr, "comment", comments, addQuotes=1)
-	jstr = addJSONkeyval(jstr, "filenum", num2istr(filenum))
-	jstr = addJSONkeyval(jstr, "current_config", sc_current_config, addQuotes = 1)
-	jstr = addJSONkeyval(jstr, "time_completed", Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
-	
-    if (!paramisDefault(S))
-        string buffer = ""
-        buffer = addJSONkeyval(buffer, "x", S.x_label, addQuotes=1)
-        buffer = addJSONkeyval(buffer, "y", S.y_label, addQuotes=1)
-        jstr = addJSONkeyval(jstr, "axis_labels", buffer)
-        jstr = addJSONkeyval(jstr, "time_elapsed", num2numStr(S.end_time-S.start_time))
-        jstr = addJSONkeyval(jstr, "read_vs_time", num2numStr(S.readVsTime))
-        jstr = addJsonKeyval(jstr, "x_channels", ReplaceString(";", S.channelsx, ","))
-        if (S.is2d)   
-	        jstr = addJsonKeyval(jstr, "y_channels", ReplaceString(";", S.channelsy, ","))        
-	     endif
-        if (S.using_fastdac)
-   	        jstr = addJSONkeyval(jstr, "sweeprate", num2numStr(S.sweeprate))  	        
-   	        jstr = addJSONkeyval(jstr, "measureFreq", num2numStr(S.measureFreq))   	           	        
-   	     endif
-    endif
-
-    sc_instrumentLogs(jstr)  // Modifies the jstr to add Instrumt Status (from ScanController Window)
-	return jstr
-end
-
-
-function sc_instrumentLogs(jstr)
-	// Runs all getinstrStatus() functions, and adds results to json string (to be stored in sweeplogs)
-	// Note: all log strings must be valid JSON objects 
-    string &jstr
-
-	wave /t sc_Instr
-	variable i=0, j=0, addQuotes=0
-	string command="", val=""
-	string /G sc_log_buffer=""
-	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
-		sc_log_buffer=""
-		command = TrimString(sc_Instr[i][2])
-		if(strlen(command)>0 && cmpstr(command[0], "/") !=0) // Command and not commented out
-			Execute/Q/Z "sc_log_buffer="+command
-			if(V_flag!=0)
-				print "[ERROR] in sc_createSweepLogs: "+GetErrMessage(V_Flag,2)
-			endif
-			if(strlen(sc_log_buffer)!=0)
-				// need to get first key and value from sc_log_buffer
-				JSONSimple sc_log_buffer
-				wave/t t_tokentext
-				wave w_tokentype, w_tokensize, w_tokenparent
-	
-				for(j=1;j<numpnts(t_tokentext)-1;j+=1)
-					if ( w_tokentype[j]==3 && w_tokensize[j]>0 )
-						if( w_tokenparent[j]==0 )
-							if( w_tokentype[j+1]==3 )
-								val = "\"" + t_tokentext[j+1] + "\""
-							else
-								val = t_tokentext[j+1]
-							endif
-							jstr = addJSONkeyval(jstr, t_tokentext[j], val)
-							break
-						endif
-					endif
-				endfor
-			else
-				print "[WARNING] command failed to log anything: "+command+"\r"
-			endif
-		endif
-	endfor
-end
-
-
-function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
-	// Adds config json string and sweeplogs json string to HDFs as attrs of a group named "metadata"
-	// Note: comments is only used when saving logs_only (otherwise comments are saved from ScanVars.comments)
-	string hdf5_id_list, comments
-	Struct ScanVars &S
-	variable logs_only  // 1=Don't save any sweep information to HDF
-	make/Free/T/N=1 cconfig = {""}
-	cconfig = prettyJSONfmt(sc_createconfig())
-	
-	if (!logs_only)
-		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(new_sc_createSweepLogs(S=S))
-	else
-		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(new_sc_createSweepLogs(comments = comments))
-	endif
-	
-	// Check that prettyJSONfmt actually returned a valid JSON.
-	sc_confirm_JSON(sweep_logs, name="sweep_logs")
-	sc_confirm_JSON(cconfig, name="cconfig")
-
-	// LOOP through the given hdf5_id in list
-	variable i
-	variable hdf5_id
-	for (i=0;i<itemsinlist(hdf5_id_list);i++)
-		hdf5_id = str2num(stringFromList(i, hdf5_id_list))
-
-		
-		// Create metadata
-		// this just creates one big JSON string attribute for the group
-		// its... fine
-		variable /G meta_group_ID
-		HDF5CreateGroup/z hdf5_id, "metadata", meta_group_ID
-		if (V_flag != 0)
-				Print "HDF5OpenGroup Failed: ", "metadata"
-		endif
-
-		
-		HDF5SaveData/z /A="sweep_logs" sweep_logs, hdf5_id, "metadata"
-		if (V_flag != 0)
-				Print "HDF5SaveData Failed: ", "sweep_logs"
-		endif
-		
-		HDF5SaveData/z /A="sc_config" cconfig, hdf5_id, "metadata"
-		if (V_flag != 0)
-				Print "HDF5SaveData Failed: ", "sc_config"
-		endif
-
-		HDF5CloseGroup /Z meta_group_id
-		if (V_flag != 0)
-			Print "HDF5CloseGroup Failed: ", "metadata"
-		endif
-
-		// may as well save this config file, since we already have it
-		sc_saveConfig(cconfig[0])
-		
-	endfor
-end
-
-
-function saveScanWaves(hdfid, S, filtered)
-	// Save x_array and y_array in HDF 
-	// Note: The x_array will have the right dimensions taking into account filtering
-	variable hdfid
-	Struct ScanVars &S
-	variable filtered
-
-
-	if(filtered)
-		make/o/free/N=(postFilterNumpts(S.numptsx, S.measureFreq)) sc_xarray
-	else
-		make/o/free/N=(S.numptsx) sc_xarray
-	endif
-
-	string cmd
-	setscale/I x S.startx, S.finx, sc_xarray
-	sc_xarray = x
-	// cmd = "setscale/I x " + num2str(S.startx) + ", " + num2str(S.finx) + ", \"\", " + "sc_xdata"; execute(cmd)
-	// cmd = "sc_xdata" +" = x"; execute(cmd)
-	HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 sc_xarray, hdfid, "x_array"
-
-	if (S.is2d)
-		make/o/free/N=(S.numptsy) sc_yarray
-		
-		setscale/I x S.starty, S.finy, sc_yarray
-		// cmd = "setscale/I x " + num2str(S.starty) + ", " + num2str(S.finy) + ", \"\", " + "sc_ydata"; execute(cmd)
-		// cmd = "sc_ydata" +" = x"; execute(cmd)
-		sc_yarray = x
-		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 sc_yarray, hdfid, "y_array"
-	endif
-
-	// save x and y arrays
-	if(S.is2d == 2)
-		abort "Not implemented again yet, need to figure out how/where to get linestarts from"
-		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 $"sc_linestart", hdfid, "linestart"
-	endif
-end
-
-
-function initSaveSingleWave(wn, hdf5_id, [saveName])  // TODO: Rename
-	// wave with name 'g1x' as dataset named 'g1x' in hdf5
-	string wn, saveName
-	variable hdf5_id
-
-	saveName = selectString(paramIsDefault(saveName), saveName, wn)
-
-	HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 /Z $wn, hdf5_id, saveName
-	if (V_flag != 0)
-		Print "HDF5SaveData failed: ", wn
-		return 0
-	endif
-
-end
-
-
-function SaveToHDF(S, [additional_wavenames])
-	// Save last measurement described by S to HDF (inluding meta data etc)
-	Struct ScanVars &S
-	string additional_wavenames  // Any additional waves to save in HDF (note: ; separated list)
-	
-	nvar filenum
-	printf "saving all dat%d files...\r", filenum
-
-	nvar/z sc_Saverawfadc  // From ScanControllerFastDAC window 
-	
-	// Open up HDF5 files
-	variable raw_hdf5_id, calc_hdf5_id
-	calc_hdf5_id = initOpenSaveFiles(0)
-	string hdfids = num2str(calc_hdf5_id)
-	if (S.using_fastdac && sc_Saverawfadc == 1)
-		raw_hdf5_id = initOpenSaveFiles(1)
-		hdfids = addlistItem(num2str(raw_hdf5_id), hdfids, ";", INF)
-	endif
-	filenum += 1  // So next created file gets a new num (setting here so that when saving fails, it doesn't try to overwrite next save)
-	
-	// add Meta data to each file
-	addMetaFiles(hdfids, S=S)
-	
-	if (S.using_fastdac)
-		// Save some fastdac specific waves (sweepgates etc)
-		saveFastdacInfoWaves(hdfids, S)
-	endif
-
-	// Save ScanWaves (e.g. x_array, y_array etc)
-	if(S.using_fastdac)
-		nvar sc_resampleFreqCheckFadc
-		saveScanWaves(calc_hdf5_id, S, sc_resampleFreqCheckFadc)  // Needs a different x_array size if filtered
-		if (Sc_saveRawFadc == 1)
-			saveScanWaves(raw_hdf5_id, S, 0)
-		endif
-	else
-		saveScanWaves(calc_hdf5_id, S, 0)
-	endif
-	
-	// Get waveList to save
-	string RawWaves, CalcWaves
-	if(S.is2d == 0)
-		RawWaves = get1DWaveNames(1, S.using_fastdac)
-		CalcWaves = get1DWaveNames(0, S.using_fastdac)
-	elseif (S.is2d == 1)
-		RawWaves = get2DWaveNames(1, S.using_fastdac)
-		CalcWaves = get2DWaveNames(0, S.using_fastdac)
-	else
-		abort "Not implemented"
-	endif
-	if (S.using_fastdac)  // Figure out better names for the raw data for fastdac scans (before adding additional_wavenames)
-		string rawSaveNames = getRawSaveNames(CalcWaves)  
-	endif
-
-	// Add additional_wavenames to CalcWaves
-	if (!paramIsDefault(additional_wavenames) && strlen(additional_wavenames) > 0)
-		assertSeparatorType(additional_wavenames, ";")
-		CalcWaves += additional_wavenames
-		// TODO: Check this adds the correct ; between strings
-	endif
-	
-	// Copy waves in Experiment
-	if (!S.using_fastdac) // Duplicate all Slow ScanController waves
-		createWavesCopyIgor(RawWaves, filenum-1)  // -1 because already incremented filenum after opening HDF file
-	endif
-	createWavesCopyIgor(CalcWaves, filenum-1)  // -1 because already incremented filenum after opening HDF file
-	
-	// Save to HDF	
-	saveWavesToHDF(CalcWaves, calc_hdf5_id)  // Includes saving additional_wavenmaes
-	if(S.using_fastdac && sc_SaveRawFadc == 1)
-		SaveWavesToHDF(RawWaves, raw_hdf5_id, saveNames=rawSaveNames)
-	else
-		saveWavesToHDF(RawWaves, calc_hdf5_id)	// Save all regular ScanController waves in the main hdf file (they are small anyway)
-	endif
-	initcloseSaveFiles(hdfids) // close all files
-end
-
-
-function saveFastdacInfoWaves(hdfids, S)
-	string hdfids
-	Struct ScanVars &S
-	
-	variable i = 0
-
-	make/o/N=(3, itemsinlist(s.channelsx, ",")) sweepgates_x = 0
-	for (i=0; i<itemsinlist(s.channelsx, ","); i++)
-		sweepgates_x[0][i] = str2num(stringfromList(i, s.channelsx, ","))
-		sweepgates_x[1][i] = str2num(stringfromlist(i, s.startxs, ","))
-		sweepgates_x[2][i] = str2num(stringfromlist(i, s.finxs, ","))
-	endfor
-	
-	if (S.is2d && !S.bdID)  // Also Y info (if not using BabyDAC for y-axis)
-		make/o/N=(3, itemsinlist(s.channelsy, ",")) sweepgates_y = 0
-		for (i=0; i<itemsinlist(s.channelsy, ","); i++)
-			sweepgates_y[0][i] = str2num(stringfromList(i, s.channelsy, ","))
-			sweepgates_y[1][i] = str2num(stringfromlist(i, s.startys, ","))
-			sweepgates_y[2][i] = str2num(stringfromlist(i, s.finys, ","))
-		endfor
-	else
-		make/o sweepgates_y = {{NaN, NaN, NaN}}
-	endif
-	
-	
-	nvar sc_AWG_used
-	string wn
-	variable hdfid
-	for(i=0; i<itemsInList(hdfids); i++)
-		hdfid = str2num(stringFromList(i, hdfids))
-		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 /Z sweepgates_x, hdfid
-		if (V_flag != 0)
-			Print "HDF5SaveData failed on sweepgates_x"
-		endif
-		HDF5SaveData /IGOR=-1 /TRAN=1 /WRIT=1 /Z sweepgates_y, hdfid
-		if (V_flag != 0)
-			Print "HDF5SaveData failed on sweepgates_y"
-		endif
-		
-		if (sc_AWG_used == 1)
-			// Add AWs used to HDF file
-			struct fdAWG_list AWG
-			fdAWG_get_global_AWG_list(AWG)
-			variable j
-			for(j=0;j<AWG.numWaves;j++)
-				// Get IGOR AW
-				wn = fdAWG_get_AWG_wave(str2num(stringfromlist(j, AWG.AW_waves, ",")))
-				initsaveSingleWave(wn, hdfid)
-			endfor
-		endif
-	endfor
-end
-
-
-function LogsOnlySave(hdfid, comments)
-	// Save current state of experiment (i.e. most of sweeplogs) but without any specific data from a scan
-	variable hdfid
-	string comments
-
-	abort "Not implemented again yet, need to think about what info to get from createSweepLogs etc"
-	make/o/free/t/n=1 attr_message = "True"
-	HDF5SaveData /A="Logs_Only" attr_message, hdfid, "/"
-
-	string jstr = ""
-//	jstr = prettyJSONfmt(new_sc_createSweepLogs(comments=comments))
-	addMetaFiles(num2str(hdfid), logs_only=1, comments=comments)
-	initcloseSaveFiles(num2str(hdfid))
-end
-
-
-function/t getRawSaveNames(baseNames)
-	// Returns baseName +"_RAW" for baseName in baseNames
-	string baseNames
-	string returnNames = ""
-	variable i
-	for (i=0; i<itemsInList(baseNames); i++)
-		returnNames = addListItem(stringFromList(i, baseNames)+"_RAW", returnNames, ";", INF)
-	endfor
-	return returnNames
-end
-
-
-function saveWavesToHDF(wavesList, hdfID, [saveNames])
-	string wavesList, saveNames
-	variable hdfID
-	
-	saveNames = selectString(paramIsDefault(saveNames), saveNames, wavesList)
-	
-	variable i	
-	string wn, saveName
-	for (i=0; i<itemsInList(wavesList); i++)
-		wn = stringFromList(i, wavesList)
-		saveName = stringFromList(i, saveNames)
-		initSaveSingleWave(wn, hdfID, saveName=saveName)
-	endfor
-end
-
-
-function createWavesCopyIgor(wavesList, filenum, [saveNames])
-	// Duplicate each wave with prefix datXXX so that it's easily accessible in Igor
-	string wavesList, saveNames
-	variable filenum
-
-	saveNames = selectString(paramIsDefault(saveNames), saveNames, wavesList)	
-	
-	variable i	
-	string wn, saveName
-	for (i=0; i<itemsInList(wavesList); i++)
-		wn = stringFromList(i, wavesList)
-		saveName = stringFromList(i, saveNames)
-		saveName = "dat"+num2str(filenum)+saveName
-		duplicate $wn $saveName
-	endfor
-end
-
-
 function SaveNamedWaves(wave_names, comments)
 	// Saves a comma separated list of wave_names to HDF under DatXXX.h5
 	string wave_names, comments
@@ -2013,12 +1532,6 @@ function SaveNamedWaves(wave_names, comments)
 		sc_copyNewFiles(current_filenum, save_experiment=0)		// copy data to server mount point (nvar filenum gets incremented after HDF is opened)
 	endif	
 	
-end
-
-
-function saveExp()
-	SaveExperiment /P=data // save current experiment as .pxp
-	SaveFromPXP(history=1, procedure=1) // grab some useful plain text docs from the pxp
 end
 
 
@@ -2068,260 +1581,6 @@ function sc_saveFuncCall(funcname)
 	fprintf hisfile, "------------------------------------\r\r"
 	
 	close hisfile
-end
-
-
-function SaveFromPXP([history, procedure])
-	// this is all based on Igor Pro Technical Note #3
-	// to save history as plain text: history=1
-	// to save main procedure window as .ipf, procedure=1
-	// if history=0 or procedure=0, they will not be saved
-
-	variable history, procedure
-
-	if(paramisdefault(history))
-		history=1
-	endif
-
-	if(paramisdefault(procedure))
-		procedure=1
-	endif
-
-	if(procedure!=1 && history!=1)
-		// why did you do this?
-		return 0
-	endif
-
-	// open experiment file as read-only
-	// make sure it exists and get total size
-	string expFile = igorinfo(1)+".pxp"
-	variable expRef
-	open /r/z/p=data expRef as expFile
-	if(V_flag!=0)
-		print "Experiment file could not be opened to fetch command history: ", expFile
-		return 0
-	endif
-	FStatus expRef
-	variable totalBytes = V_logEOF
-
-	// find records from PackedFileRecordHeader
-	variable pos = 0
-	variable foundHistory=0, startHistory=0, numHistoryBytes=0
-	variable foundProcedure=0, startProcedure=0, numProcedureBytes=0
-	variable recordType, version, numDataBytes
-	do
-		FSetPos expRef, pos                // go to next header position
-		FBinRead /U/F=2 expRef, recordType // unsigned, two-byte integer
-		recordType = recordType&0x7FFF     // mask to get just the type value
-		FBinRead /F=2 expRef, version      // signed, two-byte integer
-		FBinRead /F=3 expRef, numDataBytes // signed, four-byte integer
-
-		FGetPos expRef // get current file position in V_filePos
-
-		if(recordType==2)
-			foundHistory=1
-			startHistory=V_filePos
-			numHistoryBytes=numDataBytes
-		endif
-
-		if(recordType==5)
-			foundProcedure=1
-			startProcedure=V_filePos
-			numProcedureBytes=numDataBytes
-		endif
-
-		if(foundHistory==1 && foundProcedure==1)
-			break
-		endif
-
-		pos = V_filePos + numDataBytes // set new header position if I need to keep looking
-	while(pos<totalBytes)
-
-	variable warnings=0
-
-	string buffer=""
-	variable bytes=0, t_start=0
-	if(history==1 && foundHistory==1)
-		// I want to save it + I can save it
-
-		string histFile = igorinfo(1)+".history"
-		variable histRef
-		open /p=data histRef as histFile
-
-		FSetPos expRef, startHistory
-
-		buffer=""
-		bytes=0
-		t_start=datetime
-		do
-			FReadLine /N=(numHistoryBytes-bytes) expRef, buffer
-			bytes+=strlen(buffer)
-			fprintf histRef, "%s", buffer
-
-			if(datetime-t_start>2.0)
-				// timeout at 2 seconds
-				// something went wrong
-				warnings += 1
-				print "WARNING: timeout while trying to write out command history"
-				break
-			elseif(strlen(buffer)==0)
-				// this is probably fine
-				break
-			endif
-		while(bytes<numHistoryBytes)
-		close histRef
-
-	elseif(history==1 && foundHistory==0)
-		// I want to save it but I cannot save it
-
-		print "[WARNING] No command history saved"
-		warnings += 1
-
-	endif
-
-	if(procedure==1 && foundProcedure==1)
-		// I want to save it + I can save it
-
-		string procFile = igorinfo(1)+".ipf"
-		variable procRef
-		open /p=data procRef as procFile
-
-		FSetPos expRef, startProcedure
-
-		buffer=""
-		bytes=0
-		t_start=datetime
-		do
-			FReadLine /N=(numProcedureBytes-bytes) expRef, buffer
-			bytes+=strlen(buffer)
-			fprintf procRef, "%s", buffer
-
-			if(datetime-t_start>2.0)
-				// timeout at 2 seconds
-				// something went wrong
-				warnings += 1
-				print "[WARNING] Timeout while trying to write out procedure window"
-				break
-			elseif(strlen(buffer)==0)
-				// this is probably fine
-				break
-			endif
-
-		while(bytes<numProcedureBytes)
-		close procRef
-
-	elseif(procedure==1 && foundProcedure==0)
-		// I want to save it but I cannot save it
-		print "WARNING: no procedure window saved"
-		warnings += 1
-	endif
-
-	close expRef
-end
-
-
-function /S sc_copySingleFile(original_path, new_path, filename)
-	// custom copy file function because the Igor version seems to lead to 
-	// weird corruption problems when copying from a local machine 
-	// to a mounted server drive
-	// this assumes that all the necessary paths already exist
-	
-	string original_path, new_path, filename
-	string op="", np=""
-	
-	if( cmpstr(igorinfo(2) ,"Macintosh")==0 )
-		// using rsync if the machine is a mac
-		//   should speed things up a little bit by not copying full files
-		op = getExpPath(original_path, full=2)
-		np = getExpPath(new_path, full=2)
-		
-		string cmd = ""
-		sprintf cmd, "rsync -a %s %s", op+filename, np
-		executeMacCmd(cmd)
-	else
-		// probably can use rsync here on newer windows machines
-		//   do not currently have one to test
-		op = getExpPath(original_path, full=3)
-		np = getExpPath(new_path, full=3)
-		CopyFile /Z=1 (op+filename) as (np+filename)
-	endif
-end
-
-
-function sc_copyNewFiles(datnum, [save_experiment, verbose] )
-	// locate newly created/appended files and move to backup directory 
-
-	variable datnum, save_experiment, verbose  // save_experiment=1 to save pxp, history, and procedure
-	variable result = 0
-	string tmpname = ""	
-
-	// try to figure out if a path that is needed is missing
-	make /O/T sc_data_paths = {"data", "config", "backup_data", "backup_config"}
-	variable path_missing = 0, k=0
-	for(k=0;k<numpnts(sc_data_paths);k+=1)
-		pathinfo $(sc_data_paths[k])
-		if(V_flag==0)
-			abort "[ERROR] A path is missing. Data not backed up to server."
-		endif
-	endfor
-	
-	// add experiment/history/procedure files
-	// only if I saved the experiment this run
-	if(!paramisdefault(save_experiment) && save_experiment == 1)
-	
-		// add experiment file
-		tmpname = igorinfo(1)+".pxp"
-		sc_copySingleFile("data","backup_data",tmpname)
-
-		// add history file
-		tmpname = igorinfo(1)+".history"
-		sc_copySingleFile("data","backup_data",tmpname)
-
-		// add procedure file
-		tmpname = igorinfo(1)+".ipf"
-		sc_copySingleFile("data","backup_data",tmpname)
-		
-	endif
-
-	// find new data files
-	string extensions = ".h5;"
-	string datstr = "", idxList, matchList
-	variable i, j
-	for(i=0;i<ItemsInList(extensions, ";");i+=1)
-		sprintf datstr, "dat%d*%s", datnum, StringFromList(i, extensions, ";") // grep string
-		idxList = IndexedFile(data, -1, StringFromList(i, extensions, ";"))
-		if(strlen(idxList)==0)
-			continue
-		endif
-		matchList = ListMatch(idxList, datstr, ";")
-		if(strlen(matchlist)==0)
-			continue
-		endif
-
-		for(j=0;j<ItemsInList(matchList, ";");j+=1)
-			tmpname = StringFromList(j,matchList, ";")
-			sc_copySingleFile("data","backup_data",tmpname)
-		endfor
-		
-	endfor
-
-	// add the most recent scan controller config file
-	string configlist="", configpath=""
-	getfilefolderinfo /Q/Z/P=config // check if config folder exists before looking for files
-	if(V_flag==0 && V_isFolder==1)
-		configpath = getExpPath("config", full=1)
-		configlist = greplist(indexedfile(config,-1,".json"),"sc")
-	endif
-
-	if(itemsinlist(configlist)>0)
-		configlist = SortList(configlist, ";", 1+16)
-		tmpname = StringFromList(0,configlist, ";")
-		sc_copySingleFile("config", "backup_config", tmpname )
-	endif
-
-	if(!paramisdefault(verbose) && verbose == 1)
-		print "Copied new files to: " + getExpPath("backup_data", full=2)
-	endif
 end
 
 
@@ -2839,7 +2098,6 @@ end
 ////////////////////////////////////////////
 /// Slow ScanController Recording Data /////
 ////////////////////////////////////////////
-
 function New_RecordValues(S, i, j, [fillnan])  // TODO: Rename
 	// In a 1d scan, i is the index of the loop. j will be ignored.
 	// In a 2d scan, i is the index of the outer (slow) loop, and j is the index of the inner (fast) loop.
@@ -2970,10 +2228,10 @@ function New_RecordValues(S, i, j, [fillnan])  // TODO: Rename
 	endtry
 end
 
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////// Pre Scan Checks ///////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 function SFfd_pre_checks(S, [x_only, y_only])
    struct ScanVars &S
    variable x_only, y_only  // Whether to only check specific axis (e.g. if other axis is a babydac or something else)
@@ -3077,7 +2335,6 @@ function SFfd_check_ramprates(S)
 	endif
   
 end
-
 
 
 function SFfd_check_lims(S)
