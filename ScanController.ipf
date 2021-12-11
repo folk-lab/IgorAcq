@@ -676,12 +676,12 @@ function new_initializeWaves(S)  // TODO: rename
 
     variable numpts  // Numpts to initialize wave with, note: for Filtered data, this number is reduced
     string wavenames, wn
-    variable i, j
-    for (i = 0; i<2; i++) // 0 = Calc, 1 = Raw
-        wavenames = get1DWaveNames(i, S.using_fastdac)
+    variable raw, j
+    for (raw = 0; raw<2; raw++) // (raw = 0 means calc waves)
+        wavenames = get1DWaveNames(raw, S.using_fastdac)
         sanityCheckWavenames(wavenames)
         if (S.using_fastdac)
-	        numpts = (i) ? S.numptsx : postFilterNumpts(S.numptsx, S.measureFreq)  // Selects S.numptsx for i=1(Raw) and calculates numpts for i=0(Calc)
+	        numpts = (raw) ? S.numptsx : postFilterNumpts(S.numptsx, S.measureFreq)  
 	     else
 	     	numpts = S.numptsx
 	     endif
@@ -690,21 +690,14 @@ function new_initializeWaves(S)  // TODO: rename
             init1DWave(wn, numpts, S.startx, S.finx)
             if (S.is2d == 1)
                 init2DWave(wn+"_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
-            elseif (S.is2d == 2)
-                abort "Need to fix how waves are initialized, i.e. need to replicate something like the commented code below instead of just init1Dwave(...)"
-					// cmd = "make /o/n=(1, " + num2istr(sc_numptsy) + ") " + wn2d + "=NaN"; execute(cmd) //Makes 1 by y wave, x is redimensioned in recordline
-					// cmd = "setscale /P x, 0, " + num2str((sc_finx-sc_startx)/sc_numptsx) + "," + wn2d; execute(cmd) //sets x scale starting from 0 but with delta correct
-					// cmd = "setscale /i y, " + num2str(sc_starty) + ", " + num2str(sc_finy) + ", " + wn2d; execute(cmd)//Useful to see if top and bottom of scan are filled with NaNs
             endif
         endfor
     endfor
 
-    // If a linecut scan, then initialize the Row start X value wave
-    if (S.is2d == 2) 
-        init1DWave("sc_linestart", numpts, S.starty, S.finy)  // Wave to store first X value for each sweep
-    endif
-
-    // TODO: This is where x_array and y_array were made, but that should just be done in the savewaves part now
+	// Setup Async measurements if not doing a fastdac scan (workers will look for data made here)
+	if (!S.using_fastdac) 
+		sc_findAsyncMeasurements()
+	endif
 end
 
 
