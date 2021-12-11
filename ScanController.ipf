@@ -138,6 +138,8 @@ function/S GetLabel(channels, [fastdac])
   // Note: Only takes channels as numbers
 	string channels
 	variable fastdac
+	
+	assertSeparatorType(channels, ",")
 
 	variable i=0
 	string channel, buffer, xlabelfriendly = ""
@@ -171,9 +173,11 @@ end
 
 function/s SF_get_channels(channels, [fastdac])
 	// Returns channels as numbers string whether numbers or labels passed
-	// Note: Takes comma separated list, returns ";" separated list (because this is usually where conversion from user input to backend happens)
+	// Note: Returns "," separated list, because channels is quite often user entered
 	string channels
 	variable fastdac
+	
+	assertSeparatorType(channels, ",")
 	
 	string new_channels = "", err_msg
 	variable i = 0
@@ -194,7 +198,7 @@ function/s SF_get_channels(channels, [fastdac])
 					ch = fdacvalstr[V_value][0]
 				endif
 			endif
-			new_channels = addlistitem(ch, new_channels, ";", INF)
+			new_channels = addlistitem(ch, new_channels, ",", INF)
 		endfor
 	else  // Babydac
 		wave/t dacvalstr
@@ -212,7 +216,7 @@ function/s SF_get_channels(channels, [fastdac])
 					ch = dacvalstr[V_value][0]
 				endif
 			endif
-			new_channels = addlistitem(ch, new_channels, ";", INF)
+			new_channels = addlistitem(ch, new_channels, ",", INF)
 		endfor
 	endif
 	new_channels = new_channels[0,strlen(new_channels)-2]  // Remove ";" at end (BREAKS LIMIT CHECKING OTHERWISE)
@@ -411,6 +415,7 @@ function initFDscanVars(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
     string comments
     variable direction
 	
+	// Ensure optional strings aren't null
 	channelsy = selectString(paramIsDefault(channelsy), channelsy, "")
 	startys = selectString(paramIsDefault(startys), startys, "")
 	finys = selectString(paramIsDefault(finys), finys, "")
@@ -424,12 +429,13 @@ function initFDscanVars(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
 	
     // Handle Optional Parameters
     S.numptsx = paramisdefault(numptsx) ? NaN : numptsx
-    S.rampratex = paramisDefault(rampratex) ? NaN : rampratex
+    S.rampratex = paramisDefault(rampratex) ? Nan : rampratex
     S.delayx = paramisDefault(delayx) ? NaN : delayx
 
-    S.sweeprate = paramisdefault(sweeprate) ? NaN : sweeprate  // TODO: Should this be different?
+    S.sweeprate = paramisdefault(sweeprate) ? NaN : sweeprate
+    S.duration = paramIsDefault(duration) ? NaN : duration    
 
-	S.numptsy = paramisdefault(numptsy) ? NaN : numptsy
+	 S.numptsy = paramisdefault(numptsy) ? NaN : numptsy
     S.rampratey = paramisdefault(rampratey) ? NaN : rampratey
     S.delayy = paramisdefault(delayy) ? NaN : delayy
 
@@ -442,8 +448,13 @@ function initFDscanVars(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
 	// For repeat scans 
     S.direction = paramisdefault(direction) ? 1 : direction
    	
-   	// Sets channelsx, channelsy and is2d
+   	// Sets channelsx, channelsy
     sv_setChannels(S, channelsx, channelsy, fastdac=1)
+    
+    // Set if 2D (Repeats or true 2D)
+    if (numptsy > 0)
+    	S.is2d = 1
+    endif
     
    	// Get Labels for graphs
    	S.x_label = selectString(strlen(x_label) > 0, GetLabel(S.channelsx, fastdac=1), x_label)  // Uses channels as list of numbers, and only if x_label not passed in
@@ -466,7 +477,7 @@ function initFDscanVars(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
 end
 
 
-function initBDscanVars(S, instrID, startx, finx, [channelsx, numptsx, sweeprate, delayx, rampratex, starty, finy, channelsy, numptsy, rampratey, delayy, direction, x_label, y_label, comments])
+function initBDscanVars(S, instrID, startx, finx, [channelsx, numptsx, delayx, rampratex, starty, finy, channelsy, numptsy, rampratey, delayy, direction, x_label, y_label, comments])
     // Function to make setting up scanVars struct easier for FastDAC scans
     // PARAMETERS:
     // startx, finx, starty, finy -- Single start/fin point for all channelsx/channelsy
@@ -478,50 +489,56 @@ function initBDscanVars(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
     variable starty, finy, numptsy, delayy, rampratey
     string channelsx
     string channelsy
-    variable direction, sweeprate
+    variable direction
     string x_label, y_label
     string comments
     
-	// Handle Optional Parameters
-	x_label = selectString((paramIsDefault(x_label) || numtype(strlen(x_label)) == 2), x_label, "")
-	channelsx = selectString(paramisdefault(channelsx), channelsx, "")
+	 // Handle Optional Parameters
+	 x_label = selectString((paramIsDefault(x_label) || numtype(strlen(x_label)) == 2), x_label, "")
+	 channelsx = selectString(paramisdefault(channelsx), channelsx, "")
 	
-	y_label = selectString((paramIsDefault(y_label) || numtype(strlen(y_label)) == 2), y_label, "")
-	channelsy = selectString(paramisdefault(channelsy), channelsy, "")
+	 y_label = selectString((paramIsDefault(y_label) || numtype(strlen(y_label)) == 2), y_label, "")
+	 channelsy = selectString(paramisdefault(channelsy), channelsy, "")
 	
     S.comments = selectString(paramIsDefault(comments), comments, "")
+    
     S.startx = startx
     S.finx = finx
     s.numptsx = paramisdefault(numptsx) ? NaN : numptsx
     s.rampratex = paramisDefault(rampratex) ? NaN : rampratex
     s.delayx = paramisDefault(delayx) ? NaN : delayx
-
-    s.sweeprate = paramisdefault(sweeprate) ? NaN : sweeprate  // TODO: Should this be different?
 	
-	s.starty = starty
-	S.finy = finy
-	s.numptsy = paramisdefault(numptsy) ? NaN : numptsy
+	 s.starty = starty
+	 s.finy = finy
+	 s.numptsy = paramisdefault(numptsy) ? NaN : numptsy
     s.rampratey = paramisdefault(rampratey) ? NaN : rampratey
     s.delayy = paramisdefault(delayy) ? NaN : delayy
-    
+        
 	// Set Variables in Struct
     s.instrID = instrID
 
 	// For repeat scans 
     s.direction = paramisdefault(direction) ? 1 : direction
    	
-   	// Sets channelsx, channelsy and is2d
+   	// Sets channelsx, channelsy
     sv_setChannels(S, channelsx, channelsy, fastdac=0)
+    
+    // Set if 2D (Repeats or true 2D)
+    if (numptsy > 0)
+    	S.is2d = 1
+    endif
     
    	// Get Labels for graphs
    	S.x_label = selectString(strlen(x_label) > 0, GetLabel(S.channelsx, fastdac=0), x_label)  // Uses channels as list of numbers, and only if x_label not passed in
-   	if (S.is2d)
+   	if (S.is2d && strlen(y_label) == 0)
 	   	S.y_label = selectString(strlen(y_label) > 0, GetLabel(S.channelsy, fastdac=0), y_label) 
 	else
 		S.y_label = y_label
 	endif
    	
    	// Used for Fastdac
+   	S.sweeprate = NaN
+   	S.duration = NaN
    	S.startxs = ""
    	S.finxs = ""
    	S.startys = ""
@@ -538,6 +555,10 @@ function sv_setNumptsSweeprate(S)
    		S.sweeprate = 0
    	endif
    
+   S.numptsx = numtype(S.numptsx) == 0 ? S.numptsx : 0
+   S.sweeprate = numtype(S.sweeprate) == 0 ? S.sweeprate : 0
+   S.duration = numtype(S.duration) == 0 ? S.duration : 0      
+   
    // Chose which input to use for numpts of scan
 	if (S.numptsx == 0 && S.sweeprate == 0 && S.duration == 0)
 	    abort "ERROR[ScanFastDac]: User must provide either numpts OR sweeprate OR duration for scan (none provided)"
@@ -550,7 +571,7 @@ function sv_setNumptsSweeprate(S)
     	S.numptsx = fd_get_numpts_from_sweeprate(S.startx, S.finx, S.sweeprate, S.measureFreq)
 		S.duration = S.numptsx/S.measureFreq
 	elseif (S.duration!=0)  // If duration provided, calculate numpts required
-		S.numptsx = S.measureFreq*S.duration
+		S.numptsx = round(S.measureFreq*S.duration)
 		S.sweeprate = fd_get_sweeprate_from_numpts(S.startx, S.finx, S.numptsx, S.measureFreq)
 		if (numtype(S.sweeprate) != 0)  // TODO: Is this the right check? (For a start=fin=0 scan)
 			S.sweeprate = NaN
@@ -569,7 +590,6 @@ end
 
 function sv_setChannels(S, channelsx, channelsy, [fastdac])
     // Set S.channelsx and S.channelys converting channel labels to numbers where necessary
-    // Note: Also sets S.is2d
     struct ScanVars &S
     string channelsx, channelsy
     variable fastdac
@@ -577,13 +597,9 @@ function sv_setChannels(S, channelsx, channelsy, [fastdac])
     s.channelsx = SF_get_channels(channelsx, fastdac=fastdac)
 
 	if (numtype(strlen(channelsy)) != 0 || strlen(channelsy) == 0)  // No Y set at all
-		s.starty = NaN
-		s.finy = NaN
 		s.channelsy = ""
-        s.is2d = 0
 	else
 		s.channelsy = SF_get_channels(channelsy, fastdac=fastdac)
-       s.is2d = 1
     endif
 end
 
@@ -614,7 +630,7 @@ function sv_setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy, 
 
     // If 2D then set Y
     if (S.is2d) 
-        if ((numtype(strlen(startys)) != 0 || strlen(startys) == 0) && (numtype(strlen(finys)) != 0 || strlen(finys) == 0))  // Single start/end for Y
+        if (strlen(startys) == 0 && strlen(finys) == 0)  // Single start/end for Y
             s.starty = starty
             s.finy = finy	
             SFfd_format_setpoints(S.starty, S.finy, S.channelsy, starts, fins)  
@@ -706,6 +722,17 @@ function init1DWave(wn, numpts, start, fin)
     string wn
     variable numpts, start, fin
     string cmd
+    
+    if (numtype(numpts) != 0 || numpts==0)
+		sprintf cmd "ERROR[init1DWave]: Invalid numpts for wn = %s. numpts either 0 or NaN", wn
+    	abort cmd
+    elseif (numtype(start) != 0 || numtype(fin) != 0)
+    	sprintf cmd "ERROR[init1DWave]: Invalid range passed for wn = %s. numtype(start) = %d, numtype(fin) = %d" wn, numtype(start), numtype(fin)
+    elseif (start == fin)
+	   	sprintf cmd "ERROR[init1Dwave]: Invalid range passed for wn = %s. start = %.3f, fin = %.3f", wn, start, fin
+	   	abort cmd
+   endif
+    
     make/O/n=(numpts) $wn = NaN  
     cmd = "setscale/I x " + num2str(start) + ", " + num2str(fin) + ", " + wn; execute(cmd)
 end
@@ -716,6 +743,21 @@ function init2DWave(wn, numptsx, startx, finx, numptsy, starty, finy)
     string wn
     variable numptsx, startx, finx, numptsy, starty, finy
     string cmd
+    
+    if (numtype(numptsx) != 0 || numptsx == 0)
+		sprintf cmd "ERROR[init1DWave]: Invalid numptsx for wn = %s. numptsx either 0 or NaN", wn
+    	abort cmd
+    elseif (numtype(numptsy) != 0 || numptsy == 0)
+		sprintf cmd "ERROR[init1DWave]: Invalid numptsy for wn = %s. numptsy either 0 or NaN", wn
+    	abort cmd    	
+    elseif (numtype(startx) != 0 || numtype(finx) != 0 || numtype(starty) != 0 || numtype(finy) != 0)
+    	sprintf cmd "ERROR[init2DWave]: Invalid range passed for wn = %s. numtype(startx) = %d, numtype(finx) = %d, numtype(starty) = %d, numtype(finy) = %d" wn, numtype(startx), numtype(finx), numtype(starty), numtype(finy)
+    	abort cmd
+    elseif (startx == finx || starty == finy)
+	   	sprintf cmd "ERROR[init2Dwave]: Invalid range passed for wn = %s. startx = %.3f, finx = %.3f, starty = %.3f, finy = %.3f", wn, startx, finx, starty, finy
+	   	abort cmd
+   endif
+    
     make/O/n=(numptsx, numptsy) $wn = NaN  // TODO: can put in a cmd and execute if necessary
     cmd = "setscale/I x " + num2str(startx) + ", " + num2str(finx) + ", " + wn; execute(cmd)
 	cmd = "setscale/I y " + num2str(starty) + ", " + num2str(finy) + ", " + wn; execute(cmd)
@@ -2250,10 +2292,12 @@ function SFfd_ramp_start(S, [ignore_lims, x_only, y_only])
 	struct ScanVars &S
 	variable ignore_lims, x_only, y_only
 
+
+
 	variable i, setpoint
 	// If x exists ramp them to start
 	if(numtype(strlen(s.channelsx)) == 0 && strlen(s.channelsx) != 0 && y_only != 1)  // If not NaN and not ""
-		for(i=0;i<itemsinlist(S.channelsx,";");i+=1)
+		for(i=0;i<itemsinlist(S.channelsx,",");i+=1)
 			if(S.direction == 1)
 				setpoint = str2num(stringfromlist(i,S.startxs,","))
 			elseif(S.direction == -1)
@@ -2261,14 +2305,15 @@ function SFfd_ramp_start(S, [ignore_lims, x_only, y_only])
 			else
 				abort "ERROR[SFfd_ramp_start]: S.direction not set to 1 or -1"
 			endif
-			rampOutputfdac(S.instrID,str2num(stringfromlist(i,S.channelsx,";")),setpoint,ramprate=S.rampratex, ignore_lims=ignore_lims)			
+			rampMultipleFDAC(S.instrID,stringfromlist(i,S.channelsx,","),setpoint,ramprate=S.rampratex, ignore_lims=ignore_lims)
 		endfor
 	endif  
 	
 	// If y exists ramp them to start
 	if(numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0 && x_only != 1)  // If not NaN and not "" and not x only
-		for(i=0;i<itemsinlist(S.channelsy,";");i+=1)
-			rampOutputfdac(S.instrID,str2num(stringfromlist(i,S.channelsy,";")),str2num(stringfromlist(i,S.startys,",")),ramprate=S.rampratey, ignore_lims=ignore_lims)
+		assertSeparatorType(S.channelsy, ",")
+		for(i=0;i<itemsinlist(S.channelsy,",");i+=1)
+			rampMultipleFDAC(S.instrID,stringfromlist(i,S.channelsy,","),str2num(stringfromlist(i,S.startys,",")),ramprate=S.rampratey, ignore_lims=ignore_lims)
 		endfor
 	endif
   
@@ -2297,9 +2342,10 @@ function SFfd_check_ramprates(S)
 	string question
 
 	if(!numtype(strlen(s.channelsx)) == 0 == 0 && strlen(s.channelsx) != 0)  // if s.Channelsx != (null or "")
-		for(i=0;i<itemsinlist(S.channelsx,";");i+=1)
+		assertSeparatorType(S.channelsx, ",")
+		for(i=0;i<itemsinlist(S.channelsx,",");i+=1)
 			eff_ramprate = abs(str2num(stringfromlist(i,S.startxs,","))-str2num(stringfromlist(i,S.finxs,",")))*(S.measureFreq/S.numptsx)
-			channel = str2num(stringfromlist(i, S.channelsx, ";"))
+			channel = str2num(stringfromlist(i, S.channelsx, ","))
 			if(eff_ramprate > str2num(fdacvalstr[channel][4])*1.05 || s.rampratex > str2num(fdacvalstr[channel][4])*1.05)  // Allow 5% too high for convenience
 				// we are going too fast
 				sprintf question, "DAC channel %d will be ramped at Sweeprate: %.1f mV/s and Ramprate: %.1f mV/s, software limit is set to %s mV/s. Continue?", channel, eff_ramprate, s.rampratex, fdacvalstr[channel][4]
@@ -2314,8 +2360,9 @@ function SFfd_check_ramprates(S)
   
 	// if Y channels exist, then check against rampratey (not sweeprate because only change on slow axis)	
 	if(numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0  && kill_graphs == 0)  // if s.Channelsy != (NaN or "") and not killing graphs yet 
-		for(i=0;i<itemsinlist(S.channelsy,";");i+=1)
-			channel = str2num(stringfromlist(i, S.channelsy, ";"))
+		assertSeparatorType(S.channelsy, ",")
+		for(i=0;i<itemsinlist(S.channelsy,",");i+=1)
+			channel = str2num(stringfromlist(i, S.channelsy, ","))
 			if(s.rampratey > str2num(fdacvalstr[channel][4]))
 				sprintf question, "DAC channel %d will be ramped at %.1f mV/s, software limit is set to %s mV/s. Continue?", channel, S.rampratey, fdacvalstr[channel][4]
 				answer = ask_user(question, type=1)
@@ -2455,12 +2502,12 @@ function SFfd_sanitize_setpoints(start_list, fin_list, channels, starts, fins)
 	
 	string buffer
 	
-	assertSeparatorType(channels, ";")  // ";" because already a processed value (e.g. labels -> numbers already happened)
+	assertSeparatorType(channels, ",")  // "," because quite often user entered
 	assertSeparatorType(start_list, ",")  // "," because entered by user
 	assertSeparatorType(fin_list, ",")	// "," because entered by user
 	
-	if (itemsinlist(channels, ";") != itemsinlist(start_list, ",") || itemsinlist(channels, ";") != itemsinlist(fin_list, ","))
-		sprintf buffer, "length of start_list/fin_list/channels not equal!!! start_list:(%s), fin_list:(%s), channels:(%s)\r", start_list, fin_list, channels
+	if (itemsinlist(channels, ",") != itemsinlist(start_list, ",") || itemsinlist(channels, ",") != itemsinlist(fin_list, ","))
+		sprintf buffer, "ERROR[SFfd_sanitize_setpoints]: length of start_list/fin_list/channels not equal!!! start_list:(%s), fin_list:(%s), channels:(%s)\r", start_list, fin_list, channels
 		abort buffer
 	endif
 	
@@ -2477,12 +2524,14 @@ function SFbd_check_lims(S, [x_only, y_only])
 	// Make single list out of X's and Y's (checking if each exists first)
 	string all_channels = "", outputs = ""
 	if(!y_only && numtype(strlen(s.channelsx)) == 0 && strlen(s.channelsx) != 0)  // If not NaN and not ""
+		assertSeparatorType(S.channelsx, ",")
 		all_channels = addlistitem(S.channelsx, all_channels, "|")
 		outputs = addlistitem(num2str(S.startx), outputs, ",")
 		outputs = addlistitem(num2str(S.finx), outputs, ",")
 	endif
 
 	if(!x_only && numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0)  // If not NaN and not ""
+		assertSeparatorType(S.channelsy, ",")
 		all_channels = addlistitem(S.channelsy, all_channels, "|")
 		outputs = addlistitem(num2str(S.starty), outputs, ",")
 		outputs = addlistitem(num2str(S.finy), outputs, ",")
@@ -2497,8 +2546,8 @@ function SFbd_check_lims(S, [x_only, y_only])
 	string channels, abort_msg = "", question
 	for(i=0;i<itemsinlist(all_channels, "|");i++)  		// channelsx then channelsy if it exists
 		channels = stringfromlist(i, all_channels, "|")
-		for(j=0;j<itemsinlist(channels, ";");j++)			// each channel from channelsx/channelsy
-			channel = str2num(stringfromlist(j, channels, ";"))
+		for(j=0;j<itemsinlist(channels, ",");j++)			// each channel from channelsx/channelsy
+			channel = str2num(stringfromlist(j, channels, ","))
 			for(k=0;k<2;k++)  									// Start/Fin for each channel
 				output = str2num(stringfromlist(2*i+k, outputs, ","))  // 2 per channelsx/channelsy
 				// Check that the DAC board is initialized
@@ -2521,7 +2570,7 @@ function SFbd_check_lims(S, [x_only, y_only])
 				// if outside, ask user if want to continue anyway
 				sw_limit = str2num(dacvalstr[channel][2])
 				if(abs(output) > sw_limit)
-					sprintf question, "DAC channel %s will be ramped outside software limits. Continue?", stringfromlist(i,channels,";")
+					sprintf question, "DAC channel %s will be ramped outside software limits. Continue?", stringfromlist(i,channels,",")
 					answer = ask_user(question, type=1)
 					if(answer == 2)
 						sprintf abort_msg "User aborted"
@@ -2614,12 +2663,12 @@ function SFawg_check_AWG_list(AWG, Fsv)
 	
 	// Check no overlap between DACs for sweeping, and DACs for AWG
 	string channel // Single DAC channel
-	string FDchannels = addlistitem(Fsv.Channelsy, Fsv.Channelsx, ";") // combine channels lists
+	string FDchannels = addlistitem(Fsv.Channelsy, Fsv.Channelsx, ",") // combine channels lists
 	for(i=0;i<itemsinlist(AWG.AW_Dacs, ",");i++)
 		AWdacs = stringfromlist(i, AWG.AW_Dacs, ",")
 		for(j=0;j<strlen(AWdacs);j++)
 			channel = AWdacs[j]
-			if(findlistitem(channel, FDchannels, ";") != -1)
+			if(findlistitem(channel, FDchannels, ",") != -1)
 				abort "ERROR[SFawg_check_AWG_list]: Trying to use same DAC channel for FD scan and AWG at the same time"
 			endif
 		endfor

@@ -18,7 +18,7 @@ function ReadVsTime(delay, [y_label, max_time, comments]) // Units: s
 	max_time = paramIsDefault(max_time) ? INF : max_time
 	
 	Struct ScanVars S
-	initBDscanVars(S, 0, 0, 1, numptsx=0, delayx=delay, x_label="time /s", y_label=y_label, comments=comments)
+	initBDscanVars(S, 0, 0, 1, numptsx=1, delayx=delay, x_label="time /s", y_label=y_label, comments=comments)
 	initializeScan(S)
 	S.readVsTime = 1
 
@@ -242,7 +242,7 @@ function ScanBabyDACRepeat(instrID, startx, finx, channelsx, numptsx, delayx, ra
 	// Main measurement loop
 	variable i=0, j=0, setpointx, setpointy, scandirection=0
 	do
-		if(mod(i-1,2)!=0 && alternate == 1)  // If on odd row and alternate is on
+		if(mod(i,2)!=0 && alternate == 1)  // If on odd row and alternate is on
 			j=numptsx-1
 			scandirection=-1
 		else
@@ -378,8 +378,6 @@ function ScanFastDAC(instrID, start, fin, channels, [numpts, sweeprate, ramprate
    sc_openinstrconnections(0)
 
    // Set defaults
-   nvar fd_ramprate
-   ramprate = paramisdefault(ramprate) ? fd_ramprate : ramprate
    delay = ParamIsDefault(delay) ? 0.01 : delay
    comments = selectstring(paramisdefault(comments), comments, "")
    starts = selectstring(paramisdefault(starts), starts, "")
@@ -439,8 +437,10 @@ function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate,
 
 	// Initialize ScanVars
 	struct ScanVars S  // Note, more like a BD scan if going slow
-	initBDscanVars(S, instrID, start, fin, channelsx=channels, numptsx=numpts, delayx=delay, rampratex=ramprate, comments=comments, y_label=y_label)  
+	initFDscanVars(S, instrID, start, fin, channelsx=channels, numptsx=numpts, delayx=delay, rampratex=ramprate, comments=comments, y_label=y_label)  
 	S.using_fastdac = 0 // Explicitly showing that this is not a normal fastDac scan
+	S.duration = numpts*max(0.05, delay) // At least 50ms per point is a good estimate 
+	S.sweeprate = abs((fin-start)/S.duration) // Better estimate of sweeprate (Not really valid for a slow scan)
 
 	// Check limits (not as much to check when using FastDAC slow)
 	SFfd_check_lims(S)
@@ -484,9 +484,6 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 	variable i=0, j=0
 
 	// Set defaults
-	nvar fd_ramprate
-	rampratex = paramisdefault(rampratex) ? fd_ramprate : rampratex
-	rampratey = ParamIsDefault(rampratey) ? fd_ramprate : rampratey
 	delayy = ParamIsDefault(delayy) ? 0.01 : delayy
    comments = selectstring(paramisdefault(comments), comments, "")
    startxs = selectstring(paramisdefault(startxs), startxs, "")
@@ -599,8 +596,6 @@ function ScanFastDACRepeat(instrID, start, fin, channels, numptsy, [numptsx, swe
 	sc_openinstrconnections(0)
 
 	// Set defaults
-	nvar fd_ramprate
-	ramprate = paramisdefault(ramprate) ? fd_ramprate : ramprate
 	delay = ParamIsDefault(delay) ? 0.5 : delay
 	comments = selectstring(paramisdefault(comments), comments, "")
 	starts = selectstring(paramisdefault(starts), starts, "")
@@ -608,14 +603,11 @@ function ScanFastDACRepeat(instrID, start, fin, channels, numptsy, [numptsx, swe
 
 	// Set sc_ScanVars struct
 	struct ScanVars S
-	initFDscanVars(S, instrID, start, fin, channelsx=channels, numptsx=numptsx, rampratex=ramprate, delayy=delay, sweeprate=sweeprate,  \
+	initFDscanVars(S, instrID, start, fin, channelsx=channels, numptsx=numptsx, rampratex=ramprate, starty=1, finy=numptsy, delayy=delay, sweeprate=sweeprate,  \
 					numptsy=numptsy, direction=1, startxs=starts, finxs=fins, y_label="Repeats", comments=comments)
-	S.is2d = 1 // Doesn't otherwise get detected because of no y channels
-	S.starty = 1
-	S.finy = numptsy
 	
 	// Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
-	SFfd_pre_checks(S)  
+	SFfd_pre_checks(S, x_only=1)  
 
   	// If using AWG then get that now and check it
 	struct fdAWG_list AWG

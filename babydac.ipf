@@ -709,7 +709,7 @@ function RampOutputBD(instrID, channel, output, [ramprate, update, ignore_lims])
 		sleeptime = 0.0024 // can ramp finely if there's no updating!
 	endif
 
-	if(paramisdefault(ramprate))
+	if(paramisdefault(ramprate) || numtype(ramprate) != 0 || ramprate == 0)
 		nvar bd_ramprate
 		ramprate = bd_ramprate
 	else
@@ -806,7 +806,7 @@ function rampMultipleBD(instrID, channels, setpoint, [ramprate, update, ignore_l
 
 	channels = SF_get_channels(channels)  // Converts label names to Dac channels
 
-	if(paramisdefault(ramprate))
+	if(paramisdefault(ramprate) || ramprate == 0)
 		nvar bd_ramprate
 		ramprate = bd_ramprate    // (mV/s)
 	endif

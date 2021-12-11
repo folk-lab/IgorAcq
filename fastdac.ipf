@@ -33,13 +33,7 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 	master = paramisDefault(master) ? 0 : master
 	optical = paramisDefault(optical) ? 1 : optical
 	verbose = paramisDefault(verbose) ? 1 : verbose
-	
-	// Set default fd_ramprate if not already set
-	NVAR/Z fd_ramprate 
-	if( !NVAR_Exists(fd_ramprate) )
-		variable/g fd_ramprate=10000
-	endif
-	
+		
 	variable localRM
 	variable status = viOpenDefaultRM(localRM) // open local copy of resource manager
 	if(status < 0)
@@ -264,7 +258,7 @@ function getFADCChannelSingle(instrID,channel) // Units: mV
 	
 
 	variable device // to store device num
-	string devchannel = getDeviceChannels(num2str(channel), device)
+	string devchannel = getDeviceChannels(num2str(channel), device) // TODO: Check this doesn't have a separator
 	checkInstrIDmatchesDevice(instrID, device)
 
 	// query ADC
@@ -437,18 +431,13 @@ function setFADCSpeed(instrID,speed,[loadCalibration]) // Units: Hz
 	fdAWG_reset_init()
 end
 
-function rampOutputFDAC(instrID,channel,output,[ramprate, ignore_lims]) // Units: mV, mV/s
+function rampOutputFDAC(instrID,channel,output, ramprate, [ignore_lims]) // Units: mV, mV/s
 	// ramps a channel to the voltage specified by "output".
 	// ramp is controlled locally on DAC controller.
 	// channel must be the channel set by the GUI.
 	variable instrID, channel, output, ramprate, ignore_lims
 	wave/t fdacvalstr, old_fdacvalstr
 	svar sc_fdackeys
-	
-	if(paramIsDefault(ramprate))
-		nvar fd_ramprate
-		ramprate = fd_ramprate
-	endif
 	
 	// TOOD: refactor with getDeviceInfo()/getDeviceChannels() etc
 
@@ -506,9 +495,12 @@ function rampOutputFDAC(instrID,channel,output,[ramprate, ignore_lims]) // Units
 		endif
 	
 		// Check that ramprate is within software limit, otherwise use software limit
-		if (ramprate > str2num(fdacvalstr[channel][4]))
+		if (ramprate > str2num(fdacvalstr[channel][4]) || numtype(ramprate) != 0)
 			printf "[WARNING] \"rampOutputfdac\": Ramprate of %.0fmV/s requested for channel %d. Using max_ramprate of %.0fmV/s instead\n" ramprate, channel, str2num(fdacvalstr[channel][4])
 			ramprate = str2num(fdacvalstr[channel][4])
+			if (numtype(ramprate) != 0)
+				abort "ERROR[rampOutputFDAC]: Bad ramprate in ScanController_Fastdac window for channel "+num2str(channel)
+			endif
 		endif
 	endif 
 		
@@ -530,8 +522,6 @@ function rampOutputFDAC(instrID,channel,output,[ramprate, ignore_lims]) // Units
 	
 	// check respose
 	if(fdacCheckResponse(response,cmd,isString=1,expectedResponse="RAMP_FINISHED"))
-		// fdacvalstr[channel][1] = num2str(output)
-		// updatefdacWindow(channel)
 		output = getfdacOutput(instrID, devchannel)
 		updatefdacValStr(channel, output, update_oldValStr=1)
 	else
@@ -545,15 +535,17 @@ function RampMultipleFDAC(InstrID, channels, setpoint, [ramprate, ignore_lims])
 	variable InstrID, setpoint, ramprate, ignore_lims
 	string channels
 	
+	ramprate = numtype(ramprate) == 0 ? ramprate : 0  // If not a number, then set to zero (which means will be overridden by ramprate in window)
+	
+	assertSeparatorType(channels, ",")
 	channels = SF_get_channels(channels, fastdac=1)
 	
-	nvar fd_ramprate
-	ramprate = paramIsDefault(ramprate) ? fd_ramprate : ramprate
-	
-	variable i=0, channel, nChannels = ItemsInList(channels, ";")
+	variable i=0, channel, nChannels = ItemsInList(channels, ",")
+	variable channel_ramp
 	for(i=0;i<nChannels;i+=1)
-		channel = str2num(StringFromList(i, channels, ";"))
-		rampOutputfdac(instrID, channel, setpoint, ramprate=ramprate, ignore_lims=ignore_lims)
+		channel = str2num(StringFromList(i, channels, ","))
+		channel_ramp = ramprate != 0 ? ramprate : str2num(getFdacInfo(num2str(channel), "ramprate"))
+		rampOutputfdac(instrID, channel, setpoint, channel_ramp, ignore_lims=ignore_lims)  // TODO: get ramprate per channel here if not overridden
 	endfor
 end
 
@@ -689,7 +681,7 @@ function CalibrateFDAC(instrID)
 		endif
 		
 		// ramp channel to 0V
-		rampOutputfdac(instrID,channel,0, ramprate=100000, ignore_lims=1)
+		rampOutputfdac(instrID,channel,0, 100000, ignore_lims=1)
 		sprintf question, "Input value displayed by DMM in volts."
 		user_input = prompt_user("DAC offset calibration",question)
 		if(numtype(user_input) == 2)
@@ -707,7 +699,7 @@ function CalibrateFDAC(instrID)
 		print message
 		
 		// ramp channel to -10V
-		rampOutputfdac(instrID,channel,-10000, ramprate=100000, ignore_lims=1)
+		rampOutputfdac(instrID,channel,-10000, 100000, ignore_lims=1)
 		sprintf question, "Input value displayed by DMM in volts."
 		user_input = prompt_user("DAC gain calibration",question)
 		if(numtype(user_input) == 2)
@@ -1027,10 +1019,10 @@ end
 ///////////////////////// Spectrum Analyzer //////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 
-function FDacSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,plot_linear,nosave])
+function FDacSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,nosave])
 	// scanlength is in sec
 	// if linear is set to 1, the spectrum will be plotted on a linear scale
-	variable instrID, scanlength, numAverage, plot_linear, nosave
+	variable instrID, scanlength, numAverage, nosave
 	string comments
 	string datestring = strTime()
 	
@@ -1051,41 +1043,40 @@ function FDacSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,plot_line
 	SFfd_pre_checks(S)
 
 	// Initialize graphs and waves
-	initializeScan(S)  // Doesn't initialize frequency graphs
+	initializeScan(S)  // Going to reopen graphs below anyway (to include frequency graphs)
 
 	// Initialize Spectrum waves
 	string wn, wn_lin
 	string log_freq_wavenames = ""
 	string lin_freq_wavenames = ""
 	variable numChannels = getNumFADC()
-	string channels = getRecordedFastdacInfo("channels")
+	string adc_channels = getRecordedFastdacInfo("channels")
 	variable i
 	for(i=0;i<numChannels;i+=1)
-		wn = "spectrum_fftADC"+stringfromlist(i,channels)
+		wn = "spectrum_fftADC"+stringfromlist(i,adc_channels, ";")
 		make/o/n=(S.numptsx/2) $wn = nan
 		setscale/i x, 0, S.measureFreq/(2.0), $wn
 		log_freq_wavenames = addListItem(wn, log_freq_wavenames, ";", INF)
 				
-		wn_lin = "spectrum_fftADClin"+stringfromlist(i,channels)
+		wn_lin = "spectrum_fftADClin"+stringfromlist(i,adc_channels, ";")
 		make/o/n=(S.numptsx/2) $wn_lin = nan
 		setscale/i x, 0, S.measureFreq/(2.0), $wn_lin
 		lin_freq_wavenames = addListItem(wn_lin, lin_freq_wavenames, ";", INF)
 	endfor
 
-	// Initialize Spectrum graphs
-	string all_graphIDs = get1DWaveNames(1, 1)+";"+get1DwaveNames(0, 1) // Initialized in InitializeScan
-	// TOOD: Does this end up with a double ;; in the middle??
+	// Initialize all graphs
+	string all_graphIDs = initializeGraphsForWavenames(get1DWaveNames(1,1), "Time /s", is2d=S.is2d, y_label="ADC /mV")  // RAW ADC readings
+	all_graphIDs += initializeGraphsForWavenames(get1DWaveNames(0,1), "Time /s", is2d=S.is2d, y_label="Current /nA")    // Calculated data (should be in nA)
 	
 	string graphIDs
 	graphIDs = initializeGraphsForWavenames(log_freq_wavenames, "Frequency /Hz", is2d=0, y_label="Ylabel for log spectrum?")
 	all_graphIDs = all_graphIDs+graphIDs
 	graphIDs = initializeGraphsForWavenames(lin_freq_wavenames, "Frequency /Hz", is2d=0, y_label="Ylabel for lin spectrum?")
 	all_graphIDs = all_graphIDs+graphIDs
-	// TOOD: Does this end up with a double ;; or no ; in the middle??
 	arrangeWindows(all_graphIDs)
 
 	// Record data
-	string wavenames = getRecordedFastdacInfo("calc names")  // ";" separated list of recorded calculated waves
+	string wavenames = getRecordedFastdacInfo("calc_names")  // ";" separated list of recorded calculated waves
 	variable j
 	for (i=0; i<numAverage; i++)
 		NEW_Fd_record_values(S, i)		
@@ -1729,7 +1720,7 @@ function/s fd_start_sweep(S, [AWG_list])
 	string adcs = replacestring(";",S.adclist,"")
 
 	if (!S.readVsTime)
-		assertSeparatorType(S.channelsx, ";")
+		assertSeparatorType(S.channelsx, ",")
 		string starts, fins, temp
 		if(S.direction == 1)
 			starts = S.startxs
@@ -1741,7 +1732,7 @@ function/s fd_start_sweep(S, [AWG_list])
 			abort "ERROR[fd_start_sweep]: S.direction must be 1 or -1, not " + num2str(S.direction)
 		endif
 
-	   string dacs = replacestring(";",S.channelsx,"")
+	   string dacs = replacestring(",",S.channelsx,"")
 	endif
 
 	string cmd = ""

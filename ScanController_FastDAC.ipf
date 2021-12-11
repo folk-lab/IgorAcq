@@ -18,6 +18,39 @@
 /////////////////////
 //// Util  //////////
 /////////////////////
+function/t getFdacInfo(channelstr, info_name)
+	// Returns info from DAC window part of ScanController_Fastdac
+	// Note: Single channel only, but can be addressed as number or label
+	string channelstr, info_name
+
+	variable col_num
+	strswitch(info_name)
+		case "output":
+			col_num = 1
+			break
+		case "limit":
+			col_num = 2
+			break
+		case "label":
+			col_num = 3
+			break
+		case "ramprate":
+			col_num = 4
+			break
+		default:
+			string buf
+			sprintf buf "ERROR[getFdacInfo]: info_name (%s) not recognized. Use any of (output, limit, label, ramprate)" info_name
+			abort buf
+	endswitch
+
+	wave/T fdacValStr	
+	variable channel_num = str2num(SF_get_channels(channelstr, fastdac=1))
+	if (numtype(channel_num) != 0)
+		abort "ERROR[getFdacInfo]: Bad channelstr/channel_num"
+	endif
+	return fdacValStr[channel_num][col_num]
+end
+
 function checkInstrIDmatchesDevice(instrID, device_num)
 	// checks instrID is the correct Visa address for device number
 	// e.g. if instrID is to FD1, but if when checking DevChannels device 2 was returned, this will fail
@@ -153,7 +186,7 @@ function/S getRecordedFastdacInfo(info_name)  // TODO: Rename if prepending some
                 return_list = addlistItem(fadcvalstr[i][0], return_list, ";", INF)  																		
 					break
 				default:
-					abort "bad name requested: " + info_name
+					abort "bad name requested: " + info_name + ". Allowed are (calc_names, raw_names, calc_funcs, inputs, channels)"
 					break
 			endswitch						
         endif
@@ -173,7 +206,8 @@ function/S getDeviceChannels(channels, device, [adc])
 	variable &device // Returns device number in device (starting from 1)
 
 	svar sc_fdacKeys  // Holds info about connected FastDACs
-	
+
+	channels = replaceString(",", channels, ";")  // DAC channels may be passed in with "," separator instead of ";" separator
 	assertSeparatorType(channels, ";")
 
 	variable numDevices = getNumDevices()
@@ -783,10 +817,10 @@ function fdRV_check_ramp_start(S)
 	// will give the user a WARNING that this should have been done already in the top level scan function
 	// Note: This only works for a single fastdac sweeping at once
    struct ScanVars &S
-
+	assertSeparatorType(S.channelsx, ",")
    variable i=0, require_ramp = 0, ch, sp, diff
    for(i=0;i<itemsinlist(S.channelsx);i++)
-      ch = str2num(stringfromlist(i, S.channelsx, ";"))
+      ch = str2num(stringfromlist(i, S.channelsx, ","))
       if(S.direction == 1)
 	      sp = str2num(stringfromlist(i, S.startxs, ","))
 	   elseif(S.direction == -1)
@@ -1149,7 +1183,6 @@ function update_all_fdac([option])
 	svar sc_fdackeys
 	wave/t fdacvalstr
 	wave/t old_fdacvalstr
-	nvar fd_ramprate
 
 	if (paramisdefault(option))
 		option = "fdacramp"
@@ -1174,15 +1207,13 @@ function update_all_fdac([option])
 						for(j=0;j<numDACCh;j+=1)
 							output = str2num(fdacvalstr[startCh+j][1])
 							if(output != str2num(old_fdacvalstr[startCh+j]))
-								// rampOutputfdac(tempname,j,output,ramprate=fd_ramprate)
-								rampOutputfdac(tempname,startCh+j,output,ramprate=fd_ramprate)
+								rampmultipleFDAC(tempname, num2str(startCh+j), output)
 							endif
 						endfor
 						break
 					case "fdacrampzero":
 						for(j=0;j<numDACCh;j+=1)
-							// rampOutputfdac(tempname,j,0,ramprate=fd_ramprate)
-							rampOutputfdac(tempname,startCh+j,0,ramprate=fd_ramprate)
+							rampmultipleFDAC(tempname, num2str(startCh+j), 0)
 						endfor
 						break
 					case "updatefdac":
