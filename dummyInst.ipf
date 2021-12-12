@@ -11,7 +11,7 @@ function ScanDummy(start, fin, numpts, delay, [comments])
 	comments = selectString(paramIsDefault(comments), comments, "")
 
 	Struct ScanVars S
-	initBDscanVars(S, -1, start, fin, numptsx=numpts, delayx=delay, x_label="x_var", comments=comments)  // -1 for instrID (used for babyDac or FastDac)
+	initScanVarsBD(S, -1, start, fin, numptsx=numpts, delayx=delay, x_label="x_var", comments=comments)  // -1 for instrID (used for babyDac or FastDac)
 	
 	initializeScan(S)
 
@@ -25,7 +25,7 @@ function ScanDummy(start, fin, numpts, delay, [comments])
 		setpoint = start + (i*(fin-start)/(numpts-1))
 		setDummy(setpoint)
 		sc_sleep(delay)
-		New_RecordValues(S, i, 0)
+		RecordValues(S, i, 0)
 		i+=1
 	while (i<numpts)
 	variable telapsed = stopmstimer(-2) - tstart

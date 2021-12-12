@@ -29,10 +29,10 @@
 
 
 ////////////////////////////////
-///////// utility functions ////
+///////// utility functions //// (scu_...)
 ////////////////////////////////
 
-function assertSeparatorType(list_string, assert_separator)
+function scu_assertSeparatorType(list_string, assert_separator)
 	// If the list_string does not include <assert_separator> but does include the other common separator between "," and ";" then 
 	// an error is raised
 	string list_string, assert_separator
@@ -41,19 +41,19 @@ function assertSeparatorType(list_string, assert_separator)
 		strswitch (assert_separator)
 			case ",":
 				if (strsearch(list_string, ";", 0) >= 0)
-					sprintf buffer, "ERROR[assertSeparatorType]: Expected separator = %s     Found separator = ;\r", assert_separator
+					sprintf buffer, "ERROR[scu_assertSeparatorType]: Expected separator = %s     Found separator = ;\r", assert_separator
 					abort buffer
 				endif
 				break
 			case ";":
 				if (strsearch(list_string, ",", 0) >= 0)
-					sprintf buffer, "ERROR[assertSeparatorType]: Expected separator = %s     Found separator = ,\r", assert_separator
+					sprintf buffer, "ERROR[scu_assertSeparatorType]: Expected separator = %s     Found separator = ,\r", assert_separator
 					abort buffer
 				endif
 				break
 			default:
 				if (strsearch(list_string, ",", 0) >= 0 || strsearch(list_string, ";", 0) >= 0)
-					sprintf buffer, "ERROR[assertSeparatorType]: Expected separator = %s     Found separator = , or ;\r", assert_separator
+					sprintf buffer, "ERROR[scu_assertSeparatorType]: Expected separator = %s     Found separator = , or ;\r", assert_separator
 					abort buffer
 				endif
 				break
@@ -62,18 +62,7 @@ function assertSeparatorType(list_string, assert_separator)
 end
 
 
-function/s strTime()
-	// Returns the current time in YYYY-MM-DD;HH-MM-SS format
-	string datetime_str
-	string time_str
-	time_str = secs2time(datetime, 3)
-	sprintf time_str "%s-%s-%s", time_str[0,1], time_str[3,4], time_str[6,7]
-	sprintf datetime_str "%s_%s" secs2Date(datetime, -2), time_str
-	return datetime_str
-end
-
-
-function unixTime()
+function scu_unixTime()
 	// returns the current unix time in seconds
 	return DateTime - date2secs(1970,1,1) - date2secs(-1,-1,-1)
 end
@@ -122,8 +111,8 @@ end
 
 
 function ask_user(question, [type])
-    // Popup a confirmation window to user
-	//type = 0,1,2 for OK, Yes/No, Yes/No/Cancel returns are V_flag = 1: Yes, 2: No, 3: Cancel
+    // Popup a confirmation window to user and return answer value
+	// type = 0,1,2 for (OK), (Yes/No), (Yes/No/Cancel) returns are V_flag = 1: Yes, 2: No, 3: Cancel
 	string question
 	variable type
 	type = paramisdefault(type) ? 1 : type
@@ -132,14 +121,14 @@ function ask_user(question, [type])
 end
 
 
-function/S GetLabel(channels, [fastdac])
+function/S scu_getDacLabel(channels, [fastdac])
   // Returns Label name of given channel, defaults to BD# or FD#
   // Used to get x_label, y_label for init_waves 
   // Note: Only takes channels as numbers
 	string channels
 	variable fastdac
 	
-	assertSeparatorType(channels, ",")
+	scu_assertSeparatorType(channels, ",")
 
 	variable i=0
 	string channel, buffer, xlabelfriendly = ""
@@ -159,7 +148,7 @@ function/S GetLabel(channels, [fastdac])
 				buffer = "FD"+channel
 			endif
 		else
-			abort "\"GetLabel\": Fastdac flag must be 0 or 1"
+			abort "\"scu_getDacLabel\": Fastdac flag must be 0 or 1"
 		endif
 
 		if (cmpstr(xlabelfriendly, "") != 0)
@@ -171,13 +160,13 @@ function/S GetLabel(channels, [fastdac])
 end
 
 
-function/s SF_get_channels(channels, [fastdac])
+function/s scu_getChannelNumbers(channels, [fastdac])
 	// Returns channels as numbers string whether numbers or labels passed
 	// Note: Returns "," separated list, because channels is quite often user entered
 	string channels
 	variable fastdac
 	
-	assertSeparatorType(channels, ",")
+	scu_assertSeparatorType(channels, ",")
 	
 	string new_channels = "", err_msg
 	variable i = 0
@@ -238,7 +227,7 @@ function sc_sleep(delay)
 	doupdate // do this just once during the sleep function
 	do
 		try
-			sc_checksweepstate()
+			scs_checksweepstate()
 		catch
 			variable err = GetRTError(1)
 			string errMessage = GetErrMessage(err)
@@ -287,14 +276,12 @@ threadsafe function sc_sleep_noupdate(delay)
 end
 
 
-/////////////////////////////////////
-///// Common ScanController ///////////
-/////////////////////////////////////
-// I.e. Applicable to both regular ScanController and ScanController_Fastdac
-
+/////////////////////////////////////////////////
+//////////////////  ScanVars /////////////////// (scv_...)
+////////////////////////////////////////////////
 
 // Structure to hold scan information (general to all scans) 
-// Note: If modifying this, also modify the saveAsLastScanVarsStruct and loadLastScanVarsStruct accordingly (and to have it save to HDF, modify sc_createSweepLogs)
+// Note: If modifying this, also modify the scv_setLastScanVars and scv_getLastScanVars accordingly (and to have it save to HDF, modify sc_createSweepLogs)
 structure ScanVars
     variable instrID
     
@@ -340,7 +327,8 @@ structure ScanVars
 endstructure
 
 
-function saveAsLastScanVarsStruct(S)  // TODO: rename to setLastScanVars
+function scv_setLastScanVars(S) 
+	// Save the ScanVars to global waves so that they can be loaded later
 	Struct ScanVars &S
 	
 	if (!S.never_save)
@@ -366,9 +354,10 @@ function saveAsLastScanVarsStruct(S)  // TODO: rename to setLastScanVars
 end
 
 
-function loadLastScanVarsStruct(S)   // TODO: Rename to loadLastScanVars
+function scv_getLastScanVars(S)   
+	// Makde ScanVars from the global waves that are created when calling scv_setLastScanVars(S)
 	Struct ScanVars &S
-	// TODO: Make these (note: can't just use StructPut/Get because they only work for numeric entries, not strings...
+	// Note: can't just use StructPut/Get because they only work for numeric entries, not strings...
 	wave/T t = sc_lastScanVarsStrings
 	wave v = sc_lastScanVarsVariables
 	
@@ -414,7 +403,7 @@ function loadLastScanVarsStruct(S)   // TODO: Rename to loadLastScanVars
 end
 	
 
-function initFDscanVars(S, instrID, startx, finx, [channelsx, numptsx, sweeprate, duration, rampratex, delayx, starty, finy, channelsy, numptsy, rampratey, delayy, direction, startxs, finxs, startys, finys, x_label, y_label, comments])
+function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate, duration, rampratex, delayx, starty, finy, channelsy, numptsy, rampratey, delayy, direction, startxs, finxs, startys, finys, x_label, y_label, comments])
     // Function to make setting up scanVars struct easier for FastDAC scans
     // PARAMETERS:
     // startx, finx, starty, finy -- Single start/fin point for all channelsx/channelsy
@@ -466,7 +455,7 @@ function initFDscanVars(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
     S.direction = paramisdefault(direction) ? 1 : direction
    	
    	// Sets channelsx, channelsy
-    sv_setChannels(S, channelsx, channelsy, fastdac=1)
+    scv_setChannels(S, channelsx, channelsy, fastdac=1)
     
     // Set if 2D (Repeats or true 2D)
     if (numptsy > 0)
@@ -474,19 +463,19 @@ function initFDscanVars(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
     endif
     
    	// Get Labels for graphs
-   	S.x_label = selectString(strlen(x_label) > 0, GetLabel(S.channelsx, fastdac=1), x_label)  // Uses channels as list of numbers, and only if x_label not passed in
+   	S.x_label = selectString(strlen(x_label) > 0, scu_getDacLabel(S.channelsx, fastdac=1), x_label)  // Uses channels as list of numbers, and only if x_label not passed in
    	if (S.is2d)
-   		S.y_label = selectString(strlen(y_label) > 0, GetLabel(S.channelsy, fastdac=1), y_label) 
+   		S.y_label = selectString(strlen(y_label) > 0, scu_getDacLabel(S.channelsy, fastdac=1), y_label) 
    	else
    		S.y_label = y_label
    	endif  		
 
    	// Sets starts/fins in FD string format
-    sv_setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
+    scv_setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
 	
 	// Set variables with some calculation
-    sv_setMeasureFreq(S) 		// Sets S.samplingFreq/measureFreq/numADCs	
-    sv_setNumptsSweeprate(S) 	// Checks that either numpts OR sweeprate OR duration was provided, and sets ScanVars accordingly
+    scv_setFreq(S) 		// Sets S.samplingFreq/measureFreq/numADCs	
+    scv_setNumptsSweeprateDuration(S) 	// Checks that either numpts OR sweeprate OR duration was provided, and sets ScanVars accordingly
                                 // Note: Valid for start/fin only (uses S.startx, S.finx NOT S.startxs, S.finxs)
 
 	// Set empty string just to not raise nullstring errors
@@ -494,7 +483,7 @@ function initFDscanVars(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
 end
 
 
-function initBDscanVars(S, instrID, startx, finx, [channelsx, numptsx, delayx, rampratex, starty, finy, channelsy, numptsy, rampratey, delayy, direction, x_label, y_label, comments])
+function initScanVarsBD(S, instrID, startx, finx, [channelsx, numptsx, delayx, rampratex, starty, finy, channelsy, numptsy, rampratey, delayy, direction, x_label, y_label, comments])
     // Function to make setting up scanVars struct easier for FastDAC scans
     // PARAMETERS:
     // startx, finx, starty, finy -- Single start/fin point for all channelsx/channelsy
@@ -538,7 +527,7 @@ function initBDscanVars(S, instrID, startx, finx, [channelsx, numptsx, delayx, r
     s.direction = paramisdefault(direction) ? 1 : direction
    	
    	// Sets channelsx, channelsy
-    sv_setChannels(S, channelsx, channelsy, fastdac=0)
+    scv_setChannels(S, channelsx, channelsy, fastdac=0)
     
     // Set if 2D (Repeats or true 2D)
     if (numptsy > 0)
@@ -546,9 +535,9 @@ function initBDscanVars(S, instrID, startx, finx, [channelsx, numptsx, delayx, r
     endif
     
    	// Get Labels for graphs
-   	S.x_label = selectString(strlen(x_label) > 0, GetLabel(S.channelsx, fastdac=0), x_label)  // Uses channels as list of numbers, and only if x_label not passed in
+   	S.x_label = selectString(strlen(x_label) > 0, scu_getDacLabel(S.channelsx, fastdac=0), x_label)  // Uses channels as list of numbers, and only if x_label not passed in
    	if (S.is2d && strlen(y_label) == 0)
-	   	S.y_label = selectString(strlen(y_label) > 0, GetLabel(S.channelsy, fastdac=0), y_label) 
+	   	S.y_label = selectString(strlen(y_label) > 0, scu_getDacLabel(S.channelsy, fastdac=0), y_label) 
 	else
 		S.y_label = y_label
 	endif
@@ -565,7 +554,8 @@ function initBDscanVars(S, instrID, startx, finx, [channelsx, numptsx, delayx, r
 end
 
 
-function sv_setNumptsSweeprate(S)
+function scv_setNumptsSweeprateDuration(S)
+	// Set all of S.numptsx, S.sweeprate, S.duration based on whichever of those is provided
 	Struct ScanVars &S
 	 // If NaN then set to zero so rest of logic works
    if(numtype(S.sweeprate) == 2)
@@ -597,7 +587,8 @@ function sv_setNumptsSweeprate(S)
 end
 
 
-function sv_setMeasureFreq(S)
+function scv_setFreq(S)
+	// Set S.samplingFreq, S.numADCs, S.measureFreq
 	Struct ScanVars &S
    S.samplingFreq = getfadcSpeed(S.instrID)
    S.numADCs = getNumFADC()
@@ -605,23 +596,23 @@ function sv_setMeasureFreq(S)
 end
 
 
-function sv_setChannels(S, channelsx, channelsy, [fastdac])
+function scv_setChannels (S, channelsx, channelsy, [fastdac])
     // Set S.channelsx and S.channelys converting channel labels to numbers where necessary
     struct ScanVars &S
     string channelsx, channelsy
     variable fastdac
 
-    s.channelsx = SF_get_channels(channelsx, fastdac=fastdac)
+    s.channelsx = scu_getChannelNumbers(channelsx, fastdac=fastdac)
 
 	if (numtype(strlen(channelsy)) != 0 || strlen(channelsy) == 0)  // No Y set at all
 		s.channelsy = ""
 	else
-		s.channelsy = SF_get_channels(channelsy, fastdac=fastdac)
+		s.channelsy = scu_getChannelNumbers(channelsy, fastdac=fastdac)
     endif
 end
 
 
-function sv_setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
+function scv_setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
 
     struct ScanVars &S
     variable startx, finx, starty, finy
@@ -632,11 +623,11 @@ function sv_setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy, 
    	if ((numtype(strlen(startxs)) != 0 || strlen(startxs) == 0) && (numtype(strlen(finxs)) != 0 || strlen(finxs) == 0))  // Then just a single start/end for channelsx
    		s.startx = startx
 		s.finx = finx	
-        SFfd_format_setpoints(startx, finx, S.channelsx, starts, fins)  // Modifies starts, fins
+        scv_formatSetpointsFD(startx, finx, S.channelsx, starts, fins)  // Modifies starts, fins
 		s.startxs = starts
 		s.finxs = fins
 	elseif (!(numtype(strlen(startxs)) != 0 || strlen(startxs) == 0) && !(numtype(strlen(finxs)) != 0 || strlen(finxs) == 0))
-		SFfd_sanitize_setpoints(startxs, finxs, S.channelsx, starts, fins)  // Modifies starts, fins
+		scv_sanitizeSetpointsFD(startxs, finxs, S.channelsx, starts, fins)  // Modifies starts, fins
 		s.startx = str2num(StringFromList(0, starts, ","))
 		s.finx = str2num(StringFromList(0, fins, ","))
 		s.startxs = starts
@@ -650,11 +641,11 @@ function sv_setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy, 
         if (strlen(startys) == 0 && strlen(finys) == 0)  // Single start/end for Y
             s.starty = starty
             s.finy = finy	
-            SFfd_format_setpoints(S.starty, S.finy, S.channelsy, starts, fins)  
+            scv_formatSetpointsFD(S.starty, S.finy, S.channelsy, starts, fins)  
             s.startys = starts
             s.finys = fins
         elseif (!(numtype(strlen(startys)) != 0 || strlen(startys) == 0) && !(numtype(strlen(finys)) != 0 || strlen(finys) == 0)) // Multiple start/end for Ys
-            SFfd_sanitize_setpoints(startys, finys, S.channelsy, starts, fins)
+            scv_sanitizeSetpointsFD(startys, finys, S.channelsy, starts, fins)
             s.starty = str2num(StringFromList(0, starts, ","))
             s.finy = str2num(StringFromList(0, fins, ","))
             s.startys = starts
@@ -666,6 +657,46 @@ function sv_setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy, 
     	S.startys = ""
     	S.finys = ""
     endif
+end
+
+
+function scv_sanitizeSetpointsFD(start_list, fin_list, channels, starts, fins)
+	// Makes sure starts/fins make sense for number of channels and have no bad formatting
+	// Modifies the starts/fins strings passed in
+	string start_list, fin_list, channels
+	string &starts, &fins
+	
+	string buffer
+	
+	scu_assertSeparatorType(channels, ",")  // "," because quite often user entered
+	scu_assertSeparatorType(start_list, ",")  // "," because entered by user
+	scu_assertSeparatorType(fin_list, ",")	// "," because entered by user
+	
+	if (itemsinlist(channels, ",") != itemsinlist(start_list, ",") || itemsinlist(channels, ",") != itemsinlist(fin_list, ","))
+		sprintf buffer, "ERROR[scv_sanitizeSetpointsFD]: length of start_list/fin_list/channels not equal!!! start_list:(%s), fin_list:(%s), channels:(%s)\r", start_list, fin_list, channels
+		abort buffer
+	endif
+	
+	starts = replaceString(" ", start_list, "")
+	fins = replaceString(" ", fin_list, "")
+end
+
+
+function scv_formatSetpointsFD(start, fin, channels, starts, fins)
+	// Returns strings in starts and fins in the format that fdacRecordValues takes
+	// e.g. fd_format_setpoints(-10, 10, "1,2,3", s, f) will make string s = "-10,-10,-10" and string f = "10,10,10"
+	variable start, fin
+	string channels, &starts, &fins
+	
+	variable i
+	starts = ""
+	fins = ""
+	for(i=0; i<itemsInList(channels, ","); i++)
+		starts = addlistitem(num2str(start), starts, ",", INF)
+		fins = addlistitem(num2str(fin), fins, ",", INF)
+	endfor
+	starts = starts[0,strlen(starts)-2] // Remove comma at end
+	fins = fins[0,strlen(fins)-2]	 		// Remove comma at end
 end
 
 
@@ -683,22 +714,22 @@ function initializeScan(S)
     sc_OpenInstrConnections(0)
 
     // Make sure waves exist to store data
-    new_initializeWaves(S)
+    sci_initializeWaves(S)
 
     // Set up graphs to display recorded data
     string activeGraphs
-    activeGraphs = initializeGraphs(S)
-    arrangeWindows(activeGraphs)
+    activeGraphs = scg_initializeGraphs(S)
+    scg_arrangeWindows(activeGraphs)
 
     // Open Abort window
-    openAbortWindow()
+    scg_openAbortWindow()
 
     // Save struct to globals
-    saveAsLastScanVarsStruct(S)
+    scv_setLastScanVars(S)
 end
 
 
-function new_initializeWaves(S)  // TODO: rename
+function sci_initializeWaves(S)  // TODO: rename
     // Initializes the waves necessary for recording scan
 	//  Need 1D and 2D waves for the raw data coming from the fastdac (2D for storing, not necessarily displaying)
 	// 	Need 2D waves for either the raw data, or filtered data if a filter is set
@@ -711,8 +742,8 @@ function new_initializeWaves(S)  // TODO: rename
     string wavenames, wn
     variable raw, j
     for (raw = 0; raw<2; raw++) // (raw = 0 means calc waves)
-        wavenames = get1DWaveNames(raw, S.using_fastdac)
-        sanityCheckWavenames(wavenames)
+        wavenames = sci_get1DWaveNames(raw, S.using_fastdac)
+        sci_sanityCheckWavenames(wavenames)
         if (S.using_fastdac)
 	        numpts = (raw) ? S.numptsx : postFilterNumpts(S.numptsx, S.measureFreq)  
 	     else
@@ -720,9 +751,9 @@ function new_initializeWaves(S)  // TODO: rename
 	     endif
         for (j=0; j<itemsinlist(wavenames);j++)
             wn = stringFromList(j, wavenames)
-            init1DWave(wn, numpts, S.startx, S.finx)
+            sci_init1DWave(wn, numpts, S.startx, S.finx)
             if (S.is2d == 1)
-                init2DWave(wn+"_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+                sci_init2DWave(wn+"_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
             endif
         endfor
     endfor
@@ -734,19 +765,19 @@ function new_initializeWaves(S)  // TODO: rename
 end
 
 
-function init1DWave(wn, numpts, start, fin)
+function sci_init1DWave(wn, numpts, start, fin)
     // Overwrites waveName with scaled wave from start to fin with numpts
     string wn
     variable numpts, start, fin
     string cmd
     
     if (numtype(numpts) != 0 || numpts==0)
-		sprintf cmd "ERROR[init1DWave]: Invalid numpts for wn = %s. numpts either 0 or NaN", wn
+		sprintf cmd "ERROR[sci_init1DWave]: Invalid numpts for wn = %s. numpts either 0 or NaN", wn
     	abort cmd
     elseif (numtype(start) != 0 || numtype(fin) != 0)
-    	sprintf cmd "ERROR[init1DWave]: Invalid range passed for wn = %s. numtype(start) = %d, numtype(fin) = %d" wn, numtype(start), numtype(fin)
+    	sprintf cmd "ERROR[sci_init1DWave]: Invalid range passed for wn = %s. numtype(start) = %d, numtype(fin) = %d" wn, numtype(start), numtype(fin)
     elseif (start == fin)
-	   	sprintf cmd "ERROR[init1Dwave]: Invalid range passed for wn = %s. start = %.3f, fin = %.3f", wn, start, fin
+	   	sprintf cmd "ERROR[sci_init1DWave]: Invalid range passed for wn = %s. start = %.3f, fin = %.3f", wn, start, fin
 	   	abort cmd
    endif
     
@@ -755,23 +786,23 @@ function init1DWave(wn, numpts, start, fin)
 end
 
 
-function init2DWave(wn, numptsx, startx, finx, numptsy, starty, finy)
+function sci_init2DWave(wn, numptsx, startx, finx, numptsy, starty, finy)
     // Overwrites waveName with scaled wave from start to fin with numpts
     string wn
     variable numptsx, startx, finx, numptsy, starty, finy
     string cmd
     
     if (numtype(numptsx) != 0 || numptsx == 0)
-		sprintf cmd "ERROR[init1DWave]: Invalid numptsx for wn = %s. numptsx either 0 or NaN", wn
+		sprintf cmd "ERROR[sci_init1DWave]: Invalid numptsx for wn = %s. numptsx either 0 or NaN", wn
     	abort cmd
     elseif (numtype(numptsy) != 0 || numptsy == 0)
-		sprintf cmd "ERROR[init1DWave]: Invalid numptsy for wn = %s. numptsy either 0 or NaN", wn
+		sprintf cmd "ERROR[sci_init1DWave]: Invalid numptsy for wn = %s. numptsy either 0 or NaN", wn
     	abort cmd    	
     elseif (numtype(startx) != 0 || numtype(finx) != 0 || numtype(starty) != 0 || numtype(finy) != 0)
-    	sprintf cmd "ERROR[init2DWave]: Invalid range passed for wn = %s. numtype(startx) = %d, numtype(finx) = %d, numtype(starty) = %d, numtype(finy) = %d" wn, numtype(startx), numtype(finx), numtype(starty), numtype(finy)
+    	sprintf cmd "ERROR[sci_init2DWave]: Invalid range passed for wn = %s. numtype(startx) = %d, numtype(finx) = %d, numtype(starty) = %d, numtype(finy) = %d" wn, numtype(startx), numtype(finx), numtype(starty), numtype(finy)
     	abort cmd
     elseif (startx == finx || starty == finy)
-	   	sprintf cmd "ERROR[init2Dwave]: Invalid range passed for wn = %s. startx = %.3f, finx = %.3f, starty = %.3f, finy = %.3f", wn, startx, finx, starty, finy
+	   	sprintf cmd "ERROR[sci_init2DWave]: Invalid range passed for wn = %s. startx = %.3f, finx = %.3f, starty = %.3f, finy = %.3f", wn, startx, finx, starty, finy
 	   	abort cmd
    endif
     
@@ -781,7 +812,7 @@ function init2DWave(wn, numptsx, startx, finx, numptsy, starty, finy)
 end
 
 
-function/S get1DWaveNames(raw, fastdac)
+function/S sci_get1DWaveNames(raw, fastdac)
     // Return a list of Raw or Calc wavenames (without any checks)
     variable raw, fastdac  // 1 for True, 0 for False
     
@@ -813,10 +844,10 @@ function/S get1DWaveNames(raw, fastdac)
 end
 
 
-function/S get2DWaveNames(raw, fastdac)
+function/S sci_get2DWaveNames(raw, fastdac)
     // Return a list of Raw or Calc wavenames (without any checks)
     variable raw, fastdac  // 1 for True, 0 for False
-    string waveNames1D = get1DWaveNames(raw, fastdac)
+    string waveNames1D = sci_get1DWaveNames(raw, fastdac)
     string waveNames2D = ""
     variable i
     for (i = 0; i<ItemsInList(waveNames1D); i++)
@@ -826,7 +857,7 @@ function/S get2DWaveNames(raw, fastdac)
 end
 
 
-function sanityCheckWavenames(wavenames)
+function sci_sanityCheckWavenames(wavenames)
     // Take comma separated list of wavenames, and check they all make sense
     string wavenames
     string s
@@ -846,10 +877,10 @@ end
 
 
 /////////////////////////////////////////////////////////////////////////////
-//////////////////////////// Opening and Layout out Graphs /////////////////////
+//////////////////////////// Opening and Layout out Graphs //////////////////// (scg_...)
 /////////////////////////////////////////////////////////////////////////////
 
-function/S initializeGraphs(S)
+function/S scg_initializeGraphs(S)
     // Initialize graphs that are going to be recorded
     // Returns list of Graphs that data is being plotted in
     struct ScanVars &S
@@ -864,13 +895,13 @@ function/S initializeGraphs(S)
     variable raw
     for (i = 0; i<2; i++)  // i = 0, 1
         raw = !i
-        waveNames = get1DWaveNames(raw, S.using_fastdac)
+        waveNames = sci_get1DWaveNames(raw, S.using_fastdac)
 		if (S.is2d == 0 && raw == 1 && S.using_fastdac)
 			ylabel = "ADC /mV"
 		else
 			ylabel = S.y_label
 		endif
-        buffer = initializeGraphsForWavenames(waveNames, S.x_label, is2d=S.is2d, y_label=ylabel)
+        buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, is2d=S.is2d, y_label=ylabel)
         if(raw==1) // Raw waves
 	        sc_rawGraphs1D = buffer
         endif
@@ -880,7 +911,7 @@ function/S initializeGraphs(S)
 end
 
 
-function/S initializeGraphsForWavenames(wavenames, x_label, [is2d, y_label])
+function/S scg_initializeGraphsForWavenames(wavenames, x_label, [is2d, y_label])
 	// Ensures a graph is open and tiles graphs for each wave in comma separated wavenames
 	// Returns list of graphIDs of active graphs
 	string wavenames, x_label, y_label
@@ -895,11 +926,11 @@ function/S initializeGraphsForWavenames(wavenames, x_label, [is2d, y_label])
 	variable i
 	for (i = 0; i<ItemsInList(waveNames); i++)  // Look through wavenames that are being recorded
 	    wn = StringFromList(i, waveNames)
-	    openGraphID = graphExistsForWavename(wn)
+	    openGraphID = scg_graphExistsForWavename(wn)
 	    if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-	        setUpGraph1D(openGraphID, x_label, y_label=y_label_1d)  
+	        scg_setupGraph1D(openGraphID, x_label, y_label=y_label_1d)  
 	    else 
-	        open1Dgraph(wn, x_label, y_label=y_label, y_label=y_label_1d)
+	        scg_open1Dgraph(wn, x_label, y_label=y_label, y_label=y_label_1d)
 	        openGraphID = winname(0,1)
 	    endif
        graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
@@ -907,11 +938,11 @@ function/S initializeGraphsForWavenames(wavenames, x_label, [is2d, y_label])
 
 	    if (is2d)
 	        wn = wn+"_2d"
-	        openGraphID = graphExistsForWavename(wn)
+	        openGraphID = scg_graphExistsForWavename(wn)
 	        if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-	            setUpGraph2D(openGraphID, wn, x_label, y_label_2d)
+	            scg_setupGraph2D(openGraphID, wn, x_label, y_label_2d)
 	        else 
-	            open2Dgraph(wn, x_label, y_label_2d)
+	            scg_open2Dgraph(wn, x_label, y_label_2d)
 	            openGraphID = winname(0,1)
 	        endif
            graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
@@ -921,7 +952,7 @@ function/S initializeGraphsForWavenames(wavenames, x_label, [is2d, y_label])
 end
 
 
-function arrangeWindows(graphIDs)
+function scg_arrangeWindows(graphIDs)
     // Tile Graphs and/or windows etc
     string graphIDs
     string cmd, windowName
@@ -937,11 +968,11 @@ function arrangeWindows(graphIDs)
 end
 
 
-function/S graphExistsForWavename(wn)
+function/S scg_graphExistsForWavename(wn)
     // Checks if a graph is open containing wn, if so returns the graphTitle otherwise returns ""
     string wn
-    string graphTitles = getOpenGraphTitles() 
-    string graphIDs = getOpenGraphIDs()
+    string graphTitles = scg_getOpenGraphTitles() 
+    string graphIDs = scg_getOpenGraphIDs()
     string title
     variable i
     for (i = 0; i < ItemsInList(graphTitles, "|"); i++)  // Stupid separator to avoid clashing with all the normal separators Igor uses in title names  
@@ -954,7 +985,7 @@ function/S graphExistsForWavename(wn)
 end
 
 
-function open1Dgraph(wn, x_label, [y_label])
+function scg_open1Dgraph(wn, x_label, [y_label])
     // Opens 1D graph for wn
     string wn, x_label, y_label
     
@@ -963,11 +994,11 @@ function open1Dgraph(wn, x_label, [y_label])
     display $wn
     setWindow kwTopWin, graphicsTech=0
     
-    setUpGraph1D(WinName(0,1), x_label, y_label=y_label)
+    scg_setupGraph1D(WinName(0,1), x_label, y_label=y_label)
 end
 
 
-function open2Dgraph(wn, x_label, y_label)
+function scg_open2Dgraph(wn, x_label, y_label)
     // Opens 2D graph for wn
     string wn, x_label, y_label
     wave w = $wn
@@ -978,11 +1009,11 @@ function open2Dgraph(wn, x_label, y_label)
     display
     setwindow kwTopWin, graphicsTech=0
     appendimage $wn
-    setUpGraph2D(WinName(0,1), wn, x_label, y_label)
+    scg_setupGraph2D(WinName(0,1), wn, x_label, y_label)
 end
 
 
-function setUpGraph1D(graphID, x_label, [y_label])
+function scg_setupGraph1D(graphID, x_label, [y_label])
     // Sets up the axis labels, and datnum for a 1D graph
     string graphID, x_label, y_label
     
@@ -1002,7 +1033,7 @@ function setUpGraph1D(graphID, x_label, [y_label])
 end
 
 
-function setUpGraph2D(graphID, wn, x_label, y_label)
+function scg_setupGraph2D(graphID, wn, x_label, y_label)
     string graphID, wn, x_label, y_label
     svar sc_ColorMap
     // Sets axis labels, datnum etc
@@ -1018,7 +1049,7 @@ function setUpGraph2D(graphID, wn, x_label, y_label)
 end
 
 
-function/S getOpenGraphTitles()
+function/S scg_getOpenGraphTitles()
 	// GraphTitle == name after the ":" in graph window names
 	// e.g. "Graph1:testwave" -> "testwave"
 	// Returns a list of GraphTitles
@@ -1038,7 +1069,7 @@ function/S getOpenGraphTitles()
     return graphTitles
 end
 
-function/S getOpenGraphIDs()
+function/S scg_getOpenGraphIDs()
 	// GraphID == name before the ":" in graph window names
 	// e.g. "Graph1:testwave" -> "Graph1"
 	// Returns a list of GraphIDs
@@ -1048,11 +1079,11 @@ function/S getOpenGraphIDs()
 end
 
 
-function openAbortWindow()
+function scg_openAbortWindow()
     // Opens the window which allows for pausing/aborting/abort+saving a scan
     variable/g sc_abortsweep=0, sc_pause=0, sc_abortnosave=0 // Make sure these are initialized
     doWindow/k/z SweepControl  // Attempt to close previously open window just in case
-    execute("abortmeasurementwindow()")
+    execute("scs_abortmeasurementwindow()")
     doWindow/F SweepControl   // Bring Sweepcontrol to the front 
 end
 
@@ -1130,31 +1161,31 @@ end
 
 
 ////////////////////////////
-///// Sweep controls   /////
+///// Sweep controls   ///// scs_... (ScanControlSweep...)
 ////////////////////////////
-window abortmeasurementwindow() : Panel
+window scs_abortmeasurementwindow() : Panel
 	//Silent 1 // building window
 	NewPanel /W=(500,700,870,750) /N=SweepControl// window size
 	ModifyPanel frameStyle=2
 	ModifyPanel fixedSize=1
 	SetDrawLayer UserBack
-	Button pausesweep, pos={10,15},size={110,20},proc=pausesweep,title="Pause"
-	Button stopsweep, pos={130,15},size={110,20},proc=stopsweep,title="Abort and Save"
-	Button stopsweepnosave, pos={250,15},size={110,20},proc=stopsweep,title="Abort"
+	Button scs_pausesweep, pos={10,15},size={110,20},proc=scs_pausesweep,title="Pause"
+	Button scs_stopsweep, pos={130,15},size={110,20},proc=scs_stopsweep,title="Abort and Save"
+	Button scs_stopsweepnosave, pos={250,15},size={110,20},proc=scs_stopsweep,title="Abort"
 	DoUpdate /W=SweepControl /E=1
 endmacro
 
 
-function stopsweep(action) : Buttoncontrol
+function scs_stopsweep(action) : Buttoncontrol
 	string action
 	nvar sc_abortsweep,sc_abortnosave
 
 	strswitch(action)
-		case "stopsweep":
+		case "scs_stopsweep":
 			sc_abortsweep = 1
 			print "[SCAN] Scan will abort and the incomplete dataset will be saved."
 			break
-		case "stopsweepnosave":
+		case "scs_stopsweepnosave":
 			sc_abortnosave = 1
 			print "[SCAN] Scan will abort and dataset will not be saved."
 			break
@@ -1162,27 +1193,27 @@ function stopsweep(action) : Buttoncontrol
 end
 
 
-function pausesweep(action) : Buttoncontrol
+function scs_pausesweep(action) : Buttoncontrol
 	string action
 	nvar sc_pause, sc_abortsweep
 
-	Button pausesweep,proc=resumesweep,title="Resume"
+	Button scs_pausesweep,proc=scs_resumesweep,title="Resume"
 	sc_pause=1
 	print "[SCAN] Scan paused by user."
 end
 
 
-function resumesweep(action) : Buttoncontrol
+function scs_resumesweep(action) : Buttoncontrol
 	string action
 	nvar sc_pause
 
-	Button pausesweep,proc=pausesweep,title="Pause"
+	Button scs_pausesweep,proc=scs_pausesweep,title="Pause"
 	sc_pause = 0
 	print "Sweep resumed"
 end
 
 
-function sc_checksweepstate()
+function scs_checksweepstate()
 	nvar /Z sc_abortsweep, sc_pause, sc_abortnosave
 	
 	if(NVAR_Exists(sc_abortsweep) && sc_abortsweep==1)
@@ -1294,7 +1325,7 @@ threadsafe function sc_Worker(refWave, innerindex, outerindex, folderIndex, is2d
 		for(i=0;i<ItemsInList(queryFunc, ";");i+=1)
 
 			// do the measurements
-			funcref funcAsync func = $(StringFromList(i, queryFunc, ";"))
+			funcref sc_funcAsync func = $(StringFromList(i, queryFunc, ";"))
 			val = func(instrID)
 
 			if(numtype(val)==2)
@@ -1326,7 +1357,7 @@ threadsafe function sc_Worker(refWave, innerindex, outerindex, folderIndex, is2d
 end
 
 
-threadsafe function funcAsync(instrID)  // Reference functions for all *_async functions
+threadsafe function sc_funcAsync(instrID)  // Reference functions for all *_async functions
 	variable instrID                    // instrID used as only input to async functions
 end
 
@@ -1490,7 +1521,7 @@ end
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////  Data/Experiment Saving   ////////////////////////////////////////////////////////
+/////////////////////////  Data/Experiment Saving   //////////////////////////////////////////////////////// (sce_...) ScanControllerEnd...
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 function EndScan([S, save_experiment, aborting, additional_wavenames])
@@ -1512,11 +1543,11 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	variable current_filenum = filenum  // Because filenum gets incremented in SaveToHDF (to avoid clashing filenums when Igor crashes during saving)
 	save_experiment = paramisDefault(save_experiment) ? 1 : save_experiment
 	if(!paramIsDefault(S))
-		saveAsLastScanVarsStruct(S)  // I.e save the ScanVars including end_time and any other changed values in case saving fails (which it often does)
+		scv_setLastScanVars(S)  // I.e save the ScanVars including end_time and any other changed values in case saving fails (which it often does)
 	endif
 	
 	Struct ScanVars S_ // Note: This will definitely exist for the rest of this function
-	loadLastScanVarsStruct(S_)
+	scv_getLastScanVars(S_)
 	if (aborting)
 		S_.end_time = datetime
 		S_.comments = "aborted, " + S_.comments
@@ -1548,7 +1579,7 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	endif
 
 	// add info about scan to the scan history file in /config
-	//	sc_saveFuncCall(getrtstackinfo(2))
+	sce_saveFuncCall(getrtstackinfo(2))
 end
 
 
@@ -1577,8 +1608,6 @@ function SaveNamedWaves(wave_names, comments)
 	
 	addMetaFiles(num2str(hdfid), logs_only=1, comments=comments)
 
-
-//	initSaveFiles(msg=comments, logs_only=1)
 	printf "Saving waves [%s] in dat%d.h5\r", wave_names, filenum-1
 
 	// Now save each wave
@@ -1595,7 +1624,7 @@ function SaveNamedWaves(wave_names, comments)
 end
 
 
-function sc_saveFuncCall(funcname)
+function sce_saveFuncCall(funcname)
 	// Can be used to save Function calls to a text file
 	string funcname
 	// TODO: Update this function to new style with ScanVars
@@ -1645,7 +1674,7 @@ end
 
 
 ////////////////////////////////////////////////////////////////
-///////////////// Slow ScanController ONLY /////////////////////
+///////////////// Slow ScanController ONLY ////////////////////  scw_... (ScanControlWindow...)
 ////////////////////////////////////////////////////////////////
 // Slow == Not FastDAC compatible
 
@@ -1686,7 +1715,7 @@ function InitScanController([configFile])
 		if(itemsinlist(filelist)>0)
 			// read content into waves
 			filelist = SortList(filelist, ";", 1+16)
-			sc_loadConfig(StringFromList(0,filelist, ";"))
+			scw_loadConfig(StringFromList(0,filelist, ";"))
 		else
 			// if there are no config files, use defaults
 			// These arrays should have the same size. Their indeces correspond to each other.
@@ -1725,7 +1754,7 @@ function InitScanController([configFile])
 			endif
 		endif
 	else
-		sc_loadconfig(configFile)
+		scw_loadConfig(configFile)
 	endif
 	
 	// close all VISA sessions and create wave to hold
@@ -1738,11 +1767,11 @@ function InitScanController([configFile])
 	endif
 	make/n=0 viRM
 
-	sc_rebuildwindow()
+	scw_rebuildwindow()
 end
 
 
-function sc_rebuildwindow()
+function scw_rebuildwindow()
 	string cmd=""
 	getwindow/z ScanController wsizeRM
 	dowindow /k ScanController
@@ -1792,20 +1821,20 @@ Window ScanController(v_left,v_right,v_top,v_bottom) : Panel
 		DrawRect 9,30+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing),5+sc_InnerBoxW,30+sc_InnerBoxH+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)
 		cmd="SetVariable sc_RawWaveNameBox" + num2istr(i) + " pos={13, 37+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={110, 0}, fsize=14, title=\" \", value=sc_RawWaveNames[i]"
 		execute(cmd)
-		cmd="CheckBox sc_RawRecordCheckBox" + num2istr(i) + ", proc=sc_CheckBoxClicked, pos={150,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_RawRecord[i]) + " , title=\"\""
+		cmd="CheckBox sc_RawRecordCheckBox" + num2istr(i) + ", proc=scw_CheckboxClicked, pos={150,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_RawRecord[i]) + " , title=\"\""
 		execute(cmd)
-		cmd="CheckBox sc_RawPlotCheckBox" + num2istr(i) + ", proc=sc_CheckBoxClicked, pos={210,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_RawPlot[i]) + " , title=\"\""
+		cmd="CheckBox sc_RawPlotCheckBox" + num2istr(i) + ", proc=scw_CheckboxClicked, pos={210,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_RawPlot[i]) + " , title=\"\""
 		execute(cmd)
-		cmd="CheckBox sc_AsyncCheckBox" + num2istr(i) + ", proc=sc_CheckBoxClicked, pos={270,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_measAsync[i]) + " , title=\"\""
+		cmd="CheckBox sc_AsyncCheckBox" + num2istr(i) + ", proc=scw_CheckboxClicked, pos={270,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_measAsync[i]) + " , title=\"\""
 		execute(cmd)
 		cmd="SetVariable sc_rawScriptBox" + num2istr(i) + " pos={320, 37+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={340, 0}, fsize=14, title=\" \", value=sc_rawScripts[i]"
 		execute(cmd)
 		i+=1
 	while (i<numpnts( sc_RawWaveNames ))
 	i+=1
-	button addrowraw,pos={550,i*(sc_InnerBoxH + sc_InnerBoxSpacing)},size={110,20},proc=sc_addrow,title="Add Row"
-	button removerowraw,pos={430,i*(sc_InnerBoxH + sc_InnerBoxSpacing)},size={110,20},proc=sc_removerow,title="Remove Row"
-	checkbox sc_PrintRawBox, pos={300,i*(sc_InnerBoxH + sc_InnerBoxSpacing)}, proc=sc_CheckBoxClicked, value=sc_PrintRaw,side=1,title="\Z14Print filenames"
+	button addrowraw,pos={550,i*(sc_InnerBoxH + sc_InnerBoxSpacing)},size={110,20},proc=scw_addrow,title="Add Row"
+	button removerowraw,pos={430,i*(sc_InnerBoxH + sc_InnerBoxSpacing)},size={110,20},proc=scw_removerow,title="Remove Row"
+	checkbox sc_PrintRawBox, pos={300,i*(sc_InnerBoxH + sc_InnerBoxSpacing)}, proc=scw_CheckboxClicked, value=sc_PrintRaw,side=1,title="\Z14Print filenames"
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 13,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Wave Name"
 	SetDrawEnv fsize= 16,fstyle= 1
@@ -1820,17 +1849,17 @@ Window ScanController(v_left,v_right,v_top,v_bottom) : Panel
 		DrawRect 9,85+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing),5+sc_InnerBoxW,85+sc_InnerBoxH+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)
 		cmd="SetVariable sc_CalcWaveNameBox" + num2istr(i) + " pos={13, 92+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={110, 0}, fsize=14, title=\" \", value=sc_CalcWaveNames[i]"
 		execute(cmd)
-		cmd="CheckBox sc_CalcRecordCheckBox" + num2istr(i) + ", proc=sc_CheckBoxClicked, pos={150,95+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_CalcRecord[i]) + " , title=\"\""
+		cmd="CheckBox sc_CalcRecordCheckBox" + num2istr(i) + ", proc=scw_CheckboxClicked, pos={150,95+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_CalcRecord[i]) + " , title=\"\""
 		execute(cmd)
-		cmd="CheckBox sc_CalcPlotCheckBox" + num2istr(i) + ", proc=sc_CheckBoxClicked, pos={210,95+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_CalcPlot[i]) + " , title=\"\""
+		cmd="CheckBox sc_CalcPlotCheckBox" + num2istr(i) + ", proc=scw_CheckboxClicked, pos={210,95+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_CalcPlot[i]) + " , title=\"\""
 		execute(cmd)
 		cmd="SetVariable sc_CalcScriptBox" + num2istr(i) + " pos={320, 92+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={340, 0}, fsize=14, title=\" \", value=sc_CalcScripts[i]"
 		execute(cmd)
 		i+=1
 	while (i<numpnts( sc_CalcWaveNames ))
-	button addrowcalc,pos={550,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_addrow,title="Add Row"
-	button removerowcalc,pos={430,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=sc_removerow,title="Remove Row"
-	checkbox sc_PrintCalcBox, pos={300,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)}, proc=sc_CheckBoxClicked, value=sc_PrintCalc,side=1,title="\Z14Print filenames"
+	button addrowcalc,pos={550,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=scw_addrow,title="Add Row"
+	button removerowcalc,pos={430,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=scw_removerow,title="Remove Row"
+	checkbox sc_PrintCalcBox, pos={300,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)}, proc=scw_CheckboxClicked, value=sc_PrintCalc,side=1,title="\Z14Print filenames"
 
 	// box for instrument configuration
 	SetDrawEnv fsize= 16,fstyle= 1
@@ -1842,11 +1871,11 @@ Window ScanController(v_left,v_right,v_top,v_bottom) : Panel
 	ListBox sc_Instr,pos={9,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25},size={sc_InnerBoxW,(sc_InnerBoxH+sc_InnerBoxSpacing)*3},fsize=14,frame=2,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1, editStyle=1
 
 	// buttons
-	button connect, pos={10,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_OpenInstrButton,title="Connect Instr"
-	button gui, pos={140,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_OpenGUIButton,title="Open All GUI"
+	button connect, pos={10,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=scw_OpenInstrButton,title="Connect Instr"
+	button gui, pos={140,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=scw_OpenGUIButton,title="Open All GUI"
 	button killabout, pos={270,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={140,20},proc=sc_controlwindows,title="Kill Sweep Controls"
-	button killgraphs, pos={420,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=sc_killgraphs,title="Close All Graphs"
-	button updatebutton, pos={550,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={110,20},proc=sc_updatewindow,title="Update"
+	button killgraphs, pos={420,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=scw_killgraphs,title="Close All Graphs"
+	button updatebutton, pos={550,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={110,20},proc=scw_updatewindow,title="Update"
 
 // helpful text
 	DrawText 13,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+70,"Press Update to save changes."
@@ -1854,19 +1883,19 @@ Window ScanController(v_left,v_right,v_top,v_bottom) : Panel
 EndMacro
 
 
-function sc_OpenInstrButton(action) : Buttoncontrol
+function scw_OpenInstrButton(action) : Buttoncontrol
 	string action
 	sc_openInstrConnections(1)
 end
 
 
-function sc_OpenGUIButton(action) : Buttoncontrol
+function scw_OpenGUIButton(action) : Buttoncontrol
 	string action
 	sc_openInstrGUIs(1)
 end
 
 
-function sc_killgraphs(action) : Buttoncontrol
+function scw_killgraphs(action) : Buttoncontrol
 	string action
 	string opengraphs
 	variable ii
@@ -1881,14 +1910,14 @@ function sc_killgraphs(action) : Buttoncontrol
 end
 
 
-function sc_updatewindow(action) : ButtonControl
+function scw_updatewindow(action) : ButtonControl
 	string action
 
-	sc_saveConfig(sc_createconfig())   // write a new config file
+	scw_saveConfig(scw_createConfig())   // write a new config file
 end
 
 
-function sc_addrow(action) : ButtonControl
+function scw_addrow(action) : ButtonControl
 	string action
 	wave/t sc_RawWaveNames=sc_RawWaveNames
 	wave sc_RawRecord=sc_RawRecord
@@ -1915,10 +1944,10 @@ function sc_addrow(action) : ButtonControl
 			AppendString(sc_CalcScripts, "")
 		break
 	endswitch
-	sc_rebuildwindow()
+	scw_rebuildwindow()
 end
 
-function sc_removerow(action) : Buttoncontrol
+function scw_removerow(action) : Buttoncontrol
 	string action
 	wave/t sc_RawWaveNames=sc_RawWaveNames
 	wave sc_RawRecord=sc_RawRecord
@@ -1953,11 +1982,11 @@ function sc_removerow(action) : Buttoncontrol
 			endif
 			break
 	endswitch
-	sc_rebuildwindow()
+	scw_rebuildwindow()
 end
 
 // Update after checkbox clicked
-function sc_CheckboxClicked(ControlName, Value)
+function scw_CheckboxClicked(ControlName, Value)
 	string ControlName
 	variable value
 	string indexstring
@@ -2006,7 +2035,7 @@ function sc_CheckboxClicked(ControlName, Value)
 end
 
 
-function/s sc_createConfig()
+function/s scw_createConfig()
 	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts, sc_Instr
 	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
 	nvar sc_PrintRaw, sc_PrintCalc, filenum, sc_cleanup
@@ -2097,17 +2126,17 @@ function/s sc_createConfig()
 end
 
 
-function sc_saveConfig(configstr)
+function scw_saveConfig(configstr)
 	string configstr
 	svar sc_current_config
 
-	string filename = "sc" + num2istr(unixtime()) + ".json"
+	string filename = "sc" + num2istr(scu_unixTime()) + ".json"
 	writetofile(prettyJSONfmt(configstr), filename, "config")
 	sc_current_config = filename
 end
 
 
-function sc_loadConfig(configfile)
+function scw_loadConfig(configfile)
 	string configfile
 	string jstr
 	nvar sc_PrintRaw, sc_PrintCalc
@@ -2151,14 +2180,14 @@ function sc_loadConfig(configfile)
 	loadNum2var(getJSONvalue(jstr,"cleanup"),"sc_cleanup")
 
 	// reload ScanController window
-	sc_rebuildwindow()
+	scw_rebuildwindow()
 end
 
 
 ////////////////////////////////////////////
 /// Slow ScanController Recording Data /////
 ////////////////////////////////////////////
-function New_RecordValues(S, i, j, [fillnan])  // TODO: Rename
+function RecordValues(S, i, j, [fillnan])  
 	// In a 1d scan, i is the index of the loop. j will be ignored.
 	// In a 2d scan, i is the index of the outer (slow) loop, and j is the index of the inner (fast) loop.
 	// fillnan=1 skips any read or calculation functions entirely and fills point [i,j] with nan  (i.e. if intending to record only a subset of a larger array this effectively skips the places that should not be read)
@@ -2186,7 +2215,7 @@ function New_RecordValues(S, i, j, [fillnan])  // TODO: Rename
 	
 	// readvstime works only in 1d and rescales (grows) the wave at each index
 	if(S.readVsTime == 1 && S.is2d)
-		abort "ERROR[New_RecordValues]: Not valid to readvstime in 2D"
+		abort "ERROR[RecordValues]: Not valid to readvstime in 2D"
 	endif
 
 	//// Setup and run async data collection ////
@@ -2202,7 +2231,7 @@ function New_RecordValues(S, i, j, [fillnan])  // TODO: Rename
 	variable /g sc_tmpVal  // Used when evaluating measurement scripts from ScanController window
 	string script = "", cmd = ""
 	ii=0
-	do // TODO: Ideally rewrite this to use get1dWaveNames() but need to be careful about only updating sc_measAsync == 0 ones here...
+	do // TODO: Ideally rewrite this to use sci_get1DWaveNames() but need to be careful about only updating sc_measAsync == 0 ones here...
 		if ((sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1) && sc_measAsync[ii]==0)
 			wave wref1d = $sc_RawWaveNames[ii]
 
@@ -2213,7 +2242,7 @@ function New_RecordValues(S, i, j, [fillnan])  // TODO: Rename
 				wref1d[innerindex] = NaN  // Prevents graph updating with a zero
 				setscale/I x 0,  datetime - S.start_time, wref1d
 				S.finx = datetime - S.start_time 	// So that x_array etc will be saved correctly later
-				saveasLastScanVarsStruct(S)
+				scv_setLastScanVars(S)
 			endif
 
 			if(!fillnan)
@@ -2278,7 +2307,7 @@ function New_RecordValues(S, i, j, [fillnan])  // TODO: Rename
 	// check abort/pause status
 	nvar sc_abortsweep, sc_pause, sc_scanstarttime
 	try
-		sc_checksweepstate()
+		scs_checksweepstate()
 	catch
 		variable err = GetRTError(1)
 		// reset sweep control parameters if igor abort button is used
@@ -2294,20 +2323,20 @@ end
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////// Pre Scan Checks ///////////////////////////////////////////////////////////////
+////////////////////////////// Pre Scan Checks /////////////////////////////////////////////////////////////// scc_... (ScanControlChecks...)
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
-function SFfd_pre_checks(S, [x_only, y_only])
+function PreScanChecksFD(S, [x_only, y_only])
    struct ScanVars &S
    variable x_only, y_only  // Whether to only check specific axis (e.g. if other axis is a babydac or something else)
    
-	SFfd_check_same_device(S) 	// Checks DACs and ADCs are on same device
-	SFfd_check_ramprates(S)	 	// Check ramprates of x and y
-	SFfd_check_lims(S)			// Check within software lims for x and y
+	scc_checkSameDeviceFD(S) 	// Checks DACs and ADCs are on same device
+	scc_checkRampratesFD(S)	 	// Check ramprates of x and y
+	scc_checkLimsFD(S)			// Check within software lims for x and y
 	S.lims_checked = 1  		// So record_values knows that limits have been checked!
 end
 
 
-function SFfd_ramp_start(S, [ignore_lims, x_only, y_only])
+function RampStartFD(S, [ignore_lims, x_only, y_only])
 	// move DAC channels to starting point
 	struct ScanVars &S
 	variable ignore_lims, x_only, y_only
@@ -2323,7 +2352,7 @@ function SFfd_ramp_start(S, [ignore_lims, x_only, y_only])
 			elseif(S.direction == -1)
 				setpoint = str2num(stringfromlist(i,S.finxs,","))
 			else
-				abort "ERROR[SFfd_ramp_start]: S.direction not set to 1 or -1"
+				abort "ERROR[RampStartFD]: S.direction not set to 1 or -1"
 			endif
 			rampMultipleFDAC(S.instrID,stringfromlist(i,S.channelsx,","),setpoint,ramprate=S.rampratex, ignore_lims=ignore_lims)
 		endfor
@@ -2331,7 +2360,7 @@ function SFfd_ramp_start(S, [ignore_lims, x_only, y_only])
 	
 	// If y exists ramp them to start
 	if(numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0 && x_only != 1)  // If not NaN and not "" and not x only
-		assertSeparatorType(S.channelsy, ",")
+		scu_assertSeparatorType(S.channelsy, ",")
 		for(i=0;i<itemsinlist(S.channelsy,",");i+=1)
 			rampMultipleFDAC(S.instrID,stringfromlist(i,S.channelsy,","),str2num(stringfromlist(i,S.startys,",")),ramprate=S.rampratey, ignore_lims=ignore_lims)
 		endfor
@@ -2340,14 +2369,7 @@ function SFfd_ramp_start(S, [ignore_lims, x_only, y_only])
 end
 
 
-function SFfd_set_measureFreq(S)
-   struct ScanVars &S
-   S.samplingFreq = getfadcSpeed(S.instrID)
-   S.numADCs = getNumFADC()
-   S.measureFreq = S.samplingFreq/S.numADCs  //Because sampling is split between number of ADCs being read //TODO: This needs to be adapted for multiple FastDacs
-end
-
-function SFfd_check_ramprates(S)
+function scc_checkRampratesFD(S)
   // check if effective ramprate is higher than software limits
   struct ScanVars &S
 
@@ -2362,7 +2384,7 @@ function SFfd_check_ramprates(S)
 	string question
 
 	if(!numtype(strlen(s.channelsx)) == 0 == 0 && strlen(s.channelsx) != 0)  // if s.Channelsx != (null or "")
-		assertSeparatorType(S.channelsx, ",")
+		scu_assertSeparatorType(S.channelsx, ",")
 		for(i=0;i<itemsinlist(S.channelsx,",");i+=1)
 			eff_ramprate = abs(str2num(stringfromlist(i,S.startxs,","))-str2num(stringfromlist(i,S.finxs,",")))*(S.measureFreq/S.numptsx)
 			channel = str2num(stringfromlist(i, S.channelsx, ","))
@@ -2380,7 +2402,7 @@ function SFfd_check_ramprates(S)
   
 	// if Y channels exist, then check against rampratey (not sweeprate because only change on slow axis)	
 	if(numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0  && kill_graphs == 0)  // if s.Channelsy != (NaN or "") and not killing graphs yet 
-		assertSeparatorType(S.channelsy, ",")
+		scu_assertSeparatorType(S.channelsy, ",")
 		for(i=0;i<itemsinlist(S.channelsy,",");i+=1)
 			channel = str2num(stringfromlist(i, S.channelsy, ","))
 			if(s.rampratey > str2num(fdacvalstr[channel][4]))
@@ -2406,7 +2428,7 @@ function SFfd_check_ramprates(S)
 end
 
 
-function SFfd_check_lims(S)
+function scc_checkLimsFD(S)
 	// check that start and end values are within software limits
 	struct ScanVars &S
 
@@ -2428,7 +2450,7 @@ function SFfd_check_lims(S)
 
 	// Check channels were concatenated correctly (Seems unnecessary, but possibly killed my device because of this...)
 	if(stringmatch(channels, "*,,*") == 1)
-		abort "ERROR[SFfd_check_lims]: Channels list contains ',,' which means something has gone wrong and limit checking WONT WORK!!"
+		abort "ERROR[scc_checkLimsFD]: Channels list contains ',,' which means something has gone wrong and limit checking WONT WORK!!"
 	endif
 
 	// Check that start/fin for each channel will stay within software limits
@@ -2458,7 +2480,7 @@ function SFfd_check_lims(S)
 end
 
 
-function SFfd_check_same_device(S, [x_only, y_only])
+function scc_checkSameDeviceFD(S, [x_only, y_only])
 	// Checks all rampChs and ADCs (selected in fd_scancontroller window)
 	// are on the same device. 
 	struct ScanVars &s
@@ -2473,7 +2495,7 @@ function SFfd_check_same_device(S, [x_only, y_only])
 	if (!x_only)
 		channels = getChannelsOnFD(S.channelsy, device_buffer)
 		if (device_dacs > 0 && device_buffer > 0 && device_buffer != device_dacs)
-			abort "ERROR[SFfd_check_same_device]: X channels and Y channels are not on same device"  // TODO: Maybe this should raise an error?
+			abort "ERROR[scc_checkSameDeviceFD]: X channels and Y channels are not on same device"  // TODO: Maybe this should raise an error?
 		elseif (device_dacs <= 0 && device_buffer > 0)
 			device_dacs = device_buffer
 		endif
@@ -2481,62 +2503,24 @@ function SFfd_check_same_device(S, [x_only, y_only])
 
 	channels = getChannelsOnFD(s.AdcList, device_buffer, adc=1)  // Raises error if ADCs aren't on same device
 	if (device_dacs > 0 && device_buffer != device_dacs)
-		abort "ERROR[SFfd_check_same_device]: ADCs are not on the same device as DACs"  // TODO: Maybe should only raise error if x channels not on same device as ADCs?
+		abort "ERROR[scc_checkSameDeviceFD]: ADCs are not on the same device as DACs"  // TODO: Maybe should only raise error if x channels not on same device as ADCs?
 	endif	
 	return device_buffer // Return adc device number
 end
 
 
-function SFfd_format_setpoints(start, fin, channels, starts, fins)
-	// Returns strings in starts and fins in the format that fdacRecordValues takes
-	// e.g. fd_format_setpoints(-10, 10, "1,2,3", s, f) will make string s = "-10,-10,-10" and string f = "10,10,10"
-	variable start, fin
-	string channels, &starts, &fins
-	
-	variable i
-	starts = ""
-	fins = ""
-	for(i=0; i<itemsInList(channels, ","); i++)
-		starts = addlistitem(num2str(start), starts, ",", INF)
-		fins = addlistitem(num2str(fin), fins, ",", INF)
-	endfor
-	starts = starts[0,strlen(starts)-2] // Remove comma at end
-	fins = fins[0,strlen(fins)-2]	 		// Remove comma at end
-end
 
-
-function SFbd_pre_checks(S, [x_only, y_only])
+function PreScanChecksBD(S, [x_only, y_only])
   struct ScanVars &S
   variable x_only, y_only
 //	SFbd_check_ramprates(S)	 	// Check ramprates of x and y
-	SFbd_check_lims(S, x_only=x_only, y_only=y_only)			// Check within software lims for x and y
+	scc_checkLimsBD(S, x_only=x_only, y_only=y_only)			// Check within software lims for x and y
 	S.lims_checked = 1  		// So record_values knows that limits have been checked!
 end
 
 
-function SFfd_sanitize_setpoints(start_list, fin_list, channels, starts, fins)
-	// Makes sure starts/fins make sense for number of channels and have no bad formatting
-	// Modifies the starts/fins strings passed in
-	string start_list, fin_list, channels
-	string &starts, &fins
-	
-	string buffer
-	
-	assertSeparatorType(channels, ",")  // "," because quite often user entered
-	assertSeparatorType(start_list, ",")  // "," because entered by user
-	assertSeparatorType(fin_list, ",")	// "," because entered by user
-	
-	if (itemsinlist(channels, ",") != itemsinlist(start_list, ",") || itemsinlist(channels, ",") != itemsinlist(fin_list, ","))
-		sprintf buffer, "ERROR[SFfd_sanitize_setpoints]: length of start_list/fin_list/channels not equal!!! start_list:(%s), fin_list:(%s), channels:(%s)\r", start_list, fin_list, channels
-		abort buffer
-	endif
-	
-	starts = replaceString(" ", start_list, "")
-	fins = replaceString(" ", fin_list, "")
-end
 
-
-function SFbd_check_lims(S, [x_only, y_only])
+function scc_checkLimsBD(S, [x_only, y_only])
 	// check that start and end values are within software limits
    struct ScanVars &S
    variable x_only, y_only  // Whether to only check one axis (e.g. other is a fastdac)
@@ -2544,14 +2528,14 @@ function SFbd_check_lims(S, [x_only, y_only])
 	// Make single list out of X's and Y's (checking if each exists first)
 	string all_channels = "", outputs = ""
 	if(!y_only && numtype(strlen(s.channelsx)) == 0 && strlen(s.channelsx) != 0)  // If not NaN and not ""
-		assertSeparatorType(S.channelsx, ",")
+		scu_assertSeparatorType(S.channelsx, ",")
 		all_channels = addlistitem(S.channelsx, all_channels, "|")
 		outputs = addlistitem(num2str(S.startx), outputs, ",")
 		outputs = addlistitem(num2str(S.finx), outputs, ",")
 	endif
 
 	if(!x_only && numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0)  // If not NaN and not ""
-		assertSeparatorType(S.channelsy, ",")
+		scu_assertSeparatorType(S.channelsy, ",")
 		all_channels = addlistitem(S.channelsy, all_channels, "|")
 		outputs = addlistitem(num2str(S.starty), outputs, ",")
 		outputs = addlistitem(num2str(S.finy), outputs, ",")
@@ -2622,7 +2606,7 @@ function SFbd_check_lims(S, [x_only, y_only])
 end
 
 
-function SFbd_ramp_start(S, [x_only, y_only, ignore_lims])
+function RampStartBD(S, [x_only, y_only, ignore_lims])
 	// move DAC channels to starting point
 	// x_only/y_only to only try ramping x/y to start (e.g. y_only=1 when using a babydac for y-axis of a fastdac scan)
 	struct ScanVars &S
@@ -2641,7 +2625,7 @@ function SFbd_ramp_start(S, [x_only, y_only, ignore_lims])
 end
 
 
-function SFawg_check_AWG_list(AWG, Fsv)
+function CheckAWG(AWG, Fsv)
 	// Check that AWG and FastDAC ScanValues don't have any clashing DACs and check AWG within limits etc
 	struct fdAWG_List &AWG
 	struct ScanVars &Fsv
@@ -2651,33 +2635,33 @@ function SFawg_check_AWG_list(AWG, Fsv)
 	variable i=0, j=0
 	
 	// Assert separators are correct
-	assertSeparatorType(AWG.AW_DACs, ",")
-	assertSeparatorType(AWG.AW_waves, ",")
+	scu_assertSeparatorType(AWG.AW_DACs, ",")
+	scu_assertSeparatorType(AWG.AW_waves, ",")
 		
 	// Check initialized
 	if(AWG.initialized == 0)
-		abort "ERROR[SFawg_check_AWG_list]: AWG_List needs to be initialized. Maybe something changed since last use!"
+		abort "ERROR[CheckAWG]: AWG_List needs to be initialized. Maybe something changed since last use!"
 	endif
 	
 	// Check numADCs hasn't changed since setting up waves
 	if(AWG.numADCs != getNumFADC())
-		abort "ERROR[SFawg_check_AWG_list]: Number of ADCs being measured has changed since setting up AWG, this will change AWG frequency. Set up AWG again to continue"
+		abort "ERROR[CheckAWG]: Number of ADCs being measured has changed since setting up AWG, this will change AWG frequency. Set up AWG again to continue"
 	endif
 	
 	// Check measureFreq hasn't change since setting up waves
 	if(AWG.measureFreq != Fsv.measureFreq  || AWG.samplingFreq != Fsv.samplingFreq)
-		sprintf err_msg, "ERROR[SFawg_check_AWG_list]: MeasureFreq has changed from %.2f/s to %.2f/s since setting up AWG. Set up AWG again to continue", AWG.measureFreq, Fsv.measureFreq
+		sprintf err_msg, "ERROR[CheckAWG]: MeasureFreq has changed from %.2f/s to %.2f/s since setting up AWG. Set up AWG again to continue", AWG.measureFreq, Fsv.measureFreq
 		abort err_msg
 	endif
 	
 	// Check numSteps is an integer and not zero
 	if(AWG.numSteps != trunc(AWG.numSteps) || AWG.numSteps == 0)
-		abort "ERROR[SFawg_check_AWG_list]: numSteps must be an integer, not " + num2str(AWG.numSteps)
+		abort "ERROR[CheckAWG]: numSteps must be an integer, not " + num2str(AWG.numSteps)
 	endif
 			
 	// Check there are DACs set for each AW_wave (i.e. if using 2 AWs, need at least 1 DAC for each)
 	if(itemsInList(AWG.AW_waves, ",") != (itemsinlist(AWG.AW_Dacs,",")))
-		sprintf err_msg "ERROR[SFawg_check_AWG_list]: Number of AWs doesn't match sets of AW_Dacs. AW_Waves: %s; AW_Dacs: %s", AWG.AW_waves, AWG.AW_Dacs
+		sprintf err_msg "ERROR[CheckAWG]: Number of AWs doesn't match sets of AW_Dacs. AW_Waves: %s; AW_Dacs: %s", AWG.AW_waves, AWG.AW_Dacs
 		abort err_msg
 	endif	
 	
@@ -2689,7 +2673,7 @@ function SFawg_check_AWG_list(AWG, Fsv)
 		for(j=0;j<strlen(AWdacs);j++)
 			channel = AWdacs[j]
 			if(findlistitem(channel, FDchannels, ",") != -1)
-				abort "ERROR[SFawg_check_AWG_list]: Trying to use same DAC channel for FD scan and AWG at the same time"
+				abort "ERROR[CheckAWG]: Trying to use same DAC channel for FD scan and AWG at the same time"
 			endif
 		endfor
 	endfor
@@ -2712,7 +2696,7 @@ function SFawg_check_AWG_list(AWG, Fsv)
 					sprintf question, "DAC channel %s will be ramped outside software limits. Continue?", AWdacs[j]
 					answer = ask_user(question, type=1)
 					if(answer == 2)
-						print("ERROR[SFawg_check_AWG_list]: User abort!")
+						print("ERROR[CheckAWG]: User abort!")
 						abort
 					endif
 				endif
@@ -2722,7 +2706,7 @@ function SFawg_check_AWG_list(AWG, Fsv)
 end
 
 
-function SFawg_set_and_precheck(AWG, S)
+function SetCheckAWG(AWG, S)
 	struct fdAWG_List &AWG
 	struct ScanVars &S
 
@@ -2732,7 +2716,7 @@ function SFawg_set_and_precheck(AWG, S)
 	S.numptsx = (AWG.numSteps*AWG.waveLen*AWG.numCycles)
 	
 	// Check AWG for clashes/exceeding lims etc
-	SFawg_check_AWG_list(AWG, S)	
+	CheckAWG(AWG, S)	
 	AWG.use_AWG = 1
 	
 	// Save numSteps in AWG_list for sweeplogs later

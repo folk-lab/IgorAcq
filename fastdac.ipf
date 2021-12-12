@@ -537,8 +537,8 @@ function RampMultipleFDAC(InstrID, channels, setpoint, [ramprate, ignore_lims])
 	
 	ramprate = numtype(ramprate) == 0 ? ramprate : 0  // If not a number, then set to zero (which means will be overridden by ramprate in window)
 	
-	assertSeparatorType(channels, ",")
-	channels = SF_get_channels(channels, fastdac=1)
+	scu_assertSeparatorType(channels, ",")
+	channels = scu_getChannelNumbers(channels, fastdac=1)
 	
 	variable i=0, channel, nChannels = ItemsInList(channels, ",")
 	variable channel_ramp
@@ -861,7 +861,7 @@ function saveFdacCalibration(deviceAddress,deviceNum,numDACCh,result)
 
 	// create DAC calibration file
 	string filename = ""
-	sprintf filename, "fDAC%dCalibration_%d.txt", deviceNum, unixtime()
+	sprintf filename, "fDAC%dCalibration_%d.txt", deviceNum, scu_unixTime()
 	writetofile(prettyJSONfmt(buffer),filename,"config")
 end
 
@@ -1024,7 +1024,6 @@ function FDacSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,nosave])
 	// if linear is set to 1, the spectrum will be plotted on a linear scale
 	variable instrID, scanlength, numAverage, nosave
 	string comments
-	string datestring = strTime()
 	
 	comments = selectString(paramisdefault(comments), comments, "")	
 	numAverage = paramisDefault(numAverage) ? 1 : numAverage
@@ -1036,11 +1035,11 @@ function FDacSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,nosave])
 
 	// Initialize ScanVars
 	Struct ScanVars S
-	initFDscanVars(S, instrID, 0, scanlength, duration=scanlength, x_label="Time /s", y_label="Current /nA", comments="spectrum,"+comments)
+	initScanVarsFD(S, instrID, 0, scanlength, duration=scanlength, x_label="Time /s", y_label="Current /nA", comments="spectrum,"+comments)
 	S.readVsTime = 1
 
 	// Check things like ADCs on same device
-	SFfd_pre_checks(S)
+	PreScanChecksFD(S)
 
 	// Initialize graphs and waves
 	initializeScan(S)  // Going to reopen graphs below anyway (to include frequency graphs)
@@ -1065,15 +1064,15 @@ function FDacSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,nosave])
 	endfor
 
 	// Initialize all graphs
-	string all_graphIDs = initializeGraphsForWavenames(get1DWaveNames(1,1), "Time /s", is2d=S.is2d, y_label="ADC /mV")  // RAW ADC readings
-	all_graphIDs += initializeGraphsForWavenames(get1DWaveNames(0,1), "Time /s", is2d=S.is2d, y_label="Current /nA")    // Calculated data (should be in nA)
+	string all_graphIDs = scg_initializeGraphsForWavenames(sci_get1DWaveNames(1,1), "Time /s", is2d=S.is2d, y_label="ADC /mV")  // RAW ADC readings
+	all_graphIDs += scg_initializeGraphsForWavenames(sci_get1DWaveNames(0,1), "Time /s", is2d=S.is2d, y_label="Current /nA")    // Calculated data (should be in nA)
 	
 	string graphIDs
-	graphIDs = initializeGraphsForWavenames(log_freq_wavenames, "Frequency /Hz", is2d=0, y_label="Ylabel for log spectrum?")
+	graphIDs = scg_initializeGraphsForWavenames(log_freq_wavenames, "Frequency /Hz", is2d=0, y_label="Ylabel for log spectrum?")
 	all_graphIDs = all_graphIDs+graphIDs
-	graphIDs = initializeGraphsForWavenames(lin_freq_wavenames, "Frequency /Hz", is2d=0, y_label="Ylabel for lin spectrum?")
+	graphIDs = scg_initializeGraphsForWavenames(lin_freq_wavenames, "Frequency /Hz", is2d=0, y_label="Ylabel for lin spectrum?")
 	all_graphIDs = all_graphIDs+graphIDs
-	arrangeWindows(all_graphIDs)
+	scg_arrangeWindows(all_graphIDs)
 
 	// Record data
 	string wavenames = getRecordedFastdacInfo("calc_names")  // ";" separated list of recorded calculated waves
@@ -1163,7 +1162,7 @@ function plot_PowerSpectrum(w, [scan_duration, linear, powerspec_name])
 	endif
 
 	string y_label = selectString(linear, "Spectrum [dBnA/sqrt(Hz)]", "Spectrum [nA/sqrt(Hz)]")
-	initializeGraphsForWavenames(NameOfWave(tempwave), "Frequency /Hz", is2d=0, y_label=y_label)
+	scg_initializeGraphsForWavenames(NameOfWave(tempwave), "Frequency /Hz", is2d=0, y_label=y_label)
 	 doWindow/F $winName(0,1)
 end
 
@@ -1360,7 +1359,7 @@ function fdAWG_setup_AWG(instrID, [AWs, DACs, numCycles, verbose])
 	fdAWG_get_global_AWG_list(S)
 	
 	// Note: This needs to be changed if using same AW on multiple DACs
-	DACs = SF_get_channels(DACs, fastdac=1)  // Convert from label to numbers 
+	DACs = scu_getChannelNumbers(DACs, fastdac=1)  // Convert from label to numbers 
 	DACs = ReplaceString(";", DACs, ",")  
 	/////////////////
 	
@@ -1715,11 +1714,11 @@ function/s fd_start_sweep(S, [AWG_list])
 	Struct ScanVars &S
 	Struct fdAWG_list &AWG_List
 
-	assertSeparatorType(S.ADCList, ";")	
+	scu_assertSeparatorType(S.ADCList, ";")	
 	string adcs = replacestring(";",S.adclist,"")
 
 	if (!S.readVsTime)
-		assertSeparatorType(S.channelsx, ",")
+		scu_assertSeparatorType(S.channelsx, ",")
 		string starts, fins, temp
 		if(S.direction == 1)
 			starts = S.startxs
@@ -1860,7 +1859,7 @@ function fdAWG_get_global_AWG_list(S)
 	// Get variable parts
 	svar fdAWG_globals_stuct_vars
 	structGet/S S fdAWG_globals_stuct_vars
-	S.use_AWG = 0  // Always initialized to zero so that checks have to be run before using in scan (see SFawg_set_and_precheck())
+	S.use_AWG = 0  // Always initialized to zero so that checks have to be run before using in scan (see SetCheckAWG())
 	
 	// Get string parts
 	svar fdAWG_globals_AW_Waves

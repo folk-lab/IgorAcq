@@ -75,7 +75,7 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 	Struct ScanVars &S
 	variable logs_only  // 1=Don't save any sweep information to HDF
 	make/Free/T/N=1 cconfig = {""}
-	cconfig = prettyJSONfmt(sc_createconfig())
+	cconfig = prettyJSONfmt(scw_createConfig())
 	
 	if (!logs_only)
 		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(new_sc_createSweepLogs(S=S))
@@ -120,7 +120,7 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 		endif
 
 		// may as well save this config file, since we already have it
-		sc_saveConfig(cconfig[0])
+		scw_saveConfig(cconfig[0])
 		
 	endfor
 end
@@ -340,11 +340,11 @@ function SaveToHDF(S, [additional_wavenames])
 	// Get waveList to save
 	string RawWaves, CalcWaves
 	if(S.is2d == 0)
-		RawWaves = get1DWaveNames(1, S.using_fastdac)
-		CalcWaves = get1DWaveNames(0, S.using_fastdac)
+		RawWaves = sci_get1DWaveNames(1, S.using_fastdac)
+		CalcWaves = sci_get1DWaveNames(0, S.using_fastdac)
 	elseif (S.is2d == 1)
-		RawWaves = get2DWaveNames(1, S.using_fastdac)
-		CalcWaves = get2DWaveNames(0, S.using_fastdac)
+		RawWaves = sci_get2DWaveNames(1, S.using_fastdac)
+		CalcWaves = sci_get2DWaveNames(0, S.using_fastdac)
 	else
 		abort "Not implemented"
 	endif
@@ -354,7 +354,7 @@ function SaveToHDF(S, [additional_wavenames])
 
 	// Add additional_wavenames to CalcWaves
 	if (!paramIsDefault(additional_wavenames) && strlen(additional_wavenames) > 0)
-		assertSeparatorType(additional_wavenames, ";")
+		scu_assertSeparatorType(additional_wavenames, ";")
 		CalcWaves += additional_wavenames
 		// TODO: Check this adds the correct ; between strings
 	endif

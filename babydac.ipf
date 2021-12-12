@@ -804,7 +804,7 @@ function rampMultipleBD(instrID, channels, setpoint, [ramprate, update, ignore_l
 	wave /t customdacvalstr
 	nvar bd_num_custom
 
-	channels = SF_get_channels(channels)  // Converts label names to Dac channels
+	channels = scu_getChannelNumbers(channels)  // Converts label names to Dac channels
 
 	if(paramisdefault(ramprate) || ramprate == 0)
 		nvar bd_ramprate

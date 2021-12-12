@@ -44,7 +44,7 @@ function/t getFdacInfo(channelstr, info_name)
 	endswitch
 
 	wave/T fdacValStr	
-	variable channel_num = str2num(SF_get_channels(channelstr, fastdac=1))
+	variable channel_num = str2num(scu_getChannelNumbers(channelstr, fastdac=1))
 	if (numtype(channel_num) != 0)
 		abort "ERROR[getFdacInfo]: Bad channelstr/channel_num"
 	endif
@@ -208,7 +208,7 @@ function/S getChannelsOnFD(channels, device, [adc])
 	svar sc_fdacKeys  // Holds info about connected FastDACs
 
 	channels = replaceString(",", channels, ";")  // DAC channels may be passed in with "," separator instead of ";" separator
-	assertSeparatorType(channels, ";")
+	scu_assertSeparatorType(channels, ";")
 
 	variable numDevices = getNumDevices()
 	device = -1 // Init invalid (so can set when first channel is found)
@@ -465,8 +465,8 @@ function fdRV_process_and_distribute(ScanVars, rowNum)
 	variable rowNum
 		
 	// Get all raw 1D wave names in a list
-	string RawWaveNames1D = get1DWaveNames(1, 1)
-	string CalcWaveNames1D = get1DwaveNames(0, 1)
+	string RawWaveNames1D = sci_get1DWaveNames(1, 1)
+	string CalcWaveNames1D = sci_get1DWaveNames(0, 1)
 	string CalcStrings = getRecordedFastdacInfo("calc_funcs")
 	if (itemsinList(RawWaveNames1D) != itemsinList(CalCWaveNames1D))
 		abort "Different number of raw wave names compared to calc wave names"
@@ -515,7 +515,7 @@ end
 // 	string channels
 // 	string named_waves // Named waves to store raw data in (; separated same length as channels)
 	
-// 	assertSeparatorType(channels, ";")
+// 	scu_assertSeparatorType(channels, ";")
 
 // 	variable numChannels = itemsInList(channels)
 // 	if (numChannels == 0)
@@ -524,7 +524,7 @@ end
 
 // 	// If storing in named_waves, check they make sense
 // 	if (!paramisDefault(named_waves))
-// 		assertSeparatorType(named_waves, ";")
+// 		scu_assertSeparatorType(named_waves, ";")
 // 		if (itemsInList(channels) != itemsInList(named_waves))
 // 			abort "ERROR[fd_readvstime]: named_waves provided but length doesn't match channels"
 // 		endif
@@ -686,7 +686,7 @@ function fdRV_check_sweepstate(instrID)
 	nvar sc_abortsweep
 	nvar sc_pause
   	try
-    	sc_checksweepstate()
+    	scs_checksweepstate()
   	catch
 		errCode = GetRTError(1)
 		stopFDACsweep(instrID)
@@ -734,9 +734,9 @@ function fdRV_update_window(S, numAdcs)
   variable numADCs
   // Note: This does not yet support multiple fastdacs
 
-  assertSeparatorType(S.channelsx, ",")
-  assertSeparatorType(S.finxs, ",")
-  assertSeparatorType(S.adcList, ";")
+  scu_assertSeparatorType(S.channelsx, ",")
+  scu_assertSeparatorType(S.finxs, ",")
+  scu_assertSeparatorType(S.adcList, ";")
 
   wave/T fdacvalstr
 
@@ -777,7 +777,7 @@ function sc_distribute_data(buffer,adcList,bytes,rowNum,colNumStart,[direction, 
 	variable numADCCh = itemsinlist(adcList)
 	string waveslist = ""
 	if (!paramisDefault(named_waves) && strlen(named_waves) > 0)  // Use specified wavenames instead of default ADC#
-		assertSeparatorType(named_waves, ";")
+		scu_assertSeparatorType(named_waves, ";")
 		if (itemsInList(named_waves) != numADCch)
 			abort "ERROR[sc_distribute_data]: wrong number of named_waves for numADCch being recorded"
 		endif
@@ -817,7 +817,7 @@ function fdRV_check_ramp_start(S)
 	// will give the user a WARNING that this should have been done already in the top level scan function
 	// Note: This only works for a single fastdac sweeping at once
    struct ScanVars &S
-	assertSeparatorType(S.channelsx, ",")
+	scu_assertSeparatorType(S.channelsx, ",")
    variable i=0, require_ramp = 0, ch, sp, diff
    for(i=0;i<itemsinlist(S.channelsx);i++)
       ch = str2num(stringfromlist(i, S.channelsx, ","))
@@ -834,7 +834,7 @@ function fdRV_check_ramp_start(S)
 
    if(require_ramp == 1)
       print "WARNING[fdRV_check_ramp_start]: At least one DAC was not at start point, it has been ramped and slept for delayx, but this should be done in top level scan function!"
-      SFfd_ramp_start(S, ignore_lims = 1, x_only=1)
+      RampStartFD(S, ignore_lims = 1, x_only=1)
       sc_sleep(S.delayy) // Settle time for 2D sweeps
    endif
 end
@@ -1078,9 +1078,9 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	ListBox fadclist,pos={400,75},size={385,180},fsize=14,frame=2,widths={25,65,45,80,80}
 	ListBox fadclist,listwave=root:fadcvalstr,selwave=root:fadcattr,mode=1
 	button updatefadc,pos={400,265},size={90,20},proc=update_fadc,title="Update ADC"
-//	checkbox sc_PrintfadcBox,pos={500,265},proc=sc_CheckBoxClicked,value=sc_Printfadc,side=1,title="\Z14Print filenames "
-	checkbox sc_SavefadcBox,pos={620,265},proc=sc_CheckBoxClicked,value=sc_Saverawfadc,side=1,title="\Z14Save raw data "
-	checkbox sc_FilterfadcCheckBox,pos={400,290},proc=sc_CheckBoxClicked,value=sc_ResampleFreqCheckfadc,side=1,title="\Z14Resample "
+//	checkbox sc_PrintfadcBox,pos={500,265},proc=scw_CheckboxClicked,value=sc_Printfadc,side=1,title="\Z14Print filenames "
+	checkbox sc_SavefadcBox,pos={620,265},proc=scw_CheckboxClicked,value=sc_Saverawfadc,side=1,title="\Z14Save raw data "
+	checkbox sc_FilterfadcCheckBox,pos={400,290},proc=scw_CheckboxClicked,value=sc_ResampleFreqCheckfadc,side=1,title="\Z14Resample "
 	SetVariable sc_FilterfadcBox,pos={500,290},size={200,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resample Frequency ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
 	DrawText 705,310, "\Z14Hz" 
 	popupMenu fadcSetting1,pos={420,330},proc=update_fadcSpeed,mode=1,title="\Z14ADC1 speed",size={100,20},value=sc_fadcSpeed1 
@@ -1108,11 +1108,11 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	ListBox sc_InstrFdac,pos={10,450},size={770,100},fsize=14,frame=2,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1, editStyle=1
 
 	// buttons
-	button connectfdac,pos={10,555},size={140,20},proc=sc_OpenInstrButton,title="Connect Instr" 
-	button guifdac,pos={160,555},size={140,20},proc=sc_OpenGUIButton,title="Open All GUI" 
+	button connectfdac,pos={10,555},size={140,20},proc=scw_OpenInstrButton,title="Connect Instr" 
+	button guifdac,pos={160,555},size={140,20},proc=scw_OpenGUIButton,title="Open All GUI" 
 	button killaboutfdac, pos={310,555},size={160,20},proc=sc_controlwindows,title="Kill Sweep Controls" 
-	button killgraphsfdac, pos={480,555},size={150,20},proc=sc_killgraphs,title="Close All Graphs" 
-	button updatebuttonfdac, pos={640,555},size={140,20},proc=sc_updatewindow,title="Update" 
+	button killgraphsfdac, pos={480,555},size={150,20},proc=scw_killgraphs,title="Close All Graphs" 
+	button updatebuttonfdac, pos={640,555},size={140,20},proc=scw_updatewindow,title="Update" 
 
 	// helpful text
 	DrawText 10, 595, "Press Update to save changes." 

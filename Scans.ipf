@@ -18,7 +18,7 @@ function ReadVsTime(delay, [y_label, max_time, comments]) // Units: s
 	max_time = paramIsDefault(max_time) ? INF : max_time
 	
 	Struct ScanVars S
-	initBDscanVars(S, 0, 0, 1, numptsx=1, delayx=delay, x_label="time /s", y_label=y_label, comments=comments)
+	initScanVarsBD(S, 0, 0, 1, numptsx=1, delayx=delay, x_label="time /s", y_label=y_label, comments=comments)
 	initializeScan(S)
 	S.readVsTime = 1
 
@@ -26,7 +26,7 @@ function ReadVsTime(delay, [y_label, max_time, comments]) // Units: s
 	S.start_time = datetime
 	do
 		asleep(delay)
-		New_RecordValues(S, i, 0)
+		RecordValues(S, i, 0)
 		doupdate
 		i+=1
 	while (datetime-S.start_time < max_time)
@@ -51,13 +51,13 @@ function ScanBabyDAC(instrID, start, fin, channels, numpts, delay, ramprate, [y_
 
 	// Initialize ScanVars
 	struct ScanVars S
-	InitBDscanVars(S, instrID, start, fin, channelsx=channels, numptsx=numpts, delayx=delay, rampratex=ramprate, comments=comments, y_label=y_label)
+	initScanVarsBD(S, instrID, start, fin, channelsx=channels, numptsx=numpts, delayx=delay, rampratex=ramprate, comments=comments, y_label=y_label)
 
 	// Check software limits and ramprate limits
-	SFbd_pre_checks(S)  
+	PreScanChecksBD(S)  
 
 	// Ramp to start without checks because checked above
-	SFbd_ramp_start(S, ignore_lims=1)
+	RampStartBD(S, ignore_lims=1)
 
 	// Let gates settle 
 	sc_sleep(5*S.delayx)
@@ -71,7 +71,7 @@ function ScanBabyDAC(instrID, start, fin, channels, numpts, delay, ramprate, [y_
 		setpoint = S.startx + (i*(S.finx-S.startx)/(S.numptsx-1))
 		RampMultipleBD(S.instrID, S.channelsx, setpoint, ramprate=S.rampratex, ignore_lims=1)
 		sc_sleep(S.delayx)
-		New_recordValues(S, i, 0)
+		RecordValues(S, i, 0)
 		i+=1
 	while (i<S.numptsx)
 
@@ -111,13 +111,13 @@ function ScanBabyDACUntil(instrID, start, fin, channels, numpts, delay, ramprate
 
 	// Initialize ScanVars
 	struct ScanVars S
-	InitBDscanVars(S, instrID, start, fin, channelsx=channels, numptsx=numpts, delayx=delay, rampratex=ramprate, comments=comments, y_label=y_label)
+	initScanVarsBD(S, instrID, start, fin, channelsx=channels, numptsx=numpts, delayx=delay, rampratex=ramprate, comments=comments, y_label=y_label)
 
 	// Check software limits and ramprate limits
-	SFbd_pre_checks(S)  
+	PreScanChecksBD(S)  
 
 	// Ramp to start without checks because checked above
-	SFbd_ramp_start(S, ignore_lims=1)
+	RampStartBD(S, ignore_lims=1)
 
 	// Let gates settle 
 	sc_sleep(5*S.delayx)
@@ -132,7 +132,7 @@ function ScanBabyDACUntil(instrID, start, fin, channels, numpts, delay, ramprate
 		setpoint = S.startx + (i*(S.finx-S.startx)/(S.numptsx-1))
 		RampMultipleBD(S.instrID, S.channelsx, setpoint, ramprate=S.rampratex, ignore_lims=1)
 		sc_sleep(S.delayx)
-		New_recordValues(S, i, 0)
+		RecordValues(S, i, 0)
 		if (a*w[i] - value < 0)
 			break
 		endif
@@ -160,15 +160,15 @@ function ScanBabyDAC2D(instrID, startx, finx, channelsx, numptsx, delayx, rampra
 	
 	// Initialize ScanVars
 	struct ScanVars S
-	InitBDscanVars(S, instrID, startx, finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
+	initScanVarsBD(S, instrID, startx, finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
 							starty=starty, finy=finy, channelsy=channelsy, numptsy=numptsy, delayy=delayy, rampratey=rampratey, \
 	 						comments=comments)
 
 	// Check software limits and ramprate limits
-	SFbd_pre_checks(S)  
+	PreScanChecksBD(S)  
 	
 	// Ramp to start without checks because checked above
-	SFbd_ramp_start(S, ignore_lims=1)
+	RampStartBD(S, ignore_lims=1)
 	
 	// Let gates settle 
 	sc_sleep(S.delayy)
@@ -189,7 +189,7 @@ function ScanBabyDAC2D(instrID, startx, finx, channelsx, numptsx, delayx, rampra
 			setpointx = S.startx + (j*(S.finx-S.startx)/(S.numptsx-1))
 			RampMultipleBD(S.instrID, S.channelsx, setpointx, ramprate=S.rampratex)
 			sc_sleep(S.delayx)
-			new_RecordValues(S, i, j)
+			RecordValues(S, i, j)
 			j+=1
 		while (j<S.numptsx)
 	i+=1
@@ -220,14 +220,14 @@ function ScanBabyDACRepeat(instrID, startx, finx, channelsx, numptsx, delayx, ra
 	
 	// Initialize ScanVars
 	struct ScanVars S
-	InitBDscanVars(S, instrID, startx, finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
+	initScanVarsBD(S, instrID, startx, finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
 							starty=1, finy=numptsy, numptsy=numptsy, delayy=delayy, y_label="Repeats", comments=comments)
 
 	// Check software limits and ramprate limits
-	SFbd_pre_checks(S, x_only=1)  
+	PreScanChecksBD(S, x_only=1)  
 	
 	// Ramp to start without checks because checked above
-	SFbd_ramp_start(S, ignore_lims=1)
+	RampStartBD(S, ignore_lims=1)
 	
 	// Let gates settle 
 	sc_sleep(S.delayy)
@@ -256,7 +256,7 @@ function ScanBabyDACRepeat(instrID, startx, finx, channelsx, numptsx, delayx, ra
 			setpointx = S.startx + (j*(S.finx-S.startx)/(S.numptsx-1))
 			RampMultipleBD(S.instrID, S.channelsx, setpointx, ramprate=S.rampratex, ignore_lims=1)
 			sc_sleep(S.delayx)
-			new_RecordValues(S, i, j)
+			RecordValues(S, i, j)
 			j+=scandirection
 		while (j>-1 && j<S.numptsx)
 		i+=1
@@ -284,15 +284,15 @@ function ScanBabyDAC_SRSAmplitude(babydacID, srsID, startx, finx, channelsx, num
 	
 	// Initialize ScanVars
 	struct ScanVars S
-	InitBDscanVars(S, babydacID, startx, finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
+	initScanVarsBD(S, babydacID, startx, finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
 							starty=starty, finy=finy, numptsy=numptsy, delayy=delayy, \
 	 						y_label="SRS Amplitude", comments=comments)
 
 	// Check software limits and ramprate limits
-	SFbd_pre_checks(S, x_only=1)  
+	PreScanChecksBD(S, x_only=1)  
 	
 	// Ramp to start without checks because checked above
-	SFbd_ramp_start(S, ignore_lims=1)
+	RampStartBD(S, ignore_lims=1)
 	
 	// Let gates settle 
 	sc_sleep(S.delayy)
@@ -313,7 +313,7 @@ function ScanBabyDAC_SRSAmplitude(babydacID, srsID, startx, finx, channelsx, num
 			setpointx = S.startx + (j*(S.finx-S.startx)/(S.numptsx-1))
 			RampMultipleBD(S.instrID, S.channelsx, setpointx, ramprate=S.rampratex, ignore_lims=1)
 			sc_sleep(S.delayx)
-			New_RecordValues(S, i, j)
+			RecordValues(S, i, j)
 			j+=1
 		while (j<S.numptsx)
 		i+=1
@@ -348,7 +348,7 @@ function ReadVsTimeFastdac(instrID, duration, [y_label, comments, nosave]) // Un
 	endif
 
 	Struct ScanVars S
-	initFDscanVars(S, instrID, 0, duration, duration=duration, x_label="time /s", y_label="Current /nA", comments=comments)
+	initScanVarsFD(S, instrID, 0, duration, duration=duration, x_label="time /s", y_label="Current /nA", comments=comments)
 	S.readVsTime = 1
 	
 	initializeScan(S)
@@ -386,22 +386,22 @@ function ScanFastDAC(instrID, start, fin, channels, [numpts, sweeprate, ramprate
  
    // Initialize ScanVars 
    struct ScanVars S
-   initFDscanVars(S, instrID, start, fin, channelsx=channels, numptsx=numpts, sweeprate=sweeprate, rampratex=ramprate, delayy=delay, startxs=starts, finxs=fins, x_label=x_label, y_label=y_label, comments=comments)
+   initScanVarsFD(S, instrID, start, fin, channelsx=channels, numptsx=numpts, sweeprate=sweeprate, rampratex=ramprate, delayy=delay, startxs=starts, finxs=fins, x_label=x_label, y_label=y_label, comments=comments)
 
    // Check hardware/software limits and that DACs/ADCs are on same device
-   SFfd_pre_checks(S)  
+   PreScanChecksFD(S)  
    
    	// If using AWG then get that now and check it
 	struct fdAWG_list AWG
 	if(use_AWG)	
 		fdAWG_get_global_AWG_list(AWG)
-		SFawg_set_and_precheck(AWG, S)  // Note: sets S.numptsx here and AWG.use_AWG = 1 if pass checks
+		SetCheckAWG(AWG, S)  // Note: sets S.numptsx here and AWG.use_AWG = 1 if pass checks
 	else  // Don't use AWG
 		AWG.use_AWG = 0  	// This is the default, but just putting here explicitly
 	endif
 
    // Ramp to start without checks since checked above
-   SFfd_ramp_start(S, ignore_lims = 1)
+   RampStartFD(S, ignore_lims = 1)
 
 	// Let gates settle 
 	sc_sleep(S.delayy)
@@ -436,17 +436,17 @@ function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate,
 
 	// Initialize ScanVars
 	struct ScanVars S  // Note, more like a BD scan if going slow
-	initFDscanVars(S, instrID, start, fin, channelsx=channels, numptsx=numpts, delayx=delay, rampratex=ramprate, comments=comments, y_label=y_label)  
+	initScanVarsFD(S, instrID, start, fin, channelsx=channels, numptsx=numpts, delayx=delay, rampratex=ramprate, comments=comments, y_label=y_label)  
 	S.using_fastdac = 0 // Explicitly showing that this is not a normal fastDac scan
 	S.duration = numpts*max(0.05, delay) // At least 50ms per point is a good estimate 
 	S.sweeprate = abs((fin-start)/S.duration) // Better estimate of sweeprate (Not really valid for a slow scan)
 
 	// Check limits (not as much to check when using FastDAC slow)
-	SFfd_check_lims(S)
+	scc_checkLimsFD(S)
 	S.lims_checked = 1
 
 	// Ramp to start without checks because checked above
-	SFfd_ramp_start(S, ignore_lims=1)
+	RampStartFD(S, ignore_lims=1)
 
 	// Let gates settle 
 	sc_sleep(delay*5)
@@ -460,7 +460,7 @@ function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate,
 		setpoint = S.startx + (i*(S.finx-S.startx)/(S.numptsx-1))
 		RampMultipleFDac(S.instrID, S.channelsx, setpoint, ramprate=S.rampratex, ignore_lims=1)
 		sc_sleep(delay)
-		New_RecordValues(S, i, 0)
+		RecordValues(S, i, 0)
 		i+=1
 	while (i<S.numptsx)
 
@@ -501,35 +501,35 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 	// Put info into scanVars struct (to more easily pass around later)
  	struct ScanVars S
  	if (use_bd == 0)
-	 	initFDscanVars(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
+	 	initScanVarsFD(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
 		   						 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys, comments=comments)
 	
 	else  				// Using BabyDAC for Y axis so init x in FD_ScanVars, and init y in BD_ScanVars
-		initFDscanVars(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
+		initScanVarsFD(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
 		   						rampratey=rampratey, startxs=startxs, finxs=finxs, comments=comments)
 		S.bdID = bdID
        s.is2d = 1
 		S.starty = starty
 		S.finy = finy
-		S.channelsy = SF_get_channels(channelsy, fastdac=0)
-		S.y_label = GetLabel(S.channelsy, fastdac=0)
+		S.channelsy = scu_getChannelNumbers(channelsy, fastdac=0)
+		S.y_label = scu_getDacLabel(S.channelsy, fastdac=0)
 	endif
       
    // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
 
    if(use_bd == 1)
-//   		SFbd_pre_checks(Bsv)
-		SFfd_pre_checks(S, x_only=1)
-		SFbd_check_lims(S, y_only=1)
+//   		PreScanChecksBD(Bsv)
+		PreScanChecksFD(S, x_only=1)
+		scc_checkLimsBD(S, y_only=1)
    	else
-   	   SFfd_pre_checks(S)  
+   	   PreScanChecksFD(S)  
    	endif
    	
    	// If using AWG then get that now and check it
 	struct fdAWG_list AWG
 	if(use_AWG)	
 		fdAWG_get_global_AWG_list(AWG)
-		SFawg_set_and_precheck(AWG, S)  // Note: sets SV.numptsx here and AWG.use_AWG = 1 if pass checks
+		SetCheckAWG(AWG, S)  // Note: sets SV.numptsx here and AWG.use_AWG = 1 if pass checks
 	else  // Don't use AWG
 		AWG.use_AWG = 0  	// This is the default, but just putting here explicitly
 	endif
@@ -537,10 +537,10 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
    // Ramp to start without checks
 
    if(use_bd == 1)
-	   SFfd_ramp_start(S, x_only=1, ignore_lims=1)
-	   SFbd_ramp_start(S, y_only=1, ignore_lims=1)
+	   RampStartFD(S, x_only=1, ignore_lims=1)
+	   RampStartBD(S, y_only=1, ignore_lims=1)
    	else
-   	   SFfd_ramp_start(S, ignore_lims=1)
+   	   RampStartFD(S, ignore_lims=1)
    	endif
    	
    	// Let gates settle
@@ -567,7 +567,7 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 			RampMultipleBD(S.bdID, S.channelsy, setpointy, ramprate=S.rampratey, ignore_lims=1)
 		endif
 		// Ramp to start of fast axis
-		SFfd_ramp_start(S, ignore_lims=1, x_only=1)
+		RampStartFD(S, ignore_lims=1, x_only=1)
 		sc_sleep(S.delayy)
 		
 		// Record fast axis
@@ -602,23 +602,23 @@ function ScanFastDACRepeat(instrID, start, fin, channels, numptsy, [numptsx, swe
 
 	// Set sc_ScanVars struct
 	struct ScanVars S
-	initFDscanVars(S, instrID, start, fin, channelsx=channels, numptsx=numptsx, rampratex=ramprate, starty=1, finy=numptsy, delayy=delay, sweeprate=sweeprate,  \
+	initScanVarsFD(S, instrID, start, fin, channelsx=channels, numptsx=numptsx, rampratex=ramprate, starty=1, finy=numptsy, delayy=delay, sweeprate=sweeprate,  \
 					numptsy=numptsy, direction=1, startxs=starts, finxs=fins, y_label="Repeats", comments=comments)
 	
 	// Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
-	SFfd_pre_checks(S, x_only=1)  
+	PreScanChecksFD(S, x_only=1)  
 
   	// If using AWG then get that now and check it
 	struct fdAWG_list AWG
 	if(use_AWG)	
 		fdAWG_get_global_AWG_list(AWG)
-		SFawg_set_and_precheck(AWG, S)  // Note: sets S.numptsx here and AWG.use_AWG = 1 if pass checks
+		SetCheckAWG(AWG, S)  // Note: sets S.numptsx here and AWG.use_AWG = 1 if pass checks
 	else  // Don't use AWG
 		AWG.use_AWG = 0  	// This is the default, but just putting here explicitly
 	endif
 
 	// Ramp to start without checks since checked above
-	SFfd_ramp_start(S, ignore_lims = 1)
+	RampStartFD(S, ignore_lims = 1)
 
 	// Let gates settle
 	sc_sleep(S.delayy)
@@ -632,7 +632,7 @@ function ScanFastDACRepeat(instrID, start, fin, channels, numptsy, [numptsx, swe
 		S.direction = d  // Will determine direction of scan in fd_Record_Values
 
 		// Ramp to start of fast axis
-		SFfd_ramp_start(S, ignore_lims=1, x_only=1)
+		RampStartFD(S, ignore_lims=1, x_only=1)
 		sc_sleep(S.delayy)
 
 		// Record values for 1D sweep
