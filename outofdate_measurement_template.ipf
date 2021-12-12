@@ -1,3 +1,4 @@
+// 2021-11 -- This is out of date as of version 4.0 of ScanController (where Fastdac and regular scancontroller now share many functions and ScanVars are used rather than global variables)
 #pragma rtGlobals=1    // Use modern global access method.
 
 ////////////////////////////
