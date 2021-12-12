@@ -184,12 +184,12 @@ function getFADCspeed(instrID)
 	cmd = command+",0"  // Read convert time on channel 0
 	response = queryInstr(instrID,cmd+"\r",read_term="\n")  // Get conversion time for channel 0 (should be same for all channels)
 	response = sc_stripTermination(response,"\r\n")
-	if(!fdacCheckResponse(response,cmd))
+	if(!fd_checkResponse(response,cmd))
 		abort "ERROR[getFADCspeed]: Failed to read speed from fastdac"
 	endif
 	
 	variable numDevice = getDeviceNumber(instrID)
-	variable numADCs = getDeviceInfo(instrID, "numADC")
+	variable numADCs = getFDInfoFromID(instrID, "numADC")
 
 //	// Note: This extra check takes ~45ms (15ms per read)
 //	variable i
@@ -197,7 +197,7 @@ function getFADCspeed(instrID)
 //		cmd  = command+","+num2istr(i)
 //		compare = queryInstr(instrID,cmd+"\r",read_term="\n")
 //		compare = sc_stripTermination(compare,"\r\n")
-//		if(!fdacCheckResponse(compare,cmd))
+//		if(!fd_checkResponse(compare,cmd))
 //			abort
 //		elseif(str2num(compare) != str2num(response)) // Ensure ADC channels all have same conversion time
 //			print "WARNING[getfadcSpeed]: ADC channels 0 & "+num2istr(i)+" have different conversion times!"
@@ -258,7 +258,7 @@ function getFADCChannelSingle(instrID,channel) // Units: mV
 	
 
 	variable device // to store device num
-	string devchannel = getDeviceChannels(num2str(channel), device) // TODO: Check this doesn't have a separator
+	string devchannel = getChannelsOnFD(num2str(channel), device) 
 	checkInstrIDmatchesDevice(instrID, device)
 
 	// query ADC
@@ -270,7 +270,7 @@ function getFADCChannelSingle(instrID,channel) // Units: mV
 	
 	// check response
 	string err = ""
-	if(fdacCheckResponse(response,cmd)) 
+	if(fd_checkResponse(response,cmd)) 
 		// good response, update window
 		fadcvalstr[channel][1] = num2str(str2num(response))
 		return str2num(response)
@@ -290,7 +290,7 @@ function getFDACOutput(instrID,channel) // Units: mV
 	response = sc_stripTermination(response,"\r\n")
 	
 	// check response
-	if(fdacCheckResponse(response,cmd))
+	if(fd_checkResponse(response,cmd))
 		// good response
 		return str2num(response)
 	else
@@ -313,29 +313,29 @@ function/s getFDACStatus(instrID)
 	variable CHstart
 
 	// DAC values
-	CHstart = getDeviceChannelStart(instrID, adc=0)
-	for(i=0;i<getDeviceInfo(instrID, "numDAC");i+=1)
+	CHstart = getFDChannelStartNum(instrID, adc=0)
+	for(i=0;i<getFDInfoFromID(instrID, "numDAC");i+=1)
 		sprintf key, "DAC%d{%s}", CHstart+i, fdacvalstr[CHstart+i][3]
 		buffer = addJSONkeyval(buffer, key, num2numstr(getfdacOutput(instrID,i))) // getfdacOutput is PER instrument
 	endfor
 
 	// ADC values
-	CHstart = getDeviceChannelStart(instrID, adc=1)
-	for(i=0;i<getDeviceInfo(instrID, "numADC");i+=1)
+	CHstart = getFDChannelStartNum(instrID, adc=1)
+	for(i=0;i<getFDInfoFromID(instrID, "numADC");i+=1)
 		buffer = addJSONkeyval(buffer, "ADC"+num2istr(CHstart+i), num2numstr(getfadcChannel(instrID,CHstart+i)))
 	endfor
 	
 	// AWG info if used
 	nvar sc_AWG_used
 	if(sc_AWG_used == 1)
-		buffer = addJSONkeyval(buffer, "AWG", add_AWG_status())  //NOTE: AW saved in add_AWG_status()
+		buffer = addJSONkeyval(buffer, "AWG", getAWGstatus())  //NOTE: AW saved in getAWGstatus()
 	endif
 	
 	return addJSONkeyval("", "FastDAC "+num2istr(device), buffer)
 end
 
 
-function/s add_AWG_status()  // TODO: rename to get_AWG_status()
+function/s getAWGstatus() 
 	// Function to be called from getFDACstatus() to add a section with information about the AWG used
 	// Also adds AWs used to HDF
 	
@@ -387,9 +387,9 @@ function setFADCSpeed(instrID,speed,[loadCalibration]) // Units: Hz
 	variable i, numADCCh, numDevice	
 	string deviceAddress = "", cmd = "", response = ""
 	for(i=0;i<numDevices;i+=1)
-		deviceAddress = getDeviceResourceAddress(i+1)
+		deviceAddress = getFastdacVisaAddress(i+1)
 		if(cmpstr(deviceAddress,instrAddress) == 0)
-			numADCCh = getDeviceInfoDeviceNum(i+1, "numADC")
+			numADCCh = getFDInfoFromDeviceNum(i+1, "numADC")
 			numDevice = i+1
 			break
 		endif
@@ -398,7 +398,7 @@ function setFADCSpeed(instrID,speed,[loadCalibration]) // Units: Hz
 		sprintf cmd, "CONVERT_TIME,%d,%d\r", i, 1.0/speed*1.0e6  // Convert from Hz to microseconds
 		response = queryInstr(instrID, cmd, read_term="\n")  //Set all channels at same time (generally good practise otherwise can't read from them at the same time)
 		response = sc_stripTermination(response,"\r\n")
-		if(!fdacCheckResponse(response,cmd))
+		if(!fd_checkResponse(response,cmd))
 			abort
 		endif
 	endfor
@@ -439,7 +439,7 @@ function rampOutputFDAC(instrID,channel,output, ramprate, [ignore_lims]) // Unit
 	wave/t fdacvalstr, old_fdacvalstr
 	svar sc_fdackeys
 	
-	// TOOD: refactor with getDeviceInfo()/getDeviceChannels() etc
+	// TOOD: refactor with getFDInfoFromID()/getChannelsOnFD() etc
 
 	variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
 	variable i=0, devchannel = 0, startCh = 0, numDACCh = 0
@@ -521,7 +521,7 @@ function rampOutputFDAC(instrID,channel,output, ramprate, [ignore_lims]) // Unit
 	response = sc_stripTermination(response,"\r\n")
 	
 	// check respose
-	if(fdacCheckResponse(response,cmd,isString=1,expectedResponse="RAMP_FINISHED"))
+	if(fd_checkResponse(response,cmd,isString=1,expectedResponse="RAMP_FINISHED"))
 		output = getfdacOutput(instrID, devchannel)
 		updatefdacValStr(channel, output, update_oldValStr=1)
 	else
@@ -545,7 +545,7 @@ function RampMultipleFDAC(InstrID, channels, setpoint, [ramprate, ignore_lims])
 	for(i=0;i<nChannels;i+=1)
 		channel = str2num(StringFromList(i, channels, ","))
 		channel_ramp = ramprate != 0 ? ramprate : str2num(getFdacInfo(num2str(channel), "ramprate"))
-		rampOutputfdac(instrID, channel, setpoint, channel_ramp, ignore_lims=ignore_lims)  // TODO: get ramprate per channel here if not overridden
+		rampOutputfdac(instrID, channel, setpoint, channel_ramp, ignore_lims=ignore_lims)  
 	endfor
 end
 
@@ -793,7 +793,7 @@ function CalibrateFADC(instrID)
 	// read calibration completion
 	response = readInstr(instrID,read_term="\n")
 	response = sc_stripTermination(response,"\r\n")
-	if(fdacCheckResponse(response,cmd,isString=1,expectedResponse="CALIBRATION_FINISHED") && calibrationFail == 0)
+	if(fd_checkResponse(response,cmd,isString=1,expectedResponse="CALIBRATION_FINISHED") && calibrationFail == 0)
 		// all good, calibration complete
 		rampMultipleFDAC(instrID, "0,1,2,3", 0, ramprate=10000)
 		savefadccalibration(deviceAddress,deviceNum,numADCCh,result,adcSpeed)
@@ -872,7 +872,7 @@ function ResetFdacCalibration(instrID,channel)
 	sprintf cmd, "DAC_RESET_CAL,%d\r", channel
 	response = queryInstr(instrID,cmd,read_term="\n")
 	response = sc_stripTermination(response,"\r\n")
-	if(fdacCheckResponse(response,cmd,isString=1,expectedResponse="CALIBRATION_RESET"))
+	if(fd_checkResponse(response,cmd,isString=1,expectedResponse="CALIBRATION_RESET"))
 		// all good
 	else
 		sprintf err, "[ERROR] \"fdacResetCalibration\": Reset of DAC channel %d failed! - Response from Fastdac was %s", channel, response
@@ -893,7 +893,7 @@ function/s setFdacCalibrationOffset(instrID,channel,offset)
 	response = readInstr(instrID,read_term="\n")
 	response = sc_stripTermination(response,"\r\n")
 	
-	if(fdacCheckResponse(response,cmd,isString=1,expectedResponse="CALIBRATION_FINISHED"))
+	if(fd_checkResponse(response,cmd,isString=1,expectedResponse="CALIBRATION_FINISHED"))
 		return result
 	else
 		sprintf err, "[ERROR] \"fdacResetCalibrationOffset\": Calibrating offset on DAC channel %d failed!", channel
@@ -914,7 +914,7 @@ function/s setFdacCalibrationGain(instrID,channel,offset)
 	response = readInstr(instrID,read_term="\n")
 	response = sc_stripTermination(response,"\r\n")
 	
-	if(fdacCheckResponse(response,cmd,isString=1,expectedResponse="CALIBRATION_FINISHED"))
+	if(fd_checkResponse(response,cmd,isString=1,expectedResponse="CALIBRATION_FINISHED"))
 		return result
 	else
 		sprintf err, "[ERROR] \"fdacResetCalibrationGain\": Calibrating gain of DAC channel %d failed!", channel
@@ -931,7 +931,7 @@ function updateFadcCalibration(instrID,channel,zeroScale,fullScale)
 	response = queryInstr(instrID,cmd,read_term="\n")
 	response = sc_stripTermination(response,"\r\n")
 	
-	if(fdacCheckResponse(response,cmd,isString=1,expectedResponse="CALIBRATION_CHANGED"))
+	if(fd_checkResponse(response,cmd,isString=1,expectedResponse="CALIBRATION_CHANGED"))
 		// all good!
 	else
 		sprintf err, "[ERROR] \"updatefadcCalibration\": Updating calibration of ADC channel %d failed!", channel
@@ -973,7 +973,7 @@ function ClearFdacBuffer(instrID)
 	writeInstr(instrID,"STOP\r")
 	total = -5 //Stop command makes fastdac return a 5 character string
 	do 
-		viRead(instrID, buffer, 2000, count)  // TODO: Can I set a shorter timeout here? Annoying to wait a long time for the last viRead which is empty
+		viRead(instrID, buffer, 2000, count) 
 		total += count
 	while(count != 0)
 	printf "Cleared %d bytes of data from buffer\r", total
@@ -1086,7 +1086,6 @@ function FDacSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,nosave])
 			wave w = $stringFromList(j, wavenames)
 			wave fftw = calculate_spectrum(w)  // Log spectrum
 			wave fftwlin = calculate_spectrum(w, linear=1)  // Linear spectrum
-			// TODO: Might need to think about how to set time axis on next sweeps (i.e. S.start_time will not be the beginning of each sweep)
 
 			// Add to averaged waves
 			wave fftwave = $stringFromList(j, log_freq_wavenames)
@@ -1108,7 +1107,7 @@ function FDacSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,nosave])
 	sc_resampleFreqCheckFadc = original_resample_state
 
 	if (!nosave)
-		EndScan(S=S, additional_wavenames=log_freq_wavenames+lin_freq_wavenames) // TODO: Additionally save spectrum to HDF (how?)
+		EndScan(S=S, additional_wavenames=log_freq_wavenames+lin_freq_wavenames) 
 	endif
 end
 
@@ -1491,7 +1490,7 @@ function fdAWG_add_wave(instrID, wave_num, add_wave)
 	variable i=0
 
    waveStats/q add_wave
-   if (dimsize(add_wave, 1) != 2 || V_numNans !=0 || V_numINFs != 0) // Check 2D(TODO: Check 0/1) and no NaNs
+   if (dimsize(add_wave, 1) != 2 || V_numNans !=0 || V_numINFs != 0) 
       abort "ERROR[fdAWG_add_wave]: must be 2D (setpoints, samples) and contain no NaNs or INFs"
    endif
    if (wave_num != 0 && wave_num != 1)  // Check adding to AWG 0 or 1
@@ -1535,7 +1534,7 @@ function fdAWG_add_wave(instrID, wave_num, add_wave)
 	variable awg_len = dimsize(AWG_wave,0)
 	string expected_response
 	sprintf expected_response "WAVE,%d,%d", wave_num, awg_len+dimsize(add_wave,0)
-	if(fdacCheckResponse(response, cmd, isString=1, expectedResponse=expected_response))
+	if(fd_checkResponse(response, cmd, isString=1, expectedResponse=expected_response))
 		concatenate/o/Free/NP=0 {AWG_wave, add_wave}, tempwave
 		redimension/n=(awg_len+dimsize(add_wave,0), -1) AWG_wave 
 		AWG_wave[awg_len,][] = tempwave[p][q]
@@ -1590,7 +1589,7 @@ function fdAWG_clear_wave(instrID, wave_num)
 
    string expected_response
    sprintf expected_response "WAVE,%d,0", wave_num
-   if(fdacCheckResponse(response, cmd, isstring=1,expectedResponse=expected_response))
+   if(fd_checkResponse(response, cmd, isstring=1,expectedResponse=expected_response))
 		string wn = fdAWG_get_AWG_wave(wave_num)
 		wave AWG_wave = $wn
 		killwaves AWG_wave 
@@ -1774,11 +1773,7 @@ function fd_readChunk(fdid, adc_channels, numpts)
 		wavenames = addListItem(wn, wavenames, ";", INF)
 	endfor
 
-	// TODO: Replace this with new_fd_record_values() // Note: needs to not overwrite ADC# waves
-	// fd_readvstime(fdid, adc_channels, numpts, getfadcSpeed(fdid), named_waves = wavenames)
-
 	Struct ScanVars S
-//	initFDscanVars(S, fdid, 0, numpts, numptsx=numpts)
 	S.numptsx = numpts
 	S.instrID = fdid
 	S.readVsTime = 1  					// No ramping
@@ -1786,6 +1781,7 @@ function fd_readChunk(fdid, adc_channels, numpts)
 	S.numADCs = itemsInList(S.adcList)
 	S.samplingFreq = getFADCspeed(S.instrID)
 	S.raw_wave_names = wavenames  	// Override the waves the rawdata gets saved to
+	S.never_save = 1
 
 	new_fd_record_values(S, 0, skip_data_distribution=1)
 end
@@ -1862,7 +1858,6 @@ function fdAWG_get_global_AWG_list(S)
 	// TODO: Switch to loading from a single text wave (not sure if structGet can load from text wave)
 	
 	// Get variable parts
-//	wave fdAWG_globals_stuct_vars
 	svar fdAWG_globals_stuct_vars
 	structGet/S S fdAWG_globals_stuct_vars
 	S.use_AWG = 0  // Always initialized to zero so that checks have to be run before using in scan (see SFawg_set_and_precheck())

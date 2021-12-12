@@ -6,16 +6,10 @@
 // Call SetSystem() before anything else. Current supported systems are: BFsmall, BFbig
 // Communicates with server over http.
 // Procedure written by Christian Olsen 2018-03-xx
-// Modified to new API by Tim Child 2020-06-xx
-
-// Todo:
-// GetTempDB()
-// GetHeaterPowerDB()
-// GetPressureDB()
-// QueryDB()
+// Almost entirely rewritten for new API by Tim Child 2020-06-xx
 
 ///////////////////////////
-/// LS37X specific COMM ///
+/// LS37X specific COM ///
 ///////////////////////////
 
 function openLS370connection(instrID, http_address, system, [verbose])
@@ -57,15 +51,15 @@ function setLS370system(system)
 		case "bfsmall":
 			ls_system = "bfsmall"
 			ls_label = "LD"				//plate					//labels	  									//IDs
-			string/g bfchannellookup = "mc;still;magnet;4K;50K;ld_mc;ld_still;ld_magnet;ld_4K;ld_50K;6;5;4;2;1"  //TODO: Check with LD API
-			string/g bfheaterlookup = "mc;still;sc_mc;ld_still_heater"						//sc_mc only used internally, still label refers to API //TODO: Check with LD API
+			string/g bfchannellookup = "mc;still;magnet;4K;50K;ld_mc;ld_still;ld_magnet;ld_4K;ld_50K;6;5;4;2;1"  
+			string/g bfheaterlookup = "mc;still;sc_mc;ld_still_heater"						//sc_mc only used internally, still label refers to API 
 			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,290,1201,1800,10000}}
 			break
 		case "bfbig":
 			ls_system = "bfbig"
 			ls_label = "XLD"					//plate				//labels	  			//IDs
-			string/g bfchannellookup = "mc;still;magnet;4K;50K;ch6;ch5;ch3;ch2;ch1;6;5;3;2;1"  //TODO: Check with XLD API
-			string/g bfheaterlookup = "mc;still;sc_mc;ao2"							 		//sc_mc only used internally, still label refers to API 	//TODO: Check with XLD API
+			string/g bfchannellookup = "mc;still;magnet;4K;50K;ch6;ch5;ch3;ch2;ch1;6;5;3;2;1"  
+			string/g bfheaterlookup = "mc;still;sc_mc;ao2"							 		//sc_mc only used internally, still label refers to API 	
 			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,290,1201,1800,10000}} 
 			break
 		default:
@@ -365,63 +359,6 @@ end
 
 
 
-//// Get Functions - Directly from data base ////
-
-//function getLS370tempDB(instrID,plate, [max_age]) // Units: mK
-//	// returns the temperature of the selected "plate".
-//	// avaliable plates on BF systems: mc (mixing chamber), still, magnet, 4K, 50K
-//	// data is queried directly from the SQL database
-//	string instrID, plate
-//	variable max_age
-//	svar ls_system
-//	
-//	max_age = paramisdefault(max_age) ? 60 : max_age
-//	
-//	svar bfchannellookup
-//	string channel
-//	variable ch_id
-//	variable channel_idx
-//	
-//	strswitch(ls_system)
-//		case "bfsmall":
-//		case "bfbig":
-//			channel_idx = whichlistitem(plate,bfchannellookup,";", 0, 0)
-//			if(channel_idx < 0)
-//				printf "The requested plate (%s) doesn't exsist!", plate
-//				return -1
-//			else
-//				channel = stringfromlist(channel_idx+5,bfchannellookup,";")
-//				ch_id = str2num(stringfromlist(channel_idx+10,bfchannellookup,";"))  // TODO: Remove requirement for the actual ch_id and be able to use the label instead
-//			endif
-//			break
-//		default:
-//			abort "ls_system not implemented"
-//	endswitch
-//	
-//	nvar sqr = sql_response_code  // 0=success, 1=no_data, 2=other warning, -1=error
-//	variable t = datetime-max_age
-//	string timestamp = SQL_format_time(t)
-//	
-//	
-//	string command = ""
-//	sprintf command, "SELECT DISTINCT ON (ch_idx) ch_idx, time, t FROM qdot.lksh370.channel_data WHERE time > TIMESTAMP %s ORDER BY ch_idx, time DESC;", timestamp
-//	string wavenames = "sql_ls370_channels,sql_ls370_timestamp,sql_ls370_temperature"
-//	requestSQLData(command,wavenames=wavenames, verbose=1) // TODO: change verbose to 0
-//	if (sqr == 1) // no rows of data
-//		return -1
-//	else
-//		wave temp_wave = sql_ls370_temperature
-//		wave ch_wave = sql_ls370_channels
-//		wave t_wave = sql_ls370_timestamp
-//		print ch_wave
-//		print t
-//		print temp_wave
-//		return temp_wave(ch_id)  // return temp of channel // TODO: access this by label instead of ch_ID
-//	endif
-//end
-
-
-
 
 
 
@@ -450,6 +387,8 @@ end
 
 //set-analog-output-parameters
 function setLS370analogOutputParameters(instrID, [channel])
+	// Set analog output parameters
+	// Note: currently very limited because I don't know that we actually change any of these things. You'll have to implement it if you want it
 	string instrID, channel
 	
 	string api_channel, command, payload
@@ -471,8 +410,6 @@ function setLS370analogOutputParameters(instrID, [channel])
 		api_channel = stringfromlist(channel_idx+2,bfheaterlookup,";")
 	endif
 	
-	// TODO: What is useful to change here, do we have a default fixed state we want for analog outputs?
-//	abort "[setLS370AnalogOutputParameters]:If you really want to use this function, you need to figure out what parameters you want to be able to set below!"
 	variable high_value = 0, low_value = 0, manual_value = 0
 	string mode = "aom_manual"  // aom_undefined, aom_off, aom_channel, aom_manual, aom_zone, aom_still
 	variable monitored_channel = 0
@@ -769,47 +706,6 @@ function resetLS370exclusivereader(instrID)
 end
 
 
-// TODO: Do we want this?
-function toggleLS370magnetheater(instrID,onoff)
-	// toggles the state of the magnet heater on BF #1.
-	// it sets ANALOG 1 to -50% (-5V) in the "on" state
-	// and 0% (0V) in the off state.
-	// ANALOG 1 controls a voltage controlled switch!
-	string instrID
-	string onoff
-	variable output
-	nvar magnetheater_led
-	svar ls_system
-	string command,payload,cmd
-	svar ls_label
-
-	abort "Not updated to new API"
-	if(cmpstr(ls_system,"bfsmall") != 0)
-		abort "No heater installed on this system!"
-	endif
-
-	strswitch(onoff)
-		case "on":
-			output = -50.000
-			magnetheater_led = 1
-			break
-		case "off":
-			output = 0.000
-			magnetheater_led = 0
-			break
-		default:
-			// default is "off"
-			print "Setting to \"off\""
-			output = 0.000
-			magnetheater_led = 0
-			break
-	endswitch
-	
-	sprintf cmd, "ANALOG 1,1,2,1,1,100.0,0.0,%g", output
-	sprintf payload, "{\"command\":%s}", cmd
-	sprintf command, "command?ctrl_label=%s", ls_label
-	sendLS370(instrID,command,"post", payload=payload)
-end
 
 ////////////////////
 //// Utillities ////
@@ -1039,9 +935,7 @@ function/s getLS370Status(instrID)
 	string mc_heater_schema = getJSONvalue(jstr,"mc_heater_schema")
 	string still_heater_schema = getJSONvalue(jstr,"still_heater_schema")
 
-	// Load "LakeshoreConfig.txt" in setup folder.
 	svar ls_label
-//	string file_name = "LakeshoreConfig.txt"
 
 	jstr = readtxtfile(file_name,"setup")
 	if(cmpstr(jstr,"")==0)
@@ -1065,9 +959,6 @@ function/s getLS370Status(instrID)
 		sprintf statement, "SELECT temperature_k FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, temp_schema, stringfromlist(i,channelLabel,","), timestamp
 		temp = requestSQLValue(statement)
 
-//		print temp
-//		temp = "" // TEMPORARY FIX
-		
 		if(cmpstr(temp,"") == 0)
 			temp = num2str(getLS370temp(instrID,stringfromlist(i,LSkeys,",")))
 		endif
@@ -1076,24 +967,21 @@ function/s getLS370Status(instrID)
 		tempBuffer = addJSONkeyval(tempBuffer, stringfromlist(i,JSONkeys,","), temp)
 	endfor
 
-	// end temperature part
 	tempBuffer = addJSONkeyval("","Temperature",tempBuffer)
+	// end temperature part
 
 	//// Heaters ////
+	// MC heater
+	string heatBuffer=""
+	timestamp = sc_SQLtimestamp(300)
+	sprintf statement, "SELECT power_milliw FROM %s.%s WHERE time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, mc_heater_schema, timestamp
+	heatBuffer = addJSONkeyval(heatBuffer,"MC Heater mW",requestSQLValue(statement))
 
-//	// MC heater
-//	string heatBuffer=""
-//	timestamp = sc_SQLtimestamp(300)
-//	sprintf statement, "SELECT power_milliw FROM %s.%s WHERE time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, mc_heater_schema, timestamp
-//	heatBuffer = addJSONkeyval(heatBuffer,"MC Heater mW",requestSQLValue(statement))
-//
-//	// Still heater
-//	sprintf statement, "SELECT power_milliw FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, still_heater_schema, stillLabel, timestamp
-//	heatBuffer = addJSONkeyval(heatBuffer,"Still Heater mW",requestSQLValue(statement))
-//
-//	string buffer = addJSONkeyval(tempBuffer,"Heaters",heatBuffer)
-	
-	string buffer = tempBuffer // TEMPORARY FIX
+	// Still heater
+	sprintf statement, "SELECT power_milliw FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, still_heater_schema, stillLabel, timestamp
+	heatBuffer = addJSONkeyval(heatBuffer,"Still Heater mW",requestSQLValue(statement))
+
+	string buffer = addJSONkeyval(tempBuffer,"Heaters",heatBuffer)
 	
 	return addJSONkeyval("","Lakeshore",buffer)
 end
@@ -1138,45 +1026,6 @@ function/s getBFStatus(instrID)
 
 	return addJSONkeyval("","BlueFors",buffer)
 end
-
-//function/s getLS370status(instrID, [max_age_s])
-//	// returns JSON string with current status
-//	string instrID
-//	variable max_age_s
-//	if(paramisdefault(max_age_s))
-//		max_age_s=300
-//	else
-//		//TODO: Implement max_age_s from SQL query
-//		print "max_age_s doesn't work and needs to be implemented differently (4th Feb 2020)"
-//	endif
-//
-//	svar ls_system, ighgaugelookup
-//	string  buffer="", gauge=""
-//	variable i=0
-//
-//	buffer = addJSONkeyval(buffer,"MC K",num2str(getLS370temp(instrID, "mc", max_age_s=max_age_s)))
-//	buffer = addJSONkeyval(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age_s=max_age_s)))
-//	buffer = addJSONkeyval(buffer,"4K Plate K",num2str(getLS370temp(instrID, "4K", max_age_s=max_age_s)))
-//	buffer = addJSONkeyval(buffer,"Magnet K",num2str(getLS370temp(instrID, "magnet", max_age_s=max_age_s)))
-//	buffer = addJSONkeyval(buffer,"50K Plate K",num2str(getLS370temp(instrID, "50K", max_age_s=max_age_s)))
-//	
-////	buffer = addJSONkeyval(buffer,"Still K","4")
-////	buffer = addJSONkeyval(buffer,"4K Plate K","4")
-////	buffer = addJSONkeyval(buffer,"Magnet K","4")
-////	buffer = addJSONkeyval(buffer,"50K Plate K","50")
-//	
-//	// TODO: add other variables like (temp setpoint, heater power etc)
-//
-//	strswitch(ls_system)
-//		case "bfsmall":
-//			return addJSONkeyval("","BF Small",buffer)
-//		case "bfbig":
-//			return addJSONkeyval("","BF big",buffer)
-//	endswitch
-//end
-
-
-
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////

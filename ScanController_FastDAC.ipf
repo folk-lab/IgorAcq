@@ -76,7 +76,7 @@ function getDeviceNumber(instrID)
 	variable numDevices = getNumDevices(), i=0, numADCCh = 0, numDevice=-1
 	string instrAddress = getResourceAddress(instrID), deviceAddress = ""
 	for(i=0;i<numDevices;i+=1)
-		deviceAddress = getDeviceResourceAddress(i+1)
+		deviceAddress = getFastdacVisaAddress(i+1)
 		if(cmpstr(deviceAddress,instrAddress) == 0)
 			numDevice = i+1
 			break
@@ -96,14 +96,14 @@ function getNumDevices()
 end
 
 
-function/S getDeviceResourceAddress(device_num)  // TODO: Rename to getFastdacVisaAddress(device_num)
+function/S getFastdacVisaAddress(device_num)
 	// Get visa address from device number (has to be it's own function because this returns a string)
 	variable device_num
 	if(device_num == 0)
-		abort "ERROR[getDeviceResourceAddress]: device_num starts from 1 not 0"
+		abort "ERROR[getFastdacVisaAddress]: device_num starts from 1 not 0"
 	elseif(device_num > getNumDevices()+1)
 		string buffer
-		sprintf buffer,  "ERROR[getDeviceInfoDeviceNum]: Asking for device %d, but only %d devices connected\r", device_num, getNumDevices()
+		sprintf buffer,  "ERROR[getFDInfoFromDeviceNum]: Asking for device %d, but only %d devices connected\r", device_num, getNumDevices()
 		abort buffer
 	endif
 
@@ -112,7 +112,7 @@ function/S getDeviceResourceAddress(device_num)  // TODO: Rename to getFastdacVi
 end
 
 
-function getDeviceInfoDeviceNum(device_num, info)
+function getFDInfoFromDeviceNum(device_num, info)
 	// Returns the value for selected info of numbered fastDAC device (i.e. 1, 2 etc)
 	// Valid requests ('master', 'name', 'numADC', 'numDAC')
 	variable device_num
@@ -122,7 +122,7 @@ function getDeviceInfoDeviceNum(device_num, info)
 
 	if(device_num > getNumDevices())
 		string buffer
-		sprintf buffer,  "ERROR[getDeviceInfoDeviceNum]: Asking for device %d, but only %d devices connected\r", device_num, getNumDevices()
+		sprintf buffer,  "ERROR[getFDInfoFromDeviceNum]: Asking for device %d, but only %d devices connected\r", device_num, getNumDevices()
 		abort buffer
 	endif
 
@@ -141,21 +141,21 @@ function getDeviceInfoDeviceNum(device_num, info)
 			cmd = "numDACch"
 			break
 		default:
-			abort "ERROR[getDeviceInfo]: Requested info (" + info + ") not understood"
+			abort "ERROR[getFDInfoFromID]: Requested info (" + info + ") not understood"
 			break
 	endswitch
 	return str2num(stringByKey(cmd+num2str(device_num), sc_fdacKeys, ":", ","))
 end
 
 
-function getDeviceInfo(instrID, info)
+function getFDInfoFromID(instrID, info)
 	// Returns the value for selected info of fastDAC pointed to by instrID
 	// Basically a nice way to interact with sc_fdacKeys
 	variable instrID
 	string info
 
 	variable deviceNum = getDeviceNumber(instrID)
-	return getDeviceInfoDeviceNum(deviceNum, info)
+	return getFDInfoFromDeviceNum(deviceNum, info)
 end
 
 function/S getRecordedFastdacInfo(info_name)  // TODO: Rename if prepending something which implies fd anyway
@@ -195,7 +195,7 @@ function/S getRecordedFastdacInfo(info_name)  // TODO: Rename if prepending some
 end
 
 
-function/S getDeviceChannels(channels, device, [adc])
+function/S getChannelsOnFD(channels, device, [adc])
 	// Convert from absolute channel number to device channel number (i.e. DAC 9 is actually FastDAC2s 1 channel)
 	// Returns device number in device variable
 	// Note: Comma separated list
@@ -219,9 +219,9 @@ function/S getDeviceChannels(channels, device, [adc])
 		startCh = 0
 		for(j=0;j<numDevices+1;j+=1)  // Cycle through connected devices
 			if(!adc) // Looking at DACs
-				numCh = getDeviceInfoDeviceNum(j+1, "numDAC")
+				numCh = getFDInfoFromDeviceNum(j+1, "numDAC")
 			else  // Looking at ADCs
-				numCh = getDeviceInfoDeviceNum(j+1, "numADC")
+				numCh = getFDInfoFromDeviceNum(j+1, "numADC")
 			endif
 
 			if(startCh+numCh-1 >= Ch)
@@ -229,7 +229,7 @@ function/S getDeviceChannels(channels, device, [adc])
 				if(device <= 0)
 					device = j+1  // +1 to account for device numbering starting from 1 not zero
 				elseif (j+1 != device)
-					abort "ERROR[getDeviceChannels]: Channels are distributed across multiple devices. Not implemented"
+					abort "ERROR[getChannelsOnFD]: Channels are distributed across multiple devices. Not implemented"
 				endif
 				dev_channels = addlistitem(num2istr(Ch),dev_channels,";",INF)  // Add to list of Device Channels
 				break
@@ -242,7 +242,7 @@ function/S getDeviceChannels(channels, device, [adc])
 end
 
 
-function getDeviceChannelStart(instrID, [adc])
+function getFDChannelStartNum(instrID, [adc])
 	// Returns first channel number for given instrID (i.e. if second Fastdac, first DAC is probably channel 8)
 	variable instrID
 	variable adc // set to 1 if checking where ADCs start instead
@@ -260,18 +260,18 @@ function getDeviceChannelStart(instrID, [adc])
 			valid = 1
 			break
 		endif
-		startCh += getDeviceInfo(i+1, ch_request)
+		startCh += getFDInfoFromID(i+1, ch_request)
 	endfor
 
 	if(!valid)
-		abort "ERROR[getDeviceChannelStart]: Device not found"
+		abort "ERROR[getFDChannelStartNum]: Device not found"
 	endif
 
 	return startCh
 end
 
 
-function fdacCheckResponse(response,command,[isString,expectedResponse])
+function fd_checkResponse(response,command,[isString,expectedResponse])
 	// Checks response (that fastdac returns at the end of most commands) meets expected response (e.g. "RAMP_FINISHED")
 	string response, command, expectedResponse
 	variable isString
@@ -445,10 +445,10 @@ function fdRV_send_command_and_read(S, AWG_list, rowNum)
 	endstr = readInstr(S.instrID)
 	endstr = sc_stripTermination(endstr,"\r\n")	
 	if (S.readVsTime)
-		fdacCheckResponse(endstr,cmd_sent,isString=1,expectedResponse="READ_FINISHED")
+		fd_checkResponse(endstr,cmd_sent,isString=1,expectedResponse="READ_FINISHED")
 		// No need to update DACs
 	else
-		fdacCheckResponse(endstr,cmd_sent,isString=1,expectedResponse="RAMP_FINISHED")
+		fd_checkResponse(endstr,cmd_sent,isString=1,expectedResponse="RAMP_FINISHED")
 	   // update DAC values in window (request values from FastDAC directly in case ramp failed)
 		fdRV_update_window(S, S.numADCs) 
 	endif
@@ -577,7 +577,7 @@ end
 	
 // 	buffer = readInstr(instrID,read_term="\n")
 // 	buffer = sc_stripTermination(buffer,"\r\n")
-// 	if(!fdacCheckResponse(buffer,cmd,isString=1,expectedResponse="READ_FINISHED"))
+// 	if(!fd_checkResponse(buffer,cmd,isString=1,expectedResponse="READ_FINISHED"))
 // 		print "[ERROR] \"fd_readvstime\": Error during read. Not all data recived!"
 // 		abort
 // 	endif
@@ -744,8 +744,8 @@ function fdRV_update_window(S, numAdcs)
   string channel, device_channel
   for(i=0;i<itemsinlist(S.channelsx,",");i+=1)
     channel = stringfromlist(i,S.channelsx,",")
-	device_channel = getDeviceChannels(channel, device_num)  // Get channel for specific fastdac (and device_num of that fastdac)
-	if (cmpstr(getDeviceResourceAddress(device_num), getResourceAddress(S.instrID)) != 0)
+	device_channel = getChannelsOnFD(channel, device_num)  // Get channel for specific fastdac (and device_num of that fastdac)
+	if (cmpstr(getFastdacVisaAddress(device_num), getResourceAddress(S.instrID)) != 0)
 		print("ERROR[fdRV_update_window]: channel device address doesn't match instrID address")
 	else
 		updatefdacValStr(str2num(channel), getFDACOutput(S.instrID, str2num(device_channel)), update_oldValStr=1)
@@ -1078,7 +1078,7 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	ListBox fadclist,pos={400,75},size={385,180},fsize=14,frame=2,widths={25,65,45,80,80}
 	ListBox fadclist,listwave=root:fadcvalstr,selwave=root:fadcattr,mode=1
 	button updatefadc,pos={400,265},size={90,20},proc=update_fadc,title="Update ADC"
-	checkbox sc_PrintfadcBox,pos={500,265},proc=sc_CheckBoxClicked,value=sc_Printfadc,side=1,title="\Z14Print filenames "
+//	checkbox sc_PrintfadcBox,pos={500,265},proc=sc_CheckBoxClicked,value=sc_Printfadc,side=1,title="\Z14Print filenames "
 	checkbox sc_SavefadcBox,pos={620,265},proc=sc_CheckBoxClicked,value=sc_Saverawfadc,side=1,title="\Z14Save raw data "
 	checkbox sc_FilterfadcCheckBox,pos={400,290},proc=sc_CheckBoxClicked,value=sc_ResampleFreqCheckfadc,side=1,title="\Z14Resample "
 	SetVariable sc_FilterfadcBox,pos={500,290},size={200,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resample Frequency ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
@@ -1188,7 +1188,7 @@ function update_all_fdac([option])
 		option = "fdacramp"
 	endif
 
-	// TOOD: refactor with getDeviceInfo()/getDeviceChannels() etc
+	// TOOD: refactor with getFDInfoFromID()/getChannelsOnFD() etc
 
 	// open temporary connection to FastDACs
 	// Either ramp fastdacs or update fdacvalstr
@@ -1263,16 +1263,16 @@ function update_fadc(action) : ButtonControl
 	svar sc_fdackeys
 	variable i=0, j=0
 
-	// TOOD: refactor with getDeviceInfo()/getDeviceChannels() etc
+	// TOOD: refactor with getFDInfoFromID()/getChannelsOnFD() etc
 
 	string visa_address = "", tempnamestr = "fdac_window_resource"
 	variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
 	variable numADCCh = 0, startCh = 0, viRm = 0
 	for(i=0;i<numDevices;i+=1)
-		numADCch = getDeviceInfoDeviceNum(i+1, "numADC")
+		numADCch = getFDInfoFromDeviceNum(i+1, "numADC")
 //		numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),sc_fdackeys,":",","))
 		if(numADCCh > 0)
-			visa_address = getDeviceResourceAddress(i+1)
+			visa_address = getFastdacVisaAddress(i+1)
 //			visa_address = stringbykey("visa"+num2istr(i+1),sc_fdackeys,":",",")
 			viRm = openFastDACconnection(tempnamestr, visa_address, verbose=0)
 			nvar tempname = $tempnamestr

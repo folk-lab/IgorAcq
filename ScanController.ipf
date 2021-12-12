@@ -333,20 +333,36 @@ structure ScanVars
     string adcList 
     string startxs, finxs  // If sweeping from different start/end points for each DAC channel
     string startys, finys  // Similar for Y-axis
-	string raw_wave_names  // Names of waves to store raw data in (defaults to ADC# for each ADC)
+	 string raw_wave_names  // Names of waves to store raw data in (defaults to ADC# for each ADC)
+	 
+	 // Backend used
+	 variable never_save   // Set to 1 to make sure these ScanVars are never saved (e.g. if using to get throw away values for getting an ADC reading)
 endstructure
 
 
 function saveAsLastScanVarsStruct(S)  // TODO: rename to setLastScanVars
 	Struct ScanVars &S
 	
-	variable st = S.start_time
-	S.start_time = st == 0 ? datetime : S.start_time  // Temporarily make a start_time so at least something is saved in case of abort	 
-	
-	make/o/T sc_lastScanVarsStrings = {S.channelsx, S.channelsy, S.x_label, S.y_label, S.comments, S.adcList, S.startxs, S.finxs, S.startys, S.finys, S.raw_wave_names}
-	make/o/d sc_lastScanVarsVariables = {S.instrID, S.lims_checked, S.startx, S.finx, S.numptsx, S.rampratex, S.delayx, S.is2d, S.starty, S.finy, S.numptsy, S.rampratey, S.delayy, S.direction, S.duration, S.readVsTime, S.start_time, S.end_time, S.using_fastdac, S.numADCs, S.samplingFreq, S.measureFreq, S.sweeprate, S.bdID}
-	
-	S.start_time = st  // Restore to whatever it was before	
+	if (!S.never_save)
+		variable st = S.start_time
+		S.start_time = st == 0 ? datetime : S.start_time  // Temporarily make a start_time so at least something is saved in case of abort	 
+		
+		// Writing in chunks of 5 just to make it easier to count and keep track of them
+		make/o/T sc_lastScanVarsStrings = {\
+			S.channelsx, S.channelsy, S.x_label, S.y_label, S.comments,\
+			S.adcList, S.startxs, S.finxs, S.startys, S.finys,\
+			S.raw_wave_names\
+			}
+		make/o/d sc_lastScanVarsVariables = {\
+			S.instrID, S.lims_checked, S.startx, S.finx, S.numptsx,\
+		 	S.rampratex, S.delayx, S.is2d, S.starty, S.finy,\
+		 	S.numptsy, S.rampratey, S.delayy, S.direction, S.duration,\
+		 	S.readVsTime, S.start_time, S.end_time, S.using_fastdac, S.numADCs,\
+		 	S.samplingFreq, S.measureFreq, S.sweeprate, S.bdID, S.never_save\
+		 	}
+		
+		S.start_time = st  // Restore to whatever it was before	
+	endif
 end
 
 
@@ -394,6 +410,7 @@ function loadLastScanVarsStruct(S)   // TODO: Rename to loadLastScanVars
 	S.measureFreq = v[21]
 	S.sweeprate = v[22]
 	S.bdID = v[23]
+	S.never_save = v[24]
 end
 	
 
@@ -1174,7 +1191,7 @@ function sc_checksweepstate()
 		sc_abortsweep=0
 		sc_abortnosave=0
 		sc_pause=0
-		EndScan(save_experiment=0, aborting=1)  
+		EndScan(save_experiment=0, aborting=1) 				
 		abort "Measurement aborted by user. Data saved automatically."
 	elseif(NVAR_Exists(sc_abortnosave) && sc_abortnosave==1)
 		// Abort measurement without saving anything!
@@ -1192,7 +1209,7 @@ function sc_checksweepstate()
 				sc_abortsweep=0
 				sc_abortnosave=0
 				sc_pause=0
-				EndScan(save_experiment=0, aborting=1) 
+				EndScan(save_experiment=0, aborting=1) 				
 				abort "Measurement aborted by user"
 			elseif(sc_abortnosave)
 				dowindow /k SweepControl
@@ -2192,8 +2209,11 @@ function New_RecordValues(S, i, j, [fillnan])  // TODO: Rename
 			// Redimension waves if readvstime is set to 1
 			if (S.readVsTime == 1)
 				redimension /n=(innerindex+1) wref1d
+				S.numptsx = innerindex+1  // So that x_array etc will be saved correctly later
 				wref1d[innerindex] = NaN  // Prevents graph updating with a zero
 				setscale/I x 0,  datetime - S.start_time, wref1d
+				S.finx = datetime - S.start_time 	// So that x_array etc will be saved correctly later
+				saveasLastScanVarsStruct(S)
 			endif
 
 			if(!fillnan)
@@ -2448,10 +2468,10 @@ function SFfd_check_same_device(S, [x_only, y_only])
 	variable device_buffer
 	string channels
 	if (!y_only)
-		channels = getDeviceChannels(S.channelsx, device_dacs)  // Throws error if not all channels on one FastDAC
+		channels = getChannelsOnFD(S.channelsx, device_dacs)  // Throws error if not all channels on one FastDAC
 	endif
 	if (!x_only)
-		channels = getDeviceChannels(S.channelsy, device_buffer)
+		channels = getChannelsOnFD(S.channelsy, device_buffer)
 		if (device_dacs > 0 && device_buffer > 0 && device_buffer != device_dacs)
 			abort "ERROR[SFfd_check_same_device]: X channels and Y channels are not on same device"  // TODO: Maybe this should raise an error?
 		elseif (device_dacs <= 0 && device_buffer > 0)
@@ -2459,7 +2479,7 @@ function SFfd_check_same_device(S, [x_only, y_only])
 		endif
 	endif
 
-	channels = getDeviceChannels(s.AdcList, device_buffer, adc=1)  // Raises error if ADCs aren't on same device
+	channels = getChannelsOnFD(s.AdcList, device_buffer, adc=1)  // Raises error if ADCs aren't on same device
 	if (device_dacs > 0 && device_buffer != device_dacs)
 		abort "ERROR[SFfd_check_same_device]: ADCs are not on the same device as DACs"  // TODO: Maybe should only raise error if x channels not on same device as ADCs?
 	endif	

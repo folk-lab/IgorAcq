@@ -156,8 +156,12 @@ function /s new_sc_createSweepLogs([S, comments])  // TODO: Rename
 	        jstr = addJsonKeyval(jstr, "y_channels", ReplaceString(";", S.channelsy, ","))        
 	     endif
         if (S.using_fastdac)
+        	  nvar sc_resampleFreqFadc
+        	  nvar sc_resampleFreqFadcCheck
    	        jstr = addJSONkeyval(jstr, "sweeprate", num2numStr(S.sweeprate))  	        
-   	        jstr = addJSONkeyval(jstr, "measureFreq", num2numStr(S.measureFreq))   	           	        
+   	        jstr = addJSONkeyval(jstr, "measureFreq", num2numStr(S.measureFreq))  
+   	        jstr = addJSONkeyval(jstr, "resamplingState", num2numstr(sc_resampleFreqFadcCheck))
+		     jstr = addJSONkeyval(jstr, "resamplingFreq", num2numstr(sc_resampleFreqFadc))   	        	           	        
    	     endif
     endif
 
@@ -365,7 +369,7 @@ function SaveToHDF(S, [additional_wavenames])
 	saveWavesToHDF(CalcWaves, calc_hdf5_id)  // Includes saving additional_wavenmaes
 	if(S.using_fastdac && sc_SaveRawFadc == 1)
 		SaveWavesToHDF(RawWaves, raw_hdf5_id, saveNames=rawSaveNames)
-	else
+	elseif(!S.using_fastdac)
 		saveWavesToHDF(RawWaves, calc_hdf5_id)	// Save all regular ScanController waves in the main hdf file (they are small anyway)
 	endif
 	initcloseSaveFiles(hdfids) // close all files

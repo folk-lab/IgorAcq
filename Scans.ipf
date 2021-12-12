@@ -138,7 +138,6 @@ function ScanBabyDACUntil(instrID, start, fin, channels, numpts, delay, ramprate
 		endif
 		i+=1
 	while (i<S.numptsx)
-	S.numptsx = i   // In case scan ended early
 
 	// Save by default
 	if (nosave == 0)
