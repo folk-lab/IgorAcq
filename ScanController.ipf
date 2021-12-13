@@ -447,7 +447,7 @@ function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
 
 	// Set Variables in Struct
     S.instrID = instrID
-    S.adcList = getRecordedFastdacInfo("channels")
+    S.adcList = scf_getRecordedADCinfo("channels")
     S.using_fastdac = 1
     S.comments = selectString(paramIsDefault(comments), comments, "")
 
@@ -745,7 +745,7 @@ function sci_initializeWaves(S)  // TODO: rename
         wavenames = sci_get1DWaveNames(raw, S.using_fastdac)
         sci_sanityCheckWavenames(wavenames)
         if (S.using_fastdac)
-	        numpts = (raw) ? S.numptsx : postFilterNumpts(S.numptsx, S.measureFreq)  
+	        numpts = (raw) ? S.numptsx : scfd_postFilterNumpts(S.numptsx, S.measureFreq)  
 	     else
 	     	numpts = S.numptsx
 	     endif
@@ -819,9 +819,9 @@ function/S sci_get1DWaveNames(raw, fastdac)
     string wavenames = ""
 	if (fastdac == 1)
 		if (raw == 1)
-			wavenames = getRecordedFastdacInfo("raw_names")
+			wavenames = scf_getRecordedADCinfo("raw_names")
 		else
-			wavenames = getRecordedFastdacInfo("calc_names")
+			wavenames = scf_getRecordedADCinfo("calc_names")
 		endif
     else  // Regular ScanController
         wave sc_RawRecord, sc_RawWaveNames
@@ -1085,6 +1085,18 @@ function scg_openAbortWindow()
     doWindow/k/z SweepControl  // Attempt to close previously open window just in case
     execute("scs_abortmeasurementwindow()")
     doWindow/F SweepControl   // Bring Sweepcontrol to the front 
+end
+
+
+function scg_updateRawGraphs()
+  // updates activegraphs which takes about 15ms
+  // ONLY update 1D graphs for speed (if this takes too long, the buffer will overflow)
+  svar sc_rawGraphs1D
+
+  variable i
+  for(i=0;i<itemsinlist(sc_rawGraphs1D,";");i+=1)
+    doupdate/w=$stringfromlist(i,sc_rawGraphs1D,";")
+  endfor
 end
 
 
@@ -2368,6 +2380,32 @@ function RampStartFD(S, [ignore_lims, x_only, y_only])
   
 end
 
+function scc_checkRampStartFD(S)
+	// Checks that DACs are at the start of the ramp. If not it will ramp there and wait the delay time, but
+	// will give the user a WARNING that this should have been done already in the top level scan function
+	// Note: This only works for a single fastdac sweeping at once
+   struct ScanVars &S
+	scu_assertSeparatorType(S.channelsx, ",")
+   variable i=0, require_ramp = 0, ch, sp, diff
+   for(i=0;i<itemsinlist(S.channelsx);i++)
+      ch = str2num(stringfromlist(i, S.channelsx, ","))
+      if(S.direction == 1)
+	      sp = str2num(stringfromlist(i, S.startxs, ","))
+	   elseif(S.direction == -1)
+	      sp = str2num(stringfromlist(i, S.finxs, ","))
+	   endif
+      diff = getFDACOutput(S.instrID, ch)-sp
+      if(abs(diff) > 0.5)  // if DAC is more than 0.5mV from start of ramp
+         require_ramp = 1
+      endif
+   endfor
+
+   if(require_ramp == 1)
+      print "WARNING[scc_checkRampStartFD]: At least one DAC was not at start point, it has been ramped and slept for delayx, but this should be done in top level scan function!"
+      RampStartFD(S, ignore_lims = 1, x_only=1)
+      sc_sleep(S.delayy) // Settle time for 2D sweeps
+   endif
+end
 
 function scc_checkRampratesFD(S)
   // check if effective ramprate is higher than software limits
@@ -2490,10 +2528,10 @@ function scc_checkSameDeviceFD(S, [x_only, y_only])
 	variable device_buffer
 	string channels
 	if (!y_only)
-		channels = getChannelsOnFD(S.channelsx, device_dacs)  // Throws error if not all channels on one FastDAC
+		channels = scf_getChannelNumsOnFD(S.channelsx, device_dacs)  // Throws error if not all channels on one FastDAC
 	endif
 	if (!x_only)
-		channels = getChannelsOnFD(S.channelsy, device_buffer)
+		channels = scf_getChannelNumsOnFD(S.channelsy, device_buffer)
 		if (device_dacs > 0 && device_buffer > 0 && device_buffer != device_dacs)
 			abort "ERROR[scc_checkSameDeviceFD]: X channels and Y channels are not on same device"  // TODO: Maybe this should raise an error?
 		elseif (device_dacs <= 0 && device_buffer > 0)
@@ -2501,7 +2539,7 @@ function scc_checkSameDeviceFD(S, [x_only, y_only])
 		endif
 	endif
 
-	channels = getChannelsOnFD(s.AdcList, device_buffer, adc=1)  // Raises error if ADCs aren't on same device
+	channels = scf_getChannelNumsOnFD(s.AdcList, device_buffer, adc=1)  // Raises error if ADCs aren't on same device
 	if (device_dacs > 0 && device_buffer != device_dacs)
 		abort "ERROR[scc_checkSameDeviceFD]: ADCs are not on the same device as DACs"  // TODO: Maybe should only raise error if x channels not on same device as ADCs?
 	endif	

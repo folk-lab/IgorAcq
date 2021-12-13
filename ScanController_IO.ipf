@@ -252,7 +252,7 @@ function saveScanWaves(hdfid, S, filtered)
 
 
 	if(filtered)
-		make/o/free/N=(postFilterNumpts(S.numptsx, S.measureFreq)) sc_xarray
+		make/o/free/N=(scfd_postFilterNumpts(S.numptsx, S.measureFreq)) sc_xarray
 	else
 		make/o/free/N=(S.numptsx) sc_xarray
 	endif

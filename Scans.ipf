@@ -341,7 +341,7 @@ function ReadVsTimeFastdac(instrID, duration, [y_label, comments, nosave]) // Un
 	wave fadcattr
 	variable i=0
 
-	string channels = getRecordedFastdacInfo("channels")  // Get ADCs ticked to record
+	string channels = scf_getRecordedADCinfo("channels")  // Get ADCs ticked to record
 	
 	if(itemsinlist(channels, ",") == 0)
 		abort "[ERROR] \"ReadVsTimeFastdac\": No ADC channels selected"
@@ -353,7 +353,7 @@ function ReadVsTimeFastdac(instrID, duration, [y_label, comments, nosave]) // Un
 	
 	initializeScan(S)
 
-	NEW_fd_record_values(S, 0)
+	scfd_RecordValues(S, 0)
 
 	if (!nosave)	
 		EndScan(S=S)
@@ -410,7 +410,7 @@ function ScanFastDAC(instrID, start, fin, channels, [numpts, sweeprate, ramprate
 	initializeScan(S)
 
 	// Do 1D scan (rownum set to 0)
-	NEW_fd_record_values(S, 0, AWG_list=AWG)
+	scfd_RecordValues(S, 0, AWG_list=AWG)
 
 	// Save by default
 	if (nosave == 0)
@@ -571,7 +571,7 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 		sc_sleep(S.delayy)
 		
 		// Record fast axis
-		NEW_Fd_record_values(S, i, AWG_list=AWG)
+		scfd_RecordValues(S, i, AWG_list=AWG)
 	endfor
 
 	// Save by default
@@ -636,7 +636,7 @@ function ScanFastDACRepeat(instrID, start, fin, channels, numptsy, [numptsx, swe
 		sc_sleep(S.delayy)
 
 		// Record values for 1D sweep
-		NEW_Fd_record_values(S, j, AWG_List = AWG)
+		scfd_RecordValues(S, j, AWG_List = AWG)
 
 		if (alternate!=0) // If want to alternate scan scandirection for next row
 			d = d*-1
