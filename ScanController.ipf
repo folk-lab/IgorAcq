@@ -627,7 +627,7 @@ function scv_setFreq(S)
 	// Set S.samplingFreq, S.numADCs, S.measureFreq
 	Struct ScanVars &S
    S.samplingFreq = getfadcSpeed(S.instrIDx)
-   S.numADCs = getNumFADC()
+   S.numADCs = scf_getNumRecordedADCs()
    S.measureFreq = S.samplingFreq/S.numADCs  //Because sampling is split between number of ADCs being read //TODO: This needs to be adapted for multiple FastDacs
 end
 
@@ -2402,7 +2402,7 @@ end
 
 
 function SetCheckAWG(AWG, S)
-	struct fdAWG_List &AWG
+	struct AWGVars &AWG
 	struct ScanVars &S
 
 	
@@ -2415,7 +2415,7 @@ function SetCheckAWG(AWG, S)
 	AWG.use_AWG = 1
 	
 	// Save numSteps in AWG_list for sweeplogs later
-	fdAWG_set_global_AWG_list(AWG)
+	fd_setGlobalAWG(AWG)
 end
 
 
@@ -2727,7 +2727,7 @@ end
 
 function CheckAWG(AWG, Fsv)
 	// Check that AWG and FastDAC ScanValues don't have any clashing DACs and check AWG within limits etc
-	struct fdAWG_List &AWG
+	struct AWGVars &AWG
 	struct ScanVars &Fsv
 	
 	string AWdacs  // Used for storing all DACS for 1 channel  e.g. "123" = Dacs 1,2,3
@@ -2744,7 +2744,7 @@ function CheckAWG(AWG, Fsv)
 	endif
 	
 	// Check numADCs hasn't changed since setting up waves
-	if(AWG.numADCs != getNumFADC())
+	if(AWG.numADCs != scf_getNumRecordedADCs())
 		abort "ERROR[CheckAWG]: Number of ADCs being measured has changed since setting up AWG, this will change AWG frequency. Set up AWG again to continue"
 	endif
 	
@@ -2784,7 +2784,7 @@ function CheckAWG(AWG, Fsv)
 	variable setpoint, answer, ch_num
 	for(i=0;i<itemsinlist(AWG.AW_Dacs,",");i+=1)
 		AWdacs = stringfromlist(i, AWG.AW_Dacs, ",")
-		string wn = fdAWG_get_AWG_wave(str2num(stringfromlist(i, AWG.AW_Waves, ",")))  // Get IGOR wave of AW#
+		string wn = fd_getAWGwave(str2num(stringfromlist(i, AWG.AW_Waves, ",")))  // Get IGOR wave of AW#
 		wave w = $wn
 		duplicate/o/r=[0][] w setpoints  							// Just get setpoints part
 		for(j=0;j<strlen(AWdacs);j++)  // Check for each DAC that will be outputting this wave
@@ -3007,6 +3007,19 @@ function/S scf_getRecordedADCinfo(info_name)  // TODO: Rename if prepending some
 end
 
 
+function scf_getNumRecordedADCs() 
+	// Returns how many ADCs are set to be recorded
+	// Note: Gets this info from ScanController_Fastdac
+	string adcs = scf_getRecordedADCinfo("channels")
+	variable numadc = itemsInList(adcs)
+	if(numadc == 0)
+		print "WARNING[scf_getNumRecordedADCs]: No ADCs set to record. Behaviour may be unpredictable"
+	endif
+		
+	return numadc
+end
+
+
 function/S scf_getChannelNumsOnFD(channels, device, [adc])
 	// Convert from absolute channel number to device channel number (i.e. DAC 9 is actually FastDAC2s 1 channel)
 	// Returns device number in device variable
@@ -3190,12 +3203,12 @@ function scfd_RecordValues(S, rowNum, [AWG_list, linestart, skip_data_distributi
 	struct ScanVars &S
 	variable rowNum, linestart
 	variable skip_data_distribution // For recording data without doing any calculation or distribution of data
-	struct fdAWG_list &AWG_list
+	struct AWGVars &AWG_list
 	// If passed AWG_list with AWG_list.use_AWG == 1 then it will run with the Arbitrary Wave Generator on
 	// Note: Only works for 1 FastDAC! Not sure what implementation will look like for multiple yet
 
 	// Check if AWG is going to be used
-	Struct fdAWG_list AWG  // Note: Default has AWG.use_awg = 0
+	Struct AWGVars AWG  // Note: Default has AWG.use_awg = 0
 	if(!paramisdefault(AWG_list))  // If AWG_list passed, then overwrite default
 		AWG = AWG_list
 	endif 
@@ -3229,7 +3242,7 @@ end
 function scfd_SendCommandAndRead(S, AWG_list, rowNum)
 	// Send 1D Sweep command to fastdac and record the raw data it returns ONLY
 	struct ScanVars &S
-	struct fdAWG_list &AWG_list
+	struct AWGVars &AWG_list
 	variable rowNum
 	string cmd_sent = ""
 	variable totalByteReturn
@@ -3249,7 +3262,7 @@ function scfd_SendCommandAndRead(S, AWG_list, rowNum)
 		variable errCode = GetRTError(1)  // Clear the error
 		if (v_AbortCode != 10)  // 10 is returned when user clicks abort button mid sweep
 			printf "WARNING[scfd_SendCommandAndRead]: Error during sweep at row %d. Attempting once more without updating graphs.\r" rowNum
-			stopFDACsweep(S.instrIDx)   // Make sure the previous scan is stopped
+			fd_stopFDACsweep(S.instrIDx)   // Make sure the previous scan is stopped
 			cmd_sent = fd_start_sweep(S, AWG_list=AWG_list)
 			entered_panic_mode = scfd_RecordBuffer(S, rowNum, totalByteReturn, record_only=1)  // Try again to record the sweep
 		else
@@ -3419,7 +3432,7 @@ function scfd_checkSweepstate(instrID)
     	scs_checksweepstate()
   	catch
 		errCode = GetRTError(1)
-		stopFDACsweep(instrID)
+		fd_stopFDACsweep(instrID)
 //		if(v_abortcode == -1)  // If user abort
 //				sc_abortsweep = 0
 //				sc_pause = 0
@@ -3434,7 +3447,7 @@ function scfd_readChunk(instrID, read_chunk, buffer)
   buffer = readInstr(instrID, read_bytes=read_chunk, binary=1)
   // If failed, abort
   if (cmpstr(buffer, "NaN") == 0)
-    stopFDACsweep(instrID)
+    fd_stopFDACsweep(instrID)
     abort
   endif
 end
@@ -3529,7 +3542,7 @@ function scfd_distributeData2(buffer,adcList,bytes,rowNum,colNumStart,[direction
 		// convert to floating point
 			s1 = buffer[j + (i*2)]
 			s2 = buffer[j + (i*2) + 1]
-			datapoint = fdacChar2Num(s1, s2)
+			datapoint = fd_Char2Num(s1, s2)
 			rawwave[colNumStart+k] = dataPoint
 			k += 1*direction
 		endfor
@@ -3578,13 +3591,6 @@ function initFastDAC()
 		print("[ERROR] \"initFastDAC\": No devices found!")
 		abort
 	endif
-
-	// create path for spectrum analyzer
-	string datapath = getExpPath("data", full=3)
-	newpath/c/o/q spectrum datapath+"spectrum:" // create/overwrite spectrum path
-
-	// Init Arbitrary Wave Generator global Struct
-	fdAWG_init_global_AWG_list()
 
 	// hardware limit (mV)
 	variable/g fdac_limit = 10000

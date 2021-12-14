@@ -72,24 +72,12 @@ function getFADCmeasureFreq(instrID)
 	
 	svar sc_fdackeys	
 	variable numadc, samplefreq
-	numadc = getnumfadc() 
+	numadc = scf_getNumRecordedADCs() 
 	if (numadc == 0)
 		numadc = 1
 	endif
 	samplefreq = getFADCspeed(instrID)
 	return samplefreq/numadc
-end
-
-function getNumFADC() 
-	// Returns how many ADCs are set to be recorded
-	// Note: Gets this info from ScanController_Fastdac
-	string adcs = scf_getRecordedADCinfo("channels")
-	variable numadc = itemsInList(adcs)
-	if(numadc == 0)
-		print "WARNING[getNumFADC]: No ADCs set to record. Behaviour may be unpredictable"
-	endif
-		
-	return numadc
 end
 
 function getFADCspeed(instrID)
@@ -217,7 +205,7 @@ function getFDACOutput(instrID,channel) // Units: mV
 	endif
 end
 
-function/s getFDACStatus(instrID)
+function/s getFDstatus(instrID)
 	variable instrID
 	string  buffer = "", key = ""
 	wave/t fdacvalstr	
@@ -247,22 +235,22 @@ function/s getFDACStatus(instrID)
 	// AWG info if used
 	nvar sc_AWG_used
 	if(sc_AWG_used == 1)
-		buffer = addJSONkeyval(buffer, "AWG", getAWGstatus())  //NOTE: AW saved in getAWGstatus()
+		buffer = addJSONkeyval(buffer, "AWG", getFDAWGstatus())  //NOTE: AW saved in getFDAWGstatus()
 	endif
 	
 	return addJSONkeyval("", "FastDAC "+num2istr(device), buffer)
 end
 
 
-function/s getAWGstatus() 
-	// Function to be called from getFDACstatus() to add a section with information about the AWG used
+function/s getFDAWGstatus() 
+	// Function to be called from getFDstatus() to add a section with information about the AWG used
 	// Also adds AWs used to HDF
 	
 	string buffer = ""// For storing JSON to return
 	
 	// Get the Global AWG list (which has info about what was used in scan)
-	struct fdAWG_list AWG
-	fdAWG_get_global_AWG_list(AWG)
+	struct AWGVars AWG
+	fd_getGlobalAWG(AWG)
 	
 	buffer = addJSONkeyval(buffer, "AW_Waves", AWG.AW_Waves, addquotes=1)							// Which waves were used (e.g. "0,1" for both AW0 and AW1)
 	buffer = addJSONkeyval(buffer, "AW_Dacs", AWG.AW_Dacs, addquotes=1)								// Which Dacs output each wave (e.g. "01,2" for Dacs 0,1 outputting AW0 and Dac 2 outputting AW1)
@@ -300,7 +288,6 @@ function setFADCSpeed(instrID,speed,[loadCalibration]) // Units: Hz
 	endif
 	
 //	svar sc_fdackeys
-	// variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",",")), i=0, numADCCh = 0, numDevice = 0
 	variable numDevices = scf_getNumFDs()
 	string instrAddress = getResourceAddress(instrID)
 	variable i, numADCCh, numDevice	
@@ -326,10 +313,10 @@ function setFADCSpeed(instrID,speed,[loadCalibration]) // Units: Hz
 	
 	if(loadCalibration)
 		try
-			loadfADCCalibration(instrID,speed)
+			fd_loadFadcCalibration(instrID,speed)
 		catch
 			variable rte = getrterror(1)
-			print "WARNING[setFADCspeed]: loadFADCCalibration failed. If no calibration file exists, run CalibrateFADC() to create one"
+			print "WARNING[setFADCspeed]: fd_loadFadcCalibration failed. If no calibration file exists, run CalibrateFADC() to create one"
 		endtry			
 	else
 		print "[WARNING] \"setfadcSpeed\": Changing the ADC speed without ajdusting the calibration might affect the precision."
@@ -347,10 +334,33 @@ function setFADCSpeed(instrID,speed,[loadCalibration]) // Units: Hz
 	popupMenu $adcSpeedMenu,mode=mode
 	
 	// Set Arbitrary Wave Generator global struct .initialized to 0 (i.e. force user to update AWG because sample rate affects it)
-	fdAWG_reset_init()
+	fd_setAWGuninitialized()
 end
 
-function rampOutputFDAC(instrID,channel,output, ramprate, [ignore_lims]) // Units: mV, mV/s
+
+function RampMultipleFDAC(InstrID, channels, setpoint, [ramprate, ignore_lims])
+	// Ramps multiple channes to setpoint (this is the ramp function that SHOULD be used)
+	// Note: If ramprate is left default, then each channel will ramp at speed specified in FastDAC window
+	variable InstrID, setpoint, ramprate, ignore_lims
+	string channels
+	
+	ramprate = numtype(ramprate) == 0 ? ramprate : 0  // If not a number, then set to zero (which means will be overridden by ramprate in window)
+	
+	scu_assertSeparatorType(channels, ",")
+	channels = scu_getChannelNumbers(channels, fastdac=1)
+	
+	variable i=0, channel, nChannels = ItemsInList(channels, ",")
+	variable channel_ramp
+	for(i=0;i<nChannels;i+=1)
+		channel = str2num(StringFromList(i, channels, ","))
+		channel_ramp = ramprate != 0 ? ramprate : str2num(scf_getDacInfo(num2str(channel), "ramprate"))
+		fd_rampOutputFDAC(instrID, channel, setpoint, channel_ramp, ignore_lims=ignore_lims)  
+	endfor
+end
+
+
+function fd_rampOutputFDAC(instrID,channel,output, ramprate, [ignore_lims]) // Units: mV, mV/s
+	// NOTE: This is an internal function ONLY. Use RampMultipleFDAC instead.
 	// ramps a channel to the voltage specified by "output".
 	// ramp is controlled locally on DAC controller.
 	// channel must be the channel set by the GUI.
@@ -372,7 +382,7 @@ function rampOutputFDAC(instrID,channel,output, ramprate, [ignore_lims]) // Unit
 				devchannel = channel-startCh
 				break
 			else
-				sprintf err, "[ERROR] \"rampOutputfdac\": channel %d is not present on device with address %s", channel, instrAddress
+				sprintf err, "[ERROR] \"fd_rampOutputFDAC\": channel %d is not present on device with address %s", channel, instrAddress
 				print(err)
 				scfw_resetfdacwindow(channel)
 				abort
@@ -384,7 +394,7 @@ function rampOutputFDAC(instrID,channel,output, ramprate, [ignore_lims]) // Unit
 	// check that output is within hardware limit
 	nvar fdac_limit
 	if(abs(output) > fdac_limit || numtype(output) != 0)
-		sprintf err, "[ERROR] \"rampOutputfdac\": Output voltage on channel %d outside hardware limit", channel
+		sprintf err, "[ERROR] \"fd_rampOutputFDAC\": Output voltage on channel %d outside hardware limit", channel
 		print err
 		scfw_resetfdacwindow(channel)
 		abort
@@ -409,16 +419,16 @@ function rampOutputFDAC(instrID,channel,output, ramprate, [ignore_lims]) // Unit
 					break
 			endswitch
 			string warn
-			sprintf warn, "[WARNING] \"rampOutputfdac\": Output voltage must be within limit. Setting channel %d to %.3fmV\n", channel, output
+			sprintf warn, "[WARNING] \"fd_rampOutputFDAC\": Output voltage must be within limit. Setting channel %d to %.3fmV\n", channel, output
 			print warn
 		endif
 	
 		// Check that ramprate is within software limit, otherwise use software limit
 		if (ramprate > str2num(fdacvalstr[channel][4]) || numtype(ramprate) != 0)
-			printf "[WARNING] \"rampOutputfdac\": Ramprate of %.0fmV/s requested for channel %d. Using max_ramprate of %.0fmV/s instead\n" ramprate, channel, str2num(fdacvalstr[channel][4])
+			printf "[WARNING] \"fd_rampOutputFDAC\": Ramprate of %.0fmV/s requested for channel %d. Using max_ramprate of %.0fmV/s instead\n" ramprate, channel, str2num(fdacvalstr[channel][4])
 			ramprate = str2num(fdacvalstr[channel][4])
 			if (numtype(ramprate) != 0)
-				abort "ERROR[rampOutputFDAC]: Bad ramprate in ScanController_Fastdac window for channel "+num2str(channel)
+				abort "ERROR[fd_rampOutputFDAC]: Bad ramprate in ScanController_Fastdac window for channel "+num2str(channel)
 			endif
 		endif
 	endif 
@@ -450,23 +460,6 @@ function rampOutputFDAC(instrID,channel,output, ramprate, [ignore_lims]) // Unit
 end
 
 
-function RampMultipleFDAC(InstrID, channels, setpoint, [ramprate, ignore_lims])
-	variable InstrID, setpoint, ramprate, ignore_lims
-	string channels
-	
-	ramprate = numtype(ramprate) == 0 ? ramprate : 0  // If not a number, then set to zero (which means will be overridden by ramprate in window)
-	
-	scu_assertSeparatorType(channels, ",")
-	channels = scu_getChannelNumbers(channels, fastdac=1)
-	
-	variable i=0, channel, nChannels = ItemsInList(channels, ",")
-	variable channel_ramp
-	for(i=0;i<nChannels;i+=1)
-		channel = str2num(StringFromList(i, channels, ","))
-		channel_ramp = ramprate != 0 ? ramprate : str2num(scf_getDacInfo(num2str(channel), "ramprate"))
-		rampOutputfdac(instrID, channel, setpoint, channel_ramp, ignore_lims=ignore_lims)  
-	endfor
-end
 
 
 
@@ -559,7 +552,7 @@ end
 /////////////////////////////////////////////////////////////////////////////////////
 //////////////////////// Calibration /////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
-function loadFadcCalibration(instrID,speed)
+function fd_loadFadcCalibration(instrID,speed)
 	variable instrID,speed
 	
 	string regex = "", filelist = "", jstr=""
@@ -599,13 +592,13 @@ function loadFadcCalibration(instrID,speed)
 		else
 			// no calibration file found!
 			// raise error
-			print "[ERROR] \"loadfADCCalibration\": No calibration file found!"
+			print "[ERROR] \"fd_loadFadcCalibration\": No calibration file found!"
 			abort
 		endif
 	else
 		// no calibration file found!
 		// raise error
-		print "[ERROR] \"loadfADCCalibration\": No calibration file found!"
+		print "[ERROR] \"fd_loadFadcCalibration\": No calibration file found!"
 		abort
 	endif
 	
@@ -614,14 +607,14 @@ function loadFadcCalibration(instrID,speed)
 		// it's the same instrument
 	else
 		// not the same visa address, likely not the same instrument, abort!
-		print "[ERORR] \"loadfADCCalibration\": visa address' not the same!"
+		print "[ERORR] \"fd_loadFadcCalibration\": visa address' not the same!"
 		abort
 	endif
 	if(speed == str2num(getJSONvalue(jstr, "speed")))
 		// it's the correct speed
 	else
 		// not the same speed, abort!
-		print "[ERORR] \"loadfADCCalibration\": speed is not correct!"
+		print "[ERORR] \"fd_loadFadcCalibration\": speed is not correct!"
 		abort
 	endif
 	
@@ -631,7 +624,7 @@ function loadFadcCalibration(instrID,speed)
 	for(i=0;i<str2num(getJSONvalue(jstr, "num_channels"));i+=1)
 		zero_scale = str2num(getJSONvalue(jstr, "zero-scale"+num2istr(i)))
 		full_scale = str2num(getJSONvalue(jstr, "full-scale"+num2istr(i)))
-		updatefadcCalibration(instrID,i,zero_scale,full_scale)
+		fd_updateFadcCalibration(instrID,i,zero_scale,full_scale)
 	endfor
 end
 
@@ -671,7 +664,7 @@ function CalibrateFDAC(instrID)
 	
 	// reset calibrations on all DAC channels
 	for(i=0;i<numDACCh;i+=1)
-		ResetfdacCalibration(instrID,i)
+		fd_ResetFdacCalibration(instrID,i)
 	endfor
 	
 	// start calibration
@@ -687,7 +680,7 @@ function CalibrateFDAC(instrID)
 		endif
 		
 		// ramp channel to 0V
-		rampOutputfdac(instrID,channel,0, 100000, ignore_lims=1)
+		fd_rampOutputFDAC(instrID,channel,0, 100000, ignore_lims=1)
 		sprintf question, "Input value displayed by DMM in volts."
 		user_input = prompt_user("DAC offset calibration",question)
 		if(numtype(user_input) == 2)
@@ -697,7 +690,7 @@ function CalibrateFDAC(instrID)
 		
 		// write offset to FastDAC
 		// FastDAC returns the gain value used in uV
-		offsetReg = setfdacCalibrationOffset(instrID,channel,user_input)
+		offsetReg = fd_setFdacCalibrationOffset(instrID,channel,user_input)
 		sprintf key, "offset%d_", channel
 		result = replacenumberbykey(key+"stepsize",result,str2num(stringfromlist(1,offsetReg,",")),":",",")
 		result = replacenumberbykey(key+"register",result,str2num(stringfromlist(2,offsetReg,",")),":",",")
@@ -705,7 +698,7 @@ function CalibrateFDAC(instrID)
 		print message
 		
 		// ramp channel to -10V
-		rampOutputfdac(instrID,channel,-10000, 100000, ignore_lims=1)
+		fd_rampOutputFDAC(instrID,channel,-10000, 100000, ignore_lims=1)
 		sprintf question, "Input value displayed by DMM in volts."
 		user_input = prompt_user("DAC gain calibration",question)
 		if(numtype(user_input) == 2)
@@ -716,7 +709,7 @@ function CalibrateFDAC(instrID)
 		// write offset to FastDAC
 		// FastDAC returns the gain value used in uV
 		offset = user_input+10 
-		gainReg = setfdacCalibrationGain(instrID,channel,offset)
+		gainReg = fd_setFdacCalibrationGain(instrID,channel,offset)
 		sprintf key, "gain%d_", channel
 		result = replacenumberbykey(key+"stepsize",result,str2num(stringfromlist(1,gainReg,",")),":",",")
 		result = replacenumberbykey(key+"register",result,str2num(stringfromlist(2,gainReg,",")),":",",")
@@ -725,7 +718,7 @@ function CalibrateFDAC(instrID)
 	endfor
 	
 	// calibration complete
-	savefdaccalibration(deviceAddress,deviceNum,numDACCh,result)
+	fd_saveFdacCalibration(deviceAddress,deviceNum,numDACCh,result)
 	ask_user("DAC calibration complete! Result has been written to file on \"config\" path.", type=0)
 end
 
@@ -802,7 +795,7 @@ function CalibrateFADC(instrID)
 	if(scf_checkFDResponse(response,cmd,isString=1,expectedResponse="CALIBRATION_FINISHED") && calibrationFail == 0)
 		// all good, calibration complete
 		rampMultipleFDAC(instrID, "0,1,2,3", 0, ramprate=10000)
-		savefadccalibration(deviceAddress,deviceNum,numADCCh,result,adcSpeed)
+		fd_saveFadcCalibration(deviceAddress,deviceNum,numADCCh,result,adcSpeed)
 		ask_user("ADC calibration complete! Result has been written to file on \"config\" path.", type=0)
 	else
 		print "[ERROR] \"fadcCalibrate\": Calibration failed."
@@ -810,7 +803,7 @@ function CalibrateFADC(instrID)
 	endif
 end
 
-function saveFadcCalibration(deviceAddress,deviceNum,numADCCh,result,adcSpeed)
+function fd_saveFadcCalibration(deviceAddress,deviceNum,numADCCh,result,adcSpeed)
 	string deviceAddress, result
 	variable deviceNum, numADCCh, adcSpeed
 	
@@ -838,7 +831,7 @@ function saveFadcCalibration(deviceAddress,deviceNum,numADCCh,result,adcSpeed)
 	writetofile(prettyJSONfmt(buffer),filename,"config")
 end
 
-function saveFdacCalibration(deviceAddress,deviceNum,numDACCh,result)
+function fd_saveFdacCalibration(deviceAddress,deviceNum,numDACCh,result)
 	string deviceAddress, result
 	variable deviceNum, numDACCh
 	
@@ -871,7 +864,7 @@ function saveFdacCalibration(deviceAddress,deviceNum,numDACCh,result)
 	writetofile(prettyJSONfmt(buffer),filename,"config")
 end
 
-function ResetFdacCalibration(instrID,channel)
+function fd_ResetFdacCalibration(instrID,channel)
 	variable instrID, channel
 	
 	string cmd="", response="", err=""
@@ -887,7 +880,7 @@ function ResetFdacCalibration(instrID,channel)
 	endif 
 end
 
-function/s setFdacCalibrationOffset(instrID,channel,offset)
+function/s fd_setFdacCalibrationOffset(instrID,channel,offset)
 	variable instrID, channel, offset
 	
 	string cmd="", response="", err="",result=""
@@ -908,7 +901,7 @@ function/s setFdacCalibrationOffset(instrID,channel,offset)
 	endif
 end
 
-function/s setFdacCalibrationGain(instrID,channel,offset)
+function/s fd_setFdacCalibrationGain(instrID,channel,offset)
 	variable instrID, channel, offset
 	
 	string cmd="", response="", err="",result=""
@@ -929,7 +922,7 @@ function/s setFdacCalibrationGain(instrID,channel,offset)
 	endif
 end
 
-function updateFadcCalibration(instrID,channel,zeroScale,fullScale)
+function fd_updateFadcCalibration(instrID,channel,zeroScale,fullScale)
 	variable instrID,channel,zeroScale,fullScale
 	
 	string cmd="", response="", err=""
@@ -940,7 +933,7 @@ function updateFadcCalibration(instrID,channel,zeroScale,fullScale)
 	if(scf_checkFDResponse(response,cmd,isString=1,expectedResponse="CALIBRATION_CHANGED"))
 		// all good!
 	else
-		sprintf err, "[ERROR] \"updatefadcCalibration\": Updating calibration of ADC channel %d failed!", channel
+		sprintf err, "[ERROR] \"fd_updateFadcCalibration\": Updating calibration of ADC channel %d failed!", channel
 		print err
 		abort
 	endif
@@ -985,13 +978,13 @@ function ClearFdacBuffer(instrID)
 	printf "Cleared %d bytes of data from buffer\r", total
 end
 
-function stopFDACsweep(instrID)  
+function fd_stopFDACsweep(instrID)  
 	// Stops sweep and clears buffer 
 	variable instrID
 	ClearfdacBuffer(instrID)
 end
 
-function fdacChar2Num(c1, c2)
+function fd_Char2Num(c1, c2)
 	// Conversion of bytes to float
 	//
 	// Given two strings of length 1
@@ -1025,7 +1018,7 @@ end
 ///////////////////////// Spectrum Analyzer //////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 
-function FDacSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,nosave])
+function FDSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,nosave])
 	// scanlength is in sec
 	// if linear is set to 1, the spectrum will be plotted on a linear scale
 	variable instrID, scanlength, numAverage, nosave
@@ -1054,7 +1047,7 @@ function FDacSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,nosave])
 	string wn, wn_lin
 	string log_freq_wavenames = ""
 	string lin_freq_wavenames = ""
-	variable numChannels = getNumFADC()
+	variable numChannels = scf_getNumRecordedADCs()
 	string adc_channels = scf_getRecordedADCinfo("channels")
 	variable i
 	for(i=0;i<numChannels;i+=1)
@@ -1089,8 +1082,8 @@ function FDacSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,nosave])
 		for (j=0;j<itemsInList(wavenames);j++)
 			// Calculate spectrums from calc wave
 			wave w = $stringFromList(j, wavenames)
-			wave fftw = calculate_spectrum(w)  // Log spectrum
-			wave fftwlin = calculate_spectrum(w, linear=1)  // Linear spectrum
+			wave fftw = fd_calculate_spectrum(w)  // Log spectrum
+			wave fftwlin = fd_calculate_spectrum(w, linear=1)  // Linear spectrum
 
 			// Add to averaged waves
 			wave fftwave = $stringFromList(j, log_freq_wavenames)
@@ -1117,7 +1110,7 @@ function FDacSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,nosave])
 end
 
 
-function/WAVE calculate_spectrum(time_series, [scan_duration, linear])
+function/WAVE fd_calculate_spectrum(time_series, [scan_duration, linear])
 	// Takes time series data and returns power spectrum
 	wave time_series  // Time series (in correct units -- i.e. check that it's in nA first)
 	variable scan_duration // If passing a wave which does not have Time as x-axis, this will be used to rescale
@@ -1153,12 +1146,12 @@ function/WAVE calculate_spectrum(time_series, [scan_duration, linear])
 	return powerspec
 end
 
-function plot_PowerSpectrum(w, [scan_duration, linear, powerspec_name])
+function plotPowerSpectrum(w, [scan_duration, linear, powerspec_name])
 	wave w
 	variable scan_duration, linear
 	string powerspec_name // Wavename to save powerspectrum in (useful if you want to display more than one at a time)
 	
-	wave powerspec = calculate_spectrum(w, scan_duration=scan_duration, linear=linear)
+	wave powerspec = fd_calculate_spectrum(w, scan_duration=scan_duration, linear=linear)
 	
 	if(!paramIsDefault(powerspec_name))
 		duplicate/o powerspec $powerspec_name
@@ -1176,7 +1169,7 @@ end
 ///// Load FastDACs from HDF /////
 //////////////////////////////////
 
-function fdLoadFromHDF(datnum, [no_check])
+function FDLoadFromHDF(datnum, [no_check])
 	// Function to load fastDAC values and labels from a previously save HDF file in sweeplogs in current data directory
 	// Requires Dac info to be saved in "DAC{label} : output" format
 	// with no_check = 0 (default) a window will be shown to user where values can be changed before committing to ramping, also can chose not to load from there
@@ -1188,12 +1181,12 @@ function fdLoadFromHDF(datnum, [no_check])
 	svar sc_fdackeys
 	variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
 	if (numDevices !=1)
-		print "WARNING[fdLoadFromHDF]: Only tested to load 1 Fastdac, only first FastDAC will be loaded without code changes"
+		print "WARNING[FDLoadFromHDF]: Only tested to load 1 Fastdac, only first FastDAC will be loaded without code changes"
 	endif	
-	get_fastdacs_from_hdf(datnum, fastdac_num=1) // Creates/Overwrites load_fdacvalstr
+	fd_get_fastdacs_from_hdf(datnum, fastdac_num=1) // Creates/Overwrites load_fdacvalstr
 	
 	if (no_check == 0)  //Whether to show ask user dialog or not
-		response = fdLoadAskUser()
+		response = fd_LoadAskUser()
 	else
 		response = -1 
 	endif 
@@ -1214,7 +1207,7 @@ function fdLoadFromHDF(datnum, [no_check])
 end
 
 
-function get_fastdacs_from_hdf(datnum, [fastdac_num])
+function fd_get_fastdacs_from_hdf(datnum, [fastdac_num])
 	//Creates/Overwrites load_fdacvalstr by duplicating the current fdacvalstr then changing the labels and outputs of any values found in the metadata of HDF at dat[datnum].h5
 	//Leaves fdacvalstr unaltered	
 	variable datnum, fastdac_num
@@ -1251,37 +1244,37 @@ function get_fastdacs_from_hdf(datnum, [fastdac_num])
 	JSONXOP_Release /A  //Clear all stored JSON strings
 end
 
-function fdLoadAskUser()
+function fd_LoadAskUser()
 	variable/g fd_load_answer
 	wave/t load_fdacvalstr
 	wave/t fdacvalstr
 	wave fdacattr
 	if (waveexists(load_fdacvalstr) && waveexists(fdacvalstr) && waveexists(fdacattr))	
-		execute("fdLoadWindow()")
-		PauseForUser fdLoadWindow
+		execute("fd_LoadWindow()")
+		PauseForUser fd_LoadWindow
 		return fd_load_answer
 	else
 		abort "ERROR[bdLoadAskUser]: either load_fdacvalstr, fdacvalstr, or fdacattr doesn't exist when it should!"
 	endif
 end
 
-function fdLoadAskUserButton(action) : ButtonControl
+function fd_LoadAskUserButton(action) : ButtonControl
 	string action
 	variable/g fd_load_answer
 	strswitch(action)
 		case "do_nothing":
 			fd_load_answer = 1
-			dowindow/k fdLoadWindow
+			dowindow/k fd_LoadWindow
 			break
 		case "load_from_hdf":
 			fd_load_answer = -1
-			dowindow/k fdLoadWindow
+			dowindow/k fd_LoadWindow
 			break
 	endswitch
 end
 
 
-Window fdLoadWindow() : Panel
+Window fd_LoadWindow() : Panel
 	PauseUpdate; Silent 1 // building window
 	NewPanel /W=(0,0,740,390) // window size
 	ModifyPanel frameStyle=2
@@ -1327,8 +1320,8 @@ Window fdLoadWindow() : Panel
 	
 
 
-	Button do_nothing,pos={80,tcoord+280},size={120,20},proc=fdLoadAskUserButton,title="Keep Current Setup"
-	Button load_from_hdf,pos={80+x_offset,tcoord+280},size={100,20},proc=fdLoadAskUserButton,title="Load From HDF"
+	Button do_nothing,pos={80,tcoord+280},size={120,20},proc=fd_LoadAskUserButton,title="Keep Current Setup"
+	Button load_from_hdf,pos={80+x_offset,tcoord+280},size={100,20},proc=fd_LoadAskUserButton,title="Load From HDF"
 EndMacro
 
 
@@ -1336,22 +1329,22 @@ EndMacro
 //////////// Arbitrary Wave Generator //////////////
 ////////////////////////////////////////////////////
 
-function fdAWG_reset_init()
+function fd_setAWGuninitialized()
 	// sets global AWG_list.initialized to 0 so that it will fail pre scan checks. (to be used when changing things like sample rate, AWs etc)
 	
 	// Get current AWG_list
-	struct fdAWG_list S
-	fdAWG_get_global_AWG_list(S)
+	struct AWGVars S
+	fd_getGlobalAWG(S)
 	
 	// Set initialized to zero to prevent fd_Record_values from running without AWG_list being set up again first
 	S.initialized = 0
 
 	// Store changes
-	fdAWG_set_global_AWG_list(S)
+	fd_setGlobalAWG(S)
 end
 
-function fdAWG_setup_AWG(instrID, [AWs, DACs, numCycles, verbose])
-	// Function which initializes AWG_List s.t. selected DACs will use selected AWs when called in fd_Record_Values
+function setupAWG(instrID, [AWs, DACs, numCycles, verbose])
+	// Function which initializes AWGVars s.t. selected DACs will use selected AWs when called in fd_Record_Values
 	// Required because fd_Record_Values needs to know the total number of samples it will get back, which is calculated from values in AWG_list
 	// IGOR AWs must be set in a separate function (which should reset AWG_List.initialized to 0)
 	// Sets AWG_list.initialized to 1 to allow fd_Record_Values to run
@@ -1361,8 +1354,8 @@ function fdAWG_setup_AWG(instrID, [AWs, DACs, numCycles, verbose])
 	variable numCycles // How many full waves to execute for each ramp step
 	variable verbose  // Whether to print setup of AWG
 	
-	struct fdAWG_List S
-	fdAWG_get_global_AWG_list(S)
+	struct AWGVars S
+	fd_getGlobalAWG(S)
 
 	// Note: This needs to be changed if using same AW on multiple DACs
 	DACs = scu_getChannelNumbers(DACs, fastdac=1)  // Convert from label to numbers 
@@ -1376,7 +1369,7 @@ function fdAWG_setup_AWG(instrID, [AWs, DACs, numCycles, verbose])
 	S.numWaves = itemsinlist(AWs, ",")
 	
 	// For checking things don't change before scanning
-	S.numADCs = getNumFADC()  // Store number of ADCs selected in window so can check if this changes
+	S.numADCs = scf_getNumRecordedADCs()  // Store number of ADCs selected in window so can check if this changes
 	S.samplingFreq = getfadcspeed(instrID)
 	S.measureFreq = S.samplingFreq/S.numADCs
 	
@@ -1385,10 +1378,10 @@ function fdAWG_setup_AWG(instrID, [AWs, DACs, numCycles, verbose])
 	variable min_samples = INF  // Minimum number of samples at a setpoint
 	for(i=0;i<S.numWaves;i++)
 		// Get IGOR AW
-		wn = fdAWG_get_AWG_wave(str2num(stringfromlist(i, S.AW_waves, ",")))
+		wn = fd_getAWGwave(str2num(stringfromlist(i, S.AW_waves, ",")))
 		wave w = $wn
 		// Check AW has correct form and meets criteria. Checks length of wave = waveLen (or sets waveLen if == 0)
-		fdAWG_check_AW(w,len=waveLen)
+		fd_checkAW(w,len=waveLen)
 		
 		// Get length of shortest setpoint in samples
 		duplicate/o/free/r=[][1] w samples
@@ -1404,7 +1397,7 @@ function fdAWG_setup_AWG(instrID, [AWs, DACs, numCycles, verbose])
 	S.initialized = 1
 	
 	// Store as global to be access in fd_Record_Values
-	fdAWG_set_global_AWG_list(S)
+	fd_setGlobalAWG(S)
 	
 	// Print with current settings (changing settings will affect square wave!)
 	variable j = 0
@@ -1431,7 +1424,7 @@ function fdAWG_setup_AWG(instrID, [AWs, DACs, numCycles, verbose])
 end
 
 
-function fdAWG_check_AW(w, [len])
+function fd_checkAW(w, [len])
 	// Internal function - not to be used directly by user
 	// Checks wave w meets criteria for AW, and if len provided will check w has same length or will set len if == 0
 	wave w
@@ -1447,7 +1440,7 @@ function fdAWG_check_AW(w, [len])
 	variable i = 0
 	for(i=0;i<numpnts(samples);i++)
 		if(samples[i] != trunc(samples[i])) // IGORs bs way of checking if integer
-			abort "ERROR[fdAWG_check_AW]: Received a non-integer number of samples for setpoint " + num2str(i)
+			abort "ERROR[fd_checkAW]: Received a non-integer number of samples for setpoint " + num2str(i)
 		endif
 	endfor
 	
@@ -1456,20 +1449,20 @@ function fdAWG_check_AW(w, [len])
 		if (len == 0)
 			len = sum(samples)
 			if(len == 0)
-				abort "ERROR[fdAWG_check_AW]: AW has zero length!"
+				abort "ERROR[fd_checkAW]: AW has zero length!"
 			endif
 		else
 			if(sum(samples) != len)
-				abort "ERROR[fdAWG_check_AW]: Length of AW does not match len which is " + num2str(len)
+				abort "ERROR[fd_checkAW]: Length of AW does not match len which is " + num2str(len)
 			endif
 		endif
 	endif
 end
 
 
-function fdAWG_add_wave(instrID, wave_num, add_wave)
+function fd_addAWGwave(instrID, wave_num, add_wave)
 	// Internal function - not to be used directly by user
-	// See	"fdAWG_make_multi_square_wave()" as an example of how to use this
+	// See	"makeSquareWaveAWG()" as an example of how to use this
 	// Very basic command which adds to the AWGs stored in the fastdac
 	variable instrID
 	variable wave_num  	// Which AWG to add to (currently allowed 0 or 1)
@@ -1496,17 +1489,17 @@ function fdAWG_add_wave(instrID, wave_num, add_wave)
 
    waveStats/q add_wave
    if (dimsize(add_wave, 1) != 2 || V_numNans !=0 || V_numINFs != 0) 
-      abort "ERROR[fdAWG_add_wave]: must be 2D (setpoints, samples) and contain no NaNs or INFs"
+      abort "ERROR[fd_addAWGwave]: must be 2D (setpoints, samples) and contain no NaNs or INFs"
    endif
    if (wave_num != 0 && wave_num != 1)  // Check adding to AWG 0 or 1
-      abort "ERROR[fdAWG_add_wave]: Only supports AWG wave 0 or 1"
+      abort "ERROR[fd_addAWGwave]: Only supports AWG wave 0 or 1"
    endif
 
 	// Check all sample lengths are integers
  	duplicate/o/free/r=[][1] add_wave samples
 	for(i=0;i<numpnts(samples);i++)
 		if(samples[i] != trunc(samples[i])) // IGORs bs way of checking if integer
-			abort "ERROR[fdAWG_add_wave]: Received a non-integer number of samples for setpoint " + num2str(i)
+			abort "ERROR[fd_addAWGwave]: Received a non-integer number of samples for setpoint " + num2str(i)
 		endif
 	endfor
 
@@ -1524,7 +1517,7 @@ function fdAWG_add_wave(instrID, wave_num, add_wave)
    
 	// Check within FD input buffer length
    if (strlen(cmd) > 256)
-      sprintf buffer "ERROR[fdAWG_add_wave]: command length is %d, which exceeds fDAC buffer size of 256. Add to AWG in smaller chunks", strlen(cmd)
+      sprintf buffer "ERROR[fd_addAWGwave]: command length is %d, which exceeds fDAC buffer size of 256. Add to AWG in smaller chunks", strlen(cmd)
       abort buffer
    endif
 
@@ -1534,7 +1527,7 @@ function fdAWG_add_wave(instrID, wave_num, add_wave)
 	response = sc_stripTermination(response, "\r\n")
 
 	// Check response and add to IGOR fdAW_<wave_num> if successful
-	string wn = fdAWG_get_AWG_wave(wave_num)
+	string wn = fd_getAWGwave(wave_num)
 	wave AWG_wave = $wn
 	variable awg_len = dimsize(AWG_wave,0)
 	string expected_response
@@ -1544,16 +1537,16 @@ function fdAWG_add_wave(instrID, wave_num, add_wave)
 		redimension/n=(awg_len+dimsize(add_wave,0), -1) AWG_wave 
 		AWG_wave[awg_len,][] = tempwave[p][q]
 	else
-		abort "ERROR[fdAWG_add_wave]: Failed to add add_wave to AWG_wave"+ num2str(wave_num)
+		abort "ERROR[fd_addAWGwave]: Failed to add add_wave to AWG_wave"+ num2str(wave_num)
 	endif
 end
 
 
-function/s fdAWG_get_AWG_wave(wave_num)
+function/s fd_getAWGwave(wave_num)
    // Returns name of AW wave (and creates the wave first if necessary)
    variable wave_num
    if (wave_num != 0 && wave_num != 1)  // Check adding to AWG 0 or 1
-      abort "ERROR[fdAWG_get_AWG_wave]: Only supports AWG wave 0 or 1"
+      abort "ERROR[fd_getAWGwave]: Only supports AWG wave 0 or 1"
    endif
 
    string wn = ""
@@ -1565,7 +1558,7 @@ function/s fdAWG_get_AWG_wave(wave_num)
    return wn
 end
 
-function fdAWG_clear_wave(instrID, wave_num)
+function fd_clearAWGwave(instrID, wave_num)
 	// Clears AWG# from the fastdac and the corresponding global wave in IGOR
 	variable instrID
 	variable wave_num // Which AWG to clear (currently allowed 0 or 1)
@@ -1595,116 +1588,12 @@ function fdAWG_clear_wave(instrID, wave_num)
    string expected_response
    sprintf expected_response "WAVE,%d,0", wave_num
    if(scf_checkFDResponse(response, cmd, isstring=1,expectedResponse=expected_response))
-		string wn = fdAWG_get_AWG_wave(wave_num)
+		string wn = fd_getAWGwave(wave_num)
 		wave AWG_wave = $wn
 		killwaves AWG_wave 
    else
-      abort "ERROR[fdAWG_clear_wave]: Error while clearing AWG_wave"+num2str(wave_num)
+      abort "ERROR[fd_clearAWGwave]: Error while clearing AWG_wave"+num2str(wave_num)
    endif
-end
-
-
-function fdAWG_make_multi_square_wave(instrID, v0, vP, vM, v0len, vPlen, vMlen, wave_num, [ramplen])  // TODO: move this to Tim's igor procedures
-   // Make square waves with form v0, +vP, v0, -vM (useful for Tim's Entropy)
-   // Stores copy of wave in Igor (accessible by fdAWG_get_AWG_wave(wave_num))
-   // Note: Need to call, fdAWG_setup_AWG() after making new wave
-   // To make simple square wave set length of unwanted setpoints to zero.
-   variable instrID, v0, vP, vM, v0len, vPlen, vMlen, wave_num
-   variable ramplen  // lens in seconds
-   variable max_setpoints = 26
-
-
-	ramplen = paramisdefault(ramplen) ? 0.003 : ramplen
-
-	if (ramplen < 0)
-		abort "ERROR[fdAWG_make_multi_square_wave]: Cannot use a negative ramplen"
-	endif
-	
-    // Open connection
-    sc_openinstrconnections(0)
-
-   // put inputs into waves to make them easier to work with
-   make/o/free sps = {v0, vP, v0, vM} // CHANGE refers to output
-   make/o/free lens = {v0len, vPlen, v0len, vMlen}
-
-   // Sanity check on period
-   // Note: limit checks happen in AWG_RAMP 
-   if (sum(lens) > 1)
-      string msg
-      sprintf msg "Do you really want to make a square wave with period %.3gs?", sum(lens)
-      variable ans = ask_user(msg, type=1)
-      if (ans == 2)
-         abort "User aborted"
-      endif
-   endif
-   // Ensure that ramplen is not too long (will never reach setpoints)
-   variable i=0
-   for(i=0;i<numpnts(lens);i++)
-    if (lens[i] < ramplen)
-      msg = "Do you really want to ramp for longer than the duration of a setpoint? You will never reach the setpoint"
-      ans = ask_user(msg, type=1)
-      if (ans == 2)
-         abort "User aborted"
-      endif
-    endif
-   endfor
-
-
-    // Get current measureFreq to calculate require sampleLens to achieve durations in s
-   variable measureFreq = getFADCmeasureFreq(instrID) 
-   variable numSamples = 0
-
-   // Make wave
-   variable j=0, k=0
-   variable max_ramp_per_setpoint = floor((max_setpoints - numpnts(sps))/numpnts(sps)) // CHANGE setpoint per ramp
-   variable ramp_per_setpoint = min(max_ramp_per_setpoint, floor(measureFreq * ramplen)) // CHANGE to ramp_step_size
-   variable ramp_setpoint_duration = 0
-
-   if (ramp_per_setpoint != 0)
-     ramp_setpoint_duration = ramplen / ramp_per_setpoint 
-   endif
-
-   // make wave to store setpoints/sample_lengths, correctly sized
-   make/o/free/n=((numpnts(sps)*ramp_per_setpoint + numpnts(sps)), 2) awg_sqw
-
-   //Initialize prev_setpoint to the last setpoint
-   variable prev_setpoint = sps[numpnts(sps) - 1]
-   variable ramp_step = 0
-   for(i=0;i<numpnts(sps);i++)
-      if(lens[i] != 0)  // Only add to wave if duration is non-zero
-         // Ramps happen at the beginning of a setpoint and use the 'previous' wave setting to compute
-         // where to ramp from. Obviously this does not work for the first wave length, is that avoidable?
-         ramp_step = (sps[i] - prev_setpoint)/(ramp_per_setpoint + 1)
-         for (k = 1; k < ramp_per_setpoint+1; k++)
-          // THINK ABOUT CASE CASE RAMPLEN 0 -> ramp_setpoint_furation = 0
-          numSamples = round(ramp_setpoint_duration * measureFreq)
-          awg_sqw[j][0] = {prev_setpoint + (ramp_step * k)}
-          awg_sqw[j][1] = {numSamples}
-          j++
-         endfor 
-         numSamples = round((lens[i]-ramplen)*measureFreq)  // Convert to # samples
-         if(numSamples == 0)  // Prevent adding zero length setpoint
-            abort "ERROR[Set_multi_square_wave]: trying to add setpoint with zero length, duration too short for sampleFreq"
-         endif
-         awg_sqw[j][0] = {sps[i]}
-         awg_sqw[j][1] = {numSamples}
-         j++ // Increment awg_sqw position for storing next setpoint/sampleLen
-         prev_setpoint = sps[i]
-      endif
-   endfor
-
-
-    // Check there is a awg_sqw to add
-   if(numpnts(awg_sqw) == 0)
-      abort "ERROR[Set_multi_square_wave]: No setpoints added to awg_sqw"
-   endif
-
-    // Clear current wave and then reset with new awg_sqw
-   fdAWG_clear_wave(instrID, wave_num)
-   fdAWG_add_wave(instrID, wave_num, awg_sqw)
-
-   // Make sure user sets up AWG_list again after this change using fdAWG_setup_AWG()
-   fdAWG_reset_init()
 end
 
 
@@ -1718,7 +1607,7 @@ function/s fd_start_sweep(S, [AWG_list])
 	// sweep with arbitrary wave generator on (AWG_RAMP in arduino)
 	// readvstime sweep (SPEC_ANA in arduino)
 	Struct ScanVars &S
-	Struct fdAWG_list &AWG_List
+	Struct AWGVars &AWG_List
 
 	scu_assertSeparatorType(S.ADCList, ";")	
 	string adcs = replacestring(";",S.adclist,"")
@@ -1793,18 +1682,11 @@ end
 
 
 
-
-
-
-
 //////////////////////////////////////
 ///////////// Structs ////////////////
 //////////////////////////////////////
 
-Structure fdAWG_list
-
-	// Note: Variables must come after all strings/waves/etc so that structPut will save them!!
-
+Structure AWGVars
 	// strings/waves/etc //
 	// Convenience
 	string AW_Waves		// Which AWs to use e.g. "2" for AW_2 only, "1,2" for fdAW_1 and fdAW_2. (only supports 1 and 2 so far)
@@ -1828,52 +1710,41 @@ Structure fdAWG_list
 	variable numWaves	// Number of AWs being used
 	variable numCycles 	// # wave cycles per DAC step for a full 1D scan
 	variable numSteps  	// # DAC steps for a full 1D scan
-
 endstructure
 
 
-function fdAWG_init_global_AWG_list()
-	// Makes an empty AWG_List and stores as global
-	struct fdAWG_list S
-	S.AW_waves = ""
-	S.AW_dacs = ""
-	fdAWG_set_global_AWG_list(S)
-end
-
-
-function fdAWG_set_global_AWG_list(S)
+function fd_setGlobalAWG(S)
 	// Function to store values from AWG_list to global variables/strings/waves
 	// StructPut ONLY stores VARIABLES so have to store other parts separately
-	struct fdAWG_list &S
-
-	// TODO: switch to storing in a single text wave (not sure if structPut can store into a text wave)
+	struct AWGVars &S
 
 	// Store String parts  
-	string/g fdAWG_globals_AW_Waves = S.AW_waves
-	string/g fdAWG_globals_AW_dacs = S.AW_dacs
-	
+	make/o/t fd_AWGglobalStrings = {S.AW_Waves, S.AW_dacs}
+
 	// Store variable parts
-//	make/o fdAWG_globals_stuct_vars
-	string/g fdAWG_globals_stuct_vars 
-	structPut/S S, fdAWG_globals_stuct_vars
+	make/o fd_AWGglobalVars = {S.initialized, S.use_AWG, S.waveLen, S.numADCs, S.samplingFreq,\
+		S.measureFreq, S.numWaves, S.numCycles, S.numSteps}
 end
 
 
-function fdAWG_get_global_AWG_list(S)
+function fd_getGlobalAWG(S)
 	// Function to get global values for AWG_list that were stored using set_global_AWG_list()
 	// StructPut ONLY gets VARIABLES
-	struct fdAWG_list &S
-
-	// TODO: Switch to loading from a single text wave (not sure if structGet can load from text wave)
-	
-	// Get variable parts
-	svar fdAWG_globals_stuct_vars
-	structGet/S S fdAWG_globals_stuct_vars
-	S.use_AWG = 0  // Always initialized to zero so that checks have to be run before using in scan (see SetCheckAWG())
-	
+	struct AWGVars &S
 	// Get string parts
-	svar fdAWG_globals_AW_Waves
-	svar fdAWG_globals_AW_dacs
-	S.AW_waves = fdAWG_globals_AW_Waves
-	S.AW_dacs = fdAWG_globals_AW_dacs
+	wave/T t = fd_AWGglobalStrings
+	S.AW_waves = t[0]
+	S.AW_dacs = t[1]
+
+	// Get variable parts
+	wave v = fd_AWGglobalVars
+	S.initialized = v[0]
+	S.use_AWG = 0  // Always initialized to zero so that checks have to be run before using in scan (see SetCheckAWG())
+	S.waveLen = v[2]
+	S.numADCs = v[3]
+	S.samplingFreq = v[4]
+	S.measureFreq = v[5]
+	S.numWaves = v[6]
+	S.numCycles = v[7]
+	S.numSteps = v[8]
 end

@@ -393,9 +393,9 @@ function ScanFastDAC(instrID, start, fin, channels, [numpts, sweeprate, ramprate
    PreScanChecksFD(S)  
    
    	// If using AWG then get that now and check it
-	struct fdAWG_list AWG
+	struct AWGVars AWG
 	if(use_AWG)	
-		fdAWG_get_global_AWG_list(AWG)
+		fd_getGlobalAWG(AWG)
 		SetCheckAWG(AWG, S)  // Note: sets S.numptsx here and AWG.use_AWG = 1 if pass checks
 	else  // Don't use AWG
 		AWG.use_AWG = 0  	// This is the default, but just putting here explicitly
@@ -527,9 +527,9 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
    	endif
    	
    	// If using AWG then get that now and check it
-	struct fdAWG_list AWG
+	struct AWGVars AWG
 	if(use_AWG)	
-		fdAWG_get_global_AWG_list(AWG)
+		fd_getGlobalAWG(AWG)
 		SetCheckAWG(AWG, S)  // Note: sets SV.numptsx here and AWG.use_AWG = 1 if pass checks
 	else  // Don't use AWG
 		AWG.use_AWG = 0  	// This is the default, but just putting here explicitly
@@ -611,9 +611,9 @@ function ScanFastDACRepeat(instrID, start, fin, channels, numptsy, [numptsx, swe
 	PreScanChecksFD(S, x_only=1)  
 
   	// If using AWG then get that now and check it
-	struct fdAWG_list AWG
+	struct AWGVars AWG
 	if(use_AWG)	
-		fdAWG_get_global_AWG_list(AWG)
+		fd_getGlobalAWG(AWG)
 		SetCheckAWG(AWG, S)  // Note: sets S.numptsx here and AWG.use_AWG = 1 if pass checks
 	else  // Don't use AWG
 		AWG.use_AWG = 0  	// This is the default, but just putting here explicitly
