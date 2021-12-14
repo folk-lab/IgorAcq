@@ -1254,7 +1254,7 @@ function fd_LoadAskUser()
 		PauseForUser fd_LoadWindow
 		return fd_load_answer
 	else
-		abort "ERROR[bdLoadAskUser]: either load_fdacvalstr, fdacvalstr, or fdacattr doesn't exist when it should!"
+		abort "ERROR[bd_LoadAskUser]: either load_fdacvalstr, fdacvalstr, or fdacattr doesn't exist when it should!"
 	endif
 end
 

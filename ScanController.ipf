@@ -2656,7 +2656,7 @@ function scc_checkLimsBD(S, [x_only, y_only])
 			for(k=0;k<2;k++)  									// Start/Fin for each channel
 				output = str2num(stringfromlist(2*i+k, outputs, ","))  // 2 per channelsx/channelsy
 				// Check that the DAC board is initialized
-				bdGetBoard(channel)
+				bd_GetBoard(channel)
 				board_index = floor(channel/4)
 			
 				// check for NAN and INF

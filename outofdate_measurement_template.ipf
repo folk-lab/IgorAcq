@@ -10,23 +10,23 @@
 
 threadsafe function read51adc(instrID)
 	variable instrID
-	return readBDadc(instrID, 1, 5)/10.0
+	return bd_ReadBDadc(instrID, 1, 5)/10.0
 end
 
 threadsafe function read52adc(instrID)
 	variable instrID
-	return readBDadc(instrID, 2, 5)/10.0
+	return bd_ReadBDadc(instrID, 2, 5)/10.0
 end
 
 
 threadsafe function read61adc(instrID)
 	variable instrID
-	return readBDadc(instrID, 1, 6)
+	return bd_ReadBDadc(instrID, 1, 6)
 end
 
 threadsafe function read62adc(instrID)
 	variable instrID
-	return readBDadc(instrID, 2, 6)
+	return bd_ReadBDadc(instrID, 2, 6)
 end
 
 ///////////////////////////
@@ -413,7 +413,7 @@ function ScanBabyDACMultiRange(instrID, startvalues,finvalues,channels,numpts,de
     channel = Str2num(StringFromList(k,channels,","))
     start = Str2num(StringFromList(k,startvalues,","))
   endfor
-  UpdateMultipleBD(instrID, action="ramp", ramprate=ramprate)
+  bd_UpdateMultipleBD(instrID, action="ramp", ramprate=ramprate)
 
   sc_sleep(1.0)
   start = Str2num(StringFromList(0,startvalues,","))
@@ -427,7 +427,7 @@ function ScanBabyDACMultiRange(instrID, startvalues,finvalues,channels,numpts,de
       channel = Str2num(StringFromList(k,channels,","))
       setpoint = start + (i*(fin-start)/(numpts-1))
     endfor
-    UpdateMultipleBD(instrID, action="ramp", ramprate=ramprate)
+    bd_UpdateMultipleBD(instrID, action="ramp", ramprate=ramprate)
 
     sc_sleep(delay)
     RecordValues(i, 0)
