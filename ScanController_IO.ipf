@@ -389,7 +389,7 @@ function saveFastdacInfoWaves(hdfids, S)
 		sweepgates_x[2][i] = str2num(stringfromlist(i, s.finxs, ","))
 	endfor
 	
-	if (S.is2d && !S.bdID)  // Also Y info (if not using BabyDAC for y-axis)
+	if (S.is2d)
 		make/o/N=(3, itemsinlist(s.channelsy, ",")) sweepgates_y = 0
 		for (i=0; i<itemsinlist(s.channelsy, ","); i++)
 			sweepgates_y[0][i] = str2num(stringfromList(i, s.channelsy, ","))

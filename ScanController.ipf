@@ -283,7 +283,8 @@ end
 // Structure to hold scan information (general to all scans) 
 // Note: If modifying this, also modify the scv_setLastScanVars and scv_getLastScanVars accordingly (and to have it save to HDF, modify sc_createSweepLogs)
 structure ScanVars
-    variable instrID
+    variable instrIDx
+    variable instrIDy // If using a second device for second axis of a scan (otherwise should be same as instrIDx)
     
     variable lims_checked // Flag that gets set to 1 after checks on software limits/ramprates etc has been carried out (particularly important for fastdac scans which has no limit checking for the sweep)
 
@@ -297,11 +298,9 @@ structure ScanVars
     variable starty, finy, numptsy, rampratey 
     variable delayy  // delay after each step in y-axis (e.g. settling time after x-axis has just been ramped from fin to start quickly)
 
-    // For scanRepeat
+    // For specific scans
     variable direction  // Allows controlling scan from start -> fin or fin -> start (with 1 or -1)
-    variable duration   // Can specify duration of scan rather than numpts or sweeprate
-
-	// For ReadVsTime
+    variable duration   // Can specify duration of scan rather than numpts or sweeprate for readVsTime
 	variable readVsTime // Set to 1 if doing a readVsTime
 
     // Other useful info
@@ -316,11 +315,10 @@ structure ScanVars
     variable numADCs  // How many ADCs are being recorded 
     variable samplingFreq, measureFreq  // measureFreq = samplingFreq/numADCs 
     variable sweeprate  // How fast to sweep in mV/s (easier to specify than numpts for fastdac scans)
-    variable bdID // For using BabyDAC on Y-axis of Fastdac Scan
     string adcList 
     string startxs, finxs  // If sweeping from different start/end points for each DAC channel
     string startys, finys  // Similar for Y-axis
-	 string raw_wave_names  // Names of waves to store raw data in (defaults to ADC# for each ADC)
+	 string raw_wave_names  // Names of waves to override the names raw data is stored in for FastDAC scans
 	 
 	 // Backend used
 	 variable never_save   // Set to 1 to make sure these ScanVars are never saved (e.g. if using to get throw away values for getting an ADC reading)
@@ -342,11 +340,11 @@ function scv_setLastScanVars(S)
 			S.raw_wave_names\
 			}
 		make/o/d sc_lastScanVarsVariables = {\
-			S.instrID, S.lims_checked, S.startx, S.finx, S.numptsx,\
+			S.instrIDx, S.instrIDy, S.lims_checked, S.startx, S.finx, S.numptsx,\
 		 	S.rampratex, S.delayx, S.is2d, S.starty, S.finy,\
 		 	S.numptsy, S.rampratey, S.delayy, S.direction, S.duration,\
 		 	S.readVsTime, S.start_time, S.end_time, S.using_fastdac, S.numADCs,\
-		 	S.samplingFreq, S.measureFreq, S.sweeprate, S.bdID, S.never_save\
+		 	S.samplingFreq, S.measureFreq, S.sweeprate, S.never_save\
 		 	}
 		
 		S.start_time = st  // Restore to whatever it was before	
@@ -375,35 +373,116 @@ function scv_getLastScanVars(S)
 	S.raw_wave_names = t[10]
 
 	// Load Variable parts
-	S.instrID = v[0]
-	S.lims_checked = v[1]
-	S.startx = v[2]
-	S.finx = v[3]
-	S.numptsx = v[4]
-	S.rampratex = v[5]
-	S.delayx = v[6]
-	S.is2d = v[7]
-	S.starty = v[8]
-	S.finy = v[9]
-	S.numptsy = v[10]
-	S.rampratey = v[11]
-	S.delayy = v[12]
-	S.direction = v[13]
-	S.duration = v[14]
-	S.readVsTime = v[15]
-	S.start_time = v[16]
-	S.end_time = v[17]
-	S.using_fastdac = v[18]
-	S.numADCs = v[19]
-	S.samplingFreq = v[20]
-	S.measureFreq = v[21]
-	S.sweeprate = v[22]
-	S.bdID = v[23]
+	S.instrIDx = v[0]
+	S.instrIDy = v[1]
+	S.lims_checked = v[2]
+	S.startx = v[3]
+	S.finx = v[4]
+	S.numptsx = v[5]
+	S.rampratex = v[6]
+	S.delayx = v[7]
+	S.is2d = v[8]
+	S.starty = v[9]
+	S.finy = v[10]
+	S.numptsy = v[11]
+	S.rampratey = v[12]
+	S.delayy = v[13]
+	S.direction = v[14]
+	S.duration = v[15]
+	S.readVsTime = v[16]
+	S.start_time = v[17]
+	S.end_time = v[18]
+	S.using_fastdac = v[19]
+	S.numADCs = v[20]
+	S.samplingFreq = v[21]
+	S.measureFreq = v[22]
+	S.sweeprate = v[23]
 	S.never_save = v[24]
 end
 	
+function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, rampratex, instrIDy, starty, finy, channelsy, numptsy, rampratey, delayy, x_label, y_label, startxs, finxs, startys, finys, comments])
+    // Function to make setting up general values of scan vars easier
+    // PARAMETERS:
+    // startx, finx, starty, finy -- Single start/fin point for all channelsx/channelsy
+    // startxs, finxs, startys, finys -- For passing in multiple start/fin points for each channel as a comma separated string instead of a single start/fin for all channels
+    //		Note: Just pass anything for startx/finx if using startxs/finxs, they will be overwritten
+    struct ScanVars &s
+    variable instrIDx, instrIDy
+    variable startx, finx, numptsx, delayx, rampratex
+    variable starty, finy, numptsy, delayy, rampratey
+    string channelsx
+    string channelsy
+    string x_label, y_label
+	string startxs, finxs, startys, finys
+    string comments
+    
+	// Handle Optional Strings
+	x_label = selectString(paramIsDefault(x_label), x_label, "")
+	channelsx = selectString(paramisdefault(channelsx), channelsx, "")
 
-function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate, duration, rampratex, delayx, starty, finy, channelsy, numptsy, rampratey, delayy, direction, startxs, finxs, startys, finys, x_label, y_label, comments])
+	y_label = selectString(paramIsDefault(y_label), y_label, "")
+	channelsy = selectString(paramisdefault(channelsy), channelsy, "")
+
+	startxs = selectString(paramisdefault(startxs), startxs, "")
+	finxs = selectString(paramisdefault(finxs), finxs, "")
+	startys = selectString(paramisdefault(startys), startys, "")
+	finys = selectString(paramisdefault(finys), finys, "")
+
+	comments = selectString(paramisdefault(comments), comments, "")
+
+
+	S.instrIDx = instrIDx
+	S.instrIDy = paramIsDefault(instrIDy) ? instrIDx : instrIDy  // For a second device controlling second axis of scan
+
+	S.lims_checked = 0// Flag that gets set to 1 after checks on software limits/ramprates etc has been carried out (particularly important for fastdac scans which has no limit checking for the sweep)
+
+	S.channelsx = channelsx
+	S.startx = startx
+	S.finx = finx 
+	S.numptsx = numptsx
+	S.rampratex = rampratex
+	S.delayx = delayx  // delay after each step for Slow scans (has no effect for Fastdac scans)
+
+	// For 2D scans
+	S.is2d = numptsy > 0 ? 0 : 1
+	S.channelsy = channelsy
+	S.starty = starty 
+	S.finy = finy
+	S.numptsy = numptsy 
+	S.rampratey = rampratey
+	S.delayy = delayy // delay after each step in y-axis (e.g. settling time after x-axis has just been ramped from fin to start quickly)
+
+	// For specific scans
+	S.direction = 1 // Allows controlling scan from start -> fin or fin -> start (with 1 or -1)
+	S.duration = NaN // Can specify duration of scan rather than numpts or sweeprate  
+	S.readVsTime = 0 // Set to 1 if doing a readVsTime
+
+	// Other useful info
+	S.start_time = NaN // Should be recorded right before measurements begin (e.g. after all checks are carried out)  
+	S.end_time = NaN // Should be recorded right after measurements end (e.g. before getting sweeplogs etc)  
+	S.x_label = x_label // String to show as x_label of scan (otherwise defaults to gates that are being swept)
+	S.y_label = y_label  // String to show as y_label of scan (for 2D this defaults to gates that are being swept)
+	S.using_fastdac = 0 // Set to 1 when using fastdac
+	S.comments = comments  // Additional comments to save in HDF sweeplogs (easy place to put keyword flags for later analysis)
+
+	// Specific to Fastdac 
+	S.numADCs = NaN  // How many ADCs are being recorded  
+	S.samplingFreq = NaN  // 
+	S.measureFreq = NaN  // measureFreq = samplingFreq/numADCs  
+	S.sweeprate = NaN  // How fast to sweep in mV/s (easier to specify than numpts for fastdac scans)  
+	S.adcList  = ""  //   
+	S.startxs = startxs
+	S.finxs = finxs  // If sweeping from different start/end points for each DAC channel
+	S.startys = startys
+	S.finys = finys  // Similar for Y-axis
+	S.raw_wave_names = ""  // Names of waves to override the names raw data is stored in for FastDAC scans
+	
+	// Backend use
+	S.never_save = 0  // Set to 1 to make sure these ScanVars are never saved (e.g. if using to get throw away values for getting an ADC reading)
+end
+
+
+function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate, duration, rampratex, delayx, starty, finy, channelsy, numptsy, rampratey, delayy, startxs, finxs, startys, finys, x_label, y_label, comments])
     // Function to make setting up scanVars struct easier for FastDAC scans
     // PARAMETERS:
     // startx, finx, starty, finy -- Single start/fin point for all channelsx/channelsy
@@ -425,42 +504,26 @@ function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
 	channelsy = selectString(paramIsDefault(channelsy), channelsy, "")
 	startys = selectString(paramIsDefault(startys), startys, "")
 	finys = selectString(paramIsDefault(finys), finys, "")
-	y_label = selectString((paramIsDefault(y_label) || numtype(strlen(y_label)) == 2), y_label, "")	
+	y_label = selectString(paramIsDefault(y_label), y_label, "")	
 
 	channelsx = selectString(paramIsDefault(channelsx), channelsx, "")
 	startxs = selectString(paramIsDefault(startxs), startxs, "")
 	finxs = selectString(paramIsDefault(finxs), finxs, "")
-	x_label = selectString((paramIsDefault(x_label) || numtype(strlen(x_label)) == 2), x_label, "")
+	x_label = selectString(paramIsDefault(x_label), x_label, "")
 
-	
-    // Handle Optional Parameters
-    S.numptsx = paramisdefault(numptsx) ? NaN : numptsx
-    S.rampratex = paramisDefault(rampratex) ? Nan : rampratex
-    S.delayx = paramisDefault(delayx) ? NaN : delayx
+	comments = selectString(paramIsDefault(comments), comments, "")
 
-    S.sweeprate = paramisdefault(sweeprate) ? NaN : sweeprate
-    S.duration = paramIsDefault(duration) ? NaN : duration    
+	// Standard initialization
+	initScanVars(S, instrIDx=instrID, startx=startx, finx=finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
+	instrIDy=instrID, starty=starty, finy=finy, channelsy=channelsy, numptsy=numptsy, rampratey=rampratey, delayy=delayy, \
+	x_label=x_label, y_label=y_label, startxs=startxs, finxs=finxs, startys=startys, finys=finys, comments=comments)
 
-	 S.numptsy = paramisdefault(numptsy) ? NaN : numptsy
-    S.rampratey = paramisdefault(rampratey) ? NaN : rampratey
-    S.delayy = paramisdefault(delayy) ? NaN : delayy
-
-	// Set Variables in Struct
-    S.instrID = instrID
+	// Additional intialization for fastDAC scans
     S.adcList = scf_getRecordedADCinfo("channels")
     S.using_fastdac = 1
-    S.comments = selectString(paramIsDefault(comments), comments, "")
 
-	// For repeat scans 
-    S.direction = paramisdefault(direction) ? 1 : direction
-   	
-   	// Sets channelsx, channelsy
+   	// Sets channelsx, channelsy to be lists of channel numbers instead of labels
     scv_setChannels(S, channelsx, channelsy, fastdac=1)
-    
-    // Set if 2D (Repeats or true 2D)
-    if (numptsy > 0)
-    	S.is2d = 1
-    endif
     
    	// Get Labels for graphs
    	S.x_label = selectString(strlen(x_label) > 0, scu_getDacLabel(S.channelsx, fastdac=1), x_label)  // Uses channels as list of numbers, and only if x_label not passed in
@@ -477,14 +540,11 @@ function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
     scv_setFreq(S) 		// Sets S.samplingFreq/measureFreq/numADCs	
     scv_setNumptsSweeprateDuration(S) 	// Checks that either numpts OR sweeprate OR duration was provided, and sets ScanVars accordingly
                                 // Note: Valid for start/fin only (uses S.startx, S.finx NOT S.startxs, S.finxs)
-
-	// Set empty string just to not raise nullstring errors
-	S.raw_wave_names = ""	// This should be overridden afterwards if necessary
 end
 
 
-function initScanVarsBD(S, instrID, startx, finx, [channelsx, numptsx, delayx, rampratex, starty, finy, channelsy, numptsy, rampratey, delayy, direction, x_label, y_label, comments])
-    // Function to make setting up scanVars struct easier for FastDAC scans
+function initScanVarsBD(S, instrID, startx, finx, [channelsx, numptsx, delayx, rampratex, starty, finy, channelsy, numptsy, rampratey, delayy, startxs, finxs, startys, finys, x_label, y_label, comments])
+    // Function to make setting up scanVars struct easier for BabyDAC scans
     // PARAMETERS:
     // startx, finx, starty, finy -- Single start/fin point for all channelsx/channelsy
     // startxs, finxs, startys, finys -- For passing in multiple start/fin points for each channel as a comma separated string instead of a single start/fin for all channels
@@ -495,44 +555,30 @@ function initScanVarsBD(S, instrID, startx, finx, [channelsx, numptsx, delayx, r
     variable starty, finy, numptsy, delayy, rampratey
     string channelsx
     string channelsy
-    variable direction
     string x_label, y_label
+    string startxs, finxs, startys, finys
     string comments
     
-	 // Handle Optional Parameters
-	 x_label = selectString((paramIsDefault(x_label) || numtype(strlen(x_label)) == 2), x_label, "")
-	 channelsx = selectString(paramisdefault(channelsx), channelsx, "")
-	
-	 y_label = selectString((paramIsDefault(y_label) || numtype(strlen(y_label)) == 2), y_label, "")
-	 channelsy = selectString(paramisdefault(channelsy), channelsy, "")
-	
-    S.comments = selectString(paramIsDefault(comments), comments, "")
-    
-    S.startx = startx
-    S.finx = finx
-    s.numptsx = paramisdefault(numptsx) ? NaN : numptsx
-    s.rampratex = paramisDefault(rampratex) ? NaN : rampratex
-    s.delayx = paramisDefault(delayx) ? NaN : delayx
-	
-	 s.starty = starty
-	 s.finy = finy
-	 s.numptsy = paramisdefault(numptsy) ? NaN : numptsy
-    s.rampratey = paramisdefault(rampratey) ? NaN : rampratey
-    s.delayy = paramisdefault(delayy) ? NaN : delayy
-        
-	// Set Variables in Struct
-    s.instrID = instrID
+	// Ensure optional strings aren't null
+	channelsy = selectString(paramIsDefault(channelsy), channelsy, "")
+	startys = selectString(paramIsDefault(startys), startys, "")
+	finys = selectString(paramIsDefault(finys), finys, "")
+	y_label = selectString(paramIsDefault(y_label), y_label, "")	
 
-	// For repeat scans 
-    s.direction = paramisdefault(direction) ? 1 : direction
-   	
-   	// Sets channelsx, channelsy
-    scv_setChannels(S, channelsx, channelsy, fastdac=0)
+	channelsx = selectString(paramIsDefault(channelsx), channelsx, "")
+	startxs = selectString(paramIsDefault(startxs), startxs, "")
+	finxs = selectString(paramIsDefault(finxs), finxs, "")
+	x_label = selectString(paramIsDefault(x_label), x_label, "")
+
+	comments = selectString(paramIsDefault(comments), comments, "")
+
+	// Standard initialization
+	initScanVars(S, instrIDx=instrID, startx=startx, finx=finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
+	instrIDy=instrID, starty=starty, finy=finy, channelsy=channelsy, numptsy=numptsy, rampratey=rampratey, delayy=delayy, \
+	x_label=x_label, y_label=y_label, startxs=startxs, finxs=finxs, startys=startys, finys=finys, comments=comments)
     
-    // Set if 2D (Repeats or true 2D)
-    if (numptsy > 0)
-    	S.is2d = 1
-    endif
+	// Additional initialization for BabyDAC scans
+    scv_setChannels(S, channelsx, channelsy, fastdac=0) // Sets channelsx, channelsy to lists of numbers instead of labels
     
    	// Get Labels for graphs
    	S.x_label = selectString(strlen(x_label) > 0, scu_getDacLabel(S.channelsx, fastdac=0), x_label)  // Uses channels as list of numbers, and only if x_label not passed in
@@ -541,16 +587,6 @@ function initScanVarsBD(S, instrID, startx, finx, [channelsx, numptsx, delayx, r
 	else
 		S.y_label = y_label
 	endif
-   	
-   	// Used for Fastdac
-   	S.sweeprate = NaN
-   	S.duration = NaN
-   	S.startxs = ""
-   	S.finxs = ""
-   	S.startys = ""
-   	S.finys = ""
-   	S.adcList = ""
-	S.raw_wave_names = ""	
 end
 
 
@@ -590,7 +626,7 @@ end
 function scv_setFreq(S)
 	// Set S.samplingFreq, S.numADCs, S.measureFreq
 	Struct ScanVars &S
-   S.samplingFreq = getfadcSpeed(S.instrID)
+   S.samplingFreq = getfadcSpeed(S.instrIDx)
    S.numADCs = getNumFADC()
    S.measureFreq = S.samplingFreq/S.numADCs  //Because sampling is split between number of ADCs being read //TODO: This needs to be adapted for multiple FastDacs
 end
@@ -1549,11 +1585,11 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	variable aborting
 	string additional_wavenames // Any additional wavenames to be saved in the DatHDF (and copied in Igor)
 	
+	save_experiment = paramisDefault(save_experiment) ? 1 : save_experiment
 	additional_wavenames = SelectString(ParamIsDefault(additional_wavenames), additional_wavenames, "")
 	
 	nvar filenum
 	variable current_filenum = filenum  // Because filenum gets incremented in SaveToHDF (to avoid clashing filenums when Igor crashes during saving)
-	save_experiment = paramisDefault(save_experiment) ? 1 : save_experiment
 	if(!paramIsDefault(S))
 		scv_setLastScanVars(S)  // I.e save the ScanVars including end_time and any other changed values in case saving fails (which it often does)
 	endif
@@ -2348,6 +2384,23 @@ function PreScanChecksFD(S, [x_only, y_only])
 end
 
 
+function PreScanChecksBD(S, [x_only, y_only])
+  struct ScanVars &S
+  variable x_only, y_only
+//	SFbd_check_ramprates(S)	 	// Check ramprates of x and y
+	scc_checkLimsBD(S, x_only=x_only, y_only=y_only)			// Check within software lims for x and y
+	S.lims_checked = 1  		// So record_values knows that limits have been checked!
+end
+
+
+function PreScanChecksKeithley(S, [x_only, y_only])
+	struct ScanVars &S
+	variable x_only, y_only // Whether to only check specific axis (e.g. if other axis is a babydac or something else)
+	print "WARNING[PreScanChecksKeithley]: Currently no checks performed on Keithley scans"
+	S.lims_checked = 1  // So record_values knows that limits have been checked!
+end
+
+
 function SetCheckAWG(AWG, S)
 	struct fdAWG_List &AWG
 	struct ScanVars &S
@@ -2384,7 +2437,7 @@ function RampStartFD(S, [ignore_lims, x_only, y_only])
 			else
 				abort "ERROR[RampStartFD]: S.direction not set to 1 or -1"
 			endif
-			rampMultipleFDAC(S.instrID,stringfromlist(i,S.channelsx,","),setpoint,ramprate=S.rampratex, ignore_lims=ignore_lims)
+			rampMultipleFDAC(S.instrIDx,stringfromlist(i,S.channelsx,","),setpoint,ramprate=S.rampratex, ignore_lims=ignore_lims)
 		endfor
 	endif  
 	
@@ -2392,7 +2445,7 @@ function RampStartFD(S, [ignore_lims, x_only, y_only])
 	if(numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0 && x_only != 1)  // If not NaN and not "" and not x only
 		scu_assertSeparatorType(S.channelsy, ",")
 		for(i=0;i<itemsinlist(S.channelsy,",");i+=1)
-			rampMultipleFDAC(S.instrID,stringfromlist(i,S.channelsy,","),str2num(stringfromlist(i,S.startys,",")),ramprate=S.rampratey, ignore_lims=ignore_lims)
+			rampMultipleFDAC(S.instrIDy,stringfromlist(i,S.channelsy,","),str2num(stringfromlist(i,S.startys,",")),ramprate=S.rampratey, ignore_lims=ignore_lims)
 		endfor
 	endif
   
@@ -2412,7 +2465,7 @@ function scc_checkRampStartFD(S)
 	   elseif(S.direction == -1)
 	      sp = str2num(stringfromlist(i, S.finxs, ","))
 	   endif
-      diff = getFDACOutput(S.instrID, ch)-sp
+      diff = getFDACOutput(S.instrIDx, ch)-sp
       if(abs(diff) > 0.5)  // if DAC is more than 0.5mV from start of ramp
          require_ramp = 1
       endif
@@ -2566,14 +2619,6 @@ end
 
 
 
-function PreScanChecksBD(S, [x_only, y_only])
-  struct ScanVars &S
-  variable x_only, y_only
-//	SFbd_check_ramprates(S)	 	// Check ramprates of x and y
-	scc_checkLimsBD(S, x_only=x_only, y_only=y_only)			// Check within software lims for x and y
-	S.lims_checked = 1  		// So record_values knows that limits have been checked!
-end
-
 
 
 function scc_checkLimsBD(S, [x_only, y_only])
@@ -2667,16 +2712,15 @@ function RampStartBD(S, [x_only, y_only, ignore_lims])
 	// x_only/y_only to only try ramping x/y to start (e.g. y_only=1 when using a babydac for y-axis of a fastdac scan)
 	struct ScanVars &S
 	variable x_only, y_only, ignore_lims
-
-	variable instrID = (S.bdID) ? S.bdID : S.instrID  // Use S.bdID if it is present  
+ 
 	// If x exists ramp them to start
 	if(!y_only && numtype(strlen(s.channelsx)) == 0 && strlen(s.channelsx) != 0)  // If not NaN and not ""
-		RampMultipleBD(instrID, S.channelsx, S.startx, ramprate=S.rampratex, ignore_lims=ignore_lims)
+		RampMultipleBD(S.instrIDx, S.channelsx, S.startx, ramprate=S.rampratex, ignore_lims=ignore_lims)
 	endif  
 	
 	// If y exists ramp them to start
 	if(!x_only && numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0)  // If not NaN and not ""
-		RampMultipleBD(instrID, S.channelsy, S.starty, ramprate=S.rampratey, ignore_lims=ignore_lims)
+		RampMultipleBD(S.instrIDy, S.channelsy, S.starty, ramprate=S.rampratey, ignore_lims=ignore_lims)
 	endif
 end
 
@@ -3205,7 +3249,7 @@ function scfd_SendCommandAndRead(S, AWG_list, rowNum)
 		variable errCode = GetRTError(1)  // Clear the error
 		if (v_AbortCode != 10)  // 10 is returned when user clicks abort button mid sweep
 			printf "WARNING[scfd_SendCommandAndRead]: Error during sweep at row %d. Attempting once more without updating graphs.\r" rowNum
-			stopFDACsweep(S.instrID)   // Make sure the previous scan is stopped
+			stopFDACsweep(S.instrIDx)   // Make sure the previous scan is stopped
 			cmd_sent = fd_start_sweep(S, AWG_list=AWG_list)
 			entered_panic_mode = scfd_RecordBuffer(S, rowNum, totalByteReturn, record_only=1)  // Try again to record the sweep
 		else
@@ -3214,7 +3258,7 @@ function scfd_SendCommandAndRead(S, AWG_list, rowNum)
 	endtry	
 
 	string endstr
-	endstr = readInstr(S.instrID)
+	endstr = readInstr(S.instrIDx)
 	endstr = sc_stripTermination(endstr,"\r\n")	
 	if (S.readVsTime)
 		scf_checkFDResponse(endstr,cmd_sent,isString=1,expectedResponse="READ_FINISHED")
@@ -3226,7 +3270,7 @@ function scfd_SendCommandAndRead(S, AWG_list, rowNum)
 	endif
 	
 	if(AWG_list.use_awg == 1)  // Reset AWs back to zero (no reason to leave at end of AW)
-		rampmultiplefdac(S.instrID, AWG_list.AW_DACs, 0)
+		rampmultiplefdac(S.instrIDx, AWG_list.AW_DACs, 0)
 	endif
 end
 
@@ -3297,9 +3341,9 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only])
    variable panic_mode = record_only  // If Igor gets behind on reading at any point, it will go into panic mode and focus all efforts on clearing buffer.
    variable expected_bytes_in_buffer = 0 // For storing how many bytes are expected to be waiting in buffer
    do
-      scfd_readChunk(S.instrID, read_chunk, buffer)  // puts data into buffer
+      scfd_readChunk(S.instrIDx, read_chunk, buffer)  // puts data into buffer
       scfd_distributeData1(buffer, S, bytes_read, totalByteReturn, read_chunk, rowNum)
-      scfd_checkSweepstate(S.instrID)
+      scfd_checkSweepstate(S.instrIDx)
 
       bytes_read += read_chunk      
       expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)      
@@ -3326,11 +3370,11 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only])
    // do one last read if any data left to read
    variable bytes_left = totalByteReturn-bytes_read
    if(bytes_left > 0)
-      scfd_readChunk(S.instrID, bytes_left, buffer)  // puts data into buffer
+      scfd_readChunk(S.instrIDx, bytes_left, buffer)  // puts data into buffer
       scfd_distributeData1(buffer, S, bytes_read, totalByteReturn, bytes_left, rowNum)
    endif
    
-   scfd_checkSweepstate(S.instrID)
+   scfd_checkSweepstate(S.instrIDx)
 //   variable st = stopMSTimer(-2)
    scg_updateRawGraphs() 
 //   printf "scg_updateRawGraphs took %.2f ms\r", (stopMSTimer(-2) - st)/1000
@@ -3431,17 +3475,17 @@ function scfd_updateWindow(S, numAdcs)
   for(i=0;i<itemsinlist(S.channelsx,",");i+=1)
     channel = stringfromlist(i,S.channelsx,",")
 	device_channel = scf_getChannelNumsOnFD(channel, device_num)  // Get channel for specific fastdac (and device_num of that fastdac)
-	if (cmpstr(scf_getFDVisaAddress(device_num), getResourceAddress(S.instrID)) != 0)
+	if (cmpstr(scf_getFDVisaAddress(device_num), getResourceAddress(S.instrIDx)) != 0)
 		print("ERROR[scfd_updateWindow]: channel device address doesn't match instrID address")
 	else
-		scfw_updateFdacValStr(str2num(channel), getFDACOutput(S.instrID, str2num(device_channel)), update_oldValStr=1)
+		scfw_updateFdacValStr(str2num(channel), getFDACOutput(S.instrIDx, str2num(device_channel)), update_oldValStr=1)
 	endif
   endfor
 
   variable channel_num
   for(i=0;i<numADCs;i+=1)
     channel_num = str2num(stringfromlist(i,S.adclist,";"))
-    getfadcChannel(S.instrID,channel_num, len_avg=0.001)  // This updates the window when called
+    getfadcChannel(S.instrIDx,channel_num, len_avg=0.001)  // This updates the window when called
   endfor
 end
 

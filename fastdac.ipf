@@ -1756,7 +1756,7 @@ function/s fd_start_sweep(S, [AWG_list])
 		// OPERATION, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF STEPS
 		sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, starts, fins, S.numptsx
 	endif
-	writeInstr(S.instrID,cmd)
+	writeInstr(S.instrIDx,cmd)
 	return cmd
 end
 
@@ -1780,11 +1780,11 @@ function fd_readChunk(fdid, adc_channels, numpts)
 
 	Struct ScanVars S
 	S.numptsx = numpts
-	S.instrID = fdid
+	S.instrIDx = fdid
 	S.readVsTime = 1  					// No ramping
 	S.adcList = adc_channels  		// Recording specified channels, not ticked boxes in ScanController_Fastdac
 	S.numADCs = itemsInList(S.adcList)
-	S.samplingFreq = getFADCspeed(S.instrID)
+	S.samplingFreq = getFADCspeed(S.instrIDx)
 	S.raw_wave_names = wavenames  	// Override the waves the rawdata gets saved to
 	S.never_save = 1
 

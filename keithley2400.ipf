@@ -101,7 +101,7 @@ function rampK2400Voltage(instrID,output,[ramprate]) // Units: mV, mV/s
 	variable startpoint, sgn, step, new_output
 	variable sleeptime = 0.01 //s
 
-	if(paramisdefault(ramprate))
+	if(paramisdefault(ramprate) || ramprate == 0)
 		ramprate = 500  // mV/s
 	endif
 
