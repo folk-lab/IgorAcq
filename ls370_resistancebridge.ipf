@@ -1311,6 +1311,7 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 
 /////////////////////// END OF CONTROL MODES //////////////////////////////////////////		
 			
+
 		print 	"COMMAND: setLS370controlParameters(ls370) //sets defaults (can be adapted later to give more control)\r"
 		ans = test_lakeshore_ask_continue(ask)
 		if(ans == 1)
@@ -1322,6 +1323,7 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 		if(ans == 1)
 		   printf "RETURN: %s\r\r", getLS370controlParameters(ls370)
 		endif	
+
 /////////////////////// PID PARAMS //////////////////////////////////////////		
 //		print 	"COMMAND: setLS370tempSetpoint(ls370,100) //100mK\r"
 //		ans = test_lakeshore_ask_continue(ask)
@@ -1455,7 +1457,6 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 end
 
 
-
 function test_lakeshore_ask_continue(ask)
 	variable ask
 	
@@ -1471,3 +1472,4 @@ function test_lakeshore_ask_continue(ask)
 		return 1
 	endif
 end
+

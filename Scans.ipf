@@ -580,6 +580,7 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
   	else
   		dowindow /k SweepControl
 	endif
+
 end
 
 
@@ -714,13 +715,14 @@ function ScanMultiVarTemplate()
 end
 
 
+
 function StepTempScanSomething()
  svar ls370
+
 
 	make/o targettemps =  {300, 275, 250, 225, 200, 175, 150, 125, 100, 75, 50, 40, 30, 20}
 	make/o heaterranges = {10, 3.1, 3.1, 3.1, 3.1, 3.1, 3.1, 3.1, 3.1, 3.1, 1, 1, 1, 1}
 	setLS370exclusivereader(ls370,"mc") 
-
 	variable i=0
 	do
 		setLS370Temp(ls370,targettemps[i],maxcurrent = heaterranges[i])
@@ -728,6 +730,7 @@ function StepTempScanSomething()
 		WaitTillTempStable(ls370, targettemps[i], 5, 20, 0.10)
 		sc_sleep(60.0)
 		print "MEASURE AT: "+num2str(targettemps[i])+"mK"
+
 
 		//SCAN HERE
 
@@ -742,4 +745,5 @@ function StepTempScanSomething()
 
 	// 	SCAN HERE for base temp
 end
+
 
