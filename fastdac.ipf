@@ -59,92 +59,11 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 	return localRM
 end
 
-///////////////////////
-//// PID functions ////
-///////////////////////
-
-function startPID(instrID)
-	// Starts the PID algorithm on DAC and ADC channels 0
-	// make sure that the PID algorithm does not return any characters.
-	variable instrID
-	
-	string cmd=""
-	sprintf cmd, "START_PID"
-	writeInstr(instrID, cmd+"\r")
-end
-
-
-function stopPID(instrID)
-	// stops the PID algorithm on DAC and ADC channels 0
-	variable instrID
-	
-	string cmd=""
-	sprintf cmd, "STOP_PID"
-	writeInstr(instrID, cmd+"\r")
-end
-
-function setPIDTune(instrID, kp, ki, kd)
-	// sets the PID tuning parameters
-	variable instrID, kp, ki, kd
-	
-	string cmd=""
-	// specify to print 9 digits after the decimal place
-	sprintf cmd, "SET_PID_TUNE,%.9f,%.9f,%.9f",kp,ki,kd
-
-	writeInstr(instrID, cmd+"\r")
-end
-
-function setPIDSetp(instrID, setp)
-	// sets the PID set point, in mV
-	variable instrID, setp
-	
-	string cmd=""
-	sprintf cmd, "SET_PID_SETP,%f",setp
-
-   	writeInstr(instrID, cmd+"\r")
-end
-
-
-function setPIDLims(instrID, lower,upper) //mV, mV
-	// sets the limits of the controller output, in mV 
-	variable instrID, lower, upper
-	
-	string cmd=""
-	sprintf cmd, "SET_PID_LIMS,%f,%f",lower,upper
-
-   	writeInstr(instrID, cmd+"\r")
-end
-
-function setPIDDir(instrID, direct) // 0 is reverse, 1 is forward
-	// sets the direction of PID control
-	// The default direction is forward 
-	// The process variable of a reverse process decreases with increasing controller output 
-	// The process variable of a direct process increases with increasing controller output 
-	variable instrID, direct 
-	
-	string cmd=""
-	sprintf cmd, "SET_PID_DIR,%d",direct
-   	writeInstr(instrID, cmd+"\r")
-end
-
-function setPIDSlew(instrID, [slew]) // maximum slewrate in mV per second
-	// the slew rate is proportional how fast the controller output is allowed to ramp
-	variable instrID, slew 
-	
-	if(paramisdefault(slew))
-		slew = 10000000.0
-	endif
-		
-	string cmd=""
-	sprintf cmd, "SET_PID_SLEW,%.9f",slew
-	print/D cmd
-   	writeInstr(instrID, cmd+"\r")
-end
-
 
 ///////////////////////
 //// Get functions ////
 ///////////////////////
+
 
 function getFADCmeasureFreq(instrID)
 	// Calculates measurement frequency as sampleFreq/numadc 
@@ -234,16 +153,16 @@ function getFADCvalue(fdid, channel, [len_avg])
 	
 	len_avg = paramisdefault(len_avg) ? 0.05 : len_avg
 
-	variable/g fd_val_mv = getFADCchannel(fdid, channel, len_avg=len_avg)  // Must be global so can use execute
-	variable/g fd_val_real
+	variable/g scfd_val_mv = getFADCchannel(fdid, channel, len_avg=len_avg)  // Must be global so can use execute
+	variable/g scfd_val_real
 	wave/t fadcvalstr
 	string func = fadcvalstr[channel][4]
 
-	string cmd = replaceString("ADC"+num2str(channel), func, "fd_val_mv")
-	sprintf cmd, "fd_val_real = %s", cmd
+	string cmd = replaceString("ADC"+num2str(channel), func, "scfd_val_mv")
+	sprintf cmd, "scfd_val_real = %s", cmd
 	execute/q/z cmd
 
-	return fd_val_real
+	return scfd_val_real
 end
 
 
@@ -548,6 +467,93 @@ function RampMultipleFDAC(InstrID, channels, setpoint, [ramprate, ignore_lims])
 		rampOutputfdac(instrID, channel, setpoint, channel_ramp, ignore_lims=ignore_lims)  
 	endfor
 end
+
+
+
+
+
+///////////////////////
+//// PID functions ////
+///////////////////////
+
+function startPID(instrID)
+	// Starts the PID algorithm on DAC and ADC channels 0
+	// make sure that the PID algorithm does not return any characters.
+	variable instrID
+	
+	string cmd=""
+	sprintf cmd, "START_PID"
+	writeInstr(instrID, cmd+"\r")
+end
+
+
+function stopPID(instrID)
+	// stops the PID algorithm on DAC and ADC channels 0
+	variable instrID
+	
+	string cmd=""
+	sprintf cmd, "STOP_PID"
+	writeInstr(instrID, cmd+"\r")
+end
+
+function setPIDTune(instrID, kp, ki, kd)
+	// sets the PID tuning parameters
+	variable instrID, kp, ki, kd
+	
+	string cmd=""
+	// specify to print 9 digits after the decimal place
+	sprintf cmd, "SET_PID_TUNE,%.9f,%.9f,%.9f",kp,ki,kd
+
+	writeInstr(instrID, cmd+"\r")
+end
+
+function setPIDSetp(instrID, setp)
+	// sets the PID set point, in mV
+	variable instrID, setp
+	
+	string cmd=""
+	sprintf cmd, "SET_PID_SETP,%f",setp
+
+   	writeInstr(instrID, cmd+"\r")
+end
+
+
+function setPIDLims(instrID, lower,upper) //mV, mV
+	// sets the limits of the controller output, in mV 
+	variable instrID, lower, upper
+	
+	string cmd=""
+	sprintf cmd, "SET_PID_LIMS,%f,%f",lower,upper
+
+   	writeInstr(instrID, cmd+"\r")
+end
+
+function setPIDDir(instrID, direct) // 0 is reverse, 1 is forward
+	// sets the direction of PID control
+	// The default direction is forward 
+	// The process variable of a reverse process decreases with increasing controller output 
+	// The process variable of a direct process increases with increasing controller output 
+	variable instrID, direct 
+	
+	string cmd=""
+	sprintf cmd, "SET_PID_DIR,%d",direct
+   	writeInstr(instrID, cmd+"\r")
+end
+
+function setPIDSlew(instrID, [slew]) // maximum slewrate in mV per second
+	// the slew rate is proportional how fast the controller output is allowed to ramp
+	variable instrID, slew 
+	
+	if(paramisdefault(slew))
+		slew = 10000000.0
+	endif
+		
+	string cmd=""
+	sprintf cmd, "SET_PID_SLEW,%.9f",slew
+	print/D cmd
+   	writeInstr(instrID, cmd+"\r")
+end
+
 
 
 /////////////////////////////////////////////////////////////////////////////////////
