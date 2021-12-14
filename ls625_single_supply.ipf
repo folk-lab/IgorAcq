@@ -172,7 +172,7 @@ function setLS625current(instrID,output) // Units: A
 	nvar apt = $("amps_per_tesla_"+ls625_lookupVarName(instrID))
 	
 	// check for NAN and INF
-	if(sc_check_naninf(output) != 0)
+	if(numtype(output) != 0)
 		abort "trying to set output to NaN or Inf"
 	endif
 
@@ -209,7 +209,7 @@ function setLS625fieldWait(instrID,output)
 	setLS625field(instrID,output)
 	variable start_time = stopmsTimer(-2)
 	do
-		asleep(2.1)
+		asleep(0.05)// changed to 0s from 2.1S
 	while(getLS625rampStatus(instrID) && (stopmstimer(-2)-start_time) < 3600e6)  //Max wait for an hour
 end
 
@@ -221,7 +221,7 @@ function setLS625rate(instrID,output) // Units: mT/min
 	string cmd
 	
 	// check for NAN and INF
-	if(sc_check_naninf(output) != 0)
+	if(numtype(output) != 0)
 		abort "trying to set ramp rate to NaN or Inf"
 	endif
 

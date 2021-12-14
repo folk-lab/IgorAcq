@@ -48,7 +48,7 @@ function setK2400Current(instrID,curr) //Units: nA
 	string cmd
 	
 	// check for NAN and INF
-	if(sc_check_naninf(curr) != 0)
+	if(numtype(curr) != 0)
 		abort "trying to set current to NaN or Inf"
 	endif
 
@@ -61,7 +61,7 @@ function setK2400Voltage(instrID,volt) // Units: mV
 	string cmd
 	
 	// check for NAN and INF
-	if(sc_check_naninf(volt) != 0)
+	if(numtype(volt) != 0)
 		abort "trying to set voltage to NaN or Inf"
 	endif
 	
@@ -76,8 +76,10 @@ end
 threadsafe function getK2400current(instrID) // Units: nA
 	variable instrID
 	string response
+	//response = queryInstr(instrID,":sens:func \"curr\";:form:elem curr\n",read_term="\n")
+	writeInstr(instrID,":sens:func \"curr\";:form:elem curr\n")
 
-	response = queryInstr(instrID,":sens:func \"curr\";:form:elem curr\n",read_term="\n")
+	response = queryInstr(instrID,"READ?",read_term="\n")
 	return str2num(response)*1e9
 end
 
@@ -161,7 +163,7 @@ function setK2400compl(instrID, voltcurr, compl) // Pass "volt" or "curr", the v
 	string cmd
 	
 	// check for NaN and INF
-	if(sc_check_naninf(compl) != 0)
+	if(numtype(compl) != 0)
 		abort "trying to set compl to NaN or Inf"
 	endif
 
@@ -187,7 +189,7 @@ function setK2400range(instrID,voltcurr,range)
 	string cmd
 	
 	// check for NAN and INF
-	if(sc_check_naninf(range) != 0)
+	if(numtype(range) != 0)
 		abort "trying to set range to NaN or Inf"
 	endif
 

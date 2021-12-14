@@ -629,7 +629,7 @@ function setOutputBD(instrID, channel, output, [ignore_lims]) // in mV
 	board_index = floor(channel/4)
 
 	// check for NAN and INF
-	if(sc_check_naninf(output) != 0)
+	if(numtype(output) != 0)
 		abort "trying to set voltage to NaN or Inf"
 	endif
 
@@ -677,6 +677,8 @@ function setOutputBD(instrID, channel, output, [ignore_lims]) // in mV
 	writeBytesBD(instrID, bd_cmd_wave)
 
 	wave response_wave = readBytesBD(instrID, 7)
+	
+//	print(response_wave[0])  // DEBUGGING (X=any number. 19X seems to mean the message was transmitted successfully but not used 6X means it worked)
 
 	// Update stored values
 	dacvalstr[channel][1] = num2str(output)
@@ -707,7 +709,7 @@ function RampOutputBD(instrID, channel, output, [ramprate, update, ignore_lims])
 		sleeptime = 0.0024 // can ramp finely if there's no updating!
 	endif
 
-	if(paramisdefault(ramprate))
+	if(paramisdefault(ramprate) || numtype(ramprate) != 0 || ramprate == 0)
 		nvar bd_ramprate
 		ramprate = bd_ramprate
 	else
@@ -802,9 +804,10 @@ function rampMultipleBD(instrID, channels, setpoint, [ramprate, update, ignore_l
 	wave /t customdacvalstr
 	nvar bd_num_custom
 
-	channels = bd_get_channel_str(channels)  // Converts label names to Dac channels
+	channels = scu_getChannelNumbers(channels)  // Converts label names to Dac channels
 
-	if(paramisdefault(ramprate))
+
+	if(paramisdefault(ramprate) || ramprate == 0)
 		nvar bd_ramprate
 		ramprate = bd_ramprate    // (mV/s)
 	endif
@@ -948,9 +951,6 @@ end
 //////////////////////////////////
 ///// Load BabyDACs from HDF /////
 //////////////////////////////////
-//function bdSaveToHDF()
-//
-//end
 
 
 function bdLoadFromHDF(datnum, [no_check])
@@ -1089,7 +1089,7 @@ EndMacro
 
 
 ////////////////////////
-///// ACD readings /////
+///// ADC readings /////
 ////////////////////////
 
 threadsafe function bdReading2Voltage(byte1, byte2, byte3)

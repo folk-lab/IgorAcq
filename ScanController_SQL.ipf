@@ -324,7 +324,7 @@ function sc_openSQLConnection(s)
 	if(error != SQL_SUCCESS)
 		SQLFreeHandle(SQL_HANDLE_DBC, connRefNum)
 		SQLFreeHandle(SQL_HANDLE_ENV, envRefNum)
-		print "[ERROR] \"sc_openSQLConnection\": Unable to connected to database."
+		print "[ERROR] \"sc_openSQLConnection\": Unable to connect to database."
 		abort
 	endif
 
@@ -639,7 +639,6 @@ function sc_closeSQLConnection(s)
 end
 
 function/s sc_readSQLConnectionParameters()
-	// pass "ls" for lksh370 database and "bf" for bluefors database
 	// reads SQL setup parameters from SQLParameters.txt file on "config" path.
 
 	string jstr = readtxtfile("SQLConfig.txt","setup")
@@ -787,7 +786,7 @@ function timestamp2secs(timestamp)
 		abort
 	endif
 
-	sprintf fraction, "0.%d", fraction
+	sprintf fraction, "0.%s", fraction
 	variable fracSecs = str2num(fraction)
 
 	return date2secs(str2num(year),str2num(month),str2num(day)) + 3600*str2num(hours) + 60*str2num(minutes) + str2num(seconds) + fracSecs

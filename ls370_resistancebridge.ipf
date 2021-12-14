@@ -6,16 +6,10 @@
 // Call SetSystem() before anything else. Current supported systems are: BFsmall, BFbig
 // Communicates with server over http.
 // Procedure written by Christian Olsen 2018-03-xx
-// Modified to new API by Tim Child 2020-06-xx
-
-// Todo:
-// GetTempDB()
-// GetHeaterPowerDB()
-// GetPressureDB()
-// QueryDB()
+// Almost entirely rewritten for new API by Tim Child 2020-06-xx
 
 ///////////////////////////
-/// LS37X specific COMM ///
+/// LS37X specific COM ///
 ///////////////////////////
 
 function openLS370connection(instrID, http_address, system, [verbose])
@@ -57,16 +51,16 @@ function setLS370system(system)
 		case "bfsmall":
 			ls_system = "bfsmall"
 			ls_label = "LD"				//plate					//labels	  									//IDs
-			string/g bfchannellookup = "mc;still;magnet;4K;50K;ld_mc;ld_still;ld_magnet;ld_4K;ld_50K;6;5;4;2;1"  //TODO: Check with LD API
-			string/g bfheaterlookup = "mc;still;sc_mc;ld_still_heater"						//sc_mc only used internally, still label refers to API //TODO: Check with LD API
-			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,350,1201,1800,10000}}
+			string/g bfchannellookup = "mc;still;magnet;4K;50K;ld_mc;ld_still;ld_magnet;ld_4K;ld_50K;6;5;4;2;1"  
+			string/g bfheaterlookup = "mc;still;sc_mc;ld_still_heater"						//sc_mc only used internally, still label refers to API 
+			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,290,1201,1800,10000}}
 			break
 		case "bfbig":
 			ls_system = "bfbig"
 			ls_label = "XLD"					//plate				//labels	  			//IDs
-			string/g bfchannellookup = "mc;still;magnet;4K;50K;ch6;ch5;ch4;ch2;ch1;6;5;4;2;1"  //TODO: Check with XLD API
-			string/g bfheaterlookup = "mc;still;sc_mc;ao2"							 		//sc_mc only used internally, still label refers to API 	//TODO: Check with XLD API
-			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,350,1201,1800,10000}} // TODO: What does this do?
+			string/g bfchannellookup = "mc;still;magnet;4K;50K;ch6;ch5;ch3;ch2;ch1;6;5;3;2;1"  
+			string/g bfheaterlookup = "mc;still;sc_mc;ao2"							 		//sc_mc only used internally, still label refers to API 	
+			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,290,1201,1800,10000}} 
 			break
 		default:
 			abort "[ERROR] Please choose a supported LS370 system: [bfsmall, bfbig]"
@@ -365,63 +359,6 @@ end
 
 
 
-//// Get Functions - Directly from data base ////
-
-//function getLS370tempDB(instrID,plate, [max_age]) // Units: mK
-//	// returns the temperature of the selected "plate".
-//	// avaliable plates on BF systems: mc (mixing chamber), still, magnet, 4K, 50K
-//	// data is queried directly from the SQL database
-//	string instrID, plate
-//	variable max_age
-//	svar ls_system
-//	
-//	max_age = paramisdefault(max_age) ? 60 : max_age
-//	
-//	svar bfchannellookup
-//	string channel
-//	variable ch_id
-//	variable channel_idx
-//	
-//	strswitch(ls_system)
-//		case "bfsmall":
-//		case "bfbig":
-//			channel_idx = whichlistitem(plate,bfchannellookup,";", 0, 0)
-//			if(channel_idx < 0)
-//				printf "The requested plate (%s) doesn't exsist!", plate
-//				return -1
-//			else
-//				channel = stringfromlist(channel_idx+5,bfchannellookup,";")
-//				ch_id = str2num(stringfromlist(channel_idx+10,bfchannellookup,";"))  // TODO: Remove requirement for the actual ch_id and be able to use the label instead
-//			endif
-//			break
-//		default:
-//			abort "ls_system not implemented"
-//	endswitch
-//	
-//	nvar sqr = sql_response_code  // 0=success, 1=no_data, 2=other warning, -1=error
-//	variable t = datetime-max_age
-//	string timestamp = SQL_format_time(t)
-//	
-//	
-//	string command = ""
-//	sprintf command, "SELECT DISTINCT ON (ch_idx) ch_idx, time, t FROM qdot.lksh370.channel_data WHERE time > TIMESTAMP %s ORDER BY ch_idx, time DESC;", timestamp
-//	string wavenames = "sql_ls370_channels,sql_ls370_timestamp,sql_ls370_temperature"
-//	requestSQLData(command,wavenames=wavenames, verbose=1) // TODO: change verbose to 0
-//	if (sqr == 1) // no rows of data
-//		return -1
-//	else
-//		wave temp_wave = sql_ls370_temperature
-//		wave ch_wave = sql_ls370_channels
-//		wave t_wave = sql_ls370_timestamp
-//		print ch_wave
-//		print t
-//		print temp_wave
-//		return temp_wave(ch_id)  // return temp of channel // TODO: access this by label instead of ch_ID
-//	endif
-//end
-
-
-
 
 
 
@@ -450,6 +387,8 @@ end
 
 //set-analog-output-parameters
 function setLS370analogOutputParameters(instrID, [channel])
+	// Set analog output parameters
+	// Note: currently very limited because I don't know that we actually change any of these things. You'll have to implement it if you want it
 	string instrID, channel
 	
 	string api_channel, command, payload
@@ -471,8 +410,6 @@ function setLS370analogOutputParameters(instrID, [channel])
 		api_channel = stringfromlist(channel_idx+2,bfheaterlookup,";")
 	endif
 	
-	// TODO: What is useful to change here, do we have a default fixed state we want for analog outputs?
-//	abort "[setLS370AnalogOutputParameters]:If you really want to use this function, you need to figure out what parameters you want to be able to set below!"
 	variable high_value = 0, low_value = 0, manual_value = 0
 	string mode = "aom_manual"  // aom_undefined, aom_off, aom_channel, aom_manual, aom_zone, aom_still
 	variable monitored_channel = 0
@@ -503,6 +440,9 @@ function setLS370loggersSchedule(instrID, schedule)
 		case "default":
 			payload = LS370getLoggingScheduleFromConfig("default")
 			break
+		case "default_nomag":
+			payload = LS370getLoggingScheduleFromConfig("default_nomag")
+			break
 		case "mc_exclusive":
 			payload = LS370getLoggingScheduleFromConfig("mc_exclusive")
 			break
@@ -514,6 +454,9 @@ function setLS370loggersSchedule(instrID, schedule)
 			break
 		case "fast":
 			payload = LS370getLoggingScheduleFromConfig("fast")
+			break
+		case "slow":
+			payload = LS370getLoggingScheduleFromConfig("slow")
 			break
 		default:
 			abort "Not a valid option"
@@ -540,7 +483,7 @@ function setLS370heaterpower(instrID,heater,output) //Units: mW
 	svar ls_label
 
 	// check for NAN and INF
-	if(sc_check_naninf(output) != 0)
+	if(numtype(output) != 0)
 		abort "trying to set power to NaN or Inf"
 	endif
 
@@ -647,7 +590,7 @@ function setLS370tempSetpoint(instrID,temp) // Units: mK
 	nvar temp_set
 
 	// check for NAN and INF
-	if(sc_check_naninf(temp) != 0)
+	if(numtype(temp) != 0)
 		abort "trying to set temperarture to NaN or Inf"
 	endif
 	
@@ -669,7 +612,7 @@ function setLS370PIDparameters(instrID,p,i,d) // Units: No units
 	svar ls_label
 
 	// check for NAN and INF
-	if(sc_check_naninf(p) != 0 || sc_check_naninf(i) != 0 || sc_check_naninf(d) != 0)
+	if(numtype(p) != 0 || numtype(i) != 0 || numtype(d) != 0)
 		abort "trying to set PID parameters to NaN or Inf"
 	endif
 
@@ -718,7 +661,7 @@ function setLS370temp(instrID,setpoint,[maxcurrent]) //Units: mK, mA
 	endif
 
 	// check for NAN and INF
-	if(sc_check_naninf(setpoint) != 0)
+	if(numtype(setpoint) != 0)
 		abort "trying to set setpoint to NaN or Inf"
 	endif
 	
@@ -763,47 +706,6 @@ function resetLS370exclusivereader(instrID)
 end
 
 
-// TODO: Do we want this?
-function toggleLS370magnetheater(instrID,onoff)
-	// toggles the state of the magnet heater on BF #1.
-	// it sets ANALOG 1 to -50% (-5V) in the "on" state
-	// and 0% (0V) in the off state.
-	// ANALOG 1 controls a voltage controlled switch!
-	string instrID
-	string onoff
-	variable output
-	nvar magnetheater_led
-	svar ls_system
-	string command,payload,cmd
-	svar ls_label
-
-	abort "Not updated to new API"
-	if(cmpstr(ls_system,"bfsmall") != 0)
-		abort "No heater installed on this system!"
-	endif
-
-	strswitch(onoff)
-		case "on":
-			output = -50.000
-			magnetheater_led = 1
-			break
-		case "off":
-			output = 0.000
-			magnetheater_led = 0
-			break
-		default:
-			// default is "off"
-			print "Setting to \"off\""
-			output = 0.000
-			magnetheater_led = 0
-			break
-	endswitch
-	
-	sprintf cmd, "ANALOG 1,1,2,1,1,100.0,0.0,%g", output
-	sprintf payload, "{\"command\":%s}", cmd
-	sprintf command, "command?ctrl_label=%s", ls_label
-	sendLS370(instrID,command,"post", payload=payload)
-end
 
 ////////////////////
 //// Utillities ////
@@ -1005,15 +907,19 @@ function/s getLS370Status(instrID)
 	string instrID
 
 	svar ls_system
-	string channelLabel="", stillLabel="", ch_idx=""
+	string channelLabel="", stillLabel="", ch_idx="", file_name = ""
 	if(cmpstr(ls_system,"bfsmall") == 0)
 		channelLabel = "ld_mc,ld_50K,ld_4K,ld_magnet,ld_still"
 		stillLabel = "ld_still_heater"
-		ch_idx = "6,1,2,4,5"
+//		ch_idx = "6,1,2,4,5"
+		ch_idx = "mc,50k,4k,magnet,still"
+		file_name = "LDLoggingSchedules.txt"
 	elseif(cmpstr(ls_system,"bfbig") == 0)
 		channelLabel = "xld_50K,xld_4K,xld_magnet,xld_still,xld_mc"
 		stillLabel = "xld_still_heater"
-		ch_idx = "1,2,3,5,6"
+//		ch_idx = "1,2,3,5,6"
+		ch_idx = "50k,4k,magnet,still,mc"
+		file_name = "XLDLoggingSchedules.txt"
 	else
 		print "[ERROR] \"getLSStatus\": pass the system id as instrID: \"ld\" or \"xld\"."
 	endif
@@ -1029,9 +935,8 @@ function/s getLS370Status(instrID)
 	string mc_heater_schema = getJSONvalue(jstr,"mc_heater_schema")
 	string still_heater_schema = getJSONvalue(jstr,"still_heater_schema")
 
-	// Load "LakeshoreConfig.txt" in setup folder.
 	svar ls_label
-	string file_name = "LakeshoreConfig.txt"
+
 	jstr = readtxtfile(file_name,"setup")
 	if(cmpstr(jstr,"")==0)
 		abort file_name + " not found!"
@@ -1045,14 +950,15 @@ function/s getLS370Status(instrID)
 	string searchStr="", statement="", timestamp="", temp="", tempBuffer="", channel_label
 	variable i=0
 	for(i=0;i<itemsinlist(channelLabel,",");i+=1)
-		sprintf searchStr, "loggingschedules:default:channels:ch%s:max", stringfromlist(i,ch_idx,",")
+		sprintf searchStr, "default:channels:%s:max", stringfromlist(i,channelLabel,",")
 		
 		timestamp = sc_SQLtimestamp(str2num(getJSONvalue(jstr,searchStr)))		
 //		timestamp = sc_SQLtimestamp(3600) // Temporarily allow any old measurement of temp
+//		timestamp = sc_SQLtimestamp(1) // Temporarily always request new
 		
 		sprintf statement, "SELECT temperature_k FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, temp_schema, stringfromlist(i,channelLabel,","), timestamp
 		temp = requestSQLValue(statement)
-		
+
 		if(cmpstr(temp,"") == 0)
 			temp = num2str(getLS370temp(instrID,stringfromlist(i,LSkeys,",")))
 		endif
@@ -1061,11 +967,10 @@ function/s getLS370Status(instrID)
 		tempBuffer = addJSONkeyval(tempBuffer, stringfromlist(i,JSONkeys,","), temp)
 	endfor
 
-	// end temperature part
 	tempBuffer = addJSONkeyval("","Temperature",tempBuffer)
+	// end temperature part
 
 	//// Heaters ////
-
 	// MC heater
 	string heatBuffer=""
 	timestamp = sc_SQLtimestamp(300)
@@ -1077,7 +982,7 @@ function/s getLS370Status(instrID)
 	heatBuffer = addJSONkeyval(heatBuffer,"Still Heater mW",requestSQLValue(statement))
 
 	string buffer = addJSONkeyval(tempBuffer,"Heaters",heatBuffer)
-
+	
 	return addJSONkeyval("","Lakeshore",buffer)
 end
 
@@ -1122,45 +1027,6 @@ function/s getBFStatus(instrID)
 	return addJSONkeyval("","BlueFors",buffer)
 end
 
-//function/s getLS370status(instrID, [max_age_s])
-//	// returns JSON string with current status
-//	string instrID
-//	variable max_age_s
-//	if(paramisdefault(max_age_s))
-//		max_age_s=300
-//	else
-//		//TODO: Implement max_age_s from SQL query
-//		print "max_age_s doesn't work and needs to be implemented differently (4th Feb 2020)"
-//	endif
-//
-//	svar ls_system, ighgaugelookup
-//	string  buffer="", gauge=""
-//	variable i=0
-//
-//	buffer = addJSONkeyval(buffer,"MC K",num2str(getLS370temp(instrID, "mc", max_age_s=max_age_s)))
-//	buffer = addJSONkeyval(buffer,"Still K",num2str(getLS370temp(instrID, "still", max_age_s=max_age_s)))
-//	buffer = addJSONkeyval(buffer,"4K Plate K",num2str(getLS370temp(instrID, "4K", max_age_s=max_age_s)))
-//	buffer = addJSONkeyval(buffer,"Magnet K",num2str(getLS370temp(instrID, "magnet", max_age_s=max_age_s)))
-//	buffer = addJSONkeyval(buffer,"50K Plate K",num2str(getLS370temp(instrID, "50K", max_age_s=max_age_s)))
-//	
-////	buffer = addJSONkeyval(buffer,"Still K","4")
-////	buffer = addJSONkeyval(buffer,"4K Plate K","4")
-////	buffer = addJSONkeyval(buffer,"Magnet K","4")
-////	buffer = addJSONkeyval(buffer,"50K Plate K","50")
-//	
-//	// TODO: add other variables like (temp setpoint, heater power etc)
-//
-//	strswitch(ls_system)
-//		case "bfsmall":
-//			return addJSONkeyval("","BF Small",buffer)
-//		case "bfbig":
-//			return addJSONkeyval("","BF big",buffer)
-//	endswitch
-//end
-
-
-
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////// TESTING MACRO //////////////////////////////////////////////
@@ -1179,122 +1045,122 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 	
 	if(gets == 1)
 //		print 	"COMMAND: getLS370analogData(ls370, channel=\"still\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370analogData(ls370, channel="still")
 //		endif
 //		
 //		print 	"COMMAND: getLS370analogParameters(ls370, channel=\"still\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370analogParameters(ls370, channel="still")
 //		endif
 //		
 //		print 	"COMMAND: getLS370temp(ls370, \"mc\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370temp(ls370, "mc")
 //		endif
 //		
 //		print 	"COMMAND: getLS370temp(ls370, \"still\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370temp(ls370, "still")
 //		endif		
 //		
 //		print 	"COMMAND: getLS370temp(ls370, \"4k\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370temp(ls370, "4k")
 //		endif		
 //		
 //		print 	"COMMAND: getLS370temp(ls370, \"magnet\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370temp(ls370, "magnet")
 //		endif
 //		
 //		print 	"COMMAND: getLS370temp(ls370, \"50k\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370temp(ls370, "50k")
 //		endif	
 //		
 //		print 	"COMMAND: getLS370controllerInfo(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370controllerInfo(ls370)
 //		endif	
 //		
 //		print 	"COMMAND: getLS370controllerInfo(ls370, all=1)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370controllerInfo(ls370, all=1)
 //		endif	
 //		
 //		print 	"COMMAND: getLS370loggersSchedule(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370loggersSchedule(ls370)
 //		endif	
 //		
 //		print 	"COMMAND: getLS370heaterpower(ls370 ,\"mc\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370heaterpower(ls370 ,"mc")
 //		endif	
 //		
 //		print 	"COMMAND: getLS370heaterpower(ls370 ,\"still\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370heaterpower(ls370 ,"still")
 //		endif	
 //		   
 //		// TODO: Is return in mA or A?
 //		print 	"COMMAND: getLS370heaterrange(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370heaterrange(ls370)
 //		endif	
 //		
 //		print 	"COMMAND: getLS370controlmode(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370controlmode(ls370)
 //		endif	
 //		   
 //		print 	"COMMAND: getLS370controlParameters(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370controlParameters(ls370)
 //		endif	
 //		   
 //		print 	"COMMAND: getLS370PIDtemp(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370PIDtemp(ls370)
 //		endif	
 //		   
 //		print 	"COMMAND: getLS370PIDparameters(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370PIDparameters(ls370)
 //		endif	
 //		   
 ////////		print 	"COMMAND: \r"
-////////		ans = ask_continue(ask)
+////////		ans = test_lakeshore_ask_continue(ask)
 ////////		if(ans == 1)
 ////////			printf "RETURN: %f\r\r", getLS370tempDB(ls370,plate, [max_age])
 ////////		endif			
 //		
 //		print 	"COMMAND: getLS370status(ls370, max_age_s=0)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370status(ls370, max_age_s=0)
 //		endif	
 //		
 ////////		print 	"COMMAND: getLS370status(ls370, max_age_s=3000)\r"
-////////		ans = ask_continue(ask)
+////////		ans = test_lakeshore_ask_continue(ask)
 ////////		if(ans == 1)
 ////////		   printf "RETURN: %s\r\r", getLS370status(ls370, max_age_s=3000)
 ////////		endif	
@@ -1302,62 +1168,62 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 	
 	if(sets == 1)
 //		print 	"COMMAND: setLS370analogOutputParameters(ls370, channel=\"still\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370analogOutputParameters(ls370, channel="still")
 //		endif
 //
 //		print 	"COMMAND: getLS370analogParameters(ls370, channel=\"still\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370analogParameters(ls370, channel="still")
 //		endif
 ////////			
 /////////////////////// LOGGING SCHEDULES ////////////////////////////////////////////////
 //		print 	"COMMAND: setLS370loggersSchedule(ls370, \"default\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370loggersSchedule(ls370, "default")
 //		endif	
 //		
 //		print 	"COMMAND: getLS370loggersSchedule(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370loggersSchedule(ls370)
 //		endif	
 //		
 //		print 	"COMMAND: setLS370loggersSchedule(ls370, \"mc_exclusive\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370loggersSchedule(ls370, "mc_exclusive")
 //		endif	
 //		
 //		print 	"COMMAND: getLS370loggersSchedule(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370loggersSchedule(ls370)
 //		endif	
 //			
 //		print 	"COMMAND: setLS370loggersSchedule(ls370, \"still_exclusive\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370loggersSchedule(ls370, "still_exclusive")
 //		endif	
 //		
 //		print 	"COMMAND: getLS370loggersSchedule(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370loggersSchedule(ls370)
 //		endif		
 //		
 //		print 	"COMMAND: setLS370loggersSchedule(ls370, \"using_magnet\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370loggersSchedule(ls370, "using_magnet")
 //		endif	
 //		
 //		print 	"COMMAND: getLS370loggersSchedule(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370loggersSchedule(ls370)
 //		endif	
@@ -1366,25 +1232,25 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 
 /////////////////////// HEATER POWERS //////////////////////////////////////////
 //		print 	"COMMAND: setLS370heaterpower(ls370,\"mc\",1)  //1mW heat\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370heaterpower(ls370,"mc",1)  //1mW heat
 //		endif	
 //	
 //		print 	"COMMAND: getLS370heaterpower(ls370 ,\"mc\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370heaterpower(ls370 ,"mc")
 //		endif	
 //	
 //		print 	"COMMAND: setLS370heaterpower(ls370,\"still\",1)  //1mW heat\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370heaterpower(ls370,"still",1)  //1mW heat
 //		endif	
 //			
 //		print 	"COMMAND: getLS370heaterpower(ls370 ,\"still\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370heaterpower(ls370 ,"still")
 //		endif	
@@ -1393,13 +1259,13 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 
 /////////////////////// HEATER RANGES //////////////////////////////////////////
 //		print 	"COMMAND: setLS370heaterRange(ls370, 5)  //5mA max\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370heaterRange(ls370, 5)  //5mA max
 //		endif	
 //		
 //		print 	"COMMAND: getLS370heaterrange(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370heaterrange(ls370)
 //		endif	
@@ -1408,77 +1274,77 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 
 /////////////////////// CONTROL MODES //////////////////////////////////////////		
 //		print 	"COMMAND: setLS370controlMode(ls370, 1)  //PID\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370controlMode(ls370, 1)  //PID
 //		endif	
 //
 //		print 	"COMMAND: getLS370controlmode(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370controlmode(ls370)
 //		endif	
 //		
 //		print 	"COMMAND: setLS370controlMode(ls370, 3)  //PID\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370controlMode(ls370, 3)  //PID
 //		endif	
 //
 //		print 	"COMMAND: getLS370controlmode(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370controlmode(ls370)
 //		endif	
 //			
 //		print 	"COMMAND: setLS370controlMode(ls370, 4)  //off\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370controlMode(ls370, 4)  //off
 //		endif	
 //		
 //		print 	"COMMAND: getLS370controlmode(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370controlmode(ls370)
 //		endif	
 
 /////////////////////// END OF CONTROL MODES //////////////////////////////////////////		
 			
-//		print 	"COMMAND: setLS370controlParameters(ls370) //sets defaults (can be adapted later to give more control)\r"
-//		ans = ask_continue(ask)
-//		if(ans == 1)
-//			setLS370controlParameters(ls370) //sets defaults (can be adapted later to give more control)
-//		endif	
-//		
-//		print 	"COMMAND: getLS370controlParameters(ls370)\r"
-//		ans = ask_continue(ask)
-//		if(ans == 1)
-//		   printf "RETURN: %s\r\r", getLS370controlParameters(ls370)
-//		endif	
-//		
+
+		print 	"COMMAND: setLS370controlParameters(ls370) //sets defaults (can be adapted later to give more control)\r"
+		ans = test_lakeshore_ask_continue(ask)
+		if(ans == 1)
+			setLS370controlParameters(ls370) //sets defaults (can be adapted later to give more control)
+		endif	
 		
+		print 	"COMMAND: getLS370controlParameters(ls370)\r"
+		ans = test_lakeshore_ask_continue(ask)
+		if(ans == 1)
+		   printf "RETURN: %s\r\r", getLS370controlParameters(ls370)
+		endif	
+
 /////////////////////// PID PARAMS //////////////////////////////////////////		
 //		print 	"COMMAND: setLS370tempSetpoint(ls370,100) //100mK\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370tempSetpoint(ls370,100) //100mK
 //		endif	
 //		
 //		print 	"COMMAND: getLS370PIDtemp(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370PIDtemp(ls370)
 //		endif	
 //
 //		print 	"COMMAND: setLS370PIDparameters(ls370,10,5,0)  // p,i,d: 10, 5, 0\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370PIDparameters(ls370,10,5,0)  // p,i,d: 10, 5, 0
 //		endif	
 //
 //		print 	"COMMAND: getLS370PIDparameters(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370PIDparameters(ls370)
 //		endif	
@@ -1487,7 +1353,7 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 /////////////////////// END OF PID PARAMS //////////////////////////////////////////		
 ////////			
 //		print 	"COMMAND: setLS370heaterOff(ls370)	// mc off\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370heaterOff(ls370)	// mc off
 //		endif	
@@ -1498,25 +1364,25 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 
 ////////			
 //		print 	"COMMAND: setLS370temp(ls370,100,maxcurrent=3.1)  //100mK max 3.1mA\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370temp(ls370,100,maxcurrent=3.1)  //100mK max 3.1mA
 //		endif	
 //
 //		print 	"COMMAND: getLS370heaterrange(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370heaterrange(ls370)
 //		endif	
 //			
 //		print 	"COMMAND: setLS370temp(ls370,200)  //100mK max current set automatically (should be 3.1 or 10)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370temp(ls370,200)  //100mK max current set automatically (should be 3.1 or 10)
 //		endif	
 //
 //		print 	"COMMAND: getLS370heaterrange(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %f\r\r", getLS370heaterrange(ls370)
 //		endif	
@@ -1526,37 +1392,37 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 
 /////////////////////// EXCLUSIVE READERS //////////////////////////////////////////		
 //		print 	"COMMAND: setLS370exclusivereader(ls370,\"mc\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370exclusivereader(ls370,"mc")
 //		endif	
 //
 //		print 	"COMMAND: getLS370loggersSchedule(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370loggersSchedule(ls370)
 //		endif	
 //		
 //		print 	"COMMAND: setLS370exclusivereader(ls370,\"still\")\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			setLS370exclusivereader(ls370,"still")
 //		endif	
 //			
 //		print 	"COMMAND: getLS370loggersSchedule(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370loggersSchedule(ls370)
 //		endif	
 //			
 //		print 	"COMMAND: resetLS370exclusivereader(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //			resetLS370exclusivereader(ls370)
 //		endif	
 //
 //		print 	"COMMAND: getLS370loggersSchedule(ls370)\r"
-//		ans = ask_continue(ask)
+//		ans = test_lakeshore_ask_continue(ask)
 //		if(ans == 1)
 //		   printf "RETURN: %s\r\r", getLS370loggersSchedule(ls370)
 //		endif	
@@ -1590,17 +1456,20 @@ function test_lakeshore(ls370, [gets, sets, set_defaults, ask])
 	
 end
 
-//function ask_continue(ask)
-//	variable ask
-//	
-//	variable ans
-//	if(ask ==1)
-//		ans = ask_user("Send command?", type=2)
-//		if (ans == 3)
-//			abort
-//		endif
-//		return ans
-//	else
-//		return 1
-//	endif
-//end
+
+function test_lakeshore_ask_continue(ask)
+	variable ask
+	
+	variable ans
+	if(ask ==1)
+//		abort "WARNING: ask user has failed"
+		ans = ask_user("Send command?", type=2)
+		if (ans == 3)
+			abort
+		endif
+		return ans
+	else
+		return 1
+	endif
+end
+

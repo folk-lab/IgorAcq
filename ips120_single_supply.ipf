@@ -179,7 +179,7 @@ function setIPS120current(instrID, amps) // in A
 	nvar apt = $("amps_per_tesla_"+ips120_lookupVarName(instrID))
 
 	// check for NAN and INF
-	if(sc_check_naninf(amps) != 0)
+	if(numtype(amps) != 0)
 		abort "trying to set output to NaN or Inf"
 	endif
 
@@ -199,7 +199,7 @@ function setIPS120field(instrID, field) // in mT
 	variable amps
 
 	// check for NAN and INF
-	if(sc_check_naninf(field) != 0)
+	if(numtype(field) != 0)
 		abort "trying to set output to NaN or Inf"
 	endif
 
@@ -221,7 +221,7 @@ function setIPS120rate(instrID, ramprate) // mT/min
 	variable ramprate_amps
 
 	// check for NAN and INF
-	if(sc_check_naninf(ramprate) != 0)
+	if(numtype(ramprate) != 0)
 		abort "trying to set ramp rate to NaN or Inf"
 	endif
 

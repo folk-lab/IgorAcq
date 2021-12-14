@@ -6,7 +6,7 @@
 // Still a test driver, use InitSRS.
 // Units: mV, nA or Hz
 // Written by Christian/Nik, 2018-05-01
-// Modified by Tim Child, 2020-03
+// Modified by Tim Child to add more set/get commands, 2020-03
 
 /////////////////////////
 /// SRS specific COMM ///
@@ -198,7 +198,7 @@ threadsafe function SetSRSHarmonic(instrID,harm) // Units: AU
 	variable instrID,harm
 	
 	// check for NAN and INF
-	if(sc_check_naninf(harm) != 0)
+	if(numtype(harm) != 0)
 		print "trying to set harmonic to NaN or Inf"
 		return 0
 	endif
@@ -212,7 +212,7 @@ function SetSRSTimeConst(instrID,timeConst) // Units: s
 	make/o srs_tc_lookup = {0.00001,0.00003,0.0001,0.0003,0.001,0.003,0.01,0.03,0.1,0.3,1,3,10,30,100,300,1000,3000,10000,30000}
 	
 	// check for NAN and INF
-	if(sc_check_naninf(timeconst) != 0)
+	if(numtype(timeconst) != 0)
 		abort "trying to set time constant to NaN or Inf"
 	endif
 	
@@ -235,7 +235,7 @@ function SetSRSPhase(instrID,phase) // Units: deg
 	variable instrID, phase
 	
 	// check for NAN and INF
-	if(sc_check_naninf(phase) != 0)
+	if(numtype(phase) != 0)
 		abort "trying to set phase to NaN or Inf"
 	endif
 	
@@ -259,7 +259,7 @@ function SetSRSreadout(instrID, readout, [ch, ratio]) //e.g. for Ch1: readout 0 
 		disp = 1
 	endif
 	// check for NAN and INF
-	if(sc_check_naninf(ch) != 0 || sc_check_naninf(readout) != 0 || sc_check_naninf(ratio) != 0)
+	if(numtype(ch) != 0 || numtype(readout) != 0 || numtype(ratio) != 0)
 		abort "trying to set ch/readout/ratio to NaN or Inf"
 	endif
 	string buffer = ""
@@ -273,7 +273,7 @@ function SetSRSAmplitude(instrID,amplitude) // Units: mV
 	variable instrID, amplitude
 	
 	// check for NAN and INF
-	if(sc_check_naninf(amplitude) != 0)
+	if(numtype(amplitude) != 0)
 		abort "trying to set amplitude to NaN or Inf"
 	endif
 	
@@ -289,7 +289,7 @@ function SetSRSFrequency(instrID,frequency)
 	variable instrID, frequency
 	
 	// check for NAN and INF
-	if(sc_check_naninf(frequency) != 0)
+	if(numtype(frequency) != 0)
 		abort "trying to set frequency to NaN or Inf"
 	endif
 	
@@ -301,7 +301,7 @@ function SetSRSSensitivity(instrID,sens) // Units: mV or nA
 	make/o lookuptable={0.000002,0.000005,0.00001,0.00002,0.00005,0.0001,0.0002,0.0005,0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.2,0.5,1,2,5,10,20,50,100,200,500,1000}
 	
 	// check for NAN and INF
-	if(sc_check_naninf(sens) != 0)
+	if(numtype(sens) != 0)
 		abort "trying to set sensitivity to NaN or Inf"
 	endif
 	
