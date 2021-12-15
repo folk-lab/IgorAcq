@@ -907,9 +907,9 @@ function ScanBabyDACK24002D(bdID, startx, finx, channelsx, numptsx, delayx, ramp
 end
 
 
-function ScanBabyDACMultipleK24002D(bdID, start, fin, channelsx, numptsx, delayx, rampratex, keithleyIDs, starty, finy, numptsy, [startxs, finxs, startys, finys, delayy, rampratey, y_label, comments, nosave]) //Units: mV
+function ScanBabyDACMultipleK24002D(bdID, startx, finx, channelsx, numptsx, delayx, rampratex, keithleyIDs, starty, finy, numptsy, [startxs, finxs, startys, finys, delayy, rampratey, y_label, comments, nosave]) //Units: mV
 	// Sweeps BabyDACs in fast axis and multiple Keithleys on y-axis
-	variable start, fin, numptsx, delayx, rampratex, bdID, starty, finy, numptsy, delayy, rampratey, nosave
+	variable startx, finx, numptsx, delayx, rampratex, bdID, starty, finy, numptsy, delayy, rampratey, nosave
 	string channelsx, keithleyIDs, y_label, comments
 	string startxs, finxs, startys, finys // For different start/finish points for each channel (must match length of instrIDs if used)
 	
@@ -926,8 +926,8 @@ function ScanBabyDACMultipleK24002D(bdID, start, fin, channelsx, numptsx, delayx
 
 	// Initialize ScanVars
 	struct ScanVars S
-	initScanVars(S, instrIDx=bd, startx=startx, finx=finx, numptsx=numptsx, channelsx=channelsx, delayx=delayx, rampratex=rampratex, starty=starty, finy=finy, numptsy=numptsy, delayy=delayy, rampratey=rampratey, \
-	 						startxs=starts, finxs=fins, startys=startys, finys=finys, y_label=y_label, comments=comments)
+	initScanVars(S, instrIDx=bdID, startx=startx, finx=finx, numptsx=numptsx, channelsx=channelsx, delayx=delayx, rampratex=rampratex, starty=starty, finy=finy, numptsy=numptsy, delayy=delayy, rampratey=rampratey, \
+	 						startxs=startxs, finxs=finxs, startys=startys, finys=finys, y_label=y_label, comments=comments)
 	scv_setSetpoints(S, S.channelsx, S.startx, S.finx, keithleyIDs, S.starty, S.finy, S.startxs, S.finxs, S.startys, S.finys)  // Sets up startxs,finxs,startys,finys
 
 	// Check software limits and ramprate limits
@@ -1039,7 +1039,7 @@ end
 
 
 function ScanMultipleK2400(instrIDs, start, fin, numptsx, delayx, rampratex, [starts, fins, numptsy, delayy, y_label, comments, nosave]) //Units: mV
-	variable start, fin, numptsx, delayx, rampratex, numptsy, delayy, rampratey, nosave
+	variable start, fin, numptsx, delayx, rampratex, numptsy, delayy, nosave
 	string instrIDs, y_label, comments
 	string starts, fins // For different start/finish points for each channel (must match length of instrIDs if used)
 	
@@ -1054,7 +1054,7 @@ function ScanMultipleK2400(instrIDs, start, fin, numptsx, delayx, rampratex, [st
 
 	// Initialize ScanVars
 	struct ScanVars S
-	initScanVars(S, startx=startx, finx=finx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, numptsy=numptsy, delayy=delayy, rampratey=rampratey, \
+	initScanVars(S, startx=start, finx=fin, numptsx=numptsx, delayx=delayx, rampratex=rampratex, numptsy=numptsy, delayy=delayy, \
 	 						startxs=starts, finxs=fins, y_label=y_label, comments=comments)
 	scv_setSetpoints(S, instrIDs, S.startx, S.finx, "", 0, 0, S.startxs, S.finxs, "", "")  // Sets up startxs,finxs
 
@@ -1106,7 +1106,7 @@ function ScanMultipleK2400LS625Magnet2D(keithleyIDs, start, fin, numptsx, delayx
 
 	// Initialize ScanVars
 	struct ScanVars S
-	initScanVars(S, startx=startx, finx=finx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, starty=starty, finy=finy, numptsy=numptsy, delayy=delayy, rampratey=rampratey, \
+	initScanVars(S, startx=start, finx=fin, numptsx=numptsx, delayx=delayx, rampratex=rampratex, starty=starty, finy=finy, numptsy=numptsy, delayy=delayy, \
 	 						startxs=starts, finxs=fins, y_label=y_label, comments=comments)
 	S.instrIDy = magnetID
 

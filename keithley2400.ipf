@@ -104,14 +104,14 @@ function rampMultipleK2400s(instrIDs, index, numpts, starts, fins, [ramprate])
 	variable ramprate
 	
 	checkStartsFinsChannels(starts, fins, instrIDs)  // Checks separators and matching length
-
+	string InstrString
 	variable k=0, sx, fx, instrID, setpoint
 	for (k=0; k<itemsinlist(instrIDs, ","); k++)
 		sx = str2num(stringfromList(k, starts, ","))
 		fx = str2num(stringfromList(k, fins, ","))
-		instrID = stringfromList(k, instrIDs, ",")
+		InstrString = stringfromList(k, instrIDs, ",")
 		setpoint = sx + (index*(fx-sx)/(numpts-1))	
-		variable id = $instrID
+		nvar id = $instrString
 		rampK2400Voltage(id, setpoint, ramprate=ramprate)  
 	endfor
 end
