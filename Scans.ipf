@@ -1,13 +1,42 @@
 #pragma TextEncoding = "UTF-8"
 #pragma rtGlobals=1		// Use modern global access method
 
-// Standard Scan Functions for both BabyDAC and FastDAC scans
-// Written by Tim Child, 2021-11
+// Standard Scan Functions
+// Written by Tim Child, 2021-12
+
+// Note: This .ipf is not intended to be included in the experiment as it has many dependencies.
+// Note: You should copy the functions you will use from here into your own .ipf or procedure.ipf file
+
+// Full list of scans here:
+// ReadVsTime
+// ScanBabyDAC
+// ScanBabyDACUntil
+// ScanBabyDAC2D
+// ScanBabyDACRepeat
+// ScanBabyDAC_SRSAmplitude
+// ReadVsTimeFastdac
+// ScanFastDAC
+// ScanFastDACSlow
+// ScanFastDACSlow2D
+// ScanFastDAC2D
+// ScanFastDACRepeat
+// ScanK2400
+// ScanK24002D
+// ScanBabyDACK24002D
+// ScanBabyDACMultipleK24002D
+// ScanFastDACK24002D
+// ScanMultipleK2400
+// ScanMutipleK2400LS625Magnet2D
+// ScanLS625Magnet
+// ScanBabyDACLS625Magnet2D
+// ScanFastDACLS625Magenet2D
+// ScanK2400LS625Magent2D
+
+// Templates:
+// ScanMultiVarTemplate -- Helpful template for running a scan inside multiple loops where other variables can change (i.e. up to 5D scans)
+// StepTempScanSomething -- Scanning at multiple fridge temperatures
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////// Standard Scancontroller (Slow) Scans /////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 function ReadVsTime(delay, [y_label, max_time, comments]) // Units: s
 	variable delay, max_time
 	string y_label, comments
@@ -36,11 +65,12 @@ function ReadVsTime(delay, [y_label, max_time, comments]) // Units: s
 end
 
 
-function ScanBabyDAC(instrID, start, fin, channels, numpts, delay, ramprate, [y_label, comments, nosave]) //Units: mV
+function ScanBabyDAC(instrID, start, fin, channels, numpts, delay, ramprate, [starts, fins, y_label, comments, nosave]) //Units: mV
 	// sweep one or more babyDAC channels
 	// channels should be a comma-separated string ex: "0, 4, 5" or "LABEL1,LABEL2" 
 	variable instrID, start, fin, numpts, delay, ramprate, nosave
 	string channels, comments, y_label
+	string starts, fins // For different start/finish points for each channel (must match length of channels if used)
 
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -48,10 +78,12 @@ function ScanBabyDAC(instrID, start, fin, channels, numpts, delay, ramprate, [y_
 	// Set defaults
 	comments = selectstring(paramisdefault(comments), comments, "")
 	y_label = selectstring(paramisdefault(y_label), y_label, "")
+	starts = selectstring(paramisdefault(starts), starts, "")
+	fins = selectstring(paramisdefault(fins), fins, "")
 
 	// Initialize ScanVars
 	struct ScanVars S
-	initScanVarsBD(S, instrID, start, fin, channelsx=channels, numptsx=numpts, delayx=delay, rampratex=ramprate, comments=comments, y_label=y_label)
+	initScanVarsBD(S, instrID, start, fin, channelsx=channels, numptsx=numpts, delayx=delay, rampratex=ramprate, startxs=starts, finxs=fins, comments=comments, y_label=y_label)
 
 	// Check software limits and ramprate limits
 	PreScanChecksBD(S)  
@@ -66,14 +98,12 @@ function ScanBabyDAC(instrID, start, fin, channels, numpts, delay, ramprate, [y_
 	initializeScan(S)
 
 	// Main measurement loop
-	variable i=0, j=0, setpoint
-	do
-		setpoint = S.startx + (i*(S.finx-S.startx)/(S.numptsx-1))
-		RampMultipleBD(S.instrIDx, S.channelsx, setpoint, ramprate=S.rampratex, ignore_lims=1)
+	variable i=0, j=0
+	for (i=0;i<S.numptsx;i++)
+		rampToNextSetpoint(S, i, ignore_lims=1)
 		sc_sleep(S.delayx)
 		RecordValues(S, i, 0)
-		i+=1
-	while (i<S.numptsx)
+	endfor
 
 	// Save by default
 	if (nosave == 0)
@@ -84,18 +114,20 @@ function ScanBabyDAC(instrID, start, fin, channels, numpts, delay, ramprate, [y_
 end
 
 
-function ScanBabyDACUntil(instrID, start, fin, channels, numpts, delay, ramprate, checkwave, value, [operator, y_label, comments, nosave])
+function ScanBabyDACUntil(instrID, start, fin, channels, numpts, delay, ramprate, checkwave, value, [starts, fins, operator, y_label, comments, nosave])
 	// sweep one or more babyDAC channels until checkwave < (or >) value
 	// channels should be a comma-separated string ex: "0, 4, 5"
 	// operator is "<" or ">", meaning end on "checkwave[i] < value" or "checkwave[i] > value"
 	variable instrID, start, fin, numpts, delay, ramprate, value, nosave
 	string channels, operator, checkwave, y_label, comments
-	string x_label
+	string starts, fins // For different start/finish points for each channel (must match length of channels if used)
 
 	// Set defaults
 	comments = selectstring(paramisdefault(comments), comments, "")
 	y_label = selectstring(paramisdefault(y_label), y_label, "")
 	operator = selectstring(paramisdefault(operator), operator, "<")
+	starts = selectstring(paramisdefault(starts), starts, "")
+	fins = selectstring(paramisdefault(fins), fins, "")
 
 	variable a = 0
 	if ( stringmatch(operator, "<")==1 )
@@ -111,7 +143,7 @@ function ScanBabyDACUntil(instrID, start, fin, channels, numpts, delay, ramprate
 
 	// Initialize ScanVars
 	struct ScanVars S
-	initScanVarsBD(S, instrID, start, fin, channelsx=channels, numptsx=numpts, delayx=delay, rampratex=ramprate, comments=comments, y_label=y_label)
+	initScanVarsBD(S, instrID, start, fin, channelsx=channels, numptsx=numpts, delayx=delay, rampratex=ramprate, startxs=starts, finxs=fins, comments=comments, y_label=y_label)
 
 	// Check software limits and ramprate limits
 	PreScanChecksBD(S)  
@@ -126,11 +158,10 @@ function ScanBabyDACUntil(instrID, start, fin, channels, numpts, delay, ramprate
 	initializeScan(S)
 
 	// Main measurement loop
-	variable i=0, j=0, setpoint
+	variable i=0, j=0
 	wave w = $checkwave
 	do
-		setpoint = S.startx + (i*(S.finx-S.startx)/(S.numptsx-1))
-		RampMultipleBD(S.instrIDx, S.channelsx, setpoint, ramprate=S.rampratex, ignore_lims=1)
+		rampToNextSetpoint(S, i, ignore_lims=1)
 		sc_sleep(S.delayx)
 		RecordValues(S, i, 0)
 		if (a*w[i] - value < 0)
@@ -148,21 +179,26 @@ function ScanBabyDACUntil(instrID, start, fin, channels, numpts, delay, ramprate
 end
 
 
-function ScanBabyDAC2D(instrID, startx, finx, channelsx, numptsx, delayx, rampratex, starty, finy, channelsy, numptsy, delayy, rampratey, [comments, nosave]) //Units: mV
+function ScanBabyDAC2D(instrID, startx, finx, channelsx, numptsx, delayx, rampratex, starty, finy, channelsy, numptsy, delayy, rampratey, [startxs, finxs, startys, finys, comments, nosave]) //Units: mV
 	variable instrID, startx, finx, numptsx, delayx, rampratex, starty, finy, numptsy, delayy, rampratey, nosave
 	string channelsx, channelsy, comments
+	string startxs, finxs, startys, finys  // For ramping multiple gates with different start/end points
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
 	
 	// Set defaults
 	comments = selectstring(paramisdefault(comments), comments, "")
+	startxs = selectstring(paramisdefault(startxs), startxs, "")
+	finxs = selectstring(paramisdefault(finxs), finxs, "")
+	startys = selectstring(paramisdefault(startys), startys, "")
+	finys = selectstring(paramisdefault(finys), finys, "")
 	
 	// Initialize ScanVars
 	struct ScanVars S
 	initScanVarsBD(S, instrID, startx, finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
 							starty=starty, finy=finy, channelsy=channelsy, numptsy=numptsy, delayy=delayy, rampratey=rampratey, \
-	 						comments=comments)
+							startxs=startxs, finxs=finxs, startys=startys, finys=finys, comments=comments)
 
 	// Check software limits and ramprate limits
 	PreScanChecksBD(S)  
@@ -177,23 +213,17 @@ function ScanBabyDAC2D(instrID, startx, finx, channelsx, numptsx, delayx, rampra
 	initializeScan(S)
 
 	// Main measurement loop
-	variable i=0, j=0, setpointx, setpointy
-	do
-		setpointx = S.startx
-		setpointy = S.starty + (i*(S.finy-S.starty)/(S.numptsy-1))
-		RampMultipleBD(S.instrIDy, S.channelsy, setpointy, ramprate=S.rampratey, ignore_lims=1)
-		RampMultipleBD(S.instrIDx, S.channelsx, setpointx, ramprate=S.rampratex, ignore_lims=1)
+	variable i=0, j=0, k=0
+	for(i=0; i<S.numptsy; i++)
+		rampToNextSetpoint(S, 0, outer_index=i, ignore_lims=1)  // Ramp x to start and y to next setpoint
 		sc_sleep(S.delayy)
-		j=0
-		do
-			setpointx = S.startx + (j*(S.finx-S.startx)/(S.numptsx-1))
-			RampMultipleBD(S.instrIDx, S.channelsx, setpointx, ramprate=S.rampratex)
+		for(j=0; j<S.numptsx; j++)
+			// Ramp X to next setpoint
+			rampToNextSetpoint(S, j, ignore_lims=1)  // Ramp x to next setpoint
 			sc_sleep(S.delayx)
 			RecordValues(S, i, j)
-			j+=1
-		while (j<S.numptsx)
-	i+=1
-	while (i<S.numptsy)
+		endfor
+	endfor
 	
 	// Save by default
 	if (nosave == 0)
@@ -204,24 +234,28 @@ function ScanBabyDAC2D(instrID, startx, finx, channelsx, numptsx, delayx, rampra
 end
 
 
-function ScanBabyDACRepeat(instrID, startx, finx, channelsx, numptsx, delayx, rampratex, numptsy, delayy, [comments, alternate, nosave]) //Units: mV, mT
+function ScanBabyDACRepeat(instrID, startx, finx, channelsx, numptsx, delayx, rampratex, numptsy, delayy, [starts, fins, comments, alternate, nosave]) //Units: mV, mT
 	// x-axis is the dac sweep
 	// y-axis is an index
 	// if alternate = 1 then will sweep: start -> fin, fin -> start, start -> fin, ....
 	// each sweep (whether up or down) will count as 1 y-index
 	variable instrID, startx, finx, numptsx, delayx, rampratex, numptsy, delayy, alternate, nosave
 	string channelsx, comments
+	string starts, fins // For different start/finish points for each channel (must match length of channels if used)
 
 	// Reconnect instruments
 	sc_openinstrconnections(0)
 	
 	// Set defaults
 	comments = selectstring(paramisdefault(comments), comments, "")
+	starts = selectstring(paramisdefault(starts), starts, "")
+	fins = selectstring(paramisdefault(fins), fins, "")
 	
 	// Initialize ScanVars
 	struct ScanVars S
 	initScanVarsBD(S, instrID, startx, finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
-							starty=1, finy=numptsy, numptsy=numptsy, delayy=delayy, y_label="Repeats", comments=comments)
+							starty=1, finy=numptsy, numptsy=numptsy, delayy=delayy, y_label="Repeats", \
+							startxs=starts, finxs=fins, comments=comments)
 
 	// Check software limits and ramprate limits
 	PreScanChecksBD(S, x_only=1)  
@@ -239,8 +273,8 @@ function ScanBabyDACRepeat(instrID, startx, finx, channelsx, numptsx, delayx, ra
 	sc_sleep(S.delayy)
 	
 	// Main measurement loop
-	variable i=0, j=0, setpointx, setpointy, scandirection=0
-	do
+	variable i=0, j=0, scandirection
+	for (i=0;i<S.numptsy;i++)
 		if(mod(i,2)!=0 && alternate == 1)  // If on odd row and alternate is on
 			j=numptsx-1
 			scandirection=-1
@@ -248,19 +282,15 @@ function ScanBabyDACRepeat(instrID, startx, finx, channelsx, numptsx, delayx, ra
 			j=0
 			scandirection=1
 		endif
-
-		setpointx = S.startx + (j*(S.finx-S.startx)/(S.numptsx-1)) // reset start point
-		RampMultipleBD(S.instrIDx, S.channelsx, setpointx, ramprate=S.rampratex, ignore_lims=1)
-		sc_sleep(delayy) // wait at start point
+		rampToNextSetpoint(S, j, outer_index=i, ignore_lims=1)  // Ramp x to start and y to next setpoint
+		sc_sleep(S.delayy)
 		do
-			setpointx = S.startx + (j*(S.finx-S.startx)/(S.numptsx-1))
-			RampMultipleBD(S.instrIDx, S.channelsx, setpointx, ramprate=S.rampratex, ignore_lims=1)
+			rampToNextSetpoint(S, j, ignore_lims=1)
 			sc_sleep(S.delayx)
 			RecordValues(S, i, j)
 			j+=scandirection
 		while (j>-1 && j<S.numptsx)
-		i+=1
-	while (i<S.numptsy)
+	endfor
   
 	// Save by default
 	if (nosave == 0)
@@ -271,21 +301,24 @@ function ScanBabyDACRepeat(instrID, startx, finx, channelsx, numptsx, delayx, ra
 end
 
 
-function ScanBabyDAC_SRSAmplitude(babydacID, srsID, startx, finx, channelsx, numptsx, delayx, rampratex, starty, finy, numptsy, delayy, [comments, nosave]) //Units: mV, mV
+function ScanBabyDAC_SRSAmplitude(babydacID, srsID, startx, finx, channelsx, numptsx, delayx, rampratex, starty, finy, numptsy, delayy, [starts, fins, comments, nosave]) //Units: mV, mV
 	// Example of how to make new babyDAC scan stepping a different instrument (here SRS)
 	variable babydacID, srsID, startx, finx, numptsx, delayx, rampratex, starty, finy, numptsy, delayy, nosave
 	string channelsx, comments
+	string starts, fins // For ramping multiple gates with different start/end points
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
 	
 	// Set defaults
 	comments = selectstring(paramisdefault(comments), comments, "")
+	starts = selectstring(paramisdefault(starts), starts, "")
+	fins = selectstring(paramisdefault(fins), fins, "")
 	
 	// Initialize ScanVars
 	struct ScanVars S
 	initScanVarsBD(S, babydacID, startx, finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
-							starty=starty, finy=finy, numptsy=numptsy, delayy=delayy, \
+							starty=starty, finy=finy, numptsy=numptsy, delayy=delayy, startxs=starts, finxs=fins,\
 	 						y_label="SRS Amplitude", comments=comments)
 	S.instrIDy = srsID
 
@@ -302,17 +335,15 @@ function ScanBabyDAC_SRSAmplitude(babydacID, srsID, startx, finx, channelsx, num
 	initializeScan(S)
 
 	// main loop
-	variable i=0, j=0, setpointx, setpointy
+	variable i=0, j=0, setpointy
 	do
-		setpointx = S.startx
+		rampToNextSetpoint(S, 0, ignore_lims=1)  // Ramp BD to start
 		setpointy = starty + (i*(finy-starty)/(S.numptsy-1))
-		RampMultipleBD(S.instrIDx, S.channelsx, setpointx, ramprate=S.rampratex, ignore_lims=1)
 		SetSRSAmplitude(S.instrIDy,setpointy)
 		sc_sleep(S.delayy)
 		j=0
 		do
-			setpointx = S.startx + (j*(S.finx-S.startx)/(S.numptsx-1))
-			RampMultipleBD(S.instrIDx, S.channelsx, setpointx, ramprate=S.rampratex, ignore_lims=1)
+			rampToNextSetpoint(S, j, ignore_lims=1)  // Ramp x to next setpoint
 			sc_sleep(S.delayx)
 			RecordValues(S, i, j)
 			j+=1
@@ -329,9 +360,6 @@ function ScanBabyDAC_SRSAmplitude(babydacID, srsID, startx, finx, channelsx, num
 end
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////// Standard FastDAC Scans ///////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 function ReadVsTimeFastdac(instrID, duration, [y_label, comments, nosave]) // Units: s 
 	variable instrID, duration, nosave
 	string comments, y_label
@@ -422,11 +450,12 @@ function ScanFastDAC(instrID, start, fin, channels, [numpts, sweeprate, ramprate
 end
 
 
-function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate, [y_label, comments, nosave]) //Units: mV
+function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate, [starts, fins, y_label, comments, nosave]) //Units: mV
 	// sweep one or more FastDAC channels but in the ScanController way (not ScanControllerFastdac). I.e. ramp, measure, ramp, measure...
 	// channels should be a comma-separated string ex: "0, 4, 5"
 	variable instrID, start, fin, numpts, delay, ramprate, nosave
 	string channels, y_label, comments
+	string starts, fins // For different start/finish points for each channel (must match length of channels if used)
 
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -434,10 +463,12 @@ function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate,
 	// Set defaults
 	comments = selectstring(paramisdefault(comments), comments, "")
 	y_label = selectstring(paramisdefault(y_label), y_label, "")
+	starts = selectstring(paramisdefault(starts), starts, "")
+	fins = selectstring(paramisdefault(fins), fins, "")
 
 	// Initialize ScanVars
 	struct ScanVars S  // Note, more like a BD scan if going slow
-	initScanVarsFD(S, instrID, start, fin, channelsx=channels, numptsx=numpts, delayx=delay, rampratex=ramprate, comments=comments, y_label=y_label)  
+	initScanVarsFD(S, instrID, start, fin, channelsx=channels, numptsx=numpts, delayx=delay, rampratex=ramprate, startxs = starts, finxs = fins, comments=comments, y_label=y_label)  
 	S.using_fastdac = 0 // Explicitly showing that this is not a normal fastDac scan
 	S.duration = numpts*max(0.05, delay) // At least 50ms per point is a good estimate 
 	S.sweeprate = abs((fin-start)/S.duration) // Better estimate of sweeprate (Not really valid for a slow scan)
@@ -456,14 +487,73 @@ function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate,
 	InitializeScan(S)
 
 	// Main measurement loop
-	variable i=0, j=0, setpoint
+	variable i=0
 	do
-		setpoint = S.startx + (i*(S.finx-S.startx)/(S.numptsx-1))
-		RampMultipleFDac(S.instrIDx, S.channelsx, setpoint, ramprate=S.rampratex, ignore_lims=1)
-		sc_sleep(delay)
+		rampToNextSetpoint(S, i, fastdac=1, ignore_lims=1)  // Ramp x to next setpoint
+		sc_sleep(S.delayx)
 		RecordValues(S, i, 0)
 		i+=1
 	while (i<S.numptsx)
+
+	// Save by default
+	if (nosave == 0)
+		EndScan(S=S)
+	else
+		dowindow /k SweepControl
+	endif
+end
+
+
+function ScanFastDacSlow2D(instrID, startx, finx, channelsx, numptsx, delayx, starty, finy, channelsy, numptsy, [rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave])
+	// sweep one or more FastDAC channels but in the ScanController way (not ScanControllerFastdac). I.e. ramp, measure, ramp, measure...
+	// channels should be a comma-separated string ex: "0, 4, 5"
+	variable instrID, startx, finx, starty, finy, numptsy, numptsx, rampratex, rampratey, delayx, delayy, nosave
+	string channelsx, channelsy, comments, startxs, finxs, startys, finys
+
+	// Reconnect instruments
+	sc_openinstrconnections(0)
+
+	// Set defaults
+	comments = selectstring(paramisdefault(comments), comments, "")
+	startxs = selectstring(paramisdefault(startxs), startxs, "")
+	finxs = selectstring(paramisdefault(finxs), finxs, "")
+	startys = selectstring(paramisdefault(startys), startys, "")
+	finys = selectstring(paramisdefault(finys), finys, "")
+
+	// Initialize ScanVars
+	struct ScanVars S  
+	 	initScanVarsFD(S, instrID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numptsx, delayx=delayx,\
+		  numptsy=numptsy, delayy=delayy, starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey,\
+		  startxs=startxs, finxs=finxs, startys=startys, finys=finys, comments=comments)
+	S.using_fastdac = 0   // This is not a normal fastDac scan
+	S.duration = S.numptsx*max(0.05, S.delayx) // At least 50ms per point is a good estimate 
+	S.sweeprate = abs((S.finx-S.startx)/S.duration) // Better estimate of sweeprate (Not really valid for a slow scan)
+
+	// Check limits (not as much to check when using FastDAC slow)
+	scc_checkLimsFD(S)
+	S.lims_checked = 1
+
+	// Ramp to start without checks because checked above
+	RampStartFD(S, ignore_lims=1)
+
+	// Let gates settle 
+	sc_sleep(S.delayy*5)
+
+	// Make Waves and Display etc
+	InitializeScan(S)
+
+	// Main measurement loop
+	variable i=0, j=0, k=0, setpointx, setpointy
+	for(i=0; i<S.numptsy; i++)
+		rampToNextSetpoint(S, 0, outer_index=i, fastdac=1, ignore_lims=1)  // Ramp x to start and y to next setpoint
+		sc_sleep(S.delayy)
+		for(j=0; j<S.numptsx; j++)
+			// Ramp X to next setpoint
+			rampToNextSetpoint(S, j, fastdac=1, ignore_lims=1)  // Ramp x to next setpoint
+			sc_sleep(S.delayx)
+			RecordValues(S, i, j)
+		endfor
+	endfor
 
 	// Save by default
 	if (nosave == 0)
@@ -481,18 +571,17 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 	// Note: channels should be a comma-separated string ex: "0,4,5"
 	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, rampratex, rampratey, delayy, nosave, use_AWG
 	string channelsx, channelsy, comments, startxs, finxs, startys, finys
-	variable i=0, j=0
 
 	// Set defaults
 	delayy = ParamIsDefault(delayy) ? 0.01 : delayy
-   comments = selectstring(paramisdefault(comments), comments, "")
-   startxs = selectstring(paramisdefault(startxs), startxs, "")
-   finxs = selectstring(paramisdefault(finxs), finxs, "")
-   startys = selectstring(paramisdefault(startys), startys, "")
-   finys = selectstring(paramisdefault(finys), finys, "")
-   variable use_bd = paramisdefault(bdid) ? 0 : 1 		// Whether using both FD and BD or just FD
+	comments = selectstring(paramisdefault(comments), comments, "")
+	startxs = selectstring(paramisdefault(startxs), startxs, "")
+	finxs = selectstring(paramisdefault(finxs), finxs, "")
+	startys = selectstring(paramisdefault(startys), startys, "")
+	finys = selectstring(paramisdefault(finys), finys, "")
+	variable use_bd = paramisdefault(bdid) ? 0 : 1 		// Whether using both FD and BD or just FD
 
-   if (!paramisdefault(bdID) && (!paramisdefault(startys) || !paramisdefault(finys)))
+	if (!paramisdefault(bdID) && (!paramisdefault(startys) || !paramisdefault(finys)))
    		abort "NotImplementedError: Cannot do virtual sweep with Babydacs"
    	endif
 
@@ -551,24 +640,17 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 	initializeScan(S)
 
 	// Main measurement loop
+	variable i=0, j=0
 	variable setpointy, sy, fy
 	string chy
 	for(i=0; i<S.numptsy; i++)
+		// Ramp fast axis to start
+		rampToNextSetpoint(S, 0, fastdac=1, ignore_lims=1)
+
 		// Ramp slow axis
-		if(use_bd == 0)
-			for(j=0; j<itemsinlist(S.channelsy,";"); j++)
-				sy = str2num(stringfromList(j, S.startys, ","))
-				fy = str2num(stringfromList(j, S.finys, ","))
-				chy = stringfromList(j, S.channelsy, ";")
-				setpointy = sy + (i*(fy-sy)/(S.numptsy-1))	
-				RampMultipleFDac(S.instrIDy, chy, setpointy, ramprate=S.rampratey, ignore_lims=1)
-			endfor
-		else // If using BabyDAC on slow axis
-			setpointy = starty + (i*(finy-starty)/(S.numptsy-1))	
-			RampMultipleBD(S.instrIDy, S.channelsy, setpointy, ramprate=S.rampratey, ignore_lims=1)
-		endif
-		// Ramp to start of fast axis
-		RampStartFD(S, ignore_lims=1, x_only=1)
+		rampToNextSetpoint(S, 0, outer_index=i, y_only=1, fastdac=!use_bd, ignore_lims=1)
+
+		// Let gates settle
 		sc_sleep(S.delayy)
 		
 		// Record fast axis
@@ -702,9 +784,9 @@ function Scank2400(instrID, startx, finx, channelsx, numptsx, delayx, rampratex,
 end
 
 
-function Scank24002D(instrIDx, startx, finx, channelsx, numptsx, delayx, rampratex, instrIDy, starty, finy, channelsy, numptsy, delayy, rampratey, [y_label, comments, nosave]) //Units: mV
+function Scank24002D(instrIDx, startx, finx, numptsx, delayx, rampratex, instrIDy, starty, finy, numptsy, delayy, rampratey, [y_label, comments, nosave]) //Units: mV
 	variable instrIDx, startx, finx, numptsx, delayx, rampratex, instrIDy, starty, finy, numptsy, delayy, rampratey, nosave
-	string channelsx, channelsy, y_label, comments
+	string y_label, comments
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -716,8 +798,8 @@ function Scank24002D(instrIDx, startx, finx, channelsx, numptsx, delayx, ramprat
 	
 	// Initialize ScanVars
 	struct ScanVars S
-	initScanVars(S, instrIDx=instrIDx, startx=startx, finx=finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
-							instrIDy=instrIDy, starty=starty, finy=finy, channelsy=channelsy, numptsy=numptsy, delayy=delayy, rampratey=rampratey, \
+	initScanVars(S, instrIDx=instrIDx, startx=startx, finx=finx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
+							instrIDy=instrIDy, starty=starty, finy=finy, numptsy=numptsy, delayy=delayy, rampratey=rampratey, \
 	 						y_label=y_label, comments=comments)
 
 	// Check software limits and ramprate limits
@@ -762,10 +844,11 @@ function Scank24002D(instrIDx, startx, finx, channelsx, numptsx, delayx, ramprat
 end
 
 
-function ScanBabyDACKeithley2D(bdID, startx, finx, channelsx, numptsx, delayx, rampratex, keithleyID, starty, finy, numptsy, delayy, rampratey, [y_label, comments, nosave]) //Units: mV
+function ScanBabyDACK24002D(bdID, startx, finx, channelsx, numptsx, delayx, rampratex, keithleyID, starty, finy, numptsy, delayy, rampratey, [startxs, finxs, y_label, comments, nosave]) //Units: mV
 	// Sweeps BabyDAC on x-axis and Keithley on y-axis
 	variable bdID, startx, finx, numptsx, delayx, rampratex, keithleyID, starty, finy, numptsy, delayy, rampratey, nosave
 	string channelsx, y_label, comments
+	string startxs, finxs
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -773,12 +856,16 @@ function ScanBabyDACKeithley2D(bdID, startx, finx, channelsx, numptsx, delayx, r
 	// Set defaults
 	comments = selectstring(paramisdefault(comments), comments, "")
 	y_label = selectstring(paramisdefault(y_label), y_label, "Keithley /mV")
+	startxs = selectstring(paramisdefault(startxs), startxs, "")
+	finxs = selectstring(paramisdefault(finxs), finxs, "")
 	
 	// Initialize ScanVars
 	struct ScanVars S
 	initScanVarsBD(S, bdID, startx, finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
 							starty=starty, finy=finy, numptsy=numptsy, delayy=delayy, rampratey=rampratey, \
-	 						comments=comments)
+	 						startxs=startxs, finxs=finxs, comments=comments)
+	S.startx = str2num(stringFromList(0, S.startxs, ","))
+	S.finx = str2num(stringFromList(0, S.finxs, ","))
 	S.instrIDy = keithleyID
 	S.y_label = y_label
 
@@ -797,23 +884,19 @@ function ScanBabyDACKeithley2D(bdID, startx, finx, channelsx, numptsx, delayx, r
 	initializeScan(S)
 
 	// Main measurement loop
-	variable i=0, j=0, setpointx, setpointy
-	do
-		setpointx = S.startx
+	variable i=0, j=0, setpointy
+	for (i=0;i<S.numptsy;i++)
 		setpointy = S.starty + (i*(S.finy-S.starty)/(S.numptsy-1))
 		rampK2400Voltage(S.instrIDy, setpointy, ramprate=S.rampratey)
-		RampMultipleBD(S.instrIDx, S.channelsx, setpointx, ramprate=S.rampratex, ignore_lims=1)
+		rampToNextSetpoint(S, 0, ignore_lims=1) // Ramp BDs back to start(s)
 		sc_sleep(S.delayy)
 		j=0
-		do
-			setpointx = S.startx + (j*(S.finx-S.startx)/(S.numptsx-1))
-			RampMultipleBD(S.instrIDx, S.channelsx, setpointx, ramprate=S.rampratex)
+		for (j=0;j<S.numptsx;j++)
+			rampToNextSetpoint(S, j, ignore_lims=1) // Ramp BDs to next setpoint(s)
 			sc_sleep(S.delayx)
 			RecordValues(S, i, j)
-			j+=1
-		while (j<S.numptsx)
-	i+=1
-	while (i<S.numptsy)
+		endfor
+	endfor
 	
 	// Save by default
 	if (nosave == 0)
@@ -824,16 +907,81 @@ function ScanBabyDACKeithley2D(bdID, startx, finx, channelsx, numptsx, delayx, r
 end
 
 
-function ScanFastDACKeithley2D(fdID, startx, finx, keithleyID, starty, finy, numptsy, [numpts, sweeprate, rampratex, rampratey, delayy, y_label, comments, nosave, use_AWG])
+function ScanBabyDACMultipleK24002D(bdID, start, fin, channelsx, numptsx, delayx, rampratex, keithleyIDs, starty, finy, numptsy, [startxs, finxs, startys, finys, delayy, rampratey, y_label, comments, nosave]) //Units: mV
+	// Sweeps BabyDACs in fast axis and multiple Keithleys on y-axis
+	variable start, fin, numptsx, delayx, rampratex, bdID, starty, finy, numptsy, delayy, rampratey, nosave
+	string channelsx, keithleyIDs, y_label, comments
+	string startxs, finxs, startys, finys // For different start/finish points for each channel (must match length of instrIDs if used)
+	
+	// Reconnect instruments
+	sc_openinstrconnections(0)
+	
+	// Set defaults
+	comments = selectstring(paramisdefault(comments), comments, "") 
+	y_label = selectstring(paramisdefault(y_label), y_label, "Keithleys /mV")
+	startxs = selectstring(paramisdefault(startxs), startxs, "")
+	finxs = selectstring(paramisdefault(finxs), finxs, "")
+	startys = selectstring(paramisdefault(startys), startys, "")
+	finys = selectstring(paramisdefault(finys), finys, "")
+
+	// Initialize ScanVars
+	struct ScanVars S
+	initScanVars(S, instrIDx=bd, startx=startx, finx=finx, numptsx=numptsx, channelsx=channelsx, delayx=delayx, rampratex=rampratex, starty=starty, finy=finy, numptsy=numptsy, delayy=delayy, rampratey=rampratey, \
+	 						startxs=starts, finxs=fins, startys=startys, finys=finys, y_label=y_label, comments=comments)
+	scv_setSetpoints(S, S.channelsx, S.startx, S.finx, keithleyIDs, S.starty, S.finy, S.startxs, S.finxs, S.startys, S.finys)  // Sets up startxs,finxs,startys,finys
+
+	// Check software limits and ramprate limits
+	PreScanChecksBD(S, x_only=1)
+	// PreScanChecksKeithley(S)  
+	// PreScanChecksMagnet(S, y_only=1)
+	
+	// Ramp to start without checks because checked above
+	rampToNextSetpoint(S, 0, ignore_lims=1)  // Ramp BDs to start(s) 
+	rampMultipleK2400s(keithleyIDs, 0, S.numptsy, S.startys, S.finys, ramprate=S.rampratey)  // Ramp Keithleys to start(s)
+	
+	// Let gates settle 
+	sc_sleep(S.delayy*5)
+	
+	// Make waves and graphs etc
+	initializeScan(S)  
+
+	// Main measurement loop
+	variable i=0, j=0, setpointy
+	for(i=0;i<S.numptsy;i++)
+		rampToNextSetpoint(S, 0, ignore_lims=1)  // Ramp BDs to start(s) 
+		rampMultipleK2400s(keithleyIDs, i, S.numptsy, S.startys, S.finys, ramprate=S.rampratey)  // Ramp Keithleys to next setpoint(s)
+		
+		// Delay
+		sc_sleep(S.delayy)
+		for(j=0;j<S.numptsx;j++)
+			rampToNextSetpoint(S, j, ignore_lims=1)  // Ramp BDs to next setpoint(s)
+			sc_sleep(S.delayx)
+			RecordValues(S, i, j)
+		endfor
+	endfor
+	
+	// Save by default
+	if (nosave == 0)
+		EndScan(S=S)
+	else
+		 dowindow /k SweepControl
+	endif
+end
+
+
+function ScanFastDACK24002D(fdID, startx, finx, keithleyID, starty, finy, numptsy, [numpts, sweeprate, rampratex, rampratey, delayy, startxs, finxs, y_label, comments, nosave, use_AWG])
 	// 2D Scan with Fastdac on x-axis and keithley on y-axis
 	// Note: Must provide numptsx OR sweeprate in optional parameters instead
 	// Note: channels should be a comma-separated string ex: "0,4,5"
 	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, keithleyID, rampratex, rampratey, delayy, nosave, use_AWG
 	string y_label, comments
+	string startxs, finxs // For different start/finish points for each channel (must match length of channels if used)
 
 	// Set defaults
 	delayy = ParamIsDefault(delayy) ? 0.01 : delayy
 	comments = selectstring(paramisdefault(comments), comments, "")
+	startxs = selectstring(paramisdefault(startxs), startxs, "")
+	finxs = selectstring(paramisdefault(finxs), finxs, "")
 
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -842,7 +990,7 @@ function ScanFastDACKeithley2D(fdID, startx, finx, keithleyID, starty, finy, num
  	struct ScanVars S
 	// Init FastDAC part like usual, then manually set the rest
 	initScanVarsFD(S, fdID, startx, finx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
-							rampratey=rampratey, comments=comments)
+							rampratey=rampratey, startxs=startxs, finxs=finxs, comments=comments)
 	S.instrIDy = keithleyID
 	s.is2d = 1
 	S.starty = starty
@@ -864,12 +1012,12 @@ function ScanFastDACKeithley2D(fdID, startx, finx, keithleyID, starty, finy, num
 	initializeScan(S)
 
 	// Main measurement loop
-	variable setpointy, sy, fy
+	variable setpointy
 	variable i=0, j=0
 	string chy
 	for(i=0; i<S.numptsy; i++)
 		// Ramp slow axis
-		setpointy = sy + (i*(S.finy-S.starty)/(S.numptsy-1))	
+		setpointy = S.starty + (i*(S.finy-S.starty)/(S.numptsy-1))	
 		rampK2400Voltage(S.instrIDy, setpointy, ramprate=S.rampratey)
 
 		// Ramp to start of fast axis
@@ -888,6 +1036,121 @@ function ScanFastDACKeithley2D(fdID, startx, finx, keithleyID, starty, finy, num
 	endif
 
 end
+
+
+function ScanMultipleK2400(instrIDs, start, fin, numptsx, delayx, rampratex, [starts, fins, numptsy, delayy, y_label, comments, nosave]) //Units: mV
+	variable start, fin, numptsx, delayx, rampratex, numptsy, delayy, rampratey, nosave
+	string instrIDs, y_label, comments
+	string starts, fins // For different start/finish points for each channel (must match length of instrIDs if used)
+	
+	// Reconnect instruments
+	sc_openinstrconnections(0)
+	
+	// Set defaults
+	comments = selectstring(paramisdefault(comments), comments, "") 
+	y_label = selectstring(paramisdefault(y_label), y_label, "")
+	starts = selectstring(paramisdefault(starts), starts, "")
+	fins = selectstring(paramisdefault(fins), fins, "")
+
+	// Initialize ScanVars
+	struct ScanVars S
+	initScanVars(S, startx=startx, finx=finx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, numptsy=numptsy, delayy=delayy, rampratey=rampratey, \
+	 						startxs=starts, finxs=fins, y_label=y_label, comments=comments)
+	scv_setSetpoints(S, instrIDs, S.startx, S.finx, "", 0, 0, S.startxs, S.finxs, "", "")  // Sets up startxs,finxs
+
+	// Check software limits and ramprate limits
+	// PreScanChecksKeithley(S)  
+	
+	// Ramp to start without checks because checked above
+	rampMultipleK2400s(instrIDs, 0, S.numptsx, S.startxs, S.finxs, ramprate=S.rampratex)
+	
+	// Let gates settle 
+	sc_sleep(S.delayy*5)
+	
+	// Make waves and graphs etc
+	initializeScan(S)  
+
+	// Main measurement loop
+	variable i=0, j=0
+	for(i=0;i<S.numptsy;i++)
+		for(j=0;j<S.numptsx;j++)
+			rampMultipleK2400s(instrIDs, j, S.numptsx, S.startxs, S.finxs, ramprate=S.rampratex)
+			sc_sleep(S.delayx)
+			RecordValues(S, i, j)
+		endfor
+	endfor
+	
+	// Save by default
+	if (nosave == 0)
+		EndScan(S=S)
+	else
+		 dowindow /k SweepControl
+	endif
+end
+
+
+
+function ScanMultipleK2400LS625Magnet2D(keithleyIDs, start, fin, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, [starts, fins, delayy, y_label, comments, nosave]) //Units: mV
+	variable start, fin, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, nosave
+	string keithleyIDs, y_label, comments
+	string starts, fins // For different start/finish points for each channel (must match length of instrIDs if used)
+	
+	// Reconnect instruments
+	sc_openinstrconnections(0)
+	
+	// Set defaults
+	comments = selectstring(paramisdefault(comments), comments, "") 
+	y_label = selectstring(paramisdefault(y_label), y_label, "Field /mT")
+	starts = selectstring(paramisdefault(starts), starts, "")
+	fins = selectstring(paramisdefault(fins), fins, "")
+
+	// Initialize ScanVars
+	struct ScanVars S
+	initScanVars(S, startx=startx, finx=finx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, starty=starty, finy=finy, numptsy=numptsy, delayy=delayy, rampratey=rampratey, \
+	 						startxs=starts, finxs=fins, y_label=y_label, comments=comments)
+	S.instrIDy = magnetID
+
+	// Check software limits and ramprate limits
+	// PreScanChecksKeithley(S)  
+	// PreScanChecksMagnet(S, y_only=1)
+	
+	// Ramp to start without checks because checked above
+	rampMultipleK2400s(keithleyIDs, 0, S.numptsx, S.startxs, S.finxs, ramprate=S.rampratex)
+	setlS625fieldWait(S.instrIDy, S.starty)
+	
+	// Let gates settle 
+	sc_sleep(S.delayy*5)
+	
+	// Make waves and graphs etc
+	initializeScan(S)  
+
+	// Main measurement loop
+	variable i=0, j=0, setpointy
+	for(i=0;i<S.numptsy;i++)
+		// Ramp Keithleys back to start
+		rampMultipleK2400s(keithleyIDs, 0, S.numptsx, S.startxs, S.finxs, ramprate=S.rampratex)
+
+		// Ramp Magnet to next setpoint
+		setpointy = S.starty + (i*(S.finy-S.starty)/(S.numptsy-1))	
+		setlS625fieldWait(S.instrIDy, S.starty)
+		
+		// Delay
+		sc_sleep(S.delayy)
+		for(j=0;j<S.numptsx;j++)
+			rampMultipleK2400s(keithleyIDs, j, S.numptsx, S.startxs, S.finxs, ramprate=S.rampratex)
+			sc_sleep(S.delayx)
+			RecordValues(S, i, j)
+		endfor
+	endfor
+	
+	// Save by default
+	if (nosave == 0)
+		EndScan(S=S)
+	else
+		 dowindow /k SweepControl
+	endif
+end
+
 
 
 function ScanLS625Magnet(instrID, startx, finx, numptsx, delayx, [y_label, comments, nosave]) 
@@ -938,10 +1201,11 @@ function ScanLS625Magnet(instrID, startx, finx, numptsx, delayx, [y_label, comme
 end
 
 
-function ScanBabyDACLS625Magnet2D(bdID, startx, finx, channelsx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, rampratey, [y_label, comments, nosave]) //Units: mV
+function ScanBabyDACLS625Magnet2D(bdID, startx, finx, channelsx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, rampratey, [startxs, finxs, y_label, comments, nosave]) //Units: mV
 	// Sweeps BabyDAC on x-axis and Keithley on y-axis
 	variable bdID, startx, finx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, rampratey, nosave
 	string channelsx, y_label, comments
+	string startxs, finxs // For different start/finish points for each channel (must match length of channels if used)
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -949,12 +1213,14 @@ function ScanBabyDACLS625Magnet2D(bdID, startx, finx, channelsx, numptsx, delayx
 	// Set defaults
 	comments = selectstring(paramisdefault(comments), comments, "")
 	y_label = selectstring(paramisdefault(y_label), y_label, "Field /mT")
+	startxs = selectstring(paramisdefault(startxs), startxs, "")
+	finxs = selectstring(paramisdefault(finxs), finxs, "")
 	
 	// Initialize ScanVars
 	struct ScanVars S
 	initScanVarsBD(S, bdID, startx, finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
 							starty=starty, finy=finy, numptsy=numptsy, delayy=delayy, rampratey=rampratey, \
-	 						comments=comments)
+	 						startxs=startxs, finxs=finxs, comments=comments)
 	S.instrIDy = magnetID
 	S.y_label = y_label
 
@@ -973,23 +1239,19 @@ function ScanBabyDACLS625Magnet2D(bdID, startx, finx, channelsx, numptsx, delayx
 	initializeScan(S)
 
 	// Main measurement loop
-	variable i=0, j=0, setpointx, setpointy
-	do
-		setpointx = S.startx
+	variable i=0, j=0, setpointy
+	for(i=0;i<S.numptsy;i++)
+		rampToNextSetpoint(S, 0, ignore_lims=1)  // Ramp BDs back to start(s)
 		setpointy = S.starty + (i*(S.finy-S.starty)/(S.numptsy-1))
 		setlS625fieldWait(S.instrIDy, setpointy) 
-		RampMultipleBD(S.instrIDx, S.channelsx, setpointx, ramprate=S.rampratex, ignore_lims=1)
 		sc_sleep(S.delayy)
 		j=0
-		do
-			setpointx = S.startx + (j*(S.finx-S.startx)/(S.numptsx-1))
-			RampMultipleBD(S.instrIDx, S.channelsx, setpointx, ramprate=S.rampratex)
+		for(j=0;j<S.numptsx;j++)
+			rampToNextSetpoint(S, j, ignore_lims=1)  // Ramp BDs to next setpoint(s)
 			sc_sleep(S.delayx)
 			RecordValues(S, i, j)
-			j+=1
-		while (j<S.numptsx)
-	i+=1
-	while (i<S.numptsy)
+		endfor
+	endfor
 	
 	// Save by default
 	if (nosave == 0)
@@ -1068,7 +1330,7 @@ function ScanFastDACLS625Magnet2D(fdID, startx, finx, channelsx, magnetID, start
 end
 
 
-function Scank2400Ls625Magnet2D(keithleyID, startx, finx, channelsx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, rampratey, [y_label, comments, nosave]) //Units: mV
+function ScanK2400LS625Magnet2D(keithleyID, startx, finx, channelsx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, rampratey, [y_label, comments, nosave]) //Units: mV
 	variable keithleyID, startx, finx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, rampratey, nosave
 	string channelsx, y_label, comments
 	

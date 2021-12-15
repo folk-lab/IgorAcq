@@ -444,11 +444,11 @@ function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, ra
 	S.delayx = delayx  // delay after each step for Slow scans (has no effect for Fastdac scans)
 
 	// For 2D scans
-	S.is2d = numptsy > 0 ? 0 : 1
+	S.is2d = numptsy > 1 ? 0 : 1
 	S.channelsy = channelsy
 	S.starty = starty 
 	S.finy = finy
-	S.numptsy = numptsy 
+	S.numptsy = numptsy > 1 ? numptsy : 1  // All scans have at least size 1 in y-direction (1 implies a 1D scan)
 	S.rampratey = rampratey
 	S.delayy = delayy // delay after each step in y-axis (e.g. settling time after x-axis has just been ramped from fin to start quickly)
 
@@ -533,8 +533,8 @@ function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
    		S.y_label = y_label
    	endif  		
 
-   	// Sets starts/fins in FD string format
-    scv_setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
+   	// Sets starts/fins (either using starts/fins given or from single startx/finx given)
+    scv_setSetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
 	
 	// Set variables with some calculation
     scv_setFreq(S) 		// Sets S.samplingFreq/measureFreq/numADCs	
@@ -579,6 +579,9 @@ function initScanVarsBD(S, instrID, startx, finx, [channelsx, numptsx, delayx, r
     
 	// Additional initialization for BabyDAC scans
     scv_setChannels(S, channelsx, channelsy, fastdac=0) // Sets channelsx, channelsy to lists of numbers instead of labels
+
+   	// Sets starts/fins (either using starts/fins given or from single startx/finx given)
+    scv_setSetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
     
    	// Get Labels for graphs
    	S.x_label = selectString(strlen(x_label) > 0, scu_getDacLabel(S.channelsx, fastdac=0), x_label)  // Uses channels as list of numbers, and only if x_label not passed in
@@ -648,22 +651,21 @@ function scv_setChannels (S, channelsx, channelsy, [fastdac])
 end
 
 
-function scv_setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
-
+function scv_setSetpoints(S, itemsx, startx, finx, itemsy, starty, finy, startxs, finxs, startys, finys)
     struct ScanVars &S
     variable startx, finx, starty, finy
-    string channelsx, startxs, finxs, channelsy, startys, finys
+    string itemsx, startxs, finxs, itemsy, startys, finys
 
 	string starts, fins  // Strings to modify in format_setpoints
     // Set X
-   	if ((numtype(strlen(startxs)) != 0 || strlen(startxs) == 0) && (numtype(strlen(finxs)) != 0 || strlen(finxs) == 0))  // Then just a single start/end for channelsx
+   	if ((numtype(strlen(startxs)) != 0 || strlen(startxs) == 0) && (numtype(strlen(finxs)) != 0 || strlen(finxs) == 0))  // Then just a single start/end for itemsx
    		s.startx = startx
 		s.finx = finx	
-        scv_formatSetpointsFD(startx, finx, S.channelsx, starts, fins)  // Modifies starts, fins
+        scv_formatSetpoints(startx, finx, itemsx, starts, fins)  // Modifies starts, fins
 		s.startxs = starts
 		s.finxs = fins
 	elseif (!(numtype(strlen(startxs)) != 0 || strlen(startxs) == 0) && !(numtype(strlen(finxs)) != 0 || strlen(finxs) == 0))
-		scv_sanitizeSetpointsFD(startxs, finxs, S.channelsx, starts, fins)  // Modifies starts, fins
+		scv_sanitizeSetpoints(startxs, finxs, itemsx, starts, fins)  // Modifies starts, fins
 		s.startx = str2num(StringFromList(0, starts, ","))
 		s.finx = str2num(StringFromList(0, fins, ","))
 		s.startxs = starts
@@ -677,11 +679,11 @@ function scv_setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy,
         if (strlen(startys) == 0 && strlen(finys) == 0)  // Single start/end for Y
             s.starty = starty
             s.finy = finy	
-            scv_formatSetpointsFD(S.starty, S.finy, S.channelsy, starts, fins)  
+            scv_formatSetpoints(starty, finy, itemsy, starts, fins)  
             s.startys = starts
             s.finys = fins
         elseif (!(numtype(strlen(startys)) != 0 || strlen(startys) == 0) && !(numtype(strlen(finys)) != 0 || strlen(finys) == 0)) // Multiple start/end for Ys
-            scv_sanitizeSetpointsFD(startys, finys, S.channelsy, starts, fins)
+            scv_sanitizeSetpoints(startys, finys, itemsy, starts, fins)
             s.starty = str2num(StringFromList(0, starts, ","))
             s.finy = str2num(StringFromList(0, fins, ","))
             s.startys = starts
@@ -696,20 +698,20 @@ function scv_setFDsetpoints(S, channelsx, startx, finx, channelsy, starty, finy,
 end
 
 
-function scv_sanitizeSetpointsFD(start_list, fin_list, channels, starts, fins)
-	// Makes sure starts/fins make sense for number of channels and have no bad formatting
+function scv_sanitizeSetpoints(start_list, fin_list, items, starts, fins)
+	// Makes sure starts/fins make sense for number of items and have no bad formatting
 	// Modifies the starts/fins strings passed in
-	string start_list, fin_list, channels
+	string start_list, fin_list, items
 	string &starts, &fins
 	
 	string buffer
 	
-	scu_assertSeparatorType(channels, ",")  // "," because quite often user entered
+	scu_assertSeparatorType(items, ",")  // "," because quite often user entered
 	scu_assertSeparatorType(start_list, ",")  // "," because entered by user
 	scu_assertSeparatorType(fin_list, ",")	// "," because entered by user
 	
-	if (itemsinlist(channels, ",") != itemsinlist(start_list, ",") || itemsinlist(channels, ",") != itemsinlist(fin_list, ","))
-		sprintf buffer, "ERROR[scv_sanitizeSetpointsFD]: length of start_list/fin_list/channels not equal!!! start_list:(%s), fin_list:(%s), channels:(%s)\r", start_list, fin_list, channels
+	if (itemsinlist(items, ",") != itemsinlist(start_list, ",") || itemsinlist(items, ",") != itemsinlist(fin_list, ","))
+		sprintf buffer, "ERROR[scv_sanitizeSetpoints]: length of start_list/fin_list/items not equal!!! start_list:(%s), fin_list:(%s), items:(%s)\r", start_list, fin_list, items
 		abort buffer
 	endif
 	
@@ -718,16 +720,16 @@ function scv_sanitizeSetpointsFD(start_list, fin_list, channels, starts, fins)
 end
 
 
-function scv_formatSetpointsFD(start, fin, channels, starts, fins)
+function scv_formatSetpoints(start, fin, items, starts, fins)
 	// Returns strings in starts and fins in the format that fdacRecordValues takes
 	// e.g. fd_format_setpoints(-10, 10, "1,2,3", s, f) will make string s = "-10,-10,-10" and string f = "10,10,10"
 	variable start, fin
-	string channels, &starts, &fins
+	string items, &starts, &fins
 	
 	variable i
 	starts = ""
 	fins = ""
-	for(i=0; i<itemsInList(channels, ","); i++)
+	for(i=0; i<itemsInList(items, ","); i++)
 		starts = addlistitem(num2str(start), starts, ",", INF)
 		fins = addlistitem(num2str(fin), fins, ",", INF)
 	endfor
@@ -2376,7 +2378,6 @@ end
 function PreScanChecksFD(S, [x_only, y_only])
    struct ScanVars &S
    variable x_only, y_only  // Whether to only check specific axis (e.g. if other axis is a babydac or something else)
-   
 	scc_checkSameDeviceFD(S) 	// Checks DACs and ADCs are on same device
 	scc_checkRampratesFD(S)	 	// Check ramprates of x and y
 	scc_checkLimsFD(S)			// Check within software lims for x and y
@@ -2419,12 +2420,27 @@ function SetCheckAWG(AWG, S)
 end
 
 
+function checkStartsFinsChannels(starts, fins, channels)
+	// checks that each of starts/fins/channels has the correct separators and matching length
+	string starts, fins, channels 
+
+	scu_assertSeparatorType(starts, ",")
+	scu_assertSeparatorType(fins, ",")
+	scu_assertSeparatorType(channels, ",")
+	if (itemsInList(channels) != itemsInList(starts) || itemsInList(channels) != itemsInList(fins))
+		string buf
+		sprintf buf "ERROR[checkStartsFinsChannels]: len(channels) = %d, len(starts) = %d, len(fins) = %d. They should all match\r" , itemsInList(channels), itemsInList(starts), itemsInList(fins)
+		abort buf
+	endif
+	return 1
+end
+
+
 function RampStartFD(S, [ignore_lims, x_only, y_only])
 	// move DAC channels to starting point
+	// Note: RampToNextSetpoint works very similarly to this but is not limited to ramping only to the start
 	struct ScanVars &S
 	variable ignore_lims, x_only, y_only
-
-
 
 	variable i, setpoint
 	// If x exists ramp them to start
@@ -2492,7 +2508,7 @@ function scc_checkRampratesFD(S)
 	variable eff_ramprate, answer, i, k, channel
 	string question
 
-	if(!numtype(strlen(s.channelsx)) == 0 == 0 && strlen(s.channelsx) != 0)  // if s.Channelsx != (null or "")
+	if(numtype(strlen(s.channelsx)) == 0 && strlen(s.channelsx) != 0)  // if s.Channelsx != (null or "")
 		scu_assertSeparatorType(S.channelsx, ",")
 		for(i=0;i<itemsinlist(S.channelsx,",");i+=1)
 			eff_ramprate = abs(str2num(stringfromlist(i,S.startxs,","))-str2num(stringfromlist(i,S.finxs,",")))*(S.measureFreq/S.numptsx)
@@ -2715,12 +2731,12 @@ function RampStartBD(S, [x_only, y_only, ignore_lims])
  
 	// If x exists ramp them to start
 	if(!y_only && numtype(strlen(s.channelsx)) == 0 && strlen(s.channelsx) != 0)  // If not NaN and not ""
-		RampMultipleBD(S.instrIDx, S.channelsx, S.startx, ramprate=S.rampratex, ignore_lims=ignore_lims)
+		rampToNextSetpoint(S, 0, ignore_lims=ignore_lims)
 	endif  
 	
 	// If y exists ramp them to start
 	if(!x_only && numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0)  // If not NaN and not ""
-		RampMultipleBD(S.instrIDy, S.channelsy, S.starty, ramprate=S.rampratey, ignore_lims=ignore_lims)
+		rampToNextSetpoint(S, 0, outer_index=0, y_only=1, ignore_lims=ignore_lims)
 	endif
 end
 
@@ -2806,6 +2822,52 @@ function CheckAWG(AWG, Fsv)
 end
 
 
+function rampToNextSetpoint(S, inner_index, [outer_index, y_only, ignore_lims, fastdac])
+	// Ramps channels to next setpoint -- (BabyDAC or FastDAC)
+	// Note: only ramps x channels unless outer_index provided
+	Struct ScanVars &S
+	variable inner_index  // The faster sweeping axis (X)
+	variable outer_index  // The slower sweeping axis (Y)
+	variable y_only  	  // Set to 1 to only sweep the Y channels
+	variable ignore_lims  // Whether to ignore BabyDAC and FastDAC limits (makes sense if already checked previously)
+	variable fastdac  	  // 0 for BabyDAC, 1 for FastDAC
+
+
+	variable k
+	if (!y_only)
+		checkStartsFinsChannels(S.startxs, S.finxs, S.channelsx)
+		variable sx, fx, setpointx
+		string chx
+		for(k=0; k<itemsinlist(S.channelsx,","); k++)
+			sx = str2num(stringfromList(k, S.startxs, ","))
+			fx = str2num(stringfromList(k, S.finxs, ","))
+			chx = stringfromList(k, S.channelsx, ",")
+			setpointx = sx + (inner_index*(fx-sx)/(S.numptsx-1))	
+			if (fastdac)
+				RampMultipleFDAC(S.instrIDx, chx, setpointx, ramprate=S.rampratex, ignore_lims=ignore_lims)
+			else
+				RampMultipleBD(S.instrIDx, chx, setpointx, ramprate=S.rampratex, ignore_lims=ignore_lims)
+			endif
+		endfor
+	endif
+
+	if (!paramIsDefault(outer_index))
+		checkStartsFinsChannels(S.startys, S.finys, S.channelsy)
+		variable sy, fy, setpointy
+		string chy
+		for(k=0; k<itemsinlist(S.channelsy,","); k++)
+			sy = str2num(stringfromList(k, S.startys, ","))
+			fy = str2num(stringfromList(k, S.finys, ","))
+			chy = stringfromList(k, S.channelsy, ",")
+			setpointy = sy + (outer_index*(fy-sy)/(S.numptsy-1))	
+			if (fastdac)
+				RampMultipleFDAC(S.instrIDy, chy, setpointy, ramprate=S.rampratey, ignore_lims=ignore_lims)
+			else
+				RampMultipleBD(S.instrIDy, chy, setpointy, ramprate=S.rampratey, ignore_lims=ignore_lims)
+			endif
+		endfor
+	endif
+end
 
 	
 	

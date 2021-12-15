@@ -96,6 +96,27 @@ end
 //// Ramp functions ////
 ///////////////////////
 
+function rampMultipleK2400s(instrIDs, index, numpts, starts, fins, [ramprate])
+	// Ramp multiple K2400s to respective start/end points 
+	string instrIDs, starts, fins   // start/fin for each instrID (All "," separated lists with equal length)
+	variable index   // What position on axis
+	variable numpts  // Total numpts for axis
+	variable ramprate
+	
+	checkStartsFinsChannels(starts, fins, instrIDs)  // Checks separators and matching length
+
+	variable k=0, sx, fx, instrID, setpoint
+	for (k=0; k<itemsinlist(instrIDs, ","); k++)
+		sx = str2num(stringfromList(k, starts, ","))
+		fx = str2num(stringfromList(k, fins, ","))
+		instrID = stringfromList(k, instrIDs, ",")
+		setpoint = sx + (index*(fx-sx)/(numpts-1))	
+		variable id = $instrID
+		rampK2400Voltage(id, setpoint, ramprate=ramprate)  
+	endfor
+end
+
+
 function rampK2400Voltage(instrID,output,[ramprate]) // Units: mV, mV/s
 	variable instrID,output,ramprate
 	variable startpoint, sgn, step, new_output
