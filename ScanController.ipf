@@ -519,7 +519,7 @@ function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
 	x_label=x_label, y_label=y_label, startxs=startxs, finxs=finxs, startys=startys, finys=finys, comments=comments)
 
 	// Additional intialization for fastDAC scans
-    S.adcList = scf_getRecordedADCinfo("channels")
+    S.adcList = scf_getRecordedFADCinfo("channels")
     S.using_fastdac = 1
 
    	// Sets channelsx, channelsy to be lists of channel numbers instead of labels
@@ -857,9 +857,9 @@ function/S sci_get1DWaveNames(raw, fastdac)
     string wavenames = ""
 	if (fastdac == 1)
 		if (raw == 1)
-			wavenames = scf_getRecordedADCinfo("raw_names")
+			wavenames = scf_getRecordedFADCinfo("raw_names")
 		else
-			wavenames = scf_getRecordedADCinfo("calc_names")
+			wavenames = scf_getRecordedFADCinfo("calc_names")
 		endif
     else  // Regular ScanController
         wave sc_RawRecord, sc_RawWaveNames
@@ -3032,7 +3032,7 @@ function scf_getFDInfoFromID(instrID, info)
 	return scf_getFDInfoFromDeviceNum(deviceNum, info)
 end
 
-function/S scf_getRecordedADCinfo(info_name)  // TODO: Rename if prepending something which implies fd anyway
+function/S scf_getRecordedFADCinfo(info_name)  
 	// Return a list of strings for specified column in fadcattr based on whether "record" is ticked
 	// Valid info_name ("calc_names", "raw_names", "calc_funcs", "inputs", "channels")
     string info_name 
@@ -3069,10 +3069,57 @@ function/S scf_getRecordedADCinfo(info_name)  // TODO: Rename if prepending some
 end
 
 
+function/S scf_getRecordedScanControllerInfo(info_name)  
+	// Return a list of strings for specified part of ScanController Window 
+    string info_name 
+
+	if (cmpstr(info_name, "calc_names") == 0  || cmpstr(info_name, "calc_funcs") == 0)
+		wave sc_CalcRecord
+		duplicate/free/o sc_CalcRecord, recordWave
+	else
+		wave sc_RawRecord
+		duplicate/free/o sc_RawRecord, recordWave
+	endif
+
+	variable i
+	string return_list = ""
+	for (i = 0; i<numpnts(recordWave); i++)     
+		if (recordWave[i])
+			strswitch(info_name)
+				case "calc_names":
+					wave/T sc_CalcWaveNames
+					return_list = addlistItem(sc_CalcWaveNames[i], return_list, ";", INF)
+					break
+				case "raw_names":
+					wave/T sc_RawWaveNames
+					return_list = addlistItem(sc_RawWaveNames[i], return_list, ";", INF)
+					break
+				case "calc_scripts":
+					wave/T sc_CalcScripts
+					return_list = addlistItem(sc_CalcScripts[i], return_list, ";", INF)
+					break
+				case "raw_scripts":
+					wave/T sc_RawScripts
+					return_list = addlistItem(sc_RawScripts[i], return_list, ";", INF)
+					break
+				case "measure_async":
+					wave sc_measAsync
+					return_list = addlistItem(num2str(sc_measAsync[i]), return_list, ";", INF)
+					break
+				default:
+					abort "bad name requested: " + info_name + ". Allowed are (calc_names, raw_names, calc_scripts, raw_scripts, measure_async)"
+					break
+			endswitch
+		endif
+		return return_list
+	endfor
+end
+
+
 function scf_getNumRecordedADCs() 
 	// Returns how many ADCs are set to be recorded
 	// Note: Gets this info from ScanController_Fastdac
-	string adcs = scf_getRecordedADCinfo("channels")
+	string adcs = scf_getRecordedFADCinfo("channels")
 	variable numadc = itemsInList(adcs)
 	if(numadc == 0)
 		print "WARNING[scf_getNumRecordedADCs]: No ADCs set to record. Behaviour may be unpredictable"
@@ -3358,7 +3405,7 @@ function scfd_ProcessAndDistribute(ScanVars, rowNum)
 	// Get all raw 1D wave names in a list
 	string RawWaveNames1D = sci_get1DWaveNames(1, 1)
 	string CalcWaveNames1D = sci_get1DWaveNames(0, 1)
-	string CalcStrings = scf_getRecordedADCinfo("calc_funcs")
+	string CalcStrings = scf_getRecordedFADCinfo("calc_funcs")
 	if (itemsinList(RawWaveNames1D) != itemsinList(CalCWaveNames1D))
 		abort "Different number of raw wave names compared to calc wave names"
 	endif

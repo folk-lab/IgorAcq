@@ -234,7 +234,7 @@ function ScanBabyDAC2D(instrID, startx, finx, channelsx, numptsx, delayx, rampra
 end
 
 
-function ScanBabyDACRepeat(instrID, startx, finx, channelsx, numptsx, delayx, rampratex, numptsy, delayy, [starts, fins, comments, alternate, nosave]) //Units: mV, mT
+function ScanBabyDACRepeat(instrID, startx, finx, channelsx, numptsx, delayx, rampratex, [numptsy, delayy, starts, fins, comments, alternate, nosave]) //Units: mV, mT
 	// x-axis is the dac sweep
 	// y-axis is an index
 	// if alternate = 1 then will sweep: start -> fin, fin -> start, start -> fin, ....
@@ -370,7 +370,7 @@ function ReadVsTimeFastdac(instrID, duration, [y_label, comments, nosave]) // Un
 	wave fadcattr
 	variable i=0
 
-	string channels = scf_getRecordedADCinfo("channels")  // Get ADCs ticked to record
+	string channels = scf_getRecordedFADCinfo("channels")  // Get ADCs ticked to record
 	
 	if(itemsinlist(channels, ",") == 0)
 		abort "[ERROR] \"ReadVsTimeFastdac\": No ADC channels selected"
@@ -667,7 +667,7 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 end
 
 
-function ScanFastDACRepeat(instrID, start, fin, channels, numptsy, [numptsx, sweeprate, delay, ramprate, alternate, starts, fins, comments, nosave, use_awg])
+function ScanFastDACRepeat(instrID, start, fin, channels, [numptsy, numptsx, sweeprate, delay, ramprate, alternate, starts, fins, comments, nosave, use_awg])
 	// 1D repeat scan for FastDAC
 	// Note: to alternate scan direction set alternate=1
 	// Note: Ramprate is only for ramping gates between scans

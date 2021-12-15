@@ -1048,7 +1048,7 @@ function FDSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,nosave])
 	string log_freq_wavenames = ""
 	string lin_freq_wavenames = ""
 	variable numChannels = scf_getNumRecordedADCs()
-	string adc_channels = scf_getRecordedADCinfo("channels")
+	string adc_channels = scf_getRecordedFADCinfo("channels")
 	variable i
 	for(i=0;i<numChannels;i+=1)
 		wn = "spectrum_fftADC"+stringfromlist(i,adc_channels, ";")
@@ -1074,7 +1074,7 @@ function FDSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,nosave])
 	scg_arrangeWindows(all_graphIDs)
 
 	// Record data
-	string wavenames = scf_getRecordedADCinfo("calc_names")  // ";" separated list of recorded calculated waves
+	string wavenames = scf_getRecordedFADCinfo("calc_names")  // ";" separated list of recorded calculated waves
 	variable j
 	for (i=0; i<numAverage; i++)
 		scfd_RecordValues(S, i)		
