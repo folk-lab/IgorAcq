@@ -1636,7 +1636,7 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	endif
 
 	// add info about scan to the scan history file in /config
-	sce_ScanVarsToJson(S, getrtstackinfo(3), save_to_file=1)
+	sce_ScanVarsToJson(S_, getrtstackinfo(3), save_to_file=1)
 end
 
 
@@ -1711,8 +1711,8 @@ function/T sce_ScanVarsToJson(S, traceback, [save_to_file])
 	
 	buffer = addJSONkeyval(buffer,"duration",num2str(S.duration))
 	buffer = addJSONkeyval(buffer,"readVsTime",num2str(S.readVsTime))
-	buffer = addJSONkeyval(buffer,"start_time",num2str(S.start_time))
-	buffer = addJSONkeyval(buffer,"end_time",num2str(S.end_time))
+	buffer = addJSONkeyval(buffer,"start_time",num2str(S.start_time, "%.2f"))
+	buffer = addJSONkeyval(buffer,"end_time",num2str(S.end_time,"%.2f"))
 	buffer = addJSONkeyval(buffer,"using_fastdac",num2str(S.using_fastdac))
 	buffer = addJSONkeyval(buffer,"comments",S.comments,addquotes=1)
 

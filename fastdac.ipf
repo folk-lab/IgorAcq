@@ -1067,9 +1067,14 @@ function FDSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,nosave])
 	all_graphIDs += scg_initializeGraphsForWavenames(sci_get1DWaveNames(0,1), "Time /s", is2d=S.is2d, y_label="Current /nA")    // Calculated data (should be in nA)
 	
 	string graphIDs
-	graphIDs = scg_initializeGraphsForWavenames(log_freq_wavenames, "Frequency /Hz", is2d=0, y_label="Ylabel for log spectrum?")
+	graphIDs = scg_initializeGraphsForWavenames(log_freq_wavenames, "Frequency /Hz", is2d=0, y_label="dB nA/sqrt(Hz)")
 	all_graphIDs = all_graphIDs+graphIDs
-	graphIDs = scg_initializeGraphsForWavenames(lin_freq_wavenames, "Frequency /Hz", is2d=0, y_label="Ylabel for lin spectrum?")
+	graphIDs = scg_initializeGraphsForWavenames(lin_freq_wavenames, "Frequency /Hz", is2d=0, y_label="nA/sqrt(Hz)")
+	string gid
+	for (i=0;i<itemsInList(graphIDs);i++)
+		gid = StringFromList(i, graphIDs)
+		modifyGraph/W=$gid log(left)=1
+	endfor
 	all_graphIDs = all_graphIDs+graphIDs
 	scg_arrangeWindows(all_graphIDs)
 
@@ -1099,6 +1104,7 @@ function FDSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,nosave])
 				fftwavelin = fftwavelin/(i+1)
 			endif
 		endfor
+		doupdate
 	endfor
 
 	// Return resampling state to whatever it was before
@@ -1130,19 +1136,20 @@ function/WAVE fd_calculate_spectrum(time_series, [scan_duration, linear])
 		
 	
 	// Built in powerspectrum function
-	wave w_Periodogram
-	wave powerspec
+
 	if (!linear)  // Use log scale
-		DSPPeriodogram/PARS/DBR=1/NODC=1/R=[0,(last_val)] tseries  
+		DSPPeriodogram/PARS/DBR=1/NODC=2/R=[0,(last_val)] tseries  
+		wave w_Periodogram
 		duplicate/free w_Periodogram, powerspec
 		powerspec = powerspec+10*log(scan_duration)  // This is so that the powerspec is independent of scan_duration
 	else  // Use linear scale
-		DSPPeriodogram/PARS/NODC=1/R=[0, (last_val)] tseries
+		DSPPeriodogram/PARS/NODC=2/R=[0, (last_val)] tseries
+		wave w_Periodogram
 		duplicate/free w_Periodogram, powerspec
 		// TODO: I'm not sure this is correct, but I don't know what should be done to fix it -- TIM
 		powerspec = powerspec*scan_duration  // This is supposed to be so that the powerspec is independent of scan_duration
 	endif
-	powerspec[0] = NaN
+//	powerspec[0] = NaN
 	return powerspec
 end
 
@@ -1713,6 +1720,16 @@ Structure AWGVars
 endstructure
 
 
+function fd_initGlobalAWG()
+	Struct AWGVars S
+	// Set empty strings instead of null
+	S.AW_waves = ""
+	S.AW_dacs = ""
+	
+	fd_setGlobalAWG(S)
+end
+
+
 function fd_setGlobalAWG(S)
 	// Function to store values from AWG_list to global variables/strings/waves
 	// StructPut ONLY stores VARIABLES so have to store other parts separately
@@ -1733,6 +1750,12 @@ function fd_getGlobalAWG(S)
 	struct AWGVars &S
 	// Get string parts
 	wave/T t = fd_AWGglobalStrings
+	
+	if (!WaveExists(t))
+		fd_initGlobalAWG()
+		wave/T t = fd_AWGglobalStrings
+	endif
+	
 	S.AW_waves = t[0]
 	S.AW_dacs = t[1]
 
@@ -1748,3 +1771,4 @@ function fd_getGlobalAWG(S)
 	S.numCycles = v[7]
 	S.numSteps = v[8]
 end
+
