@@ -38,22 +38,23 @@ function scu_assertSeparatorType(list_string, assert_separator)
 	string list_string, assert_separator
 	if (strsearch(list_string, assert_separator, 0) < 0)  // Does not contain desired separator (maybe only one item)
 		string buffer
+		string calling_func = GetRTStackInfo(2)
 		strswitch (assert_separator)
 			case ",":
 				if (strsearch(list_string, ";", 0) >= 0)
-					sprintf buffer, "ERROR[scu_assertSeparatorType]: Expected separator = %s     Found separator = ;\r", assert_separator
+					sprintf buffer, "ERROR[scu_assertSeparatorType]: In function \"%s\" Expected separator = %s     Found separator = ;\r", calling_func, assert_separator
 					abort buffer
 				endif
 				break
 			case ";":
 				if (strsearch(list_string, ",", 0) >= 0)
-					sprintf buffer, "ERROR[scu_assertSeparatorType]: Expected separator = %s     Found separator = ,\r", assert_separator
+					sprintf buffer, "ERROR[scu_assertSeparatorType]: In function \"%s\" Expected separator = %s     Found separator = ,\r", calling_func, assert_separator
 					abort buffer
 				endif
 				break
 			default:
 				if (strsearch(list_string, ",", 0) >= 0 || strsearch(list_string, ";", 0) >= 0)
-					sprintf buffer, "ERROR[scu_assertSeparatorType]: Expected separator = %s     Found separator = , or ;\r", assert_separator
+					sprintf buffer, "ERROR[scu_assertSeparatorType]: In function \"%s\" Expected separator = %s     Found separator = , or ;\r",calling_func, assert_separator
 					abort buffer
 				endif
 				break
@@ -291,12 +292,14 @@ structure ScanVars
     string channelsx
     variable startx, finx, numptsx, rampratex
     variable delayx  // delay after each step for Slow scans (has no effect for Fastdac scans)
+    string startxs, finxs  // If sweeping from different start/end points for each channel or instrument
 
     // For 2D scans
     variable is2d
     string channelsy 
     variable starty, finy, numptsy, rampratey 
     variable delayy  // delay after each step in y-axis (e.g. settling time after x-axis has just been ramped from fin to start quickly)
+    string startys, finys  // Similar for Y-axis
 
     // For specific scans
     variable direction  // Allows controlling scan from start -> fin or fin -> start (with 1 or -1)
@@ -316,12 +319,11 @@ structure ScanVars
     variable samplingFreq, measureFreq  // measureFreq = samplingFreq/numADCs 
     variable sweeprate  // How fast to sweep in mV/s (easier to specify than numpts for fastdac scans)
     string adcList 
-    string startxs, finxs  // If sweeping from different start/end points for each DAC channel
-    string startys, finys  // Similar for Y-axis
 	 string raw_wave_names  // Names of waves to override the names raw data is stored in for FastDAC scans
 	 
 	 // Backend used
 	 variable never_save   // Set to 1 to make sure these ScanVars are never saved (e.g. if using to get throw away values for getting an ADC reading)
+	 variable filenum 		// Filled when getting saved
 endstructure
 
 
@@ -444,7 +446,7 @@ function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, ra
 	S.delayx = delayx  // delay after each step for Slow scans (has no effect for Fastdac scans)
 
 	// For 2D scans
-	S.is2d = numptsy > 1 ? 0 : 1
+	S.is2d = numptsy > 1 ? 1 : 0
 	S.channelsy = channelsy
 	S.starty = starty 
 	S.finy = finy
@@ -517,8 +519,11 @@ function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
 	initScanVars(S, instrIDx=instrID, startx=startx, finx=finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
 	instrIDy=instrID, starty=starty, finy=finy, channelsy=channelsy, numptsy=numptsy, rampratey=rampratey, delayy=delayy, \
 	x_label=x_label, y_label=y_label, startxs=startxs, finxs=finxs, startys=startys, finys=finys, comments=comments)
-
+	
+	
 	// Additional intialization for fastDAC scans
+	S.sweeprate = sweeprate
+	S.duration = duration
     S.adcList = scf_getRecordedFADCinfo("channels")
     S.using_fastdac = 1
 
@@ -1127,14 +1132,15 @@ end
 
 
 function scg_updateRawGraphs()
-  // updates activegraphs which takes about 15ms
-  // ONLY update 1D graphs for speed (if this takes too long, the buffer will overflow)
-  svar sc_rawGraphs1D
-
-  variable i
-  for(i=0;i<itemsinlist(sc_rawGraphs1D,";");i+=1)
-    doupdate/w=$stringfromlist(i,sc_rawGraphs1D,";")
-  endfor
+	// updates activegraphs which takes about 15ms
+	// ONLY update 1D graphs for speed (if this takes too long, the buffer will overflow)
+ 	svar/z sc_rawGraphs1D
+	if (svar_Exists(sc_rawGraphs1D))
+		variable i
+			for(i=0;i<itemsinlist(sc_rawGraphs1D,";");i+=1)
+			doupdate/w=$stringfromlist(i,sc_rawGraphs1D,";")
+		endfor
+	endif
 end
 
 
@@ -1590,8 +1596,6 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	save_experiment = paramisDefault(save_experiment) ? 1 : save_experiment
 	additional_wavenames = SelectString(ParamIsDefault(additional_wavenames), additional_wavenames, "")
 	
-	nvar filenum
-	variable current_filenum = filenum  // Because filenum gets incremented in SaveToHDF (to avoid clashing filenums when Igor crashes during saving)
 	if(!paramIsDefault(S))
 		scv_setLastScanVars(S)  // I.e save the ScanVars including end_time and any other changed values in case saving fails (which it often does)
 	endif
@@ -1602,10 +1606,13 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 		S_.end_time = datetime
 		S_.comments = "aborted, " + S_.comments
 	endif
-	if (S_.end_time == 0) // Should have already been set, but if not, this is likely a good guess and prevents a stupid number being saved
+	if (S_.end_time == 0 || numtype(S_.end_time) != 0) // Should have already been set, but if not, this is likely a good guess and prevents a stupid number being saved
 		S_.end_time = datetime
 		S_.comments = "end_time guessed, "+S_.comments
 	endif
+	
+	nvar filenum
+	S_.filenum = filenum
 
 	dowindow/k SweepControl // kill scan control window
 	printf "Time elapsed: %.2f s \r", (S_.end_time-S_.start_time)
@@ -1625,11 +1632,11 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	endif
 
 	if(sc_checkBackup())  	// check if a path is defined to backup data
-		sc_copyNewFiles(current_filenum, save_experiment=save_experiment)		// copy data to server mount point (nvar filenum gets incremented after HDF is opened)
+		sc_copyNewFiles(S_.filenum, save_experiment=save_experiment)		// copy data to server mount point (nvar filenum gets incremented after HDF is opened)
 	endif
 
 	// add info about scan to the scan history file in /config
-	sce_saveFuncCall(getrtstackinfo(2))
+	sce_ScanVarsToJson(S, getrtstackinfo(3), save_to_file=1)
 end
 
 
@@ -1674,52 +1681,70 @@ function SaveNamedWaves(wave_names, comments)
 end
 
 
-function sce_saveFuncCall(funcname)
+function/T sce_ScanVarsToJson(S, traceback, [save_to_file])
 	// Can be used to save Function calls to a text file
-	string funcname
-	// TODO: Update this function to new style with ScanVars
-	abort "Not implemented again yet: This should probably take ScanVars since all these globals are now stored in there... Also seems like this could be saved to HDF?"
-	
-	nvar sc_is2d, sc_startx, sc_starty, sc_finx, sc_starty, sc_finy, sc_numptsx, sc_numptsy
-	nvar filenum
-	svar sc_x_label, sc_y_label
+	Struct ScanVars &S
+	string traceback
+	variable save_to_file  // Whether to save to .txt file
 	
 	// create JSON string
 	string buffer = ""
 	
-	buffer = addJSONkeyval(buffer,"Filenum",num2istr(filenum))
-	buffer = addJSONkeyval(buffer,"Function Name",funcname,addquotes=1)
-	if(sc_is2d == 0)
-		buffer = addJSONkeyval(buffer,"Sweep parameter/label",sc_x_label,addquotes=1)
-		buffer = addJSONkeyval(buffer,"Starting value",num2str(sc_startx))
-		buffer = addJSONkeyval(buffer,"Ending value",num2str(sc_finx))
-		buffer = addJSONkeyval(buffer,"Number of points",num2istr(sc_numptsx))
-	else
-		buffer = addJSONkeyval(buffer,"Sweep parameter/label (x)",sc_x_label,addquotes=1)
-		buffer = addJSONkeyval(buffer,"Starting value (x)",num2str(sc_startx))
-		buffer = addJSONkeyval(buffer,"Ending value (x)",num2str(sc_finx))
-		buffer = addJSONkeyval(buffer,"Number of points (x)",num2istr(sc_numptsx))
-		buffer = addJSONkeyval(buffer,"Sweep parameter/label (y)",sc_y_label,addquotes=1)
-		buffer = addJSONkeyval(buffer,"Starting value (y)",num2str(sc_starty))
-		buffer = addJSONkeyval(buffer,"Ending value (y)",num2str(sc_finy))
-		buffer = addJSONkeyval(buffer,"Number of points (y)",num2istr(sc_numptsy))
-	endif
+	buffer = addJSONkeyval(buffer,"Filenum",num2istr(S.filenum))
+	buffer = addJSONkeyval(buffer,"Traceback",traceback,addquotes=1)
+	buffer = addJSONkeyval(buffer,"x_label",S.x_label,addquotes=1)
+	buffer = addJSONkeyval(buffer,"y_label",S.y_label,addquotes=1)
+	buffer = addJSONkeyval(buffer,"startx", num2str(S.startx))
+	buffer = addJSONkeyval(buffer,"finx",num2str(S.finx))
+	buffer = addJSONkeyval(buffer,"numptsx",num2istr(S.numptsx))
+	buffer = addJSONkeyval(buffer,"channelsx",S.channelsx,addquotes=1)
+	buffer = addJSONkeyval(buffer,"rampratex",num2str(S.rampratex))
+	buffer = addJSONkeyval(buffer,"delayx",num2str(S.delayx))
+
+	buffer = addJSONkeyval(buffer,"is2D",num2str(S.is2D))
+	buffer = addJSONkeyval(buffer,"starty",num2str(S.starty))
+	buffer = addJSONkeyval(buffer,"finy",num2str(S.finy))
+	buffer = addJSONkeyval(buffer,"numptsy",num2istr(S.numptsy))
+	buffer = addJSONkeyval(buffer,"channelsy",S.channelsy,addquotes=1)
+	buffer = addJSONkeyval(buffer,"rampratey",num2str(S.rampratey))
+	buffer = addJSONkeyval(buffer,"delayy",num2str(S.delayy))
+	
+	buffer = addJSONkeyval(buffer,"duration",num2str(S.duration))
+	buffer = addJSONkeyval(buffer,"readVsTime",num2str(S.readVsTime))
+	buffer = addJSONkeyval(buffer,"start_time",num2str(S.start_time))
+	buffer = addJSONkeyval(buffer,"end_time",num2str(S.end_time))
+	buffer = addJSONkeyval(buffer,"using_fastdac",num2str(S.using_fastdac))
+	buffer = addJSONkeyval(buffer,"comments",S.comments,addquotes=1)
+
+	buffer = addJSONkeyval(buffer,"numADCs",num2istr(S.numADCs))
+	buffer = addJSONkeyval(buffer,"samplingFreq",num2str(S.samplingFreq))
+	buffer = addJSONkeyval(buffer,"measureFreq",num2str(S.measureFreq))
+	buffer = addJSONkeyval(buffer,"sweeprate",num2str(S.sweeprate))
+	buffer = addJSONkeyval(buffer,"adcList",S.adcList,addquotes=1)
+	buffer = addJSONkeyval(buffer,"startxs",S.startxs,addquotes=1)
+	buffer = addJSONkeyval(buffer,"finxs",S.finxs,addquotes=1)
+	buffer = addJSONkeyval(buffer,"startys",S.startys,addquotes=1)
+	buffer = addJSONkeyval(buffer,"finys",S.finys,addquotes=1)
+
+	buffer = addJSONkeyval(buffer,"raw_wave_names",S.raw_wave_names,addquotes=1)
 	
 	buffer = prettyJSONfmt(buffer)
 	
-	// open function call history file (or create it)
-	variable hisfile
-	open /z/a/p=config hisfile as "FunctionCallHistory.txt"
-	
-	if(v_flag != 0)
-		print "[WARNING] \"saveFuncCall\": Could not open FunctionCallHistory.txt"
-		return 0
+	if (save_to_file)
+		// open function call history file (or create it)
+		variable hisfile
+		open /z/a/p=config hisfile as "FunctionCallHistory.txt"
+		
+		if(v_flag != 0)
+			print "[WARNING] \"saveFuncCall\": Could not open FunctionCallHistory.txt"
+		else
+			fprintf hisfile, buffer
+			fprintf hisfile, "------------------------------------\r\r"
+			
+			close hisfile
+		endif
 	endif
-	
-	fprintf hisfile, buffer
-	fprintf hisfile, "------------------------------------\r\r"
-	
-	close hisfile
+	return buffer
 end
 
 
@@ -1739,7 +1764,7 @@ function InitScanController([configFile])
 
 	string /g sc_colormap = "VioletOrangeYellow"
 	string /g slack_url =  "https://hooks.slack.com/services/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" // url for slack alert
-	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
+//	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
 
 	string /g sc_hostname = getHostName() // get machine name
 
@@ -1762,11 +1787,11 @@ function InitScanController([configFile])
 	if(paramisdefault(configFile))
 		// look for newest config file
 		string filelist = greplist(indexedfile(config,-1,".json"),"sc")
-		if(itemsinlist(filelist)>0)
-			// read content into waves
-			filelist = SortList(filelist, ";", 1+16)
-			scw_loadConfig(StringFromList(0,filelist, ";"))
-		else
+//		if(itemsinlist(filelist)>0)
+//			// read content into waves
+//			filelist = SortList(filelist, ";", 1+16)
+//			scw_loadConfig(StringFromList(0,filelist, ";"))
+//		else
 			// if there are no config files, use defaults
 			// These arrays should have the same size. Their indeces correspond to each other.
 			make/t/o sc_RawWaveNames = {"g1x", "g1y"} // Wave names to be created and saved
@@ -1802,7 +1827,7 @@ function InitScanController([configFile])
 			else
 				printf "Current filenum is %d\n", filenum
 			endif
-		endif
+//		endif
 	else
 		scw_loadConfig(configFile)
 	endif
@@ -2248,7 +2273,7 @@ function RecordValues(S, i, j, [fillnan])
 	fillnan = paramisdefault(fillnan) ? 0 : fillnan
 
 	// Set Scan start_time on first measurement if not already set
-	if (i == 0 && j == 0 && S.start_time == 0)
+	if (i == 0 && j == 0 && (S.start_time == 0 || numtype(S.start_time) != 0))
 		S.start_time = datetime
 	endif
 
@@ -2445,6 +2470,7 @@ function RampStartFD(S, [ignore_lims, x_only, y_only])
 	variable i, setpoint
 	// If x exists ramp them to start
 	if(numtype(strlen(s.channelsx)) == 0 && strlen(s.channelsx) != 0 && y_only != 1)  // If not NaN and not ""
+		scu_assertSeparatorType(S.channelsx, ",")
 		for(i=0;i<itemsinlist(S.channelsx,",");i+=1)
 			if(S.direction == 1)
 				setpoint = str2num(stringfromlist(i,S.startxs,","))
@@ -2499,8 +2525,6 @@ function scc_checkRampratesFD(S)
   struct ScanVars &S
 
   wave/T fdacvalstr
-  svar activegraphs
-
 
 	variable kill_graphs = 0
 	// Check x's won't be swept to fast by calculated sweeprate for each channel in x ramp
@@ -2544,9 +2568,6 @@ function scc_checkRampratesFD(S)
 	if(kill_graphs == 1)  // If user selected do not continue, then kill graphs and abort
 		print("[ERROR] \"RecordValues\": User abort!")
 		dowindow/k SweepControl // kill scan control window
-		for(k=0;k<itemsinlist(activegraphs,";");k+=1)
-			dowindow/k $stringfromlist(k,activegraphs,";")
-		endfor
 		abort
 	endif
   
@@ -2713,11 +2734,7 @@ function scc_checkLimsBD(S, [x_only, y_only])
 	endfor
 
 	if(kill_graphs == 1)
-		dowindow/k SweepControl // kill scan control window
-		svar activegraphs  // TODO: I don't think this is updated any more, maybe graphs can't be easily killed?
-		for(k=0;k<itemsinlist(activegraphs,";");k+=1)
-			dowindow/k $stringfromlist(k,activegraphs,";")
-		endfor		
+		dowindow/k SweepControl // kill scan control window	
 		abort abort_msg
 	endif
 end
@@ -3334,7 +3351,7 @@ function scfd_RecordValues(S, rowNum, [AWG_list, linestart, skip_data_distributi
 	endif
 
 	// If beginning of scan, record start time
-	if (rowNum == 0 && S.start_time == 0)  
+	if (rowNum == 0 && (S.start_time == 0 || numtype(S.start_time) != 0))  
 		S.start_time = datetime 
 	endif
 
@@ -3697,7 +3714,7 @@ function initFastDAC()
 	// DAC/ADC channels to use. "sc_fdackeys" is created when calling "openFastDACconnection".
 	svar sc_fdackeys
 	if(!svar_exists(sc_fdackeys))
-		print("[ERROR] \"initFastDAC\": No devices found!")
+		print("[ERROR] \"initFastDAC\": No devices found! Connections to fastDACs need to be made first using openFastDACconnection(...)")
 		abort
 	endif
 

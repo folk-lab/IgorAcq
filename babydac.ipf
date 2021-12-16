@@ -111,6 +111,11 @@ function bd_SetBoardNumbers(boards, custom)
 		bd_num_custom += 4
 	endif
 
+	if (!waveExists(dacvalstr))
+		bd_initZeros()	
+		wave/t dacvalstr=dacvalstr
+	endif
+		
 	if(numtype(bd_boardnumbers[1])==2)
 		dacvalstr[4] = "0"
 		dacvalstr[5] = "0"

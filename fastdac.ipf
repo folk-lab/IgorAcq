@@ -347,7 +347,7 @@ function RampMultipleFDAC(InstrID, channels, setpoint, [ramprate, ignore_lims])
 	ramprate = numtype(ramprate) == 0 ? ramprate : 0  // If not a number, then set to zero (which means will be overridden by ramprate in window)
 	
 	scu_assertSeparatorType(channels, ",")
-	channels = scu_getChannelNumbers(channels, fastdac=1)
+	channels = scu_getChannelNumbers(channels, fastdac=1) 
 	
 	variable i=0, channel, nChannels = ItemsInList(channels, ",")
 	variable channel_ramp

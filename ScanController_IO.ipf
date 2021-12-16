@@ -79,6 +79,7 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 	
 	if (!logs_only)
 		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(new_sc_createSweepLogs(S=S))
+		make /FREE /T /N=1 scan_vars_json = sce_ScanVarsToJson(S, getrtstackinfo(3), save_to_file = 0)
 	else
 		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(new_sc_createSweepLogs(comments = comments))
 	endif
@@ -108,12 +109,19 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 		if (V_flag != 0)
 				Print "HDF5SaveData Failed: ", "sweep_logs"
 		endif
+
+		if (!logs_only)
+			HDF5SaveData/z /A="ScanVars" scan_vars_json, hdf5_id, "metadata"
+			if (V_flag != 0)
+					Print "HDF5SaveData Failed: ", "ScanVars"
+			endif
+		endif
 		
 		HDF5SaveData/z /A="sc_config" cconfig, hdf5_id, "metadata"
 		if (V_flag != 0)
 				Print "HDF5SaveData Failed: ", "sc_config"
 		endif
-
+		
 		HDF5CloseGroup /Z meta_group_id
 		if (V_flag != 0)
 			Print "HDF5CloseGroup Failed: ", "metadata"

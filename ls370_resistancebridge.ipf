@@ -360,27 +360,6 @@ end
 
 
 
-
-
-
-//function getLS370heaterpowerDB(instrID,heater) // Units: mW
-//	// returns the power of the selected heater.
-//	// avaliable heaters on BF systems: still (analog 2), mc
-//	// avaliable heaters on IGH systems: sorb (analog 1), still (analog 2), mc
-//	// data is queried directly from the SQL database
-//	string instrID
-//	string heater
-//end
-
-//function getLS370pressureDB(instrID,gauge) // Units: mbar
-//	// returns the pressure from the selected pressure gauge
-//	// avaliable gauges on BF systems: P1,P2,P3,P4,P5,P6
-//	// avaliable gauges on IGH systems: P1,P2,G1,G2,G3
-//	// data is queried directly from the SQL database
-//	string instrID
-//	string gauge
-//end
-
 ///////////////////////
 //// Set Functions ////
 //////////////////////
@@ -710,6 +689,37 @@ end
 ////////////////////
 //// Utillities ////
 ///////////////////
+
+function WaitTillTempStable(instrID, targetTmK, times, delay, err)
+	// instrID is the lakeshore controller ID
+	// targetmK is the target temperature in mK
+	// times is the number of readings required to call a temperature stable
+	// delay is the time between readings
+	// err is a percent error that is acceptable in the readings
+	string instrID
+	variable targetTmK, times, delay, err
+	variable passCount, targetT=targetTmK/1000, currentT = 0
+
+	// check for stable temperature
+	print "Target temperature: ", targetTmK, "mK"
+
+	variable j = 0
+	for (passCount=0; passCount<times; )
+		asleep(delay)
+		for (j = 0; j<10; j+=1)
+			currentT += getLS370temp(instrID, "mc")/10 // do some averaging
+			asleep(2.1)
+		endfor
+		if (ABS(currentT-targetT) < err*targetT)
+			passCount+=1
+			print "Accepted", passCount, " @ ", currentT, "K"
+		else
+			print "Rejected", passCount, " @ ", currentT, "K"
+			passCount = 0
+		endif
+		currentT = 0
+	endfor
+end
 
 function/s LS370getLoggingScheduleFromConfig(sched_name)
 	string sched_name
