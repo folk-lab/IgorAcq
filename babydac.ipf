@@ -1338,6 +1338,14 @@ function/s GetBDStatus(instrID)
 	return addJSONkeyval("", "BabyDAC", buffer)
 end
 
+
+function GetBDdacValue(channelstr)
+	// Get the current output value of given channel
+	string channelstr
+	wave/T old_dacvalstr  // This is where the DAC was last confirmed to be
+	return str2num(old_dacvalstr[str2num(scu_getChannelNumbers(channelstr, fastdac=0))][0])
+end
+
 /////////////////
 //// testing ////
 /////////////////

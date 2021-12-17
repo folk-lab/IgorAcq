@@ -603,6 +603,7 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 		S.finy = finy
 		S.channelsy = scu_getChannelNumbers(channelsy, fastdac=0)
 		S.y_label = scu_getDacLabel(S.channelsy, fastdac=0)
+		scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, S.starty, S.finy, S.startxs, S.finxs, S.startys, S.finys)
 	endif
       
    // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC

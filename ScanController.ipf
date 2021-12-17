@@ -1691,7 +1691,7 @@ function/T sce_ScanVarsToJson(S, traceback, [save_to_file])
 	string buffer = ""
 	
 	buffer = addJSONkeyval(buffer,"Filenum",num2istr(S.filenum))
-	buffer = addJSONkeyval(buffer,"Traceback",traceback,addquotes=1)
+	buffer = addJSONkeyval(buffer,"Traceback",traceback,addquotes=1)  // TODO: Remove everything from EndScan onwards (will always be the same and gives no useful extra info)
 	buffer = addJSONkeyval(buffer,"x_label",S.x_label,addquotes=1)
 	buffer = addJSONkeyval(buffer,"y_label",S.y_label,addquotes=1)
 	buffer = addJSONkeyval(buffer,"startx", num2str(S.startx))
@@ -1727,6 +1727,7 @@ function/T sce_ScanVarsToJson(S, traceback, [save_to_file])
 	buffer = addJSONkeyval(buffer,"finys",S.finys,addquotes=1)
 
 	buffer = addJSONkeyval(buffer,"raw_wave_names",S.raw_wave_names,addquotes=1)
+	
 	
 	buffer = prettyJSONfmt(buffer)
 	
@@ -3879,8 +3880,8 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	ListBox fadclist,listwave=root:fadcvalstr,selwave=root:fadcattr,mode=1
 	button updatefadc,pos={400,265},size={90,20},proc=scfw_update_fadc,title="Update ADC"
 //	checkbox sc_PrintfadcBox,pos={500,265},proc=scw_CheckboxClicked,value=sc_Printfadc,side=1,title="\Z14Print filenames "
-	checkbox sc_SavefadcBox,pos={620,265},proc=scw_CheckboxClicked,value=sc_Saverawfadc,side=1,title="\Z14Save raw data "
-	checkbox sc_FilterfadcCheckBox,pos={400,290},proc=scw_CheckboxClicked,value=sc_ResampleFreqCheckfadc,side=1,title="\Z14Resample "
+	checkbox sc_SavefadcBox,pos={620,265},proc=scw_CheckboxClicked,variable=sc_Saverawfadc,side=1,title="\Z14Save raw data "
+	checkbox sc_FilterfadcCheckBox,pos={400,290},proc=scw_CheckboxClicked,variable=sc_ResampleFreqCheckfadc,side=1,title="\Z14Resample "
 	SetVariable sc_FilterfadcBox,pos={500,290},size={200,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resample Frequency ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
 	DrawText 705,310, "\Z14Hz" 
 	popupMenu fadcSetting1,pos={420,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14ADC1 speed",size={100,20},value=sc_fadcSpeed1 

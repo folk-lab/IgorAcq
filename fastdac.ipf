@@ -572,7 +572,7 @@ function fd_loadFadcCalibration(instrID,speed)
 	endfor
 	
 	sprintf regex, "fADC%dCalibration_%d", deviceNum, speed
-	print regex
+//	print regex
 	filelist = indexedfile(config,-1,".txt")
 	filelist = greplist(filelist,regex)
 	if(itemsinlist(filelist) == 1)
@@ -1034,7 +1034,7 @@ function FDSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,nosave])
 
 	// Initialize ScanVars
 	Struct ScanVars S
-	initScanVarsFD(S, instrID, 0, scanlength, duration=scanlength, x_label="Time /s", y_label="Current /nA", comments="spectrum,"+comments)
+	initScanVarsFD(S, instrID, 0, scanlength, duration=scanlength, starty=1, finy=numAverage, numptsy=numAverage, x_label="Time /s", y_label="Current /nA", comments="spectrum,"+comments)
 	S.readVsTime = 1
 
 	// Check things like ADCs on same device
@@ -1107,12 +1107,12 @@ function FDSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,nosave])
 		doupdate
 	endfor
 
-	// Return resampling state to whatever it was before
-	sc_resampleFreqCheckFadc = original_resample_state
-
 	if (!nosave)
 		EndScan(S=S, additional_wavenames=log_freq_wavenames+lin_freq_wavenames) 
 	endif
+
+	// Return resampling state to whatever it was before
+	sc_resampleFreqCheckFadc = original_resample_state
 end
 
 
