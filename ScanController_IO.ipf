@@ -408,8 +408,6 @@ function saveFastdacInfoWaves(hdfids, S)
 		make/o sweepgates_y = {{NaN, NaN, NaN}}
 	endif
 	
-	
-	nvar sc_AWG_used
 	string wn
 	variable hdfid
 	for(i=0; i<itemsInList(hdfids); i++)
@@ -423,10 +421,11 @@ function saveFastdacInfoWaves(hdfids, S)
 			Print "HDF5SaveData failed on sweepgates_y"
 		endif
 		
-		if (sc_AWG_used == 1)
-			// Add AWs used to HDF file
-			struct AWGVars AWG
-			fd_getGlobalAWG(AWG)
+	
+		// Add AWs used to HDF file if used
+		struct AWGVars AWG
+		fd_getGlobalAWG(AWG)
+		if (AWG.use_awg)
 			variable j
 			for(j=0;j<AWG.numWaves;j++)
 				// Get IGOR AW

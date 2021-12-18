@@ -232,11 +232,8 @@ function/s getFDstatus(instrID)
 		buffer = addJSONkeyval(buffer, "ADC"+num2istr(CHstart+i), num2numstr(getfadcChannel(instrID,CHstart+i)))
 	endfor
 	
-	// AWG info if used
-	nvar sc_AWG_used
-	if(sc_AWG_used == 1)
-		buffer = addJSONkeyval(buffer, "AWG", getFDAWGstatus())  //NOTE: AW saved in getFDAWGstatus()
-	endif
+	// AWG info
+	buffer = addJSONkeyval(buffer, "AWG", getFDAWGstatus())  //NOTE: AW saved in getFDAWGstatus()
 	
 	return addJSONkeyval("", "FastDAC "+num2istr(device), buffer)
 end
@@ -252,6 +249,7 @@ function/s getFDAWGstatus()
 	struct AWGVars AWG
 	fd_getGlobalAWG(AWG)
 	
+	buffer = addJSONkeyval(buffer, "AWG_used", num2istr(AWG.use_AWG), addquotes=0)				// Was the AWG used in this scan? 
 	buffer = addJSONkeyval(buffer, "AW_Waves", AWG.AW_Waves, addquotes=1)							// Which waves were used (e.g. "0,1" for both AW0 and AW1)
 	buffer = addJSONkeyval(buffer, "AW_Dacs", AWG.AW_Dacs, addquotes=1)								// Which Dacs output each wave (e.g. "01,2" for Dacs 0,1 outputting AW0 and Dac 2 outputting AW1)
 	buffer = addJSONkeyval(buffer, "waveLen", num2str(AWG.waveLen), addquotes=0)					// How are the AWs in total samples
@@ -261,6 +259,7 @@ function/s getFDAWGstatus()
 	buffer = addJSONkeyval(buffer, "numWaves", num2str(AWG.numWaves), addquotes=0)				// How many AWs were used in total (should be 1 or 2)
 	buffer = addJSONkeyval(buffer, "numCycles", num2str(AWG.numCycles), addquotes=0)				// How many full cycles of the AWs per DAC step
 	buffer = addJSONkeyval(buffer, "numSteps", num2str(AWG.numSteps), addquotes=0)				// How many DAC steps for the full ramp
+	
 
 	return buffer
 end
@@ -1637,7 +1636,7 @@ function/s fd_start_sweep(S, [AWG_list])
 
 	string cmd = ""
 
-	if (!paramisDefault(AWG_list) && AWG_List.use_AWG == 1)  
+	if (!paramisDefault(AWG_list) && AWG_List.use_AWG == 1 && AWG_List.lims_checked == 1)  
 		// Example:
 		// AWG_RAMP,2,012,345,67,0,-1000,1000,-2000,2000,50,50
 		// Response:
@@ -1705,7 +1704,8 @@ Structure AWGVars
 	// Variables //
 	// Convenience	
 	variable initialized	// Must set to 1 in order for this to be used in fd_Record_Values (this is per setup change basis)
-	variable use_AWG 		// Must be set to 1 in order to use in fd_Record_Values (this is per scan basis)
+	variable use_AWG 		// Is AWG going to be on during the scan
+	variable lims_checked 	// Have limits been checked before scanning
 	variable waveLen			// in samples (i.e. sum of samples at each setpoint for a single wave cycle)
 	
 	// Checking things don't change
@@ -1739,8 +1739,24 @@ function fd_setGlobalAWG(S)
 	make/o/t fd_AWGglobalStrings = {S.AW_Waves, S.AW_dacs}
 
 	// Store variable parts
-	make/o fd_AWGglobalVars = {S.initialized, S.use_AWG, S.waveLen, S.numADCs, S.samplingFreq,\
+	make/o fd_AWGglobalVars = {S.initialized, S.use_AWG, S.lims_checked, S.waveLen, S.numADCs, S.samplingFreq,\
 		S.measureFreq, S.numWaves, S.numCycles, S.numSteps}
+end
+
+
+function SetAWG(A, state)
+	// Set use_awg state to 1 or 0
+	struct AWGVars &A
+	variable state
+	
+	if (state != 0 && state != 1)
+		abort "ERROR[SetAWGuseState]: value must be 0 or 1"
+	endif
+	if (A.initialized == 0 || numtype(strlen(A.AW_Waves)) != 0 || numtype(strlen(A.AW_dacs)) != 0)
+		fd_getGlobalAWG(A)
+	endif
+	A.use_awg = state
+	fd_setGlobalAWG(A)
 end
 
 
@@ -1751,7 +1767,7 @@ function fd_getGlobalAWG(S)
 	// Get string parts
 	wave/T t = fd_AWGglobalStrings
 	
-	if (!WaveExists(t))
+		if (!WaveExists(t))
 		fd_initGlobalAWG()
 		wave/T t = fd_AWGglobalStrings
 	endif
@@ -1762,13 +1778,14 @@ function fd_getGlobalAWG(S)
 	// Get variable parts
 	wave v = fd_AWGglobalVars
 	S.initialized = v[0]
-	S.use_AWG = 0  // Always initialized to zero so that checks have to be run before using in scan (see SetCheckAWG())
-	S.waveLen = v[2]
-	S.numADCs = v[3]
-	S.samplingFreq = v[4]
-	S.measureFreq = v[5]
-	S.numWaves = v[6]
-	S.numCycles = v[7]
-	S.numSteps = v[8]
+	S.use_AWG = v[1]  
+	S.lims_checked = 0 // Always initialized to zero so that checks have to be run before using in scan (see SetCheckAWG())
+	S.waveLen = v[3]
+	S.numADCs = v[4]
+	S.samplingFreq = v[5]
+	S.measureFreq = v[6]
+	S.numWaves = v[7]
+	S.numCycles = v[8]
+	S.numSteps = v[9]
 end
 

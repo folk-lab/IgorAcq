@@ -157,7 +157,10 @@ function/S scu_getDacLabel(channels, [fastdac])
 		endif
 		xlabelfriendly += buffer
 	endfor
-	return xlabelfriendly + " (mV)"
+	if (strlen(xlabelfriendly)>0)
+		xlabelfriendly = xlabelfriendly + " (mV)"
+	endif
+	return xlabelfriendly
 end
 
 
@@ -302,9 +305,9 @@ structure ScanVars
     string startys, finys  // Similar for Y-axis
 
     // For specific scans
-    variable direction  // Allows controlling scan from start -> fin or fin -> start (with 1 or -1)
+    variable alternate  // Allows controlling scan from start -> fin or fin -> start (with 1 or -1)
     variable duration   // Can specify duration of scan rather than numpts or sweeprate for readVsTime
-	variable readVsTime // Set to 1 if doing a readVsTime
+	 variable readVsTime // Set to 1 if doing a readVsTime
 
     // Other useful info
     variable start_time // Should be recorded right before measurements begin (e.g. after all checks are carried out)
@@ -322,8 +325,10 @@ structure ScanVars
 	 string raw_wave_names  // Names of waves to override the names raw data is stored in for FastDAC scans
 	 
 	 // Backend used
+     variable direction   // For keeping track of scan direction when using alternating scan
 	 variable never_save   // Set to 1 to make sure these ScanVars are never saved (e.g. if using to get throw away values for getting an ADC reading)
 	 variable filenum 		// Filled when getting saved
+
 endstructure
 
 
@@ -344,9 +349,10 @@ function scv_setLastScanVars(S)
 		make/o/d sc_lastScanVarsVariables = {\
 			S.instrIDx, S.instrIDy, S.lims_checked, S.startx, S.finx, S.numptsx,\
 		 	S.rampratex, S.delayx, S.is2d, S.starty, S.finy,\
-		 	S.numptsy, S.rampratey, S.delayy, S.direction, S.duration,\
+		 	S.numptsy, S.rampratey, S.delayy, S.alternate, S.duration,\
 		 	S.readVsTime, S.start_time, S.end_time, S.using_fastdac, S.numADCs,\
-		 	S.samplingFreq, S.measureFreq, S.sweeprate, S.never_save\
+		 	S.samplingFreq, S.measureFreq, S.sweeprate, S.direction, S.never_save,\
+		 	S.filenum\
 		 	}
 		
 		S.start_time = st  // Restore to whatever it was before	
@@ -389,7 +395,7 @@ function scv_getLastScanVars(S)
 	S.numptsy = v[11]
 	S.rampratey = v[12]
 	S.delayy = v[13]
-	S.direction = v[14]
+	S.alternate = v[14]
 	S.duration = v[15]
 	S.readVsTime = v[16]
 	S.start_time = v[17]
@@ -399,10 +405,12 @@ function scv_getLastScanVars(S)
 	S.samplingFreq = v[21]
 	S.measureFreq = v[22]
 	S.sweeprate = v[23]
-	S.never_save = v[24]
+	S.direction = v[24]
+	S.never_save = v[25]
+	S.filenum = v[26]
 end
 	
-function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, rampratex, instrIDy, starty, finy, channelsy, numptsy, rampratey, delayy, x_label, y_label, startxs, finxs, startys, finys, comments])
+function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, rampratex, instrIDy, starty, finy, channelsy, numptsy, rampratey, delayy, x_label, y_label, startxs, finxs, startys, finys, alternate, comments])
     // Function to make setting up general values of scan vars easier
     // PARAMETERS:
     // startx, finx, starty, finy -- Single start/fin point for all channelsx/channelsy
@@ -412,6 +420,7 @@ function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, ra
     variable instrIDx, instrIDy
     variable startx, finx, numptsx, delayx, rampratex
     variable starty, finy, numptsy, delayy, rampratey
+    variable alternate
     string channelsx
     string channelsy
     string x_label, y_label
@@ -455,7 +464,7 @@ function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, ra
 	S.delayy = delayy // delay after each step in y-axis (e.g. settling time after x-axis has just been ramped from fin to start quickly)
 
 	// For specific scans
-	S.direction = 1 // Allows controlling scan from start -> fin or fin -> start (with 1 or -1)
+	S.alternate = alternate // Allows controlling scan from start -> fin or fin -> start (with 1 or -1)
 	S.duration = NaN // Can specify duration of scan rather than numpts or sweeprate  
 	S.readVsTime = 0 // Set to 1 if doing a readVsTime
 
@@ -480,11 +489,13 @@ function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, ra
 	S.raw_wave_names = ""  // Names of waves to override the names raw data is stored in for FastDAC scans
 	
 	// Backend use
+	S.direction = 1   // For keeping track of scan direction when using alternating scan
 	S.never_save = 0  // Set to 1 to make sure these ScanVars are never saved (e.g. if using to get throw away values for getting an ADC reading)
+	S.filenum = 0
 end
 
 
-function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate, duration, rampratex, delayx, starty, finy, channelsy, numptsy, rampratey, delayy, startxs, finxs, startys, finys, x_label, y_label, comments])
+function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate, duration, rampratex, delayx, starty, finy, channelsy, numptsy, rampratey, delayy, startxs, finxs, startys, finys, x_label, y_label, alternate, comments])
     // Function to make setting up scanVars struct easier for FastDAC scans
     // PARAMETERS:
     // startx, finx, starty, finy -- Single start/fin point for all channelsx/channelsy
@@ -496,11 +507,11 @@ function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
     variable starty, finy, numptsy, delayy, rampratey
 	variable sweeprate  // If start != fin numpts will be calculated based on sweeprate
 	variable duration   // numpts will be caluculated to achieve duration
+    variable alternate
     string channelsx, channelsy
     string startxs, finxs, startys, finys
     string  x_label, y_label
     string comments
-    variable direction
 	
 	// Ensure optional strings aren't null
 	channelsy = selectString(paramIsDefault(channelsy), channelsy, "")
@@ -518,7 +529,7 @@ function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
 	// Standard initialization
 	initScanVars(S, instrIDx=instrID, startx=startx, finx=finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
 	instrIDy=instrID, starty=starty, finy=finy, channelsy=channelsy, numptsy=numptsy, rampratey=rampratey, delayy=delayy, \
-	x_label=x_label, y_label=y_label, startxs=startxs, finxs=finxs, startys=startys, finys=finys, comments=comments)
+	x_label=x_label, y_label=y_label, startxs=startxs, finxs=finxs, startys=startys, finys=finys, alternate=alternate, comments=comments)
 	
 	
 	// Additional intialization for fastDAC scans
@@ -548,7 +559,7 @@ function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
 end
 
 
-function initScanVarsBD(S, instrID, startx, finx, [channelsx, numptsx, delayx, rampratex, starty, finy, channelsy, numptsy, rampratey, delayy, startxs, finxs, startys, finys, x_label, y_label, comments])
+function initScanVarsBD(S, instrID, startx, finx, [channelsx, numptsx, delayx, rampratex, starty, finy, channelsy, numptsy, rampratey, delayy, startxs, finxs, startys, finys, x_label, y_label, alternate, comments])
     // Function to make setting up scanVars struct easier for BabyDAC scans
     // PARAMETERS:
     // startx, finx, starty, finy -- Single start/fin point for all channelsx/channelsy
@@ -558,6 +569,7 @@ function initScanVarsBD(S, instrID, startx, finx, [channelsx, numptsx, delayx, r
     variable instrID
     variable startx, finx, numptsx, delayx, rampratex
     variable starty, finy, numptsy, delayy, rampratey
+    variable alternate
     string channelsx
     string channelsy
     string x_label, y_label
@@ -580,7 +592,7 @@ function initScanVarsBD(S, instrID, startx, finx, [channelsx, numptsx, delayx, r
 	// Standard initialization
 	initScanVars(S, instrIDx=instrID, startx=startx, finx=finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
 	instrIDy=instrID, starty=starty, finy=finy, channelsy=channelsy, numptsy=numptsy, rampratey=rampratey, delayy=delayy, \
-	x_label=x_label, y_label=y_label, startxs=startxs, finxs=finxs, startys=startys, finys=finys, comments=comments)
+	x_label=x_label, y_label=y_label, startxs=startxs, finxs=finxs, startys=startys, finys=finys, alternate=alternate, comments=comments)
     
 	// Additional initialization for BabyDAC scans
     scv_setChannels(S, channelsx, channelsy, fastdac=0) // Sets channelsx, channelsy to lists of numbers instead of labels
@@ -1710,6 +1722,7 @@ function/T sce_ScanVarsToJson(S, traceback, [save_to_file])
 	buffer = addJSONkeyval(buffer,"delayy",num2str(S.delayy))
 	
 	buffer = addJSONkeyval(buffer,"duration",num2str(S.duration))
+	buffer = addJSONkeyval(buffer,"alternate",num2istr(S.alternate))	
 	buffer = addJSONkeyval(buffer,"readVsTime",num2str(S.readVsTime))
 	buffer = addJSONkeyval(buffer,"start_time",num2str(S.start_time, "%.2f"))
 	buffer = addJSONkeyval(buffer,"end_time",num2str(S.end_time,"%.2f"))
@@ -2428,21 +2441,22 @@ function PreScanChecksKeithley(S, [x_only, y_only])
 end
 
 
-function SetCheckAWG(AWG, S)
+function CheckAWG(AWG, S)
 	struct AWGVars &AWG
 	struct ScanVars &S
 
-	
+	if (S.alternate == 1)
+		abort "ERROR[CheckAWG]: AWG is on and S.alternate == 1. If you are really really sure you want to do this then add an optional flag to disable this abort."
+	endif
+
 	// Set numptsx in Scan s.t. it is a whole number of full cycles
 	AWG.numSteps = round(S.numptsx/(AWG.waveLen*AWG.numCycles))  
 	S.numptsx = (AWG.numSteps*AWG.waveLen*AWG.numCycles)
 	
 	// Check AWG for clashes/exceeding lims etc
-	CheckAWG(AWG, S)	
-	AWG.use_AWG = 1
+	scc_CheckAWG(AWG, S)	
+	AWG.lims_checked = 1
 	
-	// Save numSteps in AWG_list for sweeplogs later
-	fd_setGlobalAWG(AWG)
 end
 
 
@@ -2759,10 +2773,10 @@ function RampStartBD(S, [x_only, y_only, ignore_lims])
 end
 
 
-function CheckAWG(AWG, Fsv)
+function scc_CheckAWG(AWG, S)
 	// Check that AWG and FastDAC ScanValues don't have any clashing DACs and check AWG within limits etc
 	struct AWGVars &AWG
-	struct ScanVars &Fsv
+	struct ScanVars &S
 	
 	string AWdacs  // Used for storing all DACS for 1 channel  e.g. "123" = Dacs 1,2,3
 	string err_msg
@@ -2774,40 +2788,40 @@ function CheckAWG(AWG, Fsv)
 		
 	// Check initialized
 	if(AWG.initialized == 0)
-		abort "ERROR[CheckAWG]: AWG_List needs to be initialized. Maybe something changed since last use!"
+		abort "ERROR[scc_CheckAWG]: AWG_List needs to be initialized. Maybe something changed since last use!"
 	endif
 	
 	// Check numADCs hasn't changed since setting up waves
 	if(AWG.numADCs != scf_getNumRecordedADCs())
-		abort "ERROR[CheckAWG]: Number of ADCs being measured has changed since setting up AWG, this will change AWG frequency. Set up AWG again to continue"
+		abort "ERROR[scc_CheckAWG]: Number of ADCs being measured has changed since setting up AWG, this will change AWG frequency. Set up AWG again to continue"
 	endif
 	
 	// Check measureFreq hasn't change since setting up waves
-	if(AWG.measureFreq != Fsv.measureFreq  || AWG.samplingFreq != Fsv.samplingFreq)
-		sprintf err_msg, "ERROR[CheckAWG]: MeasureFreq has changed from %.2f/s to %.2f/s since setting up AWG. Set up AWG again to continue", AWG.measureFreq, Fsv.measureFreq
+	if(abs(AWG.measureFreq - S.measureFreq) > 0.1  || abs(AWG.samplingFreq - S.samplingFreq) > 0.1)  // This allows for varying float precision (from saving and loading from waves I think)
+		sprintf err_msg, "ERROR[scc_CheckAWG]: MeasureFreq has changed from %.2f/s to %.2f/s since setting up AWG. Set up AWG again to continue", AWG.measureFreq, S.measureFreq
 		abort err_msg
 	endif
 	
 	// Check numSteps is an integer and not zero
 	if(AWG.numSteps != trunc(AWG.numSteps) || AWG.numSteps == 0)
-		abort "ERROR[CheckAWG]: numSteps must be an integer, not " + num2str(AWG.numSteps)
+		abort "ERROR[scc_CheckAWG]: numSteps must be an integer, not " + num2str(AWG.numSteps)
 	endif
 			
 	// Check there are DACs set for each AW_wave (i.e. if using 2 AWs, need at least 1 DAC for each)
 	if(itemsInList(AWG.AW_waves, ",") != (itemsinlist(AWG.AW_Dacs,",")))
-		sprintf err_msg "ERROR[CheckAWG]: Number of AWs doesn't match sets of AW_Dacs. AW_Waves: %s; AW_Dacs: %s", AWG.AW_waves, AWG.AW_Dacs
+		sprintf err_msg "ERROR[scc_CheckAWG]: Number of AWs doesn't match sets of AW_Dacs. AW_Waves: %s; AW_Dacs: %s", AWG.AW_waves, AWG.AW_Dacs
 		abort err_msg
 	endif	
 	
 	// Check no overlap between DACs for sweeping, and DACs for AWG
 	string channel // Single DAC channel
-	string FDchannels = addlistitem(Fsv.Channelsy, Fsv.Channelsx, ",") // combine channels lists
+	string FDchannels = addlistitem(S.Channelsy, S.Channelsx, ",") // combine channels lists
 	for(i=0;i<itemsinlist(AWG.AW_Dacs, ",");i++)
 		AWdacs = stringfromlist(i, AWG.AW_Dacs, ",")
 		for(j=0;j<strlen(AWdacs);j++)
 			channel = AWdacs[j]
 			if(findlistitem(channel, FDchannels, ",") != -1)
-				abort "ERROR[CheckAWG]: Trying to use same DAC channel for FD scan and AWG at the same time"
+				abort "ERROR[scc_CheckAWG]: Trying to use same DAC channel for FD scan and AWG at the same time"
 			endif
 		endfor
 	endfor
@@ -2830,7 +2844,7 @@ function CheckAWG(AWG, Fsv)
 					sprintf question, "DAC channel %s will be ramped outside software limits. Continue?", AWdacs[j]
 					answer = ask_user(question, type=1)
 					if(answer == 2)
-						print("ERROR[CheckAWG]: User abort!")
+						print("ERROR[scc_CheckAWG]: User abort!")
 						abort
 					endif
 				endif
@@ -3331,11 +3345,11 @@ function scfd_RecordValues(S, rowNum, [AWG_list, linestart, skip_data_distributi
 	variable rowNum, linestart
 	variable skip_data_distribution // For recording data without doing any calculation or distribution of data
 	struct AWGVars &AWG_list
-	// If passed AWG_list with AWG_list.use_AWG == 1 then it will run with the Arbitrary Wave Generator on
+	// If passed AWG_list with AWG_list.lims_checked == 1 then it will run with the Arbitrary Wave Generator on
 	// Note: Only works for 1 FastDAC! Not sure what implementation will look like for multiple yet
 
 	// Check if AWG is going to be used
-	Struct AWGVars AWG  // Note: Default has AWG.use_awg = 0
+	Struct AWGVars AWG  // Note: Default has AWG.lims_checked = 0
 	if(!paramisdefault(AWG_list))  // If AWG_list passed, then overwrite default
 		AWG = AWG_list
 	endif 
@@ -3389,6 +3403,7 @@ function scfd_SendCommandAndRead(S, AWG_list, rowNum)
 		variable errCode = GetRTError(1)  // Clear the error
 		if (v_AbortCode != 10)  // 10 is returned when user clicks abort button mid sweep
 			printf "WARNING[scfd_SendCommandAndRead]: Error during sweep at row %d. Attempting once more without updating graphs.\r" rowNum
+			doupdate
 			fd_stopFDACsweep(S.instrIDx)   // Make sure the previous scan is stopped
 			cmd_sent = fd_start_sweep(S, AWG_list=AWG_list)
 			entered_panic_mode = scfd_RecordBuffer(S, rowNum, totalByteReturn, record_only=1)  // Try again to record the sweep

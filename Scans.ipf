@@ -12,14 +12,12 @@
 // ScanBabyDAC
 // ScanBabyDACUntil
 // ScanBabyDAC2D
-// ScanBabyDACRepeat
 // ScanBabyDAC_SRSAmplitude
 // ReadVsTimeFastdac
 // ScanFastDAC
 // ScanFastDACSlow
 // ScanFastDACSlow2D
 // ScanFastDAC2D
-// ScanFastDACRepeat
 // ScanK2400
 // ScanK24002D
 // ScanBabyDACK24002D
@@ -65,10 +63,10 @@ function ReadVsTime(delay, [y_label, max_time, comments]) // Units: s
 end
 
 
-function ScanBabyDAC(instrID, start, fin, channels, numpts, delay, ramprate, [starts, fins, y_label, comments, nosave]) //Units: mV
+function ScanBabyDAC(instrID, start, fin, channels, numpts, delay, [ramprate, starts, fins, repeats, y_label, alternate, comments, nosave]) //Units: mV
 	// sweep one or more babyDAC channels
 	// channels should be a comma-separated string ex: "0, 4, 5" or "LABEL1,LABEL2" 
-	variable instrID, start, fin, numpts, delay, ramprate, nosave
+	variable instrID, start, fin, numpts, delay, ramprate, repeats, alternate, nosave
 	string channels, comments, y_label
 	string starts, fins // For different start/finish points for each channel (must match length of channels if used)
 
@@ -80,10 +78,11 @@ function ScanBabyDAC(instrID, start, fin, channels, numpts, delay, ramprate, [st
 	y_label = selectstring(paramisdefault(y_label), y_label, "")
 	starts = selectstring(paramisdefault(starts), starts, "")
 	fins = selectstring(paramisdefault(fins), fins, "")
+	repeats = (repeats == 0) ? 1 : repeats
 
 	// Initialize ScanVars
 	struct ScanVars S
-	initScanVarsBD(S, instrID, start, fin, channelsx=channels, numptsx=numpts, delayx=delay, rampratex=ramprate, startxs=starts, finxs=fins, comments=comments, y_label=y_label)
+	initScanVarsBD(S, instrID, start, fin, channelsx=channels, numptsx=numpts, delayx=delay, rampratex=ramprate, startxs=starts, finxs=fins, starty=1, finy=repeats, numptsy=repeats, alternate=alternate, comments=comments, y_label=y_label)
 
 	// Check software limits and ramprate limits
 	PreScanChecksBD(S)  
@@ -114,7 +113,7 @@ function ScanBabyDAC(instrID, start, fin, channels, numpts, delay, ramprate, [st
 end
 
 
-function ScanBabyDACUntil(instrID, start, fin, channels, numpts, delay, ramprate, checkwave, value, [starts, fins, operator, y_label, comments, nosave])
+function ScanBabyDACUntil(instrID, start, fin, channels, numpts, delay, checkwave, value, [ramprate, starts, fins, operator, y_label, comments, nosave])
 	// sweep one or more babyDAC channels until checkwave < (or >) value
 	// channels should be a comma-separated string ex: "0, 4, 5"
 	// operator is "<" or ">", meaning end on "checkwave[i] < value" or "checkwave[i] > value"
@@ -179,7 +178,7 @@ function ScanBabyDACUntil(instrID, start, fin, channels, numpts, delay, ramprate
 end
 
 
-function ScanBabyDAC2D(instrID, startx, finx, channelsx, numptsx, delayx, rampratex, starty, finy, channelsy, numptsy, delayy, rampratey, [startxs, finxs, startys, finys, comments, nosave]) //Units: mV
+function ScanBabyDAC2D(instrID, startx, finx, channelsx, numptsx, delayx, starty, finy, channelsy, numptsy, delayy, [rampratex, rampratey, startxs, finxs, startys, finys, comments, nosave]) //Units: mV
 	variable instrID, startx, finx, numptsx, delayx, rampratex, starty, finy, numptsy, delayy, rampratey, nosave
 	string channelsx, channelsy, comments
 	string startxs, finxs, startys, finys  // For ramping multiple gates with different start/end points
@@ -230,73 +229,6 @@ function ScanBabyDAC2D(instrID, startx, finx, channelsx, numptsx, delayx, rampra
 		EndScan(S=S)
 	else
 		 dowindow /k SweepControl
-	endif
-end
-
-
-function ScanBabyDACRepeat(instrID, startx, finx, channelsx, numptsx, delayx, rampratex, [numptsy, delayy, starts, fins, comments, alternate, nosave]) //Units: mV, mT
-	// x-axis is the dac sweep
-	// y-axis is an index
-	// if alternate = 1 then will sweep: start -> fin, fin -> start, start -> fin, ....
-	// each sweep (whether up or down) will count as 1 y-index
-	variable instrID, startx, finx, numptsx, delayx, rampratex, numptsy, delayy, alternate, nosave
-	string channelsx, comments
-	string starts, fins // For different start/finish points for each channel (must match length of channels if used)
-
-	// Reconnect instruments
-	sc_openinstrconnections(0)
-	
-	// Set defaults
-	comments = selectstring(paramisdefault(comments), comments, "")
-	starts = selectstring(paramisdefault(starts), starts, "")
-	fins = selectstring(paramisdefault(fins), fins, "")
-	
-	// Initialize ScanVars
-	struct ScanVars S
-	initScanVarsBD(S, instrID, startx, finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
-							starty=1, finy=numptsy, numptsy=numptsy, delayy=delayy, y_label="Repeats", \
-							startxs=starts, finxs=fins, comments=comments)
-
-	// Check software limits and ramprate limits
-	PreScanChecksBD(S, x_only=1)  
-	
-	// Ramp to start without checks because checked above
-	RampStartBD(S, ignore_lims=1)
-	
-	// Let gates settle 
-	sc_sleep(S.delayy)
-	
-	// Make waves and graphs etc
-	initializeScan(S)
-	
-	// Let gates settle 
-	sc_sleep(S.delayy)
-	
-	// Main measurement loop
-	variable i=0, j=0, scandirection
-	for (i=0;i<S.numptsy;i++)
-		if(mod(i,2)!=0 && alternate == 1)  // If on odd row and alternate is on
-			j=numptsx-1
-			scandirection=-1
-		else
-			j=0
-			scandirection=1
-		endif
-		rampToNextSetpoint(S, j, outer_index=i, ignore_lims=1)  // Ramp x to start and y to next setpoint
-		sc_sleep(S.delayy)
-		do
-			rampToNextSetpoint(S, j, ignore_lims=1)
-			sc_sleep(S.delayx)
-			RecordValues(S, i, j)
-			j+=scandirection
-		while (j>-1 && j<S.numptsx)
-	endfor
-  
-	// Save by default
-	if (nosave == 0)
-		EndScan(S=S)
-	else
-		dowindow /k SweepControl
 	endif
 end
 
@@ -616,17 +548,15 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
    	   PreScanChecksFD(S)  
    	endif
    	
-   	// If using AWG then get that now and check it
+  	// If using AWG then get that now and check it
 	struct AWGVars AWG
 	if(use_AWG)	
 		fd_getGlobalAWG(AWG)
-		SetCheckAWG(AWG, S)  // Note: sets SV.numptsx here and AWG.use_AWG = 1 if pass checks
-	else  // Don't use AWG
-		AWG.use_AWG = 0  	// This is the default, but just putting here explicitly
+		CheckAWG(AWG, S)  // Note: sets S.numptsx here and AWG.lims_checked = 1
 	endif
+	SetAWG(AWG, use_AWG)
    
    // Ramp to start without checks
-
    if(use_bd == 1)
 	   RampStartFD(S, x_only=1, ignore_lims=1)
 	   RampStartBD(S, y_only=1, ignore_lims=1)
@@ -668,11 +598,11 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 end
 
 
-function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, ramprate, numptsy, alternate, starts, fins, x_label, y_label, comments, nosave, use_awg])
+function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, ramprate, repeats, alternate, starts, fins, x_label, y_label, comments, nosave, use_awg])
 	// 1D repeat scan for FastDAC
 	// Note: to alternate scan direction set alternate=1
 	// Note: Ramprate is only for ramping gates between scans
-	variable instrID, start, fin, numptsy, numptsx, sweeprate, delay, ramprate, alternate, nosave, use_awg
+	variable instrID, start, fin, repeats, numptsx, sweeprate, delay, ramprate, alternate, nosave, use_awg
 	string channels, x_label, y_label, comments, starts, fins
 	variable i=0, j=0
 
@@ -680,7 +610,7 @@ function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, 
 	sc_openinstrconnections(0)
 
 	// Set defaults
-	delay = ParamIsDefault(delay) ? 0.5 : delay
+	delay = ParamIsDefault(delay) ? 0.01 : delay
 	y_label = selectstring(paramisdefault(y_label), y_label, "")
 	x_label = selectstring(paramisdefault(x_label), x_label, "")
 	comments = selectstring(paramisdefault(comments), comments, "")
@@ -689,9 +619,9 @@ function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, 
 
 	// Set sc_ScanVars struct
 	struct ScanVars S
-	initScanVarsFD(S, instrID, start, fin, channelsx=channels, numptsx=numptsx, rampratex=ramprate, starty=1, delayy=delay, sweeprate=sweeprate,  \
-					numptsy=numptsy, startxs=starts, finxs=fins, x_label=x_label, y_label=y_label, comments=comments)
-	S.finy = S.starty+S.numptsy  // Repeats
+	initScanVarsFD(S, instrID, start, fin, channelsx=channels, numptsx=numptsx, rampratex=ramprate, starty=1, finy=repeats, delayy=delay, sweeprate=sweeprate,  \
+					numptsy=repeats, startxs=starts, finxs=fins, x_label=x_label, y_label=y_label, alternate=alternate, comments=comments)
+//	S.finy = S.starty+S.numptsy  // Repeats
 	if (s.is2d && strlen(S.y_label) == 0)
 		S.y_label = "Repeats"
 	endif
@@ -703,10 +633,10 @@ function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, 
 	struct AWGVars AWG
 	if(use_AWG)	
 		fd_getGlobalAWG(AWG)
-		SetCheckAWG(AWG, S)  // Note: sets S.numptsx here and AWG.use_AWG = 1 if pass checks
-	else  // Don't use AWG
-		AWG.use_AWG = 0  	// This is the default, but just putting here explicitly
+		CheckAWG(AWG, S)  // Note: sets S.numptsx here and AWG.lims_checked = 1
 	endif
+	SetAWG(AWG, use_AWG)
+
 
 	// Ramp to start without checks since checked above
 	RampStartFD(S, ignore_lims = 1)
