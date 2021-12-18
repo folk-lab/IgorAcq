@@ -682,8 +682,10 @@ function bd_setOutputBD(instrID, channel, output, [ignore_lims]) // in mV
 	bd_writeBytesBD(instrID, bd_cmd_wave)
 
 	wave response_wave = bd_readBytesBD(instrID, 7)
-	
-//	print(response_wave[0])  // DEBUGGING (X=any number. 19X seems to mean the message was transmitted successfully but not used 6X means it worked)
+	if (response_wave[0] == 255)
+		print response_wave
+		abort "ERROR[bd_setOutputBD]: Bad response from BabyDAC (see above for response wave)"
+	endif
 
 	// Update stored values
 	dacvalstr[channel][1] = num2str(output)
@@ -787,12 +789,15 @@ function bd_UpdateMultipleBD(instrID, [action, ramprate, update, ignore_lims])
 			strswitch(action)
 				case "set":
 					check = bd_setOutputBD(instrID, i,output)
+					break
 				case "ramp":
 					check = bd_RampOutputBD(instrID, i,output,ramprate=ramprate, update=update)
+					break
 			endswitch
 			if(check == 1)
 				old_dacvalstr[i][1] = dacvalstr[i][1]
 			else
+				abort ""
 				dacvalstr[i][1] = old_dacvalstr[i][1]
 			endif
 		endif
