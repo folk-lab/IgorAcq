@@ -1485,7 +1485,7 @@ function sc_findAsyncMeasurements()
 	//    wherever the meas_async box is checked in the window
 	nvar sc_is2d
 	wave /t sc_RawScripts, sc_RawWaveNames
-	wave sc_RawRecord, sc_RawPlot, sc_measAsync
+	wave sc_RawRecord, sc_measAsync
 
 	// setup async folder
 	killdatafolder /z root:async // kill it if it exists
@@ -1499,7 +1499,7 @@ function sc_findAsyncMeasurements()
 
 	for(i=0;i<numpnts(sc_RawScripts);i+=1)
 
-		if ( (sc_RawRecord[i] == 1) || (sc_RawPlot[i] == 1) )
+		if (sc_RawRecord[i] == 1)
 			// this is something that will be measured
 
 			if (sc_measAsync[i] == 1) // this is something that should be async
@@ -1810,14 +1810,12 @@ function InitScanController([configFile])
 			// These arrays should have the same size. Their indeces correspond to each other.
 			make/t/o sc_RawWaveNames = {"g1x", "g1y"} // Wave names to be created and saved
 			make/o sc_RawRecord = {0,0} // Whether you want to record and save the data for this wave
-			make/o sc_RawPlot = {0,0} // Whether you want to record and save the data for this wave
 			make/t/o sc_RawScripts = {"readSRSx(srs1)", "readSRSy(srs1)"}
 
 			// And these waves should be the same size too
 			make/t/o sc_CalcWaveNames = {"", ""} // Calculated wave names
 			make/t/o sc_CalcScripts = {"",""} // Scripts to calculate stuff
 			make/o sc_CalcRecord = {0,0} // Include this calculated field or not
-			make/o sc_CalcPlot = {0,0} // Include this calculated field or not
 
 			make /o sc_measAsync = {0,0}
 
@@ -1898,8 +1896,6 @@ Window ScanController(v_left,v_right,v_top,v_bottom) : Panel
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 130,29,"Record"
 	SetDrawEnv fsize= 16,fstyle= 1
-	DrawText 200,29,"Plot"
-	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 250,29,"Async"
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 320,29,"Raw Script (ex: ReadSRSx(srs1)"
@@ -1911,8 +1907,6 @@ Window ScanController(v_left,v_right,v_top,v_bottom) : Panel
 		cmd="SetVariable sc_RawWaveNameBox" + num2istr(i) + " pos={13, 37+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={110, 0}, fsize=14, title=\" \", value=sc_RawWaveNames[i]"
 		execute(cmd)
 		cmd="CheckBox sc_RawRecordCheckBox" + num2istr(i) + ", proc=scw_CheckboxClicked, pos={150,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_RawRecord[i]) + " , title=\"\""
-		execute(cmd)
-		cmd="CheckBox sc_RawPlotCheckBox" + num2istr(i) + ", proc=scw_CheckboxClicked, pos={210,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_RawPlot[i]) + " , title=\"\""
 		execute(cmd)
 		cmd="CheckBox sc_AsyncCheckBox" + num2istr(i) + ", proc=scw_CheckboxClicked, pos={270,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_measAsync[i]) + " , title=\"\""
 		execute(cmd)
@@ -1929,8 +1923,6 @@ Window ScanController(v_left,v_right,v_top,v_bottom) : Panel
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 130,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Record"
 	SetDrawEnv fsize= 16,fstyle= 1
-	DrawText 200,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Plot"
-	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 320,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Calc Script (ex: dmm[i]*1.5)"
 
 	i=0
@@ -1939,8 +1931,6 @@ Window ScanController(v_left,v_right,v_top,v_bottom) : Panel
 		cmd="SetVariable sc_CalcWaveNameBox" + num2istr(i) + " pos={13, 92+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={110, 0}, fsize=14, title=\" \", value=sc_CalcWaveNames[i]"
 		execute(cmd)
 		cmd="CheckBox sc_CalcRecordCheckBox" + num2istr(i) + ", proc=scw_CheckboxClicked, pos={150,95+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_CalcRecord[i]) + " , title=\"\""
-		execute(cmd)
-		cmd="CheckBox sc_CalcPlotCheckBox" + num2istr(i) + ", proc=scw_CheckboxClicked, pos={210,95+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_CalcPlot[i]) + " , title=\"\""
 		execute(cmd)
 		cmd="SetVariable sc_CalcScriptBox" + num2istr(i) + " pos={320, 92+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={340, 0}, fsize=14, title=\" \", value=sc_CalcScripts[i]"
 		execute(cmd)
@@ -2010,26 +2000,22 @@ function scw_addrow(action) : ButtonControl
 	string action
 	wave/t sc_RawWaveNames=sc_RawWaveNames
 	wave sc_RawRecord=sc_RawRecord
-	wave sc_RawPlot=sc_RawPlot
 	wave sc_measAsync=sc_measAsync
 	wave/t sc_RawScripts=sc_RawScripts
 	wave/t sc_CalcWaveNames=sc_CalcWaveNames
 	wave sc_CalcRecord=sc_CalcRecord
-	wave sc_CalcPlot=sc_CalcPlot
 	wave/t sc_CalcScripts=sc_CalcScripts
 
 	strswitch(action)
 		case "addrowraw":
 			AppendString(sc_RawWaveNames, "")
 			AppendValue(sc_RawRecord, 0)
-			AppendValue(sc_RawPlot, 0)
 			AppendValue(sc_measAsync, 0)
 			AppendString(sc_RawScripts, "")
 		break
 		case "addrowcalc":
 			AppendString(sc_CalcWaveNames, "")
 			AppendValue(sc_CalcRecord, 0)
-			AppendValue(sc_CalcPlot, 0)
 			AppendString(sc_CalcScripts, "")
 		break
 	endswitch
@@ -2040,12 +2026,10 @@ function scw_removerow(action) : Buttoncontrol
 	string action
 	wave/t sc_RawWaveNames=sc_RawWaveNames
 	wave sc_RawRecord=sc_RawRecord
-	wave sc_RawPlot=sc_RawPlot
 	wave sc_measAsync=sc_measAsync
 	wave/t sc_RawScripts=sc_RawScripts
 	wave/t sc_CalcWaveNames=sc_CalcWaveNames
 	wave sc_CalcRecord=sc_CalcRecord
-	wave sc_CalcPlot=sc_CalcPlot
 	wave/t sc_CalcScripts=sc_CalcScripts
 
 	strswitch(action)
@@ -2053,7 +2037,6 @@ function scw_removerow(action) : Buttoncontrol
 			if(numpnts(sc_RawWaveNames) > 1)
 				Redimension /N=(numpnts(sc_RawWaveNames)-1) sc_RawWaveNames
 				Redimension /N=(numpnts(sc_RawRecord)-1) sc_RawRecord
-				Redimension /N=(numpnts(sc_RawPlot)-1) sc_RawPlot
 				Redimension /N=(numpnts(sc_measAsync)-1) sc_measAsync
 				Redimension /N=(numpnts(sc_RawScripts)-1) sc_RawScripts
 			else
@@ -2064,7 +2047,6 @@ function scw_removerow(action) : Buttoncontrol
 			if(numpnts(sc_CalcWaveNames) > 1)
 				Redimension /N=(numpnts(sc_CalcWaveNames)-1) sc_CalcWaveNames
 				Redimension /N=(numpnts(sc_CalcRecord)-1) sc_CalcRecord
-				Redimension /N=(numpnts(sc_CalcPlot)-1) sc_CalcPlot
 				Redimension /N=(numpnts(sc_CalcScripts)-1) sc_CalcScripts
 			else
 				abort "Can't remove the last row!"
@@ -2079,7 +2061,7 @@ function scw_CheckboxClicked(ControlName, Value)
 	string ControlName
 	variable value
 	string indexstring
-	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot, sc_measAsync
+	wave sc_RawRecord, sc_CalcRecord, sc_measAsync
 	nvar sc_PrintRaw, sc_PrintCalc, sc_resampleFreqCheckFadc
 	nvar/z sc_Printfadc, sc_Saverawfadc // FastDAC specific
 	variable index
@@ -2094,16 +2076,6 @@ function scw_CheckboxClicked(ControlName, Value)
 		SplitString/E=(expr) controlname, indexstring
 		index = str2num(indexstring)
 		sc_CalcRecord[index] = value
-	elseif (stringmatch(ControlName,"sc_RawPlotCheckBox*"))
-		expr="sc_RawPlotCheckBox([[:digit:]]+)"
-		SplitString/E=(expr) controlname, indexstring
-		index = str2num(indexstring)
-		sc_RawPlot[index] = value
-	elseif (stringmatch(ControlName,"sc_CalcPlotCheckBox*"))
-		expr="sc_CalcPlotCheckBox([[:digit:]]+)"
-		SplitString/E=(expr) controlname, indexstring
-		index = str2num(indexstring)
-		sc_CalcPlot[index] = value
 	elseif (stringmatch(ControlName,"sc_AsyncCheckBox*"))
 		expr="sc_AsyncCheckBox([[:digit:]]+)"
 		SplitString/E=(expr) controlname, indexstring
@@ -2126,7 +2098,7 @@ end
 
 function/s scw_createConfig()
 	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts, sc_Instr
-	wave sc_RawRecord, sc_RawPlot, sc_measAsync, sc_CalcRecord, sc_CalcPlot
+	wave sc_RawRecord, sc_measAsync, sc_CalcRecord
 	nvar sc_PrintRaw, sc_PrintCalc, filenum, sc_cleanup
 	svar sc_hostname
 	variable refnum
@@ -2154,12 +2126,6 @@ function/s scw_createConfig()
 	tmpstr = addJSONkeyval(tmpstr, "raw", wave2BoolArray(sc_RawRecord))
 	tmpstr = addJSONkeyval(tmpstr, "calc", wave2BoolArray(sc_CalcRecord))
 	configstr = addJSONkeyval(configstr, "record_waves", tmpstr)
-
-	// plot checkboxes
-	tmpstr = ""
-	tmpstr = addJSONkeyval(tmpstr, "raw",  wave2BoolArray(sc_RawPlot))
-	tmpstr = addJSONkeyval(tmpstr, "calc",  wave2BoolArray(sc_CalcPlot))
-	configstr = addJSONkeyval(configstr, "plot_waves", tmpstr)
 
 	// async checkboxes
 	configstr = addJSONkeyval(configstr, "meas_async", wave2BoolArray(sc_measAsync))
@@ -2247,10 +2213,6 @@ function scw_loadConfig(configfile)
 	loadBoolArray2wave(getJSONvalue(jstr,"record_waves:raw"),"sc_RawRecord")
 	loadBoolArray2wave(getJSONvalue(jstr,"record_waves:calc"),"sc_CalcRecord")
 
-	// plot checkboxes
-	loadBoolArray2wave(getJSONvalue(jstr,"plot_waves:raw"),"sc_RawPlot")
-	loadBoolArray2wave(getJSONvalue(jstr,"plot_waves:calc"),"sc_CalcPlot")
-
 	// async checkboxes
 	loadBoolArray2wave(getJSONvalue(jstr,"meas_async"),"sc_measAsync")
 
@@ -2315,13 +2277,13 @@ function RecordValues(S, i, j, [fillnan])
 	endif
 
 	//// Run sync data collection (or fill with NaNs) ////
-	wave sc_RawRecord, sc_CalcRecord, sc_RawPlot, sc_CalcPlot
+	wave sc_RawRecord, sc_CalcRecord
 	wave/t sc_RawWaveNames, sc_RawScripts, sc_CalcWaveNames, sc_CalcScripts
 	variable /g sc_tmpVal  // Used when evaluating measurement scripts from ScanController window
 	string script = "", cmd = ""
 	ii=0
 	do // TODO: Ideally rewrite this to use sci_get1DWaveNames() but need to be careful about only updating sc_measAsync == 0 ones here...
-		if ((sc_RawRecord[ii] == 1 || sc_RawPlot[ii] == 1) && sc_measAsync[ii]==0)
+		if (sc_RawRecord[ii] == 1 && sc_measAsync[ii]==0)
 			wave wref1d = $sc_RawWaveNames[ii]
 
 			// Redimension waves if readvstime is set to 1
@@ -2360,7 +2322,7 @@ function RecordValues(S, i, j, [fillnan])
 	ii=0
 	cmd = ""
 	do
-		if ( (sc_CalcRecord[ii] == 1) || (sc_CalcPlot[ii] == 1) )
+		if (sc_CalcRecord[ii] == 1)
 			wave wref1d = $sc_CalcWaveNames[ii] // this is the 1D wave I am filling
 
 			// Redimension waves if readvstimeis set to 1
