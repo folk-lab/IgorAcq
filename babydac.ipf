@@ -69,6 +69,10 @@ function InitBabyDACs(instrID, boards, ranges, [custom])
 	endif
 
     // functions to handle a bunch of ugly waves
+    if (!waveExists(dacvalstr) || !waveExists(old_dacvalstr)) 
+	   make/t/o dacvalstr = {{"0","1","2","3","4","5","6","7","8","9","10","11","12","13","14","15"},{"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}, {"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}, {"","","","","","","","","","","","","","","",""}}
+		make/t/o old_dacvalstr = {{"0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0"}}
+	endif
     //     these keep track of the current state of the outputs
 	bd_SetBoardNumbers(boards,custom) // handle board numbering
 	bd_SetChannelRange(ranges) // set DAC output ranges
@@ -110,12 +114,7 @@ function bd_SetBoardNumbers(boards, custom)
 	if(custom)
 		bd_num_custom += 4
 	endif
-
-	if (!waveExists(dacvalstr))
-		bd_initZeros()	
-		wave/t dacvalstr=dacvalstr
-	endif
-		
+	
 	if(numtype(bd_boardnumbers[1])==2)
 		dacvalstr[4] = "0"
 		dacvalstr[5] = "0"
