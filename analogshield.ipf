@@ -132,7 +132,7 @@ threadsafe function readSingleByteAS(instrID)
 	if (status==1073676294)
 		// do nothing
 	elseif(status>0)
-		VISAerrormsg("readSingleByteBD --", instrID, status)
+		VISAerrormsg("bd_readSingleByteBD --", instrID, status)
 		return NaN // abort not supported in threads (v7)
 	endif
 
@@ -150,7 +150,7 @@ threadsafe function /WAVE readBytesAS(instrID, nBytes)
 	make /O/B/U/N=(nBytes) /FREE response_wave
 	variable i=0
 	for(i=0;i<nBytes;i+=1)
-		response_wave[i] = readSingleByteBD(instrID)
+		response_wave[i] = bd_readSingleByteBD(instrID)
 	endfor
 	
 	return response_wave

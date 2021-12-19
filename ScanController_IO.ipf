@@ -79,6 +79,7 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 	
 	if (!logs_only)
 		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(new_sc_createSweepLogs(S=S))
+		make /FREE /T /N=1 scan_vars_json = sce_ScanVarsToJson(S, getrtstackinfo(3), save_to_file = 0)
 	else
 		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(new_sc_createSweepLogs(comments = comments))
 	endif
@@ -108,12 +109,19 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 		if (V_flag != 0)
 				Print "HDF5SaveData Failed: ", "sweep_logs"
 		endif
+
+		if (!logs_only)
+			HDF5SaveData/z /A="ScanVars" scan_vars_json, hdf5_id, "metadata"
+			if (V_flag != 0)
+					Print "HDF5SaveData Failed: ", "ScanVars"
+			endif
+		endif
 		
 		HDF5SaveData/z /A="sc_config" cconfig, hdf5_id, "metadata"
 		if (V_flag != 0)
 				Print "HDF5SaveData Failed: ", "sc_config"
 		endif
-
+		
 		HDF5CloseGroup /Z meta_group_id
 		if (V_flag != 0)
 			Print "HDF5CloseGroup Failed: ", "metadata"
@@ -389,7 +397,7 @@ function saveFastdacInfoWaves(hdfids, S)
 		sweepgates_x[2][i] = str2num(stringfromlist(i, s.finxs, ","))
 	endfor
 	
-	if (S.is2d && !S.bdID)  // Also Y info (if not using BabyDAC for y-axis)
+	if (S.is2d)
 		make/o/N=(3, itemsinlist(s.channelsy, ",")) sweepgates_y = 0
 		for (i=0; i<itemsinlist(s.channelsy, ","); i++)
 			sweepgates_y[0][i] = str2num(stringfromList(i, s.channelsy, ","))
@@ -400,8 +408,6 @@ function saveFastdacInfoWaves(hdfids, S)
 		make/o sweepgates_y = {{NaN, NaN, NaN}}
 	endif
 	
-	
-	nvar sc_AWG_used
 	string wn
 	variable hdfid
 	for(i=0; i<itemsInList(hdfids); i++)
@@ -415,14 +421,15 @@ function saveFastdacInfoWaves(hdfids, S)
 			Print "HDF5SaveData failed on sweepgates_y"
 		endif
 		
-		if (sc_AWG_used == 1)
-			// Add AWs used to HDF file
-			struct fdAWG_list AWG
-			fdAWG_get_global_AWG_list(AWG)
+	
+		// Add AWs used to HDF file if used
+		struct AWGVars AWG
+		fd_getGlobalAWG(AWG)
+		if (AWG.use_awg)
 			variable j
 			for(j=0;j<AWG.numWaves;j++)
 				// Get IGOR AW
-				wn = fdAWG_get_AWG_wave(str2num(stringfromlist(j, AWG.AW_waves, ",")))
+				wn = fd_getAWGwave(str2num(stringfromlist(j, AWG.AW_waves, ",")))
 				initsaveSingleWave(wn, hdfid)
 			endfor
 		endif

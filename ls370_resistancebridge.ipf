@@ -51,14 +51,14 @@ function setLS370system(system)
 		case "bfsmall":
 			ls_system = "bfsmall"
 			ls_label = "LD"				//plate					//labels	  									//IDs
-			string/g bfchannellookup = "mc;still;magnet;4K;50K;ld_mc;ld_still;ld_magnet;ld_4K;ld_50K;6;5;4;2;1"  
+			string/g bfbd_ChannelLookUp = "mc;still;magnet;4K;50K;ld_mc;ld_still;ld_magnet;ld_4K;ld_50K;6;5;4;2;1"  
 			string/g bfheaterlookup = "mc;still;sc_mc;ld_still_heater"						//sc_mc only used internally, still label refers to API 
 			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,290,1201,1800,10000}}
 			break
 		case "bfbig":
 			ls_system = "bfbig"
 			ls_label = "XLD"					//plate				//labels	  			//IDs
-			string/g bfchannellookup = "mc;still;magnet;4K;50K;ch6;ch5;ch3;ch2;ch1;6;5;3;2;1"  
+			string/g bfbd_ChannelLookUp = "mc;still;magnet;4K;50K;ch6;ch5;ch3;ch2;ch1;6;5;3;2;1"  
 			string/g bfheaterlookup = "mc;still;sc_mc;ao2"							 		//sc_mc only used internally, still label refers to API 	
 			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,290,1201,1800,10000}} 
 			break
@@ -77,16 +77,16 @@ function/s getLS370channelLabel(plate)
 	// standard channel names ("50K,4K,magnet,still,mc")
 	string plate
 
-	svar bfchannellookup
+	svar bfbd_ChannelLookUp
 	
 	string channel
 	variable channel_idx
-	channel_idx = whichlistitem(plate,bfchannellookup,";", 0, 0)
+	channel_idx = whichlistitem(plate,bfbd_ChannelLookUp,";", 0, 0)
 	if(channel_idx < 0)
 		printf "The requested plate (%s) doesn't exsist!\r", plate
 		abort
 	else
-		channel = stringfromlist(channel_idx+5,bfchannellookup,";")
+		channel = stringfromlist(channel_idx+5,bfbd_ChannelLookUp,";")
 	endif
 	return channel
 end
@@ -161,7 +161,7 @@ function getLS370temp(instrID, plate, [max_age_s]) // Units: K
 	string instrID
 	string plate
 	variable max_age_s
-	svar ls_system, bfchannellookup, ighchannellookup
+	svar ls_system, bfbd_ChannelLookUp, ighbd_ChannelLookUp
 	variable channel_idx
 	string channel
 	string command
@@ -360,27 +360,6 @@ end
 
 
 
-
-
-
-//function getLS370heaterpowerDB(instrID,heater) // Units: mW
-//	// returns the power of the selected heater.
-//	// avaliable heaters on BF systems: still (analog 2), mc
-//	// avaliable heaters on IGH systems: sorb (analog 1), still (analog 2), mc
-//	// data is queried directly from the SQL database
-//	string instrID
-//	string heater
-//end
-
-//function getLS370pressureDB(instrID,gauge) // Units: mbar
-//	// returns the pressure from the selected pressure gauge
-//	// avaliable gauges on BF systems: P1,P2,P3,P4,P5,P6
-//	// avaliable gauges on IGH systems: P1,P2,G1,G2,G3
-//	// data is queried directly from the SQL database
-//	string instrID
-//	string gauge
-//end
-
 ///////////////////////
 //// Set Functions ////
 //////////////////////
@@ -562,11 +541,11 @@ function setLS370controlParameters(instrID)
 	svar ls_label
 	
 	string command, payload
-	svar bfchannellookup
+	svar bfbd_ChannelLookUp
 	
 	// TODO: Is there anything here we do want to be able to change easily? Mostly looks like defaults we don't need to change
 	print "[setLS370ControlParameters]: See function if you want to change any of the default values or make selectable"
-	string channel = stringfromlist(5,bfchannellookup,";") // MC API_label
+	string channel = stringfromlist(5,bfbd_ChannelLookUp,";") // MC API_label
 	variable delay = 1
 	string heater_output_display_type = "HODT_current" // HODT_current, HODT_power
 	variable max_heater_level = 8 // A limit on the power output of the heater (8 is max, but we limit with max_heater_current seperately)
@@ -710,6 +689,37 @@ end
 ////////////////////
 //// Utillities ////
 ///////////////////
+
+function WaitTillTempStable(instrID, targetTmK, times, delay, err)
+	// instrID is the lakeshore controller ID
+	// targetmK is the target temperature in mK
+	// times is the number of readings required to call a temperature stable
+	// delay is the time between readings
+	// err is a percent error that is acceptable in the readings
+	string instrID
+	variable targetTmK, times, delay, err
+	variable passCount, targetT=targetTmK/1000, currentT = 0
+
+	// check for stable temperature
+	print "Target temperature: ", targetTmK, "mK"
+
+	variable j = 0
+	for (passCount=0; passCount<times; )
+		asleep(delay)
+		for (j = 0; j<10; j+=1)
+			currentT += getLS370temp(instrID, "mc")/10 // do some averaging
+			asleep(2.1)
+		endfor
+		if (ABS(currentT-targetT) < err*targetT)
+			passCount+=1
+			print "Accepted", passCount, " @ ", currentT, "K"
+		else
+			print "Rejected", passCount, " @ ", currentT, "K"
+			passCount = 0
+		endif
+		currentT = 0
+	endfor
+end
 
 function/s LS370getLoggingScheduleFromConfig(sched_name)
 	string sched_name
