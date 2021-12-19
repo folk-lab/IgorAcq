@@ -238,6 +238,7 @@ function ScanBabyDAC_SRSAmplitude(babydacID, srsID, startx, finx, channelsx, num
 	variable babydacID, srsID, startx, finx, numptsx, delayx, rampratex, starty, finy, numptsy, delayy, nosave
 	string channelsx, comments
 	string starts, fins // For ramping multiple gates with different start/end points
+	abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -324,62 +325,80 @@ function ReadVsTimeFastdac(instrID, duration, [y_label, comments, nosave]) // Un
 end
 
 
-//function ScanFastDAC(instrID, start, fin, channels, [numpts, sweeprate, ramprate, delay, starts, fins, x_label, y_label, comments, use_AWG, nosave]) //Units: mV
-//	// sweep one or more FastDac channels from start to fin using either numpnts or sweeprate /mV/s
-//	// Note: ramprate is for ramping to beginning of scan ONLY
-//	// Note: Delay is the wait after rampoint to start position ONLY
-//	// channels should be a comma-separated string ex: "0,4,5"
-//	// use_AWG is option to use Arbitrary Wave Generator. AWG
-//	// starts/fins are overwrite start/fin and are used to provide a start/fin for EACH channel in channels 
-//	variable instrID, start, fin, numpts, sweeprate, ramprate, delay, nosave, use_AWG
-//	string channels, comments, x_label, y_label, starts, fins
-//
-//   // Reconnect instruments
-//   sc_openinstrconnections(0)
-//
-//   // Set defaults
-//   delay = ParamIsDefault(delay) ? 0.01 : delay
-//   comments = selectstring(paramisdefault(comments), comments, "")
-//   starts = selectstring(paramisdefault(starts), starts, "")
-//   fins = selectstring(paramisdefault(fins), fins, "")
-//   x_label = selectString(paramisdefault(x_label), x_label, "")
-//   y_label = selectString(paramisdefault(y_label), y_label, "")   
-// 
-//   // Initialize ScanVars 
-//   struct ScanVars S
-//   initScanVarsFD(S, instrID, start, fin, channelsx=channels, numptsx=numpts, sweeprate=sweeprate, rampratex=ramprate, delayy=delay, startxs=starts, finxs=fins, x_label=x_label, y_label=y_label, comments=comments)
-//
-//   // Check hardware/software limits and that DACs/ADCs are on same device
-//   PreScanChecksFD(S)  
-//   
-//   	// If using AWG then get that now and check it
-//	struct AWGVars AWG
-//	if(use_AWG)	
-//		fd_getGlobalAWG(AWG)
-//		SetCheckAWG(AWG, S)  // Note: sets S.numptsx here and AWG.use_AWG = 1 if pass checks
-//	else  // Don't use AWG
-//		AWG.use_AWG = 0  	// This is the default, but just putting here explicitly
-//	endif
-//
-//   // Ramp to start without checks since checked above
-//   RampStartFD(S, ignore_lims = 1)
-//
-//	// Let gates settle 
-//	sc_sleep(S.delayy)
-//
-//	// Make Waves and Display etc
-//	initializeScan(S)
-//
-//	// Do 1D scan (rownum set to 0)
-//	scfd_RecordValues(S, 0, AWG_list=AWG)
-//
-//	// Save by default
-//	if (nosave == 0)
-//		EndScan(S=S, save_experiment=1)
-//  	else
-//  		dowindow /k SweepControl
-//	endif
-//end
+function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, ramprate, repeats, alternate, starts, fins, x_label, y_label, comments, nosave, use_awg])
+	// 1D repeat scan for FastDAC
+	// Note: to alternate scan direction set alternate=1
+	// Note: Ramprate is only for ramping gates between scans
+	variable instrID, start, fin, repeats, numptsx, sweeprate, delay, ramprate, alternate, nosave, use_awg
+	string channels, x_label, y_label, comments, starts, fins
+	variable i=0, j=0
+
+	// Reconnect instruments
+	sc_openinstrconnections(0)
+
+	// Set defaults
+	delay = ParamIsDefault(delay) ? 0.01 : delay
+	y_label = selectstring(paramisdefault(y_label), y_label, "")
+	x_label = selectstring(paramisdefault(x_label), x_label, "")
+	comments = selectstring(paramisdefault(comments), comments, "")
+	starts = selectstring(paramisdefault(starts), starts, "")
+	fins = selectstring(paramisdefault(fins), fins, "")
+
+	// Set sc_ScanVars struct
+	struct ScanVars S
+	initScanVarsFD(S, instrID, start, fin, channelsx=channels, numptsx=numptsx, rampratex=ramprate, starty=1, finy=repeats, delayy=delay, sweeprate=sweeprate,  \
+					numptsy=repeats, startxs=starts, finxs=fins, x_label=x_label, y_label=y_label, alternate=alternate, comments=comments)
+//	S.finy = S.starty+S.numptsy  // Repeats
+	if (s.is2d && strlen(S.y_label) == 0)
+		S.y_label = "Repeats"
+	endif
+	
+	// Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
+	PreScanChecksFD(S, x_only=1)  
+
+  	// If using AWG then get that now and check it
+	struct AWGVars AWG
+	if(use_AWG)	
+		fd_getGlobalAWG(AWG)
+		CheckAWG(AWG, S)  // Note: sets S.numptsx here and AWG.lims_checked = 1
+	endif
+	SetAWG(AWG, use_AWG)
+
+
+	// Ramp to start without checks since checked above
+	RampStartFD(S, ignore_lims = 1)
+
+	// Let gates settle
+	sc_sleep(S.delayy)
+
+	// Init Scan
+	initializeScan(S)
+
+	// Main measurement loop
+	variable d=1
+	for (j=0; j<S.numptsy; j++)
+		S.direction = d  // Will determine direction of scan in fd_Record_Values
+
+		// Ramp to start of fast axis
+		RampStartFD(S, ignore_lims=1, x_only=1)
+		sc_sleep(S.delayy)
+
+		// Record values for 1D sweep
+		scfd_RecordValues(S, j, AWG_List = AWG)
+
+		if (alternate!=0) // If want to alternate scan scandirection for next row
+			d = d*-1
+		endif
+	endfor
+
+	// Save by default
+	if (nosave == 0)
+		EndScan(S=S)
+		// SaveWaves(msg=comments, fastdac=1)
+	else
+		dowindow /k SweepControl
+	endif
+end
 
 
 function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate, [starts, fins, y_label, comments, nosave]) //Units: mV
@@ -513,9 +532,6 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 	finys = selectstring(paramisdefault(finys), finys, "")
 	variable use_bd = paramisdefault(bdid) ? 0 : 1 		// Whether using both FD and BD or just FD
 
-	if (!paramisdefault(bdID) && (!paramisdefault(startys) || !paramisdefault(finys)))
-   		abort "NotImplementedError: Cannot do virtual sweep with Babydacs"
-   	endif
 
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -598,85 +614,12 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 end
 
 
-function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, ramprate, repeats, alternate, starts, fins, x_label, y_label, comments, nosave, use_awg])
-	// 1D repeat scan for FastDAC
-	// Note: to alternate scan direction set alternate=1
-	// Note: Ramprate is only for ramping gates between scans
-	variable instrID, start, fin, repeats, numptsx, sweeprate, delay, ramprate, alternate, nosave, use_awg
-	string channels, x_label, y_label, comments, starts, fins
-	variable i=0, j=0
-
-	// Reconnect instruments
-	sc_openinstrconnections(0)
-
-	// Set defaults
-	delay = ParamIsDefault(delay) ? 0.01 : delay
-	y_label = selectstring(paramisdefault(y_label), y_label, "")
-	x_label = selectstring(paramisdefault(x_label), x_label, "")
-	comments = selectstring(paramisdefault(comments), comments, "")
-	starts = selectstring(paramisdefault(starts), starts, "")
-	fins = selectstring(paramisdefault(fins), fins, "")
-
-	// Set sc_ScanVars struct
-	struct ScanVars S
-	initScanVarsFD(S, instrID, start, fin, channelsx=channels, numptsx=numptsx, rampratex=ramprate, starty=1, finy=repeats, delayy=delay, sweeprate=sweeprate,  \
-					numptsy=repeats, startxs=starts, finxs=fins, x_label=x_label, y_label=y_label, alternate=alternate, comments=comments)
-//	S.finy = S.starty+S.numptsy  // Repeats
-	if (s.is2d && strlen(S.y_label) == 0)
-		S.y_label = "Repeats"
-	endif
-	
-	// Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
-	PreScanChecksFD(S, x_only=1)  
-
-  	// If using AWG then get that now and check it
-	struct AWGVars AWG
-	if(use_AWG)	
-		fd_getGlobalAWG(AWG)
-		CheckAWG(AWG, S)  // Note: sets S.numptsx here and AWG.lims_checked = 1
-	endif
-	SetAWG(AWG, use_AWG)
-
-
-	// Ramp to start without checks since checked above
-	RampStartFD(S, ignore_lims = 1)
-
-	// Let gates settle
-	sc_sleep(S.delayy)
-
-	// Init Scan
-	initializeScan(S)
-
-	// Main measurement loop
-	variable d=1
-	for (j=0; j<S.numptsy; j++)
-		S.direction = d  // Will determine direction of scan in fd_Record_Values
-
-		// Ramp to start of fast axis
-		RampStartFD(S, ignore_lims=1, x_only=1)
-		sc_sleep(S.delayy)
-
-		// Record values for 1D sweep
-		scfd_RecordValues(S, j, AWG_List = AWG)
-
-		if (alternate!=0) // If want to alternate scan scandirection for next row
-			d = d*-1
-		endif
-	endfor
-
-	// Save by default
-	if (nosave == 0)
-		EndScan(S=S)
-		// SaveWaves(msg=comments, fastdac=1)
-	else
-		dowindow /k SweepControl
-	endif
-end
 
 
 function Scank2400(instrID, startx, finx, channelsx, numptsx, delayx, rampratex, [y_label, comments, nosave]) //Units: mV
 	variable instrID, startx, finx, numptsx, delayx, rampratex,  nosave
 	string channelsx, y_label, comments
+	abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -724,6 +667,7 @@ end
 function Scank24002D(instrIDx, startx, finx, numptsx, delayx, rampratex, instrIDy, starty, finy, numptsy, delayy, rampratey, [y_label, comments, nosave]) //Units: mV
 	variable instrIDx, startx, finx, numptsx, delayx, rampratex, instrIDy, starty, finy, numptsy, delayy, rampratey, nosave
 	string y_label, comments
+	abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -786,6 +730,7 @@ function ScanBabyDACK24002D(bdID, startx, finx, channelsx, numptsx, delayx, ramp
 	variable bdID, startx, finx, numptsx, delayx, rampratex, keithleyID, starty, finy, numptsy, delayy, rampratey, nosave
 	string channelsx, y_label, comments
 	string startxs, finxs
+	abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -849,6 +794,7 @@ function ScanBabyDACMultipleK24002D(bdID, startx, finx, channelsx, numptsx, dela
 	variable startx, finx, numptsx, delayx, rampratex, bdID, starty, finy, numptsy, delayy, rampratey, nosave
 	string channelsx, keithleyIDs, y_label, comments
 	string startxs, finxs, startys, finys // For different start/finish points for each channel (must match length of instrIDs if used)
+	abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -913,6 +859,7 @@ function ScanFastDACK24002D(fdID, startx, finx, keithleyID, starty, finy, numpts
 	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, keithleyID, rampratex, rampratey, delayy, nosave, use_AWG
 	string y_label, comments
 	string startxs, finxs // For different start/finish points for each channel (must match length of channels if used)
+	abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
 
 	// Set defaults
 	delayy = ParamIsDefault(delayy) ? 0.01 : delayy
@@ -979,6 +926,7 @@ function ScanMultipleK2400(instrIDs, start, fin, numptsx, delayx, rampratex, [st
 	variable start, fin, numptsx, delayx, rampratex, numptsy, delayy, nosave
 	string instrIDs, y_label, comments
 	string starts, fins // For different start/finish points for each channel (must match length of instrIDs if used)
+	abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -1031,6 +979,7 @@ function ScanMultipleK2400LS625Magnet2D(keithleyIDs, start, fin, numptsx, delayx
 	variable start, fin, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, nosave
 	string keithleyIDs, y_label, comments
 	string starts, fins // For different start/finish points for each channel (must match length of instrIDs if used)
+	abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -1093,6 +1042,7 @@ end
 function ScanLS625Magnet(instrID, startx, finx, numptsx, delayx, [y_label, comments, nosave]) 
 	variable instrID, startx, finx, numptsx, delayx,  nosave
 	string y_label, comments
+	abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -1143,6 +1093,7 @@ function ScanBabyDACLS625Magnet2D(bdID, startx, finx, channelsx, numptsx, delayx
 	variable bdID, startx, finx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, rampratey, nosave
 	string channelsx, y_label, comments
 	string startxs, finxs // For different start/finish points for each channel (must match length of channels if used)
+	abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -1205,6 +1156,7 @@ function ScanFastDACLS625Magnet2D(fdID, startx, finx, channelsx, magnetID, start
 	// Note: channels should be a comma-separated string ex: "0,4,5"
 	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, magnetID, rampratex, delayy, nosave, use_AWG
 	string channelsx, y_label, comments, startxs, finxs
+	abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
 
 	// Set defaults
 	delayy = ParamIsDefault(delayy) ? 0.01 : delayy
@@ -1270,6 +1222,7 @@ end
 function ScanK2400LS625Magnet2D(keithleyID, startx, finx, channelsx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, rampratey, [y_label, comments, nosave]) //Units: mV
 	variable keithleyID, startx, finx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, rampratey, nosave
 	string channelsx, y_label, comments
+	abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
