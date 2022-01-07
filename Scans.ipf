@@ -616,9 +616,9 @@ end
 
 
 
-function Scank2400(instrID, startx, finx, channelsx, numptsx, delayx, rampratex, [y_label, comments, nosave]) //Units: mV
+function Scank2400(instrID, startx, finx, numptsx, delayx, rampratex, [y_label, comments, nosave]) //Units: mV
 	variable instrID, startx, finx, numptsx, delayx, rampratex,  nosave
-	string channelsx, y_label, comments
+	string y_label, comments
 	abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"
 	
 	// Reconnect instruments
@@ -630,7 +630,7 @@ function Scank2400(instrID, startx, finx, channelsx, numptsx, delayx, rampratex,
 	
 	// Initialize ScanVars
 	struct ScanVars S
-	initScanVars(S, instrIDx=instrID, startx=startx, finx=finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
+	initScanVars(S, instrIDx=instrID, startx=startx, finx=finx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
 	 						y_label=y_label, comments=comments)
 
 	// Check software limits and ramprate limits
@@ -1219,9 +1219,9 @@ function ScanFastDACLS625Magnet2D(fdID, startx, finx, channelsx, magnetID, start
 end
 
 
-function ScanK2400LS625Magnet2D(keithleyID, startx, finx, channelsx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, rampratey, [y_label, comments, nosave]) //Units: mV
+function ScanK2400LS625Magnet2D(keithleyID, startx, finx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, rampratey, [y_label, comments, nosave]) //Units: mV
 	variable keithleyID, startx, finx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, rampratey, nosave
-	string channelsx, y_label, comments
+	string y_label, comments
 	abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
 	
 	// Reconnect instruments
@@ -1234,7 +1234,7 @@ function ScanK2400LS625Magnet2D(keithleyID, startx, finx, channelsx, numptsx, de
 	
 	// Initialize ScanVars
 	struct ScanVars S
-	initScanVars(S, instrIDx=keithleyID, startx=startx, finx=finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
+	initScanVars(S, instrIDx=keithleyID, startx=startx, finx=finx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
 							instrIDy=magnetID, starty=starty, finy=finy, numptsy=numptsy, delayy=delayy, rampratey=rampratey, \
 	 						y_label=y_label, comments=comments)
 
