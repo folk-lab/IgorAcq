@@ -1,0 +1,2204 @@
+RELEASE NOTES LABONE SOFTWARE 21.08
+===================================
+
+Zurich Instruments AG, August 2021
+http://www.zhinst.com
+
+CONTENTS
+========
+1. Notes
+2. Firmware Revisions
+3. Driver Installation
+4. Labone Release History
+    Summary of Changes 21.08
+    Summary of Changes 21.02
+    Summary of Changes 20.07
+    Summary of Changes 20.01
+    Summary of Changes 19.05
+    Summary of Changes 18.12
+    Summary of Changes 18.05
+    Summary of Changes 17.12
+    Summary of Changes 17.06
+    Summary of Changes 16.12
+    Summary of Changes 16.04
+    Summary of Changes 15.11
+    Summary of Changes 15.05
+    Summary of Changes 15.01
+    Summary of Changes 14.08
+    Summary of Changes 14.02
+    Summary of Changes 13.10
+    Summary of Changes 13.06
+    Summary of Changes 13.02
+    Summary of Changes 13.01
+
+1. NOTES
+========
+
+2. FIRMWARE REVISIONS
+=====================
+
+Please find below the revisions of the firmware (and bitstreams) bundled with the latest LabOne release. The
+same information can be found in machine-readable form in the manifest.json file in the Firmware directory of
+the LabOne installation.
+
+MFLI:  FW 67629, BS 67629
+MFIA:  FW 67629, BS 67629
+HF2LI: FW 45105, BS 45105
+UHFLI: FW 67625, BS 50772
+UHFQA: FW 67742, BS 67742
+PQSC:  FW 67761, BS 67761
+HDAWG: FW 67742, BS controller 67757, BS processing 67742
+SHFQA: FW 67774, BS rfsoc 67774, BS rfsoc Gen3 67774
+SHFSG: FW 67820, BS rfsoc 67820, BS rfsoc Gen3 67820
+
+3. DRIVER INSTALLATION
+======================
+
+When prompted by Windows for driver installation, tell Windows to _not_ look for new drivers on "Windows Update"
+and tell it to "automatically install drivers".
+
+Update LabVIEW driver
+
+It is important to update the LabVIEW driver separately. After updating LabOne, you will find a new
+version of the LabVIEW API in Program Files\Zurich Instruments\LabOne\API\LabVIEW. Copy the folder
+"Zurich Instruments" to, i.e., C:\Program Files\National Instruments\Labview 2012\inst.lib\ and restart LabVIEW.
+
+4. LabOne Release History
+=========================
+
+Legend:
++ Added feature
+* Improved/changed feature
+- Bug fixed
+! Known issue / missing feature
+# Path name change
+
+SUMMARY OF CHANGES 21.08
+========================
+
+SHFSG
++ Added support for SHFSG Signal Generator.
+
+SHFQA
++ Added new nodes /DEV*/QACHANNELS/*/SPECTROSCOPY/ENVELOPE/* to enable multiplication of the oscillator signal with a complex envelope for pulsed spectroscopy.
++ Added new node /DEV*/SCOPES/0/SINGLE to switch between single-shot and continuous mode. Currently, only single-shot is available.
++ Enabled full DIO support: Added new node /DEV*/DIOS/0/MODE to select mode, and introduced the following SeqC commands: setDIO(), getDIO(), waitDIOTrigger(), and getDIOTriggered()
+* Modified the behaviour of the startQA() SeqC command: The "trigger" argument now controls the trigger signal instead of the marker output.
+- Firmware can now be updated via USB.
+# In spectroscopy mode, the nodes /DEV*/QACHANNELS/*/SPECTROSCOPY/RESULT/* must now be used for the data acquisition instead of /DEV*/QACHANNELS/*/READOUT/RESULT/*.
+# Renamed /DEV*/RAW/QACHANNELS/*/SPECTROSCOPY/TRIGGER/CHANNEL to /DEV*/QACHANNELS/*/SPECTROSCOPY/TRIGGER/CHANNEL
+# Renamed /DEV*/SYSTEM/SWTRIGGER/* to /DEV*/SYSTEM/SWTRIGGERS/*
+# Removed SEQUENCER/ from /DEV*/QACHANNELS/*/GENERATOR/SEQUENCER/{AUXTRIGGERS/*,DIO/*,ELF/*,ENABLE,SINGLE,READY,RESET}
+# Removed the node /DEV*/QACHANNELS/*/READOUT/RESULT/RESET. Instead, a running measurement can now be stopped by writing 0 to the node /DEV*/QACHANNELS/*/READOUT/RESULT/ENABLE.
+
+PQSC
++ Add graphical interface to control the feedback processing
++ Each bit in the register forwarding can be enabled separately through /DEV*/ZSYNCS/*/OUTPUT/REGISTERBANK/SOURCES/*/ENABLE node
+* Full support for SHFQA instrument, expanded readout registry bank
+* Stability improvements in ZSync link and synchronization for all instruments
+- Fixed bug where lock to external reference clock was lost after long time (days)
+- Fixed bug where feedback data was not persistent when partially updated: if decoder data was updated, forwarding data was lost, and vice versa
+- Fixed bug where zsyncs nodes were not reset with factory preset
+! Establishing a ZSync link with HDAWG instruments may fail occasionally
+! Establishing a ZSync link with SHF instruments may fail occasionally
+! PQSC may take more than 5 seconds to lock to an external reference clock
+! Skew of HDAWG instruments can change up to 3.3 ns across multiple link establishments
+
+HDAWG
++ New modulation mode mixer calibration to support complex modulation including correction of external mixer imperfections
++ Add command playWaveZSync() and improve getZSyncData() for fast feedback with PQSC
++ The '/directory' node of the AWG module is now writeable, allowing to set the directory where waveforms should be saved
+* Made resetOscPhase() AWG instruction blocking until oscillator phase reset is completed
+* Added minimal waveform length check for assignWaveIndex()
+* Increased update rate of /DEV*/AWGS/*/ENABLE node such that AWG state may be probed within 10 ms (previously >100 ms)
+* Reduced memory consumption when compiling sequence programs with long placeholder waveforms
+- Fix timing for setTrigger in grouped mode
+- Fix waveform corruption when playWave is used with conditional instructions
+- Fixed issue that load factory defaults in Device Tab does not reset Pulse Counter settings
+- Corrected display of negative oscillator frequencies in GUI
+- Change /DEV*/AWGS/*/ELF/LENGTH node to be read-only
+
+UHFLI
++ Added NAT traversal support for streaming data through UDP hole punching
+
+UHFQA
++ Added NAT traversal support for streaming data through UDP hole punching
++ Added support for variable arguments in playZero() AWG instruction
+* Increased update rate of /DEV*/AWGS/*/ENABLE node such that AWG state may be probed within 10 ms (previously >100 ms)
+* SeqC commands startQAResult() and startQAMonitor() deprecated, use startQA() instead
+
+MFLI & MFIA
++ IA: Added Current Zone ranging to manually set the switching frequency limits for all 8 current input ranges.
+* IA: Removed Impedance rang from Range Control.
+* IA: Improved user compensation sequence.
+- Fixed bug with loading user compensation data of "Short" and "Open" types.
+- Fixed performance issues with LabOne UI on some devices.
+
+LabOne User Interface
++ Added support of GNU/Linux and macOS on ARM64 and Apple M1 processors.
++ Included HTML user manuals for all instruments.
++ Added feature code verification for options installation.
+* Changed default command log output to Python.
+* When autosaving from modules, saved data is no longer overwritten when the history length is reached.
+* Empty info.txt and .log files have been removed from data and log directories.
+* Improved visibility of readonly buttons.
+- Eliminated sporadic data loss when recording from the Config tab.
+- Fixed an issue with the autoconnect behavior for users of Safari.
+- Impedance nodes, when selected, are now recorded from the Config tab.
+
+LabOne Data Server
++ Added support of GNU/Linux and macOS on ARM64 and Apple M1 processors.
+* Disconnecting a device through the API is now a blocking operation.
+* Device discovery performance has been improved and causes less CPU load.
+* Autoconnection of USB connected devices has been disabled.
+- Fixed crash of data server when the TCP connection to a device timed out.
+
+LabOne API
++ Errors from data server are now propagated to the client as extended error informaton.
+* Improved command log output.
+* Added debug log output when data is dropped in poll().
+- Fixed a bug where data requested with getAsEvent could be dropped by subsequent commands.
+
+C API
++ Added support for ARM64 architecture.
+* If the length of the passed buffer is insufficient, the length parameter is modified to indicate the required minimum buffer size
+  (ziAPIGetValueB, ziAPIGetValueString, ziAPIGetValueStringUnicode, ziAPIModGetString, ziAPIModGetStringUnicode).
+* For vector data of type ZI_VECTOR_ELEMENT_TYPE_ASCIIZ, a null terminator is always inserted (but never counted to the number of
+  vector elements). A warning will be shown if the number of vector elements differ from the string length.
+
+Python API
++ Added support for ARM64 architecture.
+* Removed getLastError and setLastError as they should not be used in the Python API. In case of an error an exception will be thrown with the appropriate information attached.
+* The set function accepts now also 2 parameters when only a single value has to be set. It is then analoguous to the explicit set<Type> function.
+* Examples moved from zhinst package to public GitHub repository (https://github.com/zhinst/labone-api-examples).
+* The pollEvent function now returns a dictionary of path and value, as opposed to only the value.
+* Added arguments to the utility function create_api_session to define Data Server address and port.
+* Added save option to sweeper example.
+* Adapted MDS sweep example to support HF2LI.
+
+SHFQA Python API utilities
++ zhinst.utils.shf_sweeper: added EnvelopeConfig for configuring the envelope for pulsed spectroscopy
+* zhinst.utils.shf_sweeper: renamed 'pointwise' to 'sequential', 'sweepwise' to 'cyclic', 'dwell_time' to 'integration_time' and 'num_samples' to 'num_averages'
+
+MATLAB API
+* Adapted MDS sweep example to support HF2LI.
+
+Version 21.08 (patch 1)
++ SHFQA: Added new nodes to select either "cyclic" or "sequential" averaging of results: /DEV*/QACHANNELS/*/READOUT/RESULT/MODE and /DEV*/QACHANNELS/*/SPECTROSCOPY/RESULT/MODE.
+* LabOne UI: Improved responsiveness of the Device Firmware Update dialog for MF devices
+- PQSC: Fixed bug where the phase between ZSync triggers and an external reference clock could be shifted by 200 ps
+- PQSC: Fixed bug where the time to lock to an external reference clock could take more than 5 seconds
+- PQSC: Fixed bug where daq.sync() runs into a timeout when switching to an invalid external reference clock
+- PQSC: Fixed bug where the reference clock source can fall back to internal when switching to an invalid external reference clock
+- PQSC: Fixed bug where the instrument reports that it correctly locked to external reference clock, but in reality it failed
+- LabOne API: Fixed bug in ziAPIDiscoveryGetValueS where the function would return an output only once for each property and leave the output parameter unchanged for further invocations. This bug could cause a crash for users of the LabVIEW API.
+
+SUMMARY OF CHANGES 21.02
+========================
+
+PQSC
++ Enabled ZSync link to SHF instruments
+* Re-enabled 10 MHz output reference clock
+* Updated ZSync protocol, breaking compatibility with 20.07 for triggering and feedback
+* Improved lock to external reference clock
+* Updated ZSync error stack to publish a notice instead of a warning when link is established or calibrating for the first time
+- Fixed an issue where the "ZSync" LED on the frontpanel is stuck
+- Fixed an issue where issuing daq.sync() would not wait while locking to an external reference clock
+- Fixed an issue where lock to external reference clock was lost after multiple days
+- Fixed an issue where PQSC execution engine does not stop if the reference clock output is modified
+
+HDAWG
++ Added option to load factory defaults in Device Tab
+* Improved timestamp resolution of Pulse Counter to 300 MHz
+* Improved output termination on DIO connector to improve signal integrity
+* Added support of run-time variable arguments of the sequencer instruction playZero()
+* Trigger mode (ZSync/DIO) used in sequencer program is checked against device configuration
+* Improved compatibility check between AWG compiler version and device version
+- Fixed an issue where signals generated on DIO displayed rare glitches and reduced interface speed from 300 MHz to 100 MHz
+- Fixed an issue where DIO data was updated without DIO trigger present
+- Fixed HDAWG command table upload via MATLAB API
+- Fixed an issue where command table descriptions were not correctly parsed
+- Fixed an issue where pulse counter (CNT) periods were not correctly configured for non-default sampling rates
+
+
+UHFQA
++ Added option to load factory defaults in Device Tab
++ Added options to bypass deskew and rotation units to reduce latency by more than 60 ns
++ New sequencer instruction startQA() to trigger integration and monitor simultaneously
+* Added new options to Signal Input Mapping to support dual-phase demodulation on a single signal input
+* Oscillator signals can now be enabled using the /DEV*/SIGOUTS/*/ENABLE/* nodes
+* Added sequencer instruction resetOscPhase() to initialize oscillator phase independently of AWG Integration Trigger
+* Updated to enable Scope State to be output on Trigger outputs even without the DIG option
+* Updated Weighted Integration units to support back-to-back integration for integration lengths >= 2048 samples
+- Fixed a problem where the input would appear as overloaded when switching to external reference clock
+- Fixed a problem where the Auxiliary Outputs were not updating correctly
+# Added nodes /DEV*/QAS/*/BYPASS/{DESKEW,CROSSTALK,ROTATION}
+
+SHFQA
++ Initial enabling of SHFQA device for LabOne
+
+UHFLI
+- Included scope trigger signal in ref/trig outputs when DIG option installed
+
+MFLI & MFIA
+* Applied DIO external clock to DIO data attached to demodulator samples
+
+LabOne General:
++ Added Online Programming Manual and API documentation
+* Improved Linux installer, adding systemd service files for data servers
+* Number of log files per LabOne server limited to 512
+
+LabOne Data Server
+* Allow running multiple instances of data server on Windows
+* Considerable speed-up of get() for non-wildcard paths
+* Improved reliability of device connection and upgrade process
+
+LabOne User Interface
++ Added independent X-Y plot to Sweeper (e.g., for parallel Nyquist and Bode plots)
+* Improved rendering of sweeps with >2000 points
+- Fixed error message in MDS tab for lost external clock
+- The correct curve fitting algorithm for histogram is now selected in Plotter math tab
+
+LabOne API
++ Expose status flags of discovered peers in Discovery
+- Fixed setVector() for empty arrays
+
+Python API
+! Removed support of Python 2.7
++ Added support of Python 3.9
++ Added API functions for adjusting debug level and log path for file output
+
+MATLAB API
+- Fixed setVector() for strings
++ Added one example to demonstrate command table feature of HDAWG
+
+LabVIEW API
++ Added tutorial VIs to demonstrate basic API functionality
+
+Version 21.02 (patch 1)
+- HDAWG: Fixed a problem where the latency when triggered by ZSync was not constant across resetting the ZSync link
+- PQSC: Fixed a bug where ZSync link gets stuck in reset after link error
+- PQSC: Fixed a bug where updating register forward index does not take effect on hardware
+- PQSC: Fixed a bug where feedback forwarding stops processing new input
+- UHFQA: Fixed bug with sending wrong readout over DIO
+* SHFQA: Changed the minimum and default RF center frequency from 800 MHz to 1 GHz, since 800 MHz leads to LO leakage to other channels
+- SHFQA: Fixed a problem causing a reduced spur performance around 6 GHz
+- SHFQA: Fixed a problem where an input signal was detected even when the input was switched off
+- SHFQA: Fixed a problem where the over-range reporting mechanism of an input signal could get stuck
+- SHFQA: Fixed a problem where the Sequencer remained busy after the program was finished
+- SHFQA: Fixed a problem where the Sequencer was triggered multiple times for long trigger pulses
+- SHFQA: Fixed a problem where the Sequencer reported an outdated length of the ELF file
+- SHFQA: Fixed a problem where the effect of the setTrigger() command was subject to jitter (2 ns)
+- Python API: Fixed import of zhinst.utils with Python <=3.6
+* Python API: Improved examples and utilities for SHFQA
+* Data Server: Added device serial to sync timeout exception text
+* Documentation: Compressed version of HTML user manuals to reduce size of LabOne installation
+# Added /DEV*/QACHANNELS/*/GENERATOR/SEQUENCER/RESET
+
+SUMMARY OF CHANGES 20.07
+========================
+
+PQSC
++ Detect device type and serial of HDAWG connected with ZSync and show in LabOne UI
+* Changed the possible values for system/clocks/referenceclock/out/freq from 10/100 to 10000000/100000000
+* Changed minimum value for /DEV*/EXECUTION/HOLDOFF to 100 ns and allow only integer multiples of that value
+* Improved minimum amplitude required to lock to an external reference clock
+* Disabled 10 MHz reference clock output (100 MHz is still available)
+- Fixed issues with ZSync link initialization
+- Fixed an issue with HDAWGs not receiving all triggers from PQSC over ZSync
+# Added /DEV*/ZSYNCS/0..17/CONNECTION/{DEVTYPE,SERIAL}
+# Added /DEV*/SYSTEM/CLOCKS/REFERENCECLOCK/IN/SOURCEACTUAL
+# Removed /DEV*/ZSYNCS/0..17/ZSYNC/CONNECTION/RESET
+# Added /DEV*/ZSYNCS/0...17/OUTPUT/{DECODER,REGISTERBANK}
+# Added /DEV*/FEEDBACK/{DECODER,REGISTERBANK}
+# Removed /DEV*/ZSYNCS/*/CONNECTION/{ENABLE,PROTOCOLVERSION,READY}
+
+HDAWG
++ New FIFO memory architecture for reliable playback of long waveforms from main memory
++ New command table feature for memory-efficient sequencing with real-time amplitude/phase changes
+* Improved output delay reproducibility for devices with HDAWG-SKW option
++ New sequencer instructions setPRNGSeed(), setPRNGRange(), getPRNGValue() for real-time pseudo-random number generation
++ New sequencer instructions waitZSyncTrigger() and getZSyncData(const data_type)
++ Introduced ZSync data type constant ZSYNC_DATA_RAW
+* Doubled instruction memory to 16'384 assembler instructions per AWG core
++ New sequencer instruction playZero()
++ New sequencer instruction assignWaveIndex() and placeholder()
+- Fixed an issue with slow compilation due to unnecessary loading of cached waveform data
+- Fixed an issue for concurrent multi-device compilation that could cause the wrong program to be uploaded to a device
+- Fixed an issue where setSinePhase works only on core 1
+- Fixed an issue where AWG execution ends prematurely in rerun mode for short programs
+- Fixed an issue where not all triggers over ZSync were received
+- Fixed an issue where playWaveDigTrigger() works only on core 1
+# Added nodes /DEV*/AWGS/*/COMMANDTABLE/{DATA,STATUS,CLEAR}
+# Added /DEV*/DIOS/0/MODE to control the DIO behavior for use in a QCCS
+! Removed playWaveIndexed functionality
+! Static timing misalignment between AWG cores for non-default sampling rates
+! DIO not functional for non-default sampling rates
+
+UHFQA
++ Added QA Results QCCS to the DIO mode
++ Introduced device error reporting in LabOne
++ Introduced SeqC constants QA_INT_0, QA_INT_1, ... , QA_INT_9, QA_INT_ALL to control the qubit readout units
++ New sequencer instruction setReadoutRegisterAddress(var results_address) to set the readout register address in the PQSC
++ New sequencer instruction waitZSyncTrigger() to wait for a trigger over ZSync
+* Limited number of complex data points displayed in Result tab to preserve UI responsiveness
+
+MFLI & MFIA
++ IA: Added one-period averaging for impedance measurements at low frequencies
+* IA: Added user compensation modes "Short" and "Open"
+
+LabOne Data Server
+- Fixed a performance issue with Windows 10, version 2004
+# Added node /ZI/ABOUT/COMMIT
+
+LabOne User Interface
++ Trend plots: added the possibility to track Math readings from the Math tab over time
++ Added "Device Information" report to Device tab (See "More info")
+* Gray out demodulators when providing inputs for PID to protect against accidental changes
+* Added option to remove a populated vertical axis group in one event
+* Increased the number of decimals for PID/PLL parameters
+* Numerical tab: allow values to be copied from context menu
+* Improved colormaps available for 2D plots
+* Improved macOS icon
+- Corrected reading of tracking values in reverse sweeps
+- Scope tab: fixed unintential switching between linear and logarithmic axis
+- Fixed responsiveness when a device is restarted and connected to an existing UI session
+
+LabOne API
++ Support using string aliases to set enumeration-like values
+- Fixed timebase saved in HDF5 files
+
+LabOne Modules (Shared Functionality API & User Interface)
+- PID advisor: clamp maximum advised bandwidth to hardware limits to guard against instability
+
+Python API
++ Added support of Python 3.8
+* Example code updated to Python 3.6+, making use of f-strings for string interpolation
+
+MATLAB API
+* Improved examples such that they free instantiated modules after use
+
+Version 20.07.2325 (patch 1)
+- Fixed a problem where AWG programs, which should terminate, never finish (shows busy)
+- Fixed a communication issue when downloading certain AWG programs in channel grouping mode
+- Fixed a reliability issue with Zsync link establishment
+- Fixed a bug resulting in potentially invalid code generation in AWG compiler
+- Fixed device identification (blinking LED) for MF devices in proxy mode
+- Fixed the peak/trough finding algorithm for reverse and bidirectional sweep in LabOne
+
+Version 20.07 (patch 2)
+* HDAWG: Improved compatibility check between device and LabOne version
+* HDAWG: Improved AWG error reporting
+- HDAWG: Fixed an issue where waveform data was not loaded correctly
+- HDAWG: Fixed an issue where AWG channels were not correctly enabled in 4- and 8-channel mode
+- HDAWG: Fixed an issue where wrong code for multiplication was generated by the AWG compiler
+- HDAWG: Fixed an issue where the oscillator control rule was not updated correctly unless AWG program was reloaded
+- HDAWG: Fixed an issue with inconsistent sequencer state when channel grouping is changed
+- UHFQA: Fixed an issue where auxiliary outputs were not updated
+- UHFQA: Fixed an issue where the input overload indicators were wrongly triggered when switching from internal to external reference clock or vice versa
+- LabOne: Fixed an issue where the second plot of a dual plot is discarded when saving data in Sweeper Tab
+
+SUMMARY OF CHANGES 20.01
+========================
+
+PQSC
++ LabOne support for Zurich Instruments Programmable Quantum System Controller (PQSC)
++ Synchronized triggering of HDAWGs with ZSync
++ Triggering of 3rd party instruments via Trigger Out
++ Lock to external reference clock at 10 MHz or 100 MHz
++ Output internal reference clock at 10 MHz or 100 MHz
++ Fixed phase between internal and external reference clock
+! ZSync link initialization sometimes hangs (yellow LED)
+
+HDAWG
++ Enable full digital IQ modulation
++ SeqC command resetOscPhase() added
++ SeqC command incrementSinePhase() added
++ SeqC command setSinePhase() added
+* Improved overall stability and predictability of the sequencer
+* Consistent alignment of waveform outputs in grouped mode with external trigger
+* New default values for sine oscillator selects: /sines/*/oscselect
+* New default values for carrier oscillator selects (MF option required): /awgs/*/outputs/*/modulation/carrier/*/oscselect
+* New default values for aux-trigger slope (rising edge): awgs/*/auxtriggers/*/slope
+* New default values for digit triggers: awgs/*/auxtriggers/*/channel
+* New default value for AWG rerun (off): awgs/*/single
+* New default values for DIO interface strobe: awgs/*/dio/strobe/slope,index
+* New default values for DIO interface valid: awgs/*/dio/valid/index,polarity
+* New default values for DIO interface mask: awgs/*/dio/mask/value,shift
+- Fixed jitter on DIO outputs
+# Soft-deprecated /DEV*/AWGS/*/OUTPUTS/*/AMPLITUDE; it now redirects to /DEV*/AWGS/*/OUTPUTS/*/GAINS/*
+# Added /DEV*/AWGS/*/OUTPUTS/*/GAINS/*
+# Removed /DEV*/DIOS/*/MODE
+! Timing misalignment between AWG channels in channel grouping modes 2x4, 1x8, 1x4 when getUserReg(n) is placed at the beginning of a sequence program
+! Timing misalignment between AWG channels in channel grouping modes 2x4, 1x8, 1x4 when operating at sampling rate other than 2.4 GSa/s
+
+UHFLI
+* PID: Added option to control integrator reset on stop/restart
+# Added /DEV*/PIDS/*/KEEPINT
+
+UHFQA
++ SeqC command startQAResult() added
++ SeqC command startQAMonitor() added
++ Added option to externally trigger signal monitoring and integration
+* Result Logger: Added sequential averaging mode
+* Improved latency for vector readout
+# Added /DEV*/QAS/*/INTEGRATION/TRIGGER/CHANNEL
+# Added /DEV*/QAS/*/MONITOR/TRIGGER/CHANNEL
+# Added /DEV*/QAS/*/RESULT/MODE
+
+MFLI & MFIA
++ External reference mode is available for all demodulator paths
++ MOD: Enable simultaneous demodulation of both sidebands when carrier and sideband frequencies are provided by external references
+* PID: Added option to control integrator reset on stop/restart
+# Added /DEV*/PIDS/*/KEEPINT
+
+LabOne Data Server
+* Memory footprint drastically reduced when connected to multiple instruments. This was particularly noticeable when connected to multiple HDAWG instruments causing unresponsiveness in the LabOne User Interface.
+* Improved handling of wildcards in node paths
+- Fixed spurious poll warning at the beginning of a subscribe/poll sequence ("No poll within 10 sec.")
+- Fixed USB communication issues (disconnect after 20 seconds and timeout due to packet size)
+
+LabOne User Interface
++ Math: Added linear fit to Sweeper and DAQ
++ Added option to save histogram data as a CSV file
++ Precompensation Advisor: added import of custom waveform from CSV file
++ QA Result: Added complex data plot with persistence
+* AWG: Removed output amplitudes from the UI
+* Precompensation Advisor: Reduced number of client sessions
+* Improved usability of checkbox and radio button groups
+* Improved importing of saved SVG figures to main vector graphics editors
+* Histogram: Add option to display a normal or Rice distribution fit (only in Plotter tab with demod X, Y, R and boxcar signals)
+
+LabOne API
++ Added quantum analyzer API module
+* Revision numbers (/ZI/ABOUT/REVISION, ziAPIGetRevision, ...) now contain the full version information as a packed decimal (YYMMBBBBB)
+* Improved error handling when subscribing/unsubscribing to non-existent nodes. An error is now returned instead of failing silently.
+* Improved error handling when a device is not connected or misspelled ("Device not found")
+
+LabOne Modules (Shared Functionality API & User Interface)
+* API Log: Removed module prefix from API log entries as it is no longer required; a descriptive name is used for the handle variable.
+* AWG Compiler Module: Improved stability of compiler
+- Precompensation Advisor: Fixed infinite recursion (crash) for certain exponential filter amplitude coefficients
+- AWG Compiler Module: Fixed unpredictable behaviour when enabling AWGs
+- Fixed recurring ZIAPINotFoundException if the 'device' parameter was set to an unconnected device
+
+Python API
+* Added deprecation warning for users of Python 2.7 and 3.5. Future versions of LabOne will remove Python 2.7 and 3.5 support.
+
+.NET API
+* Impedance flags added to ZISweeperImpedanceWave class. The results of impedance sweeps now contain impedance flags.
+  NOTE: This is an ABI breaking change. You need to recompile your client code.
+
+C API
+* Impedance flags added to ZISweeperImpedanceSample struct. The results of impedance sweeps now contain impedance flags.
+  NOTE: This is an ABI breaking change. You need to recompile your client code.
+
+Version 20.01.1335 (patch 1)
+- Fixed code signature of Windows MSI packages
+- Fixed an issue with AWG re-run on HDAWG
+
+Version 20.01.1818 (patch 2)
+- Fixed an issue where HDAWG missed the first few triggers of a measurement
+- Fixed an issue where DIOs on HDAWG4 were not working
+
+Version 20.01.2199 (patch 3)
+- Fixed a performance issue of LabOne with Windows 10, Version 2004
+- Fixed an issue where playWaveDigTrigger() works only on core 1 of HDAWG
+
+
+SUMMARY OF CHANGES 19.05
+========================
+
+ALL
+* Low level communication protocol changed, older versions of LabOne will not be able to communicate with devices running 19.05 firmware without downgrading them first
+
+HDAWG
++ Marker output delay can be controlled in relation to the analog outputs
++ SeqC command waitSineOscPhase() added
++ Increase the sequencer program memory to 8192 instructions
++ Precompensation: Display of filtered waveform on the LabOne UI
++ Output clipping indication
+* Waveforms are now ordered according to the sequence in which they are defined in the sequencer program, rather than alphabetically
+* Restrict sequencers programs to the cache memory for improved reliability
+* Precompensation: improved latency reporting upon changing the sample clock frequency
+* Waveform viewer improvement supporting now waveforms up to 10M samples
+* Added check for SeqC compiler/firmware version compatibility
+* Fixed race condition when starting AWG after waveform upload over /DEV*/AWGS/*/WAVEFORM/WAVES/*
+* Added support for unicode characters in waveform (*.csv) filenames
+* Improved marker display in waveform viewer
+* Added over-temperature warning log message
+* Improved handling of getUserReg()-commands in AWG programs
+* Improved compatibility check of AWG programs
+* Improved speed of locking to external clock
+* Improved minimum configurable Sample Clock frequency to 100 MHz
+* Improved error reporting functionality
+- Improved waveform and ELF file upload stability
+- Fixed firmware update notifications on Linux hosts
+- Fixed bug where calling waitWave() could prevent any further waveform output
+- Fixed update of waveform list when modified program is uploaded
+- Fixed issue with interleaving when playing a waveform on 2 channels
+- Fixed status indicator in GUI
+- Fixed issue in AWG compiler for large waveforms (>536e6 samples)
+- Fixed an issue with boolean operators in AWG compiler
+- Fixed an issue with advanced modulation for non default AWG sampling rates
+- Fixed an issue where the instrument would sometimes fail to lock to external clock
+# Removed /DEV*/AWGS/*/WAVEFORM/DATA (replaced by by /DEV*/AWGS/*/WAVEFORM/WAVES/*); use the helper functions convert_awg_waveform and parse_awg_waveform to convert to the new format
+# Removed /DEV*/AWGS/*/WAVEFORM/INDEX
+# Added /DEV*/SYSTEM/INTERFACESPEED (USB only)
+# Added /DEV*/DIOS/*/MODE
+# Added /DEV*/SIGOUTS/*/OVER
+# Removed /DEV*/SYSTEM/STATUS
+# Removed /DEV*/AWGS/*/DIO/VALUE
+! Manual prefetch commands may fail if not inserted for all AWG cores
+! Use of sequencer instruction waitSineOscPhase() in channel grouping modes other than 4x2 on HDAWG8, and 2x2 on HDAWG4, is not prevented by the compiler
+
+UHFLI & UHFAWG
+* Improved firmware update speed and reliability
+* Restrict AWG programs to the cache memory for improved reliability
+# Removed /DEV*/AWGS/*/WAVEFORM/DATA (replaced by by /DEV*/AWGS/*/WAVEFORM/WAVES/*); use the helper functions convert_awg_waveform and parse_awg_waveform to convert to the new format
+# Removed /DEV*/AWGS/*/WAVEFORM/INDEX
+# Added /DEV*/SYSTEM/INTERFACESPEED (USB only)
+
+UHFQA
++ Bypass of the cross correlation matrix to improve latency
++ Oscillator can now be directly output on Signal Output 1 (sine) and 2 (cosine) using controls in the Signal Outputs tab
++ Discriminated qubit state can now be output on the Ref/Trigger and Trigger Out connectors of the instrument
++ Added waitQAResultTrigger() to enable the AWG to wait for qubit discrimination to complete
++ Added getQAResult() function to enable the AWG to read the result of the last qubit discrimination operation
+* Waveform viewer improvement supporting now waveforms up to 10M samples
+* Restrict AWG programs to the cache memory for improved reliability
+* Cross correlation entries can be edited on the LabOne UI
+* Improved deskew matrix display on the LabOne UI
+- Fixed an issue where the integration length was not configured correctly when switching Standard and Spectroscopy mode
+- Fixed an issue where the Drive of the individual DIO bits could only be changed in Normal mode
+- Fixed an issue where it was not possible to use setDouble to change the oscillator frequency from a SeqC program
+- Fixed an issue where an internal data overflow could happen when many measurement averages were acquired
+# Node path change: Output mixer channel indices changed from sigouts/0/amplitudes/3 and sigouts/0/amplitudes/7 to sigouts/0/amplitudes/0, respectively sigouts/0/amplitudes/1
+# Removed /DEV*/AWGS/*/WAVEFORM/DATA (replaced by by /DEV*/AWGS/*/WAVEFORM/WAVES/*); use the helper functions convert_awg_waveform and parse_awg_waveform to convert to the new format
+# Removed /DEV*/AWGS/*/WAVEFORM/INDEX
+# Added /DEV*/SYSTEM/INTERFACESPEED (USB only)
+
+MFLI & MFIA
+* MDS: Added warning when using multiple devices with different hardware revisions
+- MDS: Fixed occasional 233ns demodulator sync error
+- PID: Fixed result distribution - includes oscillator frequency update after PID turned off
+
+HF2
+- Fixed state display of HF2CA on the LabOne UI
+
+LabOne API
++ Support of vector data for modules, e.g., in precompensation module for HDAWG
++ Added ZI_LIST_NODES_EXCLUDESTREAMING flag to allow exclusion of streaming nodes when getting node list
++ Added ZI_LIST_NODES_EXCLUDEVECTORS flag to allow exclusion of vector nodes when getting node list
++ get() now supports comma-separated paths with wildcards
++ get() with a leaf-node path tries to obtain the node disregarding the flags
+* vectorWrite() function was renamed to setVector()
+* Improved get() functionality: returns data for all nodes except for streaming nodes
+* Improved performance of high-level get()
+* High-level get() no longer interferes with poll data
+* Improved logging of small numbers in the API command log to use exponential notation
+
+LabOne Modules (Shared Functionality API & User Interface)
++ Added precompensation API module
++ It is no longer required to prefix the module parameter path with the module name.
++ Added listNodesJSON() and help() functions to API modules
+* Non-user-initiated get() commands issued during module initialization are no longer logged
+- Numeric: Fixed bug where histogram would reset every 10s
+- Scope: Fixed bug where clearing history would not reset record count
+
+LabOne User Interface
++ Support of HDF5 file format for saving of measurement data
++ Loading of HDF5 measurement data from disk into the history list
++ macOS support
++ Context menus added for plots, input fields, device connection dialog
++ Plots can be saved in PNG format
++ The save interval for recording node data to disk can now be specified under Config/Record Data
++ Command line option to specify the number of multicast hops for device discovery
++ Frequency column when saving x-y plot data
+* DAQ: Frequency span is now updated according to selected signal when multiple signals are present
+* Errors during device firmware updates are displayed
+* Disabled live autocomplete of comments in AWG sequence editor. (Can still be enabled with Ctrl+Space.)
+* Code editor autocomplete and snippets are loaded per-device
+* IA: Compensation advisor warning for low load extended to loads below 10 Ohm
+* IA: User compensation will disable DC mode before calibration start
+* IA: Improved handling of DC impedance measurements
+* Improved labelling of channel grouping settings
+* Improved startup time
+* UI improvements for Safari browser
+- AWG: Fixed waveform viewer issue when viewing > 2000 data points
+- AWG: Fixed issue where markers in the Waveform Viewer were wrongly displayed
+- AWG: Improved handling of special characters in program code
+- AWG: Fixed UI freeze when channel grouping changed
+- AWG compiler: Fixed bug where comments could result in subsequent code being ignored
+- AWG compiler: Fixed crash when compiling SeqC program without playWave instruction
+- Fixed device identification over device connection dialog when multiple network cards are present
+- Device Firmware Upgrade and AWG: "Save As" dialog closed correctly when user hits the Enter key
+- Fixed rendering performance issue in Chrome when math tab is open
+- DAQ: Fixed display of trigger level when tracking edge trigger is used in reverse scanning directions
+- DAQ: Fixed display of trigger level when vertical cursors are moved
+- Sweeper: Fixed issue where sweeper would continue to sweep previously-subscribed device nodes even after unsubscribing
+- Fixed spinner display during firmware update
+- Fixed configuration data of local data servers on Linux
+- Fixed sidebar display when switching between devices
+- Fixed inclusion of settings file updates when saving to SVG
+- Fixed opening of error log from status bar
+
+LabOne Data Server
++ Command line option to specify the number of multicast hops for device discovery
+- Improved device update stability
+
+Python API
++ listNodes(), listNodesJSON(), and get() now support keyword arguments
+* Improved and cleaned up docstrings and function signatures
+* Module handles are released automatically when no longer used
+- Fixed handling of strides in non-contiguous NumPy arrays
+- listNodes() returns an empty list if no nodes match the specified path (instead of [''])
+
+Matlab API
+* Removed the need to set LD_PRELOAD
+- Added warning for module instantiation with too many parameters
+- Fixed issue with retrieval of string node values
+
+.NET API
++ Added support for obtaining data from vector nodes when polling
+
+C API
+- Removed unnecessary symbol exports
+- Fixed broken ziAPIGetComplexData function
+
+
+SUMMARY OF CHANGES 18.12
+========================
+
+HDAWG
++ USB 3.0 interface support for HDAWG devices
++ Support of fast node and index sweeps
++ Thermal shut-down in case of over-temperature
++ Able to lock to 100 MHZ external reference clock
++ Added reference clock frequency readout node: SYSTEM/CLOCKS/REFERENCECLOCK/FREQ
++ Enable sample clock (currently limited to the range of 600 MHz to 2400 MHz)
++ Added Error Module to collect warnings and errors from the Hardware and show them in UI and accessible by API
++ Sweeper module: Allow AWG index and node sweeps
++ Allow delay (skew) adjustement to align output waves
++ SeqC command prefetch() added. Uses the same channel/wave arguments as playWave()
++ SeqC command prefetchIndexed added. Uses the same channel/wave arguments as playWaveIndexed()
++ SeqC "" (empty string) can be used as dummy waveform in playWave to alter AWG output assignment
++ SeqC command randomSeed() added to force a new seed for the subsequent random wave commands
++ SeqC commands setInt() and setDouble() to write to nodes from AWG program
++ Added pre-compensation feature for compensating for external imperfections in the signal chain such as bounces, low-pass and high-pass effects
+* SeqC command rand() deprecated, use randomGauss() or randomUniform() instead
+* Improved AWG pattern download speed
+* Improved alignment of marker bits and analog output signal
+* Higher fan speed for v1 hardware to achieve better temperature margin
+* Improved stability when compiling and downloading large AWG programs (solves disconnects)
+* Trigger-to-output latency below 50 ns when using playWaveDigTrigger() with one channel pair
+* Trigger-to-output latency below 180 ns when using waitDigTrigger() from any input to any output
+* Increase maximum streaming rate for trigger and counter streams
+* MDS in AWG module: Stacking of several HDAWGs is possible
+* MDS: Improved MDS accuracy to be better than 1 ns
+- MDS: AWG Output now allows mixed 4 channel and 8 channel HDAWG stacks
+- Fixed firmware startup behavior for static ip configuration if network cable is disconnected
+- AWG: Fixed playback interruptions and jitter on long waveforms
+- Fixed external reference clock locking after switching between external and internal consecutively
+- Reduced temperature drift between channels if only some outputs are active
+- Fixed device disconnects due to kernel crash
+! The timing between consecutive playWave commands and playWaveNow commands separated by wait commands has changed and must be rechecked by the user
+! Sample clock will only have a fixed delay in relation to the reference clock if the following two conditions are fulfilled:
+  (Sample clock frequency is denoted f_s, reference clock frequency is denoted f_r, and gcd denotes the greatest common divisor operation)
+  1) f_s/16 > f_r
+  2) f_s/16/gcd(f_s/16, fr) <= 63
+  In addition, to make sure the delay is repeatable across instrument startups, the following condition must be fulfilled:
+  3) f_s/f_r/16 must be an integer value
+
+UHFLI & UHFAWG
+- AU: Fixed scaling for polar arithmetic traces in scope
+- AWG: setRate command sets rate immediately, instead of only when a channel assignment changed
+- UHFAWG DIO Tab: Clock select shows "<undefined>"
+
+UHFQA
++ Initial enabling of UHFQA device for LabOne
+
+HF2LI & HF2IS
+- RT: Fixed silent failure of loading memfile
+- Fix for overwritten demodulator bandwidth by the PID bandwidth during a device reconnect
+
+MFLI & MFIA
++ Scope: DIG option now has access to "TU n Output Value"
+* MDS: Improved precision of timestamp synchronization
+* IA: Improved handling of user compensation in 4T mode for small DUTs e.g. < 10 Ohm
+* IA: Improved output range handling during user compensation
+* Improved stability of flash drive handling
+* Improved USB stick support for special formats
+- DIG: Fixed occasional channel swapping on large recordings
+- IA: Fix for crash when uploading a user compensation if the device is in proxy mode
+
+LabOne Data Server
+- Improved udev rules handling for USB devices under Linux
+- fixed for broken ziDiscoveryUtil.exe on Windows 7
+
+LabOne Modules (Shared Functionality API & User Interface)
++ Saving and Loading Settings from and to multiple synchronized devices
++ DAQ Module: implement full MDS support
++ /SYSTEM/IDENTIFY node available on all devices except HF2 triggering a frontend LED blinking
++ Support of string vector nodes
++ Support of complex data types (setComplex, getComplex, poll)
++ NaN values instead of suppressed data streaming during autorange or calibration (must be enabled by API user)
++ Enabled sinc filter support in manual mode for non-frequency sweeps
+* AWG Module: Various improvements when working with long and/or complex waveforms
+* AWG Module: Progress report improvement when multiple cores are in use
+* Overwriting an old settings file now removes unused nodes
+* History list becomes read only if autosave is enabled
+* Improved clamping of integer module parameters
+* AWG: Improved stability when compiling long sequencer programs
+- Sweeper: Fix for "Illegal order for demodulator" warning when loading settings with fixed 3dB BW
+- Fixed empty result when consecutive string vectors transfers are executed on the same node
+- MDS: Improved overall stability of the module
+- AWG Module: Saved scope shots can be loaded again
+- Properly load PWA with disabled interlock input
+- Spectrum Module: Auto Save now saves the history list upon every change
+
+LabOne User Interface
++ Support of multiple devices on the same user interface
++ Spectrum: Display of FFT phase
++ Device identification possible even without being connected to the device
++ Command line option --dir-watching to disable directory watching functionality of file manager
++ Math: Labeling of troughs in sweeper math
++ MDS: Device connection can now also be performed on the MDS tab
++ Manual check for update availability on session dialog
++ Chinese translation of tooltips
+* Numerical Tab: Display of device serial in path
+* Numerical Tab: Added missing mouse actions for zoom and double click
+* Better visualization of success and error in dialogs
+* Plot axis tracking only supported for x/y-plots
+* Improved scroll behavior on the session dialog
+* Config Tab: Reordering of control elements to achieve a better space usage
+* Improved handling of special characters in user and host names
+* Improved stability when loading corrupt setting files
+* Command log contains discovery code at beginning of a session
+* Command line option for resource path no longer needed on Linux with default installation
+* Improved rendering by removed blank frames during zoom / cursor events
+* The start of multiple instances of web servers are only blocked when using the same port
+* Improved axis rescaling for 'rescale axis to data' for the plotter
+* Scope: Improved axis full scale update on signals change
+* Starting the Webserver manually on Linux finds the resource folder in the standard path automatically
+- IA: Impedance max bandwidth and omega suppression were not correctly loaded for setting files
+- IA: Fix for illegal 'different representation' warnings in plotter
+- Spectrum: Fixed frequency range in plotter for very small frequency spans
+- Spectrum: Fix for unresponsive UI when closing spectrum tab
+- Correct trigger level adjustments for logarithmic plots for scope and DAQ tab
+- Loading dialog closes correctly when setting file doesn't contain tabs
+- No devices visible if web server is started in discovery off mode (--discovery 0)
+- Soft shutdown on MF and HDAWG devices now reliably shows turn-off dialog
+- Fixed DAQ module crash upon subscribe() if module is already enabled
+- API command log properly escapes special characters for Windows
+
+Python API
++ ziPython API is now available as wheel file. See https://pypi.org/project/zhinst/ for more information
++ Support of Python 3.7 (also on macOS)
++ MacOS: Support of other Python environments than System Python
+* Check that proper numpy is installed
+
+Matlab API
+* Changed "uhf_example_awg.m" and "hdawg_example_awg.m" to not rely on DSP toolbox anymore
+
+Labview API
+* Improvements of several ziLV examples
+- Fixed connection handling in case of an error during getDemodSample
+
+.NET API
++ MDS: Example for multi device synchronization (MDS) added
+
+C API
++ MDS: Example for multi device synchronization (MDS) added
+
+ziControl
+- PID: Monitor values do not initialize correctly
+- MOD: Osc frequency toggles between Osc and sideband frequency when MOD is enabled
+
+Patch Version 18.12.1 Revision 59107
+- Fixed crash of LabOne UI when confirming message dialog on HF2
+- Fixed crash when using LabOne with unusual locale settings on Windows
+- Fixed superfluous scaling in Python example for UHFQA
+
+Patch Version 18.12.2 Revision 59443
+- Fix for connection problems on HDAWG
+- Fix for wrongly displayed marker bits in AWG waveform viewer
+
+Patch Version 18.12.3 Revision 60796
+- Stability fix for device discovery
+
+SUMMARY OF CHANGES 18.05
+========================
+
+HDAWG
++ LabOne support for Zurich Instruments HDAWG4 and HDAWG8 devices
+
+UHFLI & UHFAWG
+- AWG: Fix for PID controller with AWG output gain as an output
+- AWG: Correct index assignment for waitAnaTrigger and waitDigTrigger
+- AWG: Fix for broken index sweep
+! AWG: Level triggering not supported on analog trigger sources of AWG
+
+HF2LI & HF2IS
+* PID: Support of set point control over Aux In on the LabOne UI
+* PID: Support default output enable and value on the LabOne UI
+
+MFLI & MFIA
++ MDS: Support of oscillator phase and sampling alignment between MDS synchronized devices
++ Impedance: Added Aux In channels as voltage/current source for impedance
+* WIFI: Wifi settings are stored persistent on the device
+- WIFI: Fixed sample loss when wifi is enabled
+
+LabOne Modules (Shared Functionality API & User Interface)
+* Sweeper Module: Support of auto bandwidth mode for non-frequency sweeps
+* Sweeper Module: Improved sinc control for non-frequency sweeps
+* PID Advisor: Increased stability by restricting target bandwidth to valid region
+* MDS Module: Improved handling of synchronization groups if groups are changed
+* AWG Compiler Module: Improved stability of pattern compilation
+* AWG Compiler Module: Support of compound assignment operators (+=, -=, *= etc)
+- AWG Compiler Module: Fixed handling of markers for circshift
+- Data Acquisition Module: Fix for broken force trigger parameter
+
+LabOne User Interface
++ Auto save functionality for plots with history list
++ Image rendering on LabOne supports high resolution monitors (4K)
++ Plotter supports density plot of signals
++ AWG: Enabled waveform viewer
++ Support of Net Links for plot data
+* AWG: Last used seqC files listed at top
+* AWG: Run/single buttons replaced by start/rerun
+* Plotter: Smoother rendering of plot data
+* Faster LabOne session start-up (first rendering time)
+* Improved y-axis offset rounding in center + offset display mode
+* History list supports saving of selected history list entries
+* History list information included in saved SVG of plots
+* Improved device discovery especially for MF devices in proxy server mode
+* Browser tab shows device serial if multiple devices are connected
+* Impedance: User calibration is enabled / disabled by setting data
+- Data Acquisition: PID and boxcar signals not correctly removed in the plot
+- Data Acquisition: Fix for unresponsive browser when tracking trigger is used
+- Corrected image scaling for 2D phase plots in degree
+- Spectrum: Filter compensation for power display not correct
+- Double-click in in Firefox browser now auto scales the plots correctly
+- Sweeper: XY plot data was not saved correctly
+- Fixed segmentation fault when updating a second device when a session is open on a different device
+- Fix for no more rendered plot data when extreme zoom levels are used
+
+Python API
++ New examples for continuous Data Acquisition(DAQ) recording, MDS and DAQ recording, MDS sweep
+
+Labview API
++ Added DAQ continous streaming example
++ Enabled new trigger stream format
+- Fixed spectral density calculation in LabView example
+
+.NET API
++ Support of vector write (e.g. AWG pattern) for .NET interface
+
+C API
+- Fix for compiler errors on Windows due to missing inttypes.h support
+
+SUMMARY OF CHANGES 17.12
+========================
+
+UHFLI & UHFAWG
+- Network: improved behavior on networks with large number of data servers
+- Scope: improved handling of trigger threshold and hysteresis
+# Added /DEV*/STATS/PHYSICAL/OVERTEMPERATURE
+# Added /DEV*/SCOPES/*/CHANNELS/*/OFFSET
+
+HF2LI & HF2IS
++ LabOne User Interface enabled for all HF2LI users
+* PLL Advisor: Correct handling of hardware restrictions of PID parameters
+* Improved output range switching to avoid voltage spikes
+- Sweeper: sweeper stuck with sinc enabled
+# Added /DEV*/STATS/PHYSICAL/OVERTEMPERATURE
+
+MFLI & MFIA
++ Soft shutdown button
++ TU: Logical output available also in scope with digitizer option
++ WIFI: Support of wifi client mode
+- TU: Logical operations of TU 4 neither stored, nor loaded from the preset
+- TU: Proper operation of lower threshold when upper threshold is disabled
+- Scope: improved handling of trigger threshold and hysteresis
+- MDS: Improved stability during synchronization
+- MFLI update does not work via Session dialog if MFLI version is 16.04 or older
+- MF Device finder does not show MFLI with 16.04 or older
+# Added /DEV*/STATS/PHYSICAL/OVERTEMPERATURE
+# Added /DEV*/SCOPES/*/CHANNELS/*/OFFSET
+# Added /DEV*/SYSTEM/IMPEDANCE/FILTER
+# Added /DEV*/SYSTEM/IMPEDANCE/APPLICATION
+# Added /DEV*/SYSTEM/IMPEDANCE/PRECISION
+
+LabOne Modules (Shared Functionality API & User Interface)
++ The new Data Acquisition Module for triggered recording of time and frequency domain (FFT) data
++ Data Acquisition Module: Supports of simultaneous acquisition of average, power, and standard deviation data
++ Data Acquisition Module: Frequency and time domain acquisition of gated AWG wave data
++ Data Acquisition Module: Automatic calculation of acquisition duration to support on-grid sampling
+* Improved sample loss detection and rate change detection now reported per data chunk on poll
+* The Data Acquisition Module replaces the ZoomFFT(Spectrum) and Recorder(SW Trigger) Module
+* Introduced read-only module parameter properties
+* AWG Module: Various improvements when working with long waveforms
+- AWG Module: Fixed waveform editing functions for multi-channel waveforms
+- AWG Module: Imported waveforms are no longer clipped, increased precision for compiler-internal calculations
+- AWG Module: Fixed various compiler crashes and limitations when working with large or complex sequencer programs
+- AWG Module: Internal functions can no longer be overwritten
+- IA: Fix for double auto range execution in sweeper
+- Finished flag and other header elements not correctly updated on sweeper and data acquisition module
+
+LabOne User Interface
++ Data Acquisition: New Data Acquisition tab replacing the SW Trigger tab for time and frequency domain acquisition
++ Data Acquisition: Support of simultaneous triggered acquisition of time and frequency domain data for several minutes
++ Spectrum: Support for non-demodulator spectrum data like boxcar, PID, counter
++ Spectrum: Waterfall image rendering
++ Spectrum: Support of history with data saving
++ IA: Numerical impedance values reported in impedance tab
++ Sweeper: Q factor extraction from phase and amplitude scan in math tab
++ Sweeper: Nyquist plot support by using XY Mode with tracking axis scaling mode
++ Scope: Independent time and frequency domain settings for the plot display
++ Support of user names containing unicode characters
++ Decimal point configuration for ASCII file saving is stored in user configuration
++ Detection and reporting of device over-temperature due to blocked air flow
+* Enhanced rendering of min-max traces (envelope) on plots
+* Spectrum: Tab functionality is now based on the Data Acquisition Module
+* Spectrum: Correct rendering of multiple signals with vertical axis group control
+* Spectrum: FFT overlap is no controlled by refresh rate parameter and no more in percentage
+* History: Not fully recorded entries are marked in history with a '*'
+* AWG: Wave form viewer
+* MDS: Improved error handling for MDS synchronization
+* IA: Compact impedance tab with extended settings expanded by advanced mode selection
+* IA: Sweeper takes over precision setting from impedance tab if in impedance application mode
+* IA: Improved calibration data smoothing algorithm
+* PID Advisor: Faster tab access
+* Math: Math operations not relevant for a plot are hidden
+* Improved device discovery over network
+* Dynamically loaded tooltips with description of the currently selected setting
+* Improved handling of unicode characters in setting and data files
+* User input units now stored in setting file
+* Setting file name in session dialog reflects now correctly the loaded settings
+* Plot data saved to TXT files is now column orientated for scope and sweeper
+* Speedup of saving TXT plot data files
+* Save format selection in history list does only offer supported data format for specific tab
+* Improved numerical resolution for CSV data saving (high-resolution for frequency data)
+- Numerical: Fixed mouse wheel zoom
+- Sweeper: Unrelated changes in Scope or Boxcar affect settings in sweeper
+- Sweeper: Saving of last sweep point if on the display border
+- Scope: Wrong scope FFT display when scope length does not match 2^n
+- Boxcar: Loading settings the boxcar tab does no more change the gate width
+- IA: User compensation was not saved when containing a large number of frequency points (>1500)
+- Restored command line help '--help' option
+- Proper last modified time of zip files
+- Frequent history list updates did diminish Chrome browser responsiveness
+- Fixed sorting of setting files in session dialog
+- Restored saving of history information when saving CSV data
+
+LabOne Data Server
+# Added /ZI/LOG
+# Added /ZI/LOGPATH
+
+LabOne API
++ API function getDebugLogPath() to report the log path
+* System time in data is reported in us resolution. API specific methods are offered to convert the time into native formats
+* ZIAPINotFoundException reports node name for easier debugging
+- Fixed disconnect when setString() is used with string containing a null terminator
+
+Python API
++ Support of unicode characters
++ help function for device nodes: daq.help('nodepath').
+- Corrected conversion of pulse counter samples
+
+Matlab API
++ Support of unicode characters
++ help function for device nodes:  ziDAQ('nodeHelp', 'nodepath').
+- Allow to set strings of arbitrary length (was previously limited to 1000 characters)
+
+LabView API
+* Added hardware trigger information to demodulator sample
+* Updated parameter fields in data header for module data like sweeper or data acquisition
+* Enabled JSON Node Documentation
+* Enabled ListDevices example to use Discovery
+- Improved stability of the examples
+- Examples do not work on a 64-bit LabView
+- Fixed spectral density calculation in LabView example
+
+
+.NET API
++ Data header implementation (see .NET examples for supported fields)
++ Support of unicode characters
+
+C API
++ Support of wide character strings
+
+
+Patch Version 17.12.1 Revision 50368
+- Sweeper: Fixed sinc filter crash
+- Improved Linux OS recovery functionality
+
+Patch Version 17.12.2 Revision 508xx
++ MD device shutdown node change to /DEV*/SYSTEM/SHUTDOWN
+- Disabled WIFI driver to avoid sporadic sample loss
+- Moved WIFI functionality to ZI Labs tab
+- Spectrum: Filter compensation for power signals not correct on UI plots
+- DAQ Module: Data export of plot TXT data is empty
+
+SUMMARY OF CHANGES 17.06
+========================
+
+UHFLI & UHFAWG
++ Multi-Device Synchronization
++ Device node documentation added to User Manual
++ Firmware update support on the UI or API
+* Improved AWG compiler stability
+* Aligned delay on signal input and trigger input for ExtRef
+* AUX Output gain range increased to prevent rounding errors
+* Improved handling of DIFF input mode
+* BOX: Aligned data and phase delays between DEMOD, PWA and Boxcar units
+* AWG: Improved the jitter when using 'waitDemodOscPhase' command to synchronize to a demodulator
+* AWG: 'waitDemodOscPhase' can now only synchronize to the start of the phase
+* AWG: Added basic support for configuring multiple synchronized devices
+* AWG: Added 'sync' command for managing synchronization between instruments while executing AWG programs
+- AWG: Fixed problem with sequencer getting stuck when accessing AWGS/0/OUTPUTS/*/MODE node from sequencer program
+- AWG: Fixed problem that caused the compiler to crash if the first line of a program was a const declaration without
+       the const keyword
+- AWG: Fixed problem that caused the compiler to crash when compiling long programs
+- AWG: Fixed the behavior of the 'now' and 'at' commands
+- AWG: Fixed problem that prevented Trigger Out 1-4 to be selected as AWG triggers
+- AU: Correct timestamp on arithmetic unit data stream
+- CNT: Fixed data streaming for gated free running mode
+- PWA: Improved sample count and acquisition time handling
+- PLL: Fixed non-zero residual error on phase error
+# Added /DEV*/DEMODS/*/PHASEADJUST
+# Added /DEV*/AWGS/*/READY
+# Added /DEV*/AWGS/*/ELF/LENGTH
+# Added /DEV*/AWGS/*/ELF/PROGRESS
+# Added /DEV*/SYSTEM/COMPDELAY/DELAYS/2..4
+
+HF2LI & HF2IS
+- PID: Correct handling of set-point changes
+
+MFLI & MFIA
++ Multi-Device Synchronization
++ WIFI access point feature supports direct access of the MF device by WIFI
++ Device node documentation added to User Manual
++ Demodulation of a constant one to generate a sine on AUX OUT
++ Remote firmware update for MF devices over the UI or API
++ Impedance: Added parameters sets: Cp D, Rp Lp
++ Impedance: Calibration data smoothing to reduce calibration noise effect
+* Impedance: Improved labels of impedance parameters on plots
+* Impedance: User compensation enable saved in setting file
+* Impedance: Save and load user compensation to/from file
+* Impedance: Minimum possible current range (frequency dependent) also set in manual mode
+* TU: Added TU output to signal sources to allow for feedback loops
+* TU: Added TU output to AuxOut
+* Spectrum: Increased maximal bin count if FFT is calculated on the device
+* Removed voltage glitches during output range changes
+* AUX Output gain range increased to prevent rounding errors
+* MF device discovery utility 'Finder' supports now several devices for UI start
+* Improved handling of static IP gateway
+- Impedance: DC bias not correctly set when in DC application mode
+- TU: Correct scope scaling for threshold unit scaling changes
+# Added /DEV*/DEMODS/*/PHASEADJUST
+# Added /DEV*/SYSTEM/IMPEDANCE/CALIB/INTERNAL/ALLOWSMOOTHING
+# Added /DEV*/SYSTEM/IMPEDANCE/CALIB/USER/ALLOWSMOOTHING
+# Added /DEV*/SYSTEM/COMPDELAY/DELAYS/2..4
+# Removed /DEV*/TRIGGERS/IN/*/IMP50  (functionality not supported by device)
+! Proxy connection not supported after UI session start on the device (requires MF device restart)
+
+LabOne Modules (Shared Functionality API & User Interface)
++ Sweeper: Support of sweeps on mult-device synchronized devices
++ SW Trigger: Automatic adjustment of buffer size depending on duration setting
+* Spectrum: Faster FFT calculation (cpu architecture specific)
+* Sweeper: Harmonic setting is considered for settling and averaging time calculation
+* Sweeper: Improved support of sinc filter mode when sweeping non-frequency grids
+* PID Advisor: Fix for advisor which now yields bandwidths closer to target (different PID coefficients!)
+- PID Advisor: Corrected scaling of resonator model
+- SW Trigger: Fixed continuous grid mode for MF and HF2 devices
+
+LabOne User Interface
++ User manual and programming manual access on the UI
++ Log data download from the UI
++ Support for .NET command log format
++ Additional tab listing all not yet installed options
++ Notification of availability of new LabOne release (check can be disabled during installation)
++ Hotkey Ctrl+S to save UI and device settings
++ Sweeper: Save format selection in history side tab
++ Sweeper: Tree selector to support sweeping of nodes from several devices (multi-device synchronization)
++ SW Trigger: Tree selector to support recording of nodes from several devices
++ SW Trigger: Save format selection in history side tab
++ Math: Added bin size math function
+* Session dialog sorting saved in user configuration
+* Improved storage drive information depending on device type
+* In case of an UI disconnect the last_setting contain up-to-date device settings if available
+* Blocking of browser spell checks for physical value input fields
+* Trigger Input Auto Threshold button available on the DIO tab
+* SW Trigger: Support of recordings longer than 2s
+* MDS: Improved device connectivity schema
+* BOX: Boxcar gate no more shown on Output PWA
+* Sweeper: Manual bandwidth mode forces order and timeconstant at sweep restart
+* Sweeper: Estimated time update for long sweeps during the sweep points
+* Sweeper: Save plot TXT will download referenced sweep data if enabled
+* MFLI: Time Zone settings moved to Config Tab
+- Fixed web server crash when PC goes to sleep
+- Improved web server stability when device is disconnected
+- Sweeper: UI restart if PID paths are selected from tree
+- Sweeper: Start / stop value not correctly set after load setting
+- Sweeper: Fixed sweeping of AU data streams
+- Spectrum: Zoom and pan is no more working when spectrum is stopped
+- PWA: Fixed full scale functionality when using time axis
+- Numeric: Fixed scaling for dB mapping
+- Numeric: Fix for negative values in log / dB mapping
+- Numeric: Fixed auto range when double-clicking
+
+LabOne Data Server
++ UHF and MF data server is automatically started by a service (can be disabled) at PC startup
+* System timer reduced to 1ms only in case of active sessions (reduced power consumption in idle)
+- Stability improvements at API session start (fixed timeout error)
+
+LabOne API
++ Node documentation for UHF and MF devices
++ API level 6 for string support
++ ziAPIGetValueD/I/S support for modules
++ API commands setString / getString for simplified string handling on API
++ Command listNodes supports listing of subscribed nodes with flag ZI_LIST_NODES_SUBSCRIBEDONLY and streaming nodes with ZI_LIST_NODES_STREAMINGONLY
+* Improved get command handling when subscribed
+* Improved compiler support for DEPRECATED marking
+- Correct exception handling after connect / disconnect sequence for modules
+
+Python API
++ Support for Python 3.6
+
+LabView API
++ Added ziGet on modules
++ Extended ziGetValue.vi
++ added ziExample-PollDemod.vi
++ added ziPollDataExDemodTime.vi for timed demodulator polling
+* Corrected for not initialized data in ziGetValue.vi
+
+.NET API
++ Added module interface for deviceSettings() and saveEngine() modules
++ Added support for syncSet commands
+* Improved connect() method
+
+SUMMARY OF CHANGES 16.12
+========================
+
+UHFLI & UHFAWG
++ Timestamp synchronization between UHF devices
++ Support of UHFAWG device type
++ Support of negative frequency values on oscillators
++ DIG: Counter value added to source selection
++ DIG: Enable Aux Out to be selected as Scope and Trigger input
++ CNT: Counter value can be output on auxiliary outputs of the device
++ Output overflow/clipping indicator based on actual output signal
++ AWG: Edge and state control of digital triggers over control nodes
++ AWG: Update of waveform data without changing sequencer program over control nodes
+* AWG: Indication of trigger state available over control nodes
+* AWG: Improved control over how AWG outputs are mapped to signal outputs
+* AWG: Pattern transfer speed improvement
+- AWG: Fixed crash when compiling sequencer programs containing long waveforms defined inline using the 'vect' function
+* Scope: Smaller min hold-off time between scope shots
+* PLL and PID are combined as they share the same hardware resource (see also node changes)
+- Scope: Fix for failing scope start when updating parameters on slow sampling rate
+- Improved stability for elevated environment temperatures
+- Fixed differential input control
+! High demodulator sample load over TCP >~ 500 Mbit/s may trigger a server disconnect without Jumbo frames enabled
+# Added/DEV*/PIDS/*/STREAM/EFFECTIVERATE
+# Added /DEV*/EXTREFS/AUTOMODE
+# Added /DEV*/EXTREFS/DEMODSELECT
+# Added /DEV*/EXTREFS/OSCSELECT
+# Added /DEV*/EXTREFS/LOCKED
+# Removed /DEV*/SCOPES/*/TRIGPREDELAY (use TRIGDELAY)
+# Added /DEV*/SCOPES/*/TRIGSTATE
+# Added /DEV*/SCOPES/*/TRIGSLOPE
+# Added /DEV*/DIOS/*/AUXDRIVE
+# Added /DEV*/AWGS/*/RATE
+# Added /DEV*/AWGS/*/OUTPUTS/*/ENABLES/*
+# Added /DEV*/AWGS/*/TRIGGERS/*/STATE
+# Added /DEV*/AWGS/*/TRIGGERS/*/SLOPE
+# Added /DEV*/AWGS/*/AUXTRIGGERS/*/SLOPE
+# Added /DEV*/MDS/*
+# Deprecated /DEV*/AWGS/TRIGGERS/*/RISING (use SLOPE)
+# Deprecated /DEV*/AWGS/TRIGGERS/*/FALLING (use SLOPE)
+# Renamed /DEV*/PIDS/*/OVERFLOW to /DEV*/PIDS/*/STREAM/OVERFLOW
+# Removed /DEV*/PIDS/*/STREAM/DECIMATION (use /DEV*/PIDS/*/STREAM/EFFECTIVERATE)
+# Added /DEV*/PIDS/*/DEMOD/ADCSELECT
+# Added /DEV*/PIDS/*/DEMOD/ORDER
+# Added /DEV*/PIDS/*/DEMOD/TIMECONSTANT
+# Added /DEV*/PIDS/*/DEMOD/HARMONIC
+# Added /DEV*/PIDS/*/PLL/AUTOMODE
+# Added /DEV*/PIDS/*/PLL/LOCKED
+# Added /DEV*/PIDS/*/SETPOINTTOGGLE/SETPOINT
+# Added /DEV*/PIDS/*/SETPOINTTOGGLE/RATE
+# Added /DEV*/PIDS/*/SETPOINTTOGGLE/ENABLE
+# Removed /DEV*/PLLS/*/RATE                (use /DEV*/PIDS/*/RATE)
+# Removed /DEV*/PLLS/*/SETPOINT            (use /DEV*/PIDS/*/SETPOINT)
+# Removed /DEV*/PLLS/*/DLIMITTIMECONSTANT  (use /DEV*/PIDS/*/DLIMITTIMECONSTANT)
+# Removed /DEV*/PLLS/*/LIMITUPPER          (use /DEV*/PIDS/*/LIMITUPPER)
+# Removed /DEV*/PLLS/*/LIMITLOWER          (use /DEV*/PIDS/*/LIMITLOWER)
+# Removed /DEV*/PLLS/*/AUTOCOEFF           (use /DEV*/PIDS/*/PLL/AUTOMODE)
+# Removed /DEV*/PLLS/*/P                   (use /DEV*/PIDS/*/P)
+# Removed /DEV*/PLLS/*/I                   (use /DEV*/PIDS/*/I)
+# Removed /DEV*/PLLS/*/D                   (use /DEV*/PIDS/*/D)
+# Removed /DEV*/PLLS/*/DEMODSELECT         (use /DEV*/PIDS/*/INPUT  and /DEV*/PIDS/*/INPUTCHANNEL)
+# Removed /DEV*/PLLS/*/OSCSELECT           (use /DEV*/PIDS/*/OUTPUT and /DEV*/PIDS/*/OUTPUTCHANNEL)
+# Removed /DEV*/PLLS/*/ORDER               (use /DEV*/PIDS/*/DEMOD/ORDER)
+# Removed /DEV*/PLLS/*/TIMECONSTANT        (use /DEV*/PIDS/*/DEMOD/TIMECONSTANT)
+# Removed /DEV*/PLLS/*/AUTOBW              (use /DEV*/PIDS/*/PLL/AUTOMODE)
+# Removed /DEV*/PLLS/*/LOWBW               (use /DEV*/PIDS/*/PLL/AUTOMODE)
+# Removed /DEV*/PLLS/*/CENTER              (use /DEV*/PIDS/*/CENTER)
+# Removed /DEV*/PLLS/*/PHASEUNWRAP         (use /DEV*/PIDS/*/PHASEUNWRAP)
+# Removed /DEV*/PLLS/*/ENABLE              (use /DEV*/PIDS/*/ENABLE)
+
+HF2LI & HF2IS
+# Added /DEV*/PIDS/*/DEMOD/ADCSELECT
+# Added /DEV*/PIDS/*/DEMOD/ORDER
+# Added /DEV*/PIDS/*/DEMOD/TIMECONSTANT
+# Added /DEV*/PIDS/*/DEMOD/HARMONIC
+# Added /DEV*/PLLS/*/LOCKED
+
+MFLI & MFIA
++ PID option (MF-PID)
++ MOD option (MF-MOD)
++ Threshold Unit to trigger events on dio / trigger based on analog signals
++ PID: Support of alternating setpoint toggling for tuning (rate every 15s up to 1 MHz)
++ DIG: Enable Aux Out to be selected as Scope and Trigger input
++ Output overflow/clipping indicator based on actual output signal
++ Windows XP version of the RNDIS driver added
++ Impedance: Warning of illegal range selection in manual range mode
++ Impedance: Optional functionality to discard short / open measurements based on limits
++ Impedance: R || L representation added
+* Impedance: User compensation does correctly handle GND parasitic (cable setup)
+* Impedance: Improved calibration < 80 Hz for high impedance DUT
+* Impedance: More reliable confidence indicator warning for strong compensation
+* Impedance: Voltage inputs are disabled if 2T mode is used
+* Impedance: Open compensation data is ignored if capacitive parasitic is low
+* PID: Data streaming rate aligned with demodulator streaming rate
+- Impedance: Auto-range works correctly for frequencies < 1 Hz
+- Impedance: Fixed interference of auto-bandwidth and auto-range with sweeper
+- Impedance: User compensation takes capacitance of compensation load into account
+- Impedance: User compensation applied also for the second impedance channel
+- Impedance: Internal impedance calibration is applied to the second impedance stream as well
+- Impedance: Fixed sign error on susceptance calculation
+- Impedance: Compensation precision does no longer depend on number of sweep points
+- Scope: Fix for failing scope start when updating parameters on slow sampling rate
+# Added /DEV*/EXTREFS/AUTOMODE
+# Added /DEV*/EXTREFS/DEMODSELECT
+# Added /DEV*/EXTREFS/OSCSELECT
+# Added /DEV*/EXTREFS/LOCKED
+# Added /DEV*/MODS/*  (requires MF-MOD Option)
+# Added /DEV*/PIDS/*  (requires MF-PID Option)
+# Added /DEV*/DIOS/*/AUXDRIVE
+# Added /DEV*/TU/THRESHOLDS/*
+# Added /DEV*/TU/LOGICALS/*
+# Added /DEV*/SYSTEM/IMPEDANCE/CALIB/*  (requires MF-IA Option)
+# Added /DEV*/SYSTEM/IMPEDANCE/FREQLIMIT4T/*  (requires MF-IA Option)
+# Added /DEV*/SYSTEM/IMPEDANCE/FREQLIMIT2T/*  (requires MF-IA Option)
+# Removed /DEV*/SCOPES/*/TRIGPREDELAY (use TRIGDELAY)
+# Added /DEV*/SCOPES/*/TRIGSTATE
+# Added /DEV*/SCOPES/*/TRIGSLOPE
+
+LabOne Modules (Shared Functionality API & User Interface)
++ SW Trigger: 2D grid support based on data alignment and resampling
++ SW Trigger: Continuous streaming of resampled and timestamp aligned fixed size data packages
++ SW Trigger: Support of DIO 0/1 as hardware trigger sources
++ SW Trigger: Enabled hold-off time and count for digital, hardware, and pulse triggers
++ Sweeper: Averaging time can now be specified in addition to timeconstant count and samples
+* Sweeper: Application modes updated to prefer timed averaging over sample count
+* AWG Module: AWG compiler can be interrupted
+* AWG Module: Performance improvements for loop unrolling
+* PID Advsior: Bandwidth control separated from device demodulator bandwidth
+* PID Advisor: Tuner settings are separated from PID advisor
+* PID Advisor: Support of the PID controlling the demodulator phase
+- SW Trigger: Fix for broken retrigger functionality
+- PID Advisor: Advisor is not stopped by module clear() command
+! SW Trigger: Clear all needs to be executed twice to remove all elements
+
+LabOne User Interface
++ New Tab for timestamp synchronization of UHF or HF2 devices
++ New Tab for threshold unit
++ 2D data display for scope and SW Trigger (Imaging)
++ Scope: History list for scope waves
++ DIG: Selection of the displayed scope segment
++ DIG: Display of segmented scope waves in a 2D image overview
++ Impedance: Display of confidence indicator warnings in plots
++ PID: Support of PID error output on Auxiliary output selector
++ AWG: More flexibility in selecting output multiplexer amplitudes that are controlled by AWG
++ AWG: Progress indicators
++ AWG: Example selection on the user interface
++ AWG: File upload over drop area in device tab
+* AWG: User interface shows which signal outputs are controlled by the AWG
++ Math display for max - min on wave and cursor area
++ Math: Color indicator to improve signal identification
++ Removal of single measurements from the history list
++ Configurable SVG rendering quality to circumvent SVG compatibility issues of 3rd party software
++ PID Advisor: Progress indicator for the advise functionality
+* PID Advisor: Display settings independent from advise process
+* PID: Error reporting of unlock in status footer
+* Math: Math operation also supported for second plot in dual plot mode
+* Math: Unit display on math is enabled by default (switch off when copying)
+* Histogram enable button in plotter removed (use histogram in math instead)
+* DIG: Scope streaming settings moved from plotter tab into scope tab
+* Faster device discovery at user interface start
+* FileManager: Improved functionality when adding a new USB storage device
+* Improved numerical output on command logger
+* Improved file header when saving CSV files of plot data
+- Sweeper: Wrong signal color when loading settings for dual plot mode
+- DIG: Correct handling of offset for demodulator and boxcar inputs
+- Scope: Fixed wrongly calculated spectral density on scope of 16.04 release
+- Plotter: Display of long window times if device is Switched on recently
+- Graphical lock-in shows NaN for Aux In values
+- BOX: Fix for incorrect unit of window width
+- Fix fo missing sub-directories when attaching an USB stick to a MFLI device
+! Auto backup files 'last_' may contain old device settings after a disconnect
+
+LabOne Data Server
+* Improved stability of the device discovery
+* Improved stability of LibUSB on Linux
+- Device list correctly updated if device is connected over USB
+
+Matlab API
++ Added modules 'impedanceModule', 'awgModule', 'scopeModule', and 'multiDeviceSyncModule'
++ Data header for meta data like rows and cols
+* Module 'pllAdvisor' is replaced by the generic 'pidAdvisor' module
+
+Python API
++ Added module objects for impedanceModule, awgModule, scopeModule, and multiDeviceSyncModule
++ Data header for meta data like rows and cols
+* Module object pllAdvisor is replaced by a generic pidAdvsior module
+* Improved stability of vector node transfer
+- Fixed crash if Numpy is missing
+
+LabView API
++ Added modules 'impedanceModule', 'awgModule', 'scopeModule', and 'multiDeviceSyncModule'
++ Modules data header for meta data like rows and cols
++ Introduced vector transfer
+* Module object pllAdvisor is replaced by a generic pidAdvsior module
+* New PID Advisor, AWG and multi-device sync example added
+- Added flags to ziTypeImpedanceSample
+
+.NET API
++ Support of full API functionality including modules like Sweeper, SW Trigger, PID Advisor
++ LabOne Programming Manual contains a section on .NET programming
+
+ziControl
+* PID: Adjusted PID to work with updated DataServer PID node tree, see above for details on tree change
+* PID: If a demodulator is selected as PID Input, demodulator settings are now controlled on PID panel
+
+SUMMARY OF CHANGES 16.04
+========================
+
+UHFLI
++ AWG option (UHF-AWG)
++ Pulse counter option (UHF-CNT)
++ Increased lock stability for external reference on frontpanel trigger inputs by duty cycle reconstruction
++ Support of negative frequency values
+# Added /DEV*/AWGS/* (UHF-AWG)
+# Added /DEV*/CNTS/* (UHF-CNT)
+# Added /DEV*/TRIGGERS/OUT/*/DELAY
+# Added /DEV*/DIOS/*/MODE
+# Added /DEV*/SYSTEM/PROPERTIES/*
+# Added /DEV*/AUXINS/VALUES/VALUE0
+# Added /DEV*/AUXINS/VALUES/VALUE1
+# Added /DEV*/SYSTEM/STALL
+
+HF2LI & HF2IS
++ Enabled output offset adjustment on HF2
++ PLL: added auto-center for higher harmonics
+- Fixed demodulator frequency calculation if MOD option is not installed
+# Added /DEV*/SIGOUTS/*/OFFSET
+# Added /DEV*/SYSTEM/PROPERTIES/*
+# Added /DEV*/AUXINS/VALUES/VALUE0
+# Added /DEV*/AUXINS/VALUES/VALUE1
+
+MFLI & MFIA
++ Impedance Analyzer option (MF-IA)
++ Time zone adjustment
++ DIG: Scope resolution > 16 bits when sub-sampling (high-definition mode HD24)
++ Increased lock stability for external reference on trigger inputs by duty cycle reconstruction
+* Improved internal/external clock switching stability
+- Scope: Fixed swapped scope channels when waiting for triggers
+- Scope: Fixed inverted signal output polarity
+- Fixed trigger output polarity compared to signal output
+- Fixed ample loss when using hardware trigger functionality
+! Loading preset may corrupt IA configuration
+# Added /DEV*/IMPS/* (MF-IA)
+# Added /DEV*/SYSTEM/PROPERTIES/*
+# Added /DEV*/AUXINS/VALUES/VALUE0
+# Added /DEV*/AUXINS/VALUES/VALUE1
+# Added /DEV*/SYSTEM/STALL
+
+LabOne User Interface
++ Individual trigger signal selection in plotter, sweeper, and sw trigger
++ Software update reminder
+* Improved device discovery
+* Cubic interpolation to enhance display of averaged sub-sampled scope data
+* Improved export of plot data as txt files
+* Spectrum: Absolute frequency is restricted to FFT(x+iy)
+* Plotter: Improved display of hw trigger gated demodulator data
+* Sweeper: Higher timeconstant averaging values supported
+* Sweeper: Improved progress display
+- Sweeper: Fixed dependency management of order and bandwidth control
+- Sweeper: Fix for lost parameters when loading setting file
+- SW Trigger: Fixed lowpass trigger display
+- Numeric: Fixed display of numerical parameter blocks on FireFox
+- Corrected position of the analog adder on the output for MFLI and HF2 devices
+- Zoom rectangle selector doesn't work in webkit based browsers
+- Fix for wrongly displayed lines on the graphical lockin tab on FireFox
+- Improved copy&paste of math data
+- Fix for missing last session errors when using websockets connections
+- Fix for incorrect HF2IS mixer layout in graphical lockin tab without MF option
+- Fixed resource leakage when closing the PLL tab
+
+LabOne Data Server
+* Improved thread resource management for MFLI
+- Corrected permission handling for log and setting directories on MFLI
+
+LabOne API
++ SW Trigger: Grid mode for data alignment, 2D recording, and averaging
++ Pulse counter support for sweeper and sw trigger
++ AWG support for sweeper and sw trigger
+* Sweeper: Use of exact hw timeconstant values to get more accurate spectral noise values
+* Spectrum: Default value of ZOOMFFT/BITS changed
+* Modules creation with timeout parameter is deprecated
+- Fix for corrupt data for getDIO() on 32 bit operating systems
+- SW Trigger: Fixed invalid timestamps for lowpass filter data
+- Spectrum: Left side of filter compensation was shifted by one bin
+# SW Trigger: TRIGGER/TRIGGERNODE replaces TRIGGER/PATH, TRIGGER/SOURCE, and TRIGGER/HWTRIGSOURCE
+# SW Trigger: TRIGGER/GRID/MODE
+# SW Trigger: TRIGGER/GRID/OPERATION
+# SW Trigger: TRIGGER/GRID/ROWS
+# SW Trigger: TRIGGER/GRID/COLS
+# SW Trigger: TRIGGER/GRID/REPETITIONS
+# SW Trigger: TRIGGER/GRID/DIRECTION
+
+C API (ziAPI)
++ Utility function for device discovery (examples/ziUtils.h)
++ Example for SW Trigger Module
++ Example for Sweeper Module
++ Example for PID Advisor Module
+
+Matlab API
++ Support of Mac OS X
++ Utility function for device discovery
++ Utility functions for 3dB bandwidth to timeconstant conversion
++ Utility function for signal autoranging for supported devices (with /dev/sigins/n/autorange)
++ Example for SW Trigger Grid Mode
++ Example for UHF Advisor
+
+Python API
++ Python 3.5 support
++ Support of Mac OS X
++ Utility functions for 3dB bandwidth to timeconstant conversion
++ Utility function for device discovery
++ Utility function for signal autoranging for supported devices (with /dev/sigins/n/autorange)
++ Example for polling data from UHF and MF Scope
++ Example for SW Trigger with tracking trigger
++ Example for SW Trigger Grid Mode
++ Example for UHF Advisor
+* Module for device setting handling 'devicesettings' renamed to 'deviceSettings'
+- Sampleloss utility function check_for_sampleloss()
+
+LabView API
++ Support of Mac OS X
+* Improved ziOpen vi
+* Improved error reporting with getLastError
+* Changed sweeper data structures
+
+.NET API
++ Initial .NET library for usage with C# and VB (modules and discovery not yet supported)
+
+ziControl
+* Zoom FFT: removed pointless pk/rtHz and pk^2/Hz units
+- Zoom FFT: fixed frequency axis offset by 1 position
+- HF2CA: fixed scaling of demod samples
+
+SUMMARY OF CHANGES 15.11
+========================
+
+UHFLI
++ Digital differential input mode
++ Support of multicast device discovery if multiple network cards are present in the PC
++ DIG: PID data streaming supported by scope
+* Scope: Improved hysteresis control for trigger
+* PID error stream scaled to radians in case a phase is selected as PID source (Demod theta and AU polar in phase mode)
+* BOX: Fixed repetitive restarting of boxcar when ExtRef/PLL is used
+- Improved static IP configuration for UHFLI
+# Added /DEV*/SIGINS/*/DIFF
+
+MFLI
++ DIG: Digitizer Option support on MFLI
+- Static IP configuration
+- Much higher data recording speed on USB flash drives
+- Improved USB stability when used with USB hubs
+- Device update does not work with IE
+- Improved detection of USB sticks on MFLI
+- Improved startup stability
+# Added /DEV*/STATS/PHYSICAL/FANSPEED
+# Added /DEV*/SIGINS/RANGESTEP/TRIGGER
+# Added /DEV*/CURRINS/RANGESTEP/TRIGGER
+
+HF2LI & HF2IS
++ WEB Option to enable LabOne User Interface for HF2
++ Demod rate enable node (backwards compatible with 0 rate for off)
++ User manual for LabOne User Interface
++ PLL: Lock indicators on bit 20/21 of /DEV*/STATUS/FLAGS/BINARY
+* Speed improvement on communication (will allow faster sweep)
+* TAmp and CAmp nodes are now created statically in the node tree in order to simplify programming
+* Set commands will also reply on executing session if subscribed
+* Increased the error threshold that causes the External Reference to restart its locking procedure
+  in order to improve locking stability
+- Adjusted PID coefficient scaling for more precise match against hardware
+- Improved handling of the calibration at 2V input range
+- Fix for sporadic sweeper hangups
+# Added /DEV*/STATUS/ECHOWRITE
+# Added /DEV*/STATUS/ECHOREAD
+# Added /DEV*/DEMODS/*/ENABLE
+# Added /DEV*/DEMODS/*/FREQ
+# Added /DEV*/MODS/*/ENABLE
+# Added /DEV*/MODS/*/OUTPUT
+# Added /DEV*/MODS/*/MODE
+# Added /DEV*/MODS/*/FREQDEVENABLE
+# Added /DEV*/MODS/*/FREQDEV
+# Added /DEV*/MODS/*/INDEX
+# Added /DEV*/MODS/*/SAMPLEENABLE
+# Added /DEV*/MODS/*/RATE
+# Added /DEV*/MODS/*/TRIGGER
+# Added /DEV*/MODS/*/[CARRIER,SIDEBANDS/*]/ENABLE
+# Added /DEV*/MODS/*/[CARRIER,SIDEBANDS/*]/INPUTSELECT
+# Added /DEV*/MODS/*/[CARRIER,SIDEBANDS/*]/ORDER
+# Added /DEV*/MODS/*/[CARRIER,SIDEBANDS/*]/TIMECONSTANT
+# Added /DEV*/MODS/*/[CARRIER,SIDEBANDS/*]/OSCSELECT
+# Added /DEV*/MODS/*/[CARRIER,SIDEBANDS/*]/HARMONIC
+# Added /DEV*/MODS/*/[CARRIER,SIDEBANDS/*]/PHASESHIFT
+# Added /DEV*/MODS/*/[CARRIER,SIDEBANDS/*]/AMPLITUDE
+# Added /DEV*/PLLS/*/P
+# Added /DEV*/PLLS/*/I
+# Added /DEV*/PLLS/*/D
+# Added /DEV*/PLLS/*/OSCSELECT
+# Added /DEV*/PLLS/*/DEMODSELECT
+# Added /DEV*/SCOPES/*/ENABLE
+# Added /DEV*/ZCTRLS/*/CAMP/AVAILABLE
+# Added /DEV*/ZCTRLS/*/TAMP/AVAILABLE
+# Removed /DEV*/PLLS/*/PGAIN replaced by /DEV*/PLLS/*/P
+# Removed /DEV*/PLLS/*/ITIMECONSTANT replaced by /DEV*/PLLS/*/I
+# Removed /DEV*/PLLS/*/DTIMECONSTANT replaced by /DEV*/PLLS/*/D
++ Conversion between values of the old PGAIN and the new P node can be done using the formula
+  P = 0.5 * PGAIN
++ Conversion between values of the old ITIMECONSTANT and the new I node can be done using the formula
+  I = 0.5 * PGAIN/ITIMECONSTANT
+  Note that the conversion requires the old PGAIN value.
++ Conversion between values of the old DTIMECONSTANT and the new D node can be done using the formula
+  D = 0.5 * DTIMECONSTANT*PGAIN
+  Note that the conversion requires the old PGAIN value.
+
+LabOne Data Server
++ Device discovery support for HF2 and UHF devices
++ Support of multiple network card setups with UHF
+- Fixed for --help command line option
+
+LabOne User Interface
++ Network device discovery to support connection to all ZI devices on the same user interface
++ Single HW trigger lines can be displayed in plotter
+* PID advisor: Stable indicator for internal PLL at 45 degree
+* Improved resource locking indication when using the PID
+* Improved command logging format for setInt commands
+* Recording data gives information on saving queue and improved reporting
+* Debug tab renamed to ZI Labs
+- Better functionality matching in graphical lock-in tab
+- Improved stability for IP configuration
+- Correct unit for current noise sweeps
+- Improved unit display for complex user units in combination with spectral density
+- Improved stability of command logging when using special characters
+- Sweeper and spectrum results saved with UI contain empty fields
+- Scope: Fix for displaying two traces
+
+LabOne API
++ SW Trigger: Support of all data types with timestamp
++ Improved error reporting over API boundary
++ Network discovery for UHF and HF2 devices
+* Change of API module path 'savepath' to 'directory'
+* Improved directory handling for API modules
+- Fix for missing typedef in ziAPI.h
+- Path names within modules are now case insensitive
+- Fix for incorrectly saved timeconstant values when used in auto mode
+
+ziPython
+
+ziDAQ
+* Error message when using a unsupported Matlab (< R2013b) version under Linux
+- Fixed crash when using logOn command
+
+ziLV
++ Support of SW Trigger Module
++ Added Sync vi for synchronization
+* Example improvements
+- Improved stability under Linux and Mac OS X
+- Dual-channel scope streaming improved
+
+ziControl
++ PLL: Offer both "P, I" and "P, Timeconstant" notation
++ MOD: Offer "Peak F Deviation" and "Index of Modulation" for FM generation
+* MOD: Rework MOD option to be like UHFLI
+* Preamplifiers: improved user experience upon plugging and unplugging of HF2TA and HF2CA
+* Adjustments under the hood to account for node tree changes (see above, "HF2LI&HF2IS")
+- LI: Fixed problem with linked Demod Settings
+- PID Advisor: 2nd order LP takes resonance frequency and not 3dB bandwidth
+
+SUMMARY OF CHANGES 15.05
+========================
+
+UHFLI
++ Support of input signal scaling for scope, demodulators, and pid
++ Presets saved on the instruments to operate the device stand-alone without PC connection
+* DIG: Improved transfer performance for segmented data
+* Disabling of sinc filter when ExtRef is enabled
+* Phase Streaming data of scope and PID in radians
+* Improved precision of width and reduced jitter on Trigger Out when outputting Scope Trigger, Armed and Active
+
+MFLI
++ LabOne support for Zurich Instruments MFLI devices
+! File transfer over the User Interface only supported up to 2GB per file
+! Triggering demodulators using Trigger In 1 or Trigger In 2 not working
+
+HF2LI & HF2IS
+
+LabOne Data Server
+* Improved performance of sync(), syncSetDouble(), syncSetInt() commands
+* Improved stability during UHFLI device calibration
+- Fixed memory leak on special nodes
+- Fixed race between device disconnect and session connect
+
+LabOne User Interface
++ Graphical Lock-in tabs to display lock-in functionality and signal routing dynamically
++ File Manager: New tab for direct access of measurements, settings, and log files
++ Support of input signal scaling
+* Secured handling of special characters on input fields
+* Improved number resolution when saving CSV files
+- Fixed memory leak on browser when session dialogue is idling
+- Scope: Fix for broken persistence by 15.01 release
+- Sweeper: Fix for broken bidirectional sweep
+- Deleting the setting directory causes web server to go into endless loop on Windows
+! Unit display for plots with complex unit strings may not correctly handle the input unit
+
+LabOne API
++ C API support for sweeper, software trigger, PID advisor, and spectrum modules
++ Device discovery object to detect host names of devices connected over TCP and USB
+* PID Advisor: Model supports input scaling
+* Sweeper: Improved sweeper start performance
+- SW Trigger: Fixed hardware trigger line selection
+- PID Advisor: Correct model for resonator amplitude
+- Sweeper: Secured against multiple execute() calls
+- Sweeper: Avoid sweeper dead-locks by limiting sweep to max frequency
+# Added /DEV*/SIGINS/*/SCALING
+# Added /DEV*/STATS/CPULOAD
+# Added /DEV*/STATS/MEMLOAD
+# Added /DEV*/STATS/DATASERVERCPULOAD
+# Added /DEV*/STATS/DATASERVERMEMLOAD
+
+ziPython
++ ziDiscovery object to retrieve IP address, port, and API level for a device
+
+ziDAQ
++ Discovery methods to retrieve IP address, port, and API level for a device
+- SW Trigger: Fixed crash when data loss happens during recording
+
+ziLV
++ beta 32-bit ziLV support for OSX
++ Added modules support in ziLV
++ Sweeper: Support of the sweeper module in ziLV
++ PID Advisor: Support of the pid advisor trigger module in ziLV
++ Spectrum: Support of the spectrum module in ziLV
+* ziOpen.vi: Simplified user interface and added discovery methods to retrieve ip address, port, and API level for a device
+
+SUMMARY OF CHANGES 15.01
+========================
+
+UHFLI
++ DIG: Continuous scope streaming (digitizer application)
++ DIG: Scope trigger output on Trigger 1/2
++ DIG: Gated triggering
++ DIG: Hold-off specified as number of trigger events
++ DIG: Support of boxcar, demodulator, and pid data recording
++ DIG: Cross domain triggering for scope based on boxcar, demodulator, and pid data
++ Boxcar: Reporting of the current data streaming rate
+* AU: Support of multiplication
+* AU: Support of boxcar data
+* AU: Overflow indicator
+* Trigger: Pulse width for trigger output signals
+- AU: Several bugfixes for scaling and zero flag
+- ExtRef: Improved stability
+
+HF2LI & HF2IS
++ Selecting the external 10 MHz reference clock when no signal is present no longer causes device restart.
++ ZSync port now allows the timestamps of two or more HF2LI devices to be synchronized using the /DEV*/SYSTEM/SYNCENABLE
+  and /DEV*/SYSTEM/SYNCRESET nodes.
+
+LabOne Data Server
+- Fixed directory permissions on Linux
+
+LabOne User Interface
++ PID: PID advisor
++ Sweeper: Indicator for estimated sweep time
++ Scope: Spectral Density for FFT of Scope Data
++ Scope: Support of different FFT window functions
++ Start-up screen can be skipped by enabling the 'Auto Start' flag
++ Double click on device or settings on the session dialogue will start a new session
++ File upload for setting files (drag&drop or file dialogue)
+* Improved user interface start-up time
+* Improved handling of memory allocation errors
+* Node indexes are all one references on the user interface
+* Improved rendering of data stream gaps on plotter
+* Saving at least one data point for each node during recording
+* Scope: Significantly improved rendering speed of large scope shots
+* Sweeper: Improved memory resource usage
+* Improved saving of SVG figures
+- Scope: Log x-axis not working
+- Fix for missing input fields at UI start-up
+- dBm signal output is off by 6dBm
+- Vertical cursors cannot be moved below 1e-15 for power display modes
+- Scope power spectrum y-axis scaling is wrong
+- WebServer doesn't release memory when streaming data to CSV
+- Spectrum: FS works not correct with log x-axis
+
+LabOne API
++ PID: PID advisor
++ Input auto range support on API level /DEV*/SIGINS/*/AUTORANGE
+- Matlab files not readable in octave
+# Added /DEV*/TRIGGERS/OUT/*/PULSEWIDTH
+# Added /DEV*/SCOPES/*/TRIGHOLDOFFCOUNT
+# Added /DEV*/SCOPES/*/TRIGHOLDOFFMODE
+# Added /DEV*/SCOPES/*/CHANNELS/*/LIMITLOWER
+# Added /DEV*/SCOPES/*/CHANNELS/*/LIMITUPPER
+# Added /DEV*/SCOPES/*/TRIGGATE/ENABLE
+# Added /DEV*/SCOPES/*/TRIGGATE/INPUTSELECT
+# Added /DEV*/SCOPES/*/TRIGREFERENCE
+# Added /DEV*/SCOPES/*/TRIGDELAY
+# Added /DEV*/SCOPES/*/STREAM/ENABLES/*
+# Added /DEV*/SCOPES/*/STREAM/RATE
+# Added /DEV*/SCOPES/*/STREAM/SAMPLE
+# Added /DEV*/SIGINS/*/MIN
+# Added /DEV*/SIGINS/*/MAX
+# Added /DEV*/SIGINS/*/AUTORANGE
+# Added /DEV*/BOXCARS/*/RATE
+# Renamed /DEV*/BOXCARS/*/TARGETRATE to /DEV*/BOXCARS/*/LIMITRATE
+# Removed /DEV*/PLLS/*/AUTOCOEFF
+# Obsolete /DEV*/SCOPES/*/TRIGPREDELAY (replaced by /DEV*/SCOPES/*/TRIGDELAY)
+
+ziPython
++ ziDeviceSettings utility functions to load and save XML setting files
+- Scope: (API Level 4) returns consistent block wave for single and double channels.
+  Breaking change in Python API default single channel scope data:
+  one block/shot previously available in data['/dev2006/scopes/0/wave/'][0],
+  now it must be indexed as data['/dev2006/scopes/0/wave/'][0][:,0]
+
+ziDAQ
++ ziDeviceSettings utility functions to load and save XML setting files
+
+ziLV
++ Scope: added support for new scope data type (API Level 5)
+* Improved memory consumption by redesigned ziHandle
+
+ziControl
+- Sweeper: fixed suffix of saved config file
+- Save Data: now also works for demodulator sample rates <1Hz
+* Linux Installer: Improved Scientific Linux and Redhat compatibility
+
+SUMMARY OF CHANGES 14.08
+========================
+
+UHFLI
++ Arithmetic Unit
++ Scope: Support for dual channel @ 1.8GHz (UHF-DIG)
++ Scope: Segmented recording (UHF-DIG)
++ Scope: Relative hysteresis support
++ PID: High-frequency limit on D (D limit timeconstant)
++ PID: Phase unwrap
++ MOD: Phase, timeconstant, and order adjustment for side bands
++ Sinc filter
++ Aux Out: PID shift data streaming
+* Boxcar: Boxcar gate width internally based on time / samples and no more phase
+* Boxcar: Boxcar result in V and no more Vs
+* Scope: Trigger level functionality changed for both edge mode
+* Scope: Improved trigger jitter for scope rates < 1.8GHz
+* Scope: Stability improvements
+* Scope: Trigger hysteresis can be specified absolute or relative
+* Scope: Reduced dead-time between scope shots by simultaneous recording and data transfer
+* PID: Input data rate fixed to 14MHz
+- Scope: Switching sampling rate for large sample length doesn't cause long delays
+- MOD: Output amplitude is no more forced when not selected
+
+HF2LI
+
+LabOne Data Server
++ No streaming data transfer during automatic calibration at start-up
+* More restrictive firewall rules
+* Improved wildcard handling on paths
+- getAsEvent does no more silently subscribe
+
+LabOne UI
++ Scope: Trigger level indicators and adjustment in plot
++ Scope: Multi-wave support
++ SW Trigger: Trigger level indicators
++ SW Trigger: Tracking pulse trigger added
++ SW Trigger: Filter curve shown as dashed line
++ PWA: Indication of boxcar gate and baseline range
++ PWA: Total harmonic distortion calculation in cursor math
++ Aux Out: PID shift and Arithmetic Unit signal sources
++ Sweeper: Sinc support
++ Sweeper: Support for pid, boxcar, arithmetic unit data
++ Sweeper: Selection of order to use in auto or fixed bw mode
++ Sweeper: Reverse scan direction support
++ Sweeper: Maximum bandwidth can be specified
++ Sweeper: Additional application modes for 3-omega and sinc FRA
++ User preferences for UI style and format configurations
++ Signal out of visible range indicators on all plots
++ One axis zoom rectangle
++ Chrome browser: Support for drag-out of downloads
+* Sweeper: Multi-wave support
+* Sweeper: Demodulator settling time is now specified in inaccuracy amount (instead of number of timeconstants)
+* SW Trigger: Multi-wave support
+* SW Trigger: Trigger level functionality (hysteresis instead of two levels)
+* Scope: Improved averaging and persistence refresh handling
+* Scope: Invalid scope shots are indicated by yellow trigger LED
+* Double click on plot area resets to full scale
+* PWA: Improved FFT data display
+* MOD: TC, BW, NEBW control enabled
+* MOD: Improved hardware resource locking
+* Sweeper: BW can now be adjusted in timeconstant units
+* Improved group control in multi-wave selection
+* Active wave selection to control cursor math wave usage
+* Improved unit handling
+- Sweeper: Missed results if demodulators and other signals swept together
+- Sweeper: Using the sweeper on nodes without native timestamp will no more hang
+- Spectrum: Fixed filter compensation for signal power display
+- Scope: Fixes for very long rendering times causing unresponsive behaviour
+
+API
++ Sync function
+* Compiler warnings fixed
+* Fixed link errors with gcc 4.6
+* Fix for gcc -x c usage
+* echoDevice supported but deprecated
+# Removed /DEV*/SYSTEM/EXTCLKSQUARE
+# Added /DEV*/PIDS/*/DLIMITTIMECONSTANT
+# Added /DEV*/PIDS/*/PHASEUNWRAP
+# Added /DEV*/PLLS/*/DLIMITTIMECONSTANT
+# Added /DEV*/AUCARTS/*
+# Added /DEV*/AUPOLARS/*
+# Added /DEV*/MODS/*/CARRIER/ORDER
+# Added /DEV*/MODS/*/CARRIER/HARMONIC
+# Added /DEV*/MODS/*/CARRIER/TIMECONSTANT
+# Added /DEV*/MODS/*/CARRIER/INPUTSELECT
+# Added /DEV*/MODS/*/SIDEBANDS/*/ORDER
+# Added /DEV*/MODS/*/SIDEBANDS/*/HARMONIC
+# Added /DEV*/MODS/*/SIDEBANDS/*/TIMECONSTANT
+# Added /DEV*/MODS/*/SIDEBANDS/*/INPUTSELECT
+# Added /DEV*/SCOPES/*/FULLSCALE
+# Added /DEV*/SCOPES/*/SEGMENTS/COUNT
+# Added /DEV*/SCOPES/*/SEGMENTS/ENABLE
+# Added /DEV*/SCOPES/*/TRIGHYSTERESIS/RELATIVE
+# Added /DEV*/SCOPES/*/TRIGHYSTERESIS/ENABLE
+# Added /DEV*/SCOPES/*/TRIGFORCE
+# Added /DEV*/BOXCARS/*/PERIODOVERFLOWEVENTS
+# Renamed /DEV*/SCOPES/*/TRIGHYSTERESIS to /DEV*/SCOPES/*/TRIGHYSTERESIS/ABSOLUTE
+# Renamed /DEV*/STATS/PHYSICAL/*BOARD/*TEMPS/* to /DEV*/STATS/PHYSICAL/TEMPERATURES/*
+# Renamed /DEV*/STATS/PHYSICAL/*BOARD/CURRENTS/* to /DEV*/STATS/PHYSICAL/CURRENTS/*
+# Renamed /DEV*/STATS/PHYSICAL/*BOARD/*VOLTS/* to /DEV*/STATS/PHYSICAL/VOLTAGES/*
+# Renamed /DEV*/SYSTEM/*BOARDREVISION to /DEV*/SYSTEM/BOARDREVISIONS/*
+# Removed /DEV*/PIDS/*/DSHIFT
+# Removed /DEV*/MODS/*/ORDER
+# Removed /DEV*/MODS/*/TIMECONSTANT
+# Removed /DEV*/MODS/*/INPUTSELECT
+# Removed /DEV*/MODS/*/SEGMENT
+# Removed /DEV*/SIGOUTS/SYNCFALLING/*
+# Removed /DEV*/SIGOUTS/SYNCRISING/*
+
+ziPython
++ Sync command
++ PLL advisor module
+* MSI installer to support unattended installations
+* Example improvements
+* SW Trigger: Path name changes for trigger levels
+* Sweeper: Paths for maxbandwidth and omegasuppression
+
+ziDAQ
++ Sync command
++ PLL advisor module
+* Example improvements
+* SW Trigger: Path name changes for trigger levels
+* Sweeper: Paths for maxbandwidth and omegasuppression
+
+ziLV
+* Example improvements
+- ziGetEventByteArray now working on UHF
+
+ziControl
++ Sweeper: HF2IS: Save Impedance in Scribner ZView format
+* Sweeper: Speed up of sinc mode sweep
+- Sweeper: Several settling time bug fixes
++ Added ziHF2TipProtect and ziHF2QControl executables to installer package
+* Save Data Filename: date is now prepended instead of appended
+* HF2LI: Output Amplitude is now re-enabled (sigouts/*/enables/*) when previously disabled by API
+* Linux: improved installer, improved library path handling
+
+SUMMARY OF CHANGES 14.02
+========================
+
+UHFLI
++ Digitizer option (UHF-DIG)
++ 10G Ethernet option (UHF-10G)
++ Boxcar: Baseline suppression
++ PID: Phase unwrap
+* PWA: 1024 samples for periodic wave form analyzer (PWA)
+* PWA: Higher update rate
+* Enhanced linearity of ADC for small signals
+* Scope: Stability improvements
+* Scope: Segmented recording (requires UHF-DIG Option)
+* UDP port assignment per device starting from port 8013
+- Trigger: Trigger 3/4 termination swapped
+- Ethernet: Reconnect after cable disconnect
+! HW Trigger: Mode High/Low are scrambled
+! Scope: Switching sampling rate for large sample length may cause long delays
+
+HF2LI
+- MOD: Fixed calculation of index of modulation
+- PID: Fixed calculation of MOD sidebands
+
+LabOne Data Server
++ Support of multiple devices per server
++ Device connect/disconnect without server restart
++ PID and boxcar data streaming
++ Indication of required FW update
+* Improved memory release
+* Speed optimization
+* Data Server restricted to localhost connections (set /zi/config/open to 1)
+! If several NICs are in a PC the multicast may sent over the wrong one
+
+LabOne UI
++ Start-up screen with device and setting selection
++ Support of device connect/disconnect and change
++ Cursor Math (with copy&paste of values)
++ CSV transfer to other applications (Excel,...) via LiveLink
++ Histograms
++ Error reporting on the user interface
++ Dual channel scope up to 512MS (requires UHF-DIG Option)
++ Plotter: Support for PID and boxcar streaming data
++ Footer: More information for next calibration indicator
++ Lock-in: 50Ohm/HiZ target impedance on output
++ Lock-in: Amplitude includes target impedance
++ Lock-in: Vpk, Vrms, dBm support
++ Cursor: Relative cursor
++ Session settings saved at exit (for recovery)
+* Num: Fix for speed limitation
+* Num: Support for PID and boxcar streaming data
+* Sweeper: Unbiased standard deviation
+* Sweeper: Speed increase down to 6ms per sweep point
+* Save: Same directory structure for mat and csv files
+* Improved log messages
+* Mouse wheel does only change value when pointer on element
+- Fixed load/save settings
+- Several fixes related to units handling
+- Save: Proper start/stop behaviour
+! PWA: Tracking cursor value wrong for Freq Domain FFT mode
+
+API
++ Programmer's Manual (PM)
+* Performance and stability improvements
+* Standard deviation reports unbiased values (before biased values)
+* Scope: UHF support
+* Faster command execution time
+* HW Trigger: Included in demodulator data
+* SW Trigger: Trigger support on HW trigger lines
+- Sweeper: Fix for very small sweep steps
+- Sweeper: Fix for higher harmonics at low frequencies (mHz)
+! Static API linking no more supported
+# Added /DEV*/SIGOUTS/*/IMP50
+# Added /DEV*/PIDS/*/OVERFLOW
+# Added /DEV*/PIDS/*/STREAM/RATE
+# Added /DEV*/PIDS/*/STREAM/DECIMATION
+# Added /DEV*/PIDS/*/STREAM/VALUE
+# Added /DEV*/PIDS/*/STREAM/ERROR
+# Added /DEV*/PIDS/*/STREAM/SHIFT
+# Added /DEV*/BOXCARS/*/BASELINE/*
+# Added /DEV*/BOXCARS/*/AVERAGERBANDWIDTH
+# Added /DEV*/INPUTPWAS/*/INPUTINTERLOCK
+# Added /DEV*/SYSTEM/CALIB/NEXT
+# Added /DEV*/SYSTEM/CALIB/CALIBRATE
+# Added /DEV*/SYSTEM/JUMBO
+# Added /DEV*/SYSTEM/SAVEPORTS
+# Added /DEV*/SYSTEM/PORTUDP
+# Added /DEV*/SYSTEM/PORTTCP
+# Renamed /DEV*/BOXCARS/*/ADCSELECT to /DEV*/BOXCARS/*/INPUTSELECT
+# Renamed /DEV*/TRIGGERS/FRONT/*/DRIVE to /DEV*/TRIGGERS/OUT/*/DRIVE
+# Renamed /DEV*/SYSTEM/NICS/*/*
+# Renamed /DEV*/CONN/OWNER to /DEV*/SYSTEM/OWNER
+# Renamed /DEV*/CONN/ACTIVEINTERFACE to /DEV*/SYSTEM/ACTIVEINTERFACE
+# Removed /DEV*/SAMPLES node
+# Removed /DEV*/TRIGGERS/*/IN/VALUE
+# Removed /DEV*/PIDS/*/AUTOCENTER
+# Removed /DEV*/CONN/CONNECT
+
+ziPython
++ Documentation
+- Fixed support of flat dict
+
+ziDAQ
++ Documentation
+
+ziLV
+* Renamed API from "Zurich Instruments HF2" to "Zurich Instruments LabOne"
+* Added polymorphic vi's for set and get data
++ PWA: Added support for periodic wave form analyzer (PWA)
++ Boxcar: Added support for boxcar averager (BOX)
++ Scope: Added support for UHFLI Scope
++ Added example for 3-omega method
++ Added examples for UHFLI
+* Improved documentation
+- Fixed Ticks-> conversion for UHFLI
+
+ziControl
++ HF2IS: Demodulator filters can now be configured in time constant or bandwidth
++ Sweeper: Support of Setpoint of a PID controller
+* Sweeper: Now doesn't restore initial frequency when sweep is finished or stopped
+* Sweeper: Auto BW on now suppresses omega-components
+* HF2IS: Spectroscope can now also display Z data
+- Reduced CPU usage after start of program
+- HF2LI Scope: Trigger Level on Signal Output was not working
+- Sweeper: In save file the default unit column was not averaged if averaging was enabled
+- PLL: Auto-bandwidth mode fixed
+- Load Settings: PLL auto-center not restored correctly if off in the settings file but currently on
+
+SUMMARY OF CHANGES 13.10
+========================
+
+UHFLI
++ USB interface support
++ Boxcar Averager and Periodic Wave form Analyzer (jitter free averaging scope) on Signal Inputs
++ Periodic Wave form Analyzer on Boxcar outputs
++ Integrated Tandem demodulation (full support of Auxiliary Input and Output signals as demodulator inputs)
+* Scope supports sampling rates down to 27kS/s
+* Changed meaning of colors of the power LED
+
+LabOne Data Server
+* Improved ziDataServer performance and stability
+- ziDataServer is not installed if HF2 is deselected
+- Installer fails if firewall service is not running
+- Crash on Ctrl + C
+
+LabOne UI
++ Plotter: Vertical axis groups in the plotter supporting the display of boxcar, hw trigger, and various other signals
++ Lock-in: Phase to zero adjustment
++ Lock-in: Output Amplitude setting in V and dBm
++ Lock-in: Support of edge and gating triggers
++ Aux: Automatic adjustment of Preoffset and Offset to zero outputs
++ Sweep: Additional sweep parameters
++ PLL: Center point adjustment for PLL
++ UI: up/down arrows for fast increase/decrease of values
++ SW Trigger: Triggering on Ref/Trigger lines
++ Spectrum: Higher number of samples for FFT spectrum to suppress windowing effects
+* Spectrum: ZoomFFT renamed to Spectrum
+* Spectrum: Spectral density and power calculation on FFT spectrum
+* Num: Increased font size for numerical values
+* Lock-in: To nearest value rounding of sampling rate
+* Scope: Improved triggering if dual edge trigger is enabled
+* Scope: Scope and FFT are now integrated on a single tab
+* PID: simultaneous operation of all 4 controllers at a rate of 14 MSa/s
+* Plotter: Fix of plotter data shifting artefacts
+* Sweep: Improved sweep speed and support for odd configurations
+* UI: Unified directory structure for both Matlab and CSV data saving
+* UI: Improved design and drag & drop functionality for tabs
+* UI: Improved stability of zoom/autoscaling for extreme limits
+* UI: Chaining is only applied once and transfers last changed value (solves update storms)
+- UI: SVG saving of dual plots only saves the lower plot
+- Lock-in: Aux In 2 disappears
+- SW Trigger: Returns twice the data for subsequent 'execute'
+
+API
++ Timestamp support on double and integer values (API4 mode)
++ LabVIEW 64-bit support
++ Added hwtrigger field to the demod sample structure (lowest 4bits for the trigger lines)
++ Added PWA data type to APIs
+* Clean-up of ziAPI.h
+* Improved examples running on all device types
+! LabView: hwtrigger not available in sample data
+! LabView: PWA data type not available (no API4 level support)
+# Renamed /DEV*/STATS/TCP/* to /DEV*/STATS/CMDSTREAM
+# Renamed /DEV*/STATS/UDP/* to /DEV*/STATS/DATASTREAM
+# Removed /DEV*/STATS/USB/*
+# Renamed /DEV*/SYSTEM/NICS/* to /DEV*/SYSTEM/NICS/0/*
+# Added   /DEV*/CONN/ACTIVEINTERFACE
+# Added   /DEV*/SYSTEM/NICS/0/JUMBO
+# Added   /DEV*/SYSTEM/FWLOG
+# Added   /DEV*/SYSTEM/FWLOGENABLE
+# Added   /DEV*/STATS/PHYSICAL/FANSPEED
+# Removed /DEV*/SYSTEM/NICS/SAVEMAC
+
+SUMMARY OF CHANGES 13.06
+========================
+
+UHFLI
++ Number of demodulators increased from 6 to 8
++ Auto re-calibrate after 20 minutes warmup
+* External reference moved from demodulator 7 to 4
+* Default output enable moved from demodulator 7 to 4
+* Several bug fixes and improvements in MOD option
+* Increased network stability and reconnect behavior
+* Improved Ext Ref performance
+* PLL/PID: increased max bandwidth
+
+LabOne UI
++ One-click start of LabOne GUI
++ Sweeper: added Bode plot
++ Sweeper: measurements referencing against saved data / history
++ Save/Load Settings feature fully supported
+* Renaming of servers (LabOne Data Server and LabOne Web Server)
+* General improvement of look and feel
+* Lock-in: major improvements on Lock-In tab
+* Improved status bar
+* Stability and performance improvements on Sweeper, ZoomFFT, and SW Trigger
+
+API
+! Due to the new 8 demodulator scheme, customer API programs may need to be adapted
+! Wrong button image scaling under browser zoom for Firefox versions equal or older than 22.0
+- LabVIEW: Fixed various UHFLI compatibility issues in sweeper and examples
+* Improved error messages
+
+SUMMARY OF CHANGES 13.02
+========================
+
+UHFLI
++ Added MOD Option for sideband analysis
+* Scope level trigger
+* Many PID/PLL enhancements
+* External reference support on Ref / Trigger inputs
+* Auto-range on Signal Output
++ Auto-zero phase adjustment
+
+LabOne UI
+* Improved look and feel
++ Persistence mode on scope
++ Sweeper, SW Trigger: Select waves to display and individually set colors or names
+* Stability and performance improvements on Sweeper, ZoomFFT, and SW Trigger
+* Additional functionality on Numerical Tab
++ Averaging on FFT and ZoomFFT
++ Unit support
++ Command log added
++ Saving of MATLAB and .csv files
++ PLL Advisor
++ Save ASCII files with structure
++ Automatic level find on SW Trigger
+* Additional status information in the status bar
+! At least one demodulator must be enabled to get proper refresh functionality on browser
+! Browser resizing will reset some read-only elements
+! Number of displayed entries on the history is restricted to 100
+! Missing functionality on some buttons in ZoomFFT tab
+! MATLAB data files may contain additional structure levels
+
+API
+* API examples added
+* Interface change: The API read of sweeper, zoomFFT, and SW trigger return cell arrays of measurements for Matlab and lists for Python. Therefore, data access to the structure needs an additional indirection.
+
+SUMMARY OF CHANGES 13.01
+========================
+
+Initial release of LabOne
