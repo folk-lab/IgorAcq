@@ -53,7 +53,7 @@ function ReadVsTimeFastdac(instrID, duration, [y_label, comments, nosave]) // Un
 	endif
 
 	Struct ScanVars S
-	initFDscanVars(S, instrID, 0, duration, "", x_label="time /s", y_label="Current /nA", comments=comments)
+	initFDscanVars(S, instrID, 0, duration, "", x_label="time /s", y_label=y_label, comments=comments)
 	S.numptsx = round(S.measureFreq*duration)
 	
 	initializeScan(S)

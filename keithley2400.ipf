@@ -15,28 +15,28 @@ function openK2400connection(instrID, visa_address, [verbose])
 	//                -- does not hurt to send extra parameters when using GPIB, they are ignored
 	// instrID is the name of the global variable that will be used for communication
 	// visa_address is the VISA address string, i.e. GPIB0::23::INSTR
-	
+
 	string instrID, visa_address
 	variable verbose
-	
+
 	if(paramisdefault(verbose))
 		verbose=1
 	elseif(verbose!=1)
 		verbose=0
 	endif
-	
+
 	variable localRM
 	variable status = viOpenDefaultRM(localRM) // open local copy of resource manager
 	if(status < 0)
 		VISAerrormsg("open K2400 connection:", localRM, status)
 		abort
 	endif
-	
+
 	string comm = ""
 	sprintf comm, "name=K2400,instrID=%s,visa_address=%s" instrID, visa_address
 	string options = "test_query=*IDN?"
 	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
-	
+
 end
 
 ///////////////////////
@@ -46,9 +46,9 @@ end
 function setK2400Current(instrID,curr) //Units: nA
 	variable instrID,curr
 	string cmd
-	
+
 	// check for NAN and INF
-	if(sc_check_naninf(curr) != 0)
+	if(numtype(curr) != 0)
 		abort "trying to set current to NaN or Inf"
 	endif
 
@@ -59,12 +59,12 @@ end
 function setK2400Voltage(instrID,volt) // Units: mV
 	variable instrID,volt
 	string cmd
-	
+
 	// check for NAN and INF
-	if(sc_check_naninf(volt) != 0)
+	if(numtype(volt) != 0)
 		abort "trying to set voltage to NaN or Inf"
 	endif
-	
+
 	sprintf cmd, ":sour:func volt;:sour:volt:mode fix;:sour:volt:lev %.10f\n", volt*1e-3
 	writeInstr(instrID,cmd)
 end
@@ -161,7 +161,7 @@ function setK2400compl(instrID, voltcurr, compl) // Pass "volt" or "curr", the v
 	string voltcurr
 	variable compl
 	string cmd
-	
+
 	// check for NaN and INF
 	if(sc_check_naninf(compl) != 0)
 		abort "trying to set compl to NaN or Inf"
@@ -187,7 +187,7 @@ function setK2400range(instrID,voltcurr,range)
 	string voltcurr
 	variable range
 	string cmd
-	
+
 	// check for NAN and INF
 	if(sc_check_naninf(range) != 0)
 		abort "trying to set range to NaN or Inf"

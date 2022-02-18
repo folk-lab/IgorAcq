@@ -1019,7 +1019,8 @@ function/s getLS370Status(instrID)
 		ch_idx = "mc,50k,4k,magnet,still"
 		file_name = "LDLoggingSchedules.txt"
 	elseif(cmpstr(ls_system,"bfbig") == 0)
-		channelLabel = "xld_50K,xld_4K,xld_magnet,xld_still,xld_mc"
+//		channelLabel = "xld_50K,xld_4K,xld_magnet,xld_still,xld_mc"
+		channelLabel = "ch1,ch2,ch3,ch5,ch6"		
 		stillLabel = "xld_still_heater"
 //		ch_idx = "1,2,3,5,6"
 		ch_idx = "50k,4k,magnet,still,mc"
@@ -1064,7 +1065,8 @@ function/s getLS370Status(instrID)
 		
 		sprintf statement, "SELECT temperature_k FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, temp_schema, stringfromlist(i,channelLabel,","), timestamp
 		temp = requestSQLValue(statement)
-
+//		temp = num2str(getLS370temp(instrID,stringfromlist(i,LSkeys,",")))
+		
 //		print temp
 //		temp = "" // TEMPORARY FIX
 		

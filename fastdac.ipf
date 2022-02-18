@@ -1256,16 +1256,16 @@ function/WAVE calculate_spectrum(time_series, [scan_duration, linear])
 	wave w_Periodogram
 	wave powerspec
 	if (!linear)  // Use log scale
-		DSPPeriodogram/PARS/DBR=1/NODC=1/R=[0,(last_val)] tseries  
+		DSPPeriodogram/PARS/DBR=1/NODC=2/R=[0,(last_val)] tseries  
 		duplicate/free w_Periodogram, powerspec
 		powerspec = powerspec+10*log(scan_duration)  // This is so that the powerspec is independent of scan_duration
 	else  // Use linear scale
-		DSPPeriodogram/PARS/NODC=1/R=[0, (last_val)] tseries
+		DSPPeriodogram/PARS/NODC=2/R=[0, (last_val)] tseries
 		duplicate/free w_Periodogram, powerspec
 		// TODO: I'm not sure this is correct, but I don't know what should be done to fix it -- TIM
 		powerspec = powerspec*scan_duration  // This is supposed to be so that the powerspec is independent of scan_duration
 	endif
-	powerspec[0] = NaN
+//	powerspec[0] = NaN
 	return powerspec
 end
 

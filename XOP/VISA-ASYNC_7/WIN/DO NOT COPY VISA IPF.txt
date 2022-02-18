@@ -1,0 +1,2 @@
+TIM 2021-11 
+For some reason, we have all the VISA constants in ScanController_instr.ipf, so if you copy VISA.ipf into the Igor Procedures folder you will get an error every time you open your experiment.
