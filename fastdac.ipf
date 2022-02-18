@@ -645,7 +645,7 @@ function CalibrateFDAC(instrID)
 	// check that user has all the bits needed!
 	variable user_response = 0
 	user_response = ask_user("You will need a DMM you trust set to return six decimal places. Press OK to continue",type=1)
-	if(user_response == 0)
+	if(user_response != 1)
 		print "[ERROR] \"fdacCalibrate\": User abort!"
 		abort
 	endif
@@ -673,7 +673,7 @@ function CalibrateFDAC(instrID)
 		channel = i
 		sprintf question, "Calibrating DAC Channel %d. Connect DAC Channel %d to the DMM. Press YES to continue", channel, channel
 		user_response = ask_user(question,type=1)
-		if(user_response == 0)
+		if(user_response != 1)
 			print "[ERROR] \"fdacCalibrate\": User abort! DAC's are NOT calibrated anymore.\rYou must re-run the calibration before you can trust the output values!"
 			abort
 		endif
