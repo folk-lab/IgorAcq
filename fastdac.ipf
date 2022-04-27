@@ -1085,14 +1085,14 @@ function FDSpectrumAnalyzer(instrID, scanlength,[numAverage, raw_graphs, calc_gr
 	string graphIDs
 //	graphIDs = scg_initializeGraphsForWavenames(log_freq_wavenames, "Frequency /Hz", is2d=0, y_label="dB nA/sqrt(Hz)")
 //	all_graphIDs = all_graphIDs+graphIDs
-	graphIDs = scg_initializeGraphsForWavenames(lin_freq_wavenames, "Frequency /Hz", is2d=0, y_label="nA/sqrt(Hz)")
+	graphIDs = scg_initializeGraphsForWavenames(lin_freq_wavenames, "Frequency /Hz", is2d=0, y_label="nA^2/Hz")
 	string gid
 	for (i=0;i<itemsInList(graphIDs);i++)
 		gid = StringFromList(i, graphIDs)
 		modifyGraph/W=$gid log(left)=1
 	endfor
 	all_graphIDs = all_graphIDs+graphIDs
-	all_graphIDs += scg_initializeGraphsForWavenames(int_freq_wavenames, "Frequency /Hz", is2d=0, y_label="nA")
+	all_graphIDs += scg_initializeGraphsForWavenames(int_freq_wavenames, "Frequency /Hz", is2d=0, y_label="nA^2")
 	scg_arrangeWindows(all_graphIDs)
 
 	// Record data
@@ -1130,7 +1130,7 @@ function FDSpectrumAnalyzer(instrID, scanlength,[numAverage, raw_graphs, calc_gr
 
 	if (!nosave)
 //		EndScan(S=S, additional_wavenames=log_freq_wavenames+lin_freq_wavenames) 
-		EndScan(S=S, additional_wavenames=lin_freq_wavenames) 		
+		EndScan(S=S, additional_wavenames=lin_freq_wavenames+int_freq_wavenames) 		
 	endif
 
 	// Return resampling state to whatever it was before
