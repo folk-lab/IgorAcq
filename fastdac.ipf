@@ -1017,14 +1017,20 @@ end
 ///////////////////////// Spectrum Analyzer //////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 
-function FDSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,nosave])
+function FDSpectrumAnalyzer(instrID, scanlength,[numAverage, raw_graphs, calc_graphs, comments,nosave])
+	// NOTE: Make sure the Calc function is set up in Scancontroller_Fastdac such that the result is in nA (not A)
 	// scanlength is in sec
+	// raw_graphs: whether to show the raw ADC readings
+	// calc_graphs: Whether to show the readings after converting to nA (assuming Calc function is set up correctly)
 	// if linear is set to 1, the spectrum will be plotted on a linear scale
-	variable instrID, scanlength, numAverage, nosave
+	variable instrID, scanlength, numAverage, raw_graphs, calc_graphs, nosave
 	string comments
 	
 	comments = selectString(paramisdefault(comments), comments, "")	
 	numAverage = paramisDefault(numAverage) ? 1 : numAverage
+	raw_graphs = paramisdefault(raw_graphs) ? 0 : raw_graphs
+	calc_graphs = paramisdefault(calc_graphs) ? 1 : calc_graphs	
+	
 	
 	// Turn off resampling during noise spectrum scan
 	nvar sc_resampleFreqCheckFadc
@@ -1040,41 +1046,53 @@ function FDSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,nosave])
 	PreScanChecksFD(S)
 
 	// Initialize graphs and waves
-	initializeScan(S)  // Going to reopen graphs below anyway (to include frequency graphs)
+	initializeScan(S, init_graphs=0)  // Going to open graphs below
 
 	// Initialize Spectrum waves
-	string wn, wn_lin
-	string log_freq_wavenames = ""
+	string wn, wn_lin, wn_int
+//	string log_freq_wavenames = ""
 	string lin_freq_wavenames = ""
+	string int_freq_wavenames = ""	
 	variable numChannels = scf_getNumRecordedADCs()
 	string adc_channels = scf_getRecordedFADCinfo("channels")
 	variable i
 	for(i=0;i<numChannels;i+=1)
-		wn = "spectrum_fftADC"+stringfromlist(i,adc_channels, ";")
-		make/o/n=(S.numptsx/2) $wn = nan
-		setscale/i x, 0, S.measureFreq/(2.0), $wn
-		log_freq_wavenames = addListItem(wn, log_freq_wavenames, ";", INF)
+//		wn = "spectrum_fftADC"+stringfromlist(i,adc_channels, ";")
+//		make/o/n=(S.numptsx/2) $wn = nan
+//		setscale/i x, 0, S.measureFreq/(2.0), $wn
+//		log_freq_wavenames = addListItem(wn, log_freq_wavenames, ";", INF)
 				
 		wn_lin = "spectrum_fftADClin"+stringfromlist(i,adc_channels, ";")
 		make/o/n=(S.numptsx/2) $wn_lin = nan
 		setscale/i x, 0, S.measureFreq/(2.0), $wn_lin
 		lin_freq_wavenames = addListItem(wn_lin, lin_freq_wavenames, ";", INF)
+		
+		wn_int = "spectrum_fftADCint"+stringfromlist(i,adc_channels, ";")
+		make/o/n=(S.numptsx/2) $wn_int = nan
+		setscale/i x, 0, S.measureFreq/(2.0), $wn_int
+		int_freq_wavenames = addListItem(wn_int, int_freq_wavenames, ";", INF)		
 	endfor
 
 	// Initialize all graphs
-	string all_graphIDs = scg_initializeGraphsForWavenames(sci_get1DWaveNames(1,1), "Time /s", is2d=S.is2d, y_label="ADC /mV")  // RAW ADC readings
-	all_graphIDs += scg_initializeGraphsForWavenames(sci_get1DWaveNames(0,1), "Time /s", is2d=S.is2d, y_label="Current /nA")    // Calculated data (should be in nA)
+	string all_graphIDs = ""
+	if (raw_graphs)
+		all_graphIDs += scg_initializeGraphsForWavenames(sci_get1DWaveNames(1,1), "Time /s", is2d=S.is2d, y_label="ADC /mV")  // RAW ADC readings
+	endif
+	if (calc_graphs)
+		all_graphIDs += scg_initializeGraphsForWavenames(sci_get1DWaveNames(0,1), "Time /s", is2d=S.is2d, y_label="Current /nA")    // Calculated data (should be in nA)
+	endif
 	
 	string graphIDs
-	graphIDs = scg_initializeGraphsForWavenames(log_freq_wavenames, "Frequency /Hz", is2d=0, y_label="dB nA/sqrt(Hz)")
-	all_graphIDs = all_graphIDs+graphIDs
-	graphIDs = scg_initializeGraphsForWavenames(lin_freq_wavenames, "Frequency /Hz", is2d=0, y_label="nA/sqrt(Hz)")
+//	graphIDs = scg_initializeGraphsForWavenames(log_freq_wavenames, "Frequency /Hz", is2d=0, y_label="dB nA/sqrt(Hz)")
+//	all_graphIDs = all_graphIDs+graphIDs
+	graphIDs = scg_initializeGraphsForWavenames(lin_freq_wavenames, "Frequency /Hz", is2d=0, y_label="nA^2/Hz")
 	string gid
 	for (i=0;i<itemsInList(graphIDs);i++)
 		gid = StringFromList(i, graphIDs)
 		modifyGraph/W=$gid log(left)=1
 	endfor
 	all_graphIDs = all_graphIDs+graphIDs
+	all_graphIDs += scg_initializeGraphsForWavenames(int_freq_wavenames, "Frequency /Hz", is2d=0, y_label="nA^2")
 	scg_arrangeWindows(all_graphIDs)
 
 	// Record data
@@ -1086,28 +1104,33 @@ function FDSpectrumAnalyzer(instrID, scanlength,[numAverage,comments,nosave])
 		for (j=0;j<itemsInList(wavenames);j++)
 			// Calculate spectrums from calc wave
 			wave w = $stringFromList(j, wavenames)
-			wave fftw = fd_calculate_spectrum(w)  // Log spectrum
+//			wave fftw = fd_calculate_spectrum(w)  // Log spectrum
 			wave fftwlin = fd_calculate_spectrum(w, linear=1)  // Linear spectrum
 
 			// Add to averaged waves
-			wave fftwave = $stringFromList(j, log_freq_wavenames)
+//			wave fftwave = $stringFromList(j, log_freq_wavenames)
 			wave fftwavelin = $stringFromList(j, lin_freq_wavenames)
 			if(i==0) // If first pass, initialize waves
-				fftwave = fftw
+//				fftwave = fftw
 				fftwavelin = fftwlin
 			else  // Else add and average
-				fftwave = fftwave*i + fftw  // So weighting of rows is correct when averaging
-				fftwave = fftwave/(i+1)      // ""
-				
+//				fftwave = fftwave*i + fftw  // So weighting of rows is correct when averaging
+//				fftwave = fftwave/(i+1)      // ""				
 				fftwavelin = fftwavelin*i + fftwlin
 				fftwavelin = fftwavelin/(i+1)
 			endif
+			wave fftwaveint = $stringFromList(j, int_freq_wavenames)
+			integrate fftwavelin /D=fftwaveint
+			
+			
+			
 		endfor
 		doupdate
 	endfor
 
 	if (!nosave)
-		EndScan(S=S, additional_wavenames=log_freq_wavenames+lin_freq_wavenames) 
+//		EndScan(S=S, additional_wavenames=log_freq_wavenames+lin_freq_wavenames) 
+		EndScan(S=S, additional_wavenames=lin_freq_wavenames+int_freq_wavenames) 		
 	endif
 
 	// Return resampling state to whatever it was before
@@ -1120,6 +1143,8 @@ function/WAVE fd_calculate_spectrum(time_series, [scan_duration, linear])
 	wave time_series  // Time series (in correct units -- i.e. check that it's in nA first)
 	variable scan_duration // If passing a wave which does not have Time as x-axis, this will be used to rescale
 	variable linear // Whether to return with linear scale (or log scale)
+	
+	linear = paramisDefault(linear) ? 1 : linear
 
 	duplicate/free time_series tseries
 	if (scan_duration)

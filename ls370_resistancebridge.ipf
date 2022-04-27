@@ -19,6 +19,9 @@ function openLS370connection(instrID, http_address, system, [verbose])
 	// http_address is exactly what it sounds like
 	// system is the name of the cryostat you are working on: bfsmall, igh, bfbig
 	// verbose=0 will not print any information about the connection
+	
+	// XLD -- http://lksh370-xld.qdev-b111.lab:49300/api/v1/
+	// LD -- 10.18.101.12:49301/api/v1/
 
 	string instrID, http_address, system
 	variable verbose
@@ -925,10 +928,11 @@ function/s getLS370Status(instrID)
 		ch_idx = "mc,50k,4k,magnet,still"
 		file_name = "LDLoggingSchedules.txt"
 	elseif(cmpstr(ls_system,"bfbig") == 0)
-		channelLabel = "xld_50K,xld_4K,xld_magnet,xld_still,xld_mc"
+//		channelLabel = "xld_mc, xld_50K,xld_4K,xld_magnet,xld_still"
+		channelLabel = "ch6,ch1,ch2,ch3,ch5"
 		stillLabel = "xld_still_heater"
 //		ch_idx = "1,2,3,5,6"
-		ch_idx = "50k,4k,magnet,still,mc"
+		ch_idx = "mc,50k,4k,magnet,still"
 		file_name = "XLDLoggingSchedules.txt"
 	else
 		print "[ERROR] \"getLSStatus\": pass the system id as instrID: \"ld\" or \"xld\"."
@@ -982,16 +986,17 @@ function/s getLS370Status(instrID)
 
 	//// Heaters ////
 	// MC heater
-	string heatBuffer=""
-	timestamp = sc_SQLtimestamp(300)
-	sprintf statement, "SELECT power_milliw FROM %s.%s WHERE time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, mc_heater_schema, timestamp
-	heatBuffer = addJSONkeyval(heatBuffer,"MC Heater mW",requestSQLValue(statement))
-
-	// Still heater
-	sprintf statement, "SELECT power_milliw FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, still_heater_schema, stillLabel, timestamp
-	heatBuffer = addJSONkeyval(heatBuffer,"Still Heater mW",requestSQLValue(statement))
-
-	string buffer = addJSONkeyval(tempBuffer,"Heaters",heatBuffer)
+//	string heatBuffer=""
+//	timestamp = sc_SQLtimestamp(300)
+//	sprintf statement, "SELECT power_milliw FROM %s.%s WHERE time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, mc_heater_schema, timestamp
+//	heatBuffer = addJSONkeyval(heatBuffer,"MC Heater mW",requestSQLValue(statement))
+//
+//	// Still heater
+//	sprintf statement, "SELECT power_milliw FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, still_heater_schema, stillLabel, timestamp
+//	heatBuffer = addJSONkeyval(heatBuffer,"Still Heater mW",requestSQLValue(statement))
+//
+//	string buffer = addJSONkeyval(tempBuffer,"Heaters",heatBuffer)
+	string buffer = tempBuffer
 	
 	return addJSONkeyval("","Lakeshore",buffer)
 end
