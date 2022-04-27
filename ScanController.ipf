@@ -759,9 +759,12 @@ end
 /////////////////////////////////////////////////////////// Initializing a Scan //////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-function initializeScan(S)
+function initializeScan(S, [init_graphs])
     // Opens instrument connection, initializes waves to store data, opens and tiles graphs, opens abort window.
+    // init_graphs: set to 0 if you want to handle opening graphs yourself
     struct ScanVars &S
+    variable init_graphs
+    init_graphs = paramisdefault(init_graphs) ? 1 : init_graphs
     variable fastdac
 
     // Kill and reopen connections (solves some common issues)
@@ -772,9 +775,11 @@ function initializeScan(S)
     sci_initializeWaves(S)
 
     // Set up graphs to display recorded data
-    string activeGraphs
-    activeGraphs = scg_initializeGraphs(S)
-    scg_arrangeWindows(activeGraphs)
+    if (init_graphs)
+	    string activeGraphs
+	    activeGraphs = scg_initializeGraphs(S)
+	    scg_arrangeWindows(activeGraphs)
+	 endif
 
     // Open Abort window
     scg_openAbortWindow()
