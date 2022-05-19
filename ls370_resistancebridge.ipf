@@ -293,7 +293,7 @@ function getLS370controlmode(instrID, [verbose]) // Units: No units
 	variable verbose
 	nvar pid_mode, pid_led, mcheater_led
 	string command,response
-	svar ls_label
+	svar ls_label // Set when opening connection to lakeshore
 
 	sprintf command, "get-temperature-control-mode/%s", ls_label
 
@@ -511,6 +511,7 @@ function setLS370heaterRange(instrID, max_current_mA)
 	variable true_val
 	
 	sprintf command, "set-heater-range-amps/%s/%f", ls_label, max_current_mA/1000
+//	print command, ls_label, max_current_mA/1000
 	response = sendLS370(instrID,command,"put", keys="data")
 	
 	// Can only be set to certain values, if tried to set to something > 10% different then warn user.
@@ -630,10 +631,10 @@ end
 
 //////// Set functions which don't map directly to API but are useful //////////
 
-function setLS370temp(instrID,setpoint,[maxcurrent]) //Units: mK, mA
+function setLS370temp(instrID,setpoint,[maxcurrent, verbose]) //Units: mK, mA
 	// Sets both setpoint and max_current if passed, else estimates using LS370_estimateheaterrange
 	string instrID
-	variable setpoint, maxcurrent
+	variable setpoint, maxcurrent, verbose
 	string payload, command
 	svar ls_label
 	nvar temp_set
@@ -641,18 +642,25 @@ function setLS370temp(instrID,setpoint,[maxcurrent]) //Units: mK, mA
 	if (paramisdefault(maxcurrent))
 		maxcurrent = LS370_estimateheaterrange(setpoint)
 	endif
+	if (verbose)
+		printf "\nSetLS370Temp Verbose Mode -------- \n\nSetting Max Current: %f\nSetting Setpoint: %f\n", maxcurrent, setpoint
+	endif
 
 	// check for NAN and INF
 	if(numtype(setpoint) != 0)
 		abort "trying to set setpoint to NaN or Inf"
 	endif
 	
-	setLS370HeaterRange(instrID, maxcurrent)
-	setLS370TempSetpoint(instrID, setpoint)
-	nvar pid_mode
+	nvar pid_mode // Note: PID mode needs to be set to 1 before HeaterRange can be set
 	if (pid_mode != 1)
+		if (verbose)
+			print "PID control mode was not 1, setting to 1 now"
+		endif
 		setLS370controlMode(instrID, 1)
 	endif
+	setLS370HeaterRange(instrID, maxcurrent)
+	setLS370TempSetpoint(instrID, setpoint)
+
 end
 
 
@@ -1042,6 +1050,33 @@ function/s getBFStatus(instrID)
 	return addJSONkeyval("","BlueFors",buffer)
 end
 
+function/s getLS370HeaterStatus(instrid, [full])
+	// Get some information about what the LS is currently doing (i.e. heaters on, and what control parameters for those heaters)
+	string instrid
+	variable full
+
+	string buffer
+	sprintf buffer, "\nMC Heater Power: %f, Heater Range: %f, Current Setpoint: %f\n", getLS370heaterpower(instrid, "mc"), getls370heaterrange(instrid), getLs370PIDtemp(instrid)
+	sprintf buffer, "%sStill Heater Power: %f\n", buffer, getLS370heaterpower(instrid, "still")
+	
+	// This is in getLS370controlmode(...)
+	string command, response
+	svar ls_label // Set when opening connection to lakeshore
+	sprintf command, "get-temperature-control-mode/%s", ls_label
+	response = sendLS370(instrID,command,"get", keys="data")
+	sprintf buffer, "%sControl mode is %s\n", buffer, response
+	///////////////////////////////////////////////
+		
+	if (full)
+		sprintf buffer, "%s\nHeater Control Parameters: \n %s \n", buffer, getLS370controlParameters(instrid)
+	
+		sprintf buffer, "%s\nHeater Controller Info: \n %s \n", buffer, getLS370controllerInfo(instrid, all=1)
+		
+		sprintf buffer, "%s\nLS370 Analog Parameters: \n %s \n", buffer, getLS370analogParameters(instrid, channel="still")
+	endif
+	
+	return buffer
+end
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////// TESTING MACRO //////////////////////////////////////////////

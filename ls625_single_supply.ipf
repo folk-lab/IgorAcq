@@ -203,13 +203,18 @@ function setLS625field(instrID,output) // Units: mT
 	endif
 end
 
-function setLS625fieldWait(instrID,output)
-	variable instrID, output
+function setLS625fieldWait(instrID,output, [short_wait])
+	// Set short_wait = 1 if you want the waiting to be a very tight loop (i.e. Useful if trying to ramp very short distances quickly)
+	variable instrID, output, short_wait
 
 	setLS625field(instrID,output)
 	variable start_time = stopmsTimer(-2)
 	do
-		asleep(0.05)// changed to 0s from 2.1S
+		if (short_wait)
+			asleep(0.01)
+		else
+			asleep(2.1) // Over 2s makes the waiting abortable
+		endif
 	while(getLS625rampStatus(instrID) && (stopmstimer(-2)-start_time) < 3600e6)  //Max wait for an hour
 end
 
@@ -217,7 +222,7 @@ function setLS625rate(instrID,output) // Units: mT/min
 	variable instrID, output
 	nvar maxrr = $("max_ramprate_"+ls625_lookupVarName(instrID))
 	nvar apt = $("amps_per_tesla_"+ls625_lookupVarName(instrID))
-	variable ramprate_amps
+	variable ramprate_amps, actual_ramprate_mTmin
 	string cmd
 	
 	// check for NAN and INF
@@ -230,8 +235,19 @@ function setLS625rate(instrID,output) // Units: mT/min
 		print "Max sweep rate is "+num2str(maxrr)+" mT/min"
 		return 0
 	else
-		ramprate_amps = roundNum(output*(apt/(1000*60)),5) // A/s
-		cmd = "RATE "+num2str(ramprate_amps)
+	 	// LS625 Specs from datasheet: Ramp rate	0.1 mA/s to 99.999 A/s
+	 	ramprate_amps = output*(apt/(1000*60))
+		ramprate_amps = roundNum(ramprate_amps, 4) // A/s  (4 d.p. is max precision)
+		if (ramprate_amps == 0)
+			printf "WARNING: Desired ramprate is too small, setting to minimum ramprate of 0.0001 A/s\n"
+			ramprate_amps = 0.0001
+		endif
+		actual_ramprate_mTmin = ramprate_amps/(apt/(1000*60))
+		if (abs(actual_ramprate_mTmin/output - 1) > 0.1)
+			printf "WARNING: Actual ramprate (%.5f mT/min) deviates by more than 10%% from desired ramprate (%.5f mT/min)\n" actual_ramprate_mTmin, output 
+		endif
+		
+		cmd = "RATE "+num2str(ramprate_amps, "%.4f")  // Ensure does not send e.g. "1e-4" instead of "0.0001"
 		writeInstr(instrID,cmd+"\r\n")
 		return 1
 	endif

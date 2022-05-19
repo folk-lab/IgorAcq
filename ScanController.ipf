@@ -1647,8 +1647,7 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 
 	nvar sc_save_time
 	if(save_experiment==1 & (datetime-sc_save_time)>180.0)
-		// save if sc_save_exp=1
-		// and if more than 3 minutes has elapsed since previous saveExp
+		// save if save_exp=1 and if more than 3 minutes has elapsed since previous saveExp
 		saveExp()
 		sc_save_time = datetime
 	endif
@@ -1788,7 +1787,7 @@ function InitScanController([configFile])
 
 	string /g sc_colormap = "VioletOrangeYellow"
 	string /g slack_url =  "https://hooks.slack.com/services/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" // url for slack alert
-//	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
+	variable /g sc_save_time = 0 // this will record the last time an experiment file was saved
 
 	string /g sc_hostname = getHostName() // get machine name
 
