@@ -943,30 +943,31 @@ function BDLoadFromHDF(datnum, [no_check])
 	variable datnum, no_check
 	variable response
 
-	bd_get_babydacs_from_hdf(datnum) // Creates/Overwrites load_dacvalstr
-
-	if (no_check == 0)  //Whether to show ask user dialog or not
-		response = bd_LoadAskUser()
-	else
-		response = -1
-	endif
-	if(response == 1)
-		// Do_nothing
-		print "Keep current BabyDAC state chosen, no changes made"
-	elseif(response == -1)
-		// Load from HDF
-		printf "Loading BabyDAC values and labels from dat%d\r", datnum
-		duplicate/o/t load_dacvalstr, dacvalstr //Overwrite dacvalstr with loaded values
-
-		// Ramp to new values
-		svar bd_controller_addr
-		openBabyDACconnection("bd_window_resource", bd_controller_addr, verbose=0)
-		nvar bd_window_resource, bd_ramprate
-		bd_UpdateMultipleBD(bd_window_resource, action="Ramp", ramprate=bd_ramprate, update=1)
-		viclose(bd_window_resource)
-
-	else
-		print "[WARNING] Bad user input -- BabyDAC will remain in current state"
+	if (bd_get_babydacs_from_hdf(datnum)) // Creates/Overwrites load_dacvalstr
+	
+		if (no_check == 0)  //Whether to show ask user dialog or not
+			response = bd_LoadAskUser()
+		else
+			response = -1
+		endif
+		if(response == 1)
+			// Do_nothing
+			print "Keep current BabyDAC state chosen, no changes made"
+		elseif(response == -1)
+			// Load from HDF
+			printf "Loading BabyDAC values and labels from dat%d\r", datnum
+			duplicate/o/t load_dacvalstr, dacvalstr //Overwrite dacvalstr with loaded values
+	
+			// Ramp to new values
+			svar bd_controller_addr
+			openBabyDACconnection("bd_window_resource", bd_controller_addr, verbose=0)
+			nvar bd_window_resource, bd_ramprate
+			bd_UpdateMultipleBD(bd_window_resource, action="Ramp", ramprate=bd_ramprate, update=1)
+			viclose(bd_window_resource)
+	
+		else
+			print "[WARNING] Bad user input -- BabyDAC will remain in current state"
+		endif
 	endif
 end
 
@@ -978,26 +979,32 @@ function bd_get_babydacs_from_hdf(datnum)
 	variable sl_id, bd_id  //JSON ids
 
 	sl_id = get_sweeplogs(datnum)  // Get Sweep_logs JSON
-	bd_id = getJSONXid(sl_id, "BabyDAC") // Get BabyDAC JSON from Sweeplogs
-
-	wave/t keys = JSON_getkeys(bd_id, "")
-	duplicate/o/t dacvalstr, load_dacvalstr
-
-	variable i
-	string key, label_name, str_ch
-	variable ch = 0
-	for (i=0; i<numpnts(keys); i++)  // These are in a random order. Keys must be stored as "DAC#{label}:output" in JSON
-		key = keys[i]
-		if (strsearch(key, "DAC", 0) != -1)  // Check it is actually a DAC key and not something like com_port
-			SplitString/E="DAC(\d*){" key, str_ch //Gets DAC# so that I store values in correct places
-			ch = str2num(str_ch)
-			load_dacvalstr[ch][1] = num2str(JSON_getvariable(bd_id, key))
-			SplitString/E="{(.*)}" key, label_name  //Looks for label inside {} part of e.g. BD{label}
-			label_name = replaceString("~1", label_name, "/")  // Somehow igor reads '/' as '~1' don't know why...
-			load_dacvalstr[ch][3] = label_name
-		endif
-	endfor
-	JSONXOP_release /A  //Clear all stored JSON strings
+	if (JSON_Exists(sl_id, "BabyDAC"))
+		bd_id = getJSONXid(sl_id, "BabyDAC") // Get BabyDAC JSON from Sweeplogs
+	
+		wave/t keys = JSON_getkeys(bd_id, "")
+		duplicate/o/t dacvalstr, load_dacvalstr
+	
+		variable i
+		string key, label_name, str_ch
+		variable ch = 0
+		for (i=0; i<numpnts(keys); i++)  // These are in a random order. Keys must be stored as "DAC#{label}:output" in JSON
+			key = keys[i]
+			if (strsearch(key, "DAC", 0) != -1)  // Check it is actually a DAC key and not something like com_port
+				SplitString/E="DAC(\d*){" key, str_ch //Gets DAC# so that I store values in correct places
+				ch = str2num(str_ch)
+				load_dacvalstr[ch][1] = num2str(JSON_getvariable(bd_id, key))
+				SplitString/E="{(.*)}" key, label_name  //Looks for label inside {} part of e.g. BD{label}
+				label_name = replaceString("~1", label_name, "/")  // Somehow igor reads '/' as '~1' don't know why...
+				load_dacvalstr[ch][3] = label_name
+			endif
+		endfor
+		JSONXOP_release /A  //Clear all stored JSON strings
+		return 1
+	else
+		JSONXOP_release /A  //Clear all stored JSON strings
+		return 0
+	endif
 end
 
 
