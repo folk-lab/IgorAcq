@@ -1640,7 +1640,7 @@ function /s prettyJSONfmt(jstr)
 	wave w_tokentype, w_tokensize, w_tokenparent
 	variable i=0, indent=1
 	
-	// Because JSONSimple is shit, it leaves a random number of empty cells at the end sometimes. So remove them
+	// Because JSONSimple is awful, it leaves a random number of empty cells at the end sometimes. So remove them
 	FindValue /TEXT="" t_tokentext
 	Redimension/N=(V_row) t_tokentext
 

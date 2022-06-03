@@ -2229,7 +2229,8 @@ function scw_saveConfig(configstr)
 	svar sc_current_config
 
 	string filename = "sc" + num2istr(scu_unixTime()) + ".json"
-	writetofile(prettyJSONfmt(configstr), filename, "config")
+//	writetofile(prettyJSONfmt(configstr), filename, "config")
+	writetofile(configstr, filename, "config")
 	sc_current_config = filename
 end
 
