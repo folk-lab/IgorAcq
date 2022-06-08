@@ -1681,7 +1681,7 @@ function SaveNamedWaves(wave_names, comments)
 
 	// Only init Save file after we know that the waves exist
 	variable hdfid
-	hdfid = initOpenSaveFiles(0) // Open HDF file (normal - non RAW)
+	hdfid = OpenHDFFile(0) // Open HDF file (normal - non RAW)
 
 	addMetaFiles(num2str(hdfid), logs_only=1, comments=comments)
 
@@ -1690,9 +1690,9 @@ function SaveNamedWaves(wave_names, comments)
 	// Now save each wave
 	for(ii=0;ii<itemsinlist(wave_names, ",");ii++)
 		wn = stringfromlist(ii, wave_names, ",")
-		initSaveSingleWave(wn, hdfid)
+		SaveSingleWaveToHDF(wn, hdfid)
 	endfor
-	initcloseSaveFiles(num2str(hdfid))
+	CloseHDFFile(num2str(hdfid))
 	
 	if(sc_checkBackup())  	// check if a path is defined to backup data
 		sc_copyNewFiles(current_filenum, save_experiment=0)		// copy data to server mount point (nvar filenum gets incremented after HDF is opened)
