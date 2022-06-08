@@ -140,7 +140,6 @@ function /s new_sc_createSweepLogs([S, comments])  // TODO: Rename
 	Struct ScanVars &S
     string comments
 	string jstr = ""
-	nvar filenum
 	svar sc_current_config
 
     if (!paramisDefault(S))
@@ -148,11 +147,15 @@ function /s new_sc_createSweepLogs([S, comments])  // TODO: Rename
     endif
 
 	jstr = addJSONkeyval(jstr, "comment", comments, addQuotes=1)
-	jstr = addJSONkeyval(jstr, "filenum", num2istr(filenum))
 	jstr = addJSONkeyval(jstr, "current_config", sc_current_config, addQuotes = 1)
 	jstr = addJSONkeyval(jstr, "time_completed", Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
-	
-    if (!paramisDefault(S))
+		
+    if (paramisDefault(S))
+    	nvar filenum
+   		jstr = addJSONkeyval(jstr, "filenum", num2istr(filenum))
+    else
+	    jstr = addJSONkeyval(jstr, "filenum", num2istr(S.filenum))
+
         string buffer = ""
         buffer = addJSONkeyval(buffer, "x", S.x_label, addQuotes=1)
         buffer = addJSONkeyval(buffer, "y", S.y_label, addQuotes=1)
@@ -324,6 +327,7 @@ function SaveToHDF(S, [additional_wavenames])
 		raw_hdf5_id = initOpenSaveFiles(1)
 		hdfids = addlistItem(num2str(raw_hdf5_id), hdfids, ";", INF)
 	endif
+	S.filenum = filenum
 	filenum += 1  // So next created file gets a new num (setting here so that when saving fails, it doesn't try to overwrite next save)
 	
 	// add Meta data to each file
