@@ -608,12 +608,12 @@ function SaveFromPXP([history, procedure])
 end
 
 
-function /S sc_copySingleFile(original_path, new_path, filename)
+function /S sc_copySingleFile(original_path, new_path, filename, [allow_overwrite])
 	// custom copy file function because the Igor version seems to lead to 
 	// weird corruption problems when copying from a local machine 
 	// to a mounted server drive
 	// this assumes that all the necessary paths already exist
-	
+	variable allow_overwrite
 	string original_path, new_path, filename
 	string op="", np=""
 	
@@ -631,7 +631,11 @@ function /S sc_copySingleFile(original_path, new_path, filename)
 		//   do not currently have one to test
 		op = getExpPath(original_path, full=3)
 		np = getExpPath(new_path, full=3)
-		CopyFile /Z=1 (op+filename) as (np+filename)
+		if (allow_overwrite)
+			CopyFile/O/Z=1 (op+filename) as (np+filename)
+		else
+			CopyFile/Z=1 (op+filename) as (np+filename)
+		endif
 	endif
 end
 
@@ -659,15 +663,15 @@ function sc_copyNewFiles(datnum, [save_experiment, verbose] )
 	
 		// add experiment file
 		tmpname = igorinfo(1)+".pxp"
-		sc_copySingleFile("data","backup_data",tmpname)
+		sc_copySingleFile("data","backup_data",tmpname, allow_overwrite=1)
 
 		// add history file
 		tmpname = igorinfo(1)+".history"
-		sc_copySingleFile("data","backup_data",tmpname)
+		sc_copySingleFile("data","backup_data",tmpname, allow_overwrite=1)
 
 		// add procedure file
 		tmpname = igorinfo(1)+".ipf"
-		sc_copySingleFile("data","backup_data",tmpname)
+		sc_copySingleFile("data","backup_data",tmpname, allow_overwrite=1)
 		
 	endif
 
