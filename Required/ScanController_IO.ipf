@@ -7,7 +7,7 @@ pragma rtGlobals=1		// Use modern global access method.
 /// SAVING EXPERIMENT DATA ///
 //////////////////////////////
 
-function initOpenSaveFiles(RawSave)	
+function OpenHDFFile(RawSave)	
 	//open a file and return its ID based on RawSave
 	// Rawsave = 0 to open normal hdf5
 	// Rawsave = 1 to open _RAW hdf5
@@ -34,7 +34,7 @@ function initOpenSaveFiles(RawSave)
 end
 
 
-function initcloseSaveFiles(hdf5_id_list)  // TODO: rename
+function CloseHDFFile(hdf5_id_list) 
 	// close any files that were created for this dataset
 	string hdf5_id_list	
 	
@@ -63,7 +63,7 @@ function saveWavesToHDF(wavesList, hdfID, [saveNames])
 	for (i=0; i<itemsInList(wavesList); i++)
 		wn = stringFromList(i, wavesList)
 		saveName = stringFromList(i, saveNames)
-		initSaveSingleWave(wn, hdfID, saveName=saveName)
+		SaveSingleWaveToHDF(wn, hdfID, saveName=saveName)
 	endfor
 end
 
@@ -78,10 +78,10 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 	cconfig = prettyJSONfmt(scw_createConfig())
 	
 	if (!logs_only)
-		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(new_sc_createSweepLogs(S=S))
+		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(sc_createSweepLogs(S=S))
 		make /FREE /T /N=1 scan_vars_json = sce_ScanVarsToJson(S, getrtstackinfo(3), save_to_file = 0)
 	else
-		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(new_sc_createSweepLogs(comments = comments))
+		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(sc_createSweepLogs(comments = comments))
 	endif
 	
 	// Check that prettyJSONfmt actually returned a valid JSON.
@@ -134,13 +134,12 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 end
 
 
-function /s new_sc_createSweepLogs([S, comments])  // TODO: Rename
+function /s sc_createSweepLogs([S, comments])  // TODO: Rename
 	// Creates a Json String which contains information about Scan
     // Note: Comments is ignored unless ScanVars are not provided
 	Struct ScanVars &S
     string comments
 	string jstr = ""
-	nvar filenum
 	svar sc_current_config
 
     if (!paramisDefault(S))
@@ -148,11 +147,15 @@ function /s new_sc_createSweepLogs([S, comments])  // TODO: Rename
     endif
 
 	jstr = addJSONkeyval(jstr, "comment", comments, addQuotes=1)
-	jstr = addJSONkeyval(jstr, "filenum", num2istr(filenum))
 	jstr = addJSONkeyval(jstr, "current_config", sc_current_config, addQuotes = 1)
 	jstr = addJSONkeyval(jstr, "time_completed", Secs2Date(DateTime, 1)+" "+Secs2Time(DateTime, 3), addQuotes = 1)
-	
-    if (!paramisDefault(S))
+		
+    if (paramisDefault(S))
+    	nvar filenum
+   		jstr = addJSONkeyval(jstr, "filenum", num2istr(filenum))
+    else
+	    jstr = addJSONkeyval(jstr, "filenum", num2istr(S.filenum))
+
         string buffer = ""
         buffer = addJSONkeyval(buffer, "x", S.x_label, addQuotes=1)
         buffer = addJSONkeyval(buffer, "y", S.y_label, addQuotes=1)
@@ -290,7 +293,7 @@ function saveScanWaves(hdfid, S, filtered)
 end
 
 
-function initSaveSingleWave(wn, hdf5_id, [saveName])  // TODO: Rename
+function SaveSingleWaveToHDF(wn, hdf5_id, [saveName])
 	// wave with name 'g1x' as dataset named 'g1x' in hdf5
 	string wn, saveName
 	variable hdf5_id
@@ -318,12 +321,13 @@ function SaveToHDF(S, [additional_wavenames])
 	
 	// Open up HDF5 files
 	variable raw_hdf5_id, calc_hdf5_id
-	calc_hdf5_id = initOpenSaveFiles(0)
+	calc_hdf5_id = OpenHDFFile(0)
 	string hdfids = num2str(calc_hdf5_id)
 	if (S.using_fastdac && sc_Saverawfadc == 1)
-		raw_hdf5_id = initOpenSaveFiles(1)
+		raw_hdf5_id = OpenHDFFile(1)
 		hdfids = addlistItem(num2str(raw_hdf5_id), hdfids, ";", INF)
 	endif
+	S.filenum = filenum
 	filenum += 1  // So next created file gets a new num (setting here so that when saving fails, it doesn't try to overwrite next save)
 	
 	// add Meta data to each file
@@ -380,7 +384,7 @@ function SaveToHDF(S, [additional_wavenames])
 	elseif(!S.using_fastdac)
 		saveWavesToHDF(RawWaves, calc_hdf5_id)	// Save all regular ScanController waves in the main hdf file (they are small anyway)
 	endif
-	initcloseSaveFiles(hdfids) // close all files
+	CloseHDFFile(hdfids) // close all files
 end
 
 
@@ -430,7 +434,7 @@ function saveFastdacInfoWaves(hdfids, S)
 			for(j=0;j<AWG.numWaves;j++)
 				// Get IGOR AW
 				wn = fd_getAWGwave(str2num(stringfromlist(j, AWG.AW_waves, ",")))
-				initsaveSingleWave(wn, hdfid)
+				SaveSingleWaveToHDF(wn, hdfid)
 			endfor
 		endif
 	endfor
@@ -449,7 +453,7 @@ function LogsOnlySave(hdfid, comments)
 	string jstr = ""
 //	jstr = prettyJSONfmt(new_sc_createSweepLogs(comments=comments))
 	addMetaFiles(num2str(hdfid), logs_only=1, comments=comments)
-	initcloseSaveFiles(num2str(hdfid))
+	CloseHDFFile(num2str(hdfid))
 end
 
 
@@ -608,12 +612,12 @@ function SaveFromPXP([history, procedure])
 end
 
 
-function /S sc_copySingleFile(original_path, new_path, filename)
+function /S sc_copySingleFile(original_path, new_path, filename, [allow_overwrite])
 	// custom copy file function because the Igor version seems to lead to 
 	// weird corruption problems when copying from a local machine 
 	// to a mounted server drive
 	// this assumes that all the necessary paths already exist
-	
+	variable allow_overwrite
 	string original_path, new_path, filename
 	string op="", np=""
 	
@@ -631,7 +635,11 @@ function /S sc_copySingleFile(original_path, new_path, filename)
 		//   do not currently have one to test
 		op = getExpPath(original_path, full=3)
 		np = getExpPath(new_path, full=3)
-		CopyFile /Z=1 (op+filename) as (np+filename)
+		if (allow_overwrite)
+			CopyFile/O/Z=1 (op+filename) as (np+filename)
+		else
+			CopyFile/Z=1 (op+filename) as (np+filename)
+		endif
 	endif
 end
 
@@ -659,15 +667,15 @@ function sc_copyNewFiles(datnum, [save_experiment, verbose] )
 	
 		// add experiment file
 		tmpname = igorinfo(1)+".pxp"
-		sc_copySingleFile("data","backup_data",tmpname)
+		sc_copySingleFile("data","backup_data",tmpname, allow_overwrite=1)
 
 		// add history file
 		tmpname = igorinfo(1)+".history"
-		sc_copySingleFile("data","backup_data",tmpname)
+		sc_copySingleFile("data","backup_data",tmpname, allow_overwrite=1)
 
 		// add procedure file
 		tmpname = igorinfo(1)+".ipf"
-		sc_copySingleFile("data","backup_data",tmpname)
+		sc_copySingleFile("data","backup_data",tmpname, allow_overwrite=1)
 		
 	endif
 
@@ -1640,7 +1648,7 @@ function /s prettyJSONfmt(jstr)
 	wave w_tokentype, w_tokensize, w_tokenparent
 	variable i=0, indent=1
 	
-	// Because JSONSimple is shit, it leaves a random number of empty cells at the end sometimes. So remove them
+	// Because JSONSimple is awful, it leaves a random number of empty cells at the end sometimes. So remove them
 	FindValue /TEXT="" t_tokentext
 	Redimension/N=(V_row) t_tokentext
 

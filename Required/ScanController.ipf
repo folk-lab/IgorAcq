@@ -1646,7 +1646,7 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	SaveToHDF(S_, additional_wavenames=additional_wavenames)
 
 	nvar sc_save_time
-	if(save_experiment==1 & (datetime-sc_save_time)>180.0)
+	if(save_experiment==1 && (datetime-sc_save_time)>180.0)
 		// save if save_exp=1 and if more than 3 minutes has elapsed since previous saveExp
 		saveExp()
 		sc_save_time = datetime
@@ -1681,24 +1681,23 @@ function SaveNamedWaves(wave_names, comments)
 
 	// Only init Save file after we know that the waves exist
 	variable hdfid
-	hdfid = initOpenSaveFiles(0) // Open HDF file (normal - non RAW)
-	filenum += 1  // So next created file gets a new num (setting here so that when saving fails, it doesn't try to overwrite next save)
-	
+	hdfid = OpenHDFFile(0) // Open HDF file (normal - non RAW)
+
 	addMetaFiles(num2str(hdfid), logs_only=1, comments=comments)
 
-	printf "Saving waves [%s] in dat%d.h5\r", wave_names, filenum-1
+	printf "Saving waves [%s] in dat%d.h5\r", wave_names, filenum
 
 	// Now save each wave
 	for(ii=0;ii<itemsinlist(wave_names, ",");ii++)
 		wn = stringfromlist(ii, wave_names, ",")
-		initSaveSingleWave(wn, hdfid)
+		SaveSingleWaveToHDF(wn, hdfid)
 	endfor
-	initcloseSaveFiles(num2str(hdfid))
+	CloseHDFFile(num2str(hdfid))
 	
 	if(sc_checkBackup())  	// check if a path is defined to backup data
 		sc_copyNewFiles(current_filenum, save_experiment=0)		// copy data to server mount point (nvar filenum gets incremented after HDF is opened)
 	endif	
-	
+	filenum += 1 
 end
 
 
@@ -2229,7 +2228,8 @@ function scw_saveConfig(configstr)
 	svar sc_current_config
 
 	string filename = "sc" + num2istr(scu_unixTime()) + ".json"
-	writetofile(prettyJSONfmt(configstr), filename, "config")
+//	writetofile(prettyJSONfmt(configstr), filename, "config")
+	writetofile(configstr, filename, "config")
 	sc_current_config = filename
 end
 
