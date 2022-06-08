@@ -1646,7 +1646,7 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	SaveToHDF(S_, additional_wavenames=additional_wavenames)
 
 	nvar sc_save_time
-	if(save_experiment==1 & (datetime-sc_save_time)>180.0)
+	if(save_experiment==1 && (datetime-sc_save_time)>180.0)
 		// save if save_exp=1 and if more than 3 minutes has elapsed since previous saveExp
 		saveExp()
 		sc_save_time = datetime
