@@ -3180,7 +3180,6 @@ end
 
 
 function/S scf_getChannelNumsOnFD(channels, device, [adc])
-	// Convert from absolute channel number to device channel number (i.e. DAC 9 is actually FastDAC2s 1 channel)
 	// Returns device number in device variable
 	// Note: Comma separated list
 	// Note: Must be channel NUMBERS
@@ -3651,7 +3650,7 @@ function scfd_updateWindow(S, numAdcs)
 	if (cmpstr(scf_getFDVisaAddress(device_num), getResourceAddress(S.instrIDx)) != 0)
 		print("ERROR[scfd_updateWindow]: channel device address doesn't match instrID address")
 	else
-		scfw_updateFdacValStr(str2num(channel), getFDACOutput(S.instrIDx, str2num(device_channel)), update_oldValStr=1)
+		scfw_updateFdacValStr(str2num(channel), getFDACOutput(S.instrIDx, str2num(device_channel)), update_oldValStr=1)  // + scf_getChannelStartNum( scf_getFDVisaAddress(device_num))
 	endif
   endfor
 
@@ -4054,7 +4053,7 @@ function scfw_update_all_fdac([option])
 						variable value
 						for(j=0;j<numDACCh;j+=1)
 							// getfdacOutput(tempname,j)
-							value = getfdacOutput(tempname,j) // j only because this is PER DEVICE
+							value = getfdacOutput(tempname,j+startCh)
 							scfw_updateFdacValStr(startCh+j, value, update_oldValStr=1)
 						endfor
 						break

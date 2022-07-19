@@ -13,3 +13,4 @@
 *examples/.ipynb_checkpoints/
 *.pyc
 *.egg-info
+*.autosave
