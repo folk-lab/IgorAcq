@@ -1634,22 +1634,7 @@ end
 ////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////// FastDAC Sweeps /////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
-function/s scu_getDeviceChannels(instrID, channels, [adc_flag])
-	// Convert from absolute channel number to device specific channel number (i.e. channel 8 is probably fd2's channel 0)
-	variable instrID, adc_flag  //adc_flag = 1 for ADC channels, = 0 for DAC channels
-	string channels
 
-	string new_channels = ""
-	string sep = selectString(adc_flag, ",", ";")
-	variable i
-	for (i = 0; i<itemsinlist(channels, sep); i++)
-		new_channels = addlistItem(num2str(str2num(stringfromList(i, channels, sep)) - scf_getChannelStartNum(instrID, adc=adc_flag)), new_channels, sep, INF)
-	endfor
-	if (strlen(new_channels) > 0 && cmpstr(channels[strlen(channels)-1], sep) != 0) // remove trailing ; or , if it WASN'T present initially
-		new_channels = new_channels[0,strlen(new_channels)-2] 
-	endif
-	return new_channels
-end
 
 
 function/s fd_start_sweep(S, [AWG_list])
