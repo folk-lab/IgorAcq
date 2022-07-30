@@ -1653,7 +1653,7 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	endif
 
 	if(sc_checkBackup())  	// check if a path is defined to backup data
-		sc_copyNewFiles(S_.filenum, save_experiment=save_experiment)		// copy data to server mount point (nvar filenum gets incremented after HDF is opened)
+		 sc_copyNewFiles(S_.filenum, save_experiment=save_experiment)		// copy data to server mount point (nvar filenum gets incremented after HDF is opened)
 	endif
 
 	// add info about scan to the scan history file in /config

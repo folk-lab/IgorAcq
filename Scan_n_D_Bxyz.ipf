@@ -2,57 +2,107 @@
 #pragma rtGlobals=3				// Use modern global access method and strict wave access
 #pragma DefaultTab={3,20,4}		// Set default tab width in Igor Pro 9 and later
 
+// 2D device scans 
+// Written by Zhenxiang Gao, Ray Su 
+// ruihengsu@gmail.com
+// Mr Ray: the idea is to first set the device parameters, namely the top and bottom gate dielectric thickness first 
+// using the function setDualGateDeviceParameters(top_thickness, bottom_thickness) 
+// this creates several global variables that is used in to compute the matrix elements to convert from VtVb to n,D 
+// running the setDualGateDeviceParameters function should reset global variables, thus modifying the matrix elements 
+
+function setDualGateDeviceParameters(top_thickness, bottom_thickness) 
+	// these are the estimated top and bottom gate dielectric thickness in nm
+	variable top_thickness, bottom_thickness
+	variable/G epsilon_hbn = 3.4
+	variable/G epsilon_0 = 8.8541878128e-12
+	variable/G electron_charge = 1.602176634e-19 
+	variable/G top_capacitance = epsilon_0*epsilon_hbn/(top_thickness*1e-9) // these are the capacitances per unit area 
+	variable/G bottom_capacitance = epsilon_0*epsilon_hbn/(bottom_thickness*1e-9)
+end
+
+// These are the matrix elements 
+function A_nt()
+	nvar top_capacitance
+	nvar electron_charge
+	return 1e-16*top_capacitance/electron_charge/1000
+end 
+
+function A_nb()
+	nvar electron_charge
+	nvar bottom_capacitance
+	return 1e-16*bottom_capacitance/electron_charge/1000
+end 
+
+function A_Dt()
+	nvar top_capacitance
+	nvar electron_charge
+	nvar epsilon_0
+	return -1e-9*top_capacitance/(2*epsilon_0)/1000
+end 
+
+function A_Db()
+	nvar electron_charge
+	nvar bottom_capacitance
+	nvar epsilon_0
+	return 1e-9*bottom_capacitance/(2*epsilon_0)/1000
+end 
+
+
+function B_tn()
+	nvar top_capacitance
+	nvar electron_charge
+	return 1000*1e16*electron_charge/(2*top_capacitance)
+end 
+
+function B_tD()
+	nvar top_capacitance
+	nvar epsilon_0
+	return 1000*-1e9*epsilon_0/(top_capacitance)
+end 
+
+function B_bn()
+	nvar bottom_capacitance
+	nvar electron_charge
+	return 1000*1e16*electron_charge/(2*bottom_capacitance)
+end 
+
+function B_bD()
+	nvar bottom_capacitance
+	nvar epsilon_0
+	return 1000*1e9*epsilon_0/(bottom_capacitance)
+end 
 
 //////////////////////////////////////////
-//Convertion b/w gate voltages and (n,D)//
+////Convert b/w gate voltages and (n,D)///
 //////////////////////////////////////////
-
 function ConvertVtVbTon(Vtop,Vbtm)  //Input Vtop and vbtm are in units of mV. e.g. '1000'->1V
-variable Vtop,Vbtm
-variable A_nt=0.7901785714285712
-variable A_nb=0.5267857142857142
-variable n=(A_nt*Vtop+A_nb*Vbtm)/1000
-return n
+	variable Vtop,Vbtm
+	return A_nt()*Vtop+A_nb()*Vbtm
 end
 
 function ConvertVtVbToD(Vtop,Vbtm)  //Input Vtop and vbtm are in units of mV. e.g. '1000'->1V
-variable Vtop,Vbtm
-variable A_Dt=-0.07142857142857142
-variable A_Db=0.04761904761904762
-variable D=(A_Dt*Vtop+A_Db*Vbtm)/1000
-return D
+	variable Vtop,Vbtm
+	return A_Dt()*Vtop+A_Db()*Vbtm
 end
 
-function ConvertnDToVt(n,D)
-variable n,D
-variable B_tn=0.6327683615819211
-variable B_tD=-7.000000000000001
-variable VTop=(B_tn*n+B_tD*D)*1000  //Returned Vtop is in unit of mV. e.g. '1000'->1V
-return VTop
+function ConvertnDToVt(n,D) // Input n and D in units of 10^12/cm^2 and V/nm 
+	variable n,D
+	return B_tn()*n+B_tD()*D  //Returned Vtop is in unit of mV. e.g. '1000'->1V
 end
 
 function ConvertnDToVb(n,D)
-variable n,D
-variable B_bn=0.9491525423728815
-variable B_bD=10.50000000000000
-variable VBtm=(B_bn*n+B_bD*D)*1000  //Returned Vbtm is in unit of mV. e.g. '1000'->1V
-return Vbtm
+	variable n,D
+	return B_bn()*n+B_bD()*D  //Returned Vbtm is in unit of mV. e.g. '1000'->1V
 end
 
 function ConvertVtDtoVb(Vtop,D)
-variable Vtop,D
-variable A_Dt=-0.07142857142857142/1000
-variable A_Db=0.04761904761904762/1000
-variable Vbtm=(D-A_Dt*Vtop)/A_Db
-return Vbtm
+	variable Vtop,D
+	return (D-A_Dt()*Vtop)/A_Db()
 end
 
 function ConvertVtntoVb(Vtop,n)
-variable Vtop,n
-variable A_nt=0.7901785714285712/1000
-variable A_nb=0.5267857142857142/1000
-variable Vbtm=(n-A_nt*Vtop)/A_nb
-return Vbtm
+	variable Vtop,n
+	return (n-A_nt()*Vtop)/A_nb()
 end
 
 ////////////////
@@ -74,11 +124,10 @@ function Scan_n(instrIDx,instrIDy,fixedD,startn,finn,numptsn,delayn,rampraten, [
 	//y_label = selectstring(paramisdefault(y_label), y_label, "R (Ω)")
 
 	//variable Vtgn,VtgD,Vbgn,VbgD //The matrix elements to  (n,D) into (V_top,V_bottom)
-		variable Vtgn=0.6327683615819211*1000
-		variable VtgD=-7.000000000000001*1000 //Do not forget the "-" here
-		variable Vbgn=0.9491525423728815*1000
-		variable VbgD=10.50000000000000*1000
-		
+	variable Vtgn=B_tn()
+	variable VtgD=B_tD() 
+	variable Vbgn=B_bn()
+	variable VbgD=B_bD()
 		
 		
 	// Initialize ScanVars
@@ -146,22 +195,19 @@ function Scan_D(instrIDx,instrIDy,fixedn,startD,finD,numptsD,delayD,ramprateD, [
 	variable instrIDx,instrIDy,fixedn,startD,finD,numptsD,delayD,ramprateD,nosave
 	//variable instrIDx, startx, finx, numpts, delay, rampratebothxy, instrIDy, starty, finy, nosave
 	string y_label, comments
-////	abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
-	
+
 	// Reconnect instruments
 	sc_openinstrconnections(0)
 	
 	// Set defaults
 	comments = selectstring(paramisdefault(comments), comments, "") 
-	//y_label = selectstring(paramisdefault(y_label), y_label, "R (Ω)")
+	y_label = selectstring(paramisdefault(y_label), y_label, "")
 
 	//variable Vtgn,VtgD,Vbgn,VbgD //The matrix elements to  (n,D) into (V_top,V_bottom)
-		variable Vtgn=0.6327683615819211*1000
-		variable VtgD=-7.000000000000001*1000 //Do not forget the "-" here
-		variable Vbgn=0.9491525423728815*1000
-		variable VbgD=10.50000000000000*1000
-		
-		
+	variable Vtgn=B_tn()
+	variable VtgD=B_tD() 
+	variable Vbgn=B_bn()
+	variable VbgD=B_bD()
 		
 	// Initialize ScanVars
 	struct ScanVars S
@@ -233,20 +279,17 @@ function Scan2K2400nANDd2D(keithleyIDtop,keithleyIDbtm,startn, finn, numptsn, de
 	//Two column vectors, Transpose(n,D) and Transpose(V_top,V_btm) can be converted to each other by a matrix A and its inverse B
 	//Specifically, n=A_nt*V_top+A_nb*V_btm and D=A_Dt*V_top+A_Db*V_btm. V_top=B_tn*n+B_tD*D and V_btm=B_bn*n+B_bD*D
 	//For our current device, the values of these convertion matrix elements are as below:
-	variable A_nt=0.7901785714285712/1000
-	variable A_nb=0.5267857142857142/1000
-	variable A_Dt=-0.07142857142857142/1000
-	variable A_Db=0.04761904761904762/1000
-	variable B_tn=0.6327683615819211*1000
-	variable B_tD=-7.000000000000001*1000
-	variable B_bn=0.9491525423728815*1000
-	variable B_bD=10.50000000000000*1000
+	
+	variable Vtgn=B_tn()
+	variable VtgD=B_tD() 
+	variable Vbgn=B_bn()
+	variable VbgD=B_bD()
 	//Convert the input-from-keyboard start/finish carrier density n and fixed D to start/finish V_top/V_btm 
 	//variable startTop,startBtm,FinTop,FinBtm
-	variable startTop=B_tn*startn+B_tD*startD
-	variable startBtm=B_bn*startn+B_bD*startD
-	variable finTop=B_tn*finn+B_tD*finD
-	variable finBtm=B_bn*finn+B_bD*finD
+	variable startTop=Vtgn*startn+VtgD*startD
+	variable startBtm=Vbgn*startn+VbgD*startD
+	variable finTop=Vtgn*finn+VtgD*finD
+	variable finBtm=Vbgn*finn+VbgD*finD
 	// Reconnect instruments
 	sc_openinstrconnections(0)
 	
@@ -267,8 +310,8 @@ function Scan2K2400nANDd2D(keithleyIDtop,keithleyIDbtm,startn, finn, numptsn, de
 	 						
 	//Security Check of using 'setK2400Voltage' instead of 'ramp'
 	variable KeithleyStepThreshold=40   //Never use 'setK2400Voltage' to make a gate voltage change bigger than this!!!
-	variable absDeltaVtop=abs(B_tn*(S.finx-S.startx)/(S.numptsx-1))
-	variable absDeltaVbtm=abs(B_bn*(S.finx-S.startx)/(S.numptsx-1))
+	variable absDeltaVtop=abs(Vtgn*(S.finx-S.startx)/(S.numptsx-1))
+	variable absDeltaVbtm=abs(Vbgn*(S.finx-S.startx)/(S.numptsx-1))
 	if(absDeltaVtop>KeithleyStepThreshold||absDeltaVbtm>KeithleyStepThreshold)
 		print "You will kill the device!!!"
 		return -1
@@ -294,16 +337,16 @@ function Scan2K2400nANDd2D(keithleyIDtop,keithleyIDbtm,startn, finn, numptsn, de
 	do
 		setpointn = S.startx
 		setpointD = S.starty + (i*(S.finy-S.starty)/(S.numptsy-1))
-		setpointTop=B_tn*setpointn+B_tD*setpointD
-		setpointBtm=B_bn*setpointn+B_bD*setpointD
+		setpointTop=Vtgn*setpointn+VtgD*setpointD
+		setpointBtm=Vbgn*setpointn+VbgD*setpointD
 		rampK2400Voltage(keithleyIDtop, setpointTop, ramprate=rampraten)
 		rampK2400Voltage(keithleyIDbtm, setpointBtm, ramprate=ramprateD)
 		sc_sleep(S.delayy)
 		j=0
 		do
 			setpointn = S.startx + (j*(S.finx-S.startx)/(S.numptsx-1))
-			setpointTop=B_tn*setpointn+B_tD*setpointD
-			setpointBtm=B_bn*setpointn+B_bD*setpointD
+			setpointTop=Vtgn*setpointn+VtgD*setpointD
+			setpointBtm=Vbgn*setpointn+VbgD*setpointD
 			setK2400Voltage(keithleyIDtop, setpointTop)
 			setK2400Voltage(keithleyIDbtm, setpointBtm)
 			sc_sleep(S.delayx)
@@ -322,8 +365,6 @@ function Scan2K2400nANDd2D(keithleyIDtop,keithleyIDbtm,startn, finn, numptsn, de
 end
 
 
-
-
 //'Set' n at n_0, n_1, n_2,..., and do a D scan at each n value 
 function Scan2K2400dANDn2D(keithleyIDtop,keithleyIDbtm,startn, finn, numptsn, delayn, rampraten, startD,finD,numptsD,delayD,ramprateD,[ y_label, comments, nosave]) //Units: mV
 	variable keithleyIDtop,keithleyIDbtm,startn, finn, numptsn, delayn, rampraten, startD,finD,numptsD,delayD,ramprateD,nosave
@@ -331,20 +372,16 @@ function Scan2K2400dANDn2D(keithleyIDtop,keithleyIDbtm,startn, finn, numptsn, de
 	//Two column vectors, Transpose(n,D) and Transpose(V_top,V_btm) can be converted to each other by a matrix A and its inverse B
 	//Specifically, n=A_nt*V_top+A_nb*V_btm and D=A_Dt*V_top+A_Db*V_btm. V_top=B_tn*n+B_tD*D and V_btm=B_bn*n+B_bD*D
 	//For our current device, the values of these convertion matrix elements are as below:
-	variable A_nt=0.7901785714285712/1000
-	variable A_nb=0.5267857142857142/1000
-	variable A_Dt=-0.07142857142857142/1000
-	variable A_Db=0.04761904761904762/1000
-	variable B_tn=0.6327683615819211*1000
-	variable B_tD=-7.000000000000001*1000
-	variable B_bn=0.9491525423728815*1000
-	variable B_bD=10.50000000000000*1000
+	variable Vtgn=B_tn()
+	variable VtgD=B_tD() 
+	variable Vbgn=B_bn()
+	variable VbgD=B_bD()
 	//Convert the input-from-keyboard start/finish carrier density n and fixed D to start/finish V_top/V_btm 
 	//variable startTop,startBtm,FinTop,FinBtm
-	variable startTop=B_tn*startn+B_tD*startD
-	variable startBtm=B_bn*startn+B_bD*startD
-	variable finTop=B_tn*finn+B_tD*finD
-	variable finBtm=B_bn*finn+B_bD*finD
+	variable startTop=Vtgn*startn+VtgD*startD
+	variable startBtm=Vbgn*startn+VbgD*startD
+	variable finTop=Vtgn*finn+VtgD*finD
+	variable finBtm=Vbgn*finn+VbgD*finD
 	// Reconnect instruments
 	sc_openinstrconnections(0)
 	
@@ -365,8 +402,8 @@ function Scan2K2400dANDn2D(keithleyIDtop,keithleyIDbtm,startn, finn, numptsn, de
 	 						
 	//Security Check of using 'setK2400Voltage' instead of 'ramp'
 	variable KeithleyStepThreshold=40   //Never use 'setK2400Voltage' to make a gate voltage change bigger than this!!!
-	variable absDeltaVtop=abs(B_tn*(S.finx-S.startx)/(S.numptsx-1))
-	variable absDeltaVbtm=abs(B_bn*(S.finx-S.startx)/(S.numptsx-1))
+	variable absDeltaVtop=abs(Vtgn*(S.finx-S.startx)/(S.numptsx-1))
+	variable absDeltaVbtm=abs(Vbgn*(S.finx-S.startx)/(S.numptsx-1))
 	if(absDeltaVtop>KeithleyStepThreshold||absDeltaVbtm>KeithleyStepThreshold)
 		print "You will kill the device!!!"
 		return -1
@@ -392,16 +429,16 @@ function Scan2K2400dANDn2D(keithleyIDtop,keithleyIDbtm,startn, finn, numptsn, de
 	do
 		setpointD = S.starty
 		setpointn = S.startx + (j*(S.finx-S.startx)/(S.numptsx-1))
-		setpointTop=B_tn*setpointn+B_tD*setpointD
-		setpointBtm=B_bn*setpointn+B_bD*setpointD
+		setpointTop=Vtgn*setpointn+VtgD*setpointD
+		setpointBtm=Vbgn*setpointn+VbgD*setpointD
 		rampK2400Voltage(keithleyIDtop, setpointTop, ramprate=rampraten)
 		rampK2400Voltage(keithleyIDbtm, setpointBtm, ramprate=ramprateD)
 		sc_sleep(S.delayy)
 		i=0
 		do
 			setpointD = S.starty + (i*(S.finy-S.starty)/(S.numptsy-1))
-			setpointTop=B_tn*setpointn+B_tD*setpointD
-			setpointBtm=B_bn*setpointn+B_bD*setpointD
+			setpointTop=Vtgn*setpointn+VtgD*setpointD
+			setpointBtm=Vbgn*setpointn+VbgD*setpointD
 			setK2400Voltage(keithleyIDtop, setpointTop)
 			setK2400Voltage(keithleyIDbtm, setpointBtm)
 			sc_sleep(S.delayx)
@@ -438,21 +475,20 @@ function Scan_field_n_2D(keithleyIDtop,keithleyIDbtm,fixedD,startn, finn, numpts
 
 	//Two column vectors, Transpose(n,D) and Transpose(V_top,V_btm) can be converted to each other by a matrix A and its inverse B
 	//Specifically, n=A_nt*V_top+A_nb*V_btm and D=A_Dt*V_top+A_Db*V_btm. V_top=B_tn*n+B_tD*D and V_btm=B_bn*n+B_bD*D
-	//For our current device, the values of these convertion matrix elements are as below:
-	variable A_nt=0.7901785714285712/1000
-	variable A_nb=0.5267857142857142/1000
-	variable A_Dt=-0.07142857142857142/1000
-	variable A_Db=0.04761904761904762/1000
-	variable B_tn=0.6327683615819211*1000
-	variable B_tD=-7.000000000000001*1000
-	variable B_bn=0.9491525423728815*1000
-	variable B_bD=10.50000000000000*1000
+	//For our current device, the values of these convertion matrix elements are as below:	
+	variable Vtgn=B_tn()
+	variable VtgD=B_tD() 
+	variable Vbgn=B_bn()
+	variable VbgD=B_bD()
+	
+	
 	//Convert the input-from-keyboard start/finish carrier density n and fixed D to start/finish V_top/V_btm 
 	//variable startTop,startBtm,FinTop,FinBtm
-	variable startTop=B_tn*startn+B_tD*fixedD
-	variable startBtm=B_bn*startn+B_bD*fixedD
-	variable finTop=B_tn*finn+B_tD*fixedD
-	variable finBtm=B_bn*finn+B_bD*fixedD
+	variable startTop=Vtgn*startn+VtgD*fixedD
+	variable startBtm=Vbgn*startn+VbgD*fixedD
+	variable finTop=Vtgn*finn+VtgD*fixedD
+	variable finBtm=Vbgn*finn+VbgD*fixedD
+	
 	// Initialize ScanVars
 	struct ScanVars S
 	initScanVars(S, instrIDx=keithleyIDtop, startx=startn, finx=finn, numptsx=numptsn, delayx=delayn, rampratex=rampraten, \
@@ -465,8 +501,8 @@ function Scan_field_n_2D(keithleyIDtop,keithleyIDbtm,fixedD,startn, finn, numpts
 	
 	//Security Check of using 'setK2400Voltage' instead of 'ramp'
 	variable KeithleyStepThreshold=40   //Never use 'setK2400Voltage' to make a gate voltage change bigger than this!!!
-	variable absDeltaVtop=abs(B_tn*(S.finx-S.startx)/(S.numptsx-1))
-	variable absDeltaVbtm=abs(B_bn*(S.finx-S.startx)/(S.numptsx-1))
+	variable absDeltaVtop=abs(Vtgn*(S.finx-S.startx)/(S.numptsx-1))
+	variable absDeltaVbtm=abs(Vbgn*(S.finx-S.startx)/(S.numptsx-1))
 	if(absDeltaVtop>KeithleyStepThreshold||absDeltaVbtm>KeithleyStepThreshold)
 		print "You will kill the device!!!"
 		return -1
@@ -494,8 +530,8 @@ function Scan_field_n_2D(keithleyIDtop,keithleyIDbtm,fixedD,startn, finn, numpts
 	variable i=0, j=0, setpointx, setpointy,setpointTop,setpointBtm
 	do
 		setpointx = S.startx
-		setpointTop=B_tn*setpointx+B_tD*fixedD
-		setpointBtm=B_bn*setpointx+B_bD*fixedD
+		setpointTop=Vtgn*setpointx+VtgD*fixedD
+		setpointBtm=Vbgn*setpointx+VbgD*fixedD
 		setpointy = S.starty + (i*(S.finy-S.starty)/(S.numptsy-1))
 		setlS625fieldWait(S.instrIDy, setpointy)
 		rampK2400Voltage(keithleyIDtop, setpointTop, ramprate=S.rampratex)
@@ -504,8 +540,8 @@ function Scan_field_n_2D(keithleyIDtop,keithleyIDbtm,fixedD,startn, finn, numpts
 		j=0
 		do
 			setpointx = S.startx + (j*(S.finx-S.startx)/(S.numptsx-1))
-			setpointTop=B_tn*setpointx+B_tD*fixedD
-			setpointBtm=B_bn*setpointx+B_bD*fixedD
+			setpointTop=Vtgn*setpointx+VtgD*fixedD
+			setpointBtm=Vbgn*setpointx+VbgD*fixedD
 			setK2400Voltage(keithleyIDtop, setpointTop)
 			setK2400Voltage(keithleyIDbtm, setpointBtm)
 			sc_sleep(S.delayx)
@@ -523,9 +559,6 @@ function Scan_field_n_2D(keithleyIDtop,keithleyIDbtm,fixedD,startn, finn, numpts
 	endif
 end
 
-
-
-
 function Scan_VECfield_n_2D(keithleyIDtop,keithleyIDbtm,fixedD,startn, finn, numptsn, delayn, rampraten, magnetIDX,magnetIDY,magnetIDZ, BTranslateX, BTranslateY, BTranslateZ, thetafromY, alphafromX, startB, finB, numptsB, delayB, [ramprateB, y_label, comments, nosave]) //Units: mV
 	//‘thetafromY' is the polar angle deviated from y-direction. Perpendicular: thetafromY=0deg In-Plane: thetafromY=90deg
 	//'alphafromX' is the azimuth angle deviated from x-direction. When thetafromY=90deg, B_x: alphafromX=0 B_z:alphafromX=90deg
@@ -534,21 +567,18 @@ function Scan_VECfield_n_2D(keithleyIDtop,keithleyIDbtm,fixedD,startn, finn, num
 	string y_label, comments
 	//Two column vectors, Transpose(n,D) and Transpose(V_top,V_btm) can be converted to each other by a matrix A and its inverse B
 	//Specifically, n=A_nt*V_top+A_nb*V_btm and D=A_Dt*V_top+A_Db*V_btm. V_top=B_tn*n+B_tD*D and V_btm=B_bn*n+B_bD*D
-	//For our current device, the values of these convertion matrix elements are as below:
-	variable A_nt=0.7901785714285712/1000
-	variable A_nb=0.5267857142857142/1000
-	variable A_Dt=-0.07142857142857142/1000
-	variable A_Db=0.04761904761904762/1000
-	variable B_tn=0.6327683615819211*1000
-	variable B_tD=-7.000000000000001*1000
-	variable B_bn=0.9491525423728815*1000
-	variable B_bD=10.50000000000000*1000
+	//For our current device, the values of these convertion matrix elements are as below:	
+	variable Vtgn=B_tn()
+	variable VtgD=B_tD() 
+	variable Vbgn=B_bn()
+	variable VbgD=B_bD()
+
 	//Convert the input-from-keyboard start/finish carrier density n and fixed D to start/finish V_top/V_btm 
 	//variable startTop,startBtm,FinTop,FinBtm
-	variable startTop=B_tn*startn+B_tD*fixedD
-	variable startBtm=B_bn*startn+B_bD*fixedD
-	variable finTop=B_tn*finn+B_tD*fixedD
-	variable finBtm=B_bn*finn+B_bD*fixedD
+	variable startTop=Vtgn*startn+VtgD*fixedD
+	variable startBtm=Vbgn*startn+VbgD*fixedD
+	variable finTop=Vtgn*finn+VtgD*fixedD
+	variable finBtm=Vbgn*finn+VbgD*fixedD
 	// Reconnect instruments
 	sc_openinstrconnections(0)
 	
@@ -569,8 +599,8 @@ function Scan_VECfield_n_2D(keithleyIDtop,keithleyIDbtm,fixedD,startn, finn, num
 	
 	//Security Check of using 'setK2400Voltage' instead of 'ramp'
 	variable KeithleyStepThreshold=40   //Never use 'setK2400Voltage' to make a gate voltage change bigger than this!!!
-	variable absDeltaVtop=abs(B_tn*(S.finx-S.startx)/(S.numptsx-1))
-	variable absDeltaVbtm=abs(B_bn*(S.finx-S.startx)/(S.numptsx-1))
+	variable absDeltaVtop=abs(Vtgn*(S.finx-S.startx)/(S.numptsx-1))
+	variable absDeltaVbtm=abs(Vbgn*(S.finx-S.startx)/(S.numptsx-1))
 	if(absDeltaVtop>KeithleyStepThreshold||absDeltaVbtm>KeithleyStepThreshold)
 		print "You will kill the device!!!"
 		return -1
@@ -602,8 +632,8 @@ function Scan_VECfield_n_2D(keithleyIDtop,keithleyIDbtm,fixedD,startn, finn, num
 	variable i=0, j=0, setpointx, setpointB,setpointTop,setpointBtm
 	do
 		setpointx = S.startx
-		setpointTop=B_tn*setpointx+B_tD*fixedD
-		setpointBtm=B_bn*setpointx+B_bD*fixedD
+		setpointTop=Vtgn*setpointx+VtgD*fixedD
+		setpointBtm=Vbgn*setpointx+VbgD*fixedD
 		setpointB = S.starty + (i*(S.finy-S.starty)/(S.numptsy-1))
 		setlS625fieldWait(magnetIDX, BTranslateX+setpointB*sin(thetafromY*pi/180)*cos(alphafromX*pi/180))
 		setlS625fieldWait(magnetIDY, BTranslateY+setpointB*cos(thetafromY*pi/180))
@@ -614,8 +644,8 @@ function Scan_VECfield_n_2D(keithleyIDtop,keithleyIDbtm,fixedD,startn, finn, num
 		j=0
 		do
 			setpointx = S.startx + (j*(S.finx-S.startx)/(S.numptsx-1))
-			setpointTop=B_tn*setpointx+B_tD*fixedD
-			setpointBtm=B_bn*setpointx+B_bD*fixedD
+			setpointTop=Vtgn*setpointx+VtgD*fixedD
+			setpointBtm=Vbgn*setpointx+VbgD*fixedD
 			setK2400Voltage(keithleyIDtop, setpointTop)
 			setK2400Voltage(keithleyIDbtm, setpointBtm)
 			sc_sleep(S.delayx)
