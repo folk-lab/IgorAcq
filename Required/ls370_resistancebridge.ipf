@@ -972,15 +972,17 @@ function/s getLS370Status(instrID)
 	string searchStr="", statement="", timestamp="", temp="", tempBuffer="", channel_label
 	variable i=0
 	for(i=0;i<itemsinlist(channelLabel,",");i+=1)
-		sprintf searchStr, "default:channels:%s:max", stringfromlist(i,channelLabel,",")
-		
+		// Use the "default" schedules "max" allowed times to decide what is the oldest allowed recorded temperature
+		sprintf searchStr, "default:channels:%s:max", stringfromlist(i,channelLabel,",") 
 		timestamp = sc_SQLtimestamp(str2num(getJSONvalue(jstr,searchStr)))		
 //		timestamp = sc_SQLtimestamp(3600) // Temporarily allow any old measurement of temp
 //		timestamp = sc_SQLtimestamp(1) // Temporarily always request new
-		
+
+		// Ask the database if it has a recent enough temperature		
 		sprintf statement, "SELECT temperature_k FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, temp_schema, stringfromlist(i,channelLabel,","), timestamp
 		temp = requestSQLValue(statement)
 
+		// If the database did not have a recent enough temperature, ask for a new one from the lakeshore (this takes 10 - 20s per channel)
 		if(cmpstr(temp,"") == 0)
 			temp = num2str(getLS370temp(instrID,stringfromlist(i,LSkeys,",")))
 		endif

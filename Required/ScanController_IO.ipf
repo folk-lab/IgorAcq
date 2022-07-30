@@ -1558,6 +1558,7 @@ function/s textWave2StrArray(w)
 	for (ii=0; ii<m; ii+=1)
 		list += "["
 		for(jj=0; jj<n; jj+=1)
+//   		list+="\""+removeWhiteSpace(escapeQuotes(w[jj][ii]))+"\","
    		list+="\""+escapeQuotes(w[jj][ii])+"\","
 		endfor
 		list = list[0,strlen(list)-2] // remove comma
@@ -1571,6 +1572,7 @@ function/s textWave2StrArray(w)
 
 	return list
 end
+
 
 function/s addJSONkeyval(JSONstr,key,value,[addquotes])
 	// returns a valid JSON string with a new key,value pair added.
@@ -1721,6 +1723,14 @@ function/S removeTrailingWhitespace(str)
     return str
 End
 
+function/s removeWhiteSpace(str)
+	// Remove leading or trailing whitespace
+	string str
+	str = removeLeadingWhitespace(str)
+	str = removeTrailingWhitespace(str)
+	return str
+end
+
 function countQuotes(str)
 	// count how many quotes are in the string
 	// +1 for "
@@ -1771,7 +1781,6 @@ function /S escapeQuotes(str)
 		if( CmpStr(str[i], "\"" ) == 0 && escaped == 0)
 			// this is an unescaped quote
 			str = str[0,i-1] + "\\" + str[i,inf]
-//			str = str[0,i-1] + "\\" + str[i,inf]
 		endif
 		i+=1
 
