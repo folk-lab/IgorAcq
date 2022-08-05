@@ -663,12 +663,19 @@ function sc_copyNewFiles(datnum, [save_experiment, verbose] )
 	
 	// add experiment/history/procedure files
 	// only if I saved the experiment this run
-	if(!paramisdefault(save_experiment) && save_experiment == 1)
-	
-		// add experiment file
-		tmpname = igorinfo(1)+".pxp"
-		sc_copySingleFile("data","backup_data",tmpname, allow_overwrite=1)
 
+	nvar/z sc_experiment_save_time
+	if (!nvar_Exists(sc_experiment_save_time))
+		variable/g sc_experiment_save_time = 0	
+	endif
+	if(!paramisdefault(save_experiment) && save_experiment == 1)
+		// add experiment file
+		if (datetime - sc_experiment_save_time > 60*60*24)  // Only copy the experiment to server once a day at most
+		   tmpname = igorinfo(1)+".pxp"
+			sc_copySingleFile("data","backup_data",tmpname, allow_overwrite=1)		
+			sc_experiment_save_time = datetime
+		endif		
+		
 		// add history file
 		tmpname = igorinfo(1)+".history"
 		sc_copySingleFile("data","backup_data",tmpname, allow_overwrite=1)

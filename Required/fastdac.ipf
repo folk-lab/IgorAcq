@@ -187,12 +187,15 @@ function getFADCChannelSingle(instrID,channel) // Units: mV
 end
 
 function getFDACOutput(instrID,channel) // Units: mV
-	// NOTE: Channel is PER INSTRUMENT
+	// NOTE: Channel is the same as in FasDAC window 
 	variable instrID, channel
+	
+	
+	variable CHstart = scf_getChannelStartNum(instrID, adc=0)
 	
 	wave/t old_fdacvalstr, fdacvalstr
 	string cmd="", response="",warn=""
-	sprintf cmd, "GET_DAC,%d", channel
+	sprintf cmd, "GET_DAC,%d", channel - CHstart
 	response = queryInstr(instrID, cmd+"\r", read_term="\n")
 	response = sc_stripTermination(response,"\r\n")
 	
@@ -223,7 +226,7 @@ function/s getFDstatus(instrID)
 	CHstart = scf_getChannelStartNum(instrID, adc=0)
 	for(i=0;i<scf_getFDInfoFromID(instrID, "numDAC");i+=1)
 		sprintf key, "DAC%d{%s}", CHstart+i, fdacvalstr[CHstart+i][3]
-		buffer = addJSONkeyval(buffer, key, num2numstr(getfdacOutput(instrID,i))) // getfdacOutput is PER instrument
+		buffer = addJSONkeyval(buffer, key, num2numstr(getfdacOutput(instrID,CHstart+i))) // getfdacOutput is PER instrument
 	endfor
 
 	// ADC values
@@ -433,7 +436,7 @@ function fd_rampOutputFDAC(instrID,channel,output, ramprate, [ignore_lims]) // U
 	endif 
 		
 	// read current dac output and compare to window
-	variable currentoutput = getfdacOutput(instrID,devchannel)
+	variable currentoutput = getfdacOutput(instrID,channel)
 	
 	// ramp channel to output
 	variable delay = abs(output-currentOutput)/ramprate
@@ -450,7 +453,7 @@ function fd_rampOutputFDAC(instrID,channel,output, ramprate, [ignore_lims]) // U
 	
 	// check respose
 	if(scf_checkFDResponse(response,cmd,isString=1,expectedResponse="RAMP_FINISHED"))
-		output = getfdacOutput(instrID, devchannel)
+		output = getfdacOutput(instrID, channel)
 		scfw_updateFdacValStr(channel, output, update_oldValStr=1)
 	else
 		scfw_resetfdacwindow(channel)
@@ -1632,6 +1635,8 @@ end
 /////////////////////////////////// FastDAC Sweeps /////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 
+
+
 function/s fd_start_sweep(S, [AWG_list])
 	// Starts one of:
 	// regular sweep (INT_RAMP in arduino) 
@@ -1641,7 +1646,8 @@ function/s fd_start_sweep(S, [AWG_list])
 	Struct AWGVars &AWG_List
 
 	scu_assertSeparatorType(S.ADCList, ";")	
-	string adcs = replacestring(";",S.adclist,"")
+	string adcs = scu_getDeviceChannels(s.instrIDx, S.adclist, adc_flag=1)
+	adcs = replacestring(";",adcs,"")
 
 	if (!S.readVsTime)
 		scu_assertSeparatorType(S.channelsx, ",")
@@ -1656,7 +1662,8 @@ function/s fd_start_sweep(S, [AWG_list])
 			abort "ERROR[fd_start_sweep]: S.direction must be 1 or -1, not " + num2str(S.direction)
 		endif
 
-	   string dacs = replacestring(",",S.channelsx,"")
+		string dacs = scu_getDeviceChannels(s.instrIDx, S.channelsx)
+	   dacs = replacestring(",",dacs,"")
 	endif
 
 	string cmd = ""

@@ -217,6 +217,22 @@ function/s scu_getChannelNumbers(channels, [fastdac])
 end
 
 
+function/s scu_getDeviceChannels(instrID, channels, [adc_flag])
+	// Convert from absolute channel number to device specific channel number (i.e. channel 8 is probably fd2's channel 0)
+	variable instrID, adc_flag  //adc_flag = 1 for ADC channels, = 0 for DAC channels
+	string channels
+
+	string new_channels = ""
+	string sep = selectString(adc_flag, ",", ";")
+	variable i
+	for (i = 0; i<itemsinlist(channels, sep); i++)
+		new_channels = addlistItem(num2str(str2num(stringfromList(i, channels, sep)) - scf_getChannelStartNum(instrID, adc=adc_flag)), new_channels, sep, INF)
+	endfor
+	if (strlen(new_channels) > 0 && cmpstr(channels[strlen(channels)-1], sep) != 0) // remove trailing ; or , if it WASN'T present initially
+		new_channels = new_channels[0,strlen(new_channels)-2] 
+	endif
+	return new_channels
+end
 ///////////////////////////////////////////////////////////////
 ///////////////// Sleeps/Delays ///////////////////////////////
 ///////////////////////////////////////////////////////////////
@@ -3180,7 +3196,6 @@ end
 
 
 function/S scf_getChannelNumsOnFD(channels, device, [adc])
-	// Convert from absolute channel number to device channel number (i.e. DAC 9 is actually FastDAC2s 1 channel)
 	// Returns device number in device variable
 	// Note: Comma separated list
 	// Note: Must be channel NUMBERS
@@ -3651,7 +3666,7 @@ function scfd_updateWindow(S, numAdcs)
 	if (cmpstr(scf_getFDVisaAddress(device_num), getResourceAddress(S.instrIDx)) != 0)
 		print("ERROR[scfd_updateWindow]: channel device address doesn't match instrID address")
 	else
-		scfw_updateFdacValStr(str2num(channel), getFDACOutput(S.instrIDx, str2num(device_channel)), update_oldValStr=1)
+		scfw_updateFdacValStr(str2num(channel), getFDACOutput(S.instrIDx, str2num(device_channel)), update_oldValStr=1)  // + scf_getChannelStartNum( scf_getFDVisaAddress(device_num))
 	endif
   endfor
 
@@ -4054,7 +4069,7 @@ function scfw_update_all_fdac([option])
 						variable value
 						for(j=0;j<numDACCh;j+=1)
 							// getfdacOutput(tempname,j)
-							value = getfdacOutput(tempname,j) // j only because this is PER DEVICE
+							value = getfdacOutput(tempname,j+startCh)
 							scfw_updateFdacValStr(startCh+j, value, update_oldValStr=1)
 						endfor
 						break

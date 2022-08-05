@@ -401,11 +401,11 @@ function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, 
 end
 
 
-function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate, [starts, fins, y_label, comments, nosave]) //Units: mV
+function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate, [starts, fins, y_label, until_checkwave, until_stop_val, until_operator, comments, nosave]) //Units: mV
 	// sweep one or more FastDAC channels but in the ScanController way (not ScanControllerFastdac). I.e. ramp, measure, ramp, measure...
 	// channels should be a comma-separated string ex: "0, 4, 5"
-	variable instrID, start, fin, numpts, delay, ramprate, nosave
-	string channels, y_label, comments
+	variable instrID, start, fin, numpts, delay, ramprate, nosave, until_stop_val
+	string channels, y_label, comments, until_operator, until_checkwave
 	string starts, fins // For different start/finish points for each channel (must match length of channels if used)
 
 	// Reconnect instruments
@@ -416,6 +416,27 @@ function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate,
 	y_label = selectstring(paramisdefault(y_label), y_label, "")
 	starts = selectstring(paramisdefault(starts), starts, "")
 	fins = selectstring(paramisdefault(fins), fins, "")
+	until_operator = selectstring(paramisdefault(until_operator), until_operator, "not_set")
+	
+	variable a
+	if (stringmatch(until_operator, "not_set") == 1)
+		a = 0
+	else
+		if (paramisdefault(until_checkwave) || paramisdefault(until_stop_val))
+			abort "If scanning until condition met, you must set a checkwave and stop_val"
+		else
+			wave cw = $until_checkwave
+		endif
+		
+		if ( stringmatch(until_operator, "<")==1 )
+			a = 1
+		elseif ( stringmatch(until_operator, ">")==1 )
+			a = -1
+		else
+			abort "Choose a valid operator (<, >)"
+		endif
+	endif
+	
 
 	// Initialize ScanVars
 	struct ScanVars S  // Note, more like a BD scan if going slow
@@ -443,6 +464,11 @@ function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate,
 		rampToNextSetpoint(S, i, fastdac=1, ignore_lims=1)  // Ramp x to next setpoint
 		sc_sleep(S.delayx)
 		RecordValues(S, i, 0)
+		if (a!=0)  // If running scan until condition is met
+			if (a*cw[i] - until_stop_val < 0)
+				break
+			endif
+		endif
 		i+=1
 	while (i<S.numptsx)
 
