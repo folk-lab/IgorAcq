@@ -211,7 +211,7 @@ function setLS625fieldWait(instrID,output, [short_wait])
 	variable start_time = stopmsTimer(-2)
 	do
 		if (short_wait)
-			asleep(0.01)
+			asleep(0.1)
 		else
 			asleep(2.1) // Over 2s makes the waiting abortable
 		endif

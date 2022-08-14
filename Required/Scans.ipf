@@ -613,13 +613,10 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 
 end
 
-
-
-
 function Scank2400(instrID, startx, finx, channelsx, numptsx, delayx, rampratex, [y_label, comments, nosave]) //Units: mV
 	variable instrID, startx, finx, numptsx, delayx, rampratex,  nosave
 	string channelsx, y_label, comments
-	abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"
+	//abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -631,7 +628,7 @@ function Scank2400(instrID, startx, finx, channelsx, numptsx, delayx, rampratex,
 	// Initialize ScanVars
 	struct ScanVars S
 	initScanVars(S, instrIDx=instrID, startx=startx, finx=finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
-	 						y_label=y_label, comments=comments)
+	 						y_label=y_label, x_label = "k2400", comments=comments)
 
 	// Check software limits and ramprate limits
 	// PreScanChecksKeithley(S)  
@@ -663,25 +660,24 @@ function Scank2400(instrID, startx, finx, channelsx, numptsx, delayx, rampratex,
 	endif
 end
 
-
 function Scank24002D(instrIDx, startx, finx, numptsx, delayx, rampratex, instrIDy, starty, finy, numptsy, delayy, rampratey, [y_label, comments, nosave]) //Units: mV
 	variable instrIDx, startx, finx, numptsx, delayx, rampratex, instrIDy, starty, finy, numptsy, delayy, rampratey, nosave
 	string y_label, comments
-	abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
+	//abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
 	
 	// Set defaults
 	comments = selectstring(paramisdefault(comments), comments, "") 
-	y_label = selectstring(paramisdefault(y_label), y_label, "Keithley /mV")
+	y_label = selectstring(paramisdefault(y_label), y_label, "k2400 (mV)")
 
 	
 	// Initialize ScanVars
 	struct ScanVars S
 	initScanVars(S, instrIDx=instrIDx, startx=startx, finx=finx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
 							instrIDy=instrIDy, starty=starty, finy=finy, numptsy=numptsy, delayy=delayy, rampratey=rampratey, \
-	 						y_label=y_label, comments=comments)
+	 						y_label=y_label, x_label = "k2400 (mV)", comments=comments)
 
 	// Check software limits and ramprate limits
 	// PreScanChecksKeithley(S)  
@@ -708,7 +704,8 @@ function Scank24002D(instrIDx, startx, finx, numptsx, delayx, rampratex, instrID
 		j=0
 		do
 			setpointx = S.startx + (j*(S.finx-S.startx)/(S.numptsx-1))
-			rampK2400Voltage(S.instrIDx, setpointx, ramprate=S.rampratex)
+//			rampK2400Voltage(S.instrIDx, setpointx, ramprate=S.rampratex)
+			setK2400Voltage(S.instrIDx, setpointx)
 			sc_sleep(S.delayx)
 			RecordValues(S, i, j)
 			j+=1
@@ -1042,19 +1039,19 @@ end
 function ScanLS625Magnet(instrID, startx, finx, numptsx, delayx, [y_label, comments, nosave]) 
 	variable instrID, startx, finx, numptsx, delayx,  nosave
 	string y_label, comments
-	abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
+	//abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
 	
 	// Set defaults
 	comments = selectstring(paramisdefault(comments), comments, "")
-	y_label = selectstring(paramisdefault(y_label), y_label, "Field /mT")
+	y_label = selectstring(paramisdefault(y_label), y_label, "")
 	
 	// Initialize ScanVars
 	struct ScanVars S
 	initScanVars(S, instrIDx=instrID, startx=startx, finx=finx, numptsx=numptsx, delayx=delayx, \
-	 						y_label=y_label, comments=comments)
+	 						y_label=y_label, x_label = "Field /mT", comments=comments)
 							
 
 	// Check software limits and ramprate limits
@@ -1073,7 +1070,7 @@ function ScanLS625Magnet(instrID, startx, finx, numptsx, delayx, [y_label, comme
 	variable i=0, setpointx
 	do
 		setpointx = S.startx + (i*(S.finx-S.startx)/(S.numptsx-1))
-		setlS625fieldWait(S.instrIDx, setpointx) 
+		setlS625fieldWait(S.instrIDx, setpointx, short_wait = 1) // Mr Ray changed this on August 04 
 		sc_sleep(S.delayx)
 		RecordValues(S, i, i)
 		i+=1
@@ -1219,10 +1216,9 @@ function ScanFastDACLS625Magnet2D(fdID, startx, finx, channelsx, magnetID, start
 end
 
 
-function ScanK2400LS625Magnet2D(keithleyID, startx, finx, channelsx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, rampratey, [y_label, comments, nosave]) //Units: mV
+function ScanK2400LS625Magnet2D(keithleyID, startx, finx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, [rampratey, y_label, comments, nosave]) //Units: mV
 	variable keithleyID, startx, finx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, rampratey, nosave
-	string channelsx, y_label, comments
-	abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
+	string y_label, comments
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -1234,7 +1230,7 @@ function ScanK2400LS625Magnet2D(keithleyID, startx, finx, channelsx, numptsx, de
 	
 	// Initialize ScanVars
 	struct ScanVars S
-	initScanVars(S, instrIDx=keithleyID, startx=startx, finx=finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
+	initScanVars(S, instrIDx=keithleyID, startx=startx, finx=finx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
 							instrIDy=magnetID, starty=starty, finy=finy, numptsy=numptsy, delayy=delayy, rampratey=rampratey, \
 	 						y_label=y_label, comments=comments)
 
@@ -1244,7 +1240,11 @@ function ScanK2400LS625Magnet2D(keithleyID, startx, finx, channelsx, numptsx, de
 	
 	// Ramp to start without checks because checked above
 	rampK2400Voltage(S.instrIDx, startx, ramprate=S.rampratex)
-	setlS625fieldWait(S.instrIDy, starty)
+	
+	if (!paramIsDefault(rampratey))
+		setLS625rate(magnetID,rampratey)
+	endif
+	setlS625fieldWait(S.instrIDy, starty )
 	
 	// Let gates settle 
 	sc_sleep(S.delayy*5)
@@ -1259,6 +1259,7 @@ function ScanK2400LS625Magnet2D(keithleyID, startx, finx, channelsx, numptsx, de
 		setpointy = S.starty + (i*(S.finy-S.starty)/(S.numptsy-1))
 		setlS625fieldWait(S.instrIDy, setpointy)
 		rampK2400Voltage(S.instrIDx, setpointx, ramprate=S.rampratex)
+//		setK2400Voltage(S.instrIDy, setpointy)
 
 		sc_sleep(S.delayy)
 		j=0
