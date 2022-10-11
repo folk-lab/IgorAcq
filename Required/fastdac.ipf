@@ -45,9 +45,9 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 	sprintf comm, "name=FastDAC,instrID=%s,visa_address=%s" instrID, visa_address
 	string options
 	if(optical)
- 		options = "baudrate=1750000,databits=8,stopbits=1,parity=0,test_query=*IDN?"  // For Optical
+ 		options = "baudrate=1750000,databits=8,parity=0,test_query=*IDN?"  // For Optical
 	else
-		options = "baudrate=57600,databits=8,stopbits=1,parity=0,test_query=*IDN?"  // For USB
+		options = "baudrate=57600,databits=8,parity=0,test_query=*IDN?"  // For USB
 	endif
 	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
 	
@@ -682,7 +682,7 @@ function CalibrateFDAC(instrID)
 		endif
 		
 		// ramp channel to 0V
-		fd_rampOutputFDAC(instrID,channel,0, 100000, ignore_lims=1)
+		fd_rampOutputFDAC(instrID,channel+scf_getChannelStartNum(instrID, adc=0),0, 100000, ignore_lims=1)
 		sprintf question, "Input value displayed by DMM in volts."
 		user_input = prompt_user("DAC offset calibration",question)
 		if(numtype(user_input) == 2)
@@ -700,7 +700,7 @@ function CalibrateFDAC(instrID)
 		print message
 		
 		// ramp channel to -10V
-		fd_rampOutputFDAC(instrID,channel,-10000, 100000, ignore_lims=1)
+		fd_rampOutputFDAC(instrID,channel+scf_getChannelStartNum(instrID, adc=0),-10000, 100000, ignore_lims=1)
 		sprintf question, "Input value displayed by DMM in volts."
 		user_input = prompt_user("DAC gain calibration",question)
 		if(numtype(user_input) == 2)
@@ -777,7 +777,7 @@ function CalibrateFADC(instrID)
 	// turn result into key/value string
 	// response is formatted like this: "numCh0,zero,numCh1,zero,numCh0,full,numCh1,full,"
 	string result="", key_zero="", key_full=""
-	variable zeroIndex=0,fullIndex=0, calibrationFail = 0
+	variable zeroIndex=0,fullIndex=0, calibrationFail = 0, j=0
 	for(i=0;i<numADCCh;i+=1)
 		zeroIndex = whichlistitem("ch"+num2istr(i),response,",",0)+1
 		fullIndex = whichlistitem("ch"+num2istr(i),response,",",zeroIndex)+1
@@ -796,7 +796,10 @@ function CalibrateFADC(instrID)
 	response = sc_stripTermination(response,"\r\n")
 	if(scf_checkFDResponse(response,cmd,isString=1,expectedResponse="CALIBRATION_FINISHED") && calibrationFail == 0)
 		// all good, calibration complete
-		rampMultipleFDAC(instrID, "0,1,2,3", 0, ramprate=10000)
+		for(j=0;j<4;j++)
+//			rampMultipleFDAC(instrID, "0,1,2,3", 0, ramprate=10000)
+			fd_rampOutputFDAC(instrID, j+scf_getChannelStartNum(instrID, adc=0), 0, 100000)
+		endfor
 		fd_saveFadcCalibration(deviceAddress,deviceNum,numADCCh,result,adcSpeed)
 		ask_user("ADC calibration complete! Result has been written to file on \"config\" path.", type=0)
 	else
