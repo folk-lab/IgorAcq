@@ -454,16 +454,24 @@ function listGPIBinstr()
 	variable instrID
 
 	// open resource manager
-	variable localRM
-	variable status = viOpenDefaultRM(localRM) // open local copy of resource manager
-	if(status < 0)
-		VISAerrormsg("[ERROR]: problem opening resource manager", localRM, status)
-		abort
+	nvar /z globalRM
+	if(!nvar_exists(globalRM))
+		openResourceManager()
+		nvar globalRM
 	endif
-
+	
+//	variable localRM
+//	variable status = viOpenDefaultRM(localRM) // open local copy of resource manager
+//	if(status < 0)
+//		VISAerrormsg("[ERROR]: problem opening resource manager", localRM, status)
+//		abort
+//	endif
+	variable status
+	
 	// print list of serial ports/instruments
-	status = viFindRsrc(localRM,"GPIB?*INSTR",findlist,instrcnt,instrDesc)
+	status = viFindRsrc(globalRM,"GPIB?*INSTR",findlist,instrcnt,instrDesc)
 	if(status < 0)
+		viStatusDesc(globalRM, status, error)
 		VISAerrormsg("listGPIBAddress -- OpenDefaultRM:", instrID, status)
 		return 0
 	elseif(instrcnt==0)
@@ -584,27 +592,27 @@ function setVISAoptions(instrID,options)
 		if(strlen(value)==0)
 			continue // if there is no value, move on
 		endif
-		
+		status = 0
 		strswitch(key)
 			case "baudrate":
 			    status = visaSetBaudRate(instrID, str2num(value))
-			    continue
+			    break
 			case "stopbits":
 			    status = visaSetStopBits(instrID, str2num(value))
-			    continue
+			    break
 			case "databits":
 			    status = visaSetDataBits(instrID, str2num(value))
-			    continue
+			    break
 			case "parity":
 			    status = visaSetParity(instrID, str2num(value))
-			    continue
+			    break
 			case "timeout":
 			    status = visaSetTimeout(instrID, str2num(value))
-			    continue
+			    break
 		endswitch
 		
 		if(status<0)
-			VISAerrormsg("viSetAttribute", instrID, status)
+			VISAerrormsg("viSetAttribute "+key, instrID, status)
 		endif
 		
 	endfor
