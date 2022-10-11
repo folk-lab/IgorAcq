@@ -717,10 +717,11 @@ function WaitTillTempStable(instrID, targetTmK, times, delay, err)
 	variable j = 0
 	for (passCount=0; passCount<times; )
 		asleep(delay)
-		for (j = 0; j<10; j+=1)
-			currentT += getLS370temp(instrID, "mc")/10 // do some averaging
-			asleep(2.1)
-		endfor
+//		for (j = 0; j<10; j+=1)
+//			currentT += getLS370temp(instrID, "mc")/10 // do some averaging
+//			asleep(2.1)
+//		endfor
+		currentT = getls370temp(instrID, "mc")
 		if (ABS(currentT-targetT) < err*targetT)
 			passCount+=1
 			print "Accepted", passCount, " @ ", currentT, "K"
@@ -974,7 +975,10 @@ function/s getLS370Status(instrID)
 	for(i=0;i<itemsinlist(channelLabel,",");i+=1)
 		// Use the "default" schedules "max" allowed times to decide what is the oldest allowed recorded temperature
 		sprintf searchStr, "default:channels:%s:max", stringfromlist(i,channelLabel,",") 
-		timestamp = sc_SQLtimestamp(str2num(getJSONvalue(jstr,searchStr)))		
+		
+		//UNCOMMENT WHEN ABLE TO CONNECT TO DATABASE
+		timestamp = sc_SQLtimestamp(str2num(getJSONvalue(jstr,searchStr)))	
+			
 //		timestamp = sc_SQLtimestamp(3600) // Temporarily allow any old measurement of temp
 //		timestamp = sc_SQLtimestamp(1) // Temporarily always request new
 
@@ -1009,7 +1013,37 @@ function/s getLS370Status(instrID)
 	string buffer = tempBuffer
 	
 	return addJSONkeyval("","Lakeshore",buffer)
+
+//	string buffer
+//	buffer = getls370status_nosql(instrID)
+//	return buffer
 end
+
+
+
+function/s getls370status_nosql(instrID)
+	string instrID
+
+	make/free/t LS_keys = {"MC", "50K", "4K", "Magnet", "Still"}
+	make/free/t JSON_keys = {"MC K","50K Plate K","4K Plate K","Magnet K","Still K"}
+
+	string temp="", Buffer=""
+	string LS_key, JSON_key
+	variable i
+	for (i=0; i<numpnts(LS_keys); i++)
+		LS_key = LS_keys[i]
+		JSON_key = JSON_keys[i]
+		temp = num2str(getls370temp(instrID, LS_key))
+		Buffer = addJSONkeyval(Buffer, JSON_key, temp)
+	endfor
+
+	Buffer = addJSONkeyval("","Temperature",Buffer)
+	Buffer = addJSONkeyval("","Lakeshore",Buffer)
+
+	return Buffer
+end
+
+
 
 function/s getBFStatus(instrID)
 	// instrID is not used here, just pass any string. It's kept for consistency.
