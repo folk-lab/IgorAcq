@@ -206,7 +206,8 @@ end
 function setLS625fieldWait(instrID,output, [short_wait])
 	// Set short_wait = 1 if you want the waiting to be a very tight loop (i.e. Useful if trying to ramp very short distances quickly)
 	variable instrID, output, short_wait
-
+//	print("Going to field")
+//	print(output)
 	setLS625field(instrID,output)
 	variable start_time = stopmsTimer(-2)
 	do

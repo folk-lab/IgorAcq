@@ -1148,12 +1148,12 @@ end
 
 
 function ScanFastDACLS625Magnet2D(fdID, startx, finx, channelsx, magnetID, starty, finy, numptsy, [numpts, sweeprate, rampratex, delayy, startxs, finxs, y_label, comments, nosave, use_AWG])
-	// 2D Scan with Fastdac on x-axis and keithley on y-axis
+	// 2D Scan with Fastdac on x-axis and magnet on y-axis
 	// Note: Must provide numptsx OR sweeprate in optional parameters instead
 	// Note: channels should be a comma-separated string ex: "0,4,5"
 	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, magnetID, rampratex, delayy, nosave, use_AWG
 	string channelsx, y_label, comments, startxs, finxs
-	abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
+	//abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
 
 	// Set defaults
 	delayy = ParamIsDefault(delayy) ? 0.01 : delayy
@@ -1212,9 +1212,74 @@ function ScanFastDACLS625Magnet2D(fdID, startx, finx, channelsx, magnetID, start
   	else
   		dowindow /k SweepControl
 	endif
-
 end
 
+
+function ScanFastDacSlowLS625Magnet2D(instrIDx, startx, finx, channelsx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, [rampratey, y_label, comments, nosave])
+	// sweep one or more FastDAC channels but in the ScanController way (not ScanControllerFastdac). I.e. ramp, measure, ramp, measure...
+	// channels should be a comma-separated string ex: "0, 4, 5"
+	variable instrIDx, startx, finx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, nosave, rampratey
+	string channelsx, comments, y_label
+
+	// Reconnect instruments
+	sc_openinstrconnections(0)
+
+	// Set defaults
+	comments = selectstring(paramisdefault(comments), comments, "")
+	y_label = selectstring(paramisdefault(y_label), y_label, "")
+	// Initialize ScanVars
+	struct ScanVars S  
+		  
+	initScanVars(S, instrIDx=instrIDx, startx=startx, finx=finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
+							instrIDy=magnetID, starty=starty, finy=finy, numptsy=numptsy, delayy=delayy, rampratey=rampratey, \
+	 						y_label=y_label, comments=comments)	  
+	
+	// Check limits (not as much to check when using FastDAC slow)
+	scc_checkLimsFD(S)
+	S.lims_checked = 1
+
+	// Ramp to start without checks because checked above
+	rampMultipleFDAC(S.instrIDx,channelsx,S.startx,ramprate=S.rampratex, ignore_lims=1)
+	
+	if (!paramIsDefault(rampratey))
+		setLS625rate(magnetID,rampratey)
+	endif
+	setlS625fieldWait(S.instrIDy, starty )
+	
+	// Let gates settle 
+	asleep(S.delayy*10)
+
+	// Make Waves and Display etc
+	InitializeScan(S)
+	
+	
+	// Main measurement loop
+	variable i=0, j=0, setpointx, setpointy
+	do
+		setpointx = S.startx
+		setpointy = S.starty + (i*(S.finy-S.starty)/(S.numptsy-1))
+		setlS625field(S.instrIDy, setpointy)
+		rampMultipleFDAC(S.instrIDx,channelsx,setpointx,ramprate=S.rampratex, ignore_lims=1)
+		setlS625fieldwait(S.instrIDy, setpointy, short_wait = 1)
+		sc_sleep(S.delayy)
+		j=0
+		do
+			setpointx = S.startx + (j*(S.finx-S.startx)/(S.numptsx-1))
+			rampMultipleFDAC(S.instrIDx,channelsx,setpointx,ramprate=S.rampratex, ignore_lims=1)
+			sc_sleep(S.delayx)
+			RecordValues(S, i, j)
+			j+=1
+		while (j<S.numptsx)
+	i+=1
+	while (i<S.numptsy)
+	
+	// Save by default
+	if (nosave == 0)
+		EndScan(S=S)
+	else
+		dowindow /k SweepControl
+	endif
+end
 
 function ScanK2400LS625Magnet2D(keithleyID, startx, finx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, [rampratey, y_label, comments, nosave]) //Units: mV
 	variable keithleyID, startx, finx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, rampratey, nosave
@@ -1280,6 +1345,8 @@ function ScanK2400LS625Magnet2D(keithleyID, startx, finx, numptsx, delayx, rampr
 		 dowindow /k SweepControl
 	endif
 end
+
+
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
