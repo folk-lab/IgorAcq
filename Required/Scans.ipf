@@ -29,6 +29,7 @@
 // ScanBabyDACLS625Magnet2D
 // ScanFastDACLS625Magenet2D
 // ScanK2400LS625Magent2D
+// ScanSRSFrequency
 
 // Templates:
 // ScanMultiVarTemplate -- Helpful template for running a scan inside multiple loops where other variables can change (i.e. up to 5D scans)
@@ -401,10 +402,10 @@ function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, 
 end
 
 
-function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate, [starts, fins, y_label, until_checkwave, until_stop_val, until_operator, comments, nosave]) //Units: mV
+function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate, [starts, fins, y_label, repeats, alternate, delayy, until_checkwave, until_stop_val, until_operator, comments, nosave]) //Units: mV
 	// sweep one or more FastDAC channels but in the ScanController way (not ScanControllerFastdac). I.e. ramp, measure, ramp, measure...
 	// channels should be a comma-separated string ex: "0, 4, 5"
-	variable instrID, start, fin, numpts, delay, ramprate, nosave, until_stop_val
+	variable instrID, start, fin, numpts, delay, ramprate, nosave, until_stop_val, repeats, alternate, delayy
 	string channels, y_label, comments, until_operator, until_checkwave
 	string starts, fins // For different start/finish points for each channel (must match length of channels if used)
 
@@ -417,6 +418,7 @@ function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate,
 	starts = selectstring(paramisdefault(starts), starts, "")
 	fins = selectstring(paramisdefault(fins), fins, "")
 	until_operator = selectstring(paramisdefault(until_operator), until_operator, "not_set")
+	delayy = ParamIsDefault(delayy) ? 5*delay : delayy
 	
 	variable a
 	if (stringmatch(until_operator, "not_set") == 1)
@@ -440,7 +442,11 @@ function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate,
 
 	// Initialize ScanVars
 	struct ScanVars S  // Note, more like a BD scan if going slow
-	initScanVarsFD(S, instrID, start, fin, channelsx=channels, numptsx=numpts, delayx=delay, rampratex=ramprate, startxs = starts, finxs = fins, comments=comments, y_label=y_label)  
+	initScanVarsFD(S, instrID, start, fin, channelsx=channels, numptsx=numpts, delayx=delay, rampratex=ramprate, startxs = starts, finxs = fins, comments=comments, y_label=y_label,\
+	 		starty=1, finy=repeats,  numptsy=repeats, alternate=alternate, delayy=delay)  
+	if (s.is2d && strlen(S.y_label) == 0)
+		S.y_label = "Repeats"
+	endif	 		
 	S.using_fastdac = 0 // Explicitly showing that this is not a normal fastDac scan
 	S.duration = numpts*max(0.05, delay) // At least 50ms per point is a good estimate 
 	S.sweeprate = abs((fin-start)/S.duration) // Better estimate of sweeprate (Not really valid for a slow scan)
@@ -453,24 +459,42 @@ function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate,
 	RampStartFD(S, ignore_lims=1)
 
 	// Let gates settle 
-	sc_sleep(delay*5)
+	sc_sleep(S.delayy)
 
 	// Make Waves and Display etc
 	InitializeScan(S)
 
 	// Main measurement loop
-	variable i=0
-	do
-		rampToNextSetpoint(S, i, fastdac=1, ignore_lims=1)  // Ramp x to next setpoint
-		sc_sleep(S.delayx)
-		RecordValues(S, i, 0)
-		if (a!=0)  // If running scan until condition is met
-			if (a*cw[i] - until_stop_val < 0)
-				break
+	variable i=0, j=0
+	variable d=1
+	for (j=0; j<S.numptsy; j++)
+		S.direction = d  // Will determine direction of scan in fd_Record_Values
+
+		// Ramp to start of fast axis
+		RampStartFD(S, ignore_lims=1, x_only=1)
+		sc_sleep(S.delayy)
+		i = 0
+		do
+			rampToNextSetpoint(S, i, fastdac=1, ignore_lims=1)  // Ramp x to next setpoint
+			sc_sleep(S.delayx)
+			if (s.is2d)
+				RecordValues(S, j, i)
+			else
+				RecordValues(S, i, 0)
 			endif
+			if (a!=0)  // If running scan until condition is met
+				if (a*cw[i] - until_stop_val < 0)
+					break
+				endif
+			endif
+			i+=1
+		while (i<S.numptsx)
+		
+		if (alternate!=0) // If want to alternate scan scandirection for next row
+			d = d*-1
 		endif
-		i+=1
-	while (i<S.numptsx)
+	endfor
+	
 
 	// Save by default
 	if (nosave == 0)
@@ -1306,6 +1330,52 @@ function ScanK2400LS625Magnet2D(keithleyID, startx, finx, channelsx, numptsx, de
 	endif
 end
 
+function ScanSRSFrequency(instrID, startx, finx, numptsx, delayx, nosave)
+	variable instrID, startx, finx, numptsx, delayx, nosave
+	string channelsx, y_label, comments
+
+	// Reconnect instruments
+	sc_openinstrconnections(0)
+
+	// Set defaults
+	//	comments = selectstring(paramisdefault(comments), comments, "")
+	//	y_label = selectstring(paramisdefault(y_label), y_label, "")
+
+	// Initialize ScanVars
+	struct ScanVars S
+	initScanVars(S, instrIDx=instrID, startx=startx, finx=finx, numptsx=numptsx, delayx=delayx)
+
+	// Ramp to start without checks because checked above
+	SetSRSFrequency(S.instrIDx,startx)
+
+	// Let gates settle
+	sc_sleep(S.delayy*10)
+
+	// Make waves and graphs etc
+	initializeScan(S)
+
+	// Main measurement loop
+	variable i=0, setpointx
+	do
+		setpointx = S.startx + (i*(S.finx-S.startx)/(S.numptsx-1))
+		SetSRSFrequency(S.instrIDx,setpointx)
+		sc_sleep(S.delayx)
+		RecordValues(S, i, i)
+		i+=1
+	while (i<S.numptsx)
+
+	// Save by default
+	if (nosave == 0)
+		EndScan(S=S)
+	else
+		dowindow /k SweepControl
+	endif
+	//if repeated scans, it may be a good idea to reset the frequency here,
+	//SetSRSFrequency(S.instrIDx,startx)
+
+end
+
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////// Useful Templates //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1397,5 +1467,7 @@ function StepTempScanSomething()
 
 	// 	SCAN HERE for base temp
 end
+
+
 
 
