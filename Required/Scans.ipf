@@ -29,6 +29,7 @@
 // ScanBabyDACLS625Magnet2D
 // ScanFastDACLS625Magenet2D
 // ScanK2400LS625Magent2D
+// ScanSRSFrequency
 
 // Templates:
 // ScanMultiVarTemplate -- Helpful template for running a scan inside multiple loops where other variables can change (i.e. up to 5D scans)
@@ -1329,6 +1330,52 @@ function ScanK2400LS625Magnet2D(keithleyID, startx, finx, channelsx, numptsx, de
 	endif
 end
 
+function ScanSRSFrequency(instrID, startx, finx, numptsx, delayx, nosave)
+	variable instrID, startx, finx, numptsx, delayx, nosave
+	string channelsx, y_label, comments
+
+	// Reconnect instruments
+	sc_openinstrconnections(0)
+
+	// Set defaults
+	//	comments = selectstring(paramisdefault(comments), comments, "")
+	//	y_label = selectstring(paramisdefault(y_label), y_label, "")
+
+	// Initialize ScanVars
+	struct ScanVars S
+	initScanVars(S, instrIDx=instrID, startx=startx, finx=finx, numptsx=numptsx, delayx=delayx)
+
+	// Ramp to start without checks because checked above
+	SetSRSFrequency(S.instrIDx,startx)
+
+	// Let gates settle
+	sc_sleep(S.delayy*10)
+
+	// Make waves and graphs etc
+	initializeScan(S)
+
+	// Main measurement loop
+	variable i=0, setpointx
+	do
+		setpointx = S.startx + (i*(S.finx-S.startx)/(S.numptsx-1))
+		SetSRSFrequency(S.instrIDx,setpointx)
+		sc_sleep(S.delayx)
+		RecordValues(S, i, i)
+		i+=1
+	while (i<S.numptsx)
+
+	// Save by default
+	if (nosave == 0)
+		EndScan(S=S)
+	else
+		dowindow /k SweepControl
+	endif
+	//if repeated scans, it may be a good idea to reset the frequency here,
+	//SetSRSFrequency(S.instrIDx,startx)
+
+end
+
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////// Useful Templates //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1420,5 +1467,7 @@ function StepTempScanSomething()
 
 	// 	SCAN HERE for base temp
 end
+
+
 
 
