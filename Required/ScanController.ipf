@@ -756,6 +756,14 @@ function scv_sanitizeSetpoints(start_list, fin_list, items, starts, fins)
 	
 	starts = replaceString(" ", start_list, "")
 	fins = replaceString(" ", fin_list, "")
+	
+	// Make sure the starts/ends don't have commas at the end (igor likes to put them in unnecessarily when making lists)
+	if (cmpstr(starts[strlen(starts)-1], ",") == 0)  // Zero if equal (I know... stupid)
+		starts = starts[0, strlen(starts)-2]
+	endif
+	if (cmpstr(fins[strlen(fins)-1], ",") == 0)  // Zero if equal (I know... stupid)
+		fins = fins[0, strlen(fins)-2]
+	endif
 end
 
 
@@ -2167,10 +2175,12 @@ function/s scw_createConfig()
 	string sysinfo = igorinfo(3)
 	tmpstr = addJSONkeyval(tmpstr, "OS", StringByKey("OS", sysinfo), addQuotes = 1)
 	tmpstr = addJSONkeyval(tmpstr, "IGOR_VERSION", StringByKey("IGORFILEVERSION", sysinfo), addQuotes = 1)
+	
+	
 	configstr = addJSONkeyval(configstr, "system_info", tmpstr)
 
 	// log instrument info
-	configstr = addJSONkeyval(configstr, "instruments", textWave2StrArray(sc_Instr))
+	configstr = addJSONkeyval(configstr, "instruments", textWave2StrArray(sc_Instr))  /// <<<<<<<< I think some thing with textwave2strarray is broken... seems like a lot of the logs are lost after this
 
 	// wave names
 	tmpstr = ""
@@ -2688,26 +2698,27 @@ function scc_checkSameDeviceFD(S, [x_only, y_only])
 	struct ScanVars &s
 	variable x_only, y_only // whether to check only one axis (e.g. other is babydac)
 	
-	variable device_dacs
-	variable device_buffer
+	variable device_x
+	variable device_y
+	variable device_adc
 	string channels
 	if (!y_only)
-		channels = scf_getChannelNumsOnFD(S.channelsx, device_dacs)  // Throws error if not all channels on one FastDAC
+		channels = scf_getChannelNumsOnFD(S.channelsx, device_x)  // Throws error if not all channels on one FastDAC
 	endif
 	if (!x_only)
-		channels = scf_getChannelNumsOnFD(S.channelsy, device_buffer)
-		if (device_dacs > 0 && device_buffer > 0 && device_buffer != device_dacs)
-			abort "ERROR[scc_checkSameDeviceFD]: X channels and Y channels are not on same device"  // TODO: Maybe this should raise an error?
-		elseif (device_dacs <= 0 && device_buffer > 0)
-			device_dacs = device_buffer
+		channels = scf_getChannelNumsOnFD(S.channelsy, device_y)
+		if (device_x > 0 && device_y > 0 && device_y != device_x && S.instrIDx == S.instrIDy)
+			abort "ERROR[scc_checkSameDeviceFD]: X channels and Y channels are not on same device but InstrIDx/y are the same"
+//		elseif (device_dacs <= 0 && device_buffer > 0)
+//			device_dacs = device_buffer
 		endif
 	endif
 
-	channels = scf_getChannelNumsOnFD(s.AdcList, device_buffer, adc=1)  // Raises error if ADCs aren't on same device
-	if (device_dacs > 0 && device_buffer != device_dacs)
-		abort "ERROR[scc_checkSameDeviceFD]: ADCs are not on the same device as DACs"  // TODO: Maybe should only raise error if x channels not on same device as ADCs?
+	channels = scf_getChannelNumsOnFD(s.AdcList, device_adc, adc=1)  // Raises error if ADCs aren't on same device
+	if (device_x > 0 && device_adc != device_x)
+		abort "ERROR[scc_checkSameDeviceFD]: ADCs are not on the same device as X axis DAC" 
 	endif	
-	return device_buffer // Return adc device number
+	return device_adc // Return adc device number
 end
 
 

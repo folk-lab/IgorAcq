@@ -340,20 +340,32 @@ function setFADCSpeed(instrID,speed,[loadCalibration]) // Units: Hz
 end
 
 
-function RampMultipleFDAC(InstrID, channels, setpoint, [ramprate, ignore_lims])
-	// Ramps multiple channes to setpoint (this is the ramp function that SHOULD be used)
+function RampMultipleFDAC(InstrID, channels, setpoint, [ramprate, setpoints_str, ignore_lims])
+	// Ramps multiple channels to setpoint(s) (this is the ramp function that SHOULD be used)
+	// InstrID - FastDAC connection variable (e.g. fd)
+	// channels - comma separated list of channels to sweep
+	// setpoint - Value to sweep channels to (ignored if using setpoints_str)
+	// ramprate - sweeprate of channels to setpoint mV/s
+	// setpoints_str - comma separated list of setpoints for each channel in channels (setpoint ignored)
 	// Note: If ramprate is left default, then each channel will ramp at speed specified in FastDAC window
 	variable InstrID, setpoint, ramprate, ignore_lims
-	string channels
+	string channels, setpoints_str
 	
 	ramprate = numtype(ramprate) == 0 ? ramprate : 0  // If not a number, then set to zero (which means will be overridden by ramprate in window)
-	
+
 	scu_assertSeparatorType(channels, ",")
 	channels = scu_getChannelNumbers(channels, fastdac=1) 
+	
+	if (!paramIsDefault(setpoints_str) && (itemsInList(channels, ",") != itemsInList(setpoints_str, ",")))
+		abort "ERROR[RampMultipleFdac]: number of channels does not match number of setpoints in setpoints_str"	
+	endif
 	
 	variable i=0, channel, nChannels = ItemsInList(channels, ",")
 	variable channel_ramp
 	for(i=0;i<nChannels;i+=1)
+		if (!paramIsDefault(setpoints_str))
+			setpoint = str2num(StringFromList(i, setpoints_str, ","))
+		endif
 		channel = str2num(StringFromList(i, channels, ","))
 		channel_ramp = ramprate != 0 ? ramprate : str2num(scf_getDacInfo(num2str(channel), "ramprate"))
 		fd_rampOutputFDAC(instrID, channel, setpoint, channel_ramp, ignore_lims=ignore_lims)  
@@ -576,14 +588,14 @@ function fd_loadFadcCalibration(instrID,speed)
 	sprintf regex, "fADC%dCalibration_%d", deviceNum, speed
 //	print regex
 	filelist = indexedfile(config,-1,".txt")
-	filelist = greplist(filelist,regex)
+	filelist = greplist(filelist,"^"+regex)  // ^ to force matching from start of string
 	if(itemsinlist(filelist) == 1)
 		// we have a calibration file
 		jstr = readtxtfile(stringfromlist(0,filelist),"config")
 	elseif(itemsinlist(filelist) > 1)
 		// somehow there is more than one file. Try to find the correct one!
 		for(i=0;i<itemsinlist(filelist);i+=1)
-			if(cmpstr(stringfromlist(i,filelist),regex) == 0)
+			if(cmpstr(stringfromlist(i,filelist),regex+".txt") == 0)
 				// this is the correct file
 				k = -1
 				break

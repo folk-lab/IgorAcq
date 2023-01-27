@@ -75,7 +75,8 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 	Struct ScanVars &S
 	variable logs_only  // 1=Don't save any sweep information to HDF
 	make/Free/T/N=1 cconfig = {""}
-	cconfig = prettyJSONfmt(scw_createConfig())
+//	cconfig = prettyJSONfmt(scw_createConfig())  	//<< 2023/01 -- I think someting about this is chopping off a lot of the info
+	cconfig = scw_createConfig()  					// << This is the temporary fix -- at least the info is saved even if not perfect
 	
 	if (!logs_only)
 		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(sc_createSweepLogs(S=S))
@@ -128,7 +129,7 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 		endif
 
 		// may as well save this config file, since we already have it
-		scw_saveConfig(cconfig[0])
+		scw_saveConfig(cconfig[0])	
 		
 	endfor
 end
@@ -185,7 +186,8 @@ function sc_instrumentLogs(jstr)
 	// Runs all getinstrStatus() functions, and adds results to json string (to be stored in sweeplogs)
 	// Note: all log strings must be valid JSON objects 
     string &jstr
-
+    
+	sc_openInstrConnections(0) // Reopen connections before asking for status in case it has been a long time since the beginning of the scan
 	wave /t sc_Instr
 	variable i=0, j=0, addQuotes=0
 	string command="", val=""
