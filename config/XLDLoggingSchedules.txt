@@ -1,10 +1,10 @@
 {
   "default": {
+    "heater": {
+      "min": 120,
+      "max": 240
+    },
     "analog_outputs": {
-      "ao1": {
-        "min": 120,
-        "max": 240
-      },
       "ao2": {
         "min": 120,
         "max": 240
@@ -12,33 +12,33 @@
     },
     "channels": {
       "ch1": {
-        "min": 120,
-        "max": 180
+        "min": 300,
+        "max": 360
       },
       "ch2": {
-        "min": 120,
-        "max": 180
+        "min": 170,
+        "max": 200
       },
       "ch3": {
-        "min": 120,
+        "min": 150,
         "max": 180
       },
       "ch5": {
-        "min": 60,
-        "max": 120
+        "min": 100,
+        "max": 130
       },
       "ch6": {
-        "min": 30,
-        "max": 60
+        "min": 20,
+        "max": 25
       }
     }
   },
   "mc_exclusive": {
-    "analog_outputs": {
-      "ao1": {
+    "heater": {
         "min": 15,
         "max": 30
-      },
+    },
+    "analog_outputs": {
       "ao2": {
         "min": 60,
         "max": 180
@@ -68,11 +68,11 @@
     }
   },
   "still_exclusive": {
+    "heater": {
+        "min": 15,
+        "max": 30
+    },
     "analog_outputs": {
-      "ao1": {
-        "min": 5,
-        "max": 10
-      },
       "ao2": {
         "min": 1,
         "max": 5
@@ -102,11 +102,11 @@
     }
   },
   "using_magnet": {
+    "heater": {
+        "min": 15,
+        "max": 30
+    },
     "analog_outputs": {
-      "ao1": {
-        "min": 10,
-        "max": 60
-      },
       "ao2": {
         "min": 10,
         "max": 60
@@ -135,12 +135,46 @@
       }
     }
   },
-  "fast": {
-    "analog_outputs": {
-      "ao1": {
-        "min": 20,
+  "default_nomag": {
+    "heater": {
+        "min": 15,
         "max": 30
+    },
+    "analog_outputs": {
+      "ao2": {
+        "min": 120,
+        "max": 240
+      }
+    },
+    "channels": {
+      "ch1": {
+        "min": 120,
+        "max": 180
       },
+      "ch2": {
+        "min": 120,
+        "max": 180
+      },
+      "ch3": {
+        "min": 600000,
+        "max": 600001
+      },
+      "ch5": {
+        "min": 60,
+        "max": 120
+      },
+      "ch6": {
+        "min": 30,
+        "max": 60
+      }
+    }
+  },
+  "fast": {
+    "heater": {
+        "min": 15,
+        "max": 30
+    },
+    "analog_outputs": {
       "ao2": {
         "min": 40,
         "max": 60
@@ -166,6 +200,40 @@
       "ch6": {
         "min": 5,
         "max": 20
+      }
+    }
+  },
+    "slow": {
+    "heater": {
+        "min": 3600,
+        "max": 3630
+    },
+    "analog_outputs": {
+      "ao2": {
+        "min": 3600,
+        "max": 3630
+      }
+    },
+    "channels": {
+      "ch1": {
+        "min": 3600,
+        "max": 3630
+      },
+      "ch2": {
+        "min": 3600,
+        "max": 3630
+      },
+      "ch3": {
+        "min": 3600,
+        "max": 3630
+      },
+      "ch5": {
+        "min": 3600,
+        "max": 3630
+      },
+      "ch6": {
+        "min": 3600,
+        "max": 3630
       }
     }
   }
