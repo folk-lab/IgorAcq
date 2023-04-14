@@ -142,7 +142,7 @@ function GetSRSSensitivity(instrID,[integer]) // Units: mV or nA
 	response = str2num(queryInstr(instrID, "SENS?\n"))
 	if(integer)
 		return response
-	endif
+	endif                                                            
 	modulo = mod(response,3)
 	expo = (response-modulo)/3
 
