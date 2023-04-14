@@ -637,7 +637,7 @@ function Scank2400(instrID, startx, finx, channelsx, numptsx, delayx, rampratex,
 	rampK2400Voltage(S.instrIDx, startx)
 	
 	// Let gates settle 
-	sc_sleep(S.delayy*5)
+	sc_sleep(S.delayy*20)
 	
 	// Make waves and graphs etc
 	initializeScan(S)
@@ -646,7 +646,8 @@ function Scank2400(instrID, startx, finx, channelsx, numptsx, delayx, rampratex,
 	variable i=0, setpointx
 	do
 		setpointx = S.startx + (i*(S.finx-S.startx)/(S.numptsx-1))
-		rampK2400Voltage(S.instrIDx, setpointx, ramprate=S.rampratex)
+//		rampK2400Voltage(S.instrIDx, setpointx, ramprate=S.rampratex)
+		setK2400Voltage(S.instrIDx, setpointx)
 		sc_sleep(S.delayx)
 		RecordValues(S, i, i)
 		i+=1
