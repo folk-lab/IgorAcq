@@ -217,6 +217,28 @@ function/s scu_getChannelNumbers(channels, [fastdac])
 end
 
 
+function/s scu_getDeviceChannels(instrID, channels, [adc_flag])
+	// Convert from absolute channel number to device specific channel number (i.e. channel 8 is probably fd2's channel 0)
+	variable instrID, adc_flag  //adc_flag = 1 for ADC channels, = 0 for DAC channels
+	string channels
+
+	string new_channels = ""
+	variable real_channel_val
+	string sep = selectString(adc_flag, ",", ";")
+	variable i
+	for (i = 0; i<itemsinlist(channels, sep); i++)
+		real_channel_val = str2num(stringfromList(i, channels, sep)) - scf_getChannelStartNum(instrID, adc=adc_flag)
+		if (real_channel_val < 0)
+			printf "ERROR: Channels passed were [%s]. After subtracting the start value for the device for the %d item in list, this resulted in a real value of %d which is not valid\r", channels, i, real_channel_val
+			abort "ERROR: Bad device channel given (see command history for more info)"
+		endif
+		new_channels = addlistItem(num2str(real_channel_val), new_channels, sep, INF)
+	endfor
+	if (strlen(new_channels) > 0 && cmpstr(channels[strlen(channels)-1], sep) != 0) // remove trailing ; or , if it WASN'T present initially
+		new_channels = new_channels[0,strlen(new_channels)-2] 
+	endif
+	return new_channels
+end
 ///////////////////////////////////////////////////////////////
 ///////////////// Sleeps/Delays ///////////////////////////////
 ///////////////////////////////////////////////////////////////
@@ -1313,7 +1335,6 @@ function scs_checksweepstate()
 		// Pause sweep if button is pressed
 		do
 			if(sc_abortsweep)
-//				SaveWaves(msg="The scan was aborted during the execution.", save_experiment=0,fastdac=fastdac)
 				dowindow /k SweepControl
 				sc_abortsweep=0
 				sc_abortnosave=0
@@ -2624,31 +2645,42 @@ function scc_checkLimsFD(S)
 	endif
 
 	// Check that start/fin for each channel will stay within software limits
-	string softLimitPositive = "", softLimitNegative = "", expr = "(-?[[:digit:]]+)\\s*,\\s*([[:digit:]]+)", question
-	variable startval = 0, finval = 0
 	string buffer
 	for(i=0;i<itemsinlist(channels,",");i+=1)
-		splitstring/e=(expr) fdacvalstr[str2num(stringfromlist(i,channels,","))][2], softLimitNegative, softLimitPositive
- 		if(!numtype(str2num(softLimitNegative)) == 0 || !numtype(str2num(softLimitPositive)) == 0)
- 			sprintf buffer, "No Lower or Upper Limit found for Channel %s. Low limit = %s. High limit = %s, Limit string = %s\r", stringfromlist(i,channels,","), softLimitNegative, softLimitPositive, fdacvalstr[str2num(stringfromlist(i,channels,","))][2]
- 			abort buffer
- 		endif
- 		
-		startval = str2num(stringfromlist(i,starts,","))
-		finval = str2num(stringfromlist(i,fins,","))
-		if(startval < str2num(softLimitNegative) || startval > str2num(softLimitPositive) || finval < str2num(softLimitNegative) || finval > str2num(softLimitPositive))
-			// we are outside limits
-			sprintf question, "DAC channel %s will be ramped outside software limits. Continue?", stringfromlist(i,channels,",")
-			answer = ask_user(question, type=1)
-			if(answer == 2)
-				print("[ERROR] \"RecordValues\": User abort!")
-				dowindow/k SweepControl // kill scan control window
-				abort
-			endif
-		endif
+		scc_checkLimsSingleFD(stringfromlist(i,channels,","), str2num(stringfromlist(i,starts,",")), str2num(stringfromlist(i,fins,",")))
 	endfor		
 end
 
+function scc_checkLimsSingleFD(channel, start, fin)
+	// Check the start/fin are within limits for channel of FastDAC 
+	// TODO: This function can be fairly easily adapted for BabyDACs too
+	string channel // Single Channel str
+	variable start, fin  // Single start, fin val for sweep
+	
+	variable channel_num = str2num(scu_getChannelNumbers(channel, fastdac=1))
+	
+	string softLimitPositive = "", softLimitNegative = "", expr = "(-?[[:digit:]]+)\\s*,\\s*([[:digit:]]+)", question, buffer
+	variable startval = 0, finval = 0, answer
+	wave/t fdacvalstr
+	
+	splitstring/e=(expr) fdacvalstr[channel_num][2], softLimitNegative, softLimitPositive
+	if(!numtype(str2num(softLimitNegative)) == 0 || !numtype(str2num(softLimitPositive)) == 0)
+		sprintf buffer, "No Lower or Upper Limit found for Channel %s. Low limit = %s. High limit = %s, Limit string = %s\r", channel, softLimitNegative, softLimitPositive, fdacvalstr[channel_num][2]
+		abort buffer
+	endif
+	
+	if(start < str2num(softLimitNegative) || start > str2num(softLimitPositive) || fin < str2num(softLimitNegative) || fin > str2num(softLimitPositive))
+		// we are outside limits
+		sprintf question, "DAC channel %s will be ramped outside software limits. Continue?", channel
+		answer = ask_user(question, type=1)
+		if(answer == 2)
+			print("[ERROR] \"RecordValues\": User abort!")
+			dowindow/k SweepControl // kill scan control window
+			abort
+		endif
+	endif
+
+end
 
 function scc_checkSameDeviceFD(S, [x_only, y_only])
 	// Checks all rampChs and ADCs (selected in fd_scancontroller window)
@@ -3180,7 +3212,6 @@ end
 
 
 function/S scf_getChannelNumsOnFD(channels, device, [adc])
-	// Convert from absolute channel number to device channel number (i.e. DAC 9 is actually FastDAC2s 1 channel)
 	// Returns device number in device variable
 	// Note: Comma separated list
 	// Note: Must be channel NUMBERS
@@ -3651,7 +3682,7 @@ function scfd_updateWindow(S, numAdcs)
 	if (cmpstr(scf_getFDVisaAddress(device_num), getResourceAddress(S.instrIDx)) != 0)
 		print("ERROR[scfd_updateWindow]: channel device address doesn't match instrID address")
 	else
-		scfw_updateFdacValStr(str2num(channel), getFDACOutput(S.instrIDx, str2num(device_channel)), update_oldValStr=1)
+		scfw_updateFdacValStr(str2num(channel), getFDACOutput(S.instrIDx, str2num(device_channel)), update_oldValStr=1)  // + scf_getChannelStartNum( scf_getFDVisaAddress(device_num))
 	endif
   endfor
 
@@ -4054,7 +4085,7 @@ function scfw_update_all_fdac([option])
 						variable value
 						for(j=0;j<numDACCh;j+=1)
 							// getfdacOutput(tempname,j)
-							value = getfdacOutput(tempname,j) // j only because this is PER DEVICE
+							value = getfdacOutput(tempname,j+startCh)
 							scfw_updateFdacValStr(startCh+j, value, update_oldValStr=1)
 						endfor
 						break

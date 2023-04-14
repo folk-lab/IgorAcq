@@ -64,7 +64,8 @@ function openLS625connection(instrVarName, visa_address, amps_per_tesla, max_fie
 	
 	string comm = ""
 	sprintf comm, "name=LS625,instrID=%s,visa_address=%s" instrVarName, visa_address
-	string options = "baudrate=57600,databits=7,stopbits=1,parity=1,test_query=*IDN?"
+//	string options = "baudrate=57600,databits=7,stopbits=1,parity=1,test_query=*IDN?"
+	string options = "test_query=*IDN?"	
 
 	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
 
@@ -117,7 +118,7 @@ threadsafe function getLS625current(instrID) // Units: A
 	variable instrID
 	variable current
 
-	current = str2num(queryInstr(instrID,"RDGI?\r\n", read_term = "\r\n"))
+	current = str2num(queryInstr(instrID,"RDGI?\r\n"))//, read_term = "\r\n"))
 	
 	return current
 end
@@ -140,7 +141,7 @@ function getLS625rate(instrID) // Units: mT/min
 	variable rampratefield, currentramprate
 	svar instrDescX,instrDescZ
 
-	currentramprate = str2num(queryInstr(instrID,"RATE?\r\n", read_term = "\r\n")) // A/s
+	currentramprate = str2num(queryInstr(instrID,"RATE?\r\n"))//, read_term = "\r\n")) // A/s
 	rampratefield = roundNum(currentramprate/apt*60*1000,5)
 
 	return rampratefield
@@ -151,7 +152,7 @@ function getLS625rampStatus(instrID)
 	string response
 	variable ramping
 
-	response = queryInstr(instrID,"OPST?\r\n",read_term = "\r\n")
+	response = queryInstr(instrID,"OPST?\r\n")//,read_term = "\r\n")
 	if(str2num(response) == 6)
 		ramping = 0
 	else

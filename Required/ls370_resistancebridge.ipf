@@ -63,7 +63,7 @@ function setLS370system(system)
 			ls_label = "XLD"					//plate				//labels	  			//IDs
 			string/g bfbd_ChannelLookUp = "mc;still;magnet;4K;50K;ch6;ch5;ch3;ch2;ch1;6;5;3;2;1"  
 			string/g bfheaterlookup = "mc;still;sc_mc;ao2"							 		//sc_mc only used internally, still label refers to API 	
-			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,310,1201,1800,10000}} 
+			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,290,1201,1800,10000}} 
 			break
 		default:
 			abort "[ERROR] Please choose a supported LS370 system: [bfsmall, bfbig]"
@@ -717,10 +717,11 @@ function WaitTillTempStable(instrID, targetTmK, times, delay, err)
 	variable j = 0
 	for (passCount=0; passCount<times; )
 		asleep(delay)
-		for (j = 0; j<10; j+=1)
-			currentT += getLS370temp(instrID, "mc")/10 // do some averaging
-			asleep(2.1)
-		endfor
+//		for (j = 0; j<10; j+=1)
+//			currentT += getLS370temp(instrID, "mc")/10 // do some averaging
+//			asleep(2.1)
+//		endfor
+		currentT = getls370temp(instrID, "mc")
 		if (ABS(currentT-targetT) < err*targetT)
 			passCount+=1
 			print "Accepted", passCount, " @ ", currentT, "K"
@@ -972,15 +973,20 @@ function/s getLS370Status(instrID)
 	string searchStr="", statement="", timestamp="", temp="", tempBuffer="", channel_label
 	variable i=0
 	for(i=0;i<itemsinlist(channelLabel,",");i+=1)
-		sprintf searchStr, "default:channels:%s:max", stringfromlist(i,channelLabel,",")
+		// Use the "default" schedules "max" allowed times to decide what is the oldest allowed recorded temperature
+		sprintf searchStr, "default:channels:%s:max", stringfromlist(i,channelLabel,",") 
 		
-		timestamp = sc_SQLtimestamp(str2num(getJSONvalue(jstr,searchStr)))		
+		//UNCOMMENT WHEN ABLE TO CONNECT TO DATABASE
+		timestamp = sc_SQLtimestamp(str2num(getJSONvalue(jstr,searchStr)))	
+			
 //		timestamp = sc_SQLtimestamp(3600) // Temporarily allow any old measurement of temp
 //		timestamp = sc_SQLtimestamp(1) // Temporarily always request new
-		
+
+		// Ask the database if it has a recent enough temperature		
 		sprintf statement, "SELECT temperature_k FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, temp_schema, stringfromlist(i,channelLabel,","), timestamp
 		temp = requestSQLValue(statement)
 
+		// If the database did not have a recent enough temperature, ask for a new one from the lakeshore (this takes 10 - 20s per channel)
 		if(cmpstr(temp,"") == 0)
 			temp = num2str(getLS370temp(instrID,stringfromlist(i,LSkeys,",")))
 		endif
@@ -1007,7 +1013,37 @@ function/s getLS370Status(instrID)
 	string buffer = tempBuffer
 	
 	return addJSONkeyval("","Lakeshore",buffer)
+
+//	string buffer
+//	buffer = getls370status_nosql(instrID)
+//	return buffer
 end
+
+
+
+function/s getls370status_nosql(instrID)
+	string instrID
+
+	make/free/t LS_keys = {"MC", "50K", "4K", "Magnet", "Still"}
+	make/free/t JSON_keys = {"MC K","50K Plate K","4K Plate K","Magnet K","Still K"}
+
+	string temp="", Buffer=""
+	string LS_key, JSON_key
+	variable i
+	for (i=0; i<numpnts(LS_keys); i++)
+		LS_key = LS_keys[i]
+		JSON_key = JSON_keys[i]
+		temp = num2str(getls370temp(instrID, LS_key))
+		Buffer = addJSONkeyval(Buffer, JSON_key, temp)
+	endfor
+
+	Buffer = addJSONkeyval("","Temperature",Buffer)
+	Buffer = addJSONkeyval("","Lakeshore",Buffer)
+
+	return Buffer
+end
+
+
 
 function/s getBFStatus(instrID)
 	// instrID is not used here, just pass any string. It's kept for consistency.

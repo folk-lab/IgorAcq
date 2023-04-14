@@ -663,12 +663,19 @@ function sc_copyNewFiles(datnum, [save_experiment, verbose] )
 	
 	// add experiment/history/procedure files
 	// only if I saved the experiment this run
-	if(!paramisdefault(save_experiment) && save_experiment == 1)
-	
-		// add experiment file
-		tmpname = igorinfo(1)+".pxp"
-		sc_copySingleFile("data","backup_data",tmpname, allow_overwrite=1)
 
+	nvar/z sc_experiment_save_time
+	if (!nvar_Exists(sc_experiment_save_time))
+		variable/g sc_experiment_save_time = 0	
+	endif
+	if(!paramisdefault(save_experiment) && save_experiment == 1)
+		// add experiment file
+		if (datetime - sc_experiment_save_time > 60*60*24)  // Only copy the experiment to server once a day at most
+		   tmpname = igorinfo(1)+".pxp"
+			sc_copySingleFile("data","backup_data",tmpname, allow_overwrite=1)		
+			sc_experiment_save_time = datetime
+		endif		
+		
 		// add history file
 		tmpname = igorinfo(1)+".history"
 		sc_copySingleFile("data","backup_data",tmpname, allow_overwrite=1)
@@ -1558,6 +1565,7 @@ function/s textWave2StrArray(w)
 	for (ii=0; ii<m; ii+=1)
 		list += "["
 		for(jj=0; jj<n; jj+=1)
+//   		list+="\""+removeWhiteSpace(escapeQuotes(w[jj][ii]))+"\","
    		list+="\""+escapeQuotes(w[jj][ii])+"\","
 		endfor
 		list = list[0,strlen(list)-2] // remove comma
@@ -1571,6 +1579,7 @@ function/s textWave2StrArray(w)
 
 	return list
 end
+
 
 function/s addJSONkeyval(JSONstr,key,value,[addquotes])
 	// returns a valid JSON string with a new key,value pair added.
@@ -1721,6 +1730,14 @@ function/S removeTrailingWhitespace(str)
     return str
 End
 
+function/s removeWhiteSpace(str)
+	// Remove leading or trailing whitespace
+	string str
+	str = removeLeadingWhitespace(str)
+	str = removeTrailingWhitespace(str)
+	return str
+end
+
 function countQuotes(str)
 	// count how many quotes are in the string
 	// +1 for "
@@ -1771,7 +1788,6 @@ function /S escapeQuotes(str)
 		if( CmpStr(str[i], "\"" ) == 0 && escaped == 0)
 			// this is an unescaped quote
 			str = str[0,i-1] + "\\" + str[i,inf]
-//			str = str[0,i-1] + "\\" + str[i,inf]
 		endif
 		i+=1
 
