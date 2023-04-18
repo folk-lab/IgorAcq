@@ -252,7 +252,8 @@ function sc_sleep(delay)
 
 	// Note: This can take >100ms when 2D plots are large (e.g. 10000x2000)
 //	doupdate // do this just once during the sleep function 
-// TODO: check if this prevents proper graph update for slow ScanController scans. slow 2d scan would do this
+// Checked ScanFastDacSlow with ScanFastDacSlow2D(fd, -1, 1, "OHV*9950", 101, 0.0, -1, 1, "OHC(10M)", 3, delayy=0.1, comments="graph update test")
+// and the the graphs update during sweep. 
 	do
 		try
 			scs_checksweepstate()
