@@ -250,7 +250,9 @@ function sc_sleep(delay)
 	variable start_time = stopMStimer(-2) // start the timer immediately
 	nvar sc_abortsweep, sc_pause
 
-	doupdate // do this just once during the sleep function
+	// Note: This can take >100ms when 2D plots are large (e.g. 10000x2000)
+//	doupdate // do this just once during the sleep function 
+// TODO: check if this prevents proper graph update for slow ScanController scans. slow 2d scan would do this
 	do
 		try
 			scs_checksweepstate()
