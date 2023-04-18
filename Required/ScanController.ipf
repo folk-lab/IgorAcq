@@ -330,6 +330,11 @@ structure ScanVars
     variable alternate  // Allows controlling scan from start -> fin or fin -> start (with 1 or -1)
     variable duration   // Can specify duration of scan rather than numpts or sweeprate for readVsTime
 	 variable readVsTime // Set to 1 if doing a readVsTime
+	 variable interlaced_y_flag // Whether there are different values being interlaced in the y-direction of the scan
+	 string interlaced_channels // Channels that the scan will interlace between 
+	 string interlaced_setpoints // Setpoints of each channel to interlace between e.g. "0,1,2;0,10,20" will expect 2 channels (;) which interlace between 3 values each (,)
+	 variable interlaced_num_setpoints // Number of setpoints for each channel (calculated in InitScanVars)
+	 variable prevent_2d_graph_updates // For fast x sweeps with large numptsy (e.g. 2k x 10k) the 2D graph update time becomes significant
 
     // Other useful info
     variable start_time // Should be recorded right before measurements begin (e.g. after all checks are carried out)
@@ -343,10 +348,10 @@ structure ScanVars
     variable numADCs  // How many ADCs are being recorded 
     variable samplingFreq, measureFreq  // measureFreq = samplingFreq/numADCs 
     variable sweeprate  // How fast to sweep in mV/s (easier to specify than numpts for fastdac scans)
-    string adcList 
+    string adcList // Which adcs' are being recorded
 	 string raw_wave_names  // Names of waves to override the names raw data is stored in for FastDAC scans
 	 
-	 // Backend used
+	 // Backend use
      variable direction   // For keeping track of scan direction when using alternating scan
 	 variable never_save   // Set to 1 to make sure these ScanVars are never saved (e.g. if using to get throw away values for getting an ADC reading)
 	 variable filenum 		// Filled when getting saved
@@ -366,7 +371,7 @@ function scv_setLastScanVars(S)
 		make/o/T sc_lastScanVarsStrings = {\
 			S.channelsx, S.channelsy, S.x_label, S.y_label, S.comments,\
 			S.adcList, S.startxs, S.finxs, S.startys, S.finys,\
-			S.raw_wave_names\
+			S.interlaced_channels, S.interlaced_setpoints, S.raw_wave_names, S.adcList\
 			}
 		make/o/d sc_lastScanVarsVariables = {\
 			S.instrIDx, S.instrIDy, S.lims_checked, S.startx, S.finx, S.numptsx,\
@@ -374,7 +379,7 @@ function scv_setLastScanVars(S)
 		 	S.numptsy, S.rampratey, S.delayy, S.alternate, S.duration,\
 		 	S.readVsTime, S.start_time, S.end_time, S.using_fastdac, S.numADCs,\
 		 	S.samplingFreq, S.measureFreq, S.sweeprate, S.direction, S.never_save,\
-		 	S.filenum\
+		 	S.filenum, S.interlaced_y_flag, S.interlaced_num_setpoints\
 		 	}
 		
 		S.start_time = st  // Restore to whatever it was before	
@@ -400,7 +405,10 @@ function scv_getLastScanVars(S)
 	S.finxs = t[7]
 	S.startys = t[8]
 	S.finys = t[9]
-	S.raw_wave_names = t[10]
+	S.interlaced_channels = t[10]
+	S.interlaced_setpoints = t[11]
+	S.raw_wave_names = t[12]
+	S.adcList = t[13]
 
 	// Load Variable parts
 	S.instrIDx = v[0]
@@ -430,15 +438,17 @@ function scv_getLastScanVars(S)
 	S.direction = v[24]
 	S.never_save = v[25]
 	S.filenum = v[26]
+	S.interlaced_y_flag = v[27]
+	S.interlaced_num_setpoints = v[28]
 end
 	
-function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, rampratex, instrIDy, starty, finy, channelsy, numptsy, rampratey, delayy, x_label, y_label, startxs, finxs, startys, finys, alternate, comments])
+function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, rampratex, instrIDy, starty, finy, channelsy, numptsy, rampratey, delayy, x_label, y_label, startxs, finxs, startys, finys, alternate, interlaced_channels, interlaced_setpoints, comments])
     // Function to make setting up general values of scan vars easier
     // PARAMETERS:
     // startx, finx, starty, finy -- Single start/fin point for all channelsx/channelsy
     // startxs, finxs, startys, finys -- For passing in multiple start/fin points for each channel as a comma separated string instead of a single start/fin for all channels
     //		Note: Just pass anything for startx/finx if using startxs/finxs, they will be overwritten
-    struct ScanVars &s
+    struct ScanVars &S
     variable instrIDx, instrIDy
     variable startx, finx, numptsx, delayx, rampratex
     variable starty, finy, numptsy, delayy, rampratey
@@ -446,7 +456,8 @@ function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, ra
     string channelsx
     string channelsy
     string x_label, y_label
-	string startxs, finxs, startys, finys
+	 string startxs, finxs, startys, finys
+	 string interlaced_channels, interlaced_setpoints
     string comments
     
 	// Handle Optional Strings
@@ -460,6 +471,9 @@ function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, ra
 	finxs = selectString(paramisdefault(finxs), finxs, "")
 	startys = selectString(paramisdefault(startys), startys, "")
 	finys = selectString(paramisdefault(finys), finys, "")
+	
+	interlaced_channels = selectString(paramisdefault(interlaced_channels), interlaced_channels, "")
+	interlaced_setpoints = selectString(paramisdefault(interlaced_setpoints), interlaced_setpoints, "")
 
 	comments = selectString(paramisdefault(comments), comments, "")
 
@@ -489,6 +503,21 @@ function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, ra
 	S.alternate = alternate // Allows controlling scan from start -> fin or fin -> start (with 1 or -1)
 	S.duration = NaN // Can specify duration of scan rather than numpts or sweeprate  
 	S.readVsTime = 0 // Set to 1 if doing a readVsTime
+	
+	
+	// For interlaced scans
+	S.interlaced_channels = interlaced_channels
+	S.interlaced_setpoints = interlaced_setpoints
+	if (cmpstr(interlaced_channels, "") != 0  && cmpstr(interlaced_setpoints, "") != 0) // if string are NOT empty. cmpstr returns 0, if strings are equal
+		S.interlaced_y_flag = 1 
+		variable non_interlaced_numptsy = numptsy 
+		S.interlaced_num_setpoints = ItemsInList(StringFromList(0, interlaced_setpoints, ";"), ",")
+		S.numptsy = numptsy * S.interlaced_num_setpoints
+		printf "NOTE: Interlace scan, numptsy will increase from %d to %d\r" ,non_interlaced_numptsy, S.numptsy
+
+	endif
+	
+	
 
 	// Other useful info
 	S.start_time = NaN // Should be recorded right before measurements begin (e.g. after all checks are carried out)  
@@ -517,7 +546,7 @@ function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, ra
 end
 
 
-function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate, duration, rampratex, delayx, starty, finy, channelsy, numptsy, rampratey, delayy, startxs, finxs, startys, finys, x_label, y_label, alternate, comments])
+function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate, duration, rampratex, delayx, starty, finy, channelsy, numptsy, rampratey, delayy, startxs, finxs, startys, finys, x_label, y_label, alternate,  interlaced_channels, interlaced_setpoints, comments])
     // Function to make setting up scanVars struct easier for FastDAC scans
     // PARAMETERS:
     // startx, finx, starty, finy -- Single start/fin point for all channelsx/channelsy
@@ -533,6 +562,7 @@ function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
     string channelsx, channelsy
     string startxs, finxs, startys, finys
     string  x_label, y_label
+    string interlaced_channels, interlaced_setpoints
     string comments
 	
 	// Ensure optional strings aren't null
@@ -545,13 +575,17 @@ function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
 	startxs = selectString(paramIsDefault(startxs), startxs, "")
 	finxs = selectString(paramIsDefault(finxs), finxs, "")
 	x_label = selectString(paramIsDefault(x_label), x_label, "")
+	
+	interlaced_channels = selectString(paramisdefault(interlaced_channels), interlaced_channels, "")
+	interlaced_setpoints = selectString(paramisdefault(interlaced_setpoints), interlaced_setpoints, "")
 
 	comments = selectString(paramIsDefault(comments), comments, "")
+
 
 	// Standard initialization
 	initScanVars(S, instrIDx=instrID, startx=startx, finx=finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
 	instrIDy=instrID, starty=starty, finy=finy, channelsy=channelsy, numptsy=numptsy, rampratey=rampratey, delayy=delayy, \
-	x_label=x_label, y_label=y_label, startxs=startxs, finxs=finxs, startys=startys, finys=finys, alternate=alternate, comments=comments)
+	x_label=x_label, y_label=y_label, startxs=startxs, finxs=finxs, startys=startys, finys=finys, alternate=alternate, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments)
 	
 	
 	// Additional intialization for fastDAC scans
@@ -573,6 +607,7 @@ function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
 
    	// Sets starts/fins (either using starts/fins given or from single startx/finx given)
     scv_setSetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
+
 	
 	// Set variables with some calculation
     scv_setFreq(S) 		// Sets S.samplingFreq/measureFreq/numADCs	
@@ -729,6 +764,33 @@ function scv_setSetpoints(S, itemsx, startx, finx, itemsy, starty, finy, startxs
             s.finys = fins
         else
             abort "Something wrong with Y part. Note: If either of startys/finys is provided, both must be provided"
+        endif
+        if (S.interlaced_y_flag)
+        	// Slightly adjust the endpoints such that the DAC steps are the same as without interlaced
+        	variable num_setpoints = S.interlaced_num_setpoints
+        	variable num_dac_steps = S.numptsy/num_setpoints
+        	variable spacing, original_finy, original_starty, new_finy
+        	
+        	// Adjust the single finy
+        	original_finy = S.finy
+        	original_starty = S.starty
+        	spacing = (original_finy-original_starty)/(num_dac_steps-1)/num_setpoints
+        	new_finy = original_finy + spacing*(num_setpoints-1)
+        	S.finy = new_finy
+			
+			// Adjust the finys
+			string new_finys = ""
+			variable i
+			for (i=0;i<itemsinList(S.finys, ",");i++)
+	        	original_finy = str2num(stringfromList(i, S.finys, ","))
+	        	original_starty = str2num(stringfromList(i, S.startys, ","))
+	        	spacing = (original_finy-original_starty)/(num_dac_steps-1)/num_setpoints
+	        	new_finy = original_finy + spacing*(num_setpoints-1)
+	        	new_finys = AddListItem(num2str(new_finy), new_finys, ",", INF)
+			endfor
+			scv_sanitizeSetpoints(S.startys, new_finys, itemsy, starts, fins)
+//			new_finys = new_finys[0,strlen(new_finys)-2] // Remove the comma Igor stupidly leaves behind...
+        	S.finys = fins
         endif
     else
     	S.startys = ""
@@ -996,9 +1058,12 @@ function/S scg_initializeGraphs(S)
 		else
 			ylabel = S.y_label
 		endif
-        buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, is2d=S.is2d, y_label=ylabel)
+        buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, for_2d=0, y_label=ylabel)
         if(raw==1) // Raw waves
 	        sc_rawGraphs1D = buffer
+        endif
+        if (s.is2d)
+	        buffer = buffer + scg_initializeGraphsForWavenames(waveNames, S.x_label, for_2d=1, y_label=ylabel)
         endif
         graphIDs = graphIDs + buffer
     endfor
@@ -1006,42 +1071,41 @@ function/S scg_initializeGraphs(S)
 end
 
 
-function/S scg_initializeGraphsForWavenames(wavenames, x_label, [is2d, y_label])
+function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label])
 	// Ensures a graph is open and tiles graphs for each wave in comma separated wavenames
 	// Returns list of graphIDs of active graphs
 	string wavenames, x_label, y_label
-	variable is2d
+	variable for_2d
 	
 	y_label = selectString(paramisDefault(y_label), y_label, "")
 	string y_label_2d = y_label
-	string y_label_1d = selectString(is2d, y_label, "")  // Only use the y_label for 1D graphs if the scan is 1D (otherwise gets confused with y sweep gate)
+	string y_label_1d = selectString(for_2d, y_label, "")  // Only use the y_label for 1D graphs if the scan is 1D (otherwise gets confused with y sweep gate)
 
 
 	string wn, openGraphID, graphIDs = ""
 	variable i
 	for (i = 0; i<ItemsInList(waveNames); i++)  // Look through wavenames that are being recorded
 	    wn = StringFromList(i, waveNames)
+	    if (for_2d)
+	    	wn = wn+"_2d"
+	    endif
+	    
 	    openGraphID = scg_graphExistsForWavename(wn)
 	    if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-	        scg_setupGraph1D(openGraphID, x_label, y_label=y_label_1d)  
+	    	if (!for_2d)
+	       	scg_setupGraph1D(openGraphID, x_label, y_label=y_label_1d)  
+	       else
+	       	scg_setupGraph2D(openGraphID, wn, x_label, y_label_2d)
+	       endif
 	    else 
-	        scg_open1Dgraph(wn, x_label, y_label=y_label, y_label=y_label_1d)
-	        openGraphID = winname(0,1)
+	    	if (!for_2d)
+	       	scg_open1Dgraph(wn, x_label, y_label=y_label, y_label=y_label_1d)
+	       else
+	       	scg_open2Dgraph(wn, x_label, y_label_2d)
+	       endif
+	       openGraphID = winname(0,1)
 	    endif
-       graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
-
-
-	    if (is2d)
-	        wn = wn+"_2d"
-	        openGraphID = scg_graphExistsForWavename(wn)
-	        if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-	            scg_setupGraph2D(openGraphID, wn, x_label, y_label_2d)
-	        else 
-	            scg_open2Dgraph(wn, x_label, y_label_2d)
-	            openGraphID = winname(0,1)
-	        endif
-           graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
-	    endif
+       graphIDs = addlistItem(openGraphID, graphIDs, ";", INF) 
 	endfor
 	return graphIDs
 end
@@ -1761,6 +1825,11 @@ function/T sce_ScanVarsToJson(S, traceback, [save_to_file])
 	buffer = addJSONkeyval(buffer,"duration",num2str(S.duration))
 	buffer = addJSONkeyval(buffer,"alternate",num2istr(S.alternate))	
 	buffer = addJSONkeyval(buffer,"readVsTime",num2str(S.readVsTime))
+	buffer = addJSONkeyval(buffer,"interlaced_y_flag",num2str(S.interlaced_y_flag))
+	buffer = addJSONkeyval(buffer,"interlaced_channels",S.interlaced_channels,addquotes=1)
+	buffer = addJSONkeyval(buffer,"interlaced_setpoints",S.interlaced_setpoints,addquotes=1)
+	buffer = addJSONkeyval(buffer,"interlaced_num_setpoints",num2str(S.interlaced_num_setpoints))
+	
 	buffer = addJSONkeyval(buffer,"start_time",num2str(S.start_time, "%.2f"))
 	buffer = addJSONkeyval(buffer,"end_time",num2str(S.end_time,"%.2f"))
 	buffer = addJSONkeyval(buffer,"using_fastdac",num2str(S.using_fastdac))
@@ -3011,7 +3080,7 @@ end
 
 function scf_checkInstrIDmatchesDevice(instrID, device_num)
 	// checks instrID is the correct Visa address for device number
-	// e.g. if instrID is to FD1, but if when checking DevChannels device 2 was returned, this will fail
+	// e.g. if instrID is set to FD1, but if when checking DevChannels device 2 was returned, this will fail
 	variable instrID, device_num
 
 	string instrAddress = getResourceAddress(instrID)
@@ -3394,7 +3463,7 @@ function scfd_resampleWaves(w, measureFreq, targetFreq)
 		string cmd
 		printf cmd "WARNING[scfd_resampleWaves]: Resampling will increase number of datapoints, not decrease! (ratio = %d/%d)\r", V_numerator, V_denominator
 	endif
-	resample/UP=(V_numerator)/DOWN=(V_denominator)/N=201 w
+	resample/UP=(V_numerator)/DOWN=(V_denominator)/N=201/E=3 w
 	// TODO: Need to test N more (simple testing suggests we may need >200 in some cases!)
 	// TODO: Need to decide what to do with end effect. Possibly /E=2 (set edges to 0) and then turn those zeros to NaNs? 
 	// TODO: Or maybe /E=3 is safest (repeat edges). The default /E=0 (bounce) is awful.
@@ -3535,7 +3604,9 @@ function scfd_ProcessAndDistribute(ScanVars, rowNum)
 			calc2d[][rowNum] = sc_tempwave[p]		
 		endif
 	endfor	
-	doupdate // Update all the graphs with their new data
+	if (!ScanVars.prevent_2d_graph_updates)
+		doupdate // Update all the graphs with their new data
+	endif
 end
 
 
@@ -4117,7 +4188,7 @@ function scfw_update_all_fdac([option])
 				viClose(tempname)
 				viClose(viRM)
 		endif
-		startCh =+ numDACCh
+		startCh += numDACCh
 	endfor
 end
 
