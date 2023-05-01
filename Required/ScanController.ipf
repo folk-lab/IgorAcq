@@ -1720,6 +1720,7 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	
 	Struct ScanVars S_ // Note: This will definitely exist for the rest of this function
 	scv_getLastScanVars(S_)
+	print S_
 	if (aborting)
 		S_.end_time = datetime
 		S_.comments = "aborted, " + S_.comments
@@ -3460,7 +3461,8 @@ function scfd_resampleWaves(w, measureFreq, targetFreq)
 	// to targetFreq (which should be lower than measureFreq)
 	Wave w
 	variable measureFreq, targetFreq
-	
+	// notch_filter(w,60); 	 notch_filter(w,180); 	 notch_filter(w,300)
+
 	RatioFromNumber (targetFreq / measureFreq)
 	if (V_numerator > V_denominator)
 		string cmd

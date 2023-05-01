@@ -1,0 +1,742 @@
+﻿#pragma TextEncoding = "UTF-8"
+#pragma rtGlobals=3			// Use modern global access method and strict wave access
+#pragma DefaultTab={3,20,4}		// Set default tab width in Igor Pro 9 and later
+#include <Reduce Matrix Size>
+
+function ctrans_avg(int wavenum, int refit,[int dotcondcentering])
+	variable refnum, ms
+	//		stopalltimers() // run this line if timer returns nan
+
+	refnum=startmstimer
+
+	//closeallGraphs()
+
+	string datasetname ="dat"+num2str(wavenum)+"cscurrent_2d"
+	string avg = "cst" + num2str(wavenum) + "cleaned_avg"
+	string centered="cst"+num2str(wavenum)+"centered"
+	string cleaned="cst"+num2str(wavenum)+"cleaned"
+	string fit_params_name = "cst"+num2str(wavenum)+"fit_params"
+	string centavg = "cst"+num2str(wavenum)+"centavg"
+
+	variable N=3; // how many sdevs are acceptable?
+	dotcondcentering = paramisdefault(dotcondcentering)	 ? 1 : dotcondcentering
+
+
+	wave W_coef
+	wave badthetasx
+	wave badgammasx
+
+	remove_noise($datasetname);
+	datasetname=datasetname+"_nf";
+	string quickavg = datasetname+"_avg"
+
+	resampleWave($datasetname,600);
+	avg_wav($datasetname) // quick average plot
+
+	if (refit==1)
+		get_initial_params($quickavg);// print W_coef
+		fit_transition($quickavg);// print W_coef
+		get_fit_params($datasetname) // 1 is for do not look for starting params
+	endif
+	find_plot_thetas(wavenum,N)
+
+	if (dotcondcentering==0)
+		find_plot_thetas(wavenum,N)
+		centering($datasetname) // centred plot and average plot
+		cleaning($centered,badthetasx)
+
+	elseif(dotcondcentering==1)	
+	dotcond_centering($datasetname)
+	cleaning($centered,badgammasx)
+
+	endif
+	
+
+	
+	
+
+	avg_wav($cleaned) // quick average plot
+	fit_transition($avg)
+	prepfigs(wavenum,N)
+
+	ms=stopmstimer(refnum)
+	print ms/1e6
+end
+
+
+
+
+
+//what does this mean in Igor pro: [p][q] > flag ? p : NaN
+//In Igor Pro, the expression "[p][q] > flag ? p : NaN" is a conditional statement that checks if the value of the two-dimensional array element located at [p][q] is greater than the value of the variable "flag".
+//If the condition is true, the statement returns the value of "p". If the condition is false, the statement returns "NaN", which stands for "Not a Number" and is used to represent undefined or unrepresentable numerical values.
+
+
+//function /wave avg_wav(wave wav) // /WAVE lets your return a wave
+//
+//	//  averaging any wave over columns (in y direction)
+//	// wave returned is avg_name
+//	string wn=nameofwave(wav)
+//	string avg_name=wn+"_avg";
+//	int nc
+//	int nr
+//
+////	wn="dat"+num2str(wavenum)+dataset //current 2d array
+//
+//	nr = dimsize($wn,0) //number of rows (sweep length)
+//	nc = dimsize($wn,1) //number of columns (repeats)
+//	ReduceMatrixSize(wav, 0, -1, nr, 0,-1, 1,1, avg_name)
+//	redimension/n=-1 $avg_name
+//end
+
+
+
+
+
+function /wave get_initial_params(sweep)
+
+	// for a given sweep returns a guess of initial parameters for the fit function: Charge transiton
+
+	wave sweep
+	duplicate /o sweep x_array
+	x_array = x
+
+	variable amp = wavemax(sweep) - wavemin(sweep) //might be worthwile looking for a maximum/minimum with differentiation
+	//variable amp = 0.001
+	variable const = mean(sweep)
+	variable theta = 50
+
+	duplicate /o sweep sweepsmooth
+	Smooth/S=4 201, sweepsmooth ;DelayUpdate
+
+	differentiate sweepsmooth
+	extract/INDX sweepsmooth, extractedwave, sweepsmooth == wavemin(sweepsmooth)
+	variable mid = x_array[extractedwave[0]]
+
+	//extract/INDX sweepsmooth, extractedwave, sweepsmooth == 0 //new
+	//variable amp = sweep[extractedwave[0]] - sweep[extractedwave[1]] // new
+
+
+	variable lin = 0.001  // differentiated value of flat area?
+
+	Make /D/N=6/O W_coef
+	W_coef[0] = {amp,const,theta,mid,lin,0}
+
+	killwaves extractedwave, sweepsmooth
+	return W_coef
+
+end
+
+
+
+
+function /wave fit_transition(current_array)
+	// fits the current_array, If condition is 0 it will get initial params, If 1:
+	// define a variable named W_coef_guess = {} with the correct number of arguments
+
+
+	wave current_array
+
+
+	wave W_coef
+
+	//duplicate /o current_array x_array
+	//x_array = x
+
+	//FuncFit/q Chargetransition W_coef current_array[][0] /D   //removed the x_array
+	FuncFit/q CT_faster W_coef current_array[][0] /D    //removed the x_array
+
+
+end
+
+
+
+
+function /wave get_fit_params(wave wavenm)
+	// returns wave with the name wave "dat"+ wavenum +"fit_params" eg. dat3320fit_params
+
+	//If condition is 0 it will get initial params, If 1:
+	// define a variable named W_coef_guess = {} with the correct number of arguments
+
+
+	variable i
+	string w2d=nameofwave(wavenm)
+	int wavenum=getfirstnum(w2d)
+	string fit_params_name
+	int nc
+	int nr
+	wave fit_params
+	wave temp_wave
+	wave W_coef
+	wave W_sigma
+
+
+
+	fit_params_name = "cst"+num2str(wavenum)+"fit_params" //new array
+
+	nr = dimsize(wavenm,0) //number of rows (total sweeps)
+	nc = dimsize(wavenm,1) //number of columns (data points)
+	make /N= (nc , 12) /o $fit_params_name
+	wave fit_params = $fit_params_name
+	//print W_coef
+
+	duplicate/o wavenm temp_wave
+	for (i=0; i < nc ; i+=1)
+
+		temp_wave = wavenm[p][i]
+		fit_transition(temp_wave)
+		fit_params[1 * i][,5] = W_coef[q]
+		fit_params[1 * i][6,] = W_sigma[q-6]         //I genuinely cant believe this worked
+		// i dont think the q-5 does anything, should double check
+	endfor
+
+	return fit_params
+
+end
+
+
+function find_plot_thetas(int wavenum,variable N)
+
+	//If condition is 0 it will get initial params, If 1:
+	// define a variable named W_coef_guess = {} with the correct number of arguments
+
+	string fit_params_name = "cst"+num2str(wavenum)+"fit_params"
+	variable thetamean
+	variable thetastd
+	variable i
+	int nr
+	//variable N //how many sdevs?
+
+
+
+	wave fit_params = $fit_params_name
+	nr = dimsize(fit_params,0)
+
+	duplicate /O/R =[0,nr][2] fit_params thetas
+
+
+	thetamean = mean(thetas)
+	thetastd = sqrt(variance(thetas))
+
+	make /o/n =(nr) meanwave
+	make /o/n =(nr) stdwave
+	make /o/n =(nr) stdwave2
+	make /o/n = 0 goodthetas
+	make /o/n = 0 goodthetasx
+	make /o/n = 0 badthetas
+	make /o/n = 0 badthetasx
+
+
+	meanwave = thetamean
+	stdwave = thetamean - N * thetastd
+	stdwave2 = thetamean + N * thetastd
+
+
+	//display thetas, meanwave, stdwave, stdwave2
+
+
+	for (i=0; i < nr ; i+=1)
+
+		if (abs(thetas[i] - thetamean) < (N * thetastd))
+
+			insertPoints /v = (thetas[i]) nr, 1, goodthetas // value of theta
+			insertpoints /v = (i) nr, 1, goodthetasx        // the repeat
+
+		else
+
+			insertPoints /v = (thetas[i]) nr, 1, badthetas // value of theta
+			insertpoints /v = (i) nr, 1, badthetasx        // repeat
+
+		endif
+
+	endfor
+
+
+
+
+	display meanwave, stdwave, stdwave2
+	appendtograph goodthetas vs goodthetasx
+	appendtograph badthetas vs badthetasx
+
+
+	ModifyGraph fSize=24
+	ModifyGraph gFont="Gill Sans Light"
+	//	ModifyGraph width={Aspect,1.62},height=300
+	ModifyGraph lstyle(meanwave)=3,rgb(meanwave)=(17476,17476,17476)
+	ModifyGraph lstyle(stdwave)=3,rgb(stdwave)=(52428,1,1)
+	ModifyGraph lstyle(stdwave2)=3,rgb(stdwave2)=(52428,1,1)
+	ModifyGraph mode(goodthetas)=3,lsize(goodthetas)=2, rgb(goodthetas)=(2,39321,1)
+	ModifyGraph mode(badthetas)=3
+	Legend/C/N=text0/J/A=RT "\\s(meanwave) mean\r\\s(stdwave) 2*std\r\\s(goodthetas) good\r\\s(badthetas) outliers"
+	TextBox/C/N=text1/A=MT/E=2 "\\Z14\\Z16 thetas of dat" + num2str(wavenum)
+
+
+
+	Label bottom "repeat"
+	Label left "theta values"
+
+
+
+
+end
+
+
+function plot_badthetas(wave wavenm)
+
+	int i
+	int nr
+	wave badthetasx
+	string w2d=nameofwave(wavenm)
+
+	duplicate /o wavenm, wavenmcopy
+	nr = dimsize(badthetasx,0)
+
+	display
+if (nr>0)
+	for(i=0; i < nr; i +=1)
+		appendtograph wavenmcopy[][badthetasx[i]]
+
+	endfor
+
+	QuickColorSpectrum2()
+
+	ModifyGraph fSize=24
+	ModifyGraph gFont="Gill Sans Light"
+	//    ModifyGraph width={Aspect,1.62},height=300
+	Label bottom "voltage"
+	Label left "current"
+	TextBox/C/N=text1/A=MT/E=2 "\\Z14\\Z16 bad thetas of " +w2d
+endif
+end
+
+
+function centering(wave waved)
+
+	string w2d=nameofwave(waved)
+	int wavenum=getfirstnum(w2d)
+
+	string centered="cst"+num2str(wavenum)+"centered"
+	string fit_params_name = "cst"+num2str(wavenum)+"fit_params"
+
+
+	wave goodthetasx
+	int i
+	int nr
+	int nc
+	int cutoff //percent to deal with edge cases
+
+	wave fit_params = $fit_params_name
+	cutoff = dimsize(waved,0)/20;// the edge cases are just cut off by some percent
+
+	nr = dimsize(waved,0); //print nr
+	nc = dimsize(waved,1); //print nc
+	duplicate /o /r = [][0] waved wavex;redimension/N=(nr) wavex; wavex = x
+
+
+
+	duplicate /o/r = [][3] fit_params mids // use center from fit CT fit centering
+	duplicate /o wavex new_x;
+	DeletePoints (nr-cutoff),cutoff, new_x
+	DeletePoints 0,cutoff, new_x
+	make /o/n = ((dimsize(new_x,0)),nc) $centered
+	wave new2dwave=$centered
+
+
+	setscale/I x new_x[0] , new_x[dimsize(new_x,0) - 1], "", new2dwave
+	duplicate /o new_x, sweep_l
+	setscale/I x new_x[0] , new_x[dimsize(new_x,0) - 1], "", sweep_l
+
+
+	duplicate /o wavex wavex2
+	duplicate /o wavex sweep
+
+	variable offset
+	for(i = 0; i < nc; i += 1)
+
+		wavex2=wavex-mids[i];
+		sweep=waved[p][i]
+		Interpolate2/T=1/Y=sweep_L/I=3 wavex2, sweep
+		sweep_L[0]=sweep_l[1]
+		new2dwave[][i] = sweep_L[p]
+
+
+
+	endfor
+
+
+end
+
+function /wave cleaning(wave center, wave badthetasx)
+	string w2d=nameofwave(center)
+	int wavenum=getfirstnum(w2d)
+	string cleaned="cst"+num2str(wavenum)+"cleaned"
+
+	duplicate/o center $cleaned
+
+
+	// removing lines with bad thetas;
+
+	variable i, idx
+	int nc
+	int nr
+	nr = dimsize(badthetasx,0) //number of rows
+	i=0
+	if (nr>0)
+		do
+			idx=badthetasx[i]-i //when deleting, I need the -i because if deleting in the loop the indeces of center change continously as points are deleted
+			DeletePoints/M=1 idx,1, $cleaned
+			i=i+1
+		while (i<nr)
+	endif
+end
+
+
+
+
+//function chargetransition_procedure(int wavenum, int refit)
+//
+//	// if condition is 0, It gets a guess of initial params from each sweep
+//	// If condition is 1, It uses the fit paramaters based on the quickavg wave
+//
+//	closeallGraphs()
+//
+//	string dataset = "cscurrent_2d"
+//	string quickavg = "dat" + num2str(wavenum) + "quickavg"
+//	string avg = "dat" + num2str(wavenum) + "avg"
+//
+//	wave W_coef
+//	wave badthetasx
+//	remove_noise(wavenum,dataset);
+//	dataset=dataset+"_nf"
+//	resampleWave(wavenum, dataset,600);
+//	avg_wav($dataset) // quick average plot
+//
+//	if (refit==1)
+//		fit_transition($quickavg, 0)
+//		duplicate /o W_coef W_coef_guess //guess based on the quick average
+//		get_fit_params(wavenum, dataset, 1) // 1 is for do not look for starting params
+//	endif
+//
+//	centering(wavenum, dataset) // centred plot and average plot
+//	cleaned(wavenum)
+//	string centred = "dat" + num2str(wavenum) + "centered"
+//
+//	avg_wav($centred) // quick average plot
+//	fit_transition($avg, 1)
+//	prepfigs(wavenum)
+//
+//
+//end
+
+
+
+
+
+
+
+
+
+//function chargetransition_procedure2m(int wavenum, int condition)
+//
+//	chargetransition_procedure2(wavenum, condition)
+//	MultiGraphLayout(WinList("*", ";", "WIN:1"), 3, 20, "AllGraphLayout")
+//
+//end
+
+
+//from: https://www.wavemetrics.com/forum/igor-pro-wish-list/automatically-color-traces-multi-trace-graph
+
+//Function QuickColorSpectrum2()                            // colors traces with 12 different colors
+//	String Traces    = TraceNameList("",";",1)               // get all the traces from the graph
+//	Variable Items   = ItemsInList(Traces)                   // count the traces
+//	Make/FREE/N=(11,3) colors = {{65280,0,0}, {65280,43520,0}, {0,65280,0}, {0,52224,0}, {0,65280,65280}, {0,43520,65280}, {0,15872,65280}, {65280,16384,55552}, {36864,14592,58880}, {0,0,0},{26112,26112,26112}}
+//	Variable i
+//	for (i = 0; i <DimSize(colors,1); i += 1)
+//		ModifyGraph rgb($StringFromList(i,Traces))=(colors[0][i],colors[1][i],colors[2][i])      // set new color offset
+//	endfor
+//End
+
+////from:
+//// https://www.wavemetrics.com/code-snippet/stacked-plots-multiple-plots-layout
+//
+//function MultiGraphLayout(GraphList, nCols, spacing, layoutName)
+//	string GraphList        // semicolon separated list of graphs to be appended to layout
+//	variable nCols      // number of graph columns
+//	string layoutName   // name of the layout
+//	variable spacing        // spacing between graphs in points!
+//
+//	// how many graphs are there and how many rows are required
+//	variable nGraphs = ItemsInList(GraphList)
+//	variable nRows = ceil(nGraphs / nCols)
+//	variable LayoutWidth, LayoutHeight
+//	variable gWidth, gHeight
+//	variable maxWidth = 0, maxHeight = 0
+//	variable left, top
+//	variable i, j, n = 0
+//
+//	string ThisGraph
+//
+//	// detect total layout size from individual graph sizes; get maximum graph size as column/row size
+//	for(i=0; i<nGraphs; i+=1)
+//
+//		ThisGraph = StringFromList(i, GraphList)
+//		GetWindow $ThisGraph gsize
+//		gWidth = (V_right - V_left)
+//		gHeight = (V_bottom - V_top)
+//
+//		// update maximum
+//		maxWidth = gWidth > maxWidth ? gWidth : maxWidth
+//		maxHeight = gHeight > maxHeight ? gHeight : maxHeight
+//	endfor
+//
+//	// calculate layout size
+//	LayoutWidth = maxWidth * nCols + ((nCols + 1) * spacing)
+//	LayoutHeight = maxHeight * nRows + ((nRows +1) * spacing)
+//
+//	// make layout; kill if it exists
+//	DoWindow $layoutName
+//	if(V_flag)
+//		KillWindow $layoutName
+//	endif
+//
+//	NewLayout/N=$layoutName/K=1/W=(517,55,1451,800)
+//	LayoutPageAction size=(LayoutWidth, LayoutHeight), margins=(0,0,0,0)
+//	ModifyLayout mag=0.75
+//
+//	//append graphs
+//	top = spacing
+//	for(i=0; i<nRows; i+=1)
+//
+//		// reset vertical position for each column
+//		left = spacing
+//
+//		for (j=0; j<    nCols; j+=1)
+//
+//			ThisGraph = StringFromList(n, GraphList)
+//			if(strlen(ThisGraph) == 0)
+//				return 0
+//			endif
+//
+//			GetWindow $ThisGraph gsize
+//			gWidth = (V_right - V_left)
+//			gHeight = (V_bottom - V_top)
+//
+//			AppendLayoutObject/F=0 /D=1 /R=(left, top, (left + gWidth), (top + gHeight)) graph $ThisGraph
+//
+//			// shift next starting positions to the right
+//			left += maxWidth + spacing
+//
+//			// increase plot counter
+//			n += 1
+//		endfor
+//
+//		// shift next starting positions dwon
+//		top += maxHeight + spacing
+//	endfor
+//
+//	return 1
+//end
+//
+//
+//
+//// https://www.wavemetrics.com/code-snippet/stacked-plots-multiple-plots-graph
+
+
+
+
+
+
+
+
+/////// Dealing Interlacing ////////
+
+
+
+// improvements on this function
+//			let it take an argument of names for all the waves created
+
+
+//     		an option or a new function all together that seperates the waves by grouping
+//									i.e grouping x number of rows in a m by n matrix creating
+//                                      a total of m/x waves, also takes an argument for naming?
+//          it could group based on amount of splits e.g split 2D wave into 4
+//          it could group based on number of rows indicated.
+
+
+
+
+function prepfigs(wavenum,N)
+	variable wavenum,N
+	string datasetname ="dat"+num2str(wavenum)+"cscurrent_2d_nf"
+	string avg = "cst" + num2str(wavenum) + "cleaned_avg"
+	string centered="cst"+num2str(wavenum)+"centered"
+	string cleaned="cst"+num2str(wavenum)+"cleaned"
+	string fit_params_name = "cst"+num2str(wavenum)+"fit_params"
+	string centavg = "cst"+num2str(wavenum)+"centavg"
+	string quickavg = datasetname+"_avg"
+	wave W_coef
+
+	closeallgraphs()
+
+	/////////////////// quick avg fig  //////////////////////////////////////
+
+	string fit_name = "fit_"+quickavg
+
+	display $quickavg
+	FuncFit/TBOX=768 CT_faster W_coef $quickavg /D
+	Label bottom "gate V"
+	Label left "csurrent"
+	ModifyGraph fSize=24
+	ModifyGraph gFont="Gill Sans Light"
+	ModifyGraph mode($fit_name)=0,lsize($fit_name)=1,rgb($fit_name)=(65535,0,0)
+	ModifyGraph mode($quickavg)=2,lsize($quickavg)=2,rgb($quickavg)=(0,0,0)
+	legend
+	Legend/C/N=text0/J/A=LB/X=59.50/Y=53.03
+
+
+	/////////////////// thetas  //////////////////////////////////////
+
+
+	find_plot_thetas(wavenum,N)
+	plot_badthetas($datasetname) // thetas vs repeat plot and bad theta sweep plot
+	plot2d_heatmap($datasetname)
+	plot2d_heatmap($cleaned)
+	plot2d_heatmap($centered)
+
+
+
+	/////////////////// plot avg fit  //////////////////////////////////////
+
+	string fit = "fit_cst"+num2str(wavenum)+"cleaned_avg" //new array
+
+	display $avg
+	FuncFit/TBOX=768 CT_faster W_coef $avg /D
+	Label bottom "gate V"
+	Label left "csurrent"
+	ModifyGraph fSize=24
+	ModifyGraph gFont="Gill Sans Light"
+	ModifyGraph mode($fit)=0,lsize($fit)=1,rgb($fit)=(65535,0,0)
+	ModifyGraph mode($avg)=2,lsize($avg)=2,rgb($avg)=(0,0,0)
+	legend
+
+	TileWindows/O=1/C/P
+	Legend/C/N=text0/J/A=LB/X=59.50/Y=53.03
+
+
+	//MultiGraphLayout(WinList("*", ";", "WIN:1"), 3, 20, "AllGraphLayout");
+
+
+end
+
+Function Chargetransition(w,x) : FitFunc
+	Wave w
+	Variable x
+
+	//CurveFitDialog/ These comments were created by the Curve Fitting dialog. Altering them will
+	//CurveFitDialog/ make the function less convenient to work with in the Curve Fitting dialog.
+	//CurveFitDialog/ Equation:
+	//CurveFitDialog/ f(x) = Amp*tanh((x - Mid)/(2*theta)) + Linear*x + Const
+
+	//CurveFitDialog/ End of Equation
+	//CurveFitDialog/ Independent Variables 1
+	//CurveFitDialog/ x
+	//CurveFitDialog/ Coefficients 5
+	//CurveFitDialog/ w[0] = Amp
+	//CurveFitDialog/ w[1] = Const
+	//CurveFitDialog/ w[2] = Theta
+	//CurveFitDialog/ w[3] = Mid
+	//CurveFitDialog/ w[4] = Linear
+
+
+	return w[0]*tanh((x - w[3])/(2*w[2])) + w[4]*x + w[1]
+End
+
+Function CT_faster(w,ys,xs) : FitFunc
+	Wave w, xs, ys
+
+
+	ys= w[0]*tanh((xs - w[3])/(-2*w[2])) + w[4]*xs + w[1]+w(5)*xs^2
+End
+
+Function CT2(w,x) : FitFunc
+	Wave w
+	Variable x
+
+	//CurveFitDialog/ These comments were created by the Curve Fitting dialog. Altering them will
+	//CurveFitDialog/ make the function less convenient to work with in the Curve Fitting dialog.
+	//CurveFitDialog/ Equation:
+	//CurveFitDialog/ f(x) = Amp*tanh((x - Mid)/(2*theta)) + Linear*x + Const+Quad*x^2
+	//CurveFitDialog/ End of Equation
+	//CurveFitDialog/ Independent Variables 1
+	//CurveFitDialog/ x
+	//CurveFitDialog/ Coefficients 6
+	//CurveFitDialog/ w[0] = Amp
+	//CurveFitDialog/ w[1] = Const
+	//CurveFitDialog/ w[2] = Theta
+	//CurveFitDialog/ w[3] = Mid
+	//CurveFitDialog/ w[4] = Linear
+	//CurveFitDialog/ w[5] = Quad
+
+
+	return w[0]*tanh(-(x - w[3])/(2*w[2])) + w[4]*x + w[1]+w[5]*x^2
+End
+
+
+
+function dotcond_centering(wave waved)
+
+	string w2d=nameofwave(waved)
+	int wavenum=getfirstnum(w2d)
+
+	string centered="cst"+num2str(wavenum)+"centered"
+	string fit_params_name = "cond"+num2str(wavenum)+"fit_params"
+
+
+	wave goodthetasx
+	int i
+	int nr
+	int nc
+	int cutoff //percent to deal with edge cases
+
+
+
+	wave fit_params = $fit_params_name
+	cutoff = dimsize(waved,0)/20;// the edge cases are just cut off by some percent
+
+	nr = dimsize(waved,0); //print nr
+	nc = dimsize(waved,1); //print nc
+	duplicate /o /r = [][0] waved wavex;redimension/N=(nr) wavex; wavex = x
+
+
+
+	duplicate /o/r = [][2] fit_params mids // use center from fit CBpeak centering
+	duplicate /o wavex new_x;
+	DeletePoints (nr-cutoff),cutoff, new_x
+	DeletePoints 0,cutoff, new_x
+	make /o/n = ((dimsize(new_x,0)),nc) $centered
+	wave new2dwave=$centered
+
+
+	setscale/I x new_x[0] , new_x[dimsize(new_x,0) - 1], "", new2dwave
+	duplicate /o new_x, sweep_l
+	setscale/I x new_x[0] , new_x[dimsize(new_x,0) - 1], "", sweep_l
+
+
+	duplicate /o wavex wavex2
+	duplicate /o wavex sweep
+
+	variable offset
+	for(i = 0; i < nc; i += 1)
+
+		wavex2=wavex-mids[i];
+		sweep=waved[p][i]
+		Interpolate2/T=1/Y=sweep_L/I=3 wavex2, sweep
+		sweep_L[0]=sweep_l[1]
+		new2dwave[][i] = sweep_L[p]
+
+
+
+	endfor
+
+
+end
