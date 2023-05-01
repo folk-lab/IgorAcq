@@ -708,7 +708,7 @@ function ScanFastDAC2DInterlaced(fdID, startx, finx, channelsx, starty, finy, ch
 	variable k
 	if (!paramisdefault(virtual_gates) && !paramisdefault(virtual_mids))
 	 	rampmultiplefDAC(fdID, virtual_gates, 0, setpoints_str=virtual_mids) // ramp virtual gates
-	 	CorrectChargeSensor(fd=fdID, fdchannelstr="CSQ2*20", fadcID=fdID, fadcchannel=1, gate_divider=20, natarget=1.2) // hard coded
+//	 	CorrectChargeSensor(fd=fdID, fdchannelstr="CSQ2*20", fadcID=fdID, fadcchannel=1, gate_divider=20, natarget=1.2) // hard coded
 		variable mid = str2num(scu_getChannelNumbers("P*2", fastdac=1)) // If using virtual ratios assume mid is middle of P*2
 //		string starts = "-10000"
 //		string fins = "10000"
