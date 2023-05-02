@@ -728,8 +728,8 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 	if (!paramisdefault(virtual_gates) && !paramisdefault(virtual_mids))
 	 	rampmultiplefDAC(fdID, virtual_gates, 0, setpoints_str=virtual_mids) // ramp virtual gates
 		variable mid = str2num(scu_getChannelNumbers(StringFromList(0, channelsx, ","), fastdac=1)) // If using virtual ratios assume mid is middle of P*2
-		string starts = startx
-		string fins = finx
+		string starts = num2str(startx)
+		string fins = num2str(finx)
 		string sweep_channels = addlistitem(StringFromList(0, channelsx, ","), virtual_gates, ",", 0)
 		variable temp_mid, temp_ratio, temp_start, temp_fin
 		for (k=0; k<ItemsInList(virtual_gates, ","); k++)
