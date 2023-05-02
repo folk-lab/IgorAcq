@@ -564,14 +564,144 @@ function ScanFastDacSlow2D(instrID, startx, finx, channelsx, numptsx, delayx, st
 	endif
 end
 
+//////////////////////
+///// DEPRECATED /////
+//////////////////////
+// removed this older scanfastdac2d and renamed the scanfastdac2dinterlaced as scanfastdac2d
+// keepin old scanfastdac2d for now (if all works during cooldown then it will be removed)
+//function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, numptsy, [numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave, use_AWG])
+//	// 2D Scan for FastDAC only OR FastDAC on fast axis and BabyDAC on slow axis
+//	// Note: Must provide numptsx OR sweeprate in optional parameters instead
+//	// Note: To ramp with babyDAC on slow axis provide the BabyDAC variable in bdID
+//	// Note: channels should be a comma-separated string ex: "0,4,5"
+//	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, nosave, use_AWG
+//	string channelsx, channelsy, comments, startxs, finxs, startys, finys
+//
+//	// Set defaults
+//	delayy = ParamIsDefault(delayy) ? 0.01 : delayy
+//	comments = selectstring(paramisdefault(comments), comments, "")
+//	startxs = selectstring(paramisdefault(startxs), startxs, "")
+//	finxs = selectstring(paramisdefault(finxs), finxs, "")
+//	startys = selectstring(paramisdefault(startys), startys, "")
+//	finys = selectstring(paramisdefault(finys), finys, "")
+//	variable use_bd = paramisdefault(bdid) ? 0 : 1 			// Whether using both FD and BD or just FD
+//	variable use_second_fd = paramisdefault(fdyID) ? 0 : 1  // Whether using a second FD for the y axis gates
+//	
+//
+//	// Reconnect instruments
+//	sc_openinstrconnections(0)
+//
+//	// Put info into scanVars struct (to more easily pass around later)
+// 	struct ScanVars S
+// 	if (use_bd == 0 && use_second_fd == 0)
+//	 	initScanVarsFD(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
+//		   						 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys, comments=comments)
+//	
+//	else  				// Using BabyDAC for Y axis so init x in FD_ScanVars, and init y in BD_ScanVars
+//		initScanVarsFD(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
+//		   						rampratey=rampratey, startxs=startxs, finxs=finxs, comments=comments)
+//		s.is2d = 1		   						
+//		S.starty = starty
+//		S.finy = finy		
+//		if (use_bd)
+//			S.instrIDy = bdID
+//			S.channelsy = scu_getChannelNumbers(channelsy, fastdac=0)
+//			S.y_label = scu_getDacLabel(S.channelsy, fastdac=0)
+//			scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, S.starty, S.finy, S.startxs, S.finxs, S.startys, S.finys)
+//		else  // use_second_fd
+//			S.instrIDy = fdyID
+//			S.channelsy = scu_getChannelNumbers(channelsy, fastdac=1)
+//			S.y_label = scu_getDacLabel(S.channelsy, fastdac=1)
+//			scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, S.starty, S.finy, S.startxs, S.finxs, S.startys, S.finys)
+//		endif
+//	endif
+//      
+//   // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
+//
+//   if(use_bd == 1)
+////   		PreScanChecksBD(Bsv)
+//		PreScanChecksFD(S, x_only=1)
+//		PreScanChecksBD(S, y_only=1)
+//   	else  // Should work for 1 or 2 FDs
+//   	   PreScanChecksFD(S)  
+//   	endif
+//   	
+//  	// If using AWG then get that now and check it
+//	struct AWGVars AWG
+//	if(use_AWG)	
+//		fd_getGlobalAWG(AWG)
+//		CheckAWG(AWG, S)  // Note: sets S.numptsx here and AWG.lims_checked = 1
+//	endif
+//	SetAWG(AWG, use_AWG)
+//   
+//   // Ramp to start without checks
+//   if(use_bd == 1)
+//	   RampStartFD(S, x_only=1, ignore_lims=1)
+//	   RampStartBD(S, y_only=1, ignore_lims=1)
+//   	else  // Should work for 1 or 2 FDs
+//   	   RampStartFD(S, ignore_lims=1)
+//   	endif
+//   	
+//   	// Let gates settle
+//	sc_sleep(S.delayy)
+//
+//	// Initialize waves and graphs
+//	initializeScan(S)
+//
+//	// Main measurement loop
+//	variable i=0, j=0
+//	variable setpointy, sy, fy
+//	string chy
+//	for(i=0; i<S.numptsy; i++)
+//		// Ramp fast axis to start
+//		rampToNextSetpoint(S, 0, fastdac=1, ignore_lims=1)
+//
+//		// Ramp slow axis
+//		rampToNextSetpoint(S, 0, outer_index=i, y_only=1, fastdac=!use_bd, ignore_lims=1)
+//
+//		// Let gates settle
+//		sc_sleep(S.delayy)
+//		
+//		// Record fast axis
+//		scfd_RecordValues(S, i, AWG_list=AWG)
+//	endfor
+//
+//	// Save by default
+//	if (nosave == 0)
+//		EndScan(S=S)
+//  	else
+//  		dowindow /k SweepControl
+//	endif
+//
+//end
 
-function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, numptsy, [numpts, sweeprate, bdID, rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave, use_AWG])
+
+
+
+function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, numptsy, [numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave, use_AWG, interlace_channels, interlace_values, virtual_gates, virtual_ratios, virtual_mids, virtual_width])
+	// using virtual gates supply gate, ratio and mid. The mid will be based on P*2 value. Supplying virtual gates ignores startys and finys.
+	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, nosave, use_AWG, virtual_width
+	string channelsx, channelsy, comments, startxs, finxs, startys, finys, interlace_channels, interlace_values, virtual_gates, virtual_ratios, virtual_mids
+	
 	// 2D Scan for FastDAC only OR FastDAC on fast axis and BabyDAC on slow axis
 	// Note: Must provide numptsx OR sweeprate in optional parameters instead
 	// Note: To ramp with babyDAC on slow axis provide the BabyDAC variable in bdID
 	// Note: channels should be a comma-separated string ex: "0,4,5"
-	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, rampratex, rampratey, delayy, nosave, use_AWG
-	string channelsx, channelsy, comments, startxs, finxs, startys, finys
+	// Note: assumes virtual sweeps are on the x_axis and ratios based off index 0 in channelsx
+	
+	// Example :: Interlaced parameters 
+	// Interlaced period of 3 rows where ohmic1 and ohmic2 change on each row.
+	// interlace_channels = "ohmic1, ohmic2"
+	// interlace_values = "500,10,0;10,10,10"
+	// ohmic1 will change between 500,10,0 each row
+	
+	// Example :: Virtual parameters 
+	// Interlaced period of 3 rows where ohmic1 and ohmic2 change on each row.
+	// virtual_gates = "CSQ*1000"
+	// virtual_ratios = "-0.319"
+	// virtual_mids = "0"
+	// virtual_width = "1000"
+	// CSQ*1000 will be scanned from 319 -> -319
 
 	// Set defaults
 	delayy = ParamIsDefault(delayy) ? 0.01 : delayy
@@ -580,29 +710,76 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 	finxs = selectstring(paramisdefault(finxs), finxs, "")
 	startys = selectstring(paramisdefault(startys), startys, "")
 	finys = selectstring(paramisdefault(finys), finys, "")
-	variable use_bd = paramisdefault(bdid) ? 0 : 1 		// Whether using both FD and BD or just FD
+	variable use_bd = paramisdefault(bdid) ? 0 : 1 			// Whether using both FD and BD or just FD
+	variable use_second_fd = paramisdefault(fdyID) ? 0 : 1  // Whether using a second FD for the y axis gates
+	
+	
+	///// IF USING INTERLACE ON Y-AXIS (add to comment) /////
+	string interlace_comment = ",interlaced scans channels=" + interlace_channels + " values=" + interlace_values
+	interlace_comment = ReplaceString(",", interlace_comment, " ")
+	comments = comments + interlace_comment
+	
+	
+	///// IF USING VIRTUAL GATES ON X-AXIS /////
+	if (!paramisdefault(virtual_gates) && (paramisdefault(virtual_mids) || paramisdefault(virtual_ratios) ))
+		ABORT "ERROR[ScanTransition]: virtual_gates specified but virtual_mids or virtual_ratios MISSING"
+	endif
+	variable k
+	if (!paramisdefault(virtual_gates) && !paramisdefault(virtual_mids))
+	 	rampmultiplefDAC(fdID, virtual_gates, 0, setpoints_str=virtual_mids) // ramp virtual gates
+		variable mid = str2num(scu_getChannelNumbers(StringFromList(0, channelsx, ","), fastdac=1)) // If using virtual ratios assume mid is middle of P*2
+		string starts = num2str(startx)
+		string fins = num2str(finx)
+		string sweep_channels = addlistitem(StringFromList(0, channelsx, ","), virtual_gates, ",", 0)
+		variable temp_mid, temp_ratio, temp_start, temp_fin
+		for (k=0; k<ItemsInList(virtual_gates, ","); k++)
+		
+				temp_mid = str2num(StringFromList(k, virtual_mids, ","))
+				temp_ratio = str2num(StringFromList(k, virtual_ratios, ","))
+				
+				temp_start = temp_mid - temp_ratio*virtual_width
+				temp_fin = temp_mid + temp_ratio*virtual_width
+				
+				starts = addlistitem(num2str(temp_start), starts, ",", inf)
+				fins = addlistitem(num2str(temp_fin), fins, ",", inf)
+		 endfor
+	endif
 
-
+	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
 
 	// Put info into scanVars struct (to more easily pass around later)
  	struct ScanVars S
- 	if (use_bd == 0)
-	 	initScanVarsFD(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
-		   						 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys, comments=comments)
+ 	if (use_bd == 0 && use_second_fd == 0)
+ 		if (!paramisdefault(virtual_gates) && !paramisdefault(virtual_mids))
+ 		   // give new starts and fins (calculated from virtual ratios to startxs and finxs) 
+	 		initScanVarsFD(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
+				   						 starty=starty, finy=finy, channelsy=sweep_channels, rampratey=rampratey, startxs=starts, finxs=fins, startys=startys, finys=finys, comments=comments)
+ 		else
+		 	initScanVarsFD(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
+			   						 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys, comments=comments)
+		endif
 	
 	else  				// Using BabyDAC for Y axis so init x in FD_ScanVars, and init y in BD_ScanVars
 		initScanVarsFD(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
 		   						rampratey=rampratey, startxs=startxs, finxs=finxs, comments=comments)
-		S.instrIDy = bdID
-       s.is2d = 1
+		s.is2d = 1		   						
 		S.starty = starty
-		S.finy = finy
-		S.channelsy = scu_getChannelNumbers(channelsy, fastdac=0)
-		S.y_label = scu_getDacLabel(S.channelsy, fastdac=0)
-		scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, S.starty, S.finy, S.startxs, S.finxs, S.startys, S.finys)
+		S.finy = finy		
+		if (use_bd)
+			S.instrIDy = bdID
+			S.channelsy = scu_getChannelNumbers(channelsy, fastdac=0)
+			S.y_label = scu_getDacLabel(S.channelsy, fastdac=0)
+			scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, S.starty, S.finy, S.startxs, S.finxs, S.startys, S.finys)
+		else  // use_second_fd
+			S.instrIDy = fdyID
+			S.channelsy = scu_getChannelNumbers(channelsy, fastdac=1)
+			S.y_label = scu_getDacLabel(S.channelsy, fastdac=1)
+			scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, S.starty, S.finy, S.startxs, S.finxs, S.startys, S.finys)
+		endif
 	endif
+	
       
    // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
 
@@ -610,7 +787,7 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 //   		PreScanChecksBD(Bsv)
 		PreScanChecksFD(S, x_only=1)
 		PreScanChecksBD(S, y_only=1)
-   	else
+   	else  // Should work for 1 or 2 FDs
    	   PreScanChecksFD(S)  
    	endif
    	
@@ -626,7 +803,7 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
    if(use_bd == 1)
 	   RampStartFD(S, x_only=1, ignore_lims=1)
 	   RampStartBD(S, y_only=1, ignore_lims=1)
-   	else
+   	else  // Should work for 1 or 2 FDs
    	   RampStartFD(S, ignore_lims=1)
    	endif
    	
@@ -640,7 +817,23 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 	variable i=0, j=0
 	variable setpointy, sy, fy
 	string chy
+	string interlace_channel, interlace_values_for_channel
+	variable interlace_value
 	for(i=0; i<S.numptsy; i++)
+
+		///// LOOP FOR INTERLACE SCANS /////
+		if (!paramisdefault(interlace_channels) && !paramisdefault(interlace_values))
+				for (k=0; k<ItemsInList(interlace_channels, ","); k++)
+					interlace_channel = StringFromList(k, interlace_channels, ",")  // return one of the channels in interlace_channels
+					interlace_values_for_channel = StringFromList(k, interlace_values, ";") // return string of values to interlace between for one of the channels in interlace_channels
+					interlace_value = str2num(StringFromList(mod(i, ItemsInList(interlace_values_for_channel, ",")), interlace_values_for_channel, ",")) // return the interlace value for specific channel, changes per 1d sweep
+			   		rampmultiplefDAC(fdID, interlace_channel, interlace_value)
+			   	endfor
+//				printf "DEBUG: Ramping channel %s to %.1f\r", interlace_channel, interlace_values[mod(i, numpnts(interlace_values))]							
+		endif
+		
+		
+		///// DO NORMAL SCANFASTDAC2D /////
 		// Ramp fast axis to start
 		rampToNextSetpoint(S, 0, fastdac=1, ignore_lims=1)
 
@@ -652,6 +845,9 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 		
 		// Record fast axis
 		scfd_RecordValues(S, i, AWG_list=AWG)
+		
+		
+		
 	endfor
 
 	// Save by default

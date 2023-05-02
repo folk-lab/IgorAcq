@@ -756,6 +756,14 @@ function scv_sanitizeSetpoints(start_list, fin_list, items, starts, fins)
 	
 	starts = replaceString(" ", start_list, "")
 	fins = replaceString(" ", fin_list, "")
+	
+	// Make sure the starts/ends don't have commas at the end (igor likes to put them in unnecessarily when making lists)
+	if (cmpstr(starts[strlen(starts)-1], ",") == 0)  // Zero if equal (I know... stupid)
+		starts = starts[0, strlen(starts)-2]
+	endif
+	if (cmpstr(fins[strlen(fins)-1], ",") == 0)  // Zero if equal (I know... stupid)
+		fins = fins[0, strlen(fins)-2]
+	endif
 end
 
 
@@ -988,7 +996,7 @@ function/S scg_initializeGraphs(S)
 		else
 			ylabel = S.y_label
 		endif
-        buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, is2d=S.is2d, y_label=ylabel)
+        buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, for_2d=S.is2d, y_label=ylabel)
         if(raw==1) // Raw waves
 	        sc_rawGraphs1D = buffer
         endif
@@ -998,15 +1006,15 @@ function/S scg_initializeGraphs(S)
 end
 
 
-function/S scg_initializeGraphsForWavenames(wavenames, x_label, [is2d, y_label])
+function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label])
 	// Ensures a graph is open and tiles graphs for each wave in comma separated wavenames
 	// Returns list of graphIDs of active graphs
 	string wavenames, x_label, y_label
-	variable is2d
+	variable for_2d
 	
 	y_label = selectString(paramisDefault(y_label), y_label, "")
 	string y_label_2d = y_label
-	string y_label_1d = selectString(is2d, y_label, "")  // Only use the y_label for 1D graphs if the scan is 1D (otherwise gets confused with y sweep gate)
+	string y_label_1d = selectString(for_2d, y_label, "")  // Only use the y_label for 1D graphs if the scan is 1D (otherwise gets confused with y sweep gate)
 
 
 	string wn, openGraphID, graphIDs = ""
@@ -1023,7 +1031,7 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [is2d, y_label])
        graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
 
 
-	    if (is2d)
+	    if (for_2d)
 	        wn = wn+"_2d"
 	        openGraphID = scg_graphExistsForWavename(wn)
 	        if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
@@ -2167,10 +2175,12 @@ function/s scw_createConfig()
 	string sysinfo = igorinfo(3)
 	tmpstr = addJSONkeyval(tmpstr, "OS", StringByKey("OS", sysinfo), addQuotes = 1)
 	tmpstr = addJSONkeyval(tmpstr, "IGOR_VERSION", StringByKey("IGORFILEVERSION", sysinfo), addQuotes = 1)
+	
+	
 	configstr = addJSONkeyval(configstr, "system_info", tmpstr)
 
 	// log instrument info
-	configstr = addJSONkeyval(configstr, "instruments", textWave2StrArray(sc_Instr))
+	configstr = addJSONkeyval(configstr, "instruments", textWave2StrArray(sc_Instr))  /// <<<<<<<< I think some thing with textwave2strarray is broken... seems like a lot of the logs are lost after this
 
 	// wave names
 	tmpstr = ""
@@ -2688,26 +2698,27 @@ function scc_checkSameDeviceFD(S, [x_only, y_only])
 	struct ScanVars &s
 	variable x_only, y_only // whether to check only one axis (e.g. other is babydac)
 	
-	variable device_dacs
-	variable device_buffer
+	variable device_x
+	variable device_y
+	variable device_adc
 	string channels
 	if (!y_only)
-		channels = scf_getChannelNumsOnFD(S.channelsx, device_dacs)  // Throws error if not all channels on one FastDAC
+		channels = scf_getChannelNumsOnFD(S.channelsx, device_x)  // Throws error if not all channels on one FastDAC
 	endif
 	if (!x_only)
-		channels = scf_getChannelNumsOnFD(S.channelsy, device_buffer)
-		if (device_dacs > 0 && device_buffer > 0 && device_buffer != device_dacs)
-			abort "ERROR[scc_checkSameDeviceFD]: X channels and Y channels are not on same device"  // TODO: Maybe this should raise an error?
-		elseif (device_dacs <= 0 && device_buffer > 0)
-			device_dacs = device_buffer
+		channels = scf_getChannelNumsOnFD(S.channelsy, device_y)
+		if (device_x > 0 && device_y > 0 && device_y != device_x && S.instrIDx == S.instrIDy)
+			abort "ERROR[scc_checkSameDeviceFD]: X channels and Y channels are not on same device but InstrIDx/y are the same"
+//		elseif (device_dacs <= 0 && device_buffer > 0)
+//			device_dacs = device_buffer
 		endif
 	endif
 
-	channels = scf_getChannelNumsOnFD(s.AdcList, device_buffer, adc=1)  // Raises error if ADCs aren't on same device
-	if (device_dacs > 0 && device_buffer != device_dacs)
-		abort "ERROR[scc_checkSameDeviceFD]: ADCs are not on the same device as DACs"  // TODO: Maybe should only raise error if x channels not on same device as ADCs?
+	channels = scf_getChannelNumsOnFD(s.AdcList, device_adc, adc=1)  // Raises error if ADCs aren't on same device
+	if (device_x > 0 && device_adc != device_x)
+		abort "ERROR[scc_checkSameDeviceFD]: ADCs are not on the same device as X axis DAC" 
 	endif	
-	return device_buffer // Return adc device number
+	return device_adc // Return adc device number
 end
 
 
