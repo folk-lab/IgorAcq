@@ -679,10 +679,15 @@ end
 
 
 function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, numptsy, [numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave, use_AWG, interlace_channels, interlace_values, virtual_gates, virtual_ratios, virtual_mids, virtual_width])
+	// using virtual gates supply gate, ratio and mid. The mid will be based on P*2 value. Supplying virtual gates ignores startys and finys.
+	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, nosave, use_AWG, virtual_width
+	string channelsx, channelsy, comments, startxs, finxs, startys, finys, interlace_channels, interlace_values, virtual_gates, virtual_ratios, virtual_mids
+	
 	// 2D Scan for FastDAC only OR FastDAC on fast axis and BabyDAC on slow axis
 	// Note: Must provide numptsx OR sweeprate in optional parameters instead
 	// Note: To ramp with babyDAC on slow axis provide the BabyDAC variable in bdID
 	// Note: channels should be a comma-separated string ex: "0,4,5"
+	// Note: assumes virtual sweeps are on the x_axis and ratios based off index 0 in channelsx
 	
 	// Example :: Interlaced parameters 
 	// Interlaced period of 3 rows where ohmic1 and ohmic2 change on each row.
@@ -697,10 +702,6 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 	// virtual_mids = "0"
 	// virtual_width = "1000"
 	// CSQ*1000 will be scanned from 319 -> -319
-
-	// using virtual gates supply gate, ratio and mid. The mid will be based on P*2 value. Supplying virtual gates ignores startys and finys.
-	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, nosave, use_AWG, virtual_width
-	string channelsx, channelsy, comments, startxs, finxs, startys, finys, interlace_channels, interlace_values, , virtual_gates, virtual_ratios, virtual_mids
 
 	// Set defaults
 	delayy = ParamIsDefault(delayy) ? 0.01 : delayy
@@ -719,20 +720,17 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 	comments = comments + interlace_comment
 	
 	
-	///// IF USING VIRTUAL GATES ON Y-AXIS /////
+	///// IF USING VIRTUAL GATES ON X-AXIS /////
 	if (!paramisdefault(virtual_gates) && (paramisdefault(virtual_mids) || paramisdefault(virtual_ratios) ))
 		ABORT "ERROR[ScanTransition]: virtual_gates specified but virtual_mids or virtual_ratios MISSING"
 	endif
 	variable k
 	if (!paramisdefault(virtual_gates) && !paramisdefault(virtual_mids))
 	 	rampmultiplefDAC(fdID, virtual_gates, 0, setpoints_str=virtual_mids) // ramp virtual gates
-//	 	CorrectChargeSensor(fd=fdID, fdchannelstr="CSQ2*20", fadcID=fdID, fadcchannel=1, gate_divider=20, natarget=1.2) // hard coded
-		variable mid = str2num(scu_getChannelNumbers("P*2", fastdac=1)) // If using virtual ratios assume mid is middle of P*2
-//		string starts = "-10000"
-//		string fins = "10000"
-		string starts = "-5000"
-		string fins = "5000"
-		string sweep_channels = addlistitem("P*200", virtual_gates, ",", 0)
+		variable mid = str2num(scu_getChannelNumbers(StringFromList(0, channelsx, ","), fastdac=1)) // If using virtual ratios assume mid is middle of P*2
+		string starts = startx
+		string fins = finx
+		string sweep_channels = addlistitem(StringFromList(0, channelsx, ","), virtual_gates, ",", 0)
 		variable temp_mid, temp_ratio, temp_start, temp_fin
 		for (k=0; k<ItemsInList(virtual_gates, ","); k++)
 		
@@ -755,8 +753,9 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
  	struct ScanVars S
  	if (use_bd == 0 && use_second_fd == 0)
  		if (!paramisdefault(virtual_gates) && !paramisdefault(virtual_mids))
+ 		   // give new starts and fins (calculated from virtual ratios to startxs and finxs) 
 	 		initScanVarsFD(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
-				   						 starty=starty, finy=finy, channelsy=sweep_channels, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=starts, finys=fins, comments=comments)
+				   						 starty=starty, finy=finy, channelsy=sweep_channels, rampratey=rampratey, startxs=starts, finxs=fins, startys=startys, finys=finys, comments=comments)
  		else
 		 	initScanVarsFD(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
 			   						 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys, comments=comments)
