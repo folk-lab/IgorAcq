@@ -181,7 +181,7 @@ function setLS625current(instrID,output) // Units: A
 	if (abs(output) > maxf*apt/1000)
 		print "Max current is "+num2str(maxf*apt/1000)+" A"
 	else
-		cmd = "SETI "+num2str(output)
+		cmd = "SETI "+num2str(output, "%.15f")  // Ensure does not send e.g. "1e-4" instead of "0.0001"
 		writeInstr(instrID, cmd+"\r\n")
 	endif
 	
@@ -207,12 +207,13 @@ end
 function setLS625fieldWait(instrID,output, [short_wait])
 	// Set short_wait = 1 if you want the waiting to be a very tight loop (i.e. Useful if trying to ramp very short distances quickly)
 	variable instrID, output, short_wait
-
+//	print("Going to field")
+//	print(output)
 	setLS625field(instrID,output)
 	variable start_time = stopmsTimer(-2)
 	do
 		if (short_wait)
-			asleep(0.01)
+			asleep(0.1)
 		else
 			asleep(2.1) // Over 2s makes the waiting abortable
 		endif

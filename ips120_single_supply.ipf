@@ -289,16 +289,15 @@ function setIPS120fieldWait(instrID, field) // in mT
 	variable status, count = 0
 
 	setIPS120field(instrID, field)
+//	asleep(10)
 	do
-
 		do
-			sc_sleep(0.02)
-			getIPS120field(instrID) // forces the window to update
+			asleep(1)
+			//getIPS120field(instrID) // forces the window to update
 			status = str2num(queryInstr(instrID, "X\r", read_term = "\r")[11])
 		while(numtype(status)==2)
 
 	while(status!=0)
-
 end
 
 ////////////////////////////
