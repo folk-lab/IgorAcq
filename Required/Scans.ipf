@@ -765,21 +765,9 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 	variable i=0, j=0
 	variable setpointy, sy, fy
 	string chy
-	string interlace_channel, interlace_values_for_channel
 	variable interlace_value
 	for(i=0; i<S.numptsy; i++)
 
-		///// LOOP FOR INTERLACE SCANS /////
-		if (!paramisdefault(interlace_channels) && !paramisdefault(interlace_values))
-				for (k=0; k<ItemsInList(interlace_channels, ","); k++)
-					interlace_channel = StringFromList(k, interlace_channels, ",")  // return one of the channels in interlace_channels
-					interlace_values_for_channel = StringFromList(k, interlace_values, ";") // return string of values to interlace between for one of the channels in interlace_channels
-					interlace_value = str2num(StringFromList(mod(i, ItemsInList(interlace_values_for_channel, ",")), interlace_values_for_channel, ",")) // return the interlace value for specific channel, changes per 1d sweep
-			   		rampmultiplefDAC(fdID, interlace_channel, interlace_value)
-			   	endfor
-//				printf "DEBUG: Ramping channel %s to %.1f\r", interlace_channel, interlace_values[mod(i, numpnts(interlace_values))]							
-		endif
-		
 		
 		///// DO NORMAL SCANFASTDAC2D /////
 		// Ramp fast axis to start
@@ -815,8 +803,13 @@ function ScanFastDAC2DInterlaced(fdID, startx, finx, channelsx, starty, finy, ch
 	// Note: Must provide numptsx OR sweeprate in optional parameters instead
 	// Note: To ramp with babyDAC on slow axis provide the BabyDAC variable in bdID
 	// Note: channels should be a comma-separated string ex: "0,4,5"
-////	//"Ohmic1, ohmic2", "500,10,0;10,10,10"  <<  TODO: WHAT IS THIS AN EXAMPLE OF?
-	// using virtual gates supply gate, ratio and mid. The mid will be based on P*2 value. Supplying virtual gates ignores startys and finys.
+	
+   // Example :: Interlaced parameters 
+	// Interlaced period of 3 rows where ohmic1 and ohmic2 change on each row.
+	// interlace_channels = "ohmic1, ohmic2"
+	// interlace_values = "500,10,0;10,10,10"
+	// ohmic1 will change between 500,10,0 each row
+	
 	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, nosave, use_AWG 
 	string channelsx, channelsy, comments, startxs, finxs, startys, finys, interlaced_channels, interlaced_setpoints 
 
