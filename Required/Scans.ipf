@@ -676,7 +676,6 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 
 end
 
-<<<<<<< HEAD
 
 
 
@@ -784,6 +783,7 @@ function ScanFastDAC2DInterlaced(fdID, startx, finx, channelsx, starty, finy, ch
 		else
 			// Ramp slow axis
 			rampToNextSetpoint(S, 0, outer_index=i, y_only=1, fastdac=!use_bd, ignore_lims=1)
+
 		endif
 		
 		if (mod(i, 50) == 0)
@@ -882,8 +882,6 @@ end
 
 
 
-=======
->>>>>>> master
 function Scank2400(instrID, startx, finx, channelsx, numptsx, delayx, rampratex, [y_label, comments, nosave]) //Units: mV
 	variable instrID, startx, finx, numptsx, delayx, rampratex,  nosave
 	string channelsx, y_label, comments
