@@ -1776,3 +1776,66 @@ end
 
 
 
+Function protoFunc_StepTempScan()
+	// I.e. Function passed to StepTempScanFunc must take no arguments
+End
+
+
+function StepTempScanFunc(sFunc, targettemps, [mag_fields])
+	String sFunc // string form of function you want to run
+	wave targettemps
+	wave mag_fields
+	// Master function for running scans at multiple temps and magnetic fields. Assumes the function has no input parameters.
+	// Will run function at set targettemps (including base) and mag_fields
+	// EXAMPLE USAGE:: stepTempScanFunc("feb17_Scan0to1Peaks_paper", {500, 300, 100}, mag_fields={70, 2000})
+   FUNCREF protoFunc_StepTempScan func_to_run = $sFunc
+	svar ls        
+   	nvar fd, magz
+   	  	
+   	variable use_mag_field = 0  	
+	if (paramisDefault(mag_fields))
+		make/o/free mag_fields = {0}
+		use_mag_field = 0
+	else
+		use_mag_field = 1
+	endif
+
+
+	variable j = 0
+   	for (j=0;j<numpnts(mag_fields);j++)
+   		if (use_mag_field) // Only consider ramping field if using mag_fields
+   			if (abs(getls625field(magz) - mag_fields[j]) > 1) // Only ramp and wait if change in field necessary
+   				setls625fieldWait(magz, mag_fields[j])
+	   			asleep(5*60)
+	   		endif
+   		endif
+   	
+		// Do Low T scan first (if already at low T)
+		variable low_t_scanned = 0
+		if (getls370temp(ls, "MC")*1000 < 20)
+			func_to_run() //run the function
+			low_t_scanned = 1
+		endif
+		setLS370exclusivereader(ls,"mc")
+	   
+	    // Scan at current temp   
+		variable i=0
+		for(i=0;i<numpnts(targettemps);i++)
+			setLS370temp(ls,targettemps[i])
+			asleep(2.0)
+			WaitTillTempStable(ls, targettemps[i], 5, 30, 0.05)
+			asleep(5*60)
+			print "MEASURE AT: "+num2str(targettemps[i])+"mK"
+			
+			func_to_run() //run the function
+		endfor
+		setls370heaterOff(ls)
+		resetls370exclusivereader(ls)
+		
+		if (!low_t_scanned)
+			asleep(60*60)
+			func_to_run() //run the function
+		endif
+	endfor	
+	
+end
