@@ -88,6 +88,91 @@ wn="demod"
 
 end
 
+function demodulate2(datnum,harmonic,kenner,[append2hdf, axis])
+//if axis=0: demodulation in r
+//if axis=1: demodulation in x
+//if axis=2: demodulation in y
+	variable datnum,harmonic
+	string kenner
+	variable append2hdf, axis
+	axis = paramisdefault(axis) ? axis : 0
+	variable nofcycles, period, cols, rows
+	string wn="dat"+num2str(datnum)+kenner;
+	string wn_x="tempx"
+	string wn_y="tempy"
+	wave wav=$wn
+	wave wav_x=$wn_x
+	wave wav_y=$wn_y
+	struct AWGVars AWGLI
+	fd_getoldAWG(AWGLI,datnum)
+	
+	
+	print AWGLI
+	
+	//Demodulate in x?
+	if ((axis==0)||(axis==1))
+	duplicate wav, wav_xx
+	cols=dimsize(wav,0); print cols
+	rows=dimsize(wav,1); print rows
+	nofcycles=AWGLI.numCycles;
+	period=AWGLI.waveLen;
+	//Original Measurement Wave
+	make /o/n=(cols) sine1d
+	sine1d=sin(2*pi*(harmonic*p/period))
+	matrixop /o sinewave=colrepeat(sine1d,rows)
+	matrixop /o temp=wav_xx*sinewave
+	copyscales wav_xx, temp
+	temp=temp*pi/2;
+	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,"demod_x")
+	wn_x="demod_x"
+	endif
+	
+	//Demodulate in y?
+	if ((axis==0)||(axis==2))
+	duplicate wav, wav_yy
+	cols=dimsize(wav,0); print cols
+	rows=dimsize(wav,1); print rows
+	nofcycles=AWGLI.numCycles;
+	period=AWGLI.waveLen;
+	//Original Measurement Wave
+	make /o/n=(cols) sine1d
+	sine1d=cos(2*pi*(harmonic*p/period))
+	matrixop /o sinewave=colrepeat(sine1d,rows)
+	matrixop /o temp=wav_yy*sinewave
+	copyscales wav_yy, temp
+	temp=temp*pi/2;
+	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,"demod_y")
+	wn_y="demod_y"
+	endif
+	
+	//Given wav_x and wav_y now refer to their respective demodulations, 
+	//associate the correct set with the output based on r/x/y 
+	
+	wn="demod"
+	
+	if (axis==0)
+	wav = sqrt((wav_x)^2+(wav_y)^2)
+	endif
+	
+	if (axis==1)
+	wav = wav_x
+	endif
+	
+	if (axis==1)
+	wav = wav_y
+	endif
+	
+	//Store demodulated wave w.r.t. correct axis
+	if (append2hdf)
+		variable fileid
+		fileid=get_hdfid(datnum) //opens the file
+		HDF5SaveData/o /IGOR=-1 /TRAN=1 /WRIT=1 /Z $wn, fileid
+		HDF5CloseFile/a fileid
+	endif
+
+end  
+
+
 function resampleWave(wave wav,variable targetFreq )
 	// resamples wave w from measureFreq
 	// to targetFreq (which should be lower than measureFreq)	
