@@ -387,7 +387,7 @@ function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, 
 			if (use_awg)
 				Set_AWG_state(S, AWG, mod(j, S.interlaced_num_setpoints))
 			endif
-			Ramp_interlaced_channels(S, S.instrIDy, mod(j, S.interlaced_num_setpoints))
+			Ramp_interlaced_channels(S, mod(j, S.interlaced_num_setpoints))
 		endif
 
 		// Ramp to start of fast axis
@@ -794,7 +794,7 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 
 		///// LOOP FOR INTERLACE SCANS ///// 
 		if (S.interlaced_y_flag)
-			Ramp_interlaced_channels(S, fdID, mod(i, S.interlaced_num_setpoints))
+			Ramp_interlaced_channels(S, mod(i, S.interlaced_num_setpoints))
 			Set_AWG_state(S, AWG, mod(i, S.interlaced_num_setpoints))
 			if (mod(i, S.interlaced_num_setpoints) == 0) // Ramp slow axis only for first of interlaced setpoints
 				rampToNextSetpoint(S, 0, outer_index=i, y_only=1, fastdac=!use_bd, ignore_lims=1)
@@ -847,10 +847,10 @@ function Set_AWG_State(S, AWG, index)
 end
 
 
-function Ramp_interlaced_channels(S, fdID, i)
+function Ramp_interlaced_channels(S, i)
 	// TODO: Should this live in Scans.ipf? If so, is there a better location for it?
 	struct ScanVars &S
-	variable fdID, i
+	variable i
 	
 	string interlace_channel, interlaced_setpoints_for_channel
 	
@@ -870,10 +870,8 @@ function Ramp_interlaced_channels(S, fdID, i)
 		interlace_channel = StringFromList(k, S.interlaced_channels, ",")  // return one of the channels in interlaced_channels
 		interlaced_setpoints_for_channel = StringFromList(k, S.interlaced_setpoints, ";") // return string of values to interlace between for one of the channels in interlaced_channels
 		interlace_value = str2num(StringFromList(mod(i, ItemsInList(interlaced_setpoints_for_channel, ",")), interlaced_setpoints_for_channel, ",")) // return the interlace value for specific channel, changes per 1d sweep
-//		rampmultiplefDAC(fdID, interlace_channel, interlace_value)
 		
 		//////////////////////// Additions to determine instrID from channel name //////////////
-		// TODO: If this works, then remove the requirement of fdID being passed in....
 		// Check if channel actually exists on a FastDAC, if not skip
 		if(numtype(str2num(interlace_channel)) != 0) // If possible channel is a name (not a number)
 			duplicate/o/free/t/r=[][3] fdacvalstr fdacnames
