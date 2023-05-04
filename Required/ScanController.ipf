@@ -1061,7 +1061,7 @@ function/S scg_initializeGraphs(S)
 		else
 			ylabel = S.y_label
 		endif
-        buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, for_2d=0, y_label=ylabel)
+        buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, for_2d=S.is2d, y_label=ylabel)
         if(raw==1) // Raw waves
 	        sc_rawGraphs1D = buffer
         endif
@@ -1101,12 +1101,22 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 	       	scg_setupGraph2D(openGraphID, wn, x_label, y_label_2d)
 	       endif
 	    else 
-	    	if (!for_2d)
-	       	scg_open1Dgraph(wn, x_label, y_label=y_label, y_label=y_label_1d)
-	       else
-	       	scg_open2Dgraph(wn, x_label, y_label_2d)
-	       endif
-	       openGraphID = winname(0,1)
+	        scg_open1Dgraph(wn, x_label, y_label=y_label, y_label=y_label_1d)
+	        openGraphID = winname(0,1)
+	    endif
+       graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
+
+
+	    if (for_2d)
+	        wn = wn+"_2d"
+	        openGraphID = scg_graphExistsForWavename(wn)
+	        if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
+	            scg_setupGraph2D(openGraphID, wn, x_label, y_label_2d)
+	        else 
+	            scg_open2Dgraph(wn, x_label, y_label_2d)
+	            openGraphID = winname(0,1)
+	        endif
+           graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
 	    endif
        graphIDs = addlistItem(openGraphID, graphIDs, ";", INF) 
 	endfor
