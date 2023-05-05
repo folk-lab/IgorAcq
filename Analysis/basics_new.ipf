@@ -65,30 +65,55 @@ function demodulate(datnum, harmonic, wave_kenner, [append2hdf, dat_kenner])
 	struct AWGVars AWGLI
 	fd_getoldAWG(AWGLI, datnum, kenner=dat_kenner)
 
-//	print AWGLI
+	print AWGLI
 
 	cols=dimsize(wav,0); print cols
 	rows=dimsize(wav,1); print rows
 	nofcycles=AWGLI.numCycles;
 	period=AWGLI.waveLen;
+	print "AWG num cycles  = " + num2str(nofcycles)
 	print "AWG wave len = " + num2str(period)
 	
 //	//Original Measurement Wave
 	make /o/n=(cols) sine1d
-	sine1d=0.01*sin(2*pi*(harmonic*p/period)) + 1.06 // create 1d sine wave with same frequency as AWG wave and specified harmonic
+	sine1d=sin(2*pi*(harmonic*p/period)) // create 1d sine wave with same frequency as AWG wave and specified harmonic
 
 	matrixop /o sinewave=colrepeat(sine1d, rows)
 	matrixop /o temp=wav * sinewave
 	copyscales wav, temp
 	temp=temp*pi/2;
-	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,"demod")
-wn="demod"
-	if (append2hdf)
-		variable fileid
-		fileid=get_hdfid(datnum) //opens the file
-		HDF5SaveData/o /IGOR=-1 /TRAN=1 /WRIT=1 /Z $wn, fileid
-		HDF5CloseFile/a fileid
-	endif
+	
+	
+//	display
+//	appendimage temp
+
+//	display
+//	appendimage sinewave
+
+//	Duplicate /o sine1d, wave0x
+//	wave0x = x
+//
+//	display wav vs wave0x
+//	appendtoGraph sine1d
+//
+
+	
+	print "cols = " + num2str(cols)
+	print "rows = " + num2str(rows)
+	print "(cols/period/nofcycles) = " + num2str(cols/period/nofcycles)
+	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, 25, 1, "demod")
+	
+//	display 
+////	display wav
+//	appendimage temp
+//	display temp
+//wn="demod"
+//	if (append2hdf)
+//		variable fileid
+//		fileid=get_hdfid(datnum) //opens the file
+//		HDF5SaveData/o /IGOR=-1 /TRAN=1 /WRIT=1 /Z $wn, fileid
+//		HDF5CloseFile/a fileid
+//	endif
 
 end
 
@@ -254,42 +279,42 @@ function notch_filter(wave wav, variable Hz)
 	duplicate/o wav_copy, wav
 end
 
-function remove_noise(wave wav)
-	//argument/variable Declaration
-	String wavestring=nameOfWave(wav)
-	wave wav1,wav2,wav3
-	string name=wavestring+"_nf"
-	string wn,wn1,wn2,wn3
-	int wavenum=getfirstnum(wavestring)
-
-//notch_filter(wave wav, variable Hz, int wavenum)
-	notch_filter(wav,60);
-	notch_filter($name,180)
-	name=wavestring+"_nf_nf";notch_filter($name,300)
-
-
-	//assigning variables
-	wn=wavestring
-	wn1=wavestring+"_nf" // the notchfiltered wave
-	wn2=wavestring+"_nf_nf" // the notchfiltered wave
-	wn3=wavestring+"_nf_nf_nf" // the notchfiltered wave
-
-	wave wav1=$wn1; 	wave wav2=$wn2; 	wave wav3=$wn3
-	wav1=wav3;
-	killwaves wav3,wav2
-	wave slice
-	rowslice(wav,0); duplicate/o slice slice1; 
-	rowslice(wav1,0); duplicate/o slice slice2; 
-	
-	rowslice(wav,30); duplicate/o slice slice3; 
-	rowslice(wav1,30); duplicate/o slice slice4; 
-	
-	rowslice(wav,60); duplicate/o slice slice5; 
-	rowslice(wav1,60); duplicate/o slice slice6; 
-	
-	//print "run noise_check to check the result"
-
-end
+//function remove_noise(wave wav)
+//	//argument/variable Declaration
+//	String wavestring=nameOfWave(wav)
+//	wave wav1,wav2,wav3
+//	string name=wavestring+"_nf"
+//	string wn,wn1,wn2,wn3
+//	int wavenum=getfirstnum(wavestring)
+//
+////notch_filter(wave wav, variable Hz, int wavenum)
+//	notch_filter(wav,60);
+//	notch_filter($name,180)
+//	name=wavestring+"_nf_nf";notch_filter($name,300)
+//
+//
+//	//assigning variables
+//	wn=wavestring
+//	wn1=wavestring+"_nf" // the notchfiltered wave
+//	wn2=wavestring+"_nf_nf" // the notchfiltered wave
+//	wn3=wavestring+"_nf_nf_nf" // the notchfiltered wave
+//
+//	wave wav1=$wn1; 	wave wav2=$wn2; 	wave wav3=$wn3
+//	wav1=wav3;
+//	killwaves wav3,wav2
+//	wave slice
+//	rowslice(wav,0); duplicate/o slice slice1; 
+//	rowslice(wav1,0); duplicate/o slice slice2; 
+//	
+//	rowslice(wav,30); duplicate/o slice slice3; 
+//	rowslice(wav1,30); duplicate/o slice slice4; 
+//	
+//	rowslice(wav,60); duplicate/o slice slice5; 
+//	rowslice(wav1,60); duplicate/o slice slice6; 
+//	
+//	//print "run noise_check to check the result"
+//
+//end
 
 
 
