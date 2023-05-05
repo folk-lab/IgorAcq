@@ -74,16 +74,16 @@ function makeSquareWaveAWG(instrID, v0, vP, vM, v0len, vPlen, vMlen, wave_num, [
 
    // Make wave
    variable j=0, k=0
-   variable max_ramp_per_setpoint = floor((max_setpoints - numpnts(sps))/numpnts(sps)) // CHANGE setpoint per ramp
-   variable ramp_per_setpoint = min(max_ramp_per_setpoint, floor(measureFreq * ramplen)) // CHANGE to ramp_step_size
+   variable setpoints_per_ramp = floor((max_setpoints - numpnts(sps))/numpnts(sps)) // points per section in square wave by setting points per square wave
+   variable ramp_step_size = min(setpoints_per_ramp, floor(measureFreq * ramplen)) // used points per section in square wave. Comparing setpoints_per_ramp to measured points
    variable ramp_setpoint_duration = 0
 
-   if (ramp_per_setpoint != 0)
-     ramp_setpoint_duration = ramplen / ramp_per_setpoint
+   if (ramp_step_size != 0)
+     ramp_setpoint_duration = ramplen / ramp_step_size
    endif
 
    // make wave to store setpoints/sample_lengths, correctly sized
-   make/o/free/n=((numpnts(sps)*ramp_per_setpoint + numpnts(sps)), 2) awg_sqw
+   make/o/free/n=((numpnts(sps)*ramp_step_size + numpnts(sps)), 2) awg_sqw
 
    //Initialize prev_setpoint to the last setpoint
    variable prev_setpoint = sps[numpnts(sps) - 1]
@@ -92,8 +92,8 @@ function makeSquareWaveAWG(instrID, v0, vP, vM, v0len, vPlen, vMlen, wave_num, [
       if(lens[i] != 0)  // Only add to wave if duration is non-zero
          // Ramps happen at the beginning of a setpoint and use the 'previous' wave setting to compute
          // where to ramp from. Obviously this does not work for the first wave length, is that avoidable?
-         ramp_step = (sps[i] - prev_setpoint)/(ramp_per_setpoint + 1)
-         for (k = 1; k < ramp_per_setpoint+1; k++)
+         ramp_step = (sps[i] - prev_setpoint)/(ramp_step_size + 1)
+         for (k = 1; k < ramp_step_size+1; k++)
           // THINK ABOUT CASE RAMPLEN 0 -> ramp_setpoint_duration = 0
           numSamples = round(ramp_setpoint_duration * measureFreq)
           awg_sqw[j][0] = {prev_setpoint + (ramp_step * k)}
