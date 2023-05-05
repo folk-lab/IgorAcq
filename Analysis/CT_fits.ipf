@@ -19,7 +19,7 @@ function ctrans_avg(int wavenum, int refit,[int dotcondcentering])
 	string centavg = "cst"+num2str(wavenum)+"centavg"
 
 	variable N=3; // how many sdevs are acceptable?
-	dotcondcentering = paramisdefault(dotcondcentering)	 ? 1 : dotcondcentering
+	dotcondcentering = paramisdefault(dotcondcentering)	 ? 0 : dotcondcentering
 
 
 	wave W_coef

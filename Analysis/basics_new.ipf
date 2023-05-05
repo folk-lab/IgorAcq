@@ -241,42 +241,94 @@ end
 
 
 
-function notch_filter(wave wav, variable Hz)
-	//argument/variable Declaration
-	String wav_name=nameOfWave(wav)
-	variable qual, freq
-	String final_wave_name_i, final_wave_name_o, info_wave, wav_copy_name
-	int wavenum=getfirstnum(wav_name)
+function notch_filter(wave wav, variable Hz, [variable Q, string wave_name, variable overwrite_wave])
 
+	Q = paramisdefault(Q) ? 50 : Q // set Q factor to 50 if not specified
+	overwrite_wave = paramisdefault(overwrite_wave) ? 0 : overwrite_wave	
 	
-	//assigning variables
-	wav_copy_name=wav_name+"_nf" // the notchfiltered wave
+	// Get new filtered name and make a copy of wave
+	String wave_name_from_wave = nameOfWave(wav)
+	wave_name = selectString(paramisdefault(wave_name), wave_name, wave_name_from_wave + "_nf") // notchfiltered wave name
+	
+	String wave_name_copy
+	if (overwrite_wave == 1)
+		wave_name_copy = wave_name
+	else
+		wave_name_copy = wave_name + "_copy"
+	endif
+	
+	duplicate/o wav $wave_name_copy
+	wave wave_copy = $wave_name_copy
+	
 	
 	//Creating main wave copy and wave to display transform
-	freq = 1/(fd_getmeasfreq(wavenum)*dimdelta(wav,0)/Hz)
-	
-	duplicate/o wav $wav_copy_name
-	wave wav_copy=$wav_copy_name	
-	
-	qual=50
+	int wavenum = getfirstnum(wave_name)
+	variable freq = 1 / (fd_getmeasfreq(wavenum) * dimdelta(wav, 0) / Hz)
 
 
-	//Creating wave variables, duplicating main wave to wave copy
-	variable nr=dimsize(wav_copy,0)
-	variable N= 2^ceil(log(nr)/log(2)); 
+	// Creating wave variables
+	variable num_rows = dimsize(wave_copy, 0)
+	variable N = 2^ceil(log(num_rows) / log(2)); 
+	
 	//Transform
-	FFT/OUT=1/DEST=temp_fft wav_copy
+	FFT/OUT=1/DEST=temp_fft wave_copy
 	wave /c temp_fft
 	
 	//Create gaussian, multiply it
 	duplicate/c/o temp_fft fftfactor
-	fftfactor = 1-exp(-(x-freq)^2/(freq/qual)^2)
-	temp_fft*=fftfactor
+	fftfactor = 1 - exp(-(x - freq)^2 / (freq / Q)^2)
+	temp_fft *= fftfactor
 
 	//Inverse transform
-	IFFT/DEST=wav_copy  temp_fft;DelayUpdate
-	copyscales wav, wav_copy
-	duplicate/o wav_copy, wav
+	IFFT/DEST=wave_copy  temp_fft;DelayUpdate
+	copyscales wav, wave_copy
+	
+//	if (overwrite_wave == 1)
+//		duplicate/o wave_copy, wav
+//	endif
+end
+
+
+
+function notch_filters(wave wav, [string Hzs, string Qs, string wave_name])
+	// used to apply the notch filter for a choice of frequencies and Q factors
+	// if the length of Hzs and Qs do not match then Q is chosen as the first Q is the list
+	// EXAMPLE usage: notch_filters(dat6430cscurrent_2d, Hzs="60,180,300", Qs="50,150,250")
+	Hzs = selectString(paramisdefault(Hzs), Hzs, "60")
+	Qs = selectString(paramisdefault(Qs), Qs, "50")
+	
+	// Get new filtered name and make a copy of wave
+	String wave_name_from_wave = nameOfWave(wav)
+	wave_name = selectString(paramisdefault(wave_name), wave_name, wave_name_from_wave + "_nf")
+	String wave_name_copy = wave_name
+	duplicate/o wav $wave_name_copy
+	wave wave_copy = $wave_name_copy
+	
+	
+	variable num_Hz = ItemsInList(Hzs, ",")
+	variable num_Q = ItemsInList(Qs, ",")
+	
+	
+	variable use_multiple_Q = 0
+	if (num_Hz == num_Q)
+		use_multiple_Q = 1
+	endif
+	
+	
+	variable i, Hz
+	variable Q = str2num(StringFromList(0, Qs, ",")) // set Q as initial Q
+	for (i=0; i<ItemsInList(Hzs, ","); i++)
+	
+		// get Hz and Q from list 
+		Hz = str2num(StringFromList(i, Hzs, ","))
+		if (use_multiple_Q == 1)
+			Q = str2num(StringFromList(i, Qs, ","))
+		endif
+		
+		// run notch filter
+		notch_filter(wave_copy, Hz, Q=Q, wave_name=wave_name, overwrite_wave=1)
+	
+	endfor
 end
 
 //function remove_noise(wave wav)
