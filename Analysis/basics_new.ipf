@@ -130,20 +130,21 @@ function demodulate2(datnum,harmonic,kenner,[append2hdf, axis])
 	axis = paramisdefault(axis) ? axis : 0
 	variable nofcycles, period, cols, rows
 	string wn="dat"+num2str(datnum)+kenner;
-	string wn_x="tempx"
-	string wn_y="tempy"
+	string wn_x="temp_x"
+	string wn_y="temp_y"
 	wave wav=$wn
 	wave wav_x=$wn_x
 	wave wav_y=$wn_y
 	struct AWGVars AWGLI
 	fd_getoldAWG(AWGLI,datnum)
+	make /o demod2
 	
 	
 	print AWGLI
 	
 	//Demodulate in x?
 	if ((axis==0)||(axis==1))
-	duplicate wav, wav_xx
+	duplicate /o wav, wav_xx
 	cols=dimsize(wav,0); print cols
 	rows=dimsize(wav,1); print rows
 	nofcycles=AWGLI.numCycles;
@@ -157,11 +158,12 @@ function demodulate2(datnum,harmonic,kenner,[append2hdf, axis])
 	temp=temp*pi/2;
 	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,"demod_x")
 	wn_x="demod_x"
+	wave wav_x=$wn_x
 	endif
 	
 	//Demodulate in y?
 	if ((axis==0)||(axis==2))
-	duplicate wav, wav_yy
+	duplicate /o wav, wav_yy
 	cols=dimsize(wav,0); print cols
 	rows=dimsize(wav,1); print rows
 	nofcycles=AWGLI.numCycles;
@@ -175,32 +177,33 @@ function demodulate2(datnum,harmonic,kenner,[append2hdf, axis])
 	temp=temp*pi/2;
 	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,"demod_y")
 	wn_y="demod_y"
+	wave wav_y=$wn_y
 	endif
 	
 	//Given wav_x and wav_y now refer to their respective demodulations, 
 	//associate the correct set with the output based on r/x/y 
 	
-	wn="demod"
+	//wn="demod"
 	
 	if (axis==0)
-	wav = sqrt((wav_x)^2+(wav_y)^2)
+	demod2 =( (wav_x)^2 + (wav_y)^2 ) ^ (0.5)  //problematic line - operating on null wave?
 	endif
 	
 	if (axis==1)
-	wav = wav_x
+	demod2 = wav_x
 	endif
 	
 	if (axis==1)
-	wav = wav_y
+	demod2 = wav_y
 	endif
 	
 	//Store demodulated wave w.r.t. correct axis
-	if (append2hdf)
-		variable fileid
-		fileid=get_hdfid(datnum) //opens the file
-		HDF5SaveData/o /IGOR=-1 /TRAN=1 /WRIT=1 /Z $wn, fileid
-		HDF5CloseFile/a fileid
-	endif
+	//if (append2hdf)
+	//	variable fileid
+	//	fileid=get_hdfid(datnum) //opens the file
+	//	HDF5SaveData/o /IGOR=-1 /TRAN=1 /WRIT=1 /Z $wn, fileid
+	//	HDF5CloseFile/a fileid
+	//endif
 
 end  
 
