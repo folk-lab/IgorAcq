@@ -53,28 +53,32 @@ function lock_in_test(data)
 end
 
 
-function demodulate(datnum,harmonic,kenner,[append2hdf])
-	variable datnum,harmonic
-	string kenner
+function demodulate(datnum, harmonic, wave_kenner, [append2hdf, dat_kenner])
+	variable datnum, harmonic
+	string wave_kenner
 	variable append2hdf
+	string dat_kenner
+	dat_kenner = selectString(paramisdefault(dat_kenner), dat_kenner, "")
 	variable nofcycles, period, cols, rows
-	string wn="dat"+num2str(datnum)+kenner;
+	string wn="dat" + num2str(datnum) + wave_kenner;
 	wave wav=$wn
 	struct AWGVars AWGLI
-	fd_getoldAWG(AWGLI,datnum)
+	fd_getoldAWG(AWGLI, datnum, kenner=dat_kenner)
 
-
-	print AWGLI
+//	print AWGLI
 
 	cols=dimsize(wav,0); print cols
 	rows=dimsize(wav,1); print rows
 	nofcycles=AWGLI.numCycles;
 	period=AWGLI.waveLen;
-	//Original Measurement Wave
+	print "AWG wave len = " + num2str(period)
+	
+//	//Original Measurement Wave
 	make /o/n=(cols) sine1d
-	sine1d=sin(2*pi*(harmonic*p/period))
-	matrixop /o sinewave=colrepeat(sine1d,rows)
-	matrixop /o temp=wav*sinewave
+	sine1d=0.01*sin(2*pi*(harmonic*p/period)) + 1.06 // create 1d sine wave with same frequency as AWG wave and specified harmonic
+
+	matrixop /o sinewave=colrepeat(sine1d, rows)
+	matrixop /o temp=wav * sinewave
 	copyscales wav, temp
 	temp=temp*pi/2;
 	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,"demod")
@@ -87,6 +91,9 @@ wn="demod"
 	endif
 
 end
+
+
+
 
 function demodulate2(datnum,harmonic,kenner,[append2hdf, axis])
 //if axis=0: demodulation in r
@@ -337,15 +344,23 @@ i=i+1
 while(i<9)
 end
 
-function udh5()
+function udh5([file_name])
 	// Loads HDF files back into Igor
+	string file_name
+	file_name = selectString(paramisdefault(file_name), file_name, "")
+	
 	string infile = wavelist("*",";","") // get wave list
 	string hdflist = indexedfile(data,-1,".h5") // get list of .h5 files
 
 	string currentHDF="", currentWav="", datasets="", currentDS
+	
+	if (!stringmatch(file_name, ""))
+		hdflist = file_name + ".h5"
+	endif
+	
 	variable numHDF = itemsinlist(hdflist), fileid=0, numWN = 0, wnExists=0
-
 	variable i=0, j=0, numloaded=0
+
 
 	for(i=0; i<numHDF; i+=1) // loop over h5 filelist
 

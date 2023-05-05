@@ -763,15 +763,17 @@ end
 /// Load Experiment Data ///
 ////////////////////////////
 
-function get_sweeplogs(datnum)
+function get_sweeplogs(datnum, [kenner])
 	// Opens HDF5 file from current data folder and returns sweeplogs jsonID
 	// Remember to JSON_Release(jsonID) or JSONXOP_release/A to release all objects
 	// Can be converted to JSON string by using JSON_dump(jsonID)
 	variable datnum
+	string kenner
+	kenner = selectString(paramisdefault(kenner), kenner, "")
 	variable fileid, metadataID, i, result
 	wave/t sc_sweeplogs
 	
-	HDF5OpenFile /P=data fileid as "dat"+num2str(datnum)+".h5"
+	HDF5OpenFile /P=data fileid as "dat"+num2str(datnum) + kenner + ".h5"
 	HDF5LoadData /Q/O/Type=1/N=sc_sweeplogs /A="sweep_logs" fileid, "metadata"
 	
 	variable sweeplogsID
