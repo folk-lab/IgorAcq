@@ -26,11 +26,11 @@ function ctrans_avg(int wavenum, int refit,[int dotcondcentering])
 	wave badthetasx
 	wave badgammasx
 
-	remove_noise($datasetname);
+	//remove_noise($datasetname);
 	datasetname=datasetname+"_nf";
 	string quickavg = datasetname+"_avg"
 
-	resampleWave($datasetname,600);
+	//resampleWave($datasetname,600);
 	avg_wav($datasetname) // quick average plot
 
 	if (refit==1)
@@ -178,7 +178,7 @@ function /wave get_fit_params(wave wavenm)
 	nc = dimsize(wavenm,1) //number of columns (data points)
 	make /N= (nc , 12) /o $fit_params_name
 	wave fit_params = $fit_params_name
-	//print W_coef
+	print W_coef
 
 	duplicate/o wavenm temp_wave
 	for (i=0; i < nc ; i+=1)
@@ -326,7 +326,8 @@ function centering(wave waved)
 	int cutoff //percent to deal with edge cases
 
 	wave fit_params = $fit_params_name
-	cutoff = dimsize(waved,0)/20;// the edge cases are just cut off by some percent
+	cutoff = dimsize(waved,0)/5;// the edge cases are just cut off by some percent
+	//print cutoff
 
 	nr = dimsize(waved,0); //print nr
 	nc = dimsize(waved,1); //print nc

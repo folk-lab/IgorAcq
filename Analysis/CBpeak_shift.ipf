@@ -23,7 +23,7 @@ function dotcond_avg(int wavenum, int refit)
 	variable N
 	N=40// how many sdevs in thetas are acceptable?
 
-	remove_noise($datasetname);
+	//remove_noise($datasetname);
 	datasetname=datasetname+"_nf";
 	resampleWave($datasetname,600);
 

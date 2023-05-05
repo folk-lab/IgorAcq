@@ -1730,7 +1730,7 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	
 	Struct ScanVars S_ // Note: This will definitely exist for the rest of this function
 	scv_getLastScanVars(S_)
-	print S_
+
 	if (aborting)
 		S_.end_time = datetime
 		S_.comments = "aborted, " + S_.comments
