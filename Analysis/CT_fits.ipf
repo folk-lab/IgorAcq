@@ -3,23 +3,30 @@
 #pragma DefaultTab={3,20,4}		// Set default tab width in Igor Pro 9 and later
 #include <Reduce Matrix Size>
 
-function ctrans_avg(int wavenum, int refit,[int dotcondcentering])
+function ctrans_avg(wave wav, int refit,int dotcondcentering, string kenner_out)
+	// wav is the wave containing original CT data
+	// refit tells whether to do new fits to each CT line
+	// dotcondcentering tells whether to use conductance data to center the CT data
+	// kenner_out is the prefix to replace dat for this analysis
+
 	variable refnum, ms
 	//		stopalltimers() // run this line if timer returns nan
 
 	refnum=startmstimer
 
 	//closeallGraphs()
+	string datasetname=nameofWave(wav) // typically datXXXcscurrent or similar
+	string kenner=getsuffix(datasetname) //  cscurrent in the above case
+	int wavenum=getfirstnum(datasetname) // XXX in the above case
 
-	string datasetname ="dat"+num2str(wavenum)+"cscurrent_2d"
-	string avg = "cst" + num2str(wavenum) + "cleaned_avg"
-	string centered="cst"+num2str(wavenum)+"centered"
-	string cleaned="cst"+num2str(wavenum)+"cleaned"
-	string fit_params_name = "cst"+num2str(wavenum)+"fit_params"
-	string centavg = "cst"+num2str(wavenum)+"centavg"
+	// these are the new wave names to be made
+	string avg = kenner_out + num2str(wavenum) + "cleaned_avg"
+	string centered=kenner_out+num2str(wavenum)+"centered"
+	string cleaned=kenner_out+num2str(wavenum)+"cleaned"
+	string fit_params_name = kenner_out+num2str(wavenum)+"fit_params"
+
 
 	variable N=3; // how many sdevs are acceptable?
-	dotcondcentering = paramisdefault(dotcondcentering)	 ? 0 : dotcondcentering
 
 
 	wave W_coef
@@ -27,37 +34,33 @@ function ctrans_avg(int wavenum, int refit,[int dotcondcentering])
 	wave badgammasx
 
 	//remove_noise($datasetname);
-	datasetname=datasetname+"_nf";
-	string quickavg = datasetname+"_avg"
+
 
 	//resampleWave($datasetname,600);
-	avg_wav($datasetname) // quick average plot
+	string quickavg=avg_wav($datasetname) // averages datasetname and returns the name of the averaged wave
 
 	if (refit==1)
 		get_initial_params($quickavg);// print W_coef
 		fit_transition($quickavg);// print W_coef
-		get_fit_params($datasetname) // 1 is for do not look for starting params
+		get_fit_params($datasetname,fit_params_name) // 1 is for do not look for starting params
 	endif
-	find_plot_thetas(wavenum,N)
+	find_plot_thetas(wavenum,N,fit_params_name)
 
 	if (dotcondcentering==0)
-		find_plot_thetas(wavenum,N)
-		centering($datasetname) // centred plot and average plot
+		//find_plot_thetas(wavenum,N,kenner_out)
+		cst_centering($datasetname,kenner_out) // centred plot and average plot
 		cleaning($centered,badthetasx)
 
-	elseif(dotcondcentering==1)	
-	dotcond_centering($datasetname)
-	cleaning($centered,badgammasx)
+	elseif(dotcondcentering==1)
+		dotcond_centering($datasetname,kenner_out)
+		cleaning($centered,badgammasx)
 
 	endif
 	
-
-	
-	
-
 	avg_wav($cleaned) // quick average plot
+	get_initial_params($quickavg); //print W_coef
 	fit_transition($avg)
-	prepfigs(wavenum,N)
+	prepfigs(wavenum,N,kenner,kenner_out)
 
 	ms=stopmstimer(refnum)
 	print ms/1e6
@@ -152,7 +155,7 @@ end
 
 
 
-function /wave get_fit_params(wave wavenm)
+function /wave get_fit_params(wave wavenm, string fit_params_name)
 	// returns wave with the name wave "dat"+ wavenum +"fit_params" eg. dat3320fit_params
 
 	//If condition is 0 it will get initial params, If 1:
@@ -162,7 +165,6 @@ function /wave get_fit_params(wave wavenm)
 	variable i
 	string w2d=nameofwave(wavenm)
 	int wavenum=getfirstnum(w2d)
-	string fit_params_name
 	int nc
 	int nr
 	wave fit_params
@@ -171,8 +173,6 @@ function /wave get_fit_params(wave wavenm)
 	wave W_sigma
 
 
-
-	fit_params_name = "cst"+num2str(wavenum)+"fit_params" //new array
 
 	nr = dimsize(wavenm,0) //number of rows (total sweeps)
 	nc = dimsize(wavenm,1) //number of columns (data points)
@@ -195,12 +195,12 @@ function /wave get_fit_params(wave wavenm)
 end
 
 
-function find_plot_thetas(int wavenum,variable N)
+function find_plot_thetas(int wavenum,variable N,string fit_params_name)
 
 	//If condition is 0 it will get initial params, If 1:
 	// define a variable named W_coef_guess = {} with the correct number of arguments
 
-	string fit_params_name = "cst"+num2str(wavenum)+"fit_params"
+//	string fit_params_name =kenner_out+num2str(wavenum)+"fit_params"
 	variable thetamean
 	variable thetastd
 	variable i
@@ -310,67 +310,39 @@ endif
 end
 
 
-function centering(wave waved)
-
+function cst_centering(wave waved,string kenner_out)
 	string w2d=nameofwave(waved)
 	int wavenum=getfirstnum(w2d)
-
-	string centered="cst"+num2str(wavenum)+"centered"
-	string fit_params_name = "cst"+num2str(wavenum)+"fit_params"
-
-
-	wave goodthetasx
-	int i
-	int nr
-	int nc
-	int cutoff //percent to deal with edge cases
-
+	string centered=kenner_out+num2str(wavenum)+"centered"
+	string fit_params_name = kenner_out+num2str(wavenum)+"fit_params"
 	wave fit_params = $fit_params_name
-	cutoff = dimsize(waved,0)/5;// the edge cases are just cut off by some percent
-	//print cutoff
-
-	nr = dimsize(waved,0); //print nr
-	nc = dimsize(waved,1); //print nc
-	duplicate /o /r = [][0] waved wavex;redimension/N=(nr) wavex; wavex = x
-
-
-
-	duplicate /o/r = [][3] fit_params mids // use center from fit CT fit centering
-	duplicate /o wavex new_x;
-	DeletePoints (nr-cutoff),cutoff, new_x
-	DeletePoints 0,cutoff, new_x
-	make /o/n = ((dimsize(new_x,0)),nc) $centered
+	
+	//	duplicate /o /r = [][0] waved wavex;redimension/N=(nr) wavex; wavex = x
+	duplicate/o waved $centered
 	wave new2dwave=$centered
-
-
-	setscale/I x new_x[0] , new_x[dimsize(new_x,0) - 1], "", new2dwave
-	duplicate /o new_x, sweep_l
-	setscale/I x new_x[0] , new_x[dimsize(new_x,0) - 1], "", sweep_l
-
-
-	duplicate /o wavex wavex2
-	duplicate /o wavex sweep
-
-	variable offset
-	for(i = 0; i < nc; i += 1)
-
-		wavex2=wavex-mids[i];
-		sweep=waved[p][i]
-		Interpolate2/T=1/Y=sweep_L/I=3 wavex2, sweep
-		sweep_L[0]=sweep_l[1]
-		new2dwave[][i] = sweep_L[p]
-
-
-
-	endfor
-
-
+	copyscales waved new2dwave
+	new2dwave=interp2d(waved,(x+fit_params[q][3]),(y)) // column 3 is the center fit parameter
 end
+
+function centering(wave waved,string new_name, wave mids)
+	string w2d=nameofwave(waved)
+	int wavenum=getfirstnum(w2d)
+	string centered="demod"+num2str(wavenum)+"centered"
+	string fit_params_name = getprefix(w2d)+num2str(wavenum)+"fit_params"
+	wave fit_params = $fit_params_name
+	
+	//	duplicate /o /r = [][0] waved wavex;redimension/N=(nr) wavex; wavex = x
+	duplicate/o waved $centered
+	wave new2dwave=$centered
+	copyscales waved new2dwave
+	new2dwave=interp2d(waved,(x+fit_params[q][3]),(y)) // column 3 is the center fit parameter
+end
+
 
 function /wave cleaning(wave center, wave badthetasx)
 	string w2d=nameofwave(center)
 	int wavenum=getfirstnum(w2d)
-	string cleaned="cst"+num2str(wavenum)+"cleaned"
+	string cleaned=getprefix(w2d)+num2str(wavenum)+"cleaned"
 
 	duplicate/o center $cleaned
 
@@ -566,15 +538,15 @@ end
 
 
 
-function prepfigs(wavenum,N)
+function prepfigs(wavenum,N,kenner, kenner_out)
 	variable wavenum,N
-	string datasetname ="dat"+num2str(wavenum)+"cscurrent_2d_nf"
-	string avg = "cst" + num2str(wavenum) + "cleaned_avg"
-	string centered="cst"+num2str(wavenum)+"centered"
-	string cleaned="cst"+num2str(wavenum)+"cleaned"
-	string fit_params_name = "cst"+num2str(wavenum)+"fit_params"
-	string centavg = "cst"+num2str(wavenum)+"centavg"
-	string quickavg = datasetname+"_avg"
+	string kenner, kenner_out
+	string datasetname ="dat"+num2str(wavenum)+kenner // this was the original dataset name
+	string avg = kenner_out + num2str(wavenum) + "cleaned_avg" // this is the averaged wave produced by avg_wave($cleaned)
+	string centered=kenner_out+num2str(wavenum)+"centered" // this is the centered 2D wave
+	string cleaned=kenner_out+num2str(wavenum)+"cleaned" // this is the centered 2D wave after removing outliers ("cleaning")
+	string fit_params_name = kenner_out+num2str(wavenum)+"fit_params" // this is the fit parameters 
+	string quickavg = datasetname+"_avg" // this is the wave produced by avg_wave($datasetname)
 	wave W_coef
 
 	closeallgraphs()
@@ -598,7 +570,7 @@ function prepfigs(wavenum,N)
 	/////////////////// thetas  //////////////////////////////////////
 
 
-	find_plot_thetas(wavenum,N)
+	find_plot_thetas(wavenum,N,fit_params_name)
 	plot_badthetas($datasetname) // thetas vs repeat plot and bad theta sweep plot
 	plot2d_heatmap($datasetname)
 	plot2d_heatmap($cleaned)
@@ -610,7 +582,7 @@ function prepfigs(wavenum,N)
 
 	string fit = "fit_cst"+num2str(wavenum)+"cleaned_avg" //new array
 
-	display $avg
+	display $avg; W_coef[3]=0
 	FuncFit/TBOX=768 CT_faster W_coef $avg /D
 	Label bottom "gate V"
 	Label left "csurrent"
@@ -684,60 +656,13 @@ End
 
 
 
-function dotcond_centering(wave waved)
-
+function dotcond_centering(wave waved, string kenner_out)
 	string w2d=nameofwave(waved)
 	int wavenum=getfirstnum(w2d)
-
-	string centered="cst"+num2str(wavenum)+"centered"
+	string centered=kenner_out+num2str(wavenum)+"centered"
 	string fit_params_name = "cond"+num2str(wavenum)+"fit_params"
-
-
-	wave goodthetasx
-	int i
-	int nr
-	int nc
-	int cutoff //percent to deal with edge cases
-
-
-
 	wave fit_params = $fit_params_name
-	cutoff = dimsize(waved,0)/20;// the edge cases are just cut off by some percent
-
-	nr = dimsize(waved,0); //print nr
-	nc = dimsize(waved,1); //print nc
-	duplicate /o /r = [][0] waved wavex;redimension/N=(nr) wavex; wavex = x
-
-
-
-	duplicate /o/r = [][2] fit_params mids // use center from fit CBpeak centering
-	duplicate /o wavex new_x;
-	DeletePoints (nr-cutoff),cutoff, new_x
-	DeletePoints 0,cutoff, new_x
-	make /o/n = ((dimsize(new_x,0)),nc) $centered
 	wave new2dwave=$centered
-
-
-	setscale/I x new_x[0] , new_x[dimsize(new_x,0) - 1], "", new2dwave
-	duplicate /o new_x, sweep_l
-	setscale/I x new_x[0] , new_x[dimsize(new_x,0) - 1], "", sweep_l
-
-
-	duplicate /o wavex wavex2
-	duplicate /o wavex sweep
-
-	variable offset
-	for(i = 0; i < nc; i += 1)
-
-		wavex2=wavex-mids[i];
-		sweep=waved[p][i]
-		Interpolate2/T=1/Y=sweep_L/I=3 wavex2, sweep
-		sweep_L[0]=sweep_l[1]
-		new2dwave[][i] = sweep_L[p]
-
-
-
-	endfor
-
-
-end
+	copyscales waved new2dwave
+	new2dwave=interp2d(waved,(x+fit_params[q][2]),(y)) // column 3 is the center fit parameter
+End

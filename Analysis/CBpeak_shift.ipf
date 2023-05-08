@@ -230,63 +230,17 @@ end
 
 
 
-function dotcentering(wave wav)
-	string w2d=nameofwave(wav)
+function dotcentering(wave waved)
+	string w2d=nameofwave(waved)
 	int wavenum=getfirstnum(w2d)
-
 	string fit_params_name = "cond"+num2str(wavenum)+"fit_params"
 	string centered = "cond"+num2str(wavenum)+"centered"
 	wave fit_params = $fit_params_name
-	wave waved = $w2d
 
-	int i
-	int nr
-	int nc
-	int cutoff //percent to deal with edge cases
-
-	cutoff = dimsize(waved,0)/20;// the edge cases are just cut off by some percent
-
-
-	//get_fit_params2(wavenum, dataset, condition)
-
-	duplicate /o $w2d wavecopy
-	duplicate /o $w2d centered_2dx
-
-	nr = dimsize(centered_2dx,0); //print nr
-	nc = dimsize(centered_2dx,1);// print nc
-	duplicate /o /r = [][0] wavecopy wavex;redimension/N=(nr) wavex; wavex = x
-
-
-	centered_2dx = 0
-
-	duplicate /o/r = [][2] fit_params mids
-	duplicate /o wavex new_x;
-	DeletePoints (nr-cutoff),cutoff, new_x
-	DeletePoints 0,cutoff, new_x
-	make /o/n = ((dimsize(new_x,0)),nc) $centered
 	wave new2dwave=$centered
-
-
-	setscale/I x new_x[0] , new_x[dimsize(new_x,0) - 1], "", new2dwave
-	duplicate /o new_x, sweep_l
-	setscale/I x new_x[0] , new_x[dimsize(new_x,0) - 1], "", sweep_l
-
-
-	duplicate /o wavex wavex2
-	duplicate /o wavex sweep
-
-
-	variable offset
-	//	for(i = 0; i < nc; i += 1)
-	for(i = 0; i < nc; i += 1)
-
-		wavex2=wavex-mids[i];
-		sweep=wavecopy[p][i]
-		Interpolate2/T=1/Y=sweep_L/I=3 wavex2, sweep
-		sweep_L[0]=sweep_l[1]
-		new2dwave[][i] = sweep_L[p]
-
-	endfor
+	copyscales waved new2dwave
+	new2dwave=interp2d(waved,(x+fit_params[q][2]),(y)) // column 3 is the center fit parameter
+end
 
 
 end
