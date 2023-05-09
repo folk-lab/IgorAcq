@@ -531,47 +531,80 @@ i=i+1
 while(i<9)
 end
 
-function udh5([file_name])
-	// Loads HDF files back into Igor
-	string file_name
-	file_name = selectString(paramisdefault(file_name), file_name, "")
+	
+	
+function udh5([dat_num, dat_list, dat_min_max])
+	// Loads HDF files back into Igor, if no optional paramters specified loads all dat in file path into IGOR
+	// NOTE: Assumes 'data' has been specified
+	string dat_num,dat_list, dat_min_max
+	dat_num = selectString(paramisdefault(dat_num), dat_num, "") // e.g. "302"
+	dat_list = selectString(paramisdefault(dat_list), dat_list, "") // e.g. "302,303,304,305,401"
+	dat_min_max = selectString(paramisdefault(dat_min_max), dat_min_max, "") // e.g. "302,310"
 	
 	string infile = wavelist("*",";","") // get wave list
 	string hdflist = indexedfile(data,-1,".h5") // get list of .h5 files
-
 	string currentHDF="", currentWav="", datasets="", currentDS
 	
-	if (!stringmatch(file_name, ""))
-		hdflist = file_name + ".h5"
+	
+	////////////////////////////////////////////////////
+	///// Overwriting hdflist if dat_num specified /////
+	////////////////////////////////////////////////////
+	if (!stringmatch(dat_num, ""))
+		hdflist = "dat" + dat_num + ".h5"
 	endif
 	
-	variable numHDF = itemsinlist(hdflist), fileid=0, numWN = 0, wnExists=0
-	variable i=0, j=0, numloaded=0
+	/////////////////////////////////////////////////////
+	///// Overwriting hdflist if dat_list specified /////
+	/////////////////////////////////////////////////////
+	variable i
+	if (!stringmatch(dat_list, ""))
+		hdflist = ""
+		for(i=0; i<ItemsInList(dat_list, ","); i+=1)
+			hdflist = hdflist + "dat" + StringFromList(i, dat_list, ",") + ".h5;"
+		endfor
+	endif
+	
+	////////////////////////////////////////////////////////
+	///// Overwriting hdflist if dat_min_max specified /////
+	////////////////////////////////////////////////////////
+	variable dat_start = str2num(StringFromList(0, dat_min_max, ","))
+	variable dat_end = str2num(StringFromList(1, dat_min_max, ","))
+	
+	if (!stringmatch(dat_min_max, ""))
+		hdflist = ""
+		for(i=dat_start; i<dat_end+1; i+=1)
+			hdflist = hdflist + "dat" + num2str(i) + ".h5;"
+		endfor
+	endif
+	
+	print(hdflist)
+	
+	variable numHDF = itemsinlist(hdflist, ";"), fileid = 0, numWN = 0, wnExists = 0
+	variable j = 0, numloaded = 0
 
 
-	for(i=0; i<numHDF; i+=1) // loop over h5 filelist
+	for(i = 0; i < numHDF; i += 1) // loop over h5 filelist
 
-	   currentHDF = StringFromList(i,hdflist)
+		currentHDF = StringFromList(i, hdflist, ";")
 
 		HDF5OpenFile/P=data /R fileID as currentHDF
 		HDF5ListGroup /TYPE=2 /R=1 fileID, "/" // list datasets in root group
 		datasets = S_HDF5ListGroup
-		numWN = itemsinlist(datasets)
-		currentHDF = currentHDF[0,(strlen(currentHDF)-4)]
-		for(j=0; j<numWN; j+=1) // loop over datasets within h5 file
-			currentDS = StringFromList(j,datasets)
-			currentWav = currentHDF+currentDS
-		   wnExists = FindListItem(currentWav, infile,  ";")
-		   if (wnExists==-1)
-		   	// load wave from hdf
-		   	HDF5LoadData /Q /IGOR=-1 /N=$currentWav/TRAN=1 fileID, currentDS
-		   	numloaded+=1
-		   endif
+		numWN = itemsinlist(datasets)  // number of waves in .h5
+		currentHDF = currentHDF[0, (strlen(currentHDF) - 4)]
+		for(j = 0; j < numWN; j += 1) // loop over datasets within h5 file
+	    	currentDS = StringFromList(j, datasets)
+			currentWav = currentHDF + currentDS
+		    wnExists = FindListItem(currentWav, infile,  ";")
+		    if (wnExists == -1)
+		   		// load wave from hdf
+		   		HDF5LoadData /Q /IGOR=-1 /N=$currentWav/TRAN=1 fileID, currentDS
+		   		numloaded+=1
+		    endif
 		endfor
 		HDF5CloseFile fileID
 	endfor
-
-   print numloaded, "waves uploaded"
+	print numloaded, "waves uploaded"
 end
 
 
