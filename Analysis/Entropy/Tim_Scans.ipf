@@ -182,7 +182,7 @@ function DotTuneAround2(x, y, width_x, width_y, channelx, channely, [sweeprate, 
 	additional_comments = selectstring(numtype(strlen(additional_comments)) != 0, additional_comments, "")
 	gate_divider = paramisdefault(gate_divider) ? 20 : gate_divider
 	display_diff = paramisdefault(display_diff) ? 1 : display_diff
-	natarget = paramisdefault(natarget) ? 0.22 : natarget
+	natarget = paramisdefault(natarget) ? 0.99 : natarget
 
 	nvar fd
 	variable fdy = paramIsDefault(fdy_id) ? fd : fdy_id
@@ -239,7 +239,7 @@ function DotTuneAroundVirtual(x_str, y_str, width_x_str, width_y_str, channelx_s
 	additional_comments = selectstring(numtype(strlen(additional_comments)) != 0, additional_comments, "")
 	gate_divider = paramisdefault(gate_divider) ? 20 : gate_divider
 	display_diff = paramisdefault(display_diff) ? 1 : display_diff
-	natarget = paramisdefault(natarget) ? 1.12 : natarget
+	natarget = paramisdefault(natarget) ? 0.99 : natarget
 
 	nvar fd=fd
 
@@ -454,6 +454,8 @@ function ScanFastDAC2D_virtual(fdID, startx, finx, channelsx, starty, finy, chan
    	else
    	   RampStartFD(S, ignore_lims=1)
    	endif
+   	
+
 	/////////// Ramp Virtual gates to start
 	for (k=0; k<ItemsInList(virtual_gates, ","); k++)
 		virtual_gate = scu_getChannelNumbers(StringFromList(k, virtual_gates, ","), fastdac=1)

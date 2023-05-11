@@ -1206,6 +1206,7 @@ function plotPowerSpectrum(w, [scan_duration, linear, powerspec_name])
 	variable scan_duration, linear
 	string powerspec_name // Wavename to save powerspectrum in (useful if you want to display more than one at a time)
 	
+	linear = paramisDefault(linear) ? 1 : linear
 	wave powerspec = fd_calculate_spectrum(w, scan_duration=scan_duration, linear=linear)
 	
 	if(!paramIsDefault(powerspec_name))

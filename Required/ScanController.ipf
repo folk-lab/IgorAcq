@@ -1087,38 +1087,38 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 
 	string wn, openGraphID, graphIDs = ""
 	variable i
-	for (i = 0; i<ItemsInList(waveNames); i++)  // Look through wavenames that are being recorded
-	    wn = StringFromList(i, waveNames)
+	for (i = 0; i<ItemsInList(wavenames); i++)  // Look through wavenames that are being recorded
+	
+	    wn = StringFromList(i, wavenames)
 	    if (for_2d)
-	    	wn = wn+"_2d"
+	    	wn = wn + "_2d"
 	    endif
 	    
-	    openGraphID = scg_graphExistsForWavename(wn)
-	    if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-	    	if (!for_2d)
-	       	scg_setupGraph1D(openGraphID, x_label, y_label=y_label_1d)  
-	       else
-	       	scg_setupGraph2D(openGraphID, wn, x_label, y_label_2d)
-	       endif
-	    else 
-	        scg_open1Dgraph(wn, x_label, y_label=y_label, y_label=y_label_1d)
-	        openGraphID = winname(0,1)
-	    endif
-       graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
-
-
-	    if (for_2d)
-	        wn = wn+"_2d"
-	        openGraphID = scg_graphExistsForWavename(wn)
-	        if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-	            scg_setupGraph2D(openGraphID, wn, x_label, y_label_2d)
-	        else 
-	            scg_open2Dgraph(wn, x_label, y_label_2d)
-	            openGraphID = winname(0,1)
-	        endif
-           graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
-	    endif
-       graphIDs = addlistItem(openGraphID, graphIDs, ";", INF) 
+		openGraphID = scg_graphExistsForWavename(wn)
+		
+		// 1D graphs
+		if (!for_2d)
+			if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
+				scg_setupGraph1D(openGraphID, x_label, y_label=y_label_1d) 
+			else 
+	       	scg_open1Dgraph(wn, x_label, y_label=y_label, y_label=y_label_1d)
+	        	openGraphID = winname(0,1)
+	    	endif
+	    	graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
+		endif
+		
+		// 2D graphs
+		if (for_2d)
+			if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
+				scg_setupGraph2D(openGraphID, wn, x_label, y_label_2d)
+			else 
+	       	scg_open2Dgraph(wn, x_label, y_label_2d)
+	       	openGraphID = winname(0,1)
+	    	endif
+	    	graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
+		endif
+		
+	         
 	endfor
 	return graphIDs
 end
