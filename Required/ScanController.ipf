@@ -3987,7 +3987,7 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	variable v_left,v_right,v_top,v_bottom
 	PauseUpdate; Silent 1 // pause everything else, while building the window
 	//NewPanel/w=(0,0,790,630)/n=ScanControllerFastDAC // window size ////// EDIT 570 -> 600
-	NewPanel/w=(0,0,900,630)/n=ScanControllerFastDAC
+	NewPanel/w=(0,0,960,630)/n=ScanControllerFastDAC
 	if(v_left+v_right+v_top+v_bottom > 0)
 		MoveWindow/w=ScanControllerFastDAC v_left,v_top,V_right,v_bottom
 	endif
@@ -4028,13 +4028,22 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	DrawText 575, 70, "Wave Name"
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 665, 70, "Calc Function"
-	ListBox fadclist,pos={400,75},size={385,180},fsize=14,frame=2,widths={25,65,45,80,80}
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 770, 70, "Resample"
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 845, 70, "Notch Filter"
+	ListBox fadclist,pos={400,75},size={550,180},fsize=14,frame=2,widths={30,80,60,85,85,85,85} //added two widths for resample and notch filter, changed listbox size
+	
+	
 	ListBox fadclist,listwave=root:fadcvalstr,selwave=root:fadcattr,mode=1
 	button updatefadc,pos={400,265},size={90,20},proc=scfw_update_fadc,title="Update ADC"
 //	checkbox sc_PrintfadcBox,pos={500,265},proc=scw_CheckboxClicked,value=sc_Printfadc,side=1,title="\Z14Print filenames "
 	checkbox sc_SavefadcBox,pos={620,265},proc=scw_CheckboxClicked,variable=sc_Saverawfadc,side=1,title="\Z14Save raw data "
 	checkbox sc_FilterfadcCheckBox,pos={400,290},proc=scw_CheckboxClicked,variable=sc_ResampleFreqCheckfadc,side=1,title="\Z14Resample "
 	SetVariable sc_FilterfadcBox,pos={500,290},size={200,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resample Frequency ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
+	
+	//SetVariable sc_FilterfadcBox,pos={700,290},size={200,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resample Frequency ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
+	
 	DrawText 705,310, "\Z14Hz" 
 	popupMenu fadcSetting1,pos={420,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14ADC1 speed",size={100,20},value=sc_fadcSpeed1 
 	popupMenu fadcSetting2,pos={620,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14ADC2 speed",size={100,20},value=sc_fadcSpeed2 
@@ -4281,18 +4290,21 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	make/o/t/n=(numADCCh) fadcval2 = ""		// Record (1/0)
 	make/o/t/n=(numADCCh) fadcval3 = ""		// Wave Name
 	make/o/t/n=(numADCCh) fadcval4 = ""		// Calc (e.g. ADC0*1e-6)
+	
+	make/o/t/n=(numADCCh) fadcval5 = ""		// Resample (1/0)
+	make/o/t/n=(numADCCh) fadcval6 = ""		// Notch filter (1/0)
+	
 	for(i=0;i<numADCCh;i+=1)
 		fadcval0[i] = num2istr(i)
 		fadcval3[i] = "wave"+num2istr(i)
 		fadcval4[i] = "ADC"+num2istr(i)
 	endfor
-	concatenate/o {fadcval0,fadcval1,fadcval2,fadcval3,fadcval4}, fadcvalstr
+	concatenate/o {fadcval0,fadcval1,fadcval2,fadcval3,fadcval4, fadcval5, fadcval6}, fadcvalstr // added 5 & 6 for resample and notch filter
 	make/o/n=(numADCCh) fadcattr0 = 0
 	make/o/n=(numADCCh) fadcattr1 = 2
 	make/o/n=(numADCCh) fadcattr2 = 32
-	concatenate/o {fadcattr0,fadcattr0,fadcattr2,fadcattr1,fadcattr1}, fadcattr
-
-
+	concatenate/o {fadcattr0,fadcattr0,fadcattr2,fadcattr1,fadcattr1, fadcattr2, fadcattr2}, fadcattr // added fadcattr2 twice for two checkbox commands?
+	
 	variable/g sc_printfadc = 0
 	variable/g sc_saverawfadc = 0
 	variable/g sc_ResampleFreqCheckfadc = 0 // Whether to use resampling
@@ -4302,7 +4314,7 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	// clean up
 	killwaves fdacval0,fdacval1,fdacval2,fdacval3,fdacval4
 	killwaves fdacattr0,fdacattr1
-	killwaves fadcval0,fadcval1,fadcval2,fadcval3,fadcval4
+	killwaves fadcval0,fadcval1,fadcval2,fadcval3,fadcval4, fadcval5, fadcval6 // added 5,6 for cleanup
 	killwaves fadcattr0,fadcattr1,fadcattr2
 end
 
