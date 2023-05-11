@@ -3,12 +3,13 @@
 #pragma DefaultTab={3,20,4}		// Set default tab width in Igor Pro 9 and later
 #include <Reduce Matrix Size>
 
-function ctrans_avg(wave wav, int refit,int dotcondcentering, string kenner_out)
+function ctrans_avg(wave wav, int refit,int dotcondcentering, string kenner_out,[string condfit_prefix])
 	// wav is the wave containing original CT data
 	// refit tells whether to do new fits to each CT line
 	// dotcondcentering tells whether to use conductance data to center the CT data
 	// kenner_out is the prefix to replace dat for this analysis
-
+	// kenner_out and condfit_prefix can not contain a number otherwise getfirstnu will not work
+  
 	variable refnum, ms
 	//		stopalltimers() // run this line if timer returns nan
 
@@ -24,9 +25,12 @@ function ctrans_avg(wave wav, int refit,int dotcondcentering, string kenner_out)
 	string centered=kenner_out+num2str(wavenum)+"centered"
 	string cleaned=kenner_out+num2str(wavenum)+"cleaned"
 	string fit_params_name = kenner_out+num2str(wavenum)+"fit_params"
+	wave fit_params = $fit_params_name
+	
 
 
-	variable N=3; // how many sdevs are acceptable?
+
+	variable N=1; // how many sdevs are acceptable?
 
 
 	wave W_coef
@@ -42,21 +46,27 @@ function ctrans_avg(wave wav, int refit,int dotcondcentering, string kenner_out)
 	if (refit==1)
 		get_initial_params($quickavg);// print W_coef
 		fit_transition($quickavg);// print W_coef
-		get_fit_params($datasetname,fit_params_name) // 1 is for do not look for starting params
+		get_fit_params($datasetname,fit_params_name) //
 	endif
 	find_plot_thetas(wavenum,N,fit_params_name)
 
 	if (dotcondcentering==0)
-		//find_plot_thetas(wavenum,N,kenner_out)
-		cst_centering($datasetname,kenner_out) // centred plot and average plot
+
+		duplicate/o/r=[][3] $fit_params_name mids
+		centering($datasetname,centered,mids) // centred plot and average plot
 		cleaning($centered,badthetasx)
 
 	elseif(dotcondcentering==1)
-		dotcond_centering($datasetname,kenner_out)
+		string condfit_params_name=condfit_prefix+num2str(wavenum)+"fit_params"
+		wave condfit_params = $condfit_params_name
+
+		duplicate/o/r=[][2] condfit_params mids
+
+		centering($datasetname,centered,mids)
 		cleaning($centered,badgammasx)
 
 	endif
-	
+
 	avg_wav($cleaned) // quick average plot
 	get_initial_params($quickavg); //print W_coef
 	fit_transition($avg)
@@ -167,7 +177,6 @@ function /wave get_fit_params(wave wavenm, string fit_params_name)
 	int wavenum=getfirstnum(w2d)
 	int nc
 	int nr
-	wave fit_params
 	wave temp_wave
 	wave W_coef
 	wave W_sigma
@@ -310,40 +319,11 @@ endif
 end
 
 
-function cst_centering(wave waved,string kenner_out)
-	string w2d=nameofwave(waved)
-	int wavenum=getfirstnum(w2d)
-	string centered=kenner_out+num2str(wavenum)+"centered"
-	string fit_params_name = kenner_out+num2str(wavenum)+"fit_params"
-	wave fit_params = $fit_params_name
-	
-	//	duplicate /o /r = [][0] waved wavex;redimension/N=(nr) wavex; wavex = x
-	duplicate/o waved $centered
-	wave new2dwave=$centered
-	copyscales waved new2dwave
-	new2dwave=interp2d(waved,(x+fit_params[q][3]),(y)) // column 3 is the center fit parameter
-end
-
-function centering(wave waved,string new_name, wave mids)
-	string w2d=nameofwave(waved)
-	int wavenum=getfirstnum(w2d)
-	string centered="demod"+num2str(wavenum)+"centered"
-	string fit_params_name = getprefix(w2d)+num2str(wavenum)+"fit_params"
-	wave fit_params = $fit_params_name
-	
-	//	duplicate /o /r = [][0] waved wavex;redimension/N=(nr) wavex; wavex = x
-	duplicate/o waved $centered
-	wave new2dwave=$centered
-	copyscales waved new2dwave
-	new2dwave=interp2d(waved,(x+fit_params[q][3]),(y)) // column 3 is the center fit parameter
-end
-
 
 function /wave cleaning(wave center, wave badthetasx)
 	string w2d=nameofwave(center)
 	int wavenum=getfirstnum(w2d)
 	string cleaned=getprefix(w2d)+num2str(wavenum)+"cleaned"
-
 	duplicate/o center $cleaned
 
 

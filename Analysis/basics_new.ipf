@@ -63,7 +63,7 @@ function demodulate(datnum, harmonic, wave_kenner, [append2hdf, dat_kenner])
 	string wn="dat" + num2str(datnum) + wave_kenner;
 	wave wav=$wn
 	struct AWGVars AWGLI
-	fd_getoldAWG(AWGLI, datnum, kenner=dat_kenner)
+	fd_getoldAWG(AWGLI, datnum)
 
 	print AWGLI
 
@@ -117,6 +117,64 @@ function demodulate(datnum, harmonic, wave_kenner, [append2hdf, dat_kenner])
 
 end
 
+function center_dSdN(int wavenum, string kenner)
+//wav is input wave, for example demod
+//centered is output name
+wave demod
+string centered=kenner+num2str(wavenum)+"centered"
+string centeravg=kenner+num2str(wavenum)+"centered_avg"
+string cleaned=kenner+num2str(wavenum)+"cleaned"
+string cleaned_avg=kenner+num2str(wavenum)+"cleaned_avg"
+
+
+//duplicate/o demod centered
+wave badthetasx
+
+string condfit_prefix="cst"; //this can become an input if needed
+string condfit_params_name=condfit_prefix+num2str(wavenum)+"fit_params"
+wave condfit_params = $condfit_params_name
+
+	duplicate/o/r=[][3] condfit_params mids
+
+	centering(demod,centered,mids)
+	wave temp=$centered
+
+	duplicate/o temp $cleaned
+
+
+	// removing lines with bad thetas;
+
+	variable i, idx
+	int nc
+	int nr
+	nr = dimsize(badthetasx,0) //number of rows
+	i=0
+	if (nr>0)
+		do
+			idx=badthetasx[i]-i //when deleting, I need the -i because if deleting in the loop the indeces of center change continously as points are deleted
+			DeletePoints/M=1 idx,1, $cleaned
+			i=i+1
+		while (i<nr)
+	endif
+//		WaveTransform zapnans $cleaned_avg
+//		WaveTransform zapnans $centeravg
+
+
+	avg_wav($cleaned)
+	avg_wav($centered)
+	display $cleaned_avg, $centeravg
+	makecolorful()
+//	wave center=$centeravg
+//	Extract/o/indx center,newx, (numtype(center[p])==0)
+//	wavestats center
+//	DeletePoints 0, 43, center 
+
+	
+
+	
+	
+end
+
 
 
 
@@ -127,7 +185,7 @@ function demodulate2(datnum,harmonic,kenner,[append2hdf, axis])
 	variable datnum,harmonic
 	string kenner
 	variable append2hdf, axis
-	axis = paramisdefault(axis) ? axis : 0
+	axis = paramisdefault(axis) ? 0 : axis
 	variable nofcycles, period, cols, rows
 	string wn="dat"+num2str(datnum)+kenner;
 	string wn_x="temp_x"
@@ -216,8 +274,11 @@ function resampleWave(wave wav,variable targetFreq )
 	string temp_name="dat"+num2str(wavenum)+"x_array"
 	
 	variable measureFreq
-	struct ScanVars S
-	fd_getScanVars(S,wavenum)
+//	struct ScanVars S
+//	fd_getScanVars(S,wavenum)
+struct AWGVars S
+fd_getoldAWG(S,wavenum)
+
 	measureFreq=S.measureFreq
 	variable N=measureFreq/targetFreq
 
@@ -985,5 +1046,24 @@ end
 
 
 
-// https://www.wavemetrics.com/code-snippet/stacked-plots-multiple-plots-graph
+function centering(wave waved,string centered, wave mids)
+	duplicate/o waved $centered
+	wave new2dwave=$centered
+	copyscales waved new2dwave
+	//new2dwave=interp2d(waved,(x+fit_params[q][3]),(y)) // column 3 is the center fit parameter
+	new2dwave=interp2d(waved,(x+mids[q]),(y)) // mids is the shift in x
+end
 
+//function cst_centering(wave waved,string kenner_out)
+//	string w2d=nameofwave(waved)
+//	int wavenum=getfirstnum(w2d)
+//	string centered=kenner_out+num2str(wavenum)+"centered"
+//	string fit_params_name = kenner_out+num2str(wavenum)+"fit_params"
+//	wave fit_params = $fit_params_name
+//	
+//	//	duplicate /o /r = [][0] waved wavex;redimension/N=(nr) wavex; wavex = x
+//	duplicate/o waved $centered
+//	wave new2dwave=$centered
+//	copyscales waved new2dwave
+//	new2dwave=interp2d(waved,(x+fit_params[q][3]),(y)) // column 3 is the center fit parameter
+//end
