@@ -3448,6 +3448,9 @@ function scfd_postFilterNumpts(raw_numpts, measureFreq)  // TODO: Rename to Nump
 	
 	nvar boxChecked = sc_ResampleFreqCheckFadc
 	nvar targetFreq = sc_ResampleFreqFadc
+	
+	boxChecked = 1 // forcing this calculation to happen always// could remove the if statement entirely.
+	
 	if (boxChecked)
 	  	RatioFromNumber (targetFreq / measureFreq)
 	  	return round(raw_numpts*(V_numerator)/(V_denominator))  // TODO: Is this actually how many points are returned?
@@ -3583,31 +3586,53 @@ function scfd_ProcessAndDistribute(ScanVars, rowNum)
 	variable i = 0
 	string rwn, cwn
 	string calc_string
-	for (i=0; i<itemsinlist(RawWaveNames1D); i++)
-		rwn = StringFromList(i, RawWaveNames1D)
-		cwn = StringFromList(i, CalcWaveNames1D)		
-		calc_string = StringFromList(i, CalcStrings)
-		duplicate/o $rwn sc_tempwave
 	
-		if (sc_ResampleFreqCheckfadc != 0)
-			scfd_resampleWaves(sc_tempwave, ScanVars.measureFreq, sc_ResampleFreqfadc)
-		endif
-		calc_string = ReplaceString(rwn, calc_string, "sc_tempwave")
+	wave fadcattr
+	
+	
+	//for (i = 0; i<dimsize(fadcvalstr, 0); i++)	
+		//if (fadcattr[i][5] == 48) // Checkbox checked
+	
+	
+	for (i=0; i<itemsinlist(RawWaveNames1D); i++)
+	
 		
-		execute("sc_tempwave ="+calc_string)
-		execute(cwn+" = sc_tempwave")
-		
-		if (ScanVars.is2d)
-			// Copy 1D raw into 2D
-			wave raw1d = $rwn
-			wave raw2d = $rwn+"_2d"
-			raw2d[][rowNum] = raw1d[p]
+		//if (fadcattr[i][5] == 48) // Checkbox checked
+	
+			rwn = StringFromList(i, RawWaveNames1D)
+			cwn = StringFromList(i, CalcWaveNames1D)		
+			calc_string = StringFromList(i, CalcStrings)
+			duplicate/o $rwn sc_tempwave
+	
+			//if (sc_ResampleFreqCheckfadc != 0)
+			if (fadcattr[i][5] == 48) // Checkbox checked
+				
+				
+				scfd_resampleWaves(sc_tempwave, ScanVars.measureFreq, sc_ResampleFreqfadc)
 			
-			// Copy 1D calc into 2D
-			cwn = cwn+"_2d"
-			wave calc2d = $cwn
-			calc2d[][rowNum] = sc_tempwave[p]		
-		endif
+			
+			//endif
+			endif
+			
+			calc_string = ReplaceString(rwn, calc_string, "sc_tempwave")
+		
+			execute("sc_tempwave ="+calc_string)
+			execute(cwn+" = sc_tempwave")
+			
+			if (ScanVars.is2d)
+				// Copy 1D raw into 2D
+				wave raw1d = $rwn
+				wave raw2d = $rwn+"_2d"
+				raw2d[][rowNum] = raw1d[p]
+			
+				// Copy 1D calc into 2D
+				cwn = cwn+"_2d"
+				wave calc2d = $cwn
+				calc2d[][rowNum] = sc_tempwave[p]		
+			endif
+			
+		//endif
+			
 	endfor	
 	if (!ScanVars.prevent_2d_graph_updates)
 		doupdate // Update all the graphs with their new data
@@ -4039,18 +4064,18 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	button updatefadc,pos={400,265},size={90,20},proc=scfw_update_fadc,title="Update ADC"
 //	checkbox sc_PrintfadcBox,pos={500,265},proc=scw_CheckboxClicked,value=sc_Printfadc,side=1,title="\Z14Print filenames "
 	checkbox sc_SavefadcBox,pos={620,265},proc=scw_CheckboxClicked,variable=sc_Saverawfadc,side=1,title="\Z14Save raw data "
-	checkbox sc_FilterfadcCheckBox,pos={400,290},proc=scw_CheckboxClicked,variable=sc_ResampleFreqCheckfadc,side=1,title="\Z14Resample "
+	//checkbox sc_FilterfadcCheckBox,pos={400,290},proc=scw_CheckboxClicked,variable=sc_ResampleFreqCheckfadc,side=1,title="\Z14Resample "
 	SetVariable sc_FilterfadcBox,pos={500,290},size={200,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resample Frequency ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
 	
 	//SetVariable sc_FilterfadcBox,pos={700,290},size={200,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resample Frequency ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
 	
 	DrawText 705,310, "\Z14Hz" 
-	popupMenu fadcSetting1,pos={420,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14ADC1 speed",size={100,20},value=sc_fadcSpeed1 
-	popupMenu fadcSetting2,pos={620,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14ADC2 speed",size={100,20},value=sc_fadcSpeed2 
-	popupMenu fadcSetting3,pos={420,360},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14ADC3 speed",size={100,20},value=sc_fadcSpeed3 
-	popupMenu fadcSetting4,pos={620,360},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14ADC4 speed",size={100,20},value=sc_fadcSpeed4 
-	popupMenu fadcSetting5,pos={420,390},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14ADC5 speed",size={100,20},value=sc_fadcSpeed5 
-	popupMenu fadcSetting6,pos={620,390},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14ADC6 speed",size={100,20},value=sc_fadcSpeed6 
+	popupMenu fadcSetting1,pos={420,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD1 speed",size={100,20},value=sc_fadcSpeed1 
+	popupMenu fadcSetting2,pos={620,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD2 speed",size={100,20},value=sc_fadcSpeed2 
+	popupMenu fadcSetting3,pos={420,360},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD3 speed",size={100,20},value=sc_fadcSpeed3 
+	popupMenu fadcSetting4,pos={620,360},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD4 speed",size={100,20},value=sc_fadcSpeed4 
+	popupMenu fadcSetting5,pos={420,390},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD5 speed",size={100,20},value=sc_fadcSpeed5 
+	popupMenu fadcSetting6,pos={620,390},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD6 speed",size={100,20},value=sc_fadcSpeed6 
 	DrawText 550, 347, "\Z14Hz" 
 	DrawText 750, 347, "\Z14Hz" 
 	DrawText 550, 377, "\Z14Hz" 
@@ -4357,3 +4382,22 @@ function scfw_SetGUIinteraction(numDevices)
 	endswitch
 end
 	
+	
+	
+	
+// for resampling
+//for (i = 0; i<dimsize(fadcvalstr, 0); i++)	
+//if (fadcattr[i][5] == 48) // Checkbox checked
+
+
+
+//function scfd_ProcessAndDistribute(ScanVars, rowNum) // uses global variable sc_ResampleFreqCheckfadc to run scfd_resampleWaves(sc_tempwave)
+//								global variable created in FastDacWindow() undercheckbox 
+
+
+
+
+//find where the global variable is created and updated
+// have a look at scfd_resampleWaves(sc_tempwave) function //probably wont need to update it at all.
+
+//see how the resampled data updates the graphs.
