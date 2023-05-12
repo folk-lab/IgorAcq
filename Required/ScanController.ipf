@@ -896,27 +896,37 @@ function sci_initializeWaves(S)  // TODO: rename
     variable numpts  // Numpts to initialize wave with, note: for Filtered data, this number is reduced
     string wavenames, wn
     variable raw, j
+    
+    wave fadcattr
+    
     for (raw = 0; raw<2; raw++) // (raw = 0 means calc waves)
         wavenames = sci_get1DWaveNames(raw, S.using_fastdac)
         sci_sanityCheckWavenames(wavenames)
-        if (S.using_fastdac)
-	        numpts = (raw) ? S.numptsx : scfd_postFilterNumpts(S.numptsx, S.measureFreq)  
-	     else
-	     	numpts = S.numptsx
-	     endif
-        for (j=0; j<itemsinlist(wavenames);j++)
+    	
+    	for (j=0; j<itemsinlist(wavenames);j++)
+        
+        	if (S.using_fastdac && fadcattr[j][5] == 48) // Checkbox checked
+	        	numpts = (raw) ? S.numptsx : scfd_postFilterNumpts(S.numptsx, S.measureFreq)   
+	     	else
+	     		numpts = S.numptsx
+	     	endif
+	 
             wn = stringFromList(j, wavenames)
             sci_init1DWave(wn, numpts, S.startx, S.finx)
+            
             if (S.is2d == 1)
                 sci_init2DWave(wn+"_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
             endif
+            
         endfor
+        
     endfor
 
 	// Setup Async measurements if not doing a fastdac scan (workers will look for data made here)
 	if (!S.using_fastdac) 
 		sc_findAsyncMeasurements()
 	endif
+	
 end
 
 
