@@ -878,14 +878,6 @@ end
 
 
 
-
-
-
-
-
-
-
-
 function int_PSD(tim)
 	string tim
 //	wave ref
@@ -918,9 +910,11 @@ end
 
 macro testLI()
 
-setFdacAWGSquareWave(fd, 100, -100, 0.01, 0.01, 0)
+sc_openInstrConnections(0)
+setFdacAWGSquareWave(fd, 100, -100, 0.001, 0.001, 0)
 setupAWG(fd, AWs="0", DACs="0", numCycles=1, verbose=1);
-ScanFastDAC(fd, -1, 1, "3", sweeprate=0.5,  repeats=1,  use_awg=1,nosave=0)
+ScanFastDAC(fd, 0, 1, "3", sweeprate=1,  repeats=1,  use_awg=1,nosave=0)
+
 //lock_in_main_2d(wave0_2d,1)
 //demodulate(filenum,1,"wa,[append2hdf])
 //display average
