@@ -3,35 +3,43 @@
 #pragma DefaultTab={3,20,4}		// Set default tab width in Igor Pro 9 and later
 #include <Reduce Matrix Size>
 
-function dotcond_avg(int wavenum, int refit)
+function dotcond_avg(wave wav, int refit,string kenner_out)
+// wav is the wave containing original dotcurrent data
+	// refit tells whether to do new fits to each CT line
+	// kenner_out is the prefix to replace dat for this analysis
+	// kenner_out  can not contain a number otherwise getfirstnu will not work
+
 	variable refnum, ms
 		//stopalltimers()
 	refnum=startmstimer
 
-	//closeallGraphs()
+	closeallGraphs()
 
-	string datasetname ="dat"+num2str(wavenum)+"dotcurrent_2d"
-	string avg = "cond" + num2str(wavenum) + "avg"
-	string cond_centr="cond"+num2str(wavenum)+"centered"
-	string cleaned="cond"+num2str(wavenum)+"cleaned"
+	string datasetname =nameofwave(wav)
+	string kenner=getsuffix(datasetname) //  cscurrent in the above case
+	int wavenum=getfirstnum(datasetname) // XXX in the above case
+	
+	// these are the new wave names to be made
+	string avg = kenner_out + num2str(wavenum) + "avg"
+	string cond_centr=kenner_out+num2str(wavenum)+"centered"
+	string cleaned=kenner_out+num2str(wavenum)+"cleaned"
 
 	string split_pos=cleaned+"_pos"
 	string split_neg=cleaned+"_neg"
 	string pos_avg=split_pos+"_avg"
 	string neg_avg=split_neg+"_avg"
-	string fit_params_name = "cond"+num2str(wavenum)+"fit_params"
+	string fit_params_name = kenner_out+num2str(wavenum)+"fit_params"
 	variable N
 	N=40// how many sdevs in thetas are acceptable?
 
-	remove_noise($datasetname);
-	datasetname=datasetname+"_nf";
-	resampleWave($datasetname,600);
+
 
 	if (refit==1)
-		cond_fit_params($datasetname)
+		cond_fit_params($datasetname,kenner_out)// finds fit_params
 		find_plot_gammas(fit_params_name,N) //need to do this to refind good and bad gammas
-		dotcentering($datasetname) // only need to center after redoing fits, centred plot; returns cond_centr
-		dotcleaned($cond_centr) // only need to clean after redoing fits; returns cond_centr
+		duplicate/o/r=[][2] $fit_params_name mids
+		centering($datasetname,cond_centr,mids)// only need to center after redoing fits, centred plot; returns cond_centr
+		dotcleaned($cond_centr,kenner_out) // only need to clean after redoing fits; returns cond_centr
 	endif
 
 
@@ -39,7 +47,7 @@ function dotcond_avg(int wavenum, int refit)
 	avg_wav($split_pos) // pos average
 	avg_wav($split_neg) // neg average
 	calc_avg_cond($pos_avg,$neg_avg,avg) // condxxxxavg
-	dotfigs(wavenum,N)
+	dotfigs(wavenum,N,kenner, kenner_out)
 //ctrans_avg(wavenum, 1,dotcondcentering=1)
 	ms=stopmstimer(refnum)
 	print ms/1e6
@@ -230,73 +238,27 @@ end
 
 
 
-function dotcentering(wave wav)
-	string w2d=nameofwave(wav)
-	int wavenum=getfirstnum(w2d)
-
-	string fit_params_name = "cond"+num2str(wavenum)+"fit_params"
-	string centered = "cond"+num2str(wavenum)+"centered"
-	wave fit_params = $fit_params_name
-	wave waved = $w2d
-
-	int i
-	int nr
-	int nc
-	int cutoff //percent to deal with edge cases
-
-	cutoff = dimsize(waved,0)/20;// the edge cases are just cut off by some percent
-
-
-	//get_fit_params2(wavenum, dataset, condition)
-
-	duplicate /o $w2d wavecopy
-	duplicate /o $w2d centered_2dx
-
-	nr = dimsize(centered_2dx,0); //print nr
-	nc = dimsize(centered_2dx,1);// print nc
-	duplicate /o /r = [][0] wavecopy wavex;redimension/N=(nr) wavex; wavex = x
-
-
-	centered_2dx = 0
-
-	duplicate /o/r = [][2] fit_params mids
-	duplicate /o wavex new_x;
-	DeletePoints (nr-cutoff),cutoff, new_x
-	DeletePoints 0,cutoff, new_x
-	make /o/n = ((dimsize(new_x,0)),nc) $centered
-	wave new2dwave=$centered
-
-
-	setscale/I x new_x[0] , new_x[dimsize(new_x,0) - 1], "", new2dwave
-	duplicate /o new_x, sweep_l
-	setscale/I x new_x[0] , new_x[dimsize(new_x,0) - 1], "", sweep_l
-
-
-	duplicate /o wavex wavex2
-	duplicate /o wavex sweep
-
-
-	variable offset
-	//	for(i = 0; i < nc; i += 1)
-	for(i = 0; i < nc; i += 1)
-
-		wavex2=wavex-mids[i];
-		sweep=wavecopy[p][i]
-		Interpolate2/T=1/Y=sweep_L/I=3 wavex2, sweep
-		sweep_L[0]=sweep_l[1]
-		new2dwave[][i] = sweep_L[p]
-
-	endfor
+//function dotcentering(wave waved)
+//	string w2d=nameofwave(waved)
+//	int wavenum=getfirstnum(w2d)
+//	string fit_params_name = "cond"+num2str(wavenum)+"fit_params"
+//	string centered = "cond"+num2str(wavenum)+"centered"
+//	wave fit_params = $fit_params_name
+//
+//	wave new2dwave=$centered
+//	copyscales waved new2dwave
+//	new2dwave=interp2d(waved,(x+fit_params[q][2]),(y)) // column 3 is the center fit parameter
+//end
 
 
 end
 
 
-function /wave dotcleaned(wave center)
+function /wave dotcleaned(wave center,string kenner_out)
 	wave badgammasx
 	string w2d=nameofwave(center)
 	int wavenum=getfirstnum(w2d)
-	string cleaned="cond"+num2str(wavenum)+"cleaned"
+	string cleaned=kenner_out+num2str(wavenum)+"cleaned"
 	duplicate/o center $cleaned
 
 
@@ -486,10 +448,10 @@ end
 
 
 
-function /wave cond_fit_params(wave wav)
+function /wave cond_fit_params(wave wav, string kenner_out)
 	string w2d=nameofwave(wav)
 	int wavenum=getfirstnum(w2d)
-	string fit_params_name = "cond"+num2str(wavenum)+"fit_params" //new array
+	string fit_params_name = kenner_out+num2str(wavenum)+"fit_params" //new array
 
 
 	variable i
@@ -527,18 +489,17 @@ function /wave cond_fit_params(wave wav)
 
 end
 
-function dotfigs(wavenum,N)
-	variable wavenum,N
-	string dataset="dat"+num2str(wavenum)+"dotcurrent_2d_nf"
-	string avg = "cond" + num2str(wavenum) + "avg"
-	string cond_centr="cond"+num2str(wavenum)+"centered"
-	string cleaned="cond"+num2str(wavenum)+"cleaned"
+function dotfigs(variable wavenum,variable N,string kenner, string kenner_out)	
+	string dataset="dat"+num2str(wavenum)+kenner
+	string avg = kenner_out + num2str(wavenum) + "avg"
+	string cond_centr=kenner_out+num2str(wavenum)+"centered"
+	string cleaned=kenner_out+num2str(wavenum)+"cleaned"
 
 	string split_pos=cleaned+"_pos"
 	string split_neg=cleaned+"_neg"
 	string pos_avg=split_pos+"_avg"
 	string neg_avg=split_neg+"_avg"
-	string fit_params_name = "cond"+num2str(wavenum)+"fit_params" 
+	string fit_params_name = kenner_out+num2str(wavenum)+"fit_params" 
 	closeallgraphs()
 
 	/////////////////// thetas  //////////////////////////////////////

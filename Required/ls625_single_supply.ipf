@@ -181,7 +181,7 @@ function setLS625current(instrID,output) // Units: A
 	if (abs(output) > maxf*apt/1000)
 		print "Max current is "+num2str(maxf*apt/1000)+" A"
 	else
-		cmd = "SETI "+num2str(output)
+		cmd = "SETI "+num2str(output, "%.15f")  // Ensure does not send e.g. "1e-4" instead of "0.0001"
 		writeInstr(instrID, cmd+"\r\n")
 	endif
 	

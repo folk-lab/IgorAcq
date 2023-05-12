@@ -1,4 +1,4 @@
-#pragma rtGlobals=3		// Use modern global access method and strict wave access.
+ipf#pragma rtGlobals=3		// Use modern global access method and strict wave access.
 
 // Scan Controller routines for 1d and 2d scans
 // Version 1.7 August 8, 2016
@@ -1075,7 +1075,7 @@ function/S scg_initializeGraphs(S)
 		else
 			ylabel = S.y_label
 		endif
-        buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, for_2d=0, y_label=ylabel)
+        buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, for_2d=S.is2d, y_label=ylabel)
         if(raw==1) // Raw waves
 	        sc_rawGraphs1D = buffer
         endif
@@ -1101,28 +1101,38 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 
 	string wn, openGraphID, graphIDs = ""
 	variable i
-	for (i = 0; i<ItemsInList(waveNames); i++)  // Look through wavenames that are being recorded
-	    wn = StringFromList(i, waveNames)
+	for (i = 0; i<ItemsInList(wavenames); i++)  // Look through wavenames that are being recorded
+	
+	    wn = StringFromList(i, wavenames)
 	    if (for_2d)
-	    	wn = wn+"_2d"
+	    	wn = wn + "_2d"
 	    endif
 	    
-	    openGraphID = scg_graphExistsForWavename(wn)
-	    if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-	    	if (!for_2d)
-	       	scg_setupGraph1D(openGraphID, x_label, y_label=y_label_1d)  
-	       else
-	       	scg_setupGraph2D(openGraphID, wn, x_label, y_label_2d)
-	       endif
-	    else 
-	    	if (!for_2d)
+		openGraphID = scg_graphExistsForWavename(wn)
+		
+		// 1D graphs
+		if (!for_2d)
+			if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
+				scg_setupGraph1D(openGraphID, x_label, y_label=y_label_1d) 
+			else 
 	       	scg_open1Dgraph(wn, x_label, y_label=y_label, y_label=y_label_1d)
-	       else
+	        	openGraphID = winname(0,1)
+	    	endif
+	    	graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
+		endif
+		
+		// 2D graphs
+		if (for_2d)
+			if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
+				scg_setupGraph2D(openGraphID, wn, x_label, y_label_2d)
+			else 
 	       	scg_open2Dgraph(wn, x_label, y_label_2d)
-	       endif
-	       openGraphID = winname(0,1)
-	    endif
-       graphIDs = addlistItem(openGraphID, graphIDs, ";", INF) 
+	       	openGraphID = winname(0,1)
+	    	endif
+	    	graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
+		endif
+		
+	         
 	endfor
 	return graphIDs
 end
@@ -1734,7 +1744,7 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	
 	Struct ScanVars S_ // Note: This will definitely exist for the rest of this function
 	scv_getLastScanVars(S_)
-	print S_
+
 	if (aborting)
 		S_.end_time = datetime
 		S_.comments = "aborted, " + S_.comments
@@ -3465,6 +3475,45 @@ function scfd_postFilterNumpts(raw_numpts, measureFreq)  // TODO: Rename to Nump
 	return round(raw_numpts*(V_numerator)/(V_denominator))  // TODO: Is this actually how many points are returned?
 
 end
+
+function scfd_resampleWaves2(w, measureFreq, targetFreq)
+	// resamples wave w from measureFreq
+	// to targetFreq (which should be lower than measureFreq)
+	Wave w
+	variable measureFreq, targetFreq
+	struct scanvars S
+	scv_getLastScanVars(S); print S
+
+	wave wcopy
+	// notch_filter(w,60); 	 notch_filter(w,180); 	 notch_filter(w,300)
+	
+	duplicate /o  w wcopy
+	
+	w = x
+	
+	RatioFromNumber (targetFreq / measureFreq)
+	if (V_numerator > V_denominator)
+		string cmd
+		printf cmd "WARNING[scfd_resampleWaves]: Resampling will increase number of datapoints, not decrease! (ratio = %d/%d)\r", V_numerator, V_denominator
+	endif
+	//resample/UP=(V_numerator)/DOWN=(V_denominator)/N=201/E=3 w
+	
+	setscale x 0, ((w[dimsize(w,0) - 1] - w[0])/S.sweeprate), wcopy
+	
+	resample /rate=(targetfreq)/N=201/E=3 wcopy
+	
+	copyscales w wcopy
+	
+	duplicate /o wcopy w
+	
+	killwaves wcopy
+	
+	
+	// TODO: Need to test N more (simple testing suggests we may need >200 in some cases!)
+	// TODO: Need to decide what to do with end effect. Possibly /E=2 (set edges to 0) and then turn those zeros to NaNs? 
+	// TODO: Or maybe /E=3 is safest (repeat edges). The default /E=0 (bounce) is awful.
+end
+
 
 function scfd_resampleWaves(w, measureFreq, targetFreq)
 	// resamples wave w from measureFreq

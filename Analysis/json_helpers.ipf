@@ -212,10 +212,13 @@ end
 //
 //
 //
-function fd_getoldAWG(S,datnum,[fastdac_num])
+function fd_getoldAWG(S,datnum,[fastdac_num, kenner])
 	// Function to get old values for AWG that is stored in hdf file with filenum
 	struct AWGVars &S
 	variable datnum, fastdac_num
+	string kenner
+	kenner = selectString(paramisdefault(kenner), kenner, "")
+	
 	variable sl_id, fd_id  //JSON ids
 	fastdac_num = paramisdefault(fastdac_num) ? 1 : fastdac_num
 
@@ -223,7 +226,7 @@ function fd_getoldAWG(S,datnum,[fastdac_num])
 		abort "WARNING: This is untested... remove this abort if you're feeling lucky!"
 	endif
 
-	sl_id = get_sweeplogs(datnum)  // Get Sweep_logs JSON;
+	sl_id = get_sweeplogs(datnum, kenner=kenner)  // Get Sweep_logs JSON;
 	fd_id = getJSONXid(sl_id, "FastDAC "+num2istr(fastdac_num)) // Get FastDAC JSON from Sweeplogs
 
 	// Get variable parts
