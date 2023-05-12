@@ -885,11 +885,12 @@ end
 
 
 function sci_initializeWaves(S)  // TODO: rename
-    // Initializes the waves necessary for recording scan
-	//  Need 1D and 2D waves for the raw data coming from the fastdac (2D for storing, not necessarily displaying)
+   // Initializes the waves necessary for recording scan
+	// Need 1D and 2D waves for the raw data coming from the fastdac (2D for storing, not necessarily displaying)
 	// 	Need 2D waves for either the raw data, or filtered data if a filter is set
-	//		(If a filter is set, the raw waves should only ever be plotted 1D)
-	//		(This will be after calc (i.e. don't need before and after calc wave))
+	// (If a filter is set, the raw waves should only ever be plotted 1D)
+	//	(This will be after calc (i.e. don't need before and after calc wave))
+	
     struct ScanVars &S
     variable fastdac
 
@@ -899,7 +900,10 @@ function sci_initializeWaves(S)  // TODO: rename
     
     wave fadcattr
     
-    for (raw = 0; raw<2; raw++) // (raw = 0 means calc waves)
+    for (raw = 0; raw<2; raw++)                                      // (raw = 0 means calc waves)
+    	//raw = 0 -> creates waves for raw data at 
+    	//raw = 1 -> checks if the resample box has been ticked and returns correct numpts on x-axis
+
         wavenames = sci_get1DWaveNames(raw, S.using_fastdac)
         sci_sanityCheckWavenames(wavenames)
     	
@@ -911,16 +915,16 @@ function sci_initializeWaves(S)  // TODO: rename
 	     		numpts = S.numptsx
 	     	endif
 	 
-            wn = stringFromList(j, wavenames)
-            sci_init1DWave(wn, numpts, S.startx, S.finx)
+          wn = stringFromList(j, wavenames)
+          sci_init1DWave(wn, numpts, S.startx, S.finx)
             
-            if (S.is2d == 1)
-                sci_init2DWave(wn+"_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
-            endif
+          if (S.is2d == 1)
+          	sci_init2DWave(wn+"_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+          endif
             
-        endfor
+       endfor
         
-    endfor
+	endfor
 
 	// Setup Async measurements if not doing a fastdac scan (workers will look for data made here)
 	if (!S.using_fastdac) 
@@ -3454,19 +3458,12 @@ end
 
 function scfd_postFilterNumpts(raw_numpts, measureFreq)  // TODO: Rename to NumptsAfterFilter
     // Returns number of points that will exist after applying lowpass filter specified in ScanController_Fastdac
-    variable raw_numpts, measureFreq
-	
-	nvar boxChecked = sc_ResampleFreqCheckFadc
+   variable raw_numpts, measureFreq
 	nvar targetFreq = sc_ResampleFreqFadc
-	
-	boxChecked = 1 // forcing this calculation to happen always// could remove the if statement entirely.
-	
-	if (boxChecked)
-	  	RatioFromNumber (targetFreq / measureFreq)
-	  	return round(raw_numpts*(V_numerator)/(V_denominator))  // TODO: Is this actually how many points are returned?
-	else
-		return raw_numpts
-	endif
+
+	RatioFromNumber (targetFreq / measureFreq)
+	return round(raw_numpts*(V_numerator)/(V_denominator))  // TODO: Is this actually how many points are returned?
+
 end
 
 function scfd_resampleWaves(w, measureFreq, targetFreq)
@@ -3599,29 +3596,15 @@ function scfd_ProcessAndDistribute(ScanVars, rowNum)
 	
 	wave fadcattr
 	
-	
-	//for (i = 0; i<dimsize(fadcvalstr, 0); i++)	
-		//if (fadcattr[i][5] == 48) // Checkbox checked
-	
-	
 	for (i=0; i<itemsinlist(RawWaveNames1D); i++)
-	
 		
-		//if (fadcattr[i][5] == 48) // Checkbox checked
-	
 			rwn = StringFromList(i, RawWaveNames1D)
 			cwn = StringFromList(i, CalcWaveNames1D)		
 			calc_string = StringFromList(i, CalcStrings)
 			duplicate/o $rwn sc_tempwave
 	
-			//if (sc_ResampleFreqCheckfadc != 0)
-			if (fadcattr[i][5] == 48) // Checkbox checked
-				
-				
+			if (fadcattr[i][5] == 48) // checks which resample box is checked
 				scfd_resampleWaves(sc_tempwave, ScanVars.measureFreq, sc_ResampleFreqfadc)
-			
-			
-			//endif
 			endif
 			
 			calc_string = ReplaceString(rwn, calc_string, "sc_tempwave")
@@ -3640,8 +3623,7 @@ function scfd_ProcessAndDistribute(ScanVars, rowNum)
 				wave calc2d = $cwn
 				calc2d[][rowNum] = sc_tempwave[p]		
 			endif
-			
-		//endif
+
 			
 	endfor	
 	if (!ScanVars.prevent_2d_graph_updates)
@@ -4072,12 +4054,9 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	
 	ListBox fadclist,listwave=root:fadcvalstr,selwave=root:fadcattr,mode=1
 	button updatefadc,pos={400,265},size={90,20},proc=scfw_update_fadc,title="Update ADC"
-//	checkbox sc_PrintfadcBox,pos={500,265},proc=scw_CheckboxClicked,value=sc_Printfadc,side=1,title="\Z14Print filenames "
 	checkbox sc_SavefadcBox,pos={620,265},proc=scw_CheckboxClicked,variable=sc_Saverawfadc,side=1,title="\Z14Save raw data "
-	//checkbox sc_FilterfadcCheckBox,pos={400,290},proc=scw_CheckboxClicked,variable=sc_ResampleFreqCheckfadc,side=1,title="\Z14Resample "
 	SetVariable sc_FilterfadcBox,pos={500,290},size={200,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resample Frequency ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
 	
-	//SetVariable sc_FilterfadcBox,pos={700,290},size={200,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resample Frequency ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
 	
 	DrawText 705,310, "\Z14Hz" 
 	popupMenu fadcSetting1,pos={420,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD1 speed",size={100,20},value=sc_fadcSpeed1 
