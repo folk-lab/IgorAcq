@@ -3712,14 +3712,16 @@ function scfd_ProcessAndDistribute(ScanVars, rowNum)
 			calc_string = StringFromList(i, CalcStrings)
 			duplicate/o $rwn sc_tempwave
 	
+			if (fadcattr[i][6] == 48) // checks which notch box is checked
+				scfd_notch_filters(sc_tempwave, Hzs="60;180;300", Qs="50;150;250")
+			endif
+				
 			if (fadcattr[i][5] == 48) // checks which resample box is checked
 				scfd_resampleWaves(sc_tempwave, ScanVars.measureFreq, sc_ResampleFreqfadc)
 			endif
 			
 			
-			if (fadcattr[i][6] == 48) // checks which notch box is checked
-				scfd_notch_filters(sc_tempwave, Hzs="60;180;300", Qs="50;150;250")
-			endif		
+	
 			
 			calc_string = ReplaceString(rwn, calc_string, "sc_tempwave")
 			execute("sc_tempwave ="+calc_string)
