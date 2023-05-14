@@ -1,0 +1,92 @@
+    <html>
+    <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/zoomooz/1.4.1/zoomooz.min.js"></script>
+    <style>
+        .mermaid {
+            height: 600px; /* Adjust the height as needed */
+            margin-bottom: 20px; /* Adjust the bottom margin as needed */
+        }
+    </style>
+    <pre class="mermaid">
+    graph TB;
+getls370status --> readtxtfile;
+getls370status --> getjsonvalue;
+getjsonvalue --> getjsonkeyoffset;
+getjsonvalue --> getjsonindices;
+getls370status --> sc_sqltimestamp;
+sc_sqltimestamp --> sc_sqldatabasetime;
+sc_sqldatabasetime --> requestsqlvalue;
+requestsqlvalue --> sc_opensqlconnection;
+sc_opensqlconnection --> sc_readsqlconnectionparameters;
+sc_readsqlconnectionparameters --> readtxtfile;
+sc_readsqlconnectionparameters --> getjsonvalue;
+requestsqlvalue --> sc_fetchsqlsingle;
+sc_fetchsqlsingle --> sc_closesqlconnection;
+requestsqlvalue --> sc_closesqlconnection;
+sc_sqltimestamp --> timestamp2secs;
+getls370status --> requestsqlvalue;
+getls370status --> getls370temp;
+getls370temp --> bd_channellookup;
+getls370temp --> getls370channellabel;
+getls370channellabel --> bd_channellookup;
+getls370temp --> sendls370;
+sendls370 --> gethttp;
+sendls370 --> posthttp;
+posthttp --> getjsonvalue;
+sendls370 --> puthttp;
+puthttp --> getjsonvalue;
+sendls370 --> getjsonvalue;
+getls370status --> addjsonkeyval;
+addjsonkeyval --> escapequotes;
+subgraph ScanController_SQL.ipf
+requestsqlvalue
+sc_opensqlconnection
+sc_fetchsqlsingle
+sc_closesqlconnection
+sc_readsqlconnectionparameters
+timestamp2secs
+sc_sqldatabasetime
+sc_sqltimestamp
+end
+subgraph ls370_resistancebridge.ipf
+getls370channellabel
+getls370temp
+sendls370
+getls370status
+end
+subgraph babydac.ipf
+bd_channellookup
+end
+subgraph ScanController_IO.ipf
+readtxtfile
+getjsonvalue
+getjsonindices
+getjsonkeyoffset
+addjsonkeyval
+escapequotes
+end
+subgraph ScanController_INSTR.ipf
+posthttp
+puthttp
+gethttp
+end
+    </pre>
+    <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+        startOnLoad: true,
+        flowchart: {
+                useMaxWidth: true, // Disable maximum width for better zooming
+                htmlLabels: true, // Enable HTML-based labels for better styling
+                defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
+            },
+        });
+    $(document).ready(function() {
+            // Apply Zoomooz to the Mermaid diagram container
+            $('.mermaid').zoomTarget();
+        });
+    </script>
+    </body>
+    </html>
+    

@@ -1,4 +1,5 @@
-This file cannot be stored on GitHub. Request this from Tim or Christian
+This file cannot be stored on GitHub. Find it at `//qdev-h101.phas.ubc.ca/shared/General/Igor_SQLConfig/SQLConfig.txt`
+Alternatively, copy it from the most recent cooldowns config folder.
 
 Since you're here. Other useful info for getting SQL stuff to work:
 1. Copy SQL XOP from Igor files "More Extensions (64-bit)" > Utilities" to "Igor Extensions (64-bit)"

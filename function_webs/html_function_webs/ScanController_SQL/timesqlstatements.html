@@ -1,0 +1,64 @@
+    <html>
+    <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/zoomooz/1.4.1/zoomooz.min.js"></script>
+    <style>
+        .mermaid {
+            height: 600px; /* Adjust the height as needed */
+            margin-bottom: 20px; /* Adjust the bottom margin as needed */
+        }
+    </style>
+    <pre class="mermaid">
+    graph TB;
+timesqlstatements --> requestsqldata;
+requestsqldata --> sc_opensqlconnection;
+sc_opensqlconnection --> sc_readsqlconnectionparameters;
+sc_readsqlconnectionparameters --> readtxtfile;
+sc_readsqlconnectionparameters --> getjsonvalue;
+getjsonvalue --> getjsonkeyoffset;
+getjsonvalue --> getjsonindices;
+requestsqldata --> sc_fetchsqldata;
+sc_fetchsqldata --> sc_closesqlconnection;
+sc_fetchsqldata --> sc_mapsqltypetowavetype;
+requestsqldata --> sc_closesqlconnection;
+timesqlstatements --> requestsqlvalue;
+requestsqlvalue --> sc_opensqlconnection;
+requestsqlvalue --> sc_fetchsqlsingle;
+sc_fetchsqlsingle --> sc_closesqlconnection;
+requestsqlvalue --> sc_closesqlconnection;
+subgraph ScanController_SQL.ipf
+requestsqldata
+requestsqlvalue
+sc_opensqlconnection
+sc_fetchsqlsingle
+sc_fetchsqldata
+sc_closesqlconnection
+sc_readsqlconnectionparameters
+sc_mapsqltypetowavetype
+timesqlstatements
+end
+subgraph ScanController_IO.ipf
+readtxtfile
+getjsonvalue
+getjsonindices
+getjsonkeyoffset
+end
+    </pre>
+    <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+        startOnLoad: true,
+        flowchart: {
+                useMaxWidth: true, // Disable maximum width for better zooming
+                htmlLabels: true, // Enable HTML-based labels for better styling
+                defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
+            },
+        });
+    $(document).ready(function() {
+            // Apply Zoomooz to the Mermaid diagram container
+            $('.mermaid').zoomTarget();
+        });
+    </script>
+    </body>
+    </html>
+    

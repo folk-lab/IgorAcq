@@ -1,0 +1,72 @@
+    <html>
+    <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/zoomooz/1.4.1/zoomooz.min.js"></script>
+    <style>
+        .mermaid {
+            height: 600px; /* Adjust the height as needed */
+            margin-bottom: 20px; /* Adjust the bottom margin as needed */
+        }
+    </style>
+    <pre class="mermaid">
+    graph TB;
+openhp34401aconnection --> visaerrormsg;
+openhp34401aconnection --> openvisainstr;
+openvisainstr --> closevisainstr;
+closevisainstr --> visaerrormsg;
+openvisainstr --> visaerrormsg;
+openvisainstr --> setvisaoptions;
+setvisaoptions --> visasetbaudrate;
+setvisaoptions --> visasetstopbits;
+setvisaoptions --> visasetdatabits;
+setvisaoptions --> visasetparity;
+setvisaoptions --> visasettimeout;
+setvisaoptions --> visaerrormsg;
+openvisainstr --> queryinstr;
+queryinstr --> writeinstr;
+writeinstr --> visaerrormsg;
+queryinstr --> readinstr;
+readinstr --> visasetreadterm;
+readinstr --> visasetreadtermenable;
+visasetreadtermenable --> visasetreadterm;
+readinstr --> visasetserialendin;
+readinstr --> visaerrormsg;
+subgraph hp34401A.ipf
+openhp34401aconnection
+end
+subgraph ScanController_INSTR.ipf
+visaerrormsg
+openvisainstr
+closevisainstr
+writeinstr
+readinstr
+queryinstr
+setvisaoptions
+visasetreadterm
+visasetreadtermenable
+visasettimeout
+visasetbaudrate
+visasetdatabits
+visasetstopbits
+visasetserialendin
+visasetparity
+end
+    </pre>
+    <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+        startOnLoad: true,
+        flowchart: {
+                useMaxWidth: true, // Disable maximum width for better zooming
+                htmlLabels: true, // Enable HTML-based labels for better styling
+                defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
+            },
+        });
+    $(document).ready(function() {
+            // Apply Zoomooz to the Mermaid diagram container
+            $('.mermaid').zoomTarget();
+        });
+    </script>
+    </body>
+    </html>
+    
