@@ -1,0 +1,155 @@
+    <html>
+    <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/zoomooz/1.4.1/zoomooz.min.js"></script>
+    <style>
+        .mermaid {
+            height: 600px; /* Adjust the height as needed */
+            margin-bottom: 20px; /* Adjust the bottom margin as needed */
+        }
+    </style>
+    <pre class="mermaid">
+    graph TB;
+scfd_checksweepstate --> scs_checksweepstate;
+scs_checksweepstate --> endscan;
+endscan --> scv_setlastscanvars;
+endscan --> scv_getlastscanvars;
+endscan --> savetohdf;
+savetohdf --> openhdffile;
+openhdffile --> endscan;
+savetohdf --> addmetafiles;
+addmetafiles --> scw_createconfig;
+scw_createconfig --> addjsonkeyval;
+addjsonkeyval --> escapequotes;
+scw_createconfig --> textwave2strarray;
+textwave2strarray --> escapequotes;
+scw_createconfig --> wave2boolarray;
+wave2boolarray --> num2bool;
+scw_createconfig --> num2bool;
+addmetafiles --> sc_createsweeplogs;
+sc_createsweeplogs --> addjsonkeyval;
+sc_createsweeplogs --> num2numstr;
+sc_createsweeplogs --> sc_instrumentlogs;
+sc_instrumentlogs --> sc_openinstrconnections;
+sc_instrumentlogs --> sc_createsweeplogs;
+sc_instrumentlogs --> addjsonkeyval;
+addmetafiles --> prettyjsonfmt;
+prettyjsonfmt --> getindent;
+addmetafiles --> sce_scanvarstojson;
+sce_scanvarstojson --> addjsonkeyval;
+sce_scanvarstojson --> prettyjsonfmt;
+addmetafiles --> sc_confirm_json;
+addmetafiles --> scw_saveconfig;
+scw_saveconfig --> scu_unixtime;
+scw_saveconfig --> writetofile;
+savetohdf --> savefastdacinfowaves;
+savefastdacinfowaves --> fd_getglobalawg;
+fd_getglobalawg --> fd_initglobalawg;
+fd_initglobalawg --> fd_setglobalawg;
+savefastdacinfowaves --> fd_getawgwave;
+savefastdacinfowaves --> savesinglewavetohdf;
+savetohdf --> savescanwaves;
+savescanwaves --> scfd_postfilternumpts;
+savetohdf --> sci_get1dwavenames;
+sci_get1dwavenames --> scf_getrecordedfadcinfo;
+savetohdf --> sci_get2dwavenames;
+sci_get2dwavenames --> sci_get1dwavenames;
+savetohdf --> getrawsavenames;
+savetohdf --> scu_assertseparatortype;
+savetohdf --> createwavescopyigor;
+savetohdf --> savewavestohdf;
+savewavestohdf --> savesinglewavetohdf;
+savetohdf --> closehdffile;
+endscan --> saveexp;
+saveexp --> savefrompxp;
+endscan --> sc_checkbackup;
+sc_checkbackup --> getexppath;
+endscan --> sc_copynewfiles;
+sc_copynewfiles --> sc_copysinglefile;
+sc_copysinglefile --> getexppath;
+sc_copysinglefile --> executemaccmd;
+sc_copynewfiles --> getexppath;
+endscan --> sce_scanvarstojson;
+scfd_checksweepstate --> fd_stopfdacsweep;
+fd_stopfdacsweep --> clearfdacbuffer;
+clearfdacbuffer --> writeinstr;
+writeinstr --> visaerrormsg;
+subgraph ScanController.ipf
+scu_assertseparatortype
+scu_unixtime
+scv_setlastscanvars
+scv_getlastscanvars
+sci_get1dwavenames
+sci_get2dwavenames
+sc_openinstrconnections
+sc_checkbackup
+scs_checksweepstate
+endscan
+sce_scanvarstojson
+scw_createconfig
+scw_saveconfig
+scf_getrecordedfadcinfo
+scfd_postfilternumpts
+scfd_checksweepstate
+end
+subgraph fastdac.ipf
+clearfdacbuffer
+fd_stopfdacsweep
+fd_getawgwave
+fd_initglobalawg
+fd_setglobalawg
+fd_getglobalawg
+end
+subgraph ScanController_IO.ipf
+openhdffile
+closehdffile
+savewavestohdf
+addmetafiles
+sc_createsweeplogs
+sc_instrumentlogs
+getrawsavenames
+createwavescopyigor
+savescanwaves
+savesinglewavetohdf
+savetohdf
+savefastdacinfowaves
+saveexp
+savefrompxp
+sc_copysinglefile
+sc_copynewfiles
+executemaccmd
+getexppath
+writetofile
+sc_confirm_json
+num2numstr
+num2bool
+wave2boolarray
+textwave2strarray
+addjsonkeyval
+getindent
+prettyjsonfmt
+escapequotes
+end
+subgraph ScanController_INSTR.ipf
+visaerrormsg
+writeinstr
+end
+    </pre>
+    <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+        startOnLoad: true,
+        flowchart: {
+                useMaxWidth: true, // Disable maximum width for better zooming
+                htmlLabels: true, // Enable HTML-based labels for better styling
+                defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
+            },
+        });
+    $(document).ready(function() {
+            // Apply Zoomooz to the Mermaid diagram container
+            $('.mermaid').zoomTarget();
+        });
+    </script>
+    </body>
+    </html>
+    

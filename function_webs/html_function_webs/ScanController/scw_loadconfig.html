@@ -1,0 +1,66 @@
+    <html>
+    <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/zoomooz/1.4.1/zoomooz.min.js"></script>
+    <style>
+        .mermaid {
+            height: 600px; /* Adjust the height as needed */
+            margin-bottom: 20px; /* Adjust the bottom margin as needed */
+        }
+    </style>
+    <pre class="mermaid">
+    graph TB;
+scw_loadconfig --> readtxtfile;
+scw_loadconfig --> getjsonvalue;
+getjsonvalue --> getjsonkeyoffset;
+getjsonvalue --> getjsonindices;
+scw_loadconfig --> loadstrarray2textwave;
+loadstrarray2textwave --> getstrarrayshape;
+loadstrarray2textwave --> escapequotes;
+loadstrarray2textwave --> unescapequotes;
+unescapequotes --> escapequotes;
+scw_loadconfig --> loadboolarray2wave;
+loadboolarray2wave --> getarrayshape;
+loadboolarray2wave --> bool2num;
+scw_loadconfig --> loadbool2var;
+loadbool2var --> bool2num;
+scw_loadconfig --> loadnum2var;
+scw_loadconfig --> scw_rebuildwindow;
+subgraph ScanController.ipf
+scw_rebuildwindow
+scw_loadconfig
+end
+subgraph ScanController_IO.ipf
+readtxtfile
+getjsonvalue
+getjsonindices
+getjsonkeyoffset
+getstrarrayshape
+loadstrarray2textwave
+getarrayshape
+loadboolarray2wave
+loadbool2var
+loadnum2var
+bool2num
+escapequotes
+unescapequotes
+end
+    </pre>
+    <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+        startOnLoad: true,
+        flowchart: {
+                useMaxWidth: true, // Disable maximum width for better zooming
+                htmlLabels: true, // Enable HTML-based labels for better styling
+                defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
+            },
+        });
+    $(document).ready(function() {
+            // Apply Zoomooz to the Mermaid diagram container
+            $('.mermaid').zoomTarget();
+        });
+    </script>
+    </body>
+    </html>
+    
