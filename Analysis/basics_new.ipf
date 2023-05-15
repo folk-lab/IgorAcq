@@ -251,7 +251,7 @@ function demodulate2(datnum,harmonic,kenner,[append2hdf, axis])
 	demod2 = wav_x
 	endif
 	
-	if (axis==1)
+	if (axis==2)
 	demod2 = wav_y
 	endif
 	
