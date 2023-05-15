@@ -437,6 +437,30 @@ function notch_filters(wave wav, [string Hzs, string Qs, string notch_name])
 end
 
 
+function spectrum_analyzer(wave data, variable samp_freq)
+	// Built in powerspectrum function
+	duplicate/o data spectrum
+	SetScale/P x 0,1/samp_freq,"", spectrum
+	variable nr=dimsize(spectrum,0)
+	wave slice;
+	wave w_Periodogram
+
+	variable i=0
+	rowslice(spectrum,i)
+		DSPPeriodogram/DB/NODC=1/DEST=W_Periodogram slice
+	duplicate/o w_Periodogram, powerspec
+	i=1
+	do
+		rowslice(spectrum,i)
+		DSPPeriodogram/DB/NODC=1/DEST=W_Periodogram slice
+		powerspec=powerspec+W_periodogram
+		i=i+1
+	while(i<nr)
+	powerspec[0]=nan
+	display powerspec
+end
+
+
 
 ///// DEPRECATED ///// 
 //function remove_noise(wave wav)
