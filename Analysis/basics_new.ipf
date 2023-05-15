@@ -905,7 +905,7 @@ macro testLI()
 sc_openInstrConnections(0)
 setFdacAWGSquareWave(fd, 100, -100, 0.001, 0.001, 0)
 setupAWG(fd, AWs="0", DACs="0", numCycles=1, verbose=1);
-ScanFastDAC(fd, 0, 1, "3", sweeprate=1,  repeats=2)//,  use_awg=1,nosave=1)
+ScanFastDAC(fd, 0, 1, "3", sweeprate=1,  use_awg=1,nosave=1)
 
 //lock_in_main_2d(wave0_2d,1)
 //demodulate(filenum,1,"wa,[append2hdf])

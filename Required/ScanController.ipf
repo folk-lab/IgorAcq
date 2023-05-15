@@ -3534,7 +3534,7 @@ function scfd_resampleWaves(w, measureFreq, targetFreq)
 end
 
 
-function scfd_notch_filters(wave wav, [string Hzs, string Qs])
+function scfd_notch_filters(wave wav, variable measureFreq, [string Hzs, string Qs])
 	// wav is the wave to be filtered.
 	// If not specified the filtered wave will have the original name plus '_nf' 
 	// This function is used to apply the notch filter for a choice of frequencies and Q factors
@@ -3546,7 +3546,7 @@ function scfd_notch_filters(wave wav, [string Hzs, string Qs])
 	Qs = selectString(paramisdefault(Qs), Qs, "50")
 	variable num_Hz = ItemsInList(Hzs, ";")
 	variable num_Q = ItemsInList(Qs, ";")
-	String wav_name = nameOfWave(wav)
+
 		
 	// Creating wave variables
 	variable num_rows = dimsize(wav, 0)
@@ -3560,12 +3560,12 @@ function scfd_notch_filters(wave wav, [string Hzs, string Qs])
 
 	wave /c temp_fft
 	duplicate/c/o temp_fft fftfactor // fftfactor is the wave to multiple temp_fft by to zero our certain frequencies
-//	fftfactor = 1 - exp(-(x - freq)^2 / (freq / Q)^2)
+   //fftfactor = 1 - exp(-(x - freq)^2 / (freq / Q)^2)
 	
 	// Accessing freq conversion for wav
-	int wavenum = getfirstnum(wav_name)
-	variable freqfactor = 1/(fd_getmeasfreq(wavenum) * dimdelta(wav, 0)) // freq in wav = Hz in real seconds * freqfactor
-//	variable freq = 1 / (fd_getmeasfreq(wavenum) * dimdelta(wav, 0) / Hz)
+
+	variable freqfactor = 1/(measureFreq * dimdelta(wav, 0)) // freq in wav = Hz in real seconds * freqfactor
+
 
 	fftfactor=1
 	variable freq, Q, i
@@ -3713,7 +3713,7 @@ function scfd_ProcessAndDistribute(ScanVars, rowNum)
 			duplicate/o $rwn sc_tempwave
 	
 			if (fadcattr[i][6] == 48) // checks which notch box is checked
-				scfd_notch_filters(sc_tempwave, Hzs="60;180;300", Qs="50;150;250")
+				scfd_notch_filters(sc_tempwave, ScanVars.measureFreq, Hzs="60;180;300", Qs="50;150;250")
 			endif
 				
 			if (fadcattr[i][5] == 48) // checks which resample box is checked
