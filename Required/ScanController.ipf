@@ -3533,6 +3533,66 @@ function scfd_resampleWaves(w, measureFreq, targetFreq)
 	// TODO: Or maybe /E=3 is safest (repeat edges). The default /E=0 (bounce) is awful.
 end
 
+
+function scfd_notch_filters(wave wav, [string Hzs, string Qs])
+	// wav is the wave to be filtered.
+	// If not specified the filtered wave will have the original name plus '_nf' 
+	// This function is used to apply the notch filter for a choice of frequencies and Q factors
+	// if the length of Hzs and Qs do not match then Q is chosen as the first Q is the list
+	// It is expected that wav will have an associated JSON file to convert measurement times to points, via fd_getmeasfreq below
+	// EXAMPLE usage: notch_filters(dat6430cscurrent_2d, Hzs="60;180;300", Qs="50;150;250")
+	
+	Hzs = selectString(paramisdefault(Hzs), Hzs, "60")
+	Qs = selectString(paramisdefault(Qs), Qs, "50")
+	variable num_Hz = ItemsInList(Hzs, ";")
+	variable num_Q = ItemsInList(Qs, ";")
+	String wav_name = nameOfWave(wav)
+		
+	// Creating wave variables
+	variable num_rows = dimsize(wav, 0)
+	variable padnum = 2^ceil(log(num_rows) / log(2)); 
+	duplicate /o wav tempwav // tempwav is the one we will operate on during the FFT
+	variable offset = mean(wav)
+	tempwav -= offset // make tempwav have zero average to reduce end effects associated with padding
+	
+	//Transform
+	FFT/pad=(padnum)/OUT=1/DEST=temp_fft tempwav
+
+	wave /c temp_fft
+	duplicate/c/o temp_fft fftfactor // fftfactor is the wave to multiple temp_fft by to zero our certain frequencies
+//	fftfactor = 1 - exp(-(x - freq)^2 / (freq / Q)^2)
+	
+	// Accessing freq conversion for wav
+	int wavenum = getfirstnum(wav_name)
+	variable freqfactor = 1/(fd_getmeasfreq(wavenum) * dimdelta(wav, 0)) // freq in wav = Hz in real seconds * freqfactor
+//	variable freq = 1 / (fd_getmeasfreq(wavenum) * dimdelta(wav, 0) / Hz)
+
+	fftfactor=1
+	variable freq, Q, i
+	for (i=0;i<num_Hz;i+=1)
+		freq = freqfactor * str2num(stringfromlist(i, Hzs))
+		Q = ((num_Hz==num_Q) ? str2num(stringfromlist(i, Qs)): str2num(stringfromlist(0, Qs))) // this sets Q to be the ith item on the list if num_Q==num_Hz, otherwise it sets it to be the first value
+		fftfactor -= exp(-(x - freq)^2 / (freq / Q)^2)
+	endfor
+	temp_fft *= fftfactor
+
+	//Inverse transform
+	IFFT/DEST=temp_ifft  temp_fft
+	wave temp_ifft
+	
+	temp_ifft += offset
+
+	redimension/N=(num_rows, -1) temp_ifft
+	copyscales wav, temp_ifft
+	duplicate /o temp_ifft wav
+
+	
+end
+
+
+
+
+
 function scfd_RecordValues(S, rowNum, [AWG_list, linestart, skip_data_distribution])  // TODO: Rename to fd_record_values
 	struct ScanVars &S
 	variable rowNum, linestart
@@ -3624,7 +3684,7 @@ end
 
 
 function scfd_ProcessAndDistribute(ScanVars, rowNum)
-	// Get 1D wave names, duplicate each wave then resample and copy into calc wave (and do calc string)
+	// Get 1D wave names, duplicate each wave then resample, notch filter and copy into calc wave (and do calc string)
 	struct ScanVars &ScanVars
 	variable rowNum
 		
@@ -3652,12 +3712,18 @@ function scfd_ProcessAndDistribute(ScanVars, rowNum)
 			calc_string = StringFromList(i, CalcStrings)
 			duplicate/o $rwn sc_tempwave
 	
+			if (fadcattr[i][6] == 48) // checks which notch box is checked
+				scfd_notch_filters(sc_tempwave, Hzs="60;180;300", Qs="50;150;250")
+			endif
+				
 			if (fadcattr[i][5] == 48) // checks which resample box is checked
 				scfd_resampleWaves(sc_tempwave, ScanVars.measureFreq, sc_ResampleFreqfadc)
 			endif
 			
+			
+	
+			
 			calc_string = ReplaceString(rwn, calc_string, "sc_tempwave")
-		
 			execute("sc_tempwave ="+calc_string)
 			execute(cwn+" = sc_tempwave")
 			
