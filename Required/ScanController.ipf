@@ -1964,9 +1964,9 @@ function InitScanController([configFile])
 			// instrument wave
 			make /t/o/N=(sc_instrLimit,3) sc_Instr
 
-			sc_Instr[0][0] = "openIPSconnection(\"ips1\", \"ASRL::1\", verbose=1)"
-			sc_Instr[0][1] = "initIPS120(ips1)"
-			sc_Instr[0][2] = "GetIPSStatus(ips1)"
+			sc_Instr[0][0] = "openFastDACconnection(\"fd\",\"ASRL36::INSTR\", numDACCh = 8, numADCCh = 4, master = 1, optical = 1)"
+			sc_Instr[0][1] = ""
+			sc_Instr[0][2] = "getfdstatus(fd)"
 
 			nvar/z filenum
 			if(!nvar_exists(filenum))
@@ -4161,10 +4161,12 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 665, 70, "Calc Function"
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 770, 70, "Resample"
+	DrawText 770, 70, "Resamp"
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 845, 70, "Notch Filter"
-	ListBox fadclist,pos={400,75},size={550,180},fsize=14,frame=2,widths={30,80,60,85,85,85,85} //added two widths for resample and notch filter, changed listbox size
+	DrawText 845, 70, "N.Filter"
+	SetDrawEnv fsize=14, fstyle=1
+	//DrawText 845, 70, "Demod"
+	ListBox fadclist,pos={400,75},size={550,180},fsize=14,frame=2,widths={30,80,60,85,85,85,85}//,85} //added two widths for resample and notch filter, changed listbox size, demod
 	
 	
 	ListBox fadclist,listwave=root:fadcvalstr,selwave=root:fadcattr,mode=1
