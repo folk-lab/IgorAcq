@@ -909,13 +909,16 @@ function sci_initializeWaves(S)  // TODO: rename
     	
     	for (j=0; j<itemsinlist(wavenames);j++)
         
-        	if (S.using_fastdac && fadcattr[j][5] == 48) // Checkbox checked
+        	wn = stringFromList(j, wavenames)
+        	string wavenum = wn[4,strlen(wn)]
+        	
+        	if (S.using_fastdac && fadcattr[str2num(wavenum)][8] == 48) // Checkbox checked
 	        	numpts = (raw) ? S.numptsx : scfd_postFilterNumpts(S.numptsx, S.measureFreq)   
 	     	else
 	     		numpts = S.numptsx
 	     	endif
 	 
-          wn = stringFromList(j, wavenames)
+          
           sci_init1DWave(wn, numpts, S.startx, S.finx)
             
           if (S.is2d == 1)
