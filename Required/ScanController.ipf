@@ -4299,12 +4299,12 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	popupMenu fadcSetting4,pos={420,360},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD4 speed",size={100,20},value=sc_fadcSpeed4 
 	popupMenu fadcSetting5,pos={620,360},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD5 speed",size={100,20},value=sc_fadcSpeed5 
 	popupMenu fadcSetting6,pos={820,360},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD6 speed",size={100,20},value=sc_fadcSpeed6 
-	DrawText 535, 347, "\Z14Hz" 
-	DrawText 735, 347, "\Z14Hz" 
-	DrawText 935, 347, "\Z14Hz" 
-	DrawText 535, 377, "\Z14Hz" 
-	DrawText 735, 377, "\Z14Hz" 
-	DrawText 935, 377, "\Z14Hz" 
+	DrawText 545, 347, "\Z14Hz" 
+	DrawText 745, 347, "\Z14Hz" 
+	DrawText 945, 347, "\Z14Hz" 
+	DrawText 545, 377, "\Z14Hz" 
+	DrawText 745, 377, "\Z14Hz" 
+	DrawText 945, 377, "\Z14Hz" 
 
 	// identical to ScanController window
 	// all function calls are to ScanController functions
