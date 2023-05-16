@@ -3806,23 +3806,29 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 	wave fadcattr
 	wave /T fadcvalstr
 	
+	
+	//for (i = 0; i<dimsize(fadcvalstr, 0); i++)
+	
+	
 	for (i=0; i<itemsinlist(RawWaveNames1D); i++)
 		
 			rwn = StringFromList(i, RawWaveNames1D)
 			cwn = StringFromList(i, CalcWaveNames1D)		
 			calc_string = StringFromList(i, CalcStrings)
 			duplicate/o $rwn sc_tempwave
-	
-			if (fadcattr[i][5] == 48) // checks which notch box is checked
+			
+			string ADCnum = rwn[3,strlen(rwn)]
+			
+			if (fadcattr[str2num(ADCnum)][5] == 48) // checks which notch box is checked
 				scfd_notch_filters(sc_tempwave, ScanVars.measureFreq, Hzs="60;180;300", Qs="50;150;250")
 			endif
 			
-			if (fadcattr[i][6] == 48) // checks which demod box is checked
+			if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
 				scfd_demodulate(sc_tempwave, str2num(fadcvalstr[i][7]), AWGVars.numCycles, AWGVars.waveLen, axis = 0) 
 			endif
 			
 				
-			if (fadcattr[i][8] == 48) // checks which resample box is checked
+			if (fadcattr[str2num(ADCnum)][8] == 48) // checks which resample box is checked
 				scfd_resampleWaves(sc_tempwave, ScanVars.measureFreq, sc_ResampleFreqfadc)
 			endif
 			
