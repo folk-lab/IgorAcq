@@ -1964,9 +1964,9 @@ function InitScanController([configFile])
 			// instrument wave
 			make /t/o/N=(sc_instrLimit,3) sc_Instr
 
-			sc_Instr[0][0] = "openIPSconnection(\"ips1\", \"ASRL::1\", verbose=1)"
-			sc_Instr[0][1] = "initIPS120(ips1)"
-			sc_Instr[0][2] = "GetIPSStatus(ips1)"
+			sc_Instr[0][0] = "openFastDACconnection(\"fd\",\"ASRL36::INSTR\", numDACCh = 8, numADCCh = 4, master = 1, optical = 1)"
+			sc_Instr[0][1] = ""
+			sc_Instr[0][2] = "getfdstatus(fd)"
 
 			nvar/z filenum
 			if(!nvar_exists(filenum))
@@ -3534,7 +3534,7 @@ function scfd_resampleWaves(w, measureFreq, targetFreq)
 end
 
 
-function scfd_notch_filters(wave wav, [string Hzs, string Qs])
+function scfd_notch_filters(wave wav, variable measureFreq, [string Hzs, string Qs])
 	// wav is the wave to be filtered.
 	// If not specified the filtered wave will have the original name plus '_nf' 
 	// This function is used to apply the notch filter for a choice of frequencies and Q factors
@@ -3546,7 +3546,7 @@ function scfd_notch_filters(wave wav, [string Hzs, string Qs])
 	Qs = selectString(paramisdefault(Qs), Qs, "50")
 	variable num_Hz = ItemsInList(Hzs, ";")
 	variable num_Q = ItemsInList(Qs, ";")
-	String wav_name = nameOfWave(wav)
+
 		
 	// Creating wave variables
 	variable num_rows = dimsize(wav, 0)
@@ -3560,12 +3560,12 @@ function scfd_notch_filters(wave wav, [string Hzs, string Qs])
 
 	wave /c temp_fft
 	duplicate/c/o temp_fft fftfactor // fftfactor is the wave to multiple temp_fft by to zero our certain frequencies
-//	fftfactor = 1 - exp(-(x - freq)^2 / (freq / Q)^2)
+   //fftfactor = 1 - exp(-(x - freq)^2 / (freq / Q)^2)
 	
 	// Accessing freq conversion for wav
-	int wavenum = getfirstnum(wav_name)
-	variable freqfactor = 1/(fd_getmeasfreq(wavenum) * dimdelta(wav, 0)) // freq in wav = Hz in real seconds * freqfactor
-//	variable freq = 1 / (fd_getmeasfreq(wavenum) * dimdelta(wav, 0) / Hz)
+
+	variable freqfactor = 1/(measureFreq * dimdelta(wav, 0)) // freq in wav = Hz in real seconds * freqfactor
+
 
 	fftfactor=1
 	variable freq, Q, i
@@ -3588,6 +3588,105 @@ function scfd_notch_filters(wave wav, [string Hzs, string Qs])
 
 	
 end
+
+
+
+
+function scfd_demodulate(wav, harmonic, nofcycles, period, [append2hdf, axis])
+//if axis=0: demodulation in r
+//if axis=1: demodulation in x
+//if axis=2: demodulation in y
+	//variable datnum,harmonic
+	
+	//string kenner
+	//variable 
+	
+	wave wav
+	variable harmonic, nofcycles, period, append2hdf, axis
+	
+	variable cols, rows
+	axis = paramisdefault(axis) ? 0 : axis
+	//string wn="dat"+num2str(datnum)+kenner;
+	string wn_x="temp_x"
+	string wn_y="temp_y"
+	//wave wav=$wn
+	wave wav_x=$wn_x
+	wave wav_y=$wn_y
+	//struct AWGVars AWGLI         // 
+	//fd_getoldAWG(AWGLI,datnum) // this could be called in process and distribute, gotta see whats being pulled
+	
+	make /o demod
+	
+	
+	//print AWGLI
+	
+	cols=dimsize(wav,0); print cols
+	rows=dimsize(wav,1); print rows
+	make /o/n=(cols) sine1d
+	
+	//nofcycles=AWGLI.numCycles;  // pulled from AWGLI struct
+	//period=AWGLI.waveLen;       // pulled from AWGLI struct
+	
+	
+	
+	
+	//Demodulate in x
+	if ((axis==0)||(axis==1))
+		duplicate /o wav, wav_xx
+
+	
+		//Original Measurement Wave
+		sine1d=sin(2*pi*(harmonic*p/period))
+		matrixop /o sinewave=colrepeat(sine1d,rows)
+		matrixop /o temp=wav_xx*sinewave
+		copyscales wav_xx, temp
+		temp=temp*pi/2;
+		ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,"demod_x")
+		wn_x="demod_x"
+		wave wav_x=$wn_x
+	endif
+	
+	//Demodulate in y
+	if ((axis==0)||(axis==2))
+		duplicate /o wav, wav_yy
+
+		//Original Measurement Wave
+		sine1d=cos(2*pi*(harmonic*p/period))
+		matrixop /o sinewave=colrepeat(sine1d,rows)
+		matrixop /o temp=wav_yy*sinewave
+		copyscales wav_yy, temp
+		temp=temp*pi/2;
+		ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,"demod_y")
+		wn_y="demod_y"
+		wave wav_y=$wn_y
+	endif
+	
+	//Given wav_x and wav_y now refer to their respective demodulations, 
+	//associate the correct set with the output based on r/x/y 
+	
+	//wn="demod"
+	
+	if (axis==0)
+		demod =( (wav_x)^2 + (wav_y)^2 ) ^ (0.5)  //problematic line - operating on null wave?
+	
+	elseif (axis==1)
+		demod = wav_x
+	
+	elseif (axis==2)
+		demod = wav_y
+	endif
+	
+	//Store demodulated wave w.r.t. correct axis
+	//if (append2hdf)
+	//	variable fileid
+	//	fileid=get_hdfid(datnum) //opens the file
+	//	HDF5SaveData/o /IGOR=-1 /TRAN=1 /WRIT=1 /Z $wn, fileid
+	//	HDF5CloseFile/a fileid
+	//endif
+
+end 
+
+
 
 
 
@@ -3629,7 +3728,7 @@ function scfd_RecordValues(S, rowNum, [AWG_list, linestart, skip_data_distributi
 	
 	// Process 1D read and distribute
 	if (!skip_data_distribution)
-		scfd_ProcessAndDistribute(S, rowNum) 
+		scfd_ProcessAndDistribute(S, AWG, rowNum) 
 	endif
 end
 
@@ -3683,9 +3782,10 @@ function scfd_SendCommandAndRead(S, AWG_list, rowNum)
 end
 
 
-function scfd_ProcessAndDistribute(ScanVars, rowNum)
+function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 	// Get 1D wave names, duplicate each wave then resample, notch filter and copy into calc wave (and do calc string)
 	struct ScanVars &ScanVars
+	struct AWGVars &AWGVars
 	variable rowNum
 		
 	// Get all raw 1D wave names in a list
@@ -3704,6 +3804,7 @@ function scfd_ProcessAndDistribute(ScanVars, rowNum)
 	string calc_string
 	
 	wave fadcattr
+	wave /T fadcvalstr
 	
 	for (i=0; i<itemsinlist(RawWaveNames1D); i++)
 		
@@ -3712,11 +3813,16 @@ function scfd_ProcessAndDistribute(ScanVars, rowNum)
 			calc_string = StringFromList(i, CalcStrings)
 			duplicate/o $rwn sc_tempwave
 	
-			if (fadcattr[i][6] == 48) // checks which notch box is checked
-				scfd_notch_filters(sc_tempwave, Hzs="60;180;300", Qs="50;150;250")
+			if (fadcattr[i][5] == 48) // checks which notch box is checked
+				scfd_notch_filters(sc_tempwave, ScanVars.measureFreq, Hzs="60;180;300", Qs="50;150;250")
 			endif
+			
+			if (fadcattr[i][6] == 48) // checks which demod box is checked
+				scfd_demodulate(sc_tempwave, str2num(fadcvalstr[i][7]), AWGVars.numCycles, AWGVars.waveLen, axis = 0) 
+			endif
+			
 				
-			if (fadcattr[i][5] == 48) // checks which resample box is checked
+			if (fadcattr[i][8] == 48) // checks which resample box is checked
 				scfd_resampleWaves(sc_tempwave, ScanVars.measureFreq, sc_ResampleFreqfadc)
 			endif
 			
@@ -4119,7 +4225,7 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	variable v_left,v_right,v_top,v_bottom
 	PauseUpdate; Silent 1 // pause everything else, while building the window
 	//NewPanel/w=(0,0,790,630)/n=ScanControllerFastDAC // window size ////// EDIT 570 -> 600
-	NewPanel/w=(0,0,960,630)/n=ScanControllerFastDAC
+	NewPanel/w=(0,0,1060,630)/n=ScanControllerFastDAC
 	if(v_left+v_right+v_top+v_bottom > 0)
 		MoveWindow/w=ScanControllerFastDAC v_left,v_top,V_right,v_bottom
 	endif
@@ -4130,9 +4236,9 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	SetDrawEnv fsize=25, fstyle=1
 	DrawText 546, 45, "ADC"
 	DrawLine 385,15,385,385 
-	DrawLine 10,415,780,415 /////EDIT 385-> 415
+	DrawLine 10,415,1050,415 /////EDIT 385-> 415
 	SetDrawEnv dash=7
-	Drawline 395,320,780,320 /////EDIT 295 -> 320
+	Drawline 395,320,1050,320 /////EDIT 295 -> 320
 	// DAC, 12 channels shown
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 15, 70, "Ch"
@@ -4155,37 +4261,41 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 435, 70, "Input (mV)"
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 515, 70, "Record"
+	DrawText 516, 70, "Record"
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 575, 70, "Wave Name"
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 665, 70, "Calc Function"
+	DrawText 663, 70, "Calc Function"
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 770, 70, "Resample"
+	DrawText 766, 70, "N.Filter"
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 845, 70, "Notch Filter"
-	ListBox fadclist,pos={400,75},size={550,180},fsize=14,frame=2,widths={30,80,60,85,85,85,85} //added two widths for resample and notch filter, changed listbox size
+	DrawText 825, 70, "Demod"
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 885, 70, "Harmonic"
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 970, 70, "Resamp"
+	ListBox fadclist,pos={400,75},size={650,180},fsize=14,frame=2,widths={30,80,60,85,100,60,60,85,60} //added two widths for resample and notch filter, changed listbox size, demod
 	
 	
 	ListBox fadclist,listwave=root:fadcvalstr,selwave=root:fadcattr,mode=1
 	button updatefadc,pos={400,265},size={90,20},proc=scfw_update_fadc,title="Update ADC"
 	checkbox sc_SavefadcBox,pos={620,265},proc=scw_CheckboxClicked,variable=sc_Saverawfadc,side=1,title="\Z14Save raw data "
-	SetVariable sc_FilterfadcBox,pos={500,290},size={200,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resample Frequency ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
+	SetVariable sc_FilterfadcBox,pos={800,265},size={200,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resample Frequency ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
 	
 	
-	DrawText 705,310, "\Z14Hz" 
+	DrawText 1001,285, "\Z14Hz" 
 	popupMenu fadcSetting1,pos={420,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD1 speed",size={100,20},value=sc_fadcSpeed1 
 	popupMenu fadcSetting2,pos={620,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD2 speed",size={100,20},value=sc_fadcSpeed2 
-	popupMenu fadcSetting3,pos={420,360},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD3 speed",size={100,20},value=sc_fadcSpeed3 
-	popupMenu fadcSetting4,pos={620,360},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD4 speed",size={100,20},value=sc_fadcSpeed4 
-	popupMenu fadcSetting5,pos={420,390},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD5 speed",size={100,20},value=sc_fadcSpeed5 
-	popupMenu fadcSetting6,pos={620,390},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD6 speed",size={100,20},value=sc_fadcSpeed6 
-	DrawText 550, 347, "\Z14Hz" 
-	DrawText 750, 347, "\Z14Hz" 
-	DrawText 550, 377, "\Z14Hz" 
-	DrawText 750, 377, "\Z14Hz" 
-	DrawText 550, 407, "\Z14Hz" 
-	DrawText 750, 407, "\Z14Hz" 
+	popupMenu fadcSetting3,pos={820,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD3 speed",size={100,20},value=sc_fadcSpeed3 
+	popupMenu fadcSetting4,pos={420,360},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD4 speed",size={100,20},value=sc_fadcSpeed4 
+	popupMenu fadcSetting5,pos={620,360},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD5 speed",size={100,20},value=sc_fadcSpeed5 
+	popupMenu fadcSetting6,pos={820,360},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD6 speed",size={100,20},value=sc_fadcSpeed6 
+	DrawText 535, 347, "\Z14Hz" 
+	DrawText 735, 347, "\Z14Hz" 
+	DrawText 935, 347, "\Z14Hz" 
+	DrawText 535, 377, "\Z14Hz" 
+	DrawText 735, 377, "\Z14Hz" 
+	DrawText 935, 377, "\Z14Hz" 
 
 	// identical to ScanController window
 	// all function calls are to ScanController functions
@@ -4420,19 +4530,21 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	make/o/t/n=(numADCCh) fadcval3 = ""		// Wave Name
 	make/o/t/n=(numADCCh) fadcval4 = ""		// Calc (e.g. ADC0*1e-6)
 	
-	make/o/t/n=(numADCCh) fadcval5 = ""		// Resample (1/0)
-	make/o/t/n=(numADCCh) fadcval6 = ""		// Notch filter (1/0)
+	make/o/t/n=(numADCCh) fadcval5 = ""		// Resample (1/0) // Nfilter
+	make/o/t/n=(numADCCh) fadcval6 = ""		// Notch filter (1/0) //Demod
+	make/o/t/n=(numADCCh) fadcval7 = ""		// Demod (1/0) //Harmonic
+	make/o/t/n=(numADCCh) fadcval8 = ""		// Demod (1/0) // Resample
 	
 	for(i=0;i<numADCCh;i+=1)
 		fadcval0[i] = num2istr(i)
 		fadcval3[i] = "wave"+num2istr(i)
 		fadcval4[i] = "ADC"+num2istr(i)
 	endfor
-	concatenate/o {fadcval0,fadcval1,fadcval2,fadcval3,fadcval4, fadcval5, fadcval6}, fadcvalstr // added 5 & 6 for resample and notch filter
+	concatenate/o {fadcval0,fadcval1,fadcval2,fadcval3,fadcval4, fadcval5, fadcval6, fadcval7,fadcval8}, fadcvalstr // added 5 & 6 for resample and notch filter
 	make/o/n=(numADCCh) fadcattr0 = 0
 	make/o/n=(numADCCh) fadcattr1 = 2
 	make/o/n=(numADCCh) fadcattr2 = 32
-	concatenate/o {fadcattr0,fadcattr0,fadcattr2,fadcattr1,fadcattr1, fadcattr2, fadcattr2}, fadcattr // added fadcattr2 twice for two checkbox commands?
+	concatenate/o {fadcattr0,fadcattr0,fadcattr2,fadcattr1,fadcattr1, fadcattr2, fadcattr2, fadcattr1, fadcattr2}, fadcattr // added fadcattr2 twice for two checkbox commands?
 	
 	variable/g sc_printfadc = 0
 	variable/g sc_saverawfadc = 0
@@ -4443,7 +4555,7 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	// clean up
 	killwaves fdacval0,fdacval1,fdacval2,fdacval3,fdacval4
 	killwaves fdacattr0,fdacattr1
-	killwaves fadcval0,fadcval1,fadcval2,fadcval3,fadcval4, fadcval5, fadcval6 // added 5,6 for cleanup
+	killwaves fadcval0,fadcval1,fadcval2,fadcval3,fadcval4, fadcval5, fadcval6, fadcval7,fadcval8 // added 5,6 for cleanup
 	killwaves fadcattr0,fadcattr1,fadcattr2
 end
 
@@ -4487,21 +4599,3 @@ function scfw_SetGUIinteraction(numDevices)
 end
 	
 	
-	
-	
-// for resampling
-//for (i = 0; i<dimsize(fadcvalstr, 0); i++)	
-//if (fadcattr[i][5] == 48) // Checkbox checked
-
-
-
-//function scfd_ProcessAndDistribute(ScanVars, rowNum) // uses global variable sc_ResampleFreqCheckfadc to run scfd_resampleWaves(sc_tempwave)
-//								global variable created in FastDacWindow() undercheckbox 
-
-
-
-
-//find where the global variable is created and updated
-// have a look at scfd_resampleWaves(sc_tempwave) function //probably wont need to update it at all.
-
-//see how the resampled data updates the graphs.
