@@ -3592,6 +3592,105 @@ end
 
 
 
+function scfd_demodulate(wav, harmonic, nofcycles, period, [append2hdf, axis])
+//if axis=0: demodulation in r
+//if axis=1: demodulation in x
+//if axis=2: demodulation in y
+	//variable datnum,harmonic
+	
+	//string kenner
+	//variable 
+	
+	wave wav
+	variable harmonic, nofcycles, period, append2hdf, axis
+	
+	variable cols, rows
+	axis = paramisdefault(axis) ? 0 : axis
+	//string wn="dat"+num2str(datnum)+kenner;
+	string wn_x="temp_x"
+	string wn_y="temp_y"
+	//wave wav=$wn
+	wave wav_x=$wn_x
+	wave wav_y=$wn_y
+	//struct AWGVars AWGLI         // 
+	//fd_getoldAWG(AWGLI,datnum) // this could be called in process and distribute, gotta see whats being pulled
+	
+	make /o demod
+	
+	
+	//print AWGLI
+	
+	cols=dimsize(wav,0); print cols
+	rows=dimsize(wav,1); print rows
+	make /o/n=(cols) sine1d
+	
+	//nofcycles=AWGLI.numCycles;  // pulled from AWGLI struct
+	//period=AWGLI.waveLen;       // pulled from AWGLI struct
+	
+	
+	
+	
+	//Demodulate in x
+	if ((axis==0)||(axis==1))
+		duplicate /o wav, wav_xx
+
+	
+		//Original Measurement Wave
+		sine1d=sin(2*pi*(harmonic*p/period))
+		matrixop /o sinewave=colrepeat(sine1d,rows)
+		matrixop /o temp=wav_xx*sinewave
+		copyscales wav_xx, temp
+		temp=temp*pi/2;
+		ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,"demod_x")
+		wn_x="demod_x"
+		wave wav_x=$wn_x
+	endif
+	
+	//Demodulate in y
+	if ((axis==0)||(axis==2))
+		duplicate /o wav, wav_yy
+
+		//Original Measurement Wave
+		sine1d=cos(2*pi*(harmonic*p/period))
+		matrixop /o sinewave=colrepeat(sine1d,rows)
+		matrixop /o temp=wav_yy*sinewave
+		copyscales wav_yy, temp
+		temp=temp*pi/2;
+		ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,"demod_y")
+		wn_y="demod_y"
+		wave wav_y=$wn_y
+	endif
+	
+	//Given wav_x and wav_y now refer to their respective demodulations, 
+	//associate the correct set with the output based on r/x/y 
+	
+	//wn="demod"
+	
+	if (axis==0)
+		demod =( (wav_x)^2 + (wav_y)^2 ) ^ (0.5)  //problematic line - operating on null wave?
+	
+	elseif (axis==1)
+		demod = wav_x
+	
+	elseif (axis==2)
+		demod = wav_y
+	endif
+	
+	//Store demodulated wave w.r.t. correct axis
+	//if (append2hdf)
+	//	variable fileid
+	//	fileid=get_hdfid(datnum) //opens the file
+	//	HDF5SaveData/o /IGOR=-1 /TRAN=1 /WRIT=1 /Z $wn, fileid
+	//	HDF5CloseFile/a fileid
+	//endif
+
+end 
+
+
+
+
+
+
 
 function scfd_RecordValues(S, rowNum, [AWG_list, linestart, skip_data_distribution])  // TODO: Rename to fd_record_values
 	struct ScanVars &S
@@ -3629,7 +3728,7 @@ function scfd_RecordValues(S, rowNum, [AWG_list, linestart, skip_data_distributi
 	
 	// Process 1D read and distribute
 	if (!skip_data_distribution)
-		scfd_ProcessAndDistribute(S, rowNum) 
+		scfd_ProcessAndDistribute(S, AWG, rowNum) 
 	endif
 end
 
@@ -3683,9 +3782,10 @@ function scfd_SendCommandAndRead(S, AWG_list, rowNum)
 end
 
 
-function scfd_ProcessAndDistribute(ScanVars, rowNum)
+function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 	// Get 1D wave names, duplicate each wave then resample, notch filter and copy into calc wave (and do calc string)
 	struct ScanVars &ScanVars
+	struct AWGVars &AWGVars
 	variable rowNum
 		
 	// Get all raw 1D wave names in a list
@@ -3704,6 +3804,7 @@ function scfd_ProcessAndDistribute(ScanVars, rowNum)
 	string calc_string
 	
 	wave fadcattr
+	wave /T fadcvalstr
 	
 	for (i=0; i<itemsinlist(RawWaveNames1D); i++)
 		
@@ -3715,6 +3816,11 @@ function scfd_ProcessAndDistribute(ScanVars, rowNum)
 			if (fadcattr[i][5] == 48) // checks which notch box is checked
 				scfd_notch_filters(sc_tempwave, ScanVars.measureFreq, Hzs="60;180;300", Qs="50;150;250")
 			endif
+			
+			if (fadcattr[i][6] == 48) // checks which demod box is checked
+				scfd_demodulate(sc_tempwave, str2num(fadcvalstr[i][7]), AWGVars.numCycles, AWGVars.waveLen, axis = 0) 
+			endif
+			
 				
 			if (fadcattr[i][8] == 48) // checks which resample box is checked
 				scfd_resampleWaves(sc_tempwave, ScanVars.measureFreq, sc_ResampleFreqfadc)
