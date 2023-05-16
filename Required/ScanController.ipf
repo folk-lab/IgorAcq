@@ -3817,8 +3817,7 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			calc_string = StringFromList(i, CalcStrings)
 			duplicate/o $rwn sc_tempwave
 			
-			string ADCnum = RawWaveNames1D[i]
-			ADCnum = ADCnum[3,strlen(ADCnum)]
+			string ADCnum = rwn[3,strlen(rwn)]
 			
 			if (fadcattr[str2num(ADCnum)][5] == 48) // checks which notch box is checked
 				scfd_notch_filters(sc_tempwave, ScanVars.measureFreq, Hzs="60;180;300", Qs="50;150;250")
