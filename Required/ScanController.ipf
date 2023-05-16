@@ -1078,13 +1078,13 @@ function/S scg_initializeGraphs(S)
 		else
 			ylabel = S.y_label
 		endif
+        
         buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, for_2d=S.is2d, y_label=ylabel)
+        
         if(raw==1) // Raw waves
 	        sc_rawGraphs1D = buffer
         endif
-        if (s.is2d)
-	        buffer = buffer + scg_initializeGraphsForWavenames(waveNames, S.x_label, for_2d=1, y_label=ylabel)
-        endif
+        
         graphIDs = graphIDs + buffer
     endfor
     return graphIDs
@@ -1107,34 +1107,34 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 	for (i = 0; i<ItemsInList(wavenames); i++)  // Look through wavenames that are being recorded
 	
 	    wn = StringFromList(i, wavenames)
-	    if (for_2d)
-	    	wn = wn + "_2d"
-	    endif
-	    
+
 		openGraphID = scg_graphExistsForWavename(wn)
 		
+
 		// 1D graphs
-		if (!for_2d)
-			if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-				scg_setupGraph1D(openGraphID, x_label, y_label=y_label_1d) 
-			else 
-	       	scg_open1Dgraph(wn, x_label, y_label=y_label, y_label=y_label_1d)
-	        	openGraphID = winname(0,1)
-	    	endif
-	    	graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
-		endif
+		if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
+			scg_setupGraph1D(openGraphID, x_label, y_label=y_label_1d) 
+		else 
+	       scg_open1Dgraph(wn, x_label, y_label=y_label, y_label=y_label_1d)
+	       openGraphID = winname(0,1)
+	   endif
+	   
+	   graphIDs = addlistItem(openGraphID, graphIDs, ";", INF) 	
+	   openGraphID = ""
 		
 		// 2D graphs
 		if (for_2d)
+			wn = wn + "_2d"
+		
 			if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
 				scg_setupGraph2D(openGraphID, wn, x_label, y_label_2d)
 			else 
 	       	scg_open2Dgraph(wn, x_label, y_label_2d)
 	       	openGraphID = winname(0,1)
 	    	endif
+	    	
 	    	graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
 		endif
-		
 	         
 	endfor
 	return graphIDs
@@ -3622,7 +3622,7 @@ function scfd_demodulate(wav, harmonic, nofcycles, period, [append2hdf, axis])
 	
 	
 	//print AWGLI
-	
+	Redimension/N=(-1,2) wav
 	cols=dimsize(wav,0); print cols
 	rows=dimsize(wav,1); print rows
 	make /o/n=(cols) sine1d
@@ -3679,6 +3679,7 @@ function scfd_demodulate(wav, harmonic, nofcycles, period, [append2hdf, axis])
 		demod = wav_y
 	endif
 	
+	Redimension/N=(-1) wav
 	//Store demodulated wave w.r.t. correct axis
 	//if (append2hdf)
 	//	variable fileid
@@ -3827,7 +3828,7 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			endif
 			
 			if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
-				scfd_demodulate(sc_tempwave, str2num(fadcvalstr[i][7]), AWGVars.numCycles, AWGVars.waveLen, axis = 0) 
+				scfd_demodulate(sc_tempwave, str2num(fadcvalstr[str2num(ADCnum)][7]), AWGVars.numCycles, AWGVars.waveLen, axis = 0) 
 			endif
 			
 				
