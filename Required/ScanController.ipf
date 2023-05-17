@@ -884,56 +884,6 @@ function initializeScan(S, [init_graphs])
 end
 
 
-//function sci_initializeWaves(S)  // TODO: rename
-//   // Initializes the waves necessary for recording scan
-//	// Need 1D and 2D waves for the raw data coming from the fastdac (2D for storing, not necessarily displaying)
-//	// 	Need 2D waves for either the raw data, or filtered data if a filter is set
-//	// (If a filter is set, the raw waves should only ever be plotted 1D)
-//	//	(This will be after calc (i.e. don't need before and after calc wave))
-//	
-//
-//	
-//	struct ScanVars &S
-//	variable fastdac
-//	
-//	variable numpts  // Numpts to initialize wave with, note: for Filtered data, this number is reduced
-//	string wavenames, wn
-//	variable raw, j
-//	
-//	wave fadcattr
-//	string rwn, cwn
-//	string RawWaveNames1D = sci_get1DWaveNames(1, 1)
-//	string CalcWaveNames1D = sci_get1DWaveNames(0, 1)
-// 
-//   sci_sanityCheckWavenames(CalcWaveNames1D)
-//    
-//   for (raw = 0; raw<2; raw++)                                      // (raw = 0 means calc waves)
-//    	//raw = 0 -> creates waves for raw data at 
-//    	//raw = 1 -> checks if the resample box has been ticked and returns correct numpts on x-axis
-//    	
-//    	for (j=0; j<itemsinlist(CalcWaveNames1D);j++)
-//        
-//        	rwn = stringFromList(j, RawWavenames1D)
-//        	cwn = stringFromList(j, CalcWaveNames1D)
-//        	
-//        	string wavenum = rwn[3,strlen(rwn)]
-//        	
-//        	if (S.using_fastdac && fadcattr[str2num(wavenum)][8] == 48) // Checkbox checked
-//	        	numpts = (raw) ? S.numptsx : scfd_postFilterNumpts(S.numptsx, S.measureFreq)   
-//	     	else
-//	     		numpts = S.numptsx
-//	     	endif
-//          
-//          sci_init1DWave(cwn, numpts, S.startx, S.finx)
-//            
-//          if (S.is2d == 1)
-//          	sci_init2DWave(cwn+"_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
-//          endif
-//            
-//       endfor
-//        
-//	endfor
-
 function sci_initializeWaves(S)  // TODO: rename
    // Initializes the waves necessary for recording scan
 	// Need 1D and 2D waves for the raw data coming from the fastdac (2D for storing, not necessarily displaying)
