@@ -441,24 +441,27 @@ function spectrum_analyzer(wave data, variable samp_freq)
 	// Built in powerspectrum function
 	duplicate/o data spectrum
 	SetScale/P x 0,1/samp_freq,"", spectrum
-	variable nr=dimsize(spectrum,0)
+	variable nr=dimsize(spectrum,0);  // number of points in x-direction
+	variable le=2^(floor(log(nr)/log(2))); // max factor of 2 less than total num points
 	wave slice;
 	wave w_Periodogram
 
 	variable i=0
 	rowslice(spectrum,i)
-		DSPPeriodogram/DB/NODC=1/DEST=W_Periodogram slice
+		DSPPeriodogram/R=[1,(le)] /DB/NODC=1/DEST=W_Periodogram slice
 	duplicate/o w_Periodogram, powerspec
 	i=1
 	do
 		rowslice(spectrum,i)
-		DSPPeriodogram/DB/NODC=1/DEST=W_Periodogram slice
+		DSPPeriodogram/R=[1,(le)]/DB/NODC=1/DEST=W_Periodogram slice
 		powerspec=powerspec+W_periodogram
 		i=i+1
-	while(i<nr)
+	while(i<dimsize(spectrum,1))
 	powerspec[0]=nan
-	display powerspec
+	display powerspec; // SetAxis bottom 0,500
+
 end
+
 
 
 
