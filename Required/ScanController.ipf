@@ -4304,13 +4304,13 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	
 	ListBox fadclist,listwave=root:fadcvalstr,selwave=root:fadcattr,mode=1
 	button updatefadc,pos={400,265},size={90,20},proc=scfw_update_fadc,title="Update ADC"
-	checkbox sc_SavefadcBox,pos={515,265},proc=scw_CheckboxClicked,variable=sc_Saverawfadc,side=1,title="\Z14Save raw data "
-	checkbox sc_demodxBox,pos={635,265},proc=scw_CheckboxClicked,variable=sc_demodx,side=1,title="\Z14demod.x "
-	checkbox sc_demodyBox,pos={725,265},proc=scw_CheckboxClicked,variable=sc_demody,side=1,title="\Z14demod.y "
-	SetVariable sc_FilterfadcBox,pos={820,265},size={200,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resample Frequency ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
+	//checkbox sc_SavefadcBox,pos={515,265},proc=scw_CheckboxClicked,variable=sc_Saverawfadc,side=1,title="\Z14Save raw data "
+	//checkbox sc_demodxBox,pos={635,265},proc=scw_CheckboxClicked,variable=sc_demodx,side=1,title="\Z14demod.x "
+	checkbox sc_demodyBox,pos={635,265},proc=scw_CheckboxClicked,variable=sc_demody,side=1,title="\Z14Save Demod.y"
+	SetVariable sc_FilterfadcBox,pos={820,265},size={150,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resamp Freq ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
 	
 	
-	DrawText 1021,285, "\Z14Hz" 
+	DrawText 973,285, "\Z14Hz" 
 	popupMenu fadcSetting1,pos={420,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD1 speed",size={100,20},value=sc_fadcSpeed1 
 	popupMenu fadcSetting2,pos={620,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD2 speed",size={100,20},value=sc_fadcSpeed2 
 	popupMenu fadcSetting3,pos={820,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD3 speed",size={100,20},value=sc_fadcSpeed3 
