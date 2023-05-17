@@ -943,24 +943,22 @@ function sci_initializeWaves(S)  // TODO: rename
 	
     struct ScanVars &S
     variable fastdac
-
-    variable numpts  // Numpts to initialize wave with, note: for Filtered data, this number is reduced
-    string wavenames, wn
+    variable numpts  //Numpts to initialize wave with, note: for Filtered data, this number is reduced
+    string wavenames, wn, rawwavenames, rwn
     variable raw, j
-    
     wave fadcattr
     
+    rawwavenames = sci_get1DWaveNames(1, S.using_fastdac)
+    
     for (raw = 0; raw<2; raw++)                                      // (raw = 0 means calc waves)
-    	//raw = 0 -> creates waves for raw data at 
-    	//raw = 1 -> checks if the resample box has been ticked and returns correct numpts on x-axis
-
-        wavenames = sci_get1DWaveNames(raw, S.using_fastdac)
-        sci_sanityCheckWavenames(wavenames)
+		wavenames = sci_get1DWaveNames(raw, S.using_fastdac)
+		sci_sanityCheckWavenames(wavenames)
     	
-    	for (j=0; j<itemsinlist(wavenames);j++)
-        
+		for (j=0; j<itemsinlist(wavenames);j++)
+		
         	wn = stringFromList(j, wavenames)
-        	string wavenum = wn[4,strlen(wn)]
+        	rwn = stringFromList(j, rawwavenames)
+        	string wavenum = rwn[3,strlen(rwn)]
         	
         	if (S.using_fastdac && fadcattr[str2num(wavenum)][8] == 48) // Checkbox checked
 	        	numpts = (raw) ? S.numptsx : scfd_postFilterNumpts(S.numptsx, S.measureFreq)   
@@ -968,13 +966,12 @@ function sci_initializeWaves(S)  // TODO: rename
 	     		numpts = S.numptsx
 	     	endif
 	 
-          
           sci_init1DWave(wn, numpts, S.startx, S.finx)
             
           if (S.is2d == 1)
           	sci_init2DWave(wn+"_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
           endif
-            
+           
        endfor
         
 	endfor
