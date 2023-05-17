@@ -884,6 +884,56 @@ function initializeScan(S, [init_graphs])
 end
 
 
+//function sci_initializeWaves(S)  // TODO: rename
+//   // Initializes the waves necessary for recording scan
+//	// Need 1D and 2D waves for the raw data coming from the fastdac (2D for storing, not necessarily displaying)
+//	// 	Need 2D waves for either the raw data, or filtered data if a filter is set
+//	// (If a filter is set, the raw waves should only ever be plotted 1D)
+//	//	(This will be after calc (i.e. don't need before and after calc wave))
+//	
+//
+//	
+//	struct ScanVars &S
+//	variable fastdac
+//	
+//	variable numpts  // Numpts to initialize wave with, note: for Filtered data, this number is reduced
+//	string wavenames, wn
+//	variable raw, j
+//	
+//	wave fadcattr
+//	string rwn, cwn
+//	string RawWaveNames1D = sci_get1DWaveNames(1, 1)
+//	string CalcWaveNames1D = sci_get1DWaveNames(0, 1)
+// 
+//   sci_sanityCheckWavenames(CalcWaveNames1D)
+//    
+//   for (raw = 0; raw<2; raw++)                                      // (raw = 0 means calc waves)
+//    	//raw = 0 -> creates waves for raw data at 
+//    	//raw = 1 -> checks if the resample box has been ticked and returns correct numpts on x-axis
+//    	
+//    	for (j=0; j<itemsinlist(CalcWaveNames1D);j++)
+//        
+//        	rwn = stringFromList(j, RawWavenames1D)
+//        	cwn = stringFromList(j, CalcWaveNames1D)
+//        	
+//        	string wavenum = rwn[3,strlen(rwn)]
+//        	
+//        	if (S.using_fastdac && fadcattr[str2num(wavenum)][8] == 48) // Checkbox checked
+//	        	numpts = (raw) ? S.numptsx : scfd_postFilterNumpts(S.numptsx, S.measureFreq)   
+//	     	else
+//	     		numpts = S.numptsx
+//	     	endif
+//          
+//          sci_init1DWave(cwn, numpts, S.startx, S.finx)
+//            
+//          if (S.is2d == 1)
+//          	sci_init2DWave(cwn+"_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+//          endif
+//            
+//       endfor
+//        
+//	endfor
+
 function sci_initializeWaves(S)  // TODO: rename
    // Initializes the waves necessary for recording scan
 	// Need 1D and 2D waves for the raw data coming from the fastdac (2D for storing, not necessarily displaying)
@@ -928,6 +978,15 @@ function sci_initializeWaves(S)  // TODO: rename
        endfor
         
 	endfor
+
+	// Setup Async measurements if not doing a fastdac scan (workers will look for data made here)
+	if (!S.using_fastdac) 
+		sc_findAsyncMeasurements()
+	endif
+	
+end
+
+
 
 	// Setup Async measurements if not doing a fastdac scan (workers will look for data made here)
 	if (!S.using_fastdac) 
@@ -2218,7 +2277,7 @@ function scw_CheckboxClicked(ControlName, Value)
 	string indexstring
 	wave sc_RawRecord, sc_RawPlot, sc_CalcRecord, sc_CalcPlot, sc_measAsync
 	nvar sc_PrintRaw, sc_PrintCalc, sc_resampleFreqCheckFadc
-	nvar/z sc_Printfadc, sc_Saverawfadc // FastDAC specific
+	nvar/z sc_Printfadc, sc_Saverawfadc, sc_demodx, sc_demody // FastDAC specific
 	variable index
 	string expr
 	if (stringmatch(ControlName,"sc_RawRecordCheckBox*"))
@@ -2254,6 +2313,10 @@ function scw_CheckboxClicked(ControlName, Value)
 		sc_Printfadc = value
 	elseif(stringmatch(ControlName,"sc_SavefadcBox")) // FastDAC window
 		sc_Saverawfadc = value
+	elseif(stringmatch(ControlName,"sc_demodxBox")) // FastDAC window
+		sc_demodx = value
+	elseif(stringmatch(ControlName,"sc_demodyBox")) // FastDAC window
+		sc_demody = value
 	elseif(stringmatch(ControlName,"sc_FilterfadcCheckBox")) // FastDAC window
 		sc_resampleFreqCheckFadc = value
 
@@ -3595,7 +3658,7 @@ end
 
 
 
-function scfd_demodulate(wav, harmonic, nofcycles, period, [append2hdf, axis])
+function scfd_demodulate(wav, harmonic, nofcycles, period, [append2hdf])//, axis])
 //if axis=0: demodulation in r
 //if axis=1: demodulation in x
 //if axis=2: demodulation in y
@@ -3605,10 +3668,12 @@ function scfd_demodulate(wav, harmonic, nofcycles, period, [append2hdf, axis])
 	//variable 
 	
 	wave wav
-	variable harmonic, nofcycles, period, append2hdf, axis
+	variable harmonic, nofcycles, period, append2hdf //, axis
+	
+	// harmonic should be the integer multiple of 
 	
 	variable cols, rows
-	axis = paramisdefault(axis) ? 0 : axis
+	//axis = paramisdefault(axis) ? 0 : axis
 	//string wn="dat"+num2str(datnum)+kenner;
 	string wn_x="temp_x"
 	string wn_y="temp_y"
@@ -3619,25 +3684,24 @@ function scfd_demodulate(wav, harmonic, nofcycles, period, [append2hdf, axis])
 	//fd_getoldAWG(AWGLI,datnum) // this could be called in process and distribute, gotta see whats being pulled
 	
 	make /o demod
-	
+	copyscales temp, demod
 	
 	//print AWGLI
 	Redimension/N=(-1,2) wav
-	cols=dimsize(wav,0); print cols
-	rows=dimsize(wav,1); print rows
+	cols=dimsize(wav,0); //print cols
+	rows=dimsize(wav,1); //print rows
 	make /o/n=(cols) sine1d
 	
 	//nofcycles=AWGLI.numCycles;  // pulled from AWGLI struct
 	//period=AWGLI.waveLen;       // pulled from AWGLI struct
 	
 	
-	
+	nvar sc_demodx,sc_demody
 	
 	//Demodulate in x
-	if ((axis==0)||(axis==1))
+	//if ((axis==0)||(axis==1))
+	if (sc_demodx)
 		duplicate /o wav, wav_xx
-
-	
 		//Original Measurement Wave
 		sine1d=sin(2*pi*(harmonic*p/period))
 		matrixop /o sinewave=colrepeat(sine1d,rows)
@@ -3647,12 +3711,14 @@ function scfd_demodulate(wav, harmonic, nofcycles, period, [append2hdf, axis])
 		ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,"demod_x")
 		wn_x="demod_x"
 		wave wav_x=$wn_x
+		Redimension/N=(-1) wav_x
+		
 	endif
 	
 	//Demodulate in y
-	if ((axis==0)||(axis==2))
+	//if ((axis==0)||(axis==2))
+	if(sc_demody)
 		duplicate /o wav, wav_yy
-
 		//Original Measurement Wave
 		sine1d=cos(2*pi*(harmonic*p/period))
 		matrixop /o sinewave=colrepeat(sine1d,rows)
@@ -3662,24 +3728,26 @@ function scfd_demodulate(wav, harmonic, nofcycles, period, [append2hdf, axis])
 		ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,"demod_y")
 		wn_y="demod_y"
 		wave wav_y=$wn_y
-	endif
+		Redimension/N=(-1) wav_y
+	endif 
 	
 	//Given wav_x and wav_y now refer to their respective demodulations, 
 	//associate the correct set with the output based on r/x/y 
 	
 	//wn="demod"
 	
-	if (axis==0)
+	if (sc_demodx && sc_demody)
 		demod =( (wav_x)^2 + (wav_y)^2 ) ^ (0.5)  //problematic line - operating on null wave?
 	
-	elseif (axis==1)
+	elseif (sc_demodx)
 		demod = wav_x
 	
-	elseif (axis==2)
+	elseif (sc_demody)
 		demod = wav_y
 	endif
 	
 	Redimension/N=(-1) wav
+	
 	//Store demodulated wave w.r.t. correct axis
 	//if (append2hdf)
 	//	variable fileid
@@ -3828,7 +3896,7 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			endif
 			
 			if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
-				scfd_demodulate(sc_tempwave, str2num(fadcvalstr[str2num(ADCnum)][7]), AWGVars.numCycles, AWGVars.waveLen, axis = 0) 
+				scfd_demodulate(sc_tempwave, str2num(fadcvalstr[str2num(ADCnum)][7]), AWGVars.numCycles, AWGVars.waveLen) 
 			endif
 			
 				
@@ -4289,11 +4357,13 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	
 	ListBox fadclist,listwave=root:fadcvalstr,selwave=root:fadcattr,mode=1
 	button updatefadc,pos={400,265},size={90,20},proc=scfw_update_fadc,title="Update ADC"
-	checkbox sc_SavefadcBox,pos={620,265},proc=scw_CheckboxClicked,variable=sc_Saverawfadc,side=1,title="\Z14Save raw data "
-	SetVariable sc_FilterfadcBox,pos={800,265},size={200,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resample Frequency ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
+	checkbox sc_SavefadcBox,pos={515,265},proc=scw_CheckboxClicked,variable=sc_Saverawfadc,side=1,title="\Z14Save raw data "
+	checkbox sc_demodxBox,pos={635,265},proc=scw_CheckboxClicked,variable=sc_demodx,side=1,title="\Z14demod.x "
+	checkbox sc_demodyBox,pos={725,265},proc=scw_CheckboxClicked,variable=sc_demody,side=1,title="\Z14demod.y "
+	SetVariable sc_FilterfadcBox,pos={820,265},size={200,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resample Frequency ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
 	
 	
-	DrawText 1001,285, "\Z14Hz" 
+	DrawText 1021,285, "\Z14Hz" 
 	popupMenu fadcSetting1,pos={420,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD1 speed",size={100,20},value=sc_fadcSpeed1 
 	popupMenu fadcSetting2,pos={620,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD2 speed",size={100,20},value=sc_fadcSpeed2 
 	popupMenu fadcSetting3,pos={820,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD3 speed",size={100,20},value=sc_fadcSpeed3 
@@ -4558,6 +4628,8 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	
 	variable/g sc_printfadc = 0
 	variable/g sc_saverawfadc = 0
+	variable/g sc_demodx = 0
+	variable/g sc_demody = 0
 	variable/g sc_ResampleFreqCheckfadc = 0 // Whether to use resampling
 	variable/g sc_ResampleFreqfadc = 100 // Resampling frequency if using resampling
 
