@@ -3603,81 +3603,47 @@ end
 
 
 
-function scfd_demodulate(wav, harmonic, nofcycles, period, [append2hdf])
+function scfd_demodulate(wav, harmonic, nofcycles, period)//, [append2hdf])
 	
 	wave wav
-	variable harmonic, nofcycles, period, append2hdf
+	variable harmonic, nofcycles, period //, append2hdf
 	
-	
+	nvar sc_demodphi
 	variable cols, rows
-	string wn_x="temp_x"
-	string wn_y="temp_y"
-	//wave wav=$wn
+	string wn_x="demodx"
+	string wn_y="demody"
 	wave wav_x=$wn_x
 	wave wav_y=$wn_y
 	
-	//make /o demod
-	//copyscales temp, demod
 	
-	//print AWGLI
-	Redimension/N=(-1,2) wav
-	cols=dimsize(wav,0); //print cols
-	rows=dimsize(wav,1); //print rows
+	duplicate /o wav, wav_copy
+	Redimension/N=(-1,2) wav_copy
+	cols=dimsize(wav_copy,0)
+	rows=dimsize(wav_copy,1)
 	make /o/n=(cols) sine1d
+
+	//nvar sc_demodx, sc_demody
 	
+	//demodulation in x
+	sine1d=sin(2*pi*(harmonic*p/period) + sc_demodphi/180*pi)
+	matrixop /o sinewave=colrepeat(sine1d,rows)
+	matrixop /o temp=wav_copy*sinewave
+	copyscales wav_copy, temp
+	temp=temp*pi/2;
+	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,wn_x)
+	wave wav_x=$wn_x
+	Redimension/N=(-1) wav_x //demod.x wave
 	
-	nvar sc_demodx, sc_demody
-	
-	//Demodulate in x
-	//if ((axis==0)||(axis==1))
-	if (sc_demodx)
-		duplicate /o wav, wav_xx
-		//Original Measurement Wave
-		sine1d=sin(2*pi*(harmonic*p/period))
-		matrixop /o sinewave=colrepeat(sine1d,rows)
-		matrixop /o temp=wav_xx*sinewave
-		copyscales wav_xx, temp
-		temp=temp*pi/2;
-		ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,"demod_x")
-		wn_x="demod_x"
-		wave wav_x=$wn_x
-		Redimension/N=(-1) wav_x
-		
-	endif
-	
-	//Demodulate in y
-	//if ((axis==0)||(axis==2))
-	if(sc_demody)
-		duplicate /o wav, wav_yy
-		//Original Measurement Wave
-		sine1d=cos(2*pi*(harmonic*p/period))
-		matrixop /o sinewave=colrepeat(sine1d,rows)
-		matrixop /o temp=wav_yy*sinewave
-		copyscales wav_yy, temp
-		temp=temp*pi/2;
-		ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,"demod_y")
-		wn_y="demod_y"
-		wave wav_y=$wn_y
-		Redimension/N=(-1) wav_y
-	endif 
-	
-	//Given wav_x and wav_y now refer to their respective demodulations, 
-	//associate the correct set with the output based on r/x/y 
-	
-	//wn="demod"
-	
-//	if (sc_demodx && sc_demody)
-//		demod =( (wav_x)^2 + (wav_y)^2 ) ^ (0.5)  //problematic line - operating on null wave?
-//	
-//	elseif (sc_demodx)
-//		demod = wav_x
-//	
-//	elseif (sc_demody)
-//		demod = wav_y
-//	endif
-	
-	Redimension/N=(-1) wav
-	
+	//Demodulation in y
+	sine1d=cos(2*pi*(harmonic*p/period) + sc_demodphi /180 *pi)
+	matrixop /o sinewave=colrepeat(sine1d,rows)
+	matrixop /o temp=wav_copy*sinewave
+	copyscales wav_copy, temp
+	temp=temp*pi/2;
+	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,wn_y)
+	wave wav_y=$wn_y
+	Redimension/N=(-1) wav_y //demod.y wave
+
 	//Store demodulated wave w.r.t. correct axis
 	//if (append2hdf)
 	//	variable fileid
@@ -4536,7 +4502,7 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	
 	make/o/t/n=(numADCCh) fadcval5 = ""		// Resample (1/0) // Nfilter
 	make/o/t/n=(numADCCh) fadcval6 = ""		// Notch filter (1/0) //Demod
-	make/o/t/n=(numADCCh) fadcval7 = ""		// Demod (1/0) //Harmonic
+	make/o/t/n=(numADCCh) fadcval7 = "1"		// Demod (1/0) //Harmonic
 	make/o/t/n=(numADCCh) fadcval8 = ""		// Demod (1/0) // Resample
 	
 	for(i=0;i<numADCCh;i+=1)
