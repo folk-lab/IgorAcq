@@ -333,6 +333,7 @@ function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, 
 	variable instrID, start, fin, repeats, numptsx, sweeprate, delay, ramprate, alternate, nosave, use_awg
 	string channels, x_label, y_label, comments, starts, fins, interlaced_channels, interlaced_setpoints
 	variable j=0
+	nvar sc_Saverawfadc
 
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -346,6 +347,12 @@ function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, 
 	fins = selectstring(paramisdefault(fins), fins, "")
 	interlaced_channels = selectString(paramisdefault(interlaced_channels), interlaced_channels, "")
 	interlaced_setpoints = selectString(paramisdefault(interlaced_setpoints), interlaced_setpoints, "")
+	
+	
+	//check if rawdata needs to be saved
+	duplicate /o /r=[][5,8] fadcattr rawcheck
+	sc_Saverawfadc = (sum(rawcheck) > (98 * dimsize(fadcattr, 0))) ? 1 : 0 //checks against the sum of all checkboxes from notchfilter column to resample
+
 
 	// Set sc_ScanVars struct
 	struct ScanVars S
