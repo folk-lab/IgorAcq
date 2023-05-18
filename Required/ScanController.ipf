@@ -2223,7 +2223,7 @@ function scw_CheckboxClicked(ControlName, Value)
 	variable value
 	string indexstring
 	wave sc_RawRecord, sc_RawPlot, sc_CalcRecord, sc_CalcPlot, sc_measAsync
-	nvar sc_PrintRaw, sc_PrintCalc, sc_resampleFreqCheckFadc
+	nvar sc_PrintRaw, sc_PrintCalc
 	nvar/z sc_Printfadc, sc_Saverawfadc, sc_demodx, sc_demody // FastDAC specific
 	variable index
 	string expr
@@ -2264,8 +2264,6 @@ function scw_CheckboxClicked(ControlName, Value)
 		sc_demodx = value
 	elseif(stringmatch(ControlName,"sc_demodyBox")) // FastDAC window
 		sc_demody = value
-	elseif(stringmatch(ControlName,"sc_FilterfadcCheckBox")) // FastDAC window
-		sc_resampleFreqCheckFadc = value
 
 	endif
 end
@@ -3605,33 +3603,21 @@ end
 
 
 
-function scfd_demodulate(wav, harmonic, nofcycles, period, [append2hdf])//, axis])
-//if axis=0: demodulation in r
-//if axis=1: demodulation in x
-//if axis=2: demodulation in y
-	//variable datnum,harmonic
-	
-	//string kenner
-	//variable 
+function scfd_demodulate(wav, harmonic, nofcycles, period, [append2hdf])
 	
 	wave wav
-	variable harmonic, nofcycles, period, append2hdf //, axis
+	variable harmonic, nofcycles, period, append2hdf
 	
-	// harmonic should be the integer multiple of 
 	
 	variable cols, rows
-	//axis = paramisdefault(axis) ? 0 : axis
-	//string wn="dat"+num2str(datnum)+kenner;
 	string wn_x="temp_x"
 	string wn_y="temp_y"
 	//wave wav=$wn
 	wave wav_x=$wn_x
 	wave wav_y=$wn_y
-	//struct AWGVars AWGLI         // 
-	//fd_getoldAWG(AWGLI,datnum) // this could be called in process and distribute, gotta see whats being pulled
 	
-	make /o demod
-	copyscales temp, demod
+	//make /o demod
+	//copyscales temp, demod
 	
 	//print AWGLI
 	Redimension/N=(-1,2) wav
@@ -3639,11 +3625,8 @@ function scfd_demodulate(wav, harmonic, nofcycles, period, [append2hdf])//, axis
 	rows=dimsize(wav,1); //print rows
 	make /o/n=(cols) sine1d
 	
-	//nofcycles=AWGLI.numCycles;  // pulled from AWGLI struct
-	//period=AWGLI.waveLen;       // pulled from AWGLI struct
 	
-	
-	nvar sc_demodx,sc_demody
+	nvar sc_demodx, sc_demody
 	
 	//Demodulate in x
 	//if ((axis==0)||(axis==1))
@@ -3683,15 +3666,15 @@ function scfd_demodulate(wav, harmonic, nofcycles, period, [append2hdf])//, axis
 	
 	//wn="demod"
 	
-	if (sc_demodx && sc_demody)
-		demod =( (wav_x)^2 + (wav_y)^2 ) ^ (0.5)  //problematic line - operating on null wave?
-	
-	elseif (sc_demodx)
-		demod = wav_x
-	
-	elseif (sc_demody)
-		demod = wav_y
-	endif
+//	if (sc_demodx && sc_demody)
+//		demod =( (wav_x)^2 + (wav_y)^2 ) ^ (0.5)  //problematic line - operating on null wave?
+//	
+//	elseif (sc_demodx)
+//		demod = wav_x
+//	
+//	elseif (sc_demody)
+//		demod = wav_y
+//	endif
 	
 	Redimension/N=(-1) wav
 	
@@ -3704,10 +3687,6 @@ function scfd_demodulate(wav, harmonic, nofcycles, period, [append2hdf])//, axis
 	//endif
 
 end 
-
-
-
-
 
 
 
@@ -3815,7 +3794,6 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 		abort "Different number of raw wave names compared to calc wave names"
 	endif
 
-	nvar sc_ResampleFreqCheckfadc
 	nvar sc_ResampleFreqfadc
 	
 	variable i = 0
@@ -4304,13 +4282,12 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	
 	ListBox fadclist,listwave=root:fadcvalstr,selwave=root:fadcattr,mode=1
 	button updatefadc,pos={400,265},size={90,20},proc=scfw_update_fadc,title="Update ADC"
-	//checkbox sc_SavefadcBox,pos={515,265},proc=scw_CheckboxClicked,variable=sc_Saverawfadc,side=1,title="\Z14Save raw data "
-	//checkbox sc_demodxBox,pos={635,265},proc=scw_CheckboxClicked,variable=sc_demodx,side=1,title="\Z14demod.x "
-	checkbox sc_demodyBox,pos={635,265},proc=scw_CheckboxClicked,variable=sc_demody,side=1,title="\Z14Save Demod.y"
+	checkbox sc_demodyBox,pos={535,265},proc=scw_CheckboxClicked,variable=sc_demody,side=1,title="\Z14Save Demod.y"
 	SetVariable sc_FilterfadcBox,pos={820,265},size={150,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resamp Freq ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
-	
-	
+	SetVariable sc_demodphiBox,pos={675,265},size={100,20},value=sc_demodphi,side=1,title="\Z14Demod \$WMTEX$ \Phi $/WMTEX$"//help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
+	DrawText 778,277, "\Z14\$WMTEX$ {}^{o} $/WMTEX$" 
 	DrawText 973,285, "\Z14Hz" 
+	
 	popupMenu fadcSetting1,pos={420,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD1 speed",size={100,20},value=sc_fadcSpeed1 
 	popupMenu fadcSetting2,pos={620,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD2 speed",size={100,20},value=sc_fadcSpeed2 
 	popupMenu fadcSetting3,pos={820,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD3 speed",size={100,20},value=sc_fadcSpeed3 
@@ -4575,9 +4552,8 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	
 	variable/g sc_printfadc = 0
 	variable/g sc_saverawfadc = 0
-	variable/g sc_demodx = 0
+	variable/g sc_demodphi = 0
 	variable/g sc_demody = 0
-	variable/g sc_ResampleFreqCheckfadc = 0 // Whether to use resampling
 	variable/g sc_ResampleFreqfadc = 100 // Resampling frequency if using resampling
 
 
