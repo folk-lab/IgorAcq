@@ -897,6 +897,7 @@ function sci_initializeWaves(S)  // TODO: rename
     string wavenames, wn, rawwavenames, rwn
     variable raw, j
     wave fadcattr
+    nvar sc_demody
     
     rawwavenames = sci_get1DWaveNames(1, S.using_fastdac)
     
@@ -921,7 +922,24 @@ function sci_initializeWaves(S)  // TODO: rename
           if (S.is2d == 1)
           	sci_init2DWave(wn+"_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
           endif
-           
+          
+          //initializing 1d waves for demodulation
+          if (S.using_fastdac && raw == 0 && fadcattr[str2num(wavenum)][6] == 48)
+          	sci_init1DWave(wn+"_x", numpts, S.startx, S.finx)
+          	sci_init1DWave(wn+"_y", numpts, S.startx, S.finx)
+          	
+          	//initializing 2d waves for demodulation
+          	if (s.is2d == 1)
+          		sci_init2DWave(wn+"_2dx", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+          		
+          		if (sc_demody == 1)
+          			sci_init2DWave(wn+"_2dy", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+          		endif
+          		
+          	endif
+          	
+			endif
+			      		
        endfor
         
 	endfor
@@ -1093,6 +1111,14 @@ function/S scg_initializeGraphs(S)
         
         graphIDs = graphIDs + buffer
     endfor
+    
+    // I can put demodulation down here, But i need to see what the point of GraphIDs is
+    //if ()
+    	//scg_setupGraph1D(openGraphID, x_label, y_label=y_label_1d)
+    //endif
+    
+     
+    
     return graphIDs
 end
 
@@ -3603,15 +3629,16 @@ end
 
 
 
-function scfd_demodulate(wav, harmonic, nofcycles, period)//, [append2hdf])
+function scfd_demodulate(wav, harmonic, nofcycles, period, wnam)//, [append2hdf])
 	
 	wave wav
 	variable harmonic, nofcycles, period //, append2hdf
+	string wnam
 	
 	nvar sc_demodphi
 	variable cols, rows
-	string wn_x="demodx"
-	string wn_y="demody"
+	string wn_x=wnam + "_x"
+	string wn_y=wnam + "_y"
 	wave wav_x=$wn_x
 	wave wav_y=$wn_y
 	
@@ -3760,7 +3787,7 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 		abort "Different number of raw wave names compared to calc wave names"
 	endif
 
-	nvar sc_ResampleFreqfadc
+	nvar sc_ResampleFreqfadc, sc_demody
 	
 	variable i = 0
 	string rwn, cwn
@@ -3787,7 +3814,7 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			endif
 			
 			if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
-				scfd_demodulate(sc_tempwave, str2num(fadcvalstr[str2num(ADCnum)][7]), AWGVars.numCycles, AWGVars.waveLen) 
+				scfd_demodulate(sc_tempwave, str2num(fadcvalstr[str2num(ADCnum)][7]), AWGVars.numCycles, AWGVars.waveLen, cwn) 
 			endif
 			
 				
@@ -3809,9 +3836,29 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 				raw2d[][rowNum] = raw1d[p]
 			
 				// Copy 1D calc into 2D
-				cwn = cwn+"_2d"
-				wave calc2d = $cwn
-				calc2d[][rowNum] = sc_tempwave[p]		
+				string cwn2d = cwn+"_2d"
+				wave calc2d = $cwn2d
+				calc2d[][rowNum] = sc_tempwave[p]
+				
+				
+				// Copy 1D demod into 2D
+				if (fadcattr[str2num(ADCnum)][6] == 48)
+					string cwn2dx = cwn2d + "x"
+					string cwnx = cwn + "_x"
+					wave dmod2dx = $cwn2dx
+					wave dmodx = $cwnx
+					dmod2dx[][rowNum] = dmodx[p]
+					
+					if (sc_demody == 1)
+						string cwn2dy = cwn2d + "y"
+						string cwny = cwn + "_y"
+						wave dmod2dy = $cwn2dy
+						wave dmody = $cwny
+						dmod2dy[][rowNum] = dmody[p]
+					endif
+					
+				endif
+						
 			endif
 
 			
