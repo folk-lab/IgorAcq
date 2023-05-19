@@ -3557,7 +3557,6 @@ function scfd_resampleWaves2(w, measureFreq, targetFreq)
 	scv_getLastScanVars(S); print S
 
 	wave wcopy
-	// notch_filter(w,60); 	 notch_filter(w,180); 	 notch_filter(w,300)
 	
 	duplicate /o  w wcopy
 	
@@ -3592,7 +3591,6 @@ function scfd_resampleWaves(w, measureFreq, targetFreq)
 	// to targetFreq (which should be lower than measureFreq)
 	Wave w
 	variable measureFreq, targetFreq
-	// notch_filter(w,60); 	 notch_filter(w,180); 	 notch_filter(w,300)
 
 	RatioFromNumber (targetFreq / measureFreq)
 	if (V_numerator > V_denominator)
@@ -3820,17 +3818,14 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 	endif
 
 	nvar sc_ResampleFreqfadc, sc_demody
-	
+	svar sc_nfreq, sc_nQs
+		
 	variable i = 0
 	string rwn, cwn
 	string calc_string
 	
 	wave fadcattr
 	wave /T fadcvalstr
-	
-	
-	//for (i = 0; i<dimsize(fadcvalstr, 0); i++)
-	
 	
 	for (i=0; i<itemsinlist(RawWaveNames1D); i++)
 		
@@ -3842,7 +3837,7 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			string ADCnum = rwn[3,strlen(rwn)]
 			
 			if (fadcattr[str2num(ADCnum)][5] == 48) // checks which notch box is checked
-				scfd_notch_filters(sc_tempwave, ScanVars.measureFreq, Hzs="60;180;300", Qs="50;150;250")
+				scfd_notch_filters(sc_tempwave, ScanVars.measureFreq,Hzs=sc_nfreq, Qs=sc_nQs)
 			endif
 			
 			if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
@@ -4286,7 +4281,7 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	DrawLine 385,15,385,385 
 	DrawLine 10,415,1050,415 /////EDIT 385-> 415
 	SetDrawEnv dash=7
-	Drawline 395,320,1050,320 /////EDIT 295 -> 320
+	Drawline 395,333,1050,333 /////EDIT 295 -> 320
 	// DAC, 12 channels shown
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 15, 70, "Ch"
@@ -4315,7 +4310,7 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 663, 70, "Calc Function"
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 766, 70, "N.Filter"
+	DrawText 766, 70, "Notch"
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 825, 70, "Demod"
 	SetDrawEnv fsize=14, fstyle=1
@@ -4331,21 +4326,23 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	checkbox sc_demodyBox,pos={585,265},proc=scw_CheckboxClicked,variable=sc_demody,side=1,title="\Z14Save Demod.y"
 	SetVariable sc_FilterfadcBox,pos={828,264},size={150,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resamp Freq ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
 	SetVariable sc_demodphiBox,pos={705,264},size={100,20},value=sc_demodphi,side=1,title="\Z14Demod \$WMTEX$ \Phi $/WMTEX$"//help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
+	SetVariable sc_nfreqBox,pos={698,300},size={150,20}, value=sc_nfreq ,side=1,title="\Z14 Notch Freqs" ,help={"seperate frequencies (Hz) with ; "}
+	SetVariable sc_nQsBox,pos={540,300},size={140,20}, value=sc_nQs ,side=1,title="\Z14 Notch Qs" ,help={"seperate Qs with ; "}
 	DrawText 807,277, "\Z14\$WMTEX$ {}^{o} $/WMTEX$" 
 	DrawText 987,283, "\Z14Hz" 
 	
-	popupMenu fadcSetting1,pos={420,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD1 speed",size={100,20},value=sc_fadcSpeed1 
-	popupMenu fadcSetting2,pos={620,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD2 speed",size={100,20},value=sc_fadcSpeed2 
-	popupMenu fadcSetting3,pos={820,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD3 speed",size={100,20},value=sc_fadcSpeed3 
-	popupMenu fadcSetting4,pos={420,360},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD4 speed",size={100,20},value=sc_fadcSpeed4 
-	popupMenu fadcSetting5,pos={620,360},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD5 speed",size={100,20},value=sc_fadcSpeed5 
-	popupMenu fadcSetting6,pos={820,360},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD6 speed",size={100,20},value=sc_fadcSpeed6 
-	DrawText 545, 347, "\Z14Hz" 
-	DrawText 745, 347, "\Z14Hz" 
-	DrawText 945, 347, "\Z14Hz" 
-	DrawText 545, 377, "\Z14Hz" 
-	DrawText 745, 377, "\Z14Hz" 
-	DrawText 945, 377, "\Z14Hz" 
+	popupMenu fadcSetting1,pos={420,345},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD1 speed",size={100,20},value=sc_fadcSpeed1 
+	popupMenu fadcSetting2,pos={620,345},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD2 speed",size={100,20},value=sc_fadcSpeed2 
+	popupMenu fadcSetting3,pos={820,345},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD3 speed",size={100,20},value=sc_fadcSpeed3 
+	popupMenu fadcSetting4,pos={420,375},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD4 speed",size={100,20},value=sc_fadcSpeed4 
+	popupMenu fadcSetting5,pos={620,375},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD5 speed",size={100,20},value=sc_fadcSpeed5 
+	popupMenu fadcSetting6,pos={820,375},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD6 speed",size={100,20},value=sc_fadcSpeed6 
+	DrawText 545, 362, "\Z14Hz" 
+	DrawText 745, 362, "\Z14Hz" 
+	DrawText 945, 362, "\Z14Hz" 
+	DrawText 545, 392, "\Z14Hz" 
+	DrawText 745, 392, "\Z14Hz" 
+	DrawText 945, 392, "\Z14Hz" 
 
 	// identical to ScanController window
 	// all function calls are to ScanController functions
@@ -4602,7 +4599,8 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	variable/g sc_demody = 0
 	variable/g sc_plotRaw = 0
 	variable/g sc_ResampleFreqfadc = 100 // Resampling frequency if using resampling
-	
+	string /g sc_nfreq = "60;180;300"
+	string /g sc_nQs = "50;150;250"
 
 
 	// clean up
