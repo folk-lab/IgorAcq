@@ -925,15 +925,15 @@ function sci_initializeWaves(S)  // TODO: rename
           
           //initializing 1d waves for demodulation
           if (S.using_fastdac && raw == 0 && fadcattr[str2num(wavenum)][6] == 48)
-          	sci_init1DWave(wn+"_x", numpts, S.startx, S.finx)
-          	sci_init1DWave(wn+"_y", numpts, S.startx, S.finx)
+          	sci_init1DWave(wn+"x", numpts, S.startx, S.finx)
+          	sci_init1DWave(wn+"y", numpts, S.startx, S.finx)
           	
           	//initializing 2d waves for demodulation
           	if (s.is2d == 1)
-          		sci_init2DWave(wn+"_2dx", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+          		sci_init2DWave(wn+"x_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
           		
           		if (sc_demody == 1)
-          			sci_init2DWave(wn+"_2dy", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+          			sci_init2DWave(wn+"y_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
           		endif
           		
           	endif
@@ -1090,10 +1090,13 @@ function/S scg_initializeGraphs(S)
     variable i
     string waveNames
     string buffer
-	string ylabel
+	 string ylabel
     variable raw
-    nvar sc_plotRaw
+    nvar sc_plotRaw 
     variable plotRaw = sc_plotRaw
+    wave fadcattr
+    
+    string rawwaveNames = sci_get1DWaveNames(1, S.using_fastdac, for_plotting=1)
     
     for (i = 0; i<2; i++)  // i = 0, 1
     	
@@ -1102,41 +1105,53 @@ function/S scg_initializeGraphs(S)
     		continue
     	endif
     	
-        raw = !i
-        waveNames = sci_get1DWaveNames(raw, S.using_fastdac, for_plotting=1)
+      	raw = !i
+      	waveNames = sci_get1DWaveNames(raw, S.using_fastdac, for_plotting=1)
 		if (S.is2d == 0 && raw == 1 && S.using_fastdac)
 			ylabel = "ADC /mV"
 		else
 			ylabel = S.y_label
 		endif
         
-        buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, for_2d=S.is2d, y_label=ylabel)
-        
-        if(raw==1) // Raw waves
-	        sc_rawGraphs1D = buffer
-        endif
-        
+      	buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, for_2d=S.is2d, y_label=ylabel)
+      
+      	//add demodulation to buffer, specifically the x-axis stuff. initializegraphswavenames might not be substantial
+     	if (!raw) 	
+      		
+      		for (i=0; i<itemsinlist(waveNames); i++)
+				string rwn = StringFromList(i, rawWaveNames)
+				string cwn = StringFromList(i, WaveNames)
+				string ADCnum = rwn[3,INF]
+//			
+				if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
+					buffer += scg_initializeGraphsForWavenames(cwn + "x", S.x_label, for_2d=S.is2d, y_label=ylabel, append_wn = cwn + "y")
+				endif
+			
+			endfor
+
+      	 endif
+      	 
+      	if(raw==1) // Raw waves
+	   		sc_rawGraphs1D = buffer
+      	endif
+      	  
         graphIDs = graphIDs + buffer
     endfor
-    
-    // I can put demodulation down here, But i need to see what the point of GraphIDs is
-    //if ()
-    	//scg_setupGraph1D(openGraphID, x_label, y_label=y_label_1d)
-    //endif
-    
-     
-    
+
     return graphIDs
 end
 
 
-function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label])
+function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label, append_wn])
 	// Ensures a graph is open and tiles graphs for each wave in comma separated wavenames
 	// Returns list of graphIDs of active graphs
-	string wavenames, x_label, y_label
+	// append_wavename would append a wave to every single wavename in wavenames (more useful for passing just one wavename)
+	string wavenames, x_label, y_label, append_wn
 	variable for_2d
 	
 	y_label = selectString(paramisDefault(y_label), y_label, "")
+	append_wn = selectString(paramisDefault(append_wn), append_wn, "")
+	
 	string y_label_2d = y_label
 	string y_label_1d = selectString(for_2d, y_label, "")  // Only use the y_label for 1D graphs if the scan is 1D (otherwise gets confused with y sweep gate)
 
@@ -1146,6 +1161,7 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 	for (i = 0; i<ItemsInList(wavenames); i++)  // Look through wavenames that are being recorded
 	
 	    wn = StringFromList(i, wavenames)
+	    
 
 		openGraphID = scg_graphExistsForWavename(wn)
 		
@@ -1154,7 +1170,8 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 		if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
 			scg_setupGraph1D(openGraphID, x_label, y_label=y_label_1d) 
 		else 
-	       scg_open1Dgraph(wn, x_label, y_label=y_label, y_label=y_label_1d)
+	       
+	       scg_open1Dgraph(wn, x_label, y_label=y_label, y_label=y_label_1d, append_wn = append_wn)
 	       openGraphID = winname(0,1)
 	   endif
 	   
@@ -1213,13 +1230,21 @@ function/S scg_graphExistsForWavename(wn)
 end
 
 
-function scg_open1Dgraph(wn, x_label, [y_label])
+function scg_open1Dgraph(wn, x_label, [y_label, append_wn])
     // Opens 1D graph for wn
-    string wn, x_label, y_label
+    string wn, x_label, y_label, append_wn
     
     y_label = selectString(paramIsDefault(y_label), y_label, "")
+    append_wn = selectString(paramIsDefault(append_wn), append_wn, "")
     
     display $wn
+    
+    if (cmpstr(append_wn, ""))
+    	appendtograph $append_wn
+    	makecolorful()
+    	legend
+    endif
+    
     setWindow kwTopWin, graphicsTech=0
     
     scg_setupGraph1D(WinName(0,1), x_label, y_label=y_label)
@@ -3644,8 +3669,8 @@ function scfd_demodulate(wav, harmonic, nofcycles, period, wnam)//, [append2hdf]
 	
 	nvar sc_demodphi
 	variable cols, rows
-	string wn_x=wnam + "_x"
-	string wn_y=wnam + "_y"
+	string wn_x=wnam + "x"
+	string wn_y=wnam + "y"
 	wave wav_x=$wn_x
 	wave wav_y=$wn_y
 	
@@ -3847,15 +3872,15 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 				
 				// Copy 1D demod into 2D
 				if (fadcattr[str2num(ADCnum)][6] == 48)
-					string cwn2dx = cwn2d + "x"
-					string cwnx = cwn + "_x"
+					string cwnx = cwn + "x"
+					string cwn2dx = cwnx + "_2d"
 					wave dmod2dx = $cwn2dx
 					wave dmodx = $cwnx
 					dmod2dx[][rowNum] = dmodx[p]
 					
 					if (sc_demody == 1)
-						string cwn2dy = cwn2d + "y"
-						string cwny = cwn + "_y"
+						string cwny = cwn + "y"
+						string cwn2dy = cwny + "_2d"
 						wave dmod2dy = $cwn2dy
 						wave dmody = $cwny
 						dmod2dy[][rowNum] = dmody[p]
