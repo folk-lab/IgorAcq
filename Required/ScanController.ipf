@@ -897,6 +897,7 @@ function sci_initializeWaves(S)  // TODO: rename
     string wavenames, wn, rawwavenames, rwn
     variable raw, j
     wave fadcattr
+    nvar sc_demody
     
     rawwavenames = sci_get1DWaveNames(1, S.using_fastdac)
     
@@ -921,7 +922,24 @@ function sci_initializeWaves(S)  // TODO: rename
           if (S.is2d == 1)
           	sci_init2DWave(wn+"_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
           endif
-           
+          
+          //initializing 1d waves for demodulation
+          if (S.using_fastdac && raw == 0 && fadcattr[str2num(wavenum)][6] == 48)
+          	sci_init1DWave(wn+"x", numpts, S.startx, S.finx)
+          	sci_init1DWave(wn+"y", numpts, S.startx, S.finx)
+          	
+          	//initializing 2d waves for demodulation
+          	if (s.is2d == 1)
+          		sci_init2DWave(wn+"x_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+          		
+          		if (sc_demody == 1)
+          			sci_init2DWave(wn+"y_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+          		endif
+          		
+          	endif
+          	
+			endif
+			      		
        endfor
         
 	endfor
@@ -1072,38 +1090,71 @@ function/S scg_initializeGraphs(S)
     variable i
     string waveNames
     string buffer
-	string ylabel
+	 string ylabel
     variable raw
+    nvar sc_plotRaw 
+    variable plotRaw = sc_plotRaw
+    wave fadcattr
     
+    string rawwaveNames = sci_get1DWaveNames(1, S.using_fastdac, for_plotting=1)
     
     for (i = 0; i<2; i++)  // i = 0, 1
-        raw = !i
-        waveNames = sci_get1DWaveNames(raw, S.using_fastdac, for_plotting=1)
+    	
+    	if(plotRaw == 0)
+    		plotRaw = 1
+    		continue
+    	endif
+    	
+      	raw = !i
+      	waveNames = sci_get1DWaveNames(raw, S.using_fastdac, for_plotting=1)
 		if (S.is2d == 0 && raw == 1 && S.using_fastdac)
 			ylabel = "ADC /mV"
 		else
 			ylabel = S.y_label
 		endif
-        
-        buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, for_2d=S.is2d, y_label=ylabel)
-        
-        if(raw==1) // Raw waves
-	        sc_rawGraphs1D = buffer
-        endif
-        
+      
+      	if (raw)
+      		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label=ylabel)
+      
+      	//add demodulation to buffer, specifically the x-axis stuff. initializegraphswavenames might not be substantial
+     	else 	
+     	
+      		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, for_2d=S.is2d, y_label=ylabel)
+      		
+      		for (i=0; i<itemsinlist(waveNames); i++)
+				string rwn = StringFromList(i, rawWaveNames)
+				string cwn = StringFromList(i, WaveNames)
+				string ADCnum = rwn[3,INF]
+//			
+				if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
+					buffer += scg_initializeGraphsForWavenames(cwn + "x", S.x_label, for_2d=S.is2d, y_label=ylabel, append_wn = cwn + "y")
+				endif
+			
+			endfor
+
+      	 endif
+      	 
+      	if(raw==1) // Raw waves
+	   		sc_rawGraphs1D = buffer
+      	endif
+      	  
         graphIDs = graphIDs + buffer
     endfor
+
     return graphIDs
 end
 
 
-function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label])
+function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label, append_wn])
 	// Ensures a graph is open and tiles graphs for each wave in comma separated wavenames
 	// Returns list of graphIDs of active graphs
-	string wavenames, x_label, y_label
+	// append_wavename would append a wave to every single wavename in wavenames (more useful for passing just one wavename)
+	string wavenames, x_label, y_label, append_wn
 	variable for_2d
 	
 	y_label = selectString(paramisDefault(y_label), y_label, "")
+	append_wn = selectString(paramisDefault(append_wn), append_wn, "")
+	
 	string y_label_2d = y_label
 	string y_label_1d = selectString(for_2d, y_label, "")  // Only use the y_label for 1D graphs if the scan is 1D (otherwise gets confused with y sweep gate)
 
@@ -1113,6 +1164,7 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 	for (i = 0; i<ItemsInList(wavenames); i++)  // Look through wavenames that are being recorded
 	
 	    wn = StringFromList(i, wavenames)
+	    
 
 		openGraphID = scg_graphExistsForWavename(wn)
 		
@@ -1121,7 +1173,8 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 		if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
 			scg_setupGraph1D(openGraphID, x_label, y_label=y_label_1d) 
 		else 
-	       scg_open1Dgraph(wn, x_label, y_label=y_label, y_label=y_label_1d)
+	       
+	       scg_open1Dgraph(wn, x_label, y_label=y_label, y_label=y_label_1d, append_wn = append_wn)
 	       openGraphID = winname(0,1)
 	   endif
 	   
@@ -1180,13 +1233,21 @@ function/S scg_graphExistsForWavename(wn)
 end
 
 
-function scg_open1Dgraph(wn, x_label, [y_label])
+function scg_open1Dgraph(wn, x_label, [y_label, append_wn])
     // Opens 1D graph for wn
-    string wn, x_label, y_label
+    string wn, x_label, y_label, append_wn
     
     y_label = selectString(paramIsDefault(y_label), y_label, "")
+    append_wn = selectString(paramIsDefault(append_wn), append_wn, "")
     
     display $wn
+    
+    if (cmpstr(append_wn, ""))
+    	appendtograph $append_wn
+    	makecolorful()
+    	legend
+    endif
+    
     setWindow kwTopWin, graphicsTech=0
     
     scg_setupGraph1D(WinName(0,1), x_label, y_label=y_label)
@@ -2224,7 +2285,7 @@ function scw_CheckboxClicked(ControlName, Value)
 	string indexstring
 	wave sc_RawRecord, sc_RawPlot, sc_CalcRecord, sc_CalcPlot, sc_measAsync
 	nvar sc_PrintRaw, sc_PrintCalc
-	nvar/z sc_Printfadc, sc_Saverawfadc, sc_demodx, sc_demody // FastDAC specific
+	nvar/z sc_Printfadc, sc_Saverawfadc, sc_demodx, sc_demody, sc_plotRaw // FastDAC specific
 	variable index
 	string expr
 	if (stringmatch(ControlName,"sc_RawRecordCheckBox*"))
@@ -2260,8 +2321,8 @@ function scw_CheckboxClicked(ControlName, Value)
 		sc_Printfadc = value
 	elseif(stringmatch(ControlName,"sc_SavefadcBox")) // FastDAC window
 		sc_Saverawfadc = value
-	elseif(stringmatch(ControlName,"sc_demodxBox")) // FastDAC window
-		sc_demodx = value
+	elseif(stringmatch(ControlName,"sc_plotRawBox")) // FastDAC window
+		sc_plotRaw = value
 	elseif(stringmatch(ControlName,"sc_demodyBox")) // FastDAC window
 		sc_demody = value
 
@@ -3496,7 +3557,6 @@ function scfd_resampleWaves2(w, measureFreq, targetFreq)
 	scv_getLastScanVars(S); print S
 
 	wave wcopy
-	// notch_filter(w,60); 	 notch_filter(w,180); 	 notch_filter(w,300)
 	
 	duplicate /o  w wcopy
 	
@@ -3531,7 +3591,6 @@ function scfd_resampleWaves(w, measureFreq, targetFreq)
 	// to targetFreq (which should be lower than measureFreq)
 	Wave w
 	variable measureFreq, targetFreq
-	// notch_filter(w,60); 	 notch_filter(w,180); 	 notch_filter(w,300)
 
 	RatioFromNumber (targetFreq / measureFreq)
 	if (V_numerator > V_denominator)
@@ -3603,81 +3662,45 @@ end
 
 
 
-function scfd_demodulate(wav, harmonic, nofcycles, period, [append2hdf])
+function scfd_demodulate(wav, harmonic, nofcycles, period, wnam)//, [append2hdf])
 	
 	wave wav
-	variable harmonic, nofcycles, period, append2hdf
+	variable harmonic, nofcycles, period //, append2hdf
+	string wnam
 	
-	
+	nvar sc_demodphi
 	variable cols, rows
-	string wn_x="temp_x"
-	string wn_y="temp_y"
-	//wave wav=$wn
+	string wn_x=wnam + "x"
+	string wn_y=wnam + "y"
 	wave wav_x=$wn_x
 	wave wav_y=$wn_y
 	
-	//make /o demod
-	//copyscales temp, demod
-	
-	//print AWGLI
-	Redimension/N=(-1,2) wav
-	cols=dimsize(wav,0); //print cols
-	rows=dimsize(wav,1); //print rows
+	duplicate /o wav, wav_copy
+	Redimension/N=(-1,2) wav_copy
+	cols=dimsize(wav_copy,0)
+	rows=dimsize(wav_copy,1)
 	make /o/n=(cols) sine1d
 	
+	//demodulation in x
+	sine1d=sin(2*pi*(harmonic*p/period) + sc_demodphi/180*pi)
+	matrixop /o sinewave=colrepeat(sine1d,rows)
+	matrixop /o temp=wav_copy*sinewave
+	copyscales wav_copy, temp
+	temp=temp*pi/2;
+	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,wn_x)
+	wave wav_x=$wn_x
+	Redimension/N=(-1) wav_x //demod.x wave
 	
-	nvar sc_demodx, sc_demody
-	
-	//Demodulate in x
-	//if ((axis==0)||(axis==1))
-	if (sc_demodx)
-		duplicate /o wav, wav_xx
-		//Original Measurement Wave
-		sine1d=sin(2*pi*(harmonic*p/period))
-		matrixop /o sinewave=colrepeat(sine1d,rows)
-		matrixop /o temp=wav_xx*sinewave
-		copyscales wav_xx, temp
-		temp=temp*pi/2;
-		ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,"demod_x")
-		wn_x="demod_x"
-		wave wav_x=$wn_x
-		Redimension/N=(-1) wav_x
-		
-	endif
-	
-	//Demodulate in y
-	//if ((axis==0)||(axis==2))
-	if(sc_demody)
-		duplicate /o wav, wav_yy
-		//Original Measurement Wave
-		sine1d=cos(2*pi*(harmonic*p/period))
-		matrixop /o sinewave=colrepeat(sine1d,rows)
-		matrixop /o temp=wav_yy*sinewave
-		copyscales wav_yy, temp
-		temp=temp*pi/2;
-		ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,"demod_y")
-		wn_y="demod_y"
-		wave wav_y=$wn_y
-		Redimension/N=(-1) wav_y
-	endif 
-	
-	//Given wav_x and wav_y now refer to their respective demodulations, 
-	//associate the correct set with the output based on r/x/y 
-	
-	//wn="demod"
-	
-//	if (sc_demodx && sc_demody)
-//		demod =( (wav_x)^2 + (wav_y)^2 ) ^ (0.5)  //problematic line - operating on null wave?
-//	
-//	elseif (sc_demodx)
-//		demod = wav_x
-//	
-//	elseif (sc_demody)
-//		demod = wav_y
-//	endif
-	
-	Redimension/N=(-1) wav
-	
+	//Demodulation in y
+	sine1d=cos(2*pi*(harmonic*p/period) + sc_demodphi /180 *pi)
+	matrixop /o sinewave=colrepeat(sine1d,rows)
+	matrixop /o temp=wav_copy*sinewave
+	copyscales wav_copy, temp
+	temp=temp*pi/2;
+	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,wn_y)
+	wave wav_y=$wn_y
+	Redimension/N=(-1) wav_y //demod.y wave
+
 	//Store demodulated wave w.r.t. correct axis
 	//if (append2hdf)
 	//	variable fileid
@@ -3794,18 +3817,15 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 		abort "Different number of raw wave names compared to calc wave names"
 	endif
 
-	nvar sc_ResampleFreqfadc
-	
+	nvar sc_ResampleFreqfadc, sc_demody
+	svar sc_nfreq, sc_nQs
+		
 	variable i = 0
 	string rwn, cwn
 	string calc_string
 	
 	wave fadcattr
 	wave /T fadcvalstr
-	
-	
-	//for (i = 0; i<dimsize(fadcvalstr, 0); i++)
-	
 	
 	for (i=0; i<itemsinlist(RawWaveNames1D); i++)
 		
@@ -3817,11 +3837,11 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			string ADCnum = rwn[3,strlen(rwn)]
 			
 			if (fadcattr[str2num(ADCnum)][5] == 48) // checks which notch box is checked
-				scfd_notch_filters(sc_tempwave, ScanVars.measureFreq, Hzs="60;180;300", Qs="50;150;250")
+				scfd_notch_filters(sc_tempwave, ScanVars.measureFreq,Hzs=sc_nfreq, Qs=sc_nQs)
 			endif
 			
 			if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
-				scfd_demodulate(sc_tempwave, str2num(fadcvalstr[str2num(ADCnum)][7]), AWGVars.numCycles, AWGVars.waveLen) 
+				scfd_demodulate(sc_tempwave, str2num(fadcvalstr[str2num(ADCnum)][7]), AWGVars.numCycles, AWGVars.waveLen, cwn) 
 			endif
 			
 				
@@ -3843,9 +3863,29 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 				raw2d[][rowNum] = raw1d[p]
 			
 				// Copy 1D calc into 2D
-				cwn = cwn+"_2d"
-				wave calc2d = $cwn
-				calc2d[][rowNum] = sc_tempwave[p]		
+				string cwn2d = cwn+"_2d"
+				wave calc2d = $cwn2d
+				calc2d[][rowNum] = sc_tempwave[p]
+				
+				
+				// Copy 1D demod into 2D
+				if (fadcattr[str2num(ADCnum)][6] == 48)
+					string cwnx = cwn + "x"
+					string cwn2dx = cwnx + "_2d"
+					wave dmod2dx = $cwn2dx
+					wave dmodx = $cwnx
+					dmod2dx[][rowNum] = dmodx[p]
+					
+					if (sc_demody == 1)
+						string cwny = cwn + "y"
+						string cwn2dy = cwny + "_2d"
+						wave dmod2dy = $cwn2dy
+						wave dmody = $cwny
+						dmod2dy[][rowNum] = dmody[p]
+					endif
+					
+				endif
+						
 			endif
 
 			
@@ -4241,7 +4281,7 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	DrawLine 385,15,385,385 
 	DrawLine 10,415,1050,415 /////EDIT 385-> 415
 	SetDrawEnv dash=7
-	Drawline 395,320,1050,320 /////EDIT 295 -> 320
+	Drawline 395,333,1050,333 /////EDIT 295 -> 320
 	// DAC, 12 channels shown
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 15, 70, "Ch"
@@ -4270,7 +4310,7 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 663, 70, "Calc Function"
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 766, 70, "N.Filter"
+	DrawText 766, 70, "Notch"
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 825, 70, "Demod"
 	SetDrawEnv fsize=14, fstyle=1
@@ -4282,24 +4322,27 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	
 	ListBox fadclist,listwave=root:fadcvalstr,selwave=root:fadcattr,mode=1
 	button updatefadc,pos={400,265},size={90,20},proc=scfw_update_fadc,title="Update ADC"
-	checkbox sc_demodyBox,pos={535,265},proc=scw_CheckboxClicked,variable=sc_demody,side=1,title="\Z14Save Demod.y"
-	SetVariable sc_FilterfadcBox,pos={820,265},size={150,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resamp Freq ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
-	SetVariable sc_demodphiBox,pos={675,265},size={100,20},value=sc_demodphi,side=1,title="\Z14Demod \$WMTEX$ \Phi $/WMTEX$"//help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
-	DrawText 778,277, "\Z14\$WMTEX$ {}^{o} $/WMTEX$" 
-	DrawText 973,285, "\Z14Hz" 
+	checkbox sc_plotRawBox,pos={505,265},proc=scw_CheckboxClicked,variable=sc_plotRaw,side=1,title="\Z14Plot Raw"
+	checkbox sc_demodyBox,pos={585,265},proc=scw_CheckboxClicked,variable=sc_demody,side=1,title="\Z14Save Demod.y"
+	SetVariable sc_FilterfadcBox,pos={828,264},size={150,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resamp Freq ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
+	SetVariable sc_demodphiBox,pos={705,264},size={100,20},value=sc_demodphi,side=1,title="\Z14Demod \$WMTEX$ \Phi $/WMTEX$"//help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
+	SetVariable sc_nfreqBox,pos={698,300},size={150,20}, value=sc_nfreq ,side=1,title="\Z14 Notch Freqs" ,help={"seperate frequencies (Hz) with ; "}
+	SetVariable sc_nQsBox,pos={540,300},size={140,20}, value=sc_nQs ,side=1,title="\Z14 Notch Qs" ,help={"seperate Qs with ; "}
+	DrawText 807,277, "\Z14\$WMTEX$ {}^{o} $/WMTEX$" 
+	DrawText 987,283, "\Z14Hz" 
 	
-	popupMenu fadcSetting1,pos={420,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD1 speed",size={100,20},value=sc_fadcSpeed1 
-	popupMenu fadcSetting2,pos={620,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD2 speed",size={100,20},value=sc_fadcSpeed2 
-	popupMenu fadcSetting3,pos={820,330},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD3 speed",size={100,20},value=sc_fadcSpeed3 
-	popupMenu fadcSetting4,pos={420,360},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD4 speed",size={100,20},value=sc_fadcSpeed4 
-	popupMenu fadcSetting5,pos={620,360},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD5 speed",size={100,20},value=sc_fadcSpeed5 
-	popupMenu fadcSetting6,pos={820,360},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD6 speed",size={100,20},value=sc_fadcSpeed6 
-	DrawText 545, 347, "\Z14Hz" 
-	DrawText 745, 347, "\Z14Hz" 
-	DrawText 945, 347, "\Z14Hz" 
-	DrawText 545, 377, "\Z14Hz" 
-	DrawText 745, 377, "\Z14Hz" 
-	DrawText 945, 377, "\Z14Hz" 
+	popupMenu fadcSetting1,pos={420,345},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD1 speed",size={100,20},value=sc_fadcSpeed1 
+	popupMenu fadcSetting2,pos={620,345},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD2 speed",size={100,20},value=sc_fadcSpeed2 
+	popupMenu fadcSetting3,pos={820,345},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD3 speed",size={100,20},value=sc_fadcSpeed3 
+	popupMenu fadcSetting4,pos={420,375},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD4 speed",size={100,20},value=sc_fadcSpeed4 
+	popupMenu fadcSetting5,pos={620,375},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD5 speed",size={100,20},value=sc_fadcSpeed5 
+	popupMenu fadcSetting6,pos={820,375},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD6 speed",size={100,20},value=sc_fadcSpeed6 
+	DrawText 545, 362, "\Z14Hz" 
+	DrawText 745, 362, "\Z14Hz" 
+	DrawText 945, 362, "\Z14Hz" 
+	DrawText 545, 392, "\Z14Hz" 
+	DrawText 745, 392, "\Z14Hz" 
+	DrawText 945, 392, "\Z14Hz" 
 
 	// identical to ScanController window
 	// all function calls are to ScanController functions
@@ -4536,7 +4579,7 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	
 	make/o/t/n=(numADCCh) fadcval5 = ""		// Resample (1/0) // Nfilter
 	make/o/t/n=(numADCCh) fadcval6 = ""		// Notch filter (1/0) //Demod
-	make/o/t/n=(numADCCh) fadcval7 = ""		// Demod (1/0) //Harmonic
+	make/o/t/n=(numADCCh) fadcval7 = "1"		// Demod (1/0) //Harmonic
 	make/o/t/n=(numADCCh) fadcval8 = ""		// Demod (1/0) // Resample
 	
 	for(i=0;i<numADCCh;i+=1)
@@ -4554,7 +4597,10 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	variable/g sc_saverawfadc = 0
 	variable/g sc_demodphi = 0
 	variable/g sc_demody = 0
+	variable/g sc_plotRaw = 0
 	variable/g sc_ResampleFreqfadc = 100 // Resampling frequency if using resampling
+	string /g sc_nfreq = "60;180;300"
+	string /g sc_nQs = "50;150;250"
 
 
 	// clean up
