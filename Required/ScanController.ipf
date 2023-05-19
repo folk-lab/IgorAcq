@@ -1112,11 +1112,14 @@ function/S scg_initializeGraphs(S)
 		else
 			ylabel = S.y_label
 		endif
-        
-      	buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, for_2d=S.is2d, y_label=ylabel)
+      
+      	if (raw)
+      		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label=ylabel)
       
       	//add demodulation to buffer, specifically the x-axis stuff. initializegraphswavenames might not be substantial
-     	if (!raw) 	
+     	else 	
+     	
+      		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, for_2d=S.is2d, y_label=ylabel)
       		
       		for (i=0; i<itemsinlist(waveNames); i++)
 				string rwn = StringFromList(i, rawWaveNames)
