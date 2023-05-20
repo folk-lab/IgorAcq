@@ -1114,9 +1114,9 @@ function/S scg_initializeGraphs(S)
 		endif
       
       	if (raw)
-      		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label=ylabel)
+      		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label=ylabel, spectrum = 1, mFreq = S.measureFreq)
       
-      	//add demodulation to buffer, specifically the x-axis stuff. initializegraphswavenames might not be substantial
+      	//add demodulation to buffer, specifically the x-axis stuff
      	else 	
      	
       		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, for_2d=S.is2d, y_label=ylabel)
@@ -1125,7 +1125,7 @@ function/S scg_initializeGraphs(S)
 				string rwn = StringFromList(i, rawWaveNames)
 				string cwn = StringFromList(i, WaveNames)
 				string ADCnum = rwn[3,INF]
-//			
+			
 				if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
 					buffer += scg_initializeGraphsForWavenames(cwn + "x", S.x_label, for_2d=S.is2d, y_label=ylabel, append_wn = cwn + "y")
 				endif
@@ -1145,12 +1145,12 @@ function/S scg_initializeGraphs(S)
 end
 
 
-function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label, append_wn])
+function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label, append_wn, spectrum, mFreq])
 	// Ensures a graph is open and tiles graphs for each wave in comma separated wavenames
 	// Returns list of graphIDs of active graphs
 	// append_wavename would append a wave to every single wavename in wavenames (more useful for passing just one wavename)
 	string wavenames, x_label, y_label, append_wn
-	variable for_2d
+	variable for_2d, spectrum, mFreq
 	
 	y_label = selectString(paramisDefault(y_label), y_label, "")
 	append_wn = selectString(paramisDefault(append_wn), append_wn, "")
@@ -1180,6 +1180,11 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 	   
 	   graphIDs = addlistItem(openGraphID, graphIDs, ";", INF) 	
 	   openGraphID = ""
+		
+		if (spectrum)
+			//wave wn_powerspec = scfd_spectrum_analyzer($wn, mFreq)
+			//scg_twosubplot(openGraphID, wn_powerspec)
+		endif
 		
 		// 2D graphs
 		if (for_2d)
@@ -1213,6 +1218,17 @@ function scg_arrangeWindows(graphIDs)
     endfor
     execute(cmd)
     doupdate
+end
+
+function scg_twosubplot(graphID, wave2)
+//creates a subplot with an existing wave and GraphID with wave2
+//wave2 will appear on top
+	string graphID
+	wave wave2
+	
+	ModifyGraph /W = $graphID axisEnab(left)={0,0.45} //graphID wont work
+	AppendToGraph/L=l2/B=b2 wave2 // vs something
+	ModifyGraph axisEnab(l2)={0.55,1},freePos(l2)=0,freePos(b2)={0,l2}
 end
 
 
@@ -1355,6 +1371,9 @@ function scg_updateRawGraphs()
 		endfor
 	endif
 end
+
+
+
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3711,6 +3730,30 @@ function scfd_demodulate(wav, harmonic, nofcycles, period, wnam)//, [append2hdf]
 
 end 
 
+function /wave scfd_spectrum_analyzer(wave data, variable samp_freq)
+	// Built in powerspectrum function
+	duplicate/o data spectrum
+	SetScale/P x 0,1/samp_freq,"", spectrum
+	variable nr=dimsize(spectrum,0);  // number of points in x-direction
+	variable le=2^(floor(log(nr)/log(2))); // max factor of 2 less than total num points
+	wave slice
+	wave w_Periodogram
+
+	variable i=0
+	rowslice(spectrum,i)
+	DSPPeriodogram/R=[1,(le)] /DB/NODC=1/DEST=W_Periodogram slice
+	duplicate/o w_Periodogram, powerspec
+	i=1
+	do
+		rowslice(spectrum,i)
+		DSPPeriodogram/R=[1,(le)]/DB/NODC=1/DEST=W_Periodogram slice
+		powerspec = powerspec+W_periodogram
+		i=i+1
+	while(i<dimsize(spectrum,1))
+	powerspec[0]=nan
+	//display powerspec; // SetAxis bottom 0,500
+	return powerspec
+end
 
 
 function scfd_RecordValues(S, rowNum, [AWG_list, linestart, skip_data_distribution])  // TODO: Rename to fd_record_values
@@ -3980,6 +4023,8 @@ function scfd_getReadChunkSize(numADCs, numpts, bytesSec, totalByteReturn)
   endif
   return read_chunk
 end
+
+
 
 function scfd_checkSweepstate(instrID)
   	// if abort button pressed then stops FDAC sweep then aborts
@@ -4650,3 +4695,23 @@ function scfw_SetGUIinteraction(numDevices)
 end
 	
 	
+
+
+//example of subplotting
+
+//Make/N=3 data = p
+//Make/N=3/T category = {"A", "B", "C"}
+//Display data
+//ModifyGraph axisEnab(left)={0.55,1}
+//ModifyGraph freePos(left)=0
+//ModifyGraph freePos(bottom)={0,left}
+//ModifyGraph freePos(bottom)={1,left}
+//Display /L = l1 /B = B1 data
+//ModifyGraph axisEnab(l1)={0.55,1}
+//ModifyGraph freePos(l1)=0
+//ModifyGraph freePos(B1)={0,l1}
+//AppendToGraph/L=l2/B=b2 data vs category
+//ModifyGraph axisEnab(l2)={0,0.45}
+//ModifyGraph freepos(l2)=0
+//ModifyGraph freePos(b2)={0,l2}
+//ModifyGraph axisEnab(l2)={0,0.40}
