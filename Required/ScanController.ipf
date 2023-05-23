@@ -1150,7 +1150,7 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 	// Returns list of graphIDs of active graphs
 	// append_wavename would append a wave to every single wavename in wavenames (more useful for passing just one wavename)
 	string wavenames, x_label, y_label, append_wn
-	variable for_2d, spectrum, mFreq
+	variable for_2d , spectrum, mFreq
 	
 	y_label = selectString(paramisDefault(y_label), y_label, "")
 	append_wn = selectString(paramisDefault(append_wn), append_wn, "")
@@ -1182,8 +1182,9 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 	   openGraphID = ""
 		
 		if (spectrum)
-			//wave wn_powerspec = scfd_spectrum_analyzer($wn, mFreq)
-			//scg_twosubplot(openGraphID, wn_powerspec)
+			string ADCnum = wn[3,INF] //this line would specifically fail if this function was called for the calculated waves, but we dont care about it
+			string wn_powerspec = scfd_spectrum_analyzer($wn, mFreq, "pwrspec" + ADCnum)
+			scg_twosubplot(openGraphID, wn_powerspec)
 		endif
 		
 		// 2D graphs
@@ -1220,15 +1221,19 @@ function scg_arrangeWindows(graphIDs)
     doupdate
 end
 
-function scg_twosubplot(graphID, wave2)
+function scg_twosubplot(graphID, wave2name)
 //creates a subplot with an existing wave and GraphID with wave2
 //wave2 will appear on top
-	string graphID
-	wave wave2
+	string graphID, wave2name
+	wave wave2 = $wave2name
+	//variable minwave2 = wavemin(wave2)
 	
-	ModifyGraph /W = $graphID axisEnab(left)={0,0.45} //graphID wont work
-	AppendToGraph/L=l2/B=b2 wave2 // vs something
-	ModifyGraph axisEnab(l2)={0.55,1},freePos(l2)=0,freePos(b2)={0,l2}
+	ModifyGraph /W = $graphID axisEnab(left)={0,0.40} //graphID wont work
+	AppendToGraph /W = $graphID /L=l2/B=b2 wave2 // vs something
+	ModifyGraph /W = $graphID axisEnab(l2)={0.60,1}
+	ModifyGraph /W = $graphID freePos(l2)=0
+	//ModifyGraph /W = $graphID freePos(b2)={minwave2,l2}
+	ModifyGraph /W = $graphID freePos(b2)={0,l2}
 end
 
 
@@ -3730,7 +3735,7 @@ function scfd_demodulate(wav, harmonic, nofcycles, period, wnam)//, [append2hdf]
 
 end 
 
-function /wave scfd_spectrum_analyzer(wave data, variable samp_freq)
+function /s scfd_spectrum_analyzer(wave data, variable samp_freq, string wn)
 	// Built in powerspectrum function
 	duplicate/o data spectrum
 	SetScale/P x 0,1/samp_freq,"", spectrum
@@ -3738,21 +3743,23 @@ function /wave scfd_spectrum_analyzer(wave data, variable samp_freq)
 	variable le=2^(floor(log(nr)/log(2))); // max factor of 2 less than total num points
 	wave slice
 	wave w_Periodogram
-
+	wave powerspec
+	
 	variable i=0
 	rowslice(spectrum,i)
-	DSPPeriodogram/R=[1,(le)] /DB/NODC=1/DEST=W_Periodogram slice
+	DSPPeriodogram/R=[1,(le)] /DB/NODC=1/DEST=W_Periodogram slice  //there is a normalization flag
 	duplicate/o w_Periodogram, powerspec
 	i=1
 	do
 		rowslice(spectrum,i)
-		DSPPeriodogram/R=[1,(le)]/DB/NODC=1/DEST=W_Periodogram slice
+		DSPPeriodogram/R=[1,(le)] /DB/NODC=1/DEST=W_Periodogram slice
 		powerspec = powerspec+W_periodogram
 		i=i+1
 	while(i<dimsize(spectrum,1))
 	powerspec[0]=nan
 	//display powerspec; // SetAxis bottom 0,500
-	return powerspec
+	duplicate /o powerspec, $wn
+	return wn
 end
 
 
@@ -3871,13 +3878,16 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 	wave /T fadcvalstr
 	
 	for (i=0; i<itemsinlist(RawWaveNames1D); i++)
-		
+	
+
 			rwn = StringFromList(i, RawWaveNames1D)
 			cwn = StringFromList(i, CalcWaveNames1D)		
 			calc_string = StringFromList(i, CalcStrings)
 			duplicate/o $rwn sc_tempwave
-			
 			string ADCnum = rwn[3,strlen(rwn)]
+			
+			// for powerspec  //
+			scfd_spectrum_analyzer(sc_tempwave, ScanVars.measureFreq, "pwrspec" + ADCnum)
 			
 			if (fadcattr[str2num(ADCnum)][5] == 48) // checks which notch box is checked
 				scfd_notch_filters(sc_tempwave, ScanVars.measureFreq,Hzs=sc_nfreq, Qs=sc_nQs)
@@ -3886,7 +3896,6 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
 				scfd_demodulate(sc_tempwave, str2num(fadcvalstr[str2num(ADCnum)][7]), AWGVars.numCycles, AWGVars.waveLen, cwn) 
 			endif
-			
 				
 			if (fadcattr[str2num(ADCnum)][8] == 48) // checks which resample box is checked
 				scfd_resampleWaves(sc_tempwave, ScanVars.measureFreq, sc_ResampleFreqfadc)

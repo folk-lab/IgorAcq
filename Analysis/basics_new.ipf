@@ -930,7 +930,7 @@ end
 macro testLI()
 closeallGraphs()
 sc_openInstrConnections(0)
-setFdacAWGSquareWave(fd, 100, -100, 0.001, 0.001, 0)
+setFdacAWGSquareWave(fd, 1000, -1000, 0.01, 0.01, 0)
 setupAWG(fd, AWs="0", DACs="0", numCycles=1, verbose=1)
 ScanFastDAC(fd, 0, 1, "3", sweeprate=1,  use_awg=1,nosave = 0, repeats = 5)
 
