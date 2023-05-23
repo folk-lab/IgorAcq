@@ -352,13 +352,27 @@ function SaveToHDF(S, [additional_wavenames])
 	endif
 	
 	// Get waveList to save
-	string RawWaves, CalcWaves
+	string RawWaves, CalcWaves, rwn, cwn, ADCnum
+	wave fadcattr
+	int i
 	if(S.is2d == 0)
 		RawWaves = sci_get1DWaveNames(1, S.using_fastdac)
 		CalcWaves = sci_get1DWaveNames(0, S.using_fastdac)
+		
+		for(i=0; i<itemsinlist(RawWaves); i++)
+			rwn = StringFromList(i, RawWaves)
+			cwn = StringFromList(i, CalcWaves)
+			ADCnum = rwn[3,strlen(rwn)-1]
+			if (fadcattr[str2num(ADCnum)][6] == 48)
+				CalcWaves += cwn + "x;"
+			endif
+		 endfor
+		
 	elseif (S.is2d == 1)
 		RawWaves = sci_get2DWaveNames(1, S.using_fastdac)
 		CalcWaves = sci_get2DWaveNames(0, S.using_fastdac)
+	
+	
 	else
 		abort "Not implemented"
 	endif
