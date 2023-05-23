@@ -185,6 +185,7 @@ function DotTuneAround2(x, y, width_x, width_y, channelx, channely, [sweeprate, 
 	natarget = paramisdefault(natarget) ? 0.99 : natarget
 
 	nvar fd
+
 	variable fdy = paramIsDefault(fdy_id) ? fd : fdy_id
 	variable fdcs = paramIsDefault(fdcs_id) ? fd : fdcs_id
 
@@ -213,7 +214,7 @@ function DotTuneAround2(x, y, width_x, width_y, channelx, channely, [sweeprate, 
 	endfor
 
 	
-	ScanFastDAC2D_virtual(fd, x-width_x, x+width_x, channelx, y-width_y, y+width_y, channely, numptsy, corners, csname, sweeprate=sweeprate, rampratex=ramprate_x, fdyid=fdy, nosave=nosave, comments="Dot Tuning, "+additional_comments)
+	ScanFastDAC2D_virtual(fd, x-width_x, x+width_x, channelx, y-width_y, y+width_y, channely, numptsy, corners, csname, fdcs_id=fdcs_id, sweeprate=sweeprate, rampratex=ramprate_x, fdyid=fdy, nosave=nosave, comments="Dot Tuning, "+additional_comments)
 
 	wave tempwave = $"cscurrent_2d" // This parameter needs to be the same as in the ScanController ADC Wave Name. 
 	nvar filenum
@@ -359,13 +360,13 @@ end
 
 
 
-function ScanFastDAC2D_virtual(fdID, startx, finx, channelsx, starty, finy, channelsy, numptsy, virtual_corners, virtual_gates, [numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave, use_AWG])
+function ScanFastDAC2D_virtual(fdID, startx, finx, channelsx, starty, finy, channelsy, numptsy, virtual_corners, virtual_gates, [fdcs_id, numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave, use_AWG])
 	// 2D Scan for FastDAC only OR FastDAC on fast axis and BabyDAC on slow axis
 	// Note: Must provide numptsx OR sweeprate in optional parameters instead
 	// Note: To ramp with babyDAC on slow axis provide the BabyDAC variable in bdID
 	// Note: channels should be a comma-separated string ex: "0,4,5"
 	// Note: Virtual corner gates MUST be on the fast axis (since they are swept during the scan)
-	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, rampratex, rampratey, delayy, nosave, use_AWG, fdyID
+	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, rampratex, rampratey, delayy, nosave, use_AWG, fdyID, fdcs_id
 	string channelsx, channelsy, comments, startxs, finxs, startys, finys
 	string virtual_corners  // , separated list of 4 corner values for each virtual gate. ; separated for multiple virtual gates -- Corners should be specified as a single value for each of "StartX|StartY, FinX|StartY, StartX|FinY, FinX|FinY"
 	string virtual_gates  // , separated list of virtual gates (each needs a set of virtual_corners)
@@ -377,6 +378,7 @@ function ScanFastDAC2D_virtual(fdID, startx, finx, channelsx, starty, finy, chan
 	finxs = selectstring(paramisdefault(finxs), finxs, "")
 	startys = selectstring(paramisdefault(startys), startys, "")
 	finys = selectstring(paramisdefault(finys), finys, "")
+	fdcs_id = paramisdefault(sweeprate) ? 0 : fdcs_id
 	variable use_bd = paramisdefault(bdid) ? 0 : 1 		// Whether using both FD and BD or just FD
 	variable use_second_fd = paramisdefault(fdyID) ? 0 : 1  // Whether using a second FD for the y axis gates
 
@@ -457,12 +459,22 @@ function ScanFastDAC2D_virtual(fdID, startx, finx, channelsx, starty, finy, chan
    	
 
 	/////////// Ramp Virtual gates to start
-	for (k=0; k<ItemsInList(virtual_gates, ","); k++)
-		virtual_gate = scu_getChannelNumbers(StringFromList(k, virtual_gates, ","), fastdac=1)
-   		corners = StringFromList(k, virtual_corners, ";")
-   		c0 = str2num(StringFromList(0, corners, ","))
-   		rampmultiplefDAC(S.instrIDx, virtual_gate, c0, ignore_lims=1)
-   	endfor
+	if (fdcs_id != 0)
+		for (k=0; k<ItemsInList(virtual_gates, ","); k++)
+			virtual_gate = scu_getChannelNumbers(StringFromList(k, virtual_gates, ","), fastdac=1)
+	   		corners = StringFromList(k, virtual_corners, ";")
+	   		c0 = str2num(StringFromList(0, corners, ","))
+	   		rampmultiplefDAC(fdcs_id, virtual_gate, c0, ignore_lims=1)
+	   	endfor
+   	else
+   		for (k=0; k<ItemsInList(virtual_gates, ","); k++)
+			virtual_gate = scu_getChannelNumbers(StringFromList(k, virtual_gates, ","), fastdac=1)
+	   		corners = StringFromList(k, virtual_corners, ";")
+	   		c0 = str2num(StringFromList(0, corners, ","))
+	   		rampmultiplefDAC(S.instrIDx, virtual_gate, c0, ignore_lims=1)
+	   	endfor
+	endif
+   	
 	//////////////////////////////////////////
 
    	
