@@ -354,7 +354,9 @@ function SaveToHDF(S, [additional_wavenames])
 	// Get waveList to save
 	string RawWaves, CalcWaves, rwn, cwn, ADCnum
 	wave fadcattr
+	nvar sc_demody
 	int i
+	
 	if(S.is2d == 0)
 		RawWaves = sci_get1DWaveNames(1, S.using_fastdac)
 		CalcWaves = sci_get1DWaveNames(0, S.using_fastdac)
@@ -363,21 +365,38 @@ function SaveToHDF(S, [additional_wavenames])
 			rwn = StringFromList(i, RawWaves)
 			cwn = StringFromList(i, CalcWaves)
 			ADCnum = rwn[3,strlen(rwn)-1]
+			
 			if (fadcattr[str2num(ADCnum)][6] == 48)
 				CalcWaves += cwn + "x;"
+				CalcWaves += cwn + "y;"
 			endif
+			
 		 endfor
 		
 	elseif (S.is2d == 1)
 		RawWaves = sci_get2DWaveNames(1, S.using_fastdac)
 		CalcWaves = sci_get2DWaveNames(0, S.using_fastdac)
-	
+		
+		for(i=0; i<itemsinlist(RawWaves); i++)
+			rwn = StringFromList(i, RawWaves)
+			cwn = StringFromList(i, CalcWaves)
+			ADCnum = rwn[3,strlen(rwn)-1]
+			
+			if (fadcattr[str2num(ADCnum)][6] == 48)
+				CalcWaves += cwn[0,strlen(cwn)-4] + "x_2d;"
+			endif
+			
+			if (sc_demody == 1)
+				CalcWaves += cwn[0,strlen(cwn)-4] + "y_2d;"
+			endif
+			
+		 endfor
 	
 	else
 		abort "Not implemented"
 	endif
 	if (S.using_fastdac)  // Figure out better names for the raw data for fastdac scans (before adding additional_wavenames)
-		string rawSaveNames = getRawSaveNames(CalcWaves)  
+		string rawSaveNames = Calcwaves//getRawSaveNames(CalcWaves)  
 	endif
 
 	// Add additional_wavenames to CalcWaves
