@@ -168,12 +168,19 @@ function /s sc_createSweepLogs([S, comments])  // TODO: Rename
 	        jstr = addJsonKeyval(jstr, "y_channels", ReplaceString(";", S.channelsy, ","))        
 	     endif
         if (S.using_fastdac)
-        	  nvar sc_resampleFreqFadc
+        	  nvar sc_resampleFreqFadc, sc_demodphi
         	  nvar sc_resampleFreqFadcCheck
+        	  svar sc_nQs, sc_nfreq 
+        	  
    	        jstr = addJSONkeyval(jstr, "sweeprate", num2numStr(S.sweeprate))  	        
    	        jstr = addJSONkeyval(jstr, "measureFreq", num2numStr(S.measureFreq))  
    	        jstr = addJSONkeyval(jstr, "resamplingState", num2numstr(sc_resampleFreqFadcCheck))
-		     jstr = addJSONkeyval(jstr, "resamplingFreq", num2numstr(sc_resampleFreqFadc))   	        	           	        
+		     jstr = addJSONkeyval(jstr, "resamplingFreq", num2numstr(sc_resampleFreqFadc))
+		     jstr = addJSONkeyval(jstr, "demodPhi", num2numstr(sc_demodphi))
+		     jstr = addJSONkeyval(jstr, "notchQs", sc_nQs, addQuotes=1)
+		     jstr = addJSONkeyval(jstr, "notchFreqs", sc_nfreq, addQuotes=1)
+		     
+		        	        	           	        
    	     endif
     endif
 

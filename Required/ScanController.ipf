@@ -1911,7 +1911,8 @@ function SaveNamedWaves(wave_names, comments)
 	
 	if(sc_checkBackup())  	// check if a path is defined to backup data
 		sc_copyNewFiles(current_filenum, save_experiment=0)		// copy data to server mount point (nvar filenum gets incremented after HDF is opened)
-	endif	
+	endif
+		
 	filenum += 1 
 end
 
@@ -3638,8 +3639,8 @@ function scfd_notch_filters(wave wav, variable measureFreq, [string Hzs, string 
 	
 	Hzs = selectString(paramisdefault(Hzs), Hzs, "60")
 	Qs = selectString(paramisdefault(Qs), Qs, "50")
-	variable num_Hz = ItemsInList(Hzs, ";")
-	variable num_Q = ItemsInList(Qs, ";")
+	variable num_Hz = ItemsInList(Hzs, ",")
+	variable num_Q = ItemsInList(Qs, ",")
 
 		
 	// Creating wave variables
@@ -3664,8 +3665,8 @@ function scfd_notch_filters(wave wav, variable measureFreq, [string Hzs, string 
 	fftfactor=1
 	variable freq, Q, i
 	for (i=0;i<num_Hz;i+=1)
-		freq = freqfactor * str2num(stringfromlist(i, Hzs))
-		Q = ((num_Hz==num_Q) ? str2num(stringfromlist(i, Qs)): str2num(stringfromlist(0, Qs))) // this sets Q to be the ith item on the list if num_Q==num_Hz, otherwise it sets it to be the first value
+		freq = freqfactor * str2num(stringfromlist(i, Hzs, ","))
+		Q = ((num_Hz==num_Q) ? str2num(stringfromlist(i, Qs, ",")): str2num(stringfromlist(0, Qs, ","))) // this sets Q to be the ith item on the list if num_Q==num_Hz, otherwise it sets it to be the first value
 		fftfactor -= exp(-(x - freq)^2 / (freq / Q)^2)
 	endfor
 	temp_fft *= fftfactor
@@ -4380,8 +4381,8 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	checkbox sc_demodyBox,pos={585,265},proc=scw_CheckboxClicked,variable=sc_demody,side=1,title="\Z14Save Demod.y"
 	SetVariable sc_FilterfadcBox,pos={828,264},size={150,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resamp Freq ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
 	SetVariable sc_demodphiBox,pos={705,264},size={100,20},value=sc_demodphi,side=1,title="\Z14Demod \$WMTEX$ \Phi $/WMTEX$"//help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
-	SetVariable sc_nfreqBox,pos={698,300},size={150,20}, value=sc_nfreq ,side=1,title="\Z14 Notch Freqs" ,help={"seperate frequencies (Hz) with ; "}
-	SetVariable sc_nQsBox,pos={540,300},size={140,20}, value=sc_nQs ,side=1,title="\Z14 Notch Qs" ,help={"seperate Qs with ; "}
+	SetVariable sc_nfreqBox,pos={698,300},size={150,20}, value=sc_nfreq ,side=1,title="\Z14 Notch Freqs" ,help={"seperate frequencies (Hz) with , "}
+	SetVariable sc_nQsBox,pos={540,300},size={140,20}, value=sc_nQs ,side=1,title="\Z14 Notch Qs" ,help={"seperate Qs with , "}
 	DrawText 807,277, "\Z14\$WMTEX$ {}^{o} $/WMTEX$" 
 	DrawText 987,283, "\Z14Hz" 
 	
@@ -4653,8 +4654,8 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	variable/g sc_demody = 0
 	variable/g sc_plotRaw = 0
 	variable/g sc_ResampleFreqfadc = 100 // Resampling frequency if using resampling
-	string /g sc_nfreq = "60;180;300"
-	string /g sc_nQs = "50;150;250"
+	string /g sc_nfreq = "60,180,300"
+	string /g sc_nQs = "50,150,250"
 
 
 	// clean up
