@@ -3310,38 +3310,73 @@ function scf_getFDInfoFromID(instrID, info)
 	return scf_getFDInfoFromDeviceNum(deviceNum, info)
 end
 
-function/S scf_getRecordedFADCinfo(info_name)  
+function/S scf_getRecordedFADCinfo(info_name, [column])  
 	// Return a list of strings for specified column in fadcattr based on whether "record" is ticked
 	// Valid info_name ("calc_names", "raw_names", "calc_funcs", "inputs", "channels")
-    string info_name 
+	 
+	//column specifies whether another column of checkboxes need to be satisfied, There is
+	// notch = 5, demod = 6, resample = 8, 
+    string info_name
+    variable column 
     variable i
     wave fadcattr
-
+ 
 	 string return_list = ""
     wave/t fadcvalstr
     for (i = 0; i<dimsize(fadcvalstr, 0); i++)
-        if (fadcattr[i][2] == 48) // Checkbox checked
-			strswitch(info_name)
-				case "calc_names":
-                return_list = addlistItem(fadcvalstr[i][3], return_list, ";", INF)  												
-					break
-				case "raw_names":
-                return_list = addlistItem("ADC"+num2str(i), return_list, ";", INF)  						
-					break
-				case "calc_funcs":
-                return_list = addlistItem(fadcvalstr[i][4], return_list, ";", INF)  						
-					break						
-				case "inputs":
-                return_list = addlistItem(fadcvalstr[i][1], return_list, ";", INF)  												
-					break						
-				case "channels":
-                return_list = addlistItem(fadcvalstr[i][0], return_list, ";", INF)  																		
-					break
-				default:
-					abort "bad name requested: " + info_name + ". Allowed are (calc_names, raw_names, calc_funcs, inputs, channels)"
-					break
-			endswitch						
+        
+        if (paramIsDefault(column))
+        
+        	if (fadcattr[i][2] == 48) // Checkbox checked
+				strswitch(info_name)
+					case "calc_names":
+                		return_list = addlistItem(fadcvalstr[i][3], return_list, ";", INF)  												
+						break
+					case "raw_names":
+                		return_list = addlistItem("ADC"+num2str(i), return_list, ";", INF)  						
+						break
+					case "calc_funcs":
+                		return_list = addlistItem(fadcvalstr[i][4], return_list, ";", INF)  						
+						break						
+					case "inputs":
+                		return_list = addlistItem(fadcvalstr[i][1], return_list, ";", INF)  												
+						break						
+					case "channels":
+                		return_list = addlistItem(fadcvalstr[i][0], return_list, ";", INF)  																		
+						break
+					default:
+						abort "bad name requested: " + info_name + ". Allowed are (calc_names, raw_names, calc_funcs, inputs, channels)"
+						break
+				endswitch			
+        	endif
+        	
+        else
+        
+        	if (fadcattr[i][2] == 48 && fadcattr[i][column] == 48) // Checkbox checked
+				strswitch(info_name)
+					case "calc_names":
+                		return_list = addlistItem(fadcvalstr[i][3], return_list, ";", INF)  												
+						break
+					case "raw_names":
+                		return_list = addlistItem("ADC"+num2str(i), return_list, ";", INF)  						
+						break
+					case "calc_funcs":
+                		return_list = addlistItem(fadcvalstr[i][4], return_list, ";", INF)  						
+						break						
+					case "inputs":
+                		return_list = addlistItem(fadcvalstr[i][1], return_list, ";", INF)  												
+						break						
+					case "channels":
+                		return_list = addlistItem(fadcvalstr[i][0], return_list, ";", INF)  																		
+						break
+					default:
+						abort "bad name requested: " + info_name + ". Allowed are (calc_names, raw_names, calc_funcs, inputs, channels)"
+						break
+				endswitch			
+        	endif
+        	
         endif
+        
     endfor
     return return_list
 end
@@ -3635,7 +3670,7 @@ function scfd_notch_filters(wave wav, variable measureFreq, [string Hzs, string 
 	// This function is used to apply the notch filter for a choice of frequencies and Q factors
 	// if the length of Hzs and Qs do not match then Q is chosen as the first Q is the list
 	// It is expected that wav will have an associated JSON file to convert measurement times to points, via fd_getmeasfreq below
-	// EXAMPLE usage: notch_filters(dat6430cscurrent_2d, Hzs="60;180;300", Qs="50;150;250")
+	// EXAMPLE usage: notch_filters(dat6430cscurrent_2d, Hzs="60,180,300", Qs="50,150,250")
 	
 	Hzs = selectString(paramisdefault(Hzs), Hzs, "60")
 	Qs = selectString(paramisdefault(Qs), Qs, "50")

@@ -169,18 +169,19 @@ function /s sc_createSweepLogs([S, comments])  // TODO: Rename
 	     endif
         if (S.using_fastdac)
         	  nvar sc_resampleFreqFadc, sc_demodphi
-        	  nvar sc_resampleFreqFadcCheck
+        	  nvar sc_demody
         	  svar sc_nQs, sc_nfreq 
         	  
    	        jstr = addJSONkeyval(jstr, "sweeprate", num2numStr(S.sweeprate))  	        
    	        jstr = addJSONkeyval(jstr, "measureFreq", num2numStr(S.measureFreq))  
-   	        jstr = addJSONkeyval(jstr, "resamplingState", num2numstr(sc_resampleFreqFadcCheck))
 		     jstr = addJSONkeyval(jstr, "resamplingFreq", num2numstr(sc_resampleFreqFadc))
+		     jstr = addJSONkeyval(jstr, "resampWaves", scf_getRecordedFADCinfo("calc_names", column = 8), addQuotes= 1)
 		     jstr = addJSONkeyval(jstr, "demodPhi", num2numstr(sc_demodphi))
+		     jstr = addJSONkeyval(jstr, "save_demody", num2numstr(sc_demody))
+		     jstr = addJSONkeyval(jstr, "demodWaves", scf_getRecordedFADCinfo("calc_names", column = 6), addQuotes= 1)
 		     jstr = addJSONkeyval(jstr, "notchQs", sc_nQs, addQuotes=1)
 		     jstr = addJSONkeyval(jstr, "notchFreqs", sc_nfreq, addQuotes=1)
-		     
-		        	        	           	        
+		     jstr = addJSONkeyval(jstr, "notchedWaves", scf_getRecordedFADCinfo("calc_names", column = 5), addQuotes= 1)
    	     endif
     endif
 
