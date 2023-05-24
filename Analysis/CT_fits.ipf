@@ -3,14 +3,26 @@
 #pragma DefaultTab={3,20,4}		// Set default tab width in Igor Pro 9 and later
 #include <Reduce Matrix Size>
 
-function ctrans_avg(wave wav, int refit,int dotcondcentering, string kenner_out,[string condfit_prefix])
+function ctrans_avg(wave wav, int refit,int dotcondcentering, string kenner_out,[string condfit_prefix, variable minx, variable maxx])
 	// wav is the wave containing original CT data
 	// refit tells whether to do new fits to each CT line
 	// dotcondcentering tells whether to use conductance data to center the CT data
 	// kenner_out is the prefix to replace dat for this analysis
 	// kenner_out and condfit_prefix can not contain a number otherwise getfirstnu will not work
-  
+
 	variable refnum, ms
+	//	option to limit fit to indexes [minx,maxx]
+
+		if (paramisdefault(minx))
+			minx=0
+		endif
+
+		if (paramisdefault(maxx))
+			maxx=dimsize(wav,0)-1
+		endif
+	
+
+	
 	//		stopalltimers() // run this line if timer returns nan
 
 	refnum=startmstimer
@@ -28,9 +40,7 @@ function ctrans_avg(wave wav, int refit,int dotcondcentering, string kenner_out,
 	wave fit_params = $fit_params_name
 	
 
-
-
-	variable N=1; // how many sdevs are acceptable?
+	variable N=20; // how many sdevs are acceptable?
 
 
 	wave W_coef
@@ -44,13 +54,15 @@ function ctrans_avg(wave wav, int refit,int dotcondcentering, string kenner_out,
 	string quickavg=avg_wav($datasetname) // averages datasetname and returns the name of the averaged wave
 
 	if (refit==1)
-		get_initial_params($quickavg);// print W_coef
-		fit_transition($quickavg);// print W_coef
-		get_fit_params($datasetname,fit_params_name) //
+		//get_initial_params($quickavg);// print W_coef
+		fit_transition($quickavg,minx,maxx);// print W_coef
+		
+		get_fit_params($datasetname,fit_params_name,minx,maxx) //
 	endif
-	find_plot_thetas(wavenum,N,fit_params_name)
+closeallGraphs()
 
 	if (dotcondcentering==0)
+	find_plot_thetas(wavenum,N,fit_params_name)
 
 		duplicate/o/r=[][3] $fit_params_name mids
 		centering($datasetname,centered,mids) // centred plot and average plot
@@ -58,19 +70,22 @@ function ctrans_avg(wave wav, int refit,int dotcondcentering, string kenner_out,
 
 	elseif(dotcondcentering==1)
 		string condfit_params_name=condfit_prefix+num2str(wavenum)+"fit_params"
+		print condfit_params_name
 		wave condfit_params = $condfit_params_name
-
+		find_plot_gammas(condfit_params_name,N)
+		plot_badgammas($centered)
 		duplicate/o/r=[][2] condfit_params mids
 
 		centering($datasetname,centered,mids)
 		cleaning($centered,badgammasx)
 
+
 	endif
 
 	avg_wav($cleaned) // quick average plot
 	get_initial_params($quickavg); //print W_coef
-	fit_transition($avg)
-	prepfigs(wavenum,N,kenner,kenner_out)
+	fit_transition($avg,minx,maxx)
+	prepfigs(wavenum,N,kenner,kenner_out,minx,maxx)
 
 	ms=stopmstimer(refnum)
 	print ms/1e6
@@ -83,28 +98,6 @@ end
 //what does this mean in Igor pro: [p][q] > flag ? p : NaN
 //In Igor Pro, the expression "[p][q] > flag ? p : NaN" is a conditional statement that checks if the value of the two-dimensional array element located at [p][q] is greater than the value of the variable "flag".
 //If the condition is true, the statement returns the value of "p". If the condition is false, the statement returns "NaN", which stands for "Not a Number" and is used to represent undefined or unrepresentable numerical values.
-
-
-//function /wave avg_wav(wave wav) // /WAVE lets your return a wave
-//
-//	//  averaging any wave over columns (in y direction)
-//	// wave returned is avg_name
-//	string wn=nameofwave(wav)
-//	string avg_name=wn+"_avg";
-//	int nc
-//	int nr
-//
-////	wn="dat"+num2str(wavenum)+dataset //current 2d array
-//
-//	nr = dimsize($wn,0) //number of rows (sweep length)
-//	nc = dimsize($wn,1) //number of columns (repeats)
-//	ReduceMatrixSize(wav, 0, -1, nr, 0,-1, 1,1, avg_name)
-//	redimension/n=-1 $avg_name
-//end
-
-
-
-
 
 function /wave get_initial_params(sweep)
 
@@ -143,29 +136,29 @@ end
 
 
 
-function /wave fit_transition(current_array)
+function /wave fit_transition(current_array,minx,maxx)
 	// fits the current_array, If condition is 0 it will get initial params, If 1:
 	// define a variable named W_coef_guess = {} with the correct number of arguments
 
 
 	wave current_array
+	variable minx,maxx
 
 
 	wave W_coef
 
 	//duplicate /o current_array x_array
 	//x_array = x
-
 	//FuncFit/q Chargetransition W_coef current_array[][0] /D   //removed the x_array
-	FuncFit/q CT_faster W_coef current_array[][0] /D    //removed the x_array
-
-
+	//	FuncFit/q CT_faster W_coef current_array[][0] /D    //removed the x_array
+	
+	FuncFit/q /TBOX=768 CT_faster W_coef current_array[minx,maxx][0] /D
 end
 
 
 
 
-function /wave get_fit_params(wave wavenm, string fit_params_name)
+function /wave get_fit_params(wave wavenm, string fit_params_name,variable minx, variable maxx)
 	// returns wave with the name wave "dat"+ wavenum +"fit_params" eg. dat3320fit_params
 
 	//If condition is 0 it will get initial params, If 1:
@@ -193,7 +186,7 @@ function /wave get_fit_params(wave wavenm, string fit_params_name)
 	for (i=0; i < nc ; i+=1)
 
 		temp_wave = wavenm[p][i]
-		fit_transition(temp_wave)
+		fit_transition(temp_wave,minx,maxx)
 		fit_params[1 * i][,5] = W_coef[q]
 		fit_params[1 * i][6,] = W_sigma[q-6]         //I genuinely cant believe this worked
 		// i dont think the q-5 does anything, should double check
@@ -344,183 +337,10 @@ function /wave cleaning(wave center, wave badthetasx)
 end
 
 
-
-
-//function chargetransition_procedure(int wavenum, int refit)
-//
-//	// if condition is 0, It gets a guess of initial params from each sweep
-//	// If condition is 1, It uses the fit paramaters based on the quickavg wave
-//
-//	closeallGraphs()
-//
-//	string dataset = "cscurrent_2d"
-//	string quickavg = "dat" + num2str(wavenum) + "quickavg"
-//	string avg = "dat" + num2str(wavenum) + "avg"
-//
-//	wave W_coef
-//	wave badthetasx
-//	remove_noise(wavenum,dataset);
-//	dataset=dataset+"_nf"
-//	resampleWave(wavenum, dataset,600);
-//	avg_wav($dataset) // quick average plot
-//
-//	if (refit==1)
-//		fit_transition($quickavg, 0)
-//		duplicate /o W_coef W_coef_guess //guess based on the quick average
-//		get_fit_params(wavenum, dataset, 1) // 1 is for do not look for starting params
-//	endif
-//
-//	centering(wavenum, dataset) // centred plot and average plot
-//	cleaned(wavenum)
-//	string centred = "dat" + num2str(wavenum) + "centered"
-//
-//	avg_wav($centred) // quick average plot
-//	fit_transition($avg, 1)
-//	prepfigs(wavenum)
-//
-//
-//end
-
-
-
-
-
-
-
-
-
-//function chargetransition_procedure2m(int wavenum, int condition)
-//
-//	chargetransition_procedure2(wavenum, condition)
-//	MultiGraphLayout(WinList("*", ";", "WIN:1"), 3, 20, "AllGraphLayout")
-//
-//end
-
-
-//from: https://www.wavemetrics.com/forum/igor-pro-wish-list/automatically-color-traces-multi-trace-graph
-
-//Function QuickColorSpectrum2()                            // colors traces with 12 different colors
-//	String Traces    = TraceNameList("",";",1)               // get all the traces from the graph
-//	Variable Items   = ItemsInList(Traces)                   // count the traces
-//	Make/FREE/N=(11,3) colors = {{65280,0,0}, {65280,43520,0}, {0,65280,0}, {0,52224,0}, {0,65280,65280}, {0,43520,65280}, {0,15872,65280}, {65280,16384,55552}, {36864,14592,58880}, {0,0,0},{26112,26112,26112}}
-//	Variable i
-//	for (i = 0; i <DimSize(colors,1); i += 1)
-//		ModifyGraph rgb($StringFromList(i,Traces))=(colors[0][i],colors[1][i],colors[2][i])      // set new color offset
-//	endfor
-//End
-
-////from:
-//// https://www.wavemetrics.com/code-snippet/stacked-plots-multiple-plots-layout
-//
-//function MultiGraphLayout(GraphList, nCols, spacing, layoutName)
-//	string GraphList        // semicolon separated list of graphs to be appended to layout
-//	variable nCols      // number of graph columns
-//	string layoutName   // name of the layout
-//	variable spacing        // spacing between graphs in points!
-//
-//	// how many graphs are there and how many rows are required
-//	variable nGraphs = ItemsInList(GraphList)
-//	variable nRows = ceil(nGraphs / nCols)
-//	variable LayoutWidth, LayoutHeight
-//	variable gWidth, gHeight
-//	variable maxWidth = 0, maxHeight = 0
-//	variable left, top
-//	variable i, j, n = 0
-//
-//	string ThisGraph
-//
-//	// detect total layout size from individual graph sizes; get maximum graph size as column/row size
-//	for(i=0; i<nGraphs; i+=1)
-//
-//		ThisGraph = StringFromList(i, GraphList)
-//		GetWindow $ThisGraph gsize
-//		gWidth = (V_right - V_left)
-//		gHeight = (V_bottom - V_top)
-//
-//		// update maximum
-//		maxWidth = gWidth > maxWidth ? gWidth : maxWidth
-//		maxHeight = gHeight > maxHeight ? gHeight : maxHeight
-//	endfor
-//
-//	// calculate layout size
-//	LayoutWidth = maxWidth * nCols + ((nCols + 1) * spacing)
-//	LayoutHeight = maxHeight * nRows + ((nRows +1) * spacing)
-//
-//	// make layout; kill if it exists
-//	DoWindow $layoutName
-//	if(V_flag)
-//		KillWindow $layoutName
-//	endif
-//
-//	NewLayout/N=$layoutName/K=1/W=(517,55,1451,800)
-//	LayoutPageAction size=(LayoutWidth, LayoutHeight), margins=(0,0,0,0)
-//	ModifyLayout mag=0.75
-//
-//	//append graphs
-//	top = spacing
-//	for(i=0; i<nRows; i+=1)
-//
-//		// reset vertical position for each column
-//		left = spacing
-//
-//		for (j=0; j<    nCols; j+=1)
-//
-//			ThisGraph = StringFromList(n, GraphList)
-//			if(strlen(ThisGraph) == 0)
-//				return 0
-//			endif
-//
-//			GetWindow $ThisGraph gsize
-//			gWidth = (V_right - V_left)
-//			gHeight = (V_bottom - V_top)
-//
-//			AppendLayoutObject/F=0 /D=1 /R=(left, top, (left + gWidth), (top + gHeight)) graph $ThisGraph
-//
-//			// shift next starting positions to the right
-//			left += maxWidth + spacing
-//
-//			// increase plot counter
-//			n += 1
-//		endfor
-//
-//		// shift next starting positions dwon
-//		top += maxHeight + spacing
-//	endfor
-//
-//	return 1
-//end
-//
-//
-//
-//// https://www.wavemetrics.com/code-snippet/stacked-plots-multiple-plots-graph
-
-
-
-
-
-
-
-
-/////// Dealing Interlacing ////////
-
-
-
-// improvements on this function
-//			let it take an argument of names for all the waves created
-
-
-//     		an option or a new function all together that seperates the waves by grouping
-//									i.e grouping x number of rows in a m by n matrix creating
-//                                      a total of m/x waves, also takes an argument for naming?
-//          it could group based on amount of splits e.g split 2D wave into 4
-//          it could group based on number of rows indicated.
-
-
-
-
-function prepfigs(wavenum,N,kenner, kenner_out)
+function prepfigs(wavenum,N,kenner, kenner_out, minx, maxx)
 	variable wavenum,N
 	string kenner, kenner_out
+	variable minx, maxx
 	string datasetname ="dat"+num2str(wavenum)+kenner // this was the original dataset name
 	string avg = kenner_out + num2str(wavenum) + "cleaned_avg" // this is the averaged wave produced by avg_wave($cleaned)
 	string centered=kenner_out+num2str(wavenum)+"centered" // this is the centered 2D wave
@@ -529,14 +349,13 @@ function prepfigs(wavenum,N,kenner, kenner_out)
 	string quickavg = datasetname+"_avg" // this is the wave produced by avg_wave($datasetname)
 	wave W_coef
 
-	closeallgraphs()
 
 	/////////////////// quick avg fig  //////////////////////////////////////
 
 	string fit_name = "fit_"+quickavg
 
 	display $quickavg
-	FuncFit/TBOX=768 CT_faster W_coef $quickavg /D
+	fit_transition($quickavg,minx,maxx)
 	Label bottom "gate V"
 	Label left "csurrent"
 	ModifyGraph fSize=24
@@ -550,8 +369,8 @@ function prepfigs(wavenum,N,kenner, kenner_out)
 	/////////////////// thetas  //////////////////////////////////////
 
 
-	find_plot_thetas(wavenum,N,fit_params_name)
-	plot_badthetas($datasetname) // thetas vs repeat plot and bad theta sweep plot
+	//find_plot_thetas(wavenum,N,fit_params_name)
+	//plot_badthetas($datasetname) // thetas vs repeat plot and bad theta sweep plot
 	plot2d_heatmap($datasetname)
 	plot2d_heatmap($cleaned)
 	plot2d_heatmap($centered)
@@ -563,7 +382,8 @@ function prepfigs(wavenum,N,kenner, kenner_out)
 	string fit = "fit_cst"+num2str(wavenum)+"cleaned_avg" //new array
 
 	display $avg; W_coef[3]=0
-	FuncFit/TBOX=768 CT_faster W_coef $avg /D
+	fit_transition($avg,minx,maxx)
+
 	Label bottom "gate V"
 	Label left "csurrent"
 	ModifyGraph fSize=24
@@ -606,8 +426,6 @@ End
 
 Function CT_faster(w,ys,xs) : FitFunc
 	Wave w, xs, ys
-
-
 	ys= w[0]*tanh((xs - w[3])/(-2*w[2])) + w[4]*xs + w[1]+w(5)*xs^2
 End
 
