@@ -1114,9 +1114,9 @@ function/S scg_initializeGraphs(S)
 		endif
       
       	if (raw)
-      		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label=ylabel)
+      		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label=ylabel, spectrum = 1, mFreq = S.measureFreq)
       
-      	//add demodulation to buffer, specifically the x-axis stuff. initializegraphswavenames might not be substantial
+      	//add demodulation to buffer, specifically the x-axis stuff
      	else 	
      	
       		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, for_2d=S.is2d, y_label=ylabel)
@@ -1125,7 +1125,7 @@ function/S scg_initializeGraphs(S)
 				string rwn = StringFromList(i, rawWaveNames)
 				string cwn = StringFromList(i, WaveNames)
 				string ADCnum = rwn[3,INF]
-//			
+			
 				if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
 					buffer += scg_initializeGraphsForWavenames(cwn + "x", S.x_label, for_2d=S.is2d, y_label=ylabel, append_wn = cwn + "y")
 				endif
@@ -1145,12 +1145,12 @@ function/S scg_initializeGraphs(S)
 end
 
 
-function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label, append_wn])
+function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label, append_wn, spectrum, mFreq])
 	// Ensures a graph is open and tiles graphs for each wave in comma separated wavenames
 	// Returns list of graphIDs of active graphs
 	// append_wavename would append a wave to every single wavename in wavenames (more useful for passing just one wavename)
 	string wavenames, x_label, y_label, append_wn
-	variable for_2d
+	variable for_2d , spectrum, mFreq
 	
 	y_label = selectString(paramisDefault(y_label), y_label, "")
 	append_wn = selectString(paramisDefault(append_wn), append_wn, "")
@@ -1180,6 +1180,12 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 	   
 	   graphIDs = addlistItem(openGraphID, graphIDs, ";", INF) 	
 	   openGraphID = ""
+		
+		if (spectrum)
+			string ADCnum = wn[3,INF] //this line would specifically fail if this function was called for the calculated waves, but we dont care about it
+			string wn_powerspec = scfd_spectrum_analyzer($wn, mFreq, "pwrspec" + ADCnum)
+			scg_twosubplot(openGraphID, wn_powerspec)
+		endif
 		
 		// 2D graphs
 		if (for_2d)
@@ -1213,6 +1219,21 @@ function scg_arrangeWindows(graphIDs)
     endfor
     execute(cmd)
     doupdate
+end
+
+function scg_twosubplot(graphID, wave2name)
+//creates a subplot with an existing wave and GraphID with wave2
+//wave2 will appear on top
+	string graphID, wave2name
+	wave wave2 = $wave2name
+	//variable minwave2 = wavemin(wave2)
+	
+	ModifyGraph /W = $graphID axisEnab(left)={0,0.40} //graphID wont work
+	AppendToGraph /W = $graphID /L=l2/B=b2 wave2 // vs something
+	ModifyGraph /W = $graphID axisEnab(l2)={0.60,1}
+	ModifyGraph /W = $graphID freePos(l2)=0
+	//ModifyGraph /W = $graphID freePos(b2)={minwave2,l2}
+	ModifyGraph /W = $graphID freePos(b2)={0,l2}
 end
 
 
@@ -1355,6 +1376,9 @@ function scg_updateRawGraphs()
 		endfor
 	endif
 end
+
+
+
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1887,7 +1911,8 @@ function SaveNamedWaves(wave_names, comments)
 	
 	if(sc_checkBackup())  	// check if a path is defined to backup data
 		sc_copyNewFiles(current_filenum, save_experiment=0)		// copy data to server mount point (nvar filenum gets incremented after HDF is opened)
-	endif	
+	endif
+		
 	filenum += 1 
 end
 
@@ -3285,38 +3310,73 @@ function scf_getFDInfoFromID(instrID, info)
 	return scf_getFDInfoFromDeviceNum(deviceNum, info)
 end
 
-function/S scf_getRecordedFADCinfo(info_name)  
+function/S scf_getRecordedFADCinfo(info_name, [column])  
 	// Return a list of strings for specified column in fadcattr based on whether "record" is ticked
 	// Valid info_name ("calc_names", "raw_names", "calc_funcs", "inputs", "channels")
-    string info_name 
+	 
+	//column specifies whether another column of checkboxes need to be satisfied, There is
+	// notch = 5, demod = 6, resample = 8, 
+    string info_name
+    variable column 
     variable i
     wave fadcattr
-
+ 
 	 string return_list = ""
     wave/t fadcvalstr
     for (i = 0; i<dimsize(fadcvalstr, 0); i++)
-        if (fadcattr[i][2] == 48) // Checkbox checked
-			strswitch(info_name)
-				case "calc_names":
-                return_list = addlistItem(fadcvalstr[i][3], return_list, ";", INF)  												
-					break
-				case "raw_names":
-                return_list = addlistItem("ADC"+num2str(i), return_list, ";", INF)  						
-					break
-				case "calc_funcs":
-                return_list = addlistItem(fadcvalstr[i][4], return_list, ";", INF)  						
-					break						
-				case "inputs":
-                return_list = addlistItem(fadcvalstr[i][1], return_list, ";", INF)  												
-					break						
-				case "channels":
-                return_list = addlistItem(fadcvalstr[i][0], return_list, ";", INF)  																		
-					break
-				default:
-					abort "bad name requested: " + info_name + ". Allowed are (calc_names, raw_names, calc_funcs, inputs, channels)"
-					break
-			endswitch						
+        
+        if (paramIsDefault(column))
+        
+        	if (fadcattr[i][2] == 48) // Checkbox checked
+				strswitch(info_name)
+					case "calc_names":
+                		return_list = addlistItem(fadcvalstr[i][3], return_list, ";", INF)  												
+						break
+					case "raw_names":
+                		return_list = addlistItem("ADC"+num2str(i), return_list, ";", INF)  						
+						break
+					case "calc_funcs":
+                		return_list = addlistItem(fadcvalstr[i][4], return_list, ";", INF)  						
+						break						
+					case "inputs":
+                		return_list = addlistItem(fadcvalstr[i][1], return_list, ";", INF)  												
+						break						
+					case "channels":
+                		return_list = addlistItem(fadcvalstr[i][0], return_list, ";", INF)  																		
+						break
+					default:
+						abort "bad name requested: " + info_name + ". Allowed are (calc_names, raw_names, calc_funcs, inputs, channels)"
+						break
+				endswitch			
+        	endif
+        	
+        else
+        
+        	if (fadcattr[i][2] == 48 && fadcattr[i][column] == 48) // Checkbox checked
+				strswitch(info_name)
+					case "calc_names":
+                		return_list = addlistItem(fadcvalstr[i][3], return_list, ";", INF)  												
+						break
+					case "raw_names":
+                		return_list = addlistItem("ADC"+num2str(i), return_list, ";", INF)  						
+						break
+					case "calc_funcs":
+                		return_list = addlistItem(fadcvalstr[i][4], return_list, ";", INF)  						
+						break						
+					case "inputs":
+                		return_list = addlistItem(fadcvalstr[i][1], return_list, ";", INF)  												
+						break						
+					case "channels":
+                		return_list = addlistItem(fadcvalstr[i][0], return_list, ";", INF)  																		
+						break
+					default:
+						abort "bad name requested: " + info_name + ". Allowed are (calc_names, raw_names, calc_funcs, inputs, channels)"
+						break
+				endswitch			
+        	endif
+        	
         endif
+        
     endfor
     return return_list
 end
@@ -3610,12 +3670,12 @@ function scfd_notch_filters(wave wav, variable measureFreq, [string Hzs, string 
 	// This function is used to apply the notch filter for a choice of frequencies and Q factors
 	// if the length of Hzs and Qs do not match then Q is chosen as the first Q is the list
 	// It is expected that wav will have an associated JSON file to convert measurement times to points, via fd_getmeasfreq below
-	// EXAMPLE usage: notch_filters(dat6430cscurrent_2d, Hzs="60;180;300", Qs="50;150;250")
+	// EXAMPLE usage: notch_filters(dat6430cscurrent_2d, Hzs="60,180,300", Qs="50,150,250")
 	
 	Hzs = selectString(paramisdefault(Hzs), Hzs, "60")
 	Qs = selectString(paramisdefault(Qs), Qs, "50")
-	variable num_Hz = ItemsInList(Hzs, ";")
-	variable num_Q = ItemsInList(Qs, ";")
+	variable num_Hz = ItemsInList(Hzs, ",")
+	variable num_Q = ItemsInList(Qs, ",")
 
 		
 	// Creating wave variables
@@ -3640,8 +3700,8 @@ function scfd_notch_filters(wave wav, variable measureFreq, [string Hzs, string 
 	fftfactor=1
 	variable freq, Q, i
 	for (i=0;i<num_Hz;i+=1)
-		freq = freqfactor * str2num(stringfromlist(i, Hzs))
-		Q = ((num_Hz==num_Q) ? str2num(stringfromlist(i, Qs)): str2num(stringfromlist(0, Qs))) // this sets Q to be the ith item on the list if num_Q==num_Hz, otherwise it sets it to be the first value
+		freq = freqfactor * str2num(stringfromlist(i, Hzs, ","))
+		Q = ((num_Hz==num_Q) ? str2num(stringfromlist(i, Qs, ",")): str2num(stringfromlist(0, Qs, ","))) // this sets Q to be the ith item on the list if num_Q==num_Hz, otherwise it sets it to be the first value
 		fftfactor -= exp(-(x - freq)^2 / (freq / Q)^2)
 	endfor
 	temp_fft *= fftfactor
@@ -3711,6 +3771,32 @@ function scfd_demodulate(wav, harmonic, nofcycles, period, wnam)//, [append2hdf]
 
 end 
 
+function /s scfd_spectrum_analyzer(wave data, variable samp_freq, string wn)
+	// Built in powerspectrum function
+	duplicate/o data spectrum
+	SetScale/P x 0,1/samp_freq,"", spectrum
+	variable nr=dimsize(spectrum,0);  // number of points in x-direction
+	variable le=2^(floor(log(nr)/log(2))); // max factor of 2 less than total num points
+	wave slice
+	wave w_Periodogram
+	wave powerspec
+	
+	variable i=0
+	rowslice(spectrum,i)
+	DSPPeriodogram/R=[1,(le)] /DB/NODC=1/DEST=W_Periodogram slice  //there is a normalization flag
+	duplicate/o w_Periodogram, powerspec
+	i=1
+	do
+		rowslice(spectrum,i)
+		DSPPeriodogram/R=[1,(le)] /DB/NODC=1/DEST=W_Periodogram slice
+		powerspec = powerspec+W_periodogram
+		i=i+1
+	while(i<dimsize(spectrum,1))
+	powerspec[0]=nan
+	//display powerspec; // SetAxis bottom 0,500
+	duplicate /o powerspec, $wn
+	return wn
+end
 
 
 function scfd_RecordValues(S, rowNum, [AWG_list, linestart, skip_data_distribution])  // TODO: Rename to fd_record_values
@@ -3828,13 +3914,16 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 	wave /T fadcvalstr
 	
 	for (i=0; i<itemsinlist(RawWaveNames1D); i++)
-		
+	
+
 			rwn = StringFromList(i, RawWaveNames1D)
 			cwn = StringFromList(i, CalcWaveNames1D)		
 			calc_string = StringFromList(i, CalcStrings)
 			duplicate/o $rwn sc_tempwave
+			string ADCnum = rwn[3,INF]
 			
-			string ADCnum = rwn[3,strlen(rwn)]
+			// for powerspec  //
+			scfd_spectrum_analyzer(sc_tempwave, ScanVars.measureFreq, "pwrspec" + ADCnum)
 			
 			if (fadcattr[str2num(ADCnum)][5] == 48) // checks which notch box is checked
 				scfd_notch_filters(sc_tempwave, ScanVars.measureFreq,Hzs=sc_nfreq, Qs=sc_nQs)
@@ -3843,7 +3932,6 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
 				scfd_demodulate(sc_tempwave, str2num(fadcvalstr[str2num(ADCnum)][7]), AWGVars.numCycles, AWGVars.waveLen, cwn) 
 			endif
-			
 				
 			if (fadcattr[str2num(ADCnum)][8] == 48) // checks which resample box is checked
 				scfd_resampleWaves(sc_tempwave, ScanVars.measureFreq, sc_ResampleFreqfadc)
@@ -3980,6 +4068,8 @@ function scfd_getReadChunkSize(numADCs, numpts, bytesSec, totalByteReturn)
   endif
   return read_chunk
 end
+
+
 
 function scfd_checkSweepstate(instrID)
   	// if abort button pressed then stops FDAC sweep then aborts
@@ -4326,8 +4416,8 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	checkbox sc_demodyBox,pos={585,265},proc=scw_CheckboxClicked,variable=sc_demody,side=1,title="\Z14Save Demod.y"
 	SetVariable sc_FilterfadcBox,pos={828,264},size={150,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resamp Freq ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
 	SetVariable sc_demodphiBox,pos={705,264},size={100,20},value=sc_demodphi,side=1,title="\Z14Demod \$WMTEX$ \Phi $/WMTEX$"//help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
-	SetVariable sc_nfreqBox,pos={698,300},size={150,20}, value=sc_nfreq ,side=1,title="\Z14 Notch Freqs" ,help={"seperate frequencies (Hz) with ; "}
-	SetVariable sc_nQsBox,pos={540,300},size={140,20}, value=sc_nQs ,side=1,title="\Z14 Notch Qs" ,help={"seperate Qs with ; "}
+	SetVariable sc_nfreqBox,pos={698,300},size={150,20}, value=sc_nfreq ,side=1,title="\Z14 Notch Freqs" ,help={"seperate frequencies (Hz) with , "}
+	SetVariable sc_nQsBox,pos={540,300},size={140,20}, value=sc_nQs ,side=1,title="\Z14 Notch Qs" ,help={"seperate Qs with , "}
 	DrawText 807,277, "\Z14\$WMTEX$ {}^{o} $/WMTEX$" 
 	DrawText 987,283, "\Z14Hz" 
 	
@@ -4599,8 +4689,8 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	variable/g sc_demody = 0
 	variable/g sc_plotRaw = 0
 	variable/g sc_ResampleFreqfadc = 100 // Resampling frequency if using resampling
-	string /g sc_nfreq = "60;180;300"
-	string /g sc_nQs = "50;150;250"
+	string /g sc_nfreq = "60,180,300"
+	string /g sc_nQs = "50,150,250"
 
 
 	// clean up
@@ -4650,3 +4740,23 @@ function scfw_SetGUIinteraction(numDevices)
 end
 	
 	
+
+
+//example of subplotting
+
+//Make/N=3 data = p
+//Make/N=3/T category = {"A", "B", "C"}
+//Display data
+//ModifyGraph axisEnab(left)={0.55,1}
+//ModifyGraph freePos(left)=0
+//ModifyGraph freePos(bottom)={0,left}
+//ModifyGraph freePos(bottom)={1,left}
+//Display /L = l1 /B = B1 data
+//ModifyGraph axisEnab(l1)={0.55,1}
+//ModifyGraph freePos(l1)=0
+//ModifyGraph freePos(B1)={0,l1}
+//AppendToGraph/L=l2/B=b2 data vs category
+//ModifyGraph axisEnab(l2)={0,0.45}
+//ModifyGraph freepos(l2)=0
+//ModifyGraph freePos(b2)={0,l2}
+//ModifyGraph axisEnab(l2)={0,0.40}

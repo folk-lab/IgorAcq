@@ -168,12 +168,20 @@ function /s sc_createSweepLogs([S, comments])  // TODO: Rename
 	        jstr = addJsonKeyval(jstr, "y_channels", ReplaceString(";", S.channelsy, ","))        
 	     endif
         if (S.using_fastdac)
-        	  nvar sc_resampleFreqFadc
-        	  nvar sc_resampleFreqFadcCheck
+        	  nvar sc_resampleFreqFadc, sc_demodphi
+        	  nvar sc_demody
+        	  svar sc_nQs, sc_nfreq 
+        	  
    	        jstr = addJSONkeyval(jstr, "sweeprate", num2numStr(S.sweeprate))  	        
    	        jstr = addJSONkeyval(jstr, "measureFreq", num2numStr(S.measureFreq))  
-   	        jstr = addJSONkeyval(jstr, "resamplingState", num2numstr(sc_resampleFreqFadcCheck))
-		     jstr = addJSONkeyval(jstr, "resamplingFreq", num2numstr(sc_resampleFreqFadc))   	        	           	        
+		     jstr = addJSONkeyval(jstr, "resamplingFreq", num2numstr(sc_resampleFreqFadc))
+		     jstr = addJSONkeyval(jstr, "resampWaves", scf_getRecordedFADCinfo("calc_names", column = 8), addQuotes= 1)
+		     jstr = addJSONkeyval(jstr, "demodPhi", num2numstr(sc_demodphi))
+		     jstr = addJSONkeyval(jstr, "save_demody", num2numstr(sc_demody))
+		     jstr = addJSONkeyval(jstr, "demodWaves", scf_getRecordedFADCinfo("calc_names", column = 6), addQuotes= 1)
+		     jstr = addJSONkeyval(jstr, "notchQs", sc_nQs, addQuotes=1)
+		     jstr = addJSONkeyval(jstr, "notchFreqs", sc_nfreq, addQuotes=1)
+		     jstr = addJSONkeyval(jstr, "notchedWaves", scf_getRecordedFADCinfo("calc_names", column = 5), addQuotes= 1)
    	     endif
     endif
 
@@ -352,18 +360,51 @@ function SaveToHDF(S, [additional_wavenames])
 	endif
 	
 	// Get waveList to save
-	string RawWaves, CalcWaves
+	string RawWaves, CalcWaves, rwn, cwn, ADCnum
+	wave fadcattr
+	nvar sc_demody
+	int i
+	
 	if(S.is2d == 0)
 		RawWaves = sci_get1DWaveNames(1, S.using_fastdac)
 		CalcWaves = sci_get1DWaveNames(0, S.using_fastdac)
+		
+		for(i=0; i<itemsinlist(RawWaves); i++)
+			rwn = StringFromList(i, RawWaves)
+			cwn = StringFromList(i, CalcWaves)
+			ADCnum = rwn[3,INF]
+			
+			if (fadcattr[str2num(ADCnum)][6] == 48)
+				CalcWaves += cwn + "x;"
+				CalcWaves += cwn + "y;"
+			endif
+			
+		 endfor
+		
 	elseif (S.is2d == 1)
 		RawWaves = sci_get2DWaveNames(1, S.using_fastdac)
 		CalcWaves = sci_get2DWaveNames(0, S.using_fastdac)
+		
+		for(i=0; i<itemsinlist(RawWaves); i++)
+			rwn = StringFromList(i, RawWaves)
+			cwn = StringFromList(i, CalcWaves)
+			ADCnum = rwn[3,strlen(rwn)-4]
+			
+			if (fadcattr[str2num(ADCnum)][6] == 48)
+				CalcWaves += cwn[0,strlen(cwn)-4] + "x_2d;"
+			endif
+			
+			if (sc_demody == 1)
+				CalcWaves += cwn[0,strlen(cwn)-4] + "y_2d;"
+			endif
+			
+		 endfor
+	
 	else
 		abort "Not implemented"
 	endif
 	if (S.using_fastdac)  // Figure out better names for the raw data for fastdac scans (before adding additional_wavenames)
-		string rawSaveNames = getRawSaveNames(CalcWaves)  
+		string rawSaveNames = Calcwaves//getRawSaveNames(CalcWaves)  
 	endif
 
 	// Add additional_wavenames to CalcWaves

@@ -350,9 +350,15 @@ function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, 
 	
 	
 	//check if rawdata needs to be saved
-	duplicate /o /r=[][5,8] fadcattr rawcheck
-	sc_Saverawfadc = (sum(rawcheck) > (98 * dimsize(fadcattr, 0))) ? 1 : 0 //checks against the sum of all checkboxes from notchfilter column to resample
-
+	string notched_waves = scf_getRecordedFADCinfo("calc_names", column = 5)
+	string resamp_waves = scf_getRecordedFADCinfo("calc_names",column = 8)
+	
+	if(cmpstr(notched_waves,"") || cmpstr(resamp_waves,""))
+		sc_Saverawfadc = 1
+	else
+		sc_Saverawfadc = 0
+	endif
+	
 
 	// Set sc_ScanVars struct
 	struct ScanVars S
