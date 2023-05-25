@@ -3783,16 +3783,16 @@ function /s scfd_spectrum_analyzer(wave data, variable samp_freq, string wn)
 	
 	variable i=0
 	rowslice(spectrum,i)
-	DSPPeriodogram/R=[1,(le)]/PARS/DB/NODC=2/DEST=W_Periodogram slice  //there is a normalization flag
+	DSPPeriodogram/R=[0,(le-1)]/PARS/DB/NODC=2/DEST=W_Periodogram slice  //there is a normalization flag
 	duplicate/o w_Periodogram, powerspec
 	i=1
 	do
 		rowslice(spectrum,i)
-		DSPPeriodogram/R=[1,(le)]/PARS/DB/NODC=2/DEST=W_Periodogram slice
+		DSPPeriodogram/R=[0,(le-1)]/PARS/DB/NODC=2/DEST=W_Periodogram slice
 		powerspec = powerspec+W_periodogram
 		i=i+1
 	while(i<dimsize(spectrum,1))
-	powerspec[0]=nan
+	//powerspec[0]=nan
 	//display powerspec; // SetAxis bottom 0,500
 	duplicate /o powerspec, $wn
 	return wn
@@ -3903,7 +3903,7 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 		abort "Different number of raw wave names compared to calc wave names"
 	endif
 
-	nvar sc_ResampleFreqfadc, sc_demody
+	nvar sc_ResampleFreqfadc, sc_demody, sc_plotRaw
 	svar sc_nfreq, sc_nQs
 		
 	variable i = 0
@@ -3923,7 +3923,9 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			string ADCnum = rwn[3,INF]
 			
 			// for powerspec  //
-			scfd_spectrum_analyzer(sc_tempwave, ScanVars.measureFreq, "pwrspec" + ADCnum)
+			if (sc_plotRaw == 1)
+				scfd_spectrum_analyzer(sc_tempwave, ScanVars.measureFreq, "pwrspec" + ADCnum)
+			endif
 			
 			if (fadcattr[str2num(ADCnum)][5] == 48) // checks which notch box is checked
 				scfd_notch_filters(sc_tempwave, ScanVars.measureFreq,Hzs=sc_nfreq, Qs=sc_nQs)
