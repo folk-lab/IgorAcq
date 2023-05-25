@@ -372,7 +372,7 @@ function SaveToHDF(S, [additional_wavenames])
 		for(i=0; i<itemsinlist(RawWaves); i++)
 			rwn = StringFromList(i, RawWaves)
 			cwn = StringFromList(i, CalcWaves)
-			ADCnum = rwn[3,strlen(rwn)-1]
+			ADCnum = rwn[3,INF]
 			
 			if (fadcattr[str2num(ADCnum)][6] == 48)
 				CalcWaves += cwn + "x;"
@@ -388,7 +388,7 @@ function SaveToHDF(S, [additional_wavenames])
 		for(i=0; i<itemsinlist(RawWaves); i++)
 			rwn = StringFromList(i, RawWaves)
 			cwn = StringFromList(i, CalcWaves)
-			ADCnum = rwn[3,strlen(rwn)-1]
+			ADCnum = rwn[3,strlen(rwn)-4]
 			
 			if (fadcattr[str2num(ADCnum)][6] == 48)
 				CalcWaves += cwn[0,strlen(cwn)-4] + "x_2d;"

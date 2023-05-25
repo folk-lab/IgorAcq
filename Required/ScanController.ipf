@@ -3920,7 +3920,7 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			cwn = StringFromList(i, CalcWaveNames1D)		
 			calc_string = StringFromList(i, CalcStrings)
 			duplicate/o $rwn sc_tempwave
-			string ADCnum = rwn[3,strlen(rwn)]
+			string ADCnum = rwn[3,INF]
 			
 			// for powerspec  //
 			scfd_spectrum_analyzer(sc_tempwave, ScanVars.measureFreq, "pwrspec" + ADCnum)
