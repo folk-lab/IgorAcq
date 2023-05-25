@@ -3783,12 +3783,12 @@ function /s scfd_spectrum_analyzer(wave data, variable samp_freq, string wn)
 	
 	variable i=0
 	rowslice(spectrum,i)
-	DSPPeriodogram/R=[1,(le)] /DB/NODC=1/DEST=W_Periodogram slice  //there is a normalization flag
+	DSPPeriodogram/R=[1,(le)]/PARS/DB/NODC=2/DEST=W_Periodogram slice  //there is a normalization flag
 	duplicate/o w_Periodogram, powerspec
 	i=1
 	do
 		rowslice(spectrum,i)
-		DSPPeriodogram/R=[1,(le)] /DB/NODC=1/DEST=W_Periodogram slice
+		DSPPeriodogram/R=[1,(le)]/PARS/DB/NODC=2/DEST=W_Periodogram slice
 		powerspec = powerspec+W_periodogram
 		i=i+1
 	while(i<dimsize(spectrum,1))
