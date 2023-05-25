@@ -432,7 +432,8 @@ function notch_filters(wave wav, [string Hzs, string Qs, string notch_name])
 	redimension/N=(num_rows, -1) temp_ifft
 	copyscales wav, temp_ifft
 	duplicate /o temp_ifft $notch_name
-
+	 freq=fd_getmeasfreq(wavenum)
+return freq
 	
 end
 
