@@ -449,16 +449,16 @@ function spectrum_analyzer(wave data, variable samp_freq)
 
 	variable i=0
 	rowslice(spectrum,i)
-		DSPPeriodogram/R=[1,(le)] /DB/NODC=1/DEST=W_Periodogram slice
+		DSPPeriodogram/R=[0,(le-1)]/PARS/NODC=2/DEST=W_Periodogram slice
 	duplicate/o w_Periodogram, powerspec
 	i=1
 	do
 		rowslice(spectrum,i)
-		DSPPeriodogram/R=[1,(le)]/DB/NODC=1/DEST=W_Periodogram slice
+		DSPPeriodogram/R=[0,(le-1)]/PARS/NODC=2/DEST=W_Periodogram slice
 		powerspec=powerspec+W_periodogram
 		i=i+1
 	while(i<dimsize(spectrum,1))
-	powerspec[0]=nan
+	//powerspec[0]=nan
 	display powerspec; // SetAxis bottom 0,500
 
 end
@@ -933,7 +933,7 @@ closeallGraphs()
 sc_openInstrConnections(0)
 setFdacAWGSquareWave(fd, 1000, -1000, 0.01, 0.01, 0)
 setupAWG(fd, AWs="0", DACs="0", numCycles=1, verbose=1)
-ScanFastDAC(fd, 0, 1, "3", sweeprate=1,  use_awg=1,nosave = 0, repeats = 5)
+ScanFastDAC(fd, 0, 1, "3", sweeprate=1,  use_awg=1,nosave = 0, repeats = 10)
 
 //lock_in_main_2d(wave0_2d,1)
 //demodulate(filenum,1,"wa,[append2hdf])
