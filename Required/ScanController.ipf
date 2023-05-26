@@ -1234,11 +1234,11 @@ function scg_twosubplot(graphID, wave2name,[logy, logx])
 	AppendToGraph /W = $graphID /L=l2/B=b2 wave2 // vs something
 	
 	if(!paramisDefault(logy))
-		ModifyGraph log(l2)=2
+		ModifyGraph log(l2)=1
 	endif
 	
 	if(!paramisDefault(logx))
-		ModifyGraph log(b2)=2
+		ModifyGraph log(b2)=1
 	endif
 	
 	ModifyGraph /W = $graphID axisEnab(l2)={0.60,1}
