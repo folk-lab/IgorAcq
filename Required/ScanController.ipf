@@ -1184,7 +1184,7 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 		if (spectrum)
 			string ADCnum = wn[3,INF] //this line would specifically fail if this function was called for the calculated waves, but we dont care about it
 			string wn_powerspec = scfd_spectrum_analyzer($wn, mFreq, "pwrspec" + ADCnum)
-			scg_twosubplot(openGraphID, wn_powerspec)
+			scg_twosubplot(openGraphID, wn_powerspec, logy = 1)
 		endif
 		
 		// 2D graphs
@@ -1221,15 +1221,26 @@ function scg_arrangeWindows(graphIDs)
     doupdate
 end
 
-function scg_twosubplot(graphID, wave2name)
+function scg_twosubplot(graphID, wave2name,[logy, logx])
 //creates a subplot with an existing wave and GraphID with wave2
 //wave2 will appear on top
 	string graphID, wave2name
+	variable logy,logx
 	wave wave2 = $wave2name
+	
 	//variable minwave2 = wavemin(wave2)
 	
 	ModifyGraph /W = $graphID axisEnab(left)={0,0.40} //graphID wont work
 	AppendToGraph /W = $graphID /L=l2/B=b2 wave2 // vs something
+	
+	if(!paramisDefault(logy))
+		ModifyGraph log(l2)=2
+	endif
+	
+	if(!paramisDefault(logx))
+		ModifyGraph log(b2)=2
+	endif
+	
 	ModifyGraph /W = $graphID axisEnab(l2)={0.60,1}
 	ModifyGraph /W = $graphID freePos(l2)=0
 	//ModifyGraph /W = $graphID freePos(b2)={minwave2,l2}
@@ -3783,16 +3794,16 @@ function /s scfd_spectrum_analyzer(wave data, variable samp_freq, string wn)
 	
 	variable i=0
 	rowslice(spectrum,i)
-	DSPPeriodogram/R=[1,(le)] /DB/NODC=1/DEST=W_Periodogram slice  //there is a normalization flag
+	DSPPeriodogram/R=[0,(le-1)]/PARS/NODC=2/DEST=W_Periodogram slice  //there is a normalization flag
 	duplicate/o w_Periodogram, powerspec
 	i=1
 	do
 		rowslice(spectrum,i)
-		DSPPeriodogram/R=[1,(le)] /DB/NODC=1/DEST=W_Periodogram slice
+		DSPPeriodogram/R=[0,(le-1)]/PARS/NODC=2/DEST=W_Periodogram slice
 		powerspec = powerspec+W_periodogram
 		i=i+1
 	while(i<dimsize(spectrum,1))
-	powerspec[0]=nan
+	//powerspec[0]=nan
 	//display powerspec; // SetAxis bottom 0,500
 	duplicate /o powerspec, $wn
 	return wn
@@ -3903,7 +3914,7 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 		abort "Different number of raw wave names compared to calc wave names"
 	endif
 
-	nvar sc_ResampleFreqfadc, sc_demody
+	nvar sc_ResampleFreqfadc, sc_demody, sc_plotRaw
 	svar sc_nfreq, sc_nQs
 		
 	variable i = 0
@@ -3922,8 +3933,7 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			duplicate/o $rwn sc_tempwave
 			string ADCnum = rwn[3,INF]
 			
-			// for powerspec  //
-			scfd_spectrum_analyzer(sc_tempwave, ScanVars.measureFreq, "pwrspec" + ADCnum)
+
 			
 			if (fadcattr[str2num(ADCnum)][5] == 48) // checks which notch box is checked
 				scfd_notch_filters(sc_tempwave, ScanVars.measureFreq,Hzs=sc_nfreq, Qs=sc_nQs)
@@ -3975,7 +3985,21 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 				endif
 						
 			endif
-
+			
+			
+			//for powerspec//
+			variable avg_over = 5 //can specify the amount of rows that should be averaged over
+			
+			if (sc_plotRaw == 1)
+	
+				if (rowNum < avg_over)			
+					duplicate /O/R = [][0,rowNum] $(rwn + "_2d") powerspec2D
+				else
+					duplicate /O/R = [][rowNum-avg_over,rowNum] $(rwn + "_2d") powerspec2D
+				endif
+				
+				scfd_spectrum_analyzer(powerspec2D, ScanVars.measureFreq, "pwrspec" + ADCnum)
+			endif
 			
 	endfor	
 	if (!ScanVars.prevent_2d_graph_updates)
