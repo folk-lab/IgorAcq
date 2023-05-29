@@ -4390,8 +4390,8 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	SetDrawLayer userback
 	SetDrawEnv fsize=25, fstyle=1
 	DrawText 160, 45, "DAC"
-	SetDrawEnv fsize=25, fstyle=1
-	DrawText 546, 45, "ADC"
+	//SetDrawEnv fsize=25, fstyle=1
+	//DrawText 546, 45, "ADC"
 	DrawLine 385,15,385,385 
 	DrawLine 10,415,1050,415 /////EDIT 385-> 415
 	SetDrawEnv dash=7
@@ -4413,25 +4413,27 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	Button fdacramp,pos={150,384},size={65,20},proc=scfw_update_fdac,title="Ramp"
 	Button fdacrampzero,pos={255,384},size={80,20},proc=scfw_update_fdac,title="Ramp all 0" 
 	// ADC, 8 channels shown
-	SetDrawEnv fsize=14, fstyle=1
-	DrawText 405, 70, "Ch"
-	SetDrawEnv fsize=14, fstyle=1
-	DrawText 435, 70, "Input (mV)"
-	SetDrawEnv fsize=14, fstyle=1
-	DrawText 516, 70, "Record"
-	SetDrawEnv fsize=14, fstyle=1
-	DrawText 575, 70, "Wave Name"
-	SetDrawEnv fsize=14, fstyle=1
-	DrawText 663, 70, "Calc Function"
-	SetDrawEnv fsize=14, fstyle=1
-	DrawText 766, 70, "Notch"
-	SetDrawEnv fsize=14, fstyle=1
-	DrawText 825, 70, "Demod"
-	SetDrawEnv fsize=14, fstyle=1
-	DrawText 885, 70, "Harmonic"
-	SetDrawEnv fsize=14, fstyle=1
-	DrawText 970, 70, "Resamp"
-	ListBox fadclist,pos={400,75},size={650,180},fsize=14,frame=2,widths={30,80,60,85,100,60,60,85,60} //added two widths for resample and notch filter, changed listbox size, demod
+	SetDrawEnv fsize=14, fstyle=1, textrot = -60
+	DrawText 405, 62, "Ch"
+	SetDrawEnv fsize=14, fstyle=1, textrot = -60
+	DrawText 470, 63, "Input"
+	SetDrawEnv fsize=14, fstyle=1, textrot = -60
+	DrawText 455, 70, "(mV)"
+	SetDrawEnv fsize=14, fstyle=1, textrot = -60
+	DrawText 516, 66, "Record"
+	SetDrawEnv fsize=14, fstyle=1, textrot = -60
+	DrawText 575, 60, "Wave Name"
+	SetDrawEnv fsize=14, fstyle=1, textrot = -60
+	DrawText 663, 60, "Calc Function"
+	SetDrawEnv fsize=14, fstyle=1, textrot = -60
+	DrawText 766, 60, "Notch"
+	SetDrawEnv fsize=14, fstyle=1, textrot = -60
+	DrawText 825, 60, "Demod"
+	SetDrawEnv fsize=14, fstyle=1, textrot = -60
+	DrawText 885, 60, "Harmonic"
+	SetDrawEnv fsize=14, fstyle=1, textrot = -60
+	DrawText 950, 65, "Resamp"
+	ListBox fadclist,pos={400,75},size={600,180},fsize=14,frame=2,widths={30,70,30,95,100,30,30,20,30} //added two widths for resample and notch filter, changed listbox size, demod
 	
 	
 	ListBox fadclist,listwave=root:fadcvalstr,selwave=root:fadcattr,mode=1
