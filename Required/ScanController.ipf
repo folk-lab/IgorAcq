@@ -1184,7 +1184,7 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 		if (spectrum)
 			string ADCnum = wn[3,INF] //this line would specifically fail if this function was called for the calculated waves, but we dont care about it
 			string wn_powerspec = scfd_spectrum_analyzer($wn, mFreq, "pwrspec" + ADCnum)
-			scg_twosubplot(openGraphID, wn_powerspec, logy = 1)
+			scg_twosubplot(openGraphID, wn_powerspec, logy = 1, labelx = "Frequency (Hz)")
 		endif
 		
 		// 2D graphs
@@ -1221,17 +1221,21 @@ function scg_arrangeWindows(graphIDs)
     doupdate
 end
 
-function scg_twosubplot(graphID, wave2name,[logy, logx])
+function scg_twosubplot(graphID, wave2name,[logy, logx, labelx, labely])
 //creates a subplot with an existing wave and GraphID with wave2
 //wave2 will appear on top
-	string graphID, wave2name
+	string graphID, wave2name, labelx, labely
 	variable logy,logx
 	wave wave2 = $wave2name
 	
+	labelx = selectString(paramIsDefault(labelx), labelx, "")
+	labely = selectString(paramIsDefault(labely), labely, "")
 	//variable minwave2 = wavemin(wave2)
 	
 	ModifyGraph /W = $graphID axisEnab(left)={0,0.40} //graphID wont work
 	AppendToGraph /W = $graphID /L=l2/B=b2 wave2 // vs something
+	label b2 labelx
+	label l2 labely
 	
 	if(!paramisDefault(logy))
 		ModifyGraph log(l2)=1
@@ -1245,6 +1249,7 @@ function scg_twosubplot(graphID, wave2name,[logy, logx])
 	ModifyGraph /W = $graphID freePos(l2)=0
 	//ModifyGraph /W = $graphID freePos(b2)={minwave2,l2}
 	ModifyGraph /W = $graphID freePos(b2)={0,l2}
+
 end
 
 
