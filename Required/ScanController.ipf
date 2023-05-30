@@ -2234,17 +2234,6 @@ function scw_setupAWG(action) : Buttoncontrol
 	setupAWG(fdID, AWs=sc_AWs, DACs=sc_DACs, numCycles=sc_numcyclesawg, verbose=1)
 end
 
-function scw_clearAWG(action) : Buttoncontrol
-	string action
-	svar sc_instrID
-	nvar fdID = $sc_instrID
-	
-	fd_clearAWGwave(fdID, 0)
-	fd_clearAWGwave(fdID, 1)
-	
-end
-
-
 function scw_OpenInstrButton(action) : Buttoncontrol
 	string action
 	sc_openInstrConnections(1)
@@ -4433,8 +4422,8 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	DrawText 650, 45, "ADC"
 	DrawLine 385,15,385,580 
 	DrawLine 395,415,1000,415 /////EDIT 385-> 415
-	SetDrawEnv dash=7
-	Drawline 395,333,1050,333 /////EDIT 295 -> 320
+	SetDrawEnv dash=1
+	Drawline 395,333,1000,333 /////EDIT 295 -> 320
 	// DAC, 12 channels shown
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 15, 70, "Ch"
@@ -4522,20 +4511,19 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	DrawText 820, 595, "Press Update to save changes."
 
 	///AWG buttons
-	button squarewavefdac,pos={20,555},size={100,20},proc=scw_setupsquarewave,title="Set Square Wave"
-	button setupAWGfdac,pos={140,555},size={100,20},proc=scw_setupAWG,title="Setup AWG" 
-	button clearAWGfdac,pos={260,555},size={100,20},proc=scw_clearAWG,title="Clear AWG"
+	button squarewavefdac,pos={140,555},size={110,20},proc=scw_setupsquarewave,title="Set Square Wave"
+	button setupAWGfdac,pos={260,555},size={110,20},proc=scw_setupAWG,title="Setup AWG" 
 	
 	//AWG variables
-	SetVariable sc_instrIDbox, pos={10,455},size={130,20}, value=sc_instrID ,side=1,title="\Z14 Instrument ID" ,help={"fd, fd2, ...."}
-	SetVariable sc_AWsbox, pos={260,485},size={100,20}, value=sc_AWs ,side=1,title="\Z14 AWs"
-	SetVariable sc_DACsbox, pos={260,455},size={100,20}, value=sc_DACs ,side=1,title="\Z14 DACs"
-	SetVariable sc_maxawgBox,pos={10,485},size={130,20},value=sc_maxawg,side=1,title="\Z14 Max (mV)"
-	SetVariable sc_minawgBox,pos={10,515},size={130,20},value=sc_minawg,side=1,title="\Z14 Min (mV)"
-	SetVariable sc_maxtawgBox,pos={150,485},size={100,20},value=sc_maxtawg,side=1,title="\Z14 Time"
-	SetVariable sc_mintawgBox,pos={150,515},size={100,20},value=sc_mintawg,side=1,title="\Z14 Time"
-	SetVariable sc_wnumawgBox,pos={150,455},size={100,20},value=sc_wnumawg,side=1,title="\Z14 W.Num"
-	SetVariable sc_numcyclesawgBox,pos={260,515},size={100,20},value=sc_numcyclesawg,side=1,title="\Z14 # Cycles"
+	SetVariable sc_instrIDbox, pos={10,455},size={130,20}, value=sc_instrID ,side=1,title="\Z14Instrument ID" ,help={"fd, fd2, ...."}
+	SetVariable sc_AWsbox, pos={260,485},size={110,20}, value=sc_AWs ,side=1,title="\Z14Select AWs", help={"CSV for AWs to select which AWs (0,1) to use."}
+	SetVariable sc_DACsbox, pos={260,455},size={110,20}, value=sc_DACs ,side=1,title="\Z14Select DACs", help={"CSV sets for DACS e.g. \"02, 1\" for DACs 0, 2 to output AW0, and DAC 1 to output AW1"}
+	SetVariable sc_maxawgBox,pos={10,485},size={130,20},value=sc_maxawg,side=1,title="\Z14Max (mV)" 
+	SetVariable sc_minawgBox,pos={10,515},size={130,20},value=sc_minawg,side=1,title="\Z14Min (mV)"
+	SetVariable sc_maxtawgBox,pos={150,485},size={100,20},value=sc_maxtawg,side=1,title="\Z14Time", help={"width at maximum voltage"}
+	SetVariable sc_mintawgBox,pos={150,515},size={100,20},value=sc_mintawg,side=1,title="\Z14Time", help={"width at minimum voltage"}
+	SetVariable sc_wnumawgBox,pos={150,455},size={100,20},value=sc_wnumawg,side=1,title="\Z14Set AW", help={"0 or 1"}
+	SetVariable sc_numcyclesawgBox,pos={260,515},size={110,20},value=sc_numcyclesawg,side=1,title="\Z14# of Cycles"
 endmacro
 
 	// set update speed for ADCs
