@@ -2216,6 +2216,15 @@ Window ScanController(v_left,v_right,v_top,v_bottom) : Panel
 
 EndMacro
 
+function scw_setupsquarewave(action) : Buttoncontrol
+	string action
+	svar sc_instrID, sc_AWs, sc_DACs
+	nvar sc_maxawg, sc_minawg, sc_maxtawg, sc_mintawg, sc_wnumawg, sc_numcyclesawg 
+	nvar fdID = $sc_instrID
+	setFdacAWGSquareWave(fdID, sc_maxawg, sc_minawg, sc_maxtawg, sc_mintawg, sc_wnumawg)
+	setupAWG(fdID, AWs=sc_AWs, DACs=sc_DACs, numCycles=sc_numcyclesawg, verbose=1)
+end
+
 
 function scw_OpenInstrButton(action) : Buttoncontrol
 	string action
@@ -4387,7 +4396,7 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	variable v_left,v_right,v_top,v_bottom
 	PauseUpdate; Silent 1 // pause everything else, while building the window
 	//NewPanel/w=(0,0,790,630)/n=ScanControllerFastDAC // window size ////// EDIT 570 -> 600
-	NewPanel/w=(0,0,1060,630)/n=ScanControllerFastDAC
+	NewPanel/w=(0,0,1010,600)/n=ScanControllerFastDAC
 	if(v_left+v_right+v_top+v_bottom > 0)
 		MoveWindow/w=ScanControllerFastDAC v_left,v_top,V_right,v_bottom
 	endif
@@ -4397,8 +4406,8 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	DrawText 160, 45, "DAC"
 	SetDrawEnv fsize=25, fstyle=1
 	DrawText 650, 45, "ADC"
-	DrawLine 385,15,385,385 
-	DrawLine 10,415,1050,415 /////EDIT 385-> 415
+	DrawLine 385,15,385,580 
+	DrawLine 395,415,1000,415 /////EDIT 385-> 415
 	SetDrawEnv dash=7
 	Drawline 395,333,1050,333 /////EDIT 295 -> 320
 	// DAC, 12 channels shown
@@ -4418,15 +4427,15 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	Button fdacramp,pos={150,384},size={65,20},proc=scfw_update_fdac,title="Ramp"
 	Button fdacrampzero,pos={255,384},size={80,20},proc=scfw_update_fdac,title="Ramp all 0" 
 	// ADC, 8 channels shown
-	SetDrawEnv fsize=14, fstyle=1//, textrot = -60
+	SetDrawEnv fsize=14, fstyle=1
 	DrawText 405, 70, "Ch"
-	SetDrawEnv fsize=14, fstyle=1//, //textrot = -60
+	SetDrawEnv fsize=14, fstyle=1
 	DrawText 450, 70, "Input (mV)"
 	SetDrawEnv fsize=14, fstyle=1, textrot = -60
 	DrawText 550, 75, "Record"
-	SetDrawEnv fsize=14, fstyle=1//, textrot = -60
+	SetDrawEnv fsize=14, fstyle=1
 	DrawText 590, 70, "Wave Name"
-	SetDrawEnv fsize=14, fstyle=1//, textrot = -60
+	SetDrawEnv fsize=14, fstyle=1
 	DrawText 705, 70, "Calc Function"
 	SetDrawEnv fsize=14, fstyle=1, textrot = -60
 	DrawText 850, 75, "Notch"
@@ -4448,7 +4457,7 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	SetVariable sc_nfreqBox,pos={698,300},size={150,20}, value=sc_nfreq ,side=1,title="\Z14 Notch Freqs" ,help={"seperate frequencies (Hz) with , "}
 	SetVariable sc_nQsBox,pos={540,300},size={140,20}, value=sc_nQs ,side=1,title="\Z14 Notch Qs" ,help={"seperate Qs with , "}
 	DrawText 807,277, "\Z14\$WMTEX$ {}^{o} $/WMTEX$" 
-	DrawText 987,283, "\Z14Hz" 
+	DrawText 982,283, "\Z14Hz" 
 	
 	popupMenu fadcSetting1,pos={420,345},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD1 speed",size={100,20},value=sc_fadcSpeed1 
 	popupMenu fadcSetting2,pos={620,345},proc=scfw_scfw_update_fadcSpeed,mode=1,title="\Z14FD2 speed",size={100,20},value=sc_fadcSpeed2 
@@ -4467,22 +4476,36 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	// all function calls are to ScanController functions
 	// instrument communication
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 15, 445, "Connect Instrument" 
-	SetDrawEnv fsize=14, fstyle=1 
-	DrawText 265, 445, "Open GUI" 
+	DrawText 15, 445, "Arbitrary Wave Generator"
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 515, 445, "Log Status" 
-	ListBox sc_InstrFdac,pos={10,450},size={770,100},fsize=14,frame=2,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1, editStyle=1
+	DrawText 415, 445, "Connect Instrument" 
+	SetDrawEnv fsize=14, fstyle=1 
+	DrawText 635, 445, "Open GUI" 
+	SetDrawEnv fsize=14, fstyle=1
+	DrawText 825, 445, "Log Status" 
+	ListBox sc_InstrFdac,pos={400,450},size={600,100},fsize=14,frame=2,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1, editStyle=1
 
 	// buttons
-	button connectfdac,pos={10,555},size={140,20},proc=scw_OpenInstrButton,title="Connect Instr" 
-	button guifdac,pos={160,555},size={140,20},proc=scw_OpenGUIButton,title="Open All GUI" 
-	button killaboutfdac, pos={310,555},size={160,20},proc=sc_controlwindows,title="Kill Sweep Controls" 
-	button killgraphsfdac, pos={480,555},size={150,20},proc=scw_killgraphs,title="Close All Graphs" 
-	button updatebuttonfdac, pos={640,555},size={140,20},proc=scw_updatewindow,title="Update" 
+	button squarewave,pos={15,555},size={100,20},proc=scw_setupsquarewave,title="Set Square Wave" 
+	button connectfdac,pos={400,555},size={110,20},proc=scw_OpenInstrButton,title="Connect Instr" 
+	button guifdac,pos={520,555},size={110,20},proc=scw_OpenGUIButton,title="Open All GUI" 
+	button killaboutfdac, pos={640,555},size={120,20},proc=sc_controlwindows,title="Kill Sweep Controls" 
+	button killgraphsfdac, pos={770,555},size={110,20},proc=scw_killgraphs,title="Close All Graphs" 
+	button updatebuttonfdac, pos={890,555},size={110,20},proc=scw_updatewindow,title="Update" 
 
 	// helpful text
-	DrawText 10, 595, "Press Update to save changes." 
+	DrawText 820, 595, "Press Update to save changes." 
+	
+	//AWG variables
+	SetVariable sc_instrIDbox, pos={10,455},size={130,20}, value=sc_instrID ,side=1,title="\Z14 Instrument ID" ,help={"fd, fd2, ...."}
+	SetVariable sc_AWsbox, pos={150,455},size={100,20}, value=sc_AWs ,side=1,title="\Z14 AWs"
+	SetVariable sc_DACsbox, pos={260,455},size={100,20}, value=sc_DACs ,side=1,title="\Z14 DACs"
+	SetVariable sc_maxawgBox,pos={10,485},size={130,20},value=sc_maxawg,side=1,title="\Z14 Max (mV)"
+	SetVariable sc_minawgBox,pos={10,515},size={130,20},value=sc_minawg,side=1,title="\Z14 Min (mV)"
+	SetVariable sc_maxtawgBox,pos={150,485},size={100,20},value=sc_maxtawg,side=1,title="\Z14 Time"
+	SetVariable sc_mintawgBox,pos={150,515},size={100,20},value=sc_mintawg,side=1,title="\Z14 Time"
+	SetVariable sc_wnumawgBox,pos={260,485},size={100,20},value=sc_wnumawg,side=1,title="\Z14 W.Num"
+	SetVariable sc_numcyclesawgBox,pos={260,515},size={100,20},value=sc_numcyclesawg,side=1,title="\Z14 # Cycles"
 endmacro
 
 	// set update speed for ADCs
@@ -4718,8 +4741,17 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	variable/g sc_demody = 0
 	variable/g sc_plotRaw = 0
 	variable/g sc_ResampleFreqfadc = 100 // Resampling frequency if using resampling
+	variable /g sc_maxawg = 100
+	variable /g sc_minawg = -100
+	variable /g sc_maxtawg = 0.01
+	variable /g sc_mintawg = 0.01
+	variable /g sc_wnumawg = 0
+	variable /g sc_numcyclesawg = 1
 	string /g sc_nfreq = "60,180,300"
 	string /g sc_nQs = "50,150,250"
+	string /g sc_instrID = "fd"
+	string /g sc_AWs = "0"
+	string /g sc_DACs = "0"
 
 
 	// clean up
