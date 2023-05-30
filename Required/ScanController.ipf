@@ -3070,7 +3070,7 @@ function scc_CheckAWG(AWG, S)
 	
 	string AWdacs  // Used for storing all DACS for 1 channel  e.g. "123" = Dacs 1,2,3
 	string err_msg
-	variable i=0, j=0
+	variable i=0, j=0, k=0
 	
 	// Assert separators are correct
 	scu_assertSeparatorType(AWG.AW_DACs, ",")
@@ -3124,11 +3124,17 @@ function scc_CheckAWG(AWG, S)
 		AWdacs = stringfromlist(i, AWG.AW_Dacs, ",")
 		string wn = fd_getAWGwave(str2num(stringfromlist(i, AWG.AW_Waves, ",")))  // Get IGOR wave of AW#
 		wave w = $wn
+		
+		if(dimsize(w,0) == 0)
+			print("square wave " + wn +" does not exist. Set it up in ScanFastDAC Window or set  \"use_awg = 0\" ")
+			abort
+		endif
+		
 		duplicate/o/r=[0][] w setpoints  							// Just get setpoints part
 		for(j=0;j<strlen(AWdacs);j++)  // Check for each DAC that will be outputting this wave
 			ch_num = str2num(AWdacs[j])
 			splitstring/e=(expr) fdacvalstr[ch_num][2], softLimitNegative, softLimitPositive
-			for(j=0;j<numpnts(setpoints);j++)	// Check against each setpoint in AW
+			for(k=0;k<numpnts(setpoints);k++)	// Check against each setpoint in AW
 				if(setpoint < str2num(softLimitNegative) || setpoint > str2num(softLimitPositive))
 					// we are outside limits
 					sprintf question, "DAC channel %s will be ramped outside software limits. Continue?", AWdacs[j]
