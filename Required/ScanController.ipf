@@ -1280,7 +1280,7 @@ function scg_open1Dgraph(wn, x_label, [y_label, append_wn])
     display $wn
     
     if (cmpstr(append_wn, ""))
-    	appendtograph $append_wn
+    	appendtograph /r $append_wn
     	makecolorful()
     	legend
     endif
@@ -2218,13 +2218,21 @@ EndMacro
 
 function scw_setupsquarewave(action) : Buttoncontrol
 	string action
-	svar sc_instrID, sc_AWs, sc_DACs
-	nvar sc_maxawg, sc_minawg, sc_maxtawg, sc_mintawg, sc_wnumawg, sc_numcyclesawg 
+	svar sc_instrID
+	nvar sc_maxawg, sc_minawg, sc_maxtawg, sc_mintawg, sc_wnumawg
 	nvar fdID = $sc_instrID
+	
 	setFdacAWGSquareWave(fdID, sc_maxawg, sc_minawg, sc_maxtawg, sc_mintawg, sc_wnumawg)
-	setupAWG(fdID, AWs=sc_AWs, DACs=sc_DACs, numCycles=sc_numcyclesawg, verbose=1)
 end
 
+function scw_setupAWG(action) : Buttoncontrol
+	string action
+	svar sc_instrID, sc_AWs, sc_DACs
+	nvar  sc_numcyclesawg 
+	nvar fdID = $sc_instrID
+	
+	setupAWG(fdID, AWs=sc_AWs, DACs=sc_DACs, numCycles=sc_numcyclesawg, verbose=1)
+end
 
 function scw_OpenInstrButton(action) : Buttoncontrol
 	string action
@@ -3051,7 +3059,7 @@ function scc_CheckAWG(AWG, S)
 	
 	string AWdacs  // Used for storing all DACS for 1 channel  e.g. "123" = Dacs 1,2,3
 	string err_msg
-	variable i=0, j=0
+	variable i=0, j=0, k=0
 	
 	// Assert separators are correct
 	scu_assertSeparatorType(AWG.AW_DACs, ",")
@@ -3105,11 +3113,17 @@ function scc_CheckAWG(AWG, S)
 		AWdacs = stringfromlist(i, AWG.AW_Dacs, ",")
 		string wn = fd_getAWGwave(str2num(stringfromlist(i, AWG.AW_Waves, ",")))  // Get IGOR wave of AW#
 		wave w = $wn
+		
+		if(dimsize(w,0) == 0)
+			print("square wave " + wn +" does not exist. Set it up in ScanFastDAC Window or set  \"use_awg = 0\" ")
+			abort
+		endif
+		
 		duplicate/o/r=[0][] w setpoints  							// Just get setpoints part
 		for(j=0;j<strlen(AWdacs);j++)  // Check for each DAC that will be outputting this wave
 			ch_num = str2num(AWdacs[j])
 			splitstring/e=(expr) fdacvalstr[ch_num][2], softLimitNegative, softLimitPositive
-			for(j=0;j<numpnts(setpoints);j++)	// Check against each setpoint in AW
+			for(k=0;k<numpnts(setpoints);k++)	// Check against each setpoint in AW
 				if(setpoint < str2num(softLimitNegative) || setpoint > str2num(softLimitPositive))
 					// we are outside limits
 					sprintf question, "DAC channel %s will be ramped outside software limits. Continue?", AWdacs[j]
@@ -4408,8 +4422,8 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	DrawText 650, 45, "ADC"
 	DrawLine 385,15,385,580 
 	DrawLine 395,415,1000,415 /////EDIT 385-> 415
-	SetDrawEnv dash=7
-	Drawline 395,333,1050,333 /////EDIT 295 -> 320
+	SetDrawEnv dash=1
+	Drawline 395,333,1000,333 /////EDIT 295 -> 320
 	// DAC, 12 channels shown
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 15, 70, "Ch"
@@ -4486,7 +4500,7 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	ListBox sc_InstrFdac,pos={400,450},size={600,100},fsize=14,frame=2,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1, editStyle=1
 
 	// buttons
-	button squarewave,pos={15,555},size={100,20},proc=scw_setupsquarewave,title="Set Square Wave" 
+		  
 	button connectfdac,pos={400,555},size={110,20},proc=scw_OpenInstrButton,title="Connect Instr" 
 	button guifdac,pos={520,555},size={110,20},proc=scw_OpenGUIButton,title="Open All GUI" 
 	button killaboutfdac, pos={640,555},size={120,20},proc=sc_controlwindows,title="Kill Sweep Controls" 
@@ -4494,18 +4508,22 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	button updatebuttonfdac, pos={890,555},size={110,20},proc=scw_updatewindow,title="Update" 
 
 	// helpful text
-	DrawText 820, 595, "Press Update to save changes." 
+	DrawText 820, 595, "Press Update to save changes."
+
+	///AWG buttons
+	button squarewavefdac,pos={140,555},size={110,20},proc=scw_setupsquarewave,title="Set Square Wave"
+	button setupAWGfdac,pos={260,555},size={110,20},proc=scw_setupAWG,title="Setup AWG" 
 	
 	//AWG variables
-	SetVariable sc_instrIDbox, pos={10,455},size={130,20}, value=sc_instrID ,side=1,title="\Z14 Instrument ID" ,help={"fd, fd2, ...."}
-	SetVariable sc_AWsbox, pos={150,455},size={100,20}, value=sc_AWs ,side=1,title="\Z14 AWs"
-	SetVariable sc_DACsbox, pos={260,455},size={100,20}, value=sc_DACs ,side=1,title="\Z14 DACs"
-	SetVariable sc_maxawgBox,pos={10,485},size={130,20},value=sc_maxawg,side=1,title="\Z14 Max (mV)"
-	SetVariable sc_minawgBox,pos={10,515},size={130,20},value=sc_minawg,side=1,title="\Z14 Min (mV)"
-	SetVariable sc_maxtawgBox,pos={150,485},size={100,20},value=sc_maxtawg,side=1,title="\Z14 Time"
-	SetVariable sc_mintawgBox,pos={150,515},size={100,20},value=sc_mintawg,side=1,title="\Z14 Time"
-	SetVariable sc_wnumawgBox,pos={260,485},size={100,20},value=sc_wnumawg,side=1,title="\Z14 W.Num"
-	SetVariable sc_numcyclesawgBox,pos={260,515},size={100,20},value=sc_numcyclesawg,side=1,title="\Z14 # Cycles"
+	SetVariable sc_instrIDbox, pos={10,455},size={130,20}, value=sc_instrID ,side=1,title="\Z14Instrument ID" ,help={"fd, fd2, ...."}
+	SetVariable sc_AWsbox, pos={260,485},size={110,20}, value=sc_AWs ,side=1,title="\Z14Select AWs", help={"CSV for AWs to select which AWs (0,1) to use."}
+	SetVariable sc_DACsbox, pos={260,455},size={110,20}, value=sc_DACs ,side=1,title="\Z14Select DACs", help={"CSV sets for DACS e.g. \"02, 1\" for DACs 0, 2 to output AW0, and DAC 1 to output AW1"}
+	SetVariable sc_maxawgBox,pos={10,485},size={130,20},value=sc_maxawg,side=1,title="\Z14Max (mV)" 
+	SetVariable sc_minawgBox,pos={10,515},size={130,20},value=sc_minawg,side=1,title="\Z14Min (mV)"
+	SetVariable sc_maxtawgBox,pos={150,485},size={100,20},value=sc_maxtawg,side=1,title="\Z14Time", help={"width at maximum voltage"}
+	SetVariable sc_mintawgBox,pos={150,515},size={100,20},value=sc_mintawg,side=1,title="\Z14Time", help={"width at minimum voltage"}
+	SetVariable sc_wnumawgBox,pos={150,455},size={100,20},value=sc_wnumawg,side=1,title="\Z14Set AW", help={"0 or 1"}
+	SetVariable sc_numcyclesawgBox,pos={260,515},size={110,20},value=sc_numcyclesawg,side=1,title="\Z14# of Cycles"
 endmacro
 
 	// set update speed for ADCs
