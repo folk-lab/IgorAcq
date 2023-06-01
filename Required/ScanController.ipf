@@ -2219,22 +2219,75 @@ Window ScanController(v_left,v_right,v_top,v_bottom) : Panel
 
 EndMacro
 
-function scw_setupsquarewave(action) : Buttoncontrol
+function scw_setupsquarewave0(action) : Buttoncontrol
 	string action
-	svar sc_instrID
-	nvar sc_maxawg, sc_minawg, sc_maxtawg, sc_mintawg, sc_wnumawg
-	nvar fdID = $sc_instrID
 	
-	setFdacAWGSquareWave(fdID, sc_maxawg, sc_minawg, sc_maxtawg, sc_mintawg, sc_wnumawg)
+	wave /t awgsetvalstr
+	nvar fdID = $(awgsetvalstr[0][1])  //this needs to change
+	
+	wave /t awgvalstr
+	variable v0    = str2num(awgvalstr[2][0])
+	variable vP    = str2num(awgvalstr[1][0])
+	variable vM    = str2num(awgvalstr[3][0])
+	variable v0len = str2num(awgvalstr[2][1]) / 1000
+	variable vPlen = str2num(awgvalstr[1][1]) / 1000
+	variable vMlen = str2num(awgvalstr[3][1]) / 1000
+	
+	//setFdacAWGSquareWave(fdID, sc_maxawg, sc_minawg, sc_maxtawg, sc_mintawg, sc_wnumawg)
+	
+	makeSquareWaveAWG(fdID, v0, vP, vM, v0len, vPlen, vMlen, 0, ramplen = 0)
 end
+
+function scw_setupsquarewave1(action) : Buttoncontrol
+	string action
+	
+	wave /t awgsetvalstr
+	nvar fdID = $(awgsetvalstr[0][1])  //this needs to change
+	
+	wave /t awgvalstr
+	variable v0    = str2num(awgvalstr[2][0])
+	variable vP    = str2num(awgvalstr[1][0])
+	variable vM    = str2num(awgvalstr[3][0])
+	variable v0len = str2num(awgvalstr[2][1]) / 1000
+	variable vPlen = str2num(awgvalstr[1][1]) / 1000
+	variable vMlen = str2num(awgvalstr[3][1]) / 1000
+	
+	//setFdacAWGSquareWave(fdID, sc_maxawg, sc_minawg, sc_maxtawg, sc_mintawg, sc_wnumawg)
+	
+	makeSquareWaveAWG(fdID, v0, vP, vM, v0len, vPlen, vMlen, 1, ramplen = 0)
+	
+end
+
 
 function scw_setupAWG(action) : Buttoncontrol
 	string action
-	svar sc_instrID, sc_AWs, sc_DACs
-	nvar  sc_numcyclesawg 
-	nvar fdID = $sc_instrID
+	//svar sc_instrID, sc_AWs, sc_DACs
+	//nvar  sc_numcyclesawg 
+	//nvar fdID = $sc_instrID
 	
-	setupAWG(fdID, AWs=sc_AWs, DACs=sc_DACs, numCycles=sc_numcyclesawg, verbose=1)
+	wave /t awgsetvalstr
+	nvar fdID = $(awgsetvalstr[0][1])
+	string AWs = awgsetvalstr[1][1]
+	string DACs = awgsetvalstr[2][1]
+	variable Cycles = str2num(awgsetvalstr[3][1])
+	
+	setupAWG(fdID, AWs=AWs, DACs=DACs, numCycles=Cycles, verbose=1)
+end
+
+function scw_setupLockIn(action) : Buttoncontrol
+	string action
+	wave /t LIvalstr
+	string fdIDname = LIvalstr[1][0]
+	variable Amp    = str2num(LIvalstr[1][1])
+	variable sTime  = str2num(LIvalstr[1][2])
+	string DACs     = LIvalstr[1][3]
+	variable Cycles = str2num(LIvalstr[1][4])
+	nvar fdID = $fdIDname
+	
+	sTime /= 1000
+	
+	setFdacAWGSquareWave(fdID, Amp, -Amp, sTime, sTime, 0)
+	setupAWG(fdID, AWs="0", DACs=DACs, numCycles=Cycles, verbose=1)
 end
 
 function scw_OpenInstrButton(action) : Buttoncontrol
@@ -4413,7 +4466,7 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	variable v_left,v_right,v_top,v_bottom
 	PauseUpdate; Silent 1 // pause everything else, while building the window
 	//NewPanel/w=(0,0,790,630)/n=ScanControllerFastDAC // window size ////// EDIT 570 -> 600
-	NewPanel/w=(0,0,1010,700)/n=ScanControllerFastDAC
+	NewPanel/w=(0,0,1010,610)/n=ScanControllerFastDAC
 	if(v_left+v_right+v_top+v_bottom > 0)
 		MoveWindow/w=ScanControllerFastDAC v_left,v_top,V_right,v_bottom
 	endif
@@ -4492,8 +4545,8 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	// identical to ScanController window
 	// all function calls are to ScanController functions
 	// instrument communication
-	SetDrawEnv fsize=14, fstyle=1
-	DrawText 15, 545, "Arbitrary Wave Generator"
+	//SetDrawEnv fsize=14, fstyle=1
+	//DrawText 15, 545, "Arbitrary Wave Generator"
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 415, 445, "Connect Instrument" 
 	SetDrawEnv fsize=14, fstyle=1 
@@ -4516,26 +4569,32 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	
 	/// Lock in stuff
 	//ListBox sc_InstrFdac,pos={400,450},size={600,100},fsize=14,frame=2,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1, editStyle=1
-	ListBox awgLIlist,pos={70,450},size={300,50},fsize=14,frame=2,widths={40,40,65,40,50}
-	ListBox awgLIlist,listwave=root:awgLIvalstr,selwave=root:awgLIattr,mode=1
+	ListBox LIlist,pos={70,420},size={300,50},fsize=14,frame=2,widths={40,40,65,40,50}
+	ListBox LIlist,listwave=root:LIvalstr,selwave=root:LIattr,mode=1
 	//awgLIvalstr
+	//AWGvalstr
+	ListBox awglist,pos={70,480},size={140,120},fsize=14,frame=2,widths={40,60}
+	ListBox awglist,listwave=root:awgvalstr,selwave=root:awgattr,mode=1
+	
+	ListBox awgsetlist,pos={240,480},size={130,95},fsize=14,frame=2,widths={50,40}
+	ListBox awgsetlist,listwave=root:awgsetvalstr,selwave=root:awgsetattr,mode=1
 	
 	///AWG buttons
-	button squarewavefdac,pos={140,655},size={110,20},proc=scw_setupsquarewave,title="Create Square Wave"
-	button setupAWGfdac,pos={260,655},size={110,20},proc=scw_setupAWG,title="Setup AWG"
-	
-	button setupLI,pos={10,450},size={53,50},proc=scw_OpenInstrButton,title="\f01 Set\rLock-In" 
+	button setupAW0,pos={10,490},size={53,40},proc=scw_setupsquarewave0,title="Create\rAW0"
+	button setupAW1,pos={10,550},size={53,40},proc=scw_setupsquarewave1,title="Create\rAW1"
+	button setupAWGfdac,pos={260,580},size={110,20},proc=scw_setupAWG,title="Setup AWG"
+	button setupLI,pos={10,420},size={53,40},proc=scw_setupLockIn,title="Set\rLock-In" 
 	
 	//AWG variables
-	SetVariable sc_instrIDbox, pos={10,555},size={130,20}, value=sc_instrID ,side=1,title="\Z14Instrument ID" ,help={"fd, fd2, ...."}
-	SetVariable sc_AWsbox, pos={260,585},size={110,20}, value=sc_AWs ,side=1,title="\Z14Select AWs", help={"CSV for AWs to select which AWs (0,1) to use."}
-	SetVariable sc_DACsbox, pos={260,555},size={110,20}, value=sc_DACs ,side=1,title="\Z14Select DACs", help={"CSV sets for DACS e.g. \"02, 1\" for DACs 0, 2 to output AW0, and DAC 1 to output AW1"}
-	SetVariable sc_maxawgBox,pos={10,585},size={130,20},value=sc_maxawg,side=1,title="\Z14Max (mV)" 
-	SetVariable sc_minawgBox,pos={10,615},size={130,20},value=sc_minawg,side=1,title="\Z14Min (mV)"
-	SetVariable sc_maxtawgBox,pos={150,585},size={100,20},value=sc_maxtawg,side=1,title="\Z14Time", help={"width at maximum voltage"}
-	SetVariable sc_mintawgBox,pos={150,615},size={100,20},value=sc_mintawg,side=1,title="\Z14Time", help={"width at minimum voltage"}
-	SetVariable sc_wnumawgBox,pos={150,555},size={100,20},value=sc_wnumawg,side=1,title="\Z14Set AW", help={"0 or 1"}
-	SetVariable sc_numcyclesawgBox,pos={260,615},size={110,20},value=sc_numcyclesawg,side=1,title="\Z14# of Cycles"
+	//SetVariable sc_instrIDbox, pos={10,555},size={130,20}, value=sc_instrID ,side=1,title="\Z14Instrument ID" ,help={"fd, fd2, ...."}
+	//SetVariable sc_AWsbox, pos={260,585},size={110,20}, value=sc_AWs ,side=1,title="\Z14Select AWs", help={"CSV for AWs to select which AWs (0,1) to use."}
+	//SetVariable sc_DACsbox, pos={260,555},size={110,20}, value=sc_DACs ,side=1,title="\Z14Select DACs", help={"CSV sets for DACS e.g. \"02, 1\" for DACs 0, 2 to output AW0, and DAC 1 to output AW1"}
+	//SetVariable sc_maxawgBox,pos={10,585},size={130,20},value=sc_maxawg,side=1,title="\Z14Max (mV)" 
+	//SetVariable sc_minawgBox,pos={10,615},size={130,20},value=sc_minawg,side=1,title="\Z14Min (mV)"
+	//SetVariable sc_maxtawgBox,pos={150,585},size={100,20},value=sc_maxtawg,side=1,title="\Z14Time", help={"width at maximum voltage"}
+	//SetVariable sc_mintawgBox,pos={150,615},size={100,20},value=sc_mintawg,side=1,title="\Z14Time", help={"width at minimum voltage"}
+	//SetVariable sc_wnumawgBox,pos={150,555},size={100,20},value=sc_wnumawg,side=1,title="\Z14Set AW", help={"0 or 1"}
+	//SetVariable sc_numcyclesawgBox,pos={260,615},size={110,20},value=sc_numcyclesawg,side=1,title="\Z14# of Cycles"
 endmacro
 
 	// set update speed for ADCs
@@ -4766,17 +4825,35 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	concatenate/o {fadcattr0,fadcattr0,fadcattr2,fadcattr1,fadcattr1, fadcattr2, fadcattr2, fadcattr1, fadcattr2}, fadcattr // added fadcattr2 twice for two checkbox commands?
 	
 	
-	// create waves for AWG stuff
-	make/o/t/n=(2,5) awgLIvalstr
-	awgLIvalstr[0][0] = "fdID"
-	awgLIvalstr[0][1] = "Amp"
-	awgLIvalstr[0][2] = "Time (ms)"
-	awgLIvalstr[0][3] = "DACs"
-	awgLIvalstr[0][4] = "Cycles"
+	// create waves for LI
+	make/o/t/n=(2,5) LIvalstr
+	LIvalstr[0][0] = "fdID"
+	LIvalstr[0][1] = "Amp"
+	LIvalstr[0][2] = "Time (ms)"
+	LIvalstr[0][3] = "DACs"
+	LIvalstr[0][4] = "Cycles"
 	
-	make/o/n=(2,5) awgLIattr = 0
-	awgLIattr[1][] = 2
+	make/o/n=(2,5) LIattr = 0
+	LIattr[1][] = 2
 
+	// create waves for AWG
+	make/o/t/n=(5,2) AWGvalstr
+	AWGvalstr[0][0] = "Amp"
+	AWGvalstr[0][1] = "Time (ms)"
+	
+	make/o/n=(5,2) AWGattr = 2
+	AWGattr[0][] = 0
+	
+	// create waves for AWGset
+	make/o/t/n=(4,2) AWGsetvalstr
+	AWGsetvalstr[0][0] = "fdID"
+	AWGsetvalstr[1][0] = "AWs"
+	AWGsetvalstr[2][0] = "DACs"
+	AWGsetvalstr[3][0] = "Cycles"
+	
+	make/o/n=(4,2) AWGsetattr = 0
+	AWGsetattr[][1] = 2
+	
 	variable/g sc_printfadc = 0
 	variable/g sc_saverawfadc = 0
 	variable/g sc_demodphi = 0
@@ -4791,9 +4868,9 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	variable/g sc_numcyclesawg = 1
 	string /g sc_nfreq = "60,180,300"
 	string /g sc_nQs = "50,150,250"
-	string /g sc_instrID = "fd"
-	string /g sc_AWs = "0"
-	string /g sc_DACs = "0"
+	string /g sc_instrID = "fd" //likely dont need this
+	string /g sc_AWs = "0"      //likely dont need this
+	string /g sc_DACs = "0"     //likely dont need this
 
 
 	// clean up
