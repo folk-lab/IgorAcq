@@ -1432,6 +1432,7 @@ function setFdacAWGSquareWave(instrID, v1, v2, v1len, v2len, wave_num)
    fd_clearAWGwave(instrID, wave_num)
    fd_addAWGwave(instrID, wave_num, awg_sqw)
    printf "Set square wave on AWG_wave%d\r", wave_num
+   
 end
 
 

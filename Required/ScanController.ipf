@@ -863,8 +863,11 @@ function initializeScan(S, [init_graphs])
     variable fastdac
 
     // Kill and reopen connections (solves some common issues)
-    killVISA()
-    sc_OpenInstrConnections(0)
+//    killVISA()
+//    
+//    sc_sleep(1)
+//    
+//    sc_OpenInstrConnections(0)
 
     // Make sure waves exist to store data
     sci_initializeWaves(S)
@@ -4410,7 +4413,7 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	variable v_left,v_right,v_top,v_bottom
 	PauseUpdate; Silent 1 // pause everything else, while building the window
 	//NewPanel/w=(0,0,790,630)/n=ScanControllerFastDAC // window size ////// EDIT 570 -> 600
-	NewPanel/w=(0,0,1010,600)/n=ScanControllerFastDAC
+	NewPanel/w=(0,0,1010,700)/n=ScanControllerFastDAC
 	if(v_left+v_right+v_top+v_bottom > 0)
 		MoveWindow/w=ScanControllerFastDAC v_left,v_top,V_right,v_bottom
 	endif
@@ -4490,7 +4493,7 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	// all function calls are to ScanController functions
 	// instrument communication
 	SetDrawEnv fsize=14, fstyle=1
-	DrawText 15, 445, "Arbitrary Wave Generator"
+	DrawText 15, 545, "Arbitrary Wave Generator"
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 415, 445, "Connect Instrument" 
 	SetDrawEnv fsize=14, fstyle=1 
@@ -4509,21 +4512,30 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 
 	// helpful text
 	DrawText 820, 595, "Press Update to save changes."
-
+	
+	
+	/// Lock in stuff
+	//ListBox sc_InstrFdac,pos={400,450},size={600,100},fsize=14,frame=2,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1, editStyle=1
+	ListBox awgLIlist,pos={70,450},size={300,50},fsize=14,frame=2,widths={40,40,65,40,50}
+	ListBox awgLIlist,listwave=root:awgLIvalstr,selwave=root:awgLIattr,mode=1
+	//awgLIvalstr
+	
 	///AWG buttons
-	button squarewavefdac,pos={140,555},size={110,20},proc=scw_setupsquarewave,title="Set Square Wave"
-	button setupAWGfdac,pos={260,555},size={110,20},proc=scw_setupAWG,title="Setup AWG" 
+	button squarewavefdac,pos={140,655},size={110,20},proc=scw_setupsquarewave,title="Create Square Wave"
+	button setupAWGfdac,pos={260,655},size={110,20},proc=scw_setupAWG,title="Setup AWG"
+	
+	button setupLI,pos={10,450},size={53,50},proc=scw_OpenInstrButton,title="\f01 Set\rLock-In" 
 	
 	//AWG variables
-	SetVariable sc_instrIDbox, pos={10,455},size={130,20}, value=sc_instrID ,side=1,title="\Z14Instrument ID" ,help={"fd, fd2, ...."}
-	SetVariable sc_AWsbox, pos={260,485},size={110,20}, value=sc_AWs ,side=1,title="\Z14Select AWs", help={"CSV for AWs to select which AWs (0,1) to use."}
-	SetVariable sc_DACsbox, pos={260,455},size={110,20}, value=sc_DACs ,side=1,title="\Z14Select DACs", help={"CSV sets for DACS e.g. \"02, 1\" for DACs 0, 2 to output AW0, and DAC 1 to output AW1"}
-	SetVariable sc_maxawgBox,pos={10,485},size={130,20},value=sc_maxawg,side=1,title="\Z14Max (mV)" 
-	SetVariable sc_minawgBox,pos={10,515},size={130,20},value=sc_minawg,side=1,title="\Z14Min (mV)"
-	SetVariable sc_maxtawgBox,pos={150,485},size={100,20},value=sc_maxtawg,side=1,title="\Z14Time", help={"width at maximum voltage"}
-	SetVariable sc_mintawgBox,pos={150,515},size={100,20},value=sc_mintawg,side=1,title="\Z14Time", help={"width at minimum voltage"}
-	SetVariable sc_wnumawgBox,pos={150,455},size={100,20},value=sc_wnumawg,side=1,title="\Z14Set AW", help={"0 or 1"}
-	SetVariable sc_numcyclesawgBox,pos={260,515},size={110,20},value=sc_numcyclesawg,side=1,title="\Z14# of Cycles"
+	SetVariable sc_instrIDbox, pos={10,555},size={130,20}, value=sc_instrID ,side=1,title="\Z14Instrument ID" ,help={"fd, fd2, ...."}
+	SetVariable sc_AWsbox, pos={260,585},size={110,20}, value=sc_AWs ,side=1,title="\Z14Select AWs", help={"CSV for AWs to select which AWs (0,1) to use."}
+	SetVariable sc_DACsbox, pos={260,555},size={110,20}, value=sc_DACs ,side=1,title="\Z14Select DACs", help={"CSV sets for DACS e.g. \"02, 1\" for DACs 0, 2 to output AW0, and DAC 1 to output AW1"}
+	SetVariable sc_maxawgBox,pos={10,585},size={130,20},value=sc_maxawg,side=1,title="\Z14Max (mV)" 
+	SetVariable sc_minawgBox,pos={10,615},size={130,20},value=sc_minawg,side=1,title="\Z14Min (mV)"
+	SetVariable sc_maxtawgBox,pos={150,585},size={100,20},value=sc_maxtawg,side=1,title="\Z14Time", help={"width at maximum voltage"}
+	SetVariable sc_mintawgBox,pos={150,615},size={100,20},value=sc_mintawg,side=1,title="\Z14Time", help={"width at minimum voltage"}
+	SetVariable sc_wnumawgBox,pos={150,555},size={100,20},value=sc_wnumawg,side=1,title="\Z14Set AW", help={"0 or 1"}
+	SetVariable sc_numcyclesawgBox,pos={260,615},size={110,20},value=sc_numcyclesawg,side=1,title="\Z14# of Cycles"
 endmacro
 
 	// set update speed for ADCs
@@ -4739,7 +4751,7 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	
 	make/o/t/n=(numADCCh) fadcval5 = ""		// Resample (1/0) // Nfilter
 	make/o/t/n=(numADCCh) fadcval6 = ""		// Notch filter (1/0) //Demod
-	make/o/t/n=(numADCCh) fadcval7 = "1"		// Demod (1/0) //Harmonic
+	make/o/t/n=(numADCCh) fadcval7 = "1"	// Demod (1/0) //Harmonic
 	make/o/t/n=(numADCCh) fadcval8 = ""		// Demod (1/0) // Resample
 	
 	for(i=0;i<numADCCh;i+=1)
@@ -4753,18 +4765,30 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	make/o/n=(numADCCh) fadcattr2 = 32
 	concatenate/o {fadcattr0,fadcattr0,fadcattr2,fadcattr1,fadcattr1, fadcattr2, fadcattr2, fadcattr1, fadcattr2}, fadcattr // added fadcattr2 twice for two checkbox commands?
 	
+	
+	// create waves for AWG stuff
+	make/o/t/n=(2,5) awgLIvalstr
+	awgLIvalstr[0][0] = "fdID"
+	awgLIvalstr[0][1] = "Amp"
+	awgLIvalstr[0][2] = "Time (ms)"
+	awgLIvalstr[0][3] = "DACs"
+	awgLIvalstr[0][4] = "Cycles"
+	
+	make/o/n=(2,5) awgLIattr = 0
+	awgLIattr[1][] = 2
+
 	variable/g sc_printfadc = 0
 	variable/g sc_saverawfadc = 0
 	variable/g sc_demodphi = 0
 	variable/g sc_demody = 0
 	variable/g sc_plotRaw = 0
 	variable/g sc_ResampleFreqfadc = 100 // Resampling frequency if using resampling
-	variable /g sc_maxawg = 100
-	variable /g sc_minawg = -100
-	variable /g sc_maxtawg = 0.01
-	variable /g sc_mintawg = 0.01
-	variable /g sc_wnumawg = 0
-	variable /g sc_numcyclesawg = 1
+	variable/g sc_maxawg = 100
+	variable/g sc_minawg = -100
+	variable/g sc_maxtawg = 0.01
+	variable/g sc_mintawg = 0.01
+	variable/g sc_wnumawg = 0
+	variable/g sc_numcyclesawg = 1
 	string /g sc_nfreq = "60,180,300"
 	string /g sc_nQs = "50,150,250"
 	string /g sc_instrID = "fd"
