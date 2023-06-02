@@ -1385,6 +1385,58 @@ EndMacro
 //////////// Arbitrary Wave Generator //////////////
 ////////////////////////////////////////////////////
 
+
+function setFdacAWGSquareWave_r(instrID, amps, times, wave_num)
+	// Wrapper around fd_addAWGwave to make waves with 'amps' and their durations indicated with 'times'
+	// inputs: instrID - FastDac ID variable
+	//         amps - wave with the setpoints in mV
+	//			 times - wave with all the durations (seconds) for the setpoints.
+	//         note* amps and times should be the same length
+	//         wave_num - used to name the wave holding the information about the squarewave, printed at the end of the function
+	   
+	variable instrID
+	wave amps, times
+	int wave_num 
+	
+	
+	// checking if amps and times are the same length
+	if (numpnts(amps) != numpnts(times))
+		abort nameofwave(amps) + " and " + nameofwave(times) +" are not the same size"  
+	endif
+
+	
+	make/o/free/n=(numpnts(amps), 2) awg_sqw          //awg_sqw will hold the information about the squarewave
+	variable samplingFreq = getFADCspeed(instrID)     //sampling frequency is needed to properly implement time
+	variable numSamples = 0, i=0, j=0
+   
+   for(i=0;i<numpnts(amps);i++)
+      
+      if(times[i] != 0)                              // Only add to wave if duration is non-zero
+         numSamples = round(times[i]*samplingFreq)   // Convert to # samples
+         
+         if(numSamples == 0)                         // Prevent adding zero length setpoint
+            abort "ERROR[setFdacAWGSquareWave]: trying to add setpoint with zero length, duration too short for sampleFreq"
+         endif
+         
+         awg_sqw[j][0] = {amps[i]}
+         awg_sqw[j][1] = {numSamples}
+         j++
+         
+      endif
+      
+   endfor
+  
+	// aborts if awg_sqw has no information
+	if(numpnts(awg_sqw) == 0)
+      abort "ERROR[setFdacAWGSquareWave]: No setpoints added to awg_sqw"
+   endif
+   
+   fd_clearAWGwave(instrID, wave_num)                // clears any old existing wave named "fDAW_" + wave_num
+   fd_addAWGwave(instrID, wave_num, awg_sqw)         // creats wave named "fDAW_" + wave_num
+   printf "Set square wave on fdAW_%d\r", wave_num
+   	
+end
+
 function setFdacAWGSquareWave(instrID, v1, v2, v1len, v2len, wave_num)
    // Wrapper around fd_addAWGwave to make square waves with two setpoints (v1, v2) and durations (v1len, v2len)
    variable instrID, v1, v2, v1len, v2len, wave_num  // lens in seconds
@@ -1706,7 +1758,7 @@ end
 
 ////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////// FastDAC Sweeps /////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
 
 
 
