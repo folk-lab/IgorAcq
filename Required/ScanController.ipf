@@ -2219,51 +2219,64 @@ Window ScanController(v_left,v_right,v_top,v_bottom) : Panel
 
 EndMacro
 
-function scw_setupsquarewave0(action) : Buttoncontrol
-	string action
-	
-	wave /t awgsetvalstr
-	nvar fdID = $(awgsetvalstr[0][1])  //this needs to change
-	
-	wave /t awgvalstr
-	variable v0    = str2num(awgvalstr[2][0])
-	variable vP    = str2num(awgvalstr[1][0])
-	variable vM    = str2num(awgvalstr[3][0])
-	variable v0len = str2num(awgvalstr[2][1]) / 1000
-	variable vPlen = str2num(awgvalstr[1][1]) / 1000
-	variable vMlen = str2num(awgvalstr[3][1]) / 1000
-	
-	//setFdacAWGSquareWave(fdID, sc_maxawg, sc_minawg, sc_maxtawg, sc_mintawg, sc_wnumawg)
-	
-	makeSquareWaveAWG(fdID, v0, vP, vM, v0len, vPlen, vMlen, 0, ramplen = 0)
-end
 
-function scw_setupsquarewave1(action) : Buttoncontrol
+function scw_setupsquarewave(action) : Buttoncontrol
 	string action
-	
 	wave /t awgsetvalstr
-	nvar fdID = $(awgsetvalstr[0][1])  //this needs to change
-	
+	svar sc_fdID
+	nvar sc_wnumawg, fdID = $sc_fdID
 	wave /t awgvalstr
-	variable v0    = str2num(awgvalstr[2][0])
-	variable vP    = str2num(awgvalstr[1][0])
-	variable vM    = str2num(awgvalstr[3][0])
-	variable v0len = str2num(awgvalstr[2][1]) / 1000
-	variable vPlen = str2num(awgvalstr[1][1]) / 1000
-	variable vMlen = str2num(awgvalstr[3][1]) / 1000
 	
-	//setFdacAWGSquareWave(fdID, sc_maxawg, sc_minawg, sc_maxtawg, sc_mintawg, sc_wnumawg)
+	int i, j=0, num_amps = dimsize(awgvalstr,0) - 1
+	make /free /n=(num_amps) amps = 0
+	make /free /n=(num_amps) times = 0
+	 
+	for(i=1; i <= num_amps; i++)
+		
+		//checks for empty str or invalid inputs in scancontroller window
+		variable amp      = str2num(awgvalstr[i][0])
+		variable amp_time = str2num(awgvalstr[i][1])
+		
+		if(numtype(amp) == 0 && numtype(amp_time) == 0)	
+		   if(amp_time != 0)
+		   		amps[j]  = amp
+         		times[j] = amp_time
+         		j++
+         	endif
+		endif		
 	
-	makeSquareWaveAWG(fdID, v0, vP, vM, v0len, vPlen, vMlen, 1, ramplen = 0)
+	endfor
+	
+	//removing zero valued rows and changing times to seconds
+	deletepoints j, num_amps-j, amps
+	deletepoints j, num_amps-j, times
+	
+	times /= 1000
+	
+	setFdacAWGSquareWave(fdID, amps, times, sc_wnumawg)
+	
+	//for populating AWs
+	j=1
+	for(i=0; i<=itemsInList(awgsetvalstr[1][1], ","); i++)
+		if(!cmpstr(stringFromList(i, awgsetvalstr[1][1], ","), num2str(sc_wnumawg)))
+			j=0
+			break
+		endif
+	endfor
+		
+	if(j==1)
+		if (cmpstr(awgsetvalstr[1][1], ""))
+		awgsetvalstr[1][1] += "," + num2str(sc_wnumawg)
+		else
+		awgsetvalstr[1][1] += num2str(sc_wnumawg)
+		endif
+	endif
 	
 end
 
 
 function scw_setupAWG(action) : Buttoncontrol
 	string action
-	//svar sc_instrID, sc_AWs, sc_DACs
-	//nvar  sc_numcyclesawg 
-	//nvar fdID = $sc_instrID
 	
 	wave /t awgsetvalstr
 	nvar fdID = $(awgsetvalstr[0][1])
@@ -2277,16 +2290,16 @@ end
 function scw_setupLockIn(action) : Buttoncontrol
 	string action
 	wave /t LIvalstr
-	string fdIDname = LIvalstr[1][0]
-	variable Amp    = str2num(LIvalstr[1][1])
-	variable sTime  = str2num(LIvalstr[1][2])
-	string DACs     = LIvalstr[1][3]
-	variable Cycles = str2num(LIvalstr[1][4])
+	string fdIDname           = LIvalstr[1][0]
+	make /free /n=2 amp       = str2num(LIvalstr[1][1])
+	make /free /n=2 amp_time  = str2num(LIvalstr[1][2])
+	string DACs               = LIvalstr[1][3]
+	variable Cycles           = str2num(LIvalstr[1][4])
 	nvar fdID = $fdIDname
+	amp_time /= 1000
+	amp[2] *= -1
 	
-	sTime /= 1000
-	
-	setFdacAWGSquareWave(fdID, Amp, -Amp, sTime, sTime, 0)
+	setFdacAWGSquareWave(fdID, amp, amp_time, 0)
 	setupAWG(fdID, AWs="0", DACs=DACs, numCycles=Cycles, verbose=1)
 end
 
@@ -4476,7 +4489,7 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	DrawText 160, 45, "DAC"
 	SetDrawEnv fsize=25, fstyle=1
 	DrawText 650, 45, "ADC"
-	DrawLine 385,15,385,580 
+	DrawLine 385,15,385,600 
 	DrawLine 395,415,1000,415 /////EDIT 385-> 415
 	SetDrawEnv dash=1
 	Drawline 395,333,1000,333 /////EDIT 295 -> 320
@@ -4576,25 +4589,17 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	ListBox awglist,pos={70,480},size={140,120},fsize=14,frame=2,widths={40,60}
 	ListBox awglist,listwave=root:awgvalstr,selwave=root:awgattr,mode=1
 	
-	ListBox awgsetlist,pos={240,480},size={130,95},fsize=14,frame=2,widths={50,40}
+	ListBox awgsetlist,pos={223,480},size={147,95},fsize=14,frame=2,widths={50,40}
 	ListBox awgsetlist,listwave=root:awgsetvalstr,selwave=root:awgsetattr,mode=1
 	
-	///AWG buttons
-	button setupAW0,pos={10,490},size={53,40},proc=scw_setupsquarewave0,title="Create\rAW0"
-	button setupAW1,pos={10,550},size={53,40},proc=scw_setupsquarewave1,title="Create\rAW1"
+	///AWG
+	button setupAW1,pos={10,580},size={55,20},proc=scw_setupsquarewave,title="Create"
+	DrawText 10, 573, "\Z14AW"
+	SetVariable sc_wnumawgBox,pos={25,554},size={40,25},value=sc_wnumawg,side=1,title ="\Z14 ", help={"any whole number -> 0, 1, 2"}
+	SetVariable sc_fdIDBox, pos={10,528},size={55,20}, value=sc_fdID ,side=1,title="\Z14fdID", help={"CSV sets for DACS e.g. \"02, 1\" for DACs 0, 2 to output AW0, and DAC 1 to output AW1"}
 	button setupAWGfdac,pos={260,580},size={110,20},proc=scw_setupAWG,title="Setup AWG"
 	button setupLI,pos={10,420},size={53,40},proc=scw_setupLockIn,title="Set\rLock-In" 
 	
-	//AWG variables
-	//SetVariable sc_instrIDbox, pos={10,555},size={130,20}, value=sc_instrID ,side=1,title="\Z14Instrument ID" ,help={"fd, fd2, ...."}
-	//SetVariable sc_AWsbox, pos={260,585},size={110,20}, value=sc_AWs ,side=1,title="\Z14Select AWs", help={"CSV for AWs to select which AWs (0,1) to use."}
-	//SetVariable sc_DACsbox, pos={260,555},size={110,20}, value=sc_DACs ,side=1,title="\Z14Select DACs", help={"CSV sets for DACS e.g. \"02, 1\" for DACs 0, 2 to output AW0, and DAC 1 to output AW1"}
-	//SetVariable sc_maxawgBox,pos={10,585},size={130,20},value=sc_maxawg,side=1,title="\Z14Max (mV)" 
-	//SetVariable sc_minawgBox,pos={10,615},size={130,20},value=sc_minawg,side=1,title="\Z14Min (mV)"
-	//SetVariable sc_maxtawgBox,pos={150,585},size={100,20},value=sc_maxtawg,side=1,title="\Z14Time", help={"width at maximum voltage"}
-	//SetVariable sc_mintawgBox,pos={150,615},size={100,20},value=sc_mintawg,side=1,title="\Z14Time", help={"width at minimum voltage"}
-	//SetVariable sc_wnumawgBox,pos={150,555},size={100,20},value=sc_wnumawg,side=1,title="\Z14Set AW", help={"0 or 1"}
-	//SetVariable sc_numcyclesawgBox,pos={260,615},size={110,20},value=sc_numcyclesawg,side=1,title="\Z14# of Cycles"
 endmacro
 
 	// set update speed for ADCs
@@ -4837,11 +4842,12 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	LIattr[1][] = 2
 
 	// create waves for AWG
-	make/o/t/n=(5,2) AWGvalstr
+	make/o/t/n=(10,2) AWGvalstr
 	AWGvalstr[0][0] = "Amp"
 	AWGvalstr[0][1] = "Time (ms)"
+	AWGvalstr[1,10][] = ""
 	
-	make/o/n=(5,2) AWGattr = 2
+	make/o/n=(10,2) AWGattr = 2
 	AWGattr[0][] = 0
 	
 	// create waves for AWGset
@@ -4860,17 +4866,9 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	variable/g sc_demody = 0
 	variable/g sc_plotRaw = 0
 	variable/g sc_ResampleFreqfadc = 100 // Resampling frequency if using resampling
-	variable/g sc_maxawg = 100
-	variable/g sc_minawg = -100
-	variable/g sc_maxtawg = 0.01
-	variable/g sc_mintawg = 0.01
-	variable/g sc_wnumawg = 0
-	variable/g sc_numcyclesawg = 1
 	string /g sc_nfreq = "60,180,300"
 	string /g sc_nQs = "50,150,250"
-	string /g sc_instrID = "fd" //likely dont need this
-	string /g sc_AWs = "0"      //likely dont need this
-	string /g sc_DACs = "0"     //likely dont need this
+	string /g sc_fdID = ""    
 
 
 	// clean up

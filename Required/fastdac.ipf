@@ -1386,7 +1386,7 @@ EndMacro
 ////////////////////////////////////////////////////
 
 
-function setFdacAWGSquareWave_r(instrID, amps, times, wave_num)
+function setFdacAWGSquareWave(instrID, amps, times, wave_num)
 	// Wrapper around fd_addAWGwave to make waves with 'amps' and their durations indicated with 'times'
 	// inputs: instrID - FastDac ID variable
 	//         amps - wave with the setpoints in mV
@@ -1409,21 +1409,17 @@ function setFdacAWGSquareWave_r(instrID, amps, times, wave_num)
 	variable samplingFreq = getFADCspeed(instrID)     //sampling frequency is needed to properly implement time
 	variable numSamples = 0, i=0, j=0
    
-   for(i=0;i<numpnts(amps);i++)
-      
-      if(times[i] != 0)                              // Only add to wave if duration is non-zero
-         numSamples = round(times[i]*samplingFreq)   // Convert to # samples
+   for(i=0;i<numpnts(amps);i++)                            
+   		numSamples = round(times[i]*samplingFreq)   // Convert to # samples
          
-         if(numSamples == 0)                         // Prevent adding zero length setpoint
-            abort "ERROR[setFdacAWGSquareWave]: trying to add setpoint with zero length, duration too short for sampleFreq"
-         endif
+      	if(numSamples == 0)                         // Prevent adding zero length setpoint
+       	abort "ERROR[setFdacAWGSquareWave]: trying to add setpoint with zero length, duration too short for sampleFreq"
+      	endif
          
-         awg_sqw[j][0] = {amps[i]}
-         awg_sqw[j][1] = {numSamples}
-         j++
-         
-      endif
-      
+       awg_sqw[j][0] = {amps[i]}
+       awg_sqw[j][1] = {numSamples}
+       j++
+        
    endfor
   
 	// aborts if awg_sqw has no information
@@ -1437,26 +1433,26 @@ function setFdacAWGSquareWave_r(instrID, amps, times, wave_num)
    	
 end
 
-function setFdacAWGSquareWave(instrID, v1, v2, v1len, v2len, wave_num)
-   // Wrapper around fd_addAWGwave to make square waves with two setpoints (v1, v2) and durations (v1len, v2len)
-   variable instrID, v1, v2, v1len, v2len, wave_num  // lens in seconds
-
-   // TODO: need to make a warning that if changing ADC frequency that AWG_frequency changes
-
-   // put into wave to make it easier to work with
-   make/o/free sps = {v1, v2}
-   make/o/free lens = {v1len, v2len}
-
-   // Sanity check on period
-   // Note: limit checks happen in AWG_RAMP
-   if (sum(lens) > 1)
-      string msg
-      sprintf msg "Do you really want to make a square wave with period %.3gs?", sum(lens)
-      variable ans = ask_user(msg, type=1)
-      if (ans == 2)
-         abort "User aborted"
-      endif
-   endif
+//function setFdacAWGSquareWave(instrID, v1, v2, v1len, v2len, wave_num)
+//   // Wrapper around fd_addAWGwave to make square waves with two setpoints (v1, v2) and durations (v1len, v2len)
+//   variable instrID, v1, v2, v1len, v2len, wave_num  // lens in seconds
+//
+//   // TODO: need to make a warning that if changing ADC frequency that AWG_frequency changes
+//
+//   // put into wave to make it easier to work with
+//   make/o/free sps = {v1, v2}
+//   make/o/free lens = {v1len, v2len}
+//
+//   // Sanity check on period
+//   // Note: limit checks happen in AWG_RAMP
+//   if (sum(lens) > 1)
+//      string msg
+//      sprintf msg "Do you really want to make a square wave with period %.3gs?", sum(lens)
+//      variable ans = ask_user(msg, type=1)
+//      if (ans == 2)
+//         abort "User aborted"
+//      endif
+//   endif
 
    // make wave to store setpoints/sample_lengths
    make/o/free/n=(2, 2) awg_sqw  // First 2 is number of setpoints, second 2 is for setpoints/sample_lens
