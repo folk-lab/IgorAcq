@@ -1161,39 +1161,39 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 	string y_label_2d = y_label
 	string y_label_1d = selectString(for_2d, y_label, "")  // Only use the y_label for 1D graphs if the scan is 1D (otherwise gets confused with y sweep gate)
 
-
 	string wn, openGraphID, graphIDs = ""
 	variable i
 	for (i = 0; i<ItemsInList(wavenames); i++)  // Look through wavenames that are being recorded
-	
-	    wn = StringFromList(i, wavenames)
+	    wn = selectString(cmpstr(append_wn, ""), StringFromList(i, wavenames), StringFromList(i, wavenames)+";" +append_wn)
 	    
-
-		openGraphID = scg_graphExistsForWavename(wn)
-		
+		if (spectrum)
+			string ADCnum = wn[3,INF] //would fail if this was done with calculated waves, but we dont care about it
+			openGraphID = scg_graphExistsForWavename(wn + ";pwrspec" + ADCnum)
+		else
+			openGraphID = scg_graphExistsForWavename(wn)
+		endif
 
 		// 1D graphs
 		if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-			scg_setupGraph1D(openGraphID, x_label, y_label=y_label_1d) 
-		else 
-	       
-	       scg_open1Dgraph(wn, x_label, y_label=y_label, y_label=y_label_1d, append_wn = append_wn)
-	       openGraphID = winname(0,1)
+			scg_setupGraph1D(openGraphID, x_label, y_label=y_label_1d)
+			wn = StringFromList(i, wavenames) 
+		else
+			wn = StringFromList(i, wavenames) 
+	      	scg_open1Dgraph(wn, x_label, y_label=y_label, y_label=y_label_1d, append_wn = append_wn)
+	      	openGraphID = winname(0,1)
+	      	if (spectrum)
+				string wn_powerspec = scfd_spectrum_analyzer($wn, mFreq, "pwrspec" + ADCnum)
+				scg_twosubplot(openGraphID, wn_powerspec, logy = 1, labelx = "Frequency (Hz)")
+			endif 
 	   endif
-	   
-	   graphIDs = addlistItem(openGraphID, graphIDs, ";", INF) 	
-	   openGraphID = ""
 		
-		if (spectrum)
-			string ADCnum = wn[3,INF] //this line would specifically fail if this function was called for the calculated waves, but we dont care about it
-			string wn_powerspec = scfd_spectrum_analyzer($wn, mFreq, "pwrspec" + ADCnum)
-			scg_twosubplot(openGraphID, wn_powerspec, logy = 1, labelx = "Frequency (Hz)")
-		endif
+		graphIDs = addlistItem(openGraphID, graphIDs, ";", INF) 	
+	   openGraphID = ""
 		
 		// 2D graphs
 		if (for_2d)
 			wn = wn + "_2d"
-		
+			openGraphID = scg_graphExistsForWavename(wn)
 			if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
 				scg_setupGraph2D(openGraphID, wn, x_label, y_label_2d)
 			else 
