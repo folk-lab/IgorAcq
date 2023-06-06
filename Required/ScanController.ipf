@@ -2287,6 +2287,15 @@ function scw_setupAWG(action) : Buttoncontrol
 	setupAWG(fdID, AWs=AWs, DACs=DACs, numCycles=Cycles, verbose=1)
 end
 
+function scw_clearAWinputs(action) : Buttoncontrol
+	string action
+	
+	wave /t awgvalstr
+	
+	awgvalstr[1,9][] = ""
+end
+
+
 function scw_setupLockIn(action) : Buttoncontrol
 	string action
 	wave /t LIvalstr
@@ -4593,7 +4602,8 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	ListBox awgsetlist,listwave=root:awgsetvalstr,selwave=root:awgsetattr,mode=1
 	
 	///AWG
-	button setupAW1,pos={10,580},size={55,20},proc=scw_setupsquarewave,title="Create"
+	button clearAW,pos={10,504},size={55,20},proc=scw_clearAWinputs,title="Clear"
+	button setupAW,pos={10,580},size={55,20},proc=scw_setupsquarewave,title="Create"
 	DrawText 10, 573, "\Z14AW"
 	SetVariable sc_wnumawgBox,pos={25,554},size={40,25},value=sc_wnumawg,side=1,title ="\Z14 ", help={"any whole number -> 0, 1, 2"}
 	SetVariable sc_fdIDBox, pos={10,528},size={55,20}, value=sc_fdID ,side=1,title="\Z14fdID", help={"CSV sets for DACS e.g. \"02, 1\" for DACs 0, 2 to output AW0, and DAC 1 to output AW1"}
