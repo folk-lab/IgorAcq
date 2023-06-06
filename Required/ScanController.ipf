@@ -1092,7 +1092,7 @@ function/S scg_initializeGraphs(S , [y_label])
 	 string/g sc_rawGraphs1D = ""  // So that fd_record_values knows which graphs to update while reading
 
     string graphIDs = ""
-    variable i
+    variable i,j
     string waveNames
     string buffer
 	 string ylabel
@@ -1106,7 +1106,7 @@ function/S scg_initializeGraphs(S , [y_label])
     
     for (i = 0; i<2; i++)  // i = 0, 1
     	
-    	if(plotRaw == 0)
+    	if(plotRaw == 0 && S.using_fastdac)
     		plotRaw = 1
     		continue
     	endif
@@ -1120,24 +1120,27 @@ function/S scg_initializeGraphs(S , [y_label])
 		endif
       
       	if (raw)
-      		
-      		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label=ylabel, spectrum = 1, mFreq = S.measureFreq)
-      
-      	//add demodulation to buffer, specifically the x-axis stuff
+      		if (S.using_fastdac)
+      			buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label=ylabel, spectrum = 1, mFreq = S.measureFreq)
+      		else 
+      			buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label=ylabel,for_2d=S.is2d, y_label=ylabel, y_label_2d = S.y_label)
+      		endif
+      	
      	else 	
       		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, for_2d=S.is2d, y_label=ylabel, y_label_2d = S.y_label)
-      		
-      		for (i=0; i<itemsinlist(waveNames); i++)
-				string rwn = StringFromList(i, rawWaveNames)
-				string cwn = StringFromList(i, WaveNames)
-				string ADCnum = rwn[3,INF]
+      	
+      		if (S.using_fastdac)	
+      			for (j=0; j<itemsinlist(waveNames); j++)
+					string rwn = StringFromList(j, rawWaveNames)
+					string cwn = StringFromList(j, WaveNames)
+					string ADCnum = rwn[3,INF]
 			
-				if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
-					buffer += scg_initializeGraphsForWavenames(cwn + "x", S.x_label, for_2d=S.is2d, y_label=ylabel, append_wn = cwn + "y")
-				endif
-			
-			endfor
-
+					if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
+						buffer += scg_initializeGraphsForWavenames(cwn + "x", S.x_label, for_2d=S.is2d, y_label=ylabel, append_wn = cwn + "y")
+					endif
+				
+				endfor
+			endif
       	 endif
       	 
       	if(raw==1) // Raw waves
@@ -1158,6 +1161,7 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 	string wavenames, x_label, y_label, append_wn, y_label_2d
 	variable for_2d , spectrum, mFreq
 	
+	spectrum = paramisDefault(spectrum) ? 0 : 1
 	y_label = selectString(paramisDefault(y_label), y_label, "")
 	append_wn = selectString(paramisDefault(append_wn), append_wn, "")
 	y_label_2d = selectString(paramisDefault(y_label_2d), y_label_2d, "")
