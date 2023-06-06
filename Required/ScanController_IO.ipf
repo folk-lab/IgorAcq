@@ -392,10 +392,10 @@ function SaveToHDF(S, [additional_wavenames])
 			
 			if (fadcattr[str2num(ADCnum)][6] == 48)
 				CalcWaves += cwn[0,strlen(cwn)-4] + "x_2d;"
-			endif
 			
-			if (sc_demody == 1)
-				CalcWaves += cwn[0,strlen(cwn)-4] + "y_2d;"
+				if (sc_demody == 1)
+					CalcWaves += cwn[0,strlen(cwn)-4] + "y_2d;"
+				endif
 			endif
 			
 		 endfor

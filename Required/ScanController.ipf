@@ -854,11 +854,13 @@ end
 /////////////////////////////////////////////////////////// Initializing a Scan //////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-function initializeScan(S, [init_graphs])
+function initializeScan(S, [init_graphs, y_label])
     // Opens instrument connection, initializes waves to store data, opens and tiles graphs, opens abort window.
     // init_graphs: set to 0 if you want to handle opening graphs yourself
     struct ScanVars &S
     variable init_graphs
+    string y_label
+    y_label = selectString(paramIsDefault(y_label), y_label, "")
     init_graphs = paramisdefault(init_graphs) ? 1 : init_graphs
     variable fastdac
 
@@ -875,7 +877,7 @@ function initializeScan(S, [init_graphs])
     // Set up graphs to display recorded data
     if (init_graphs)
 	    string activeGraphs
-	    activeGraphs = scg_initializeGraphs(S)
+	    activeGraphs = scg_initializeGraphs(S, y_label = y_label)
 	    scg_arrangeWindows(activeGraphs)
 	 endif
 
@@ -1082,11 +1084,11 @@ end
 //////////////////////////// Opening and Layout out Graphs //////////////////// (scg_...)
 /////////////////////////////////////////////////////////////////////////////
 
-function/S scg_initializeGraphs(S)
+function/S scg_initializeGraphs(S , [y_label])
     // Initialize graphs that are going to be recorded
     // Returns list of Graphs that data is being plotted in
     struct ScanVars &S
-
+	 string y_label
 	 string/g sc_rawGraphs1D = ""  // So that fd_record_values knows which graphs to update while reading
 
     string graphIDs = ""
@@ -1100,6 +1102,7 @@ function/S scg_initializeGraphs(S)
     wave fadcattr
     
     string rawwaveNames = sci_get1DWaveNames(1, S.using_fastdac, for_plotting=1)
+    string CalcStrings = scf_getRecordedFADCinfo("calc_funcs")
     
     for (i = 0; i<2; i++)  // i = 0, 1
     	
@@ -1110,19 +1113,19 @@ function/S scg_initializeGraphs(S)
     	
       	raw = !i
       	waveNames = sci_get1DWaveNames(raw, S.using_fastdac, for_plotting=1)
-		if (S.is2d == 0 && raw == 1 && S.using_fastdac)
-			ylabel = "ADC /mV"
+		if (raw == 1 && S.using_fastdac)
+			ylabel = "mV"
 		else
-			ylabel = S.y_label
+			ylabel = selectString(cmpstr(rawwaveNames, CalcStrings), "mV", y_label)
 		endif
       
       	if (raw)
+      		
       		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label=ylabel, spectrum = 1, mFreq = S.measureFreq)
       
       	//add demodulation to buffer, specifically the x-axis stuff
      	else 	
-     	
-      		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, for_2d=S.is2d, y_label=ylabel)
+      		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, for_2d=S.is2d, y_label=ylabel, y_label_2d = S.y_label)
       		
       		for (i=0; i<itemsinlist(waveNames); i++)
 				string rwn = StringFromList(i, rawWaveNames)
@@ -1148,18 +1151,18 @@ function/S scg_initializeGraphs(S)
 end
 
 
-function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label, append_wn, spectrum, mFreq])
+function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label, append_wn, spectrum, mFreq, y_label_2d])
 	// Ensures a graph is open and tiles graphs for each wave in comma separated wavenames
 	// Returns list of graphIDs of active graphs
 	// append_wavename would append a wave to every single wavename in wavenames (more useful for passing just one wavename)
-	string wavenames, x_label, y_label, append_wn
+	string wavenames, x_label, y_label, append_wn, y_label_2d
 	variable for_2d , spectrum, mFreq
 	
 	y_label = selectString(paramisDefault(y_label), y_label, "")
 	append_wn = selectString(paramisDefault(append_wn), append_wn, "")
+	y_label_2d = selectString(paramisDefault(y_label_2d), y_label_2d, "")
 	
-	string y_label_2d = y_label
-	string y_label_1d = selectString(for_2d, y_label, "")  // Only use the y_label for 1D graphs if the scan is 1D (otherwise gets confused with y sweep gate)
+	string y_label_1d = y_label //selectString(for_2d, y_label, "")  // Only use the y_label for 1D graphs if the scan is 1D (otherwise gets confused with y sweep gate)
 
 	string wn, openGraphID, graphIDs = ""
 	variable i
@@ -1175,11 +1178,11 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 
 		// 1D graphs
 		if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-			scg_setupGraph1D(openGraphID, x_label, y_label=y_label_1d)
+			scg_setupGraph1D(openGraphID, x_label, y_label= selectstring(cmpstr(y_label_1d,""), wn, wn +" ("+y_label_1d +")"))
 			wn = StringFromList(i, wavenames) 
 		else
 			wn = StringFromList(i, wavenames) 
-	      	scg_open1Dgraph(wn, x_label, y_label=y_label, y_label=y_label_1d, append_wn = append_wn)
+	      	scg_open1Dgraph(wn, x_label, y_label=selectstring(cmpstr(y_label_1d,""), wn, wn +" ("+y_label_1d+")"),append_wn = append_wn)
 	      	openGraphID = winname(0,1)
 	      	if (spectrum)
 				string wn_powerspec = scfd_spectrum_analyzer($wn, mFreq, "pwrspec" + ADCnum)
@@ -1192,12 +1195,12 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 		
 		// 2D graphs
 		if (for_2d)
-			wn = wn + "_2d"
-			openGraphID = scg_graphExistsForWavename(wn)
+			string wn2d = wn + "_2d"
+			openGraphID = scg_graphExistsForWavename(wn2d)
 			if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-				scg_setupGraph2D(openGraphID, wn, x_label, y_label_2d)
+				scg_setupGraph2D(openGraphID, wn2d, x_label, y_label_2d, heat_label = selectstring(cmpstr(y_label_1d,""), wn, wn +" ("+y_label_1d +")"))
 			else 
-	       	scg_open2Dgraph(wn, x_label, y_label_2d)
+	       	scg_open2Dgraph(wn2d, x_label, y_label_2d, heat_label = selectstring(cmpstr(y_label_1d,""), wn, wn +" ("+y_label_1d +")"))
 	       	openGraphID = winname(0,1)
 	    	endif
 	    	
@@ -1294,9 +1297,10 @@ function scg_open1Dgraph(wn, x_label, [y_label, append_wn])
 end
 
 
-function scg_open2Dgraph(wn, x_label, y_label)
+function scg_open2Dgraph(wn, x_label, y_label, [heat_label])
     // Opens 2D graph for wn
-    string wn, x_label, y_label
+    string wn, x_label, y_label, heat_label
+    heat_label = selectstring(paramisdefault(heat_label), heat_label, "")
     wave w = $wn
     if (dimsize(w, 1) == 0)
     	abort "Trying to open a 2D graph for a 1D wave"
@@ -1305,7 +1309,7 @@ function scg_open2Dgraph(wn, x_label, y_label)
     display
     setwindow kwTopWin, graphicsTech=0
     appendimage $wn
-    scg_setupGraph2D(WinName(0,1), wn, x_label, y_label)
+    scg_setupGraph2D(WinName(0,1), wn, x_label, y_label, heat_label = heat_label)
 end
 
 
@@ -1329,15 +1333,17 @@ function scg_setupGraph1D(graphID, x_label, [y_label])
 end
 
 
-function scg_setupGraph2D(graphID, wn, x_label, y_label)
-    string graphID, wn, x_label, y_label
+function scg_setupGraph2D(graphID, wn, x_label, y_label, [heat_label])
+    string graphID, wn, x_label, y_label, heat_label
     svar sc_ColorMap
+    
+    heat_label = selectstring(paramisdefault(heat_label), heat_label, "")
     // Sets axis labels, datnum etc
     Label /W=$graphID bottom, x_label
     Label /W=$graphID left, y_label
 
     modifyimage /W=$graphID $wn ctab={*, *, $sc_ColorMap, 0}
-    colorscale /c/n=$sc_ColorMap /e/a=rc image=$wn
+    colorscale /W=$graphID /c/n=$sc_ColorMap /e/a=rc image=$wn, heat_label  
 
 	nvar filenum
     TextBox /W=$graphID/C/N=datnum/A=LT/X=1.0/Y=1.0/E=2 "Dat"+num2str(filenum)
