@@ -4673,28 +4673,38 @@ Function TabProc(tca) : TabControl
 	STRUCT WMTabControlAction &tca
 	switch (tca.eventCode)
 		case 2: // Mouse up
+			nvar tabNumAW
+			
 			Variable tabNum = tca.tab // Active tab number
 			Variable isTab0 = tabNum==0
 			Variable isTab1 = tabNum==1
+			
+			
 			ModifyControl LIList disable=!isTab0 // Hide if not Tab 0
 			ModifyControl setupLI disable=!isTab0 // Hide if not Tab 0	
-			ModifyControl awglist disable=!isTab1 // Hide if not Tab 0
-			ModifyControl awgsetlist disable=!isTab1 // Hide if not Tab 1
-			ModifyControl setupAWGfdac disable=!isTab1 // Hide if not Tab 1
-			ModifyControl clearAW disable=!isTab1
-			ModifyControl setupAW disable=!isTab1
-			ModifyControl sc_wnumawgBox disable=!isTab1
-			ModifyControl sc_fdIDbox disable=!isTab1
 			
-			ModifyControl awglist0 disable=!isTab1
-			ModifyControl awglist1 disable=!isTab1
-			tabcontrol tb2 disable =!isTab1
-//			ModifyControl thisCheck disable=!isTab0 // Hide if not Tab 0
-//			ModifyControl thatCheck disable=!isTab0 // Hide if not Tab 0
-//			ModifyControl colorPop disable=!isTab0 // Hide if not Tab 0
-//			ModifyControl multCheck disable=!isTab1 // Hide if not Tab 1
-//			ModifyControl multVar disable=!isTab1 // Hide if not Tab 1
-//			
+			if(tabNumAW == 0)
+				ModifyControl awglist disable=!isTab1 // Hide if not Tab 0
+				 // Hide if not Tab 1
+			
+				ModifyControl clearAW disable=!isTab1
+				ModifyControl setupAW disable=!isTab1
+				ModifyControl sc_wnumawgBox disable=!isTab1
+				
+			elseif(tabNumAW == 1)
+				
+				ModifyControl sc_fdIDbox disable = isTab1
+				ModifyControl awglist0 disable=!isTab1
+				
+			elseif(tabNumAW==2)	
+				ModifyControl sc_fdIDbox disable = isTab1
+				ModifyControl awglist1 disable=!isTab1
+			
+			endif
+			
+			ModifyControl awgsetlist disable=!isTab1
+			ModifyControl setupAWGfdac disable=!isTab1 // Hide if not Tab 1
+			tabcontrol tb2 disable =!isTab1			
 			break
 	endswitch
 	return 0
@@ -4704,10 +4714,11 @@ Function TabProc2(tca) : TabControl
 	STRUCT WMTabControlAction &tca
 	switch (tca.eventCode)
 		case 2: // Mouse up
-			Variable tabNum = tca.tab // Active tab number
-			Variable isTab0 = tabNum==0
-			Variable isTab1 = tabNum==1
-			variable isTab2 = tabNum==2
+			nvar tabNumAW 
+			tabNumAW = tca.tab // Active tab number
+			Variable isTab0 = tabNumAW==0
+			Variable isTab1 = tabNumAW==1
+			variable isTab2 = tabNumAW==2
 			
 			ModifyControl awglist disable=!isTab0 // Hide if not Tab 0
 			ModifyControl clearAW disable=!isTab0
@@ -4717,12 +4728,7 @@ Function TabProc2(tca) : TabControl
 			
 			ModifyControl awglist0 disable=!isTab1
 			ModifyControl awglist1 disable=!isTab2
-//			ModifyControl thisCheck disable=!isTab0 // Hide if not Tab 0
-//			ModifyControl thatCheck disable=!isTab0 // Hide if not Tab 0
-//			ModifyControl colorPop disable=!isTab0 // Hide if not Tab 0
-//			ModifyControl multCheck disable=!isTab1 // Hide if not Tab 1
-//			ModifyControl multVar disable=!isTab1 // Hide if not Tab 1
-//			
+						
 			break
 	endswitch
 	return 0
@@ -5036,6 +5042,7 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	variable/g sc_demody = 0
 	variable/g sc_plotRaw = 0
 	variable/g sc_wnumawg = 0
+	variable/g tabnumAW = 0
 	variable/g sc_ResampleFreqfadc = 100 // Resampling frequency if using resampling
 	string /g sc_nfreq = "60,180,300"
 	string /g sc_nQs = "50,150,250"
