@@ -2318,15 +2318,19 @@ end
 
 function scw_setupLockIn(action) : Buttoncontrol
 	string action
-	wave /t LIvalstr
-	string fdIDname           = LIvalstr[1][0]
-	make /free /n=2 amp       = str2num(LIvalstr[1][1])
-	variable freq				= str2num(LIvalstr[1][2])
+	//wave /t LIvalstr
+	wave /t LIvalstr2
+	svar sc_fdID
+	nvar fdID = $sc_fdID
+	
+	//string fdIDname           = LIvalstr[1][0]
+	
+	make /free /n=2 amp       = str2num(LIvalstr2[0][1])
+	variable freq				= str2num(LIvalstr2[1][1])
 	make /free /n=2 amp_time  = 1/freq/2
-	string DACs               = LIvalstr[1][3]
-	variable Cycles           = str2num(LIvalstr[1][4])
-	nvar fdID = $fdIDname
-	//amp_time /= 1000
+	string DACs               = LIvalstr2[2][1]
+	variable Cycles           = str2num(LIvalstr2[3][1])
+	
 	amp[2] *= -1
 	
 	setFdacAWGSquareWave(fdID, amp, amp_time, 0)
@@ -4632,12 +4636,14 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	tabControl tb2,tabLabel(2) = "AW1"
 	
 	//ListBox sc_InstrFdac,pos={400,450},size={600,100},fsize=14,frame=2,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1, editStyle=1
-	ListBox LIlist,pos={70,450},size={300,50},fsize=14,frame=2,widths={40,40,65,40,50}
-	ListBox LIlist,listwave=root:LIvalstr,selwave=root:LIattr,mode=1
-	button setupLI,pos={10,450},size={53,40},proc=scw_setupLockIn,title="Set\rLock-In"
+	//ListBox LIlist,pos={70,450},size={300,50},fsize=14,frame=2,widths={40,40,65,40,50}
+	//ListBox LIlist,listwave=root:LIvalstr,selwave=root:LIattr,mode=1
 	
-	//ListBox LIlist2,pos={80,650},size={250,50},fsize=14,frame=2,widths={40,40,65,40,50}
-	//ListBox LIlist2,listwave=root:LIvalstr,selwave=root:LIattr,mode=1
+	
+	button setupLI,pos={10,480},size={53,40},proc=scw_setupLockIn,title="Set\rLock-In"
+	
+	ListBox LIlist2,pos={70,440},size={140,100},fsize=14,frame=2,widths={60,40}
+	ListBox LIlist2,listwave=root:LIvalstr2,selwave=root:LIattr2,mode=1
 	
 	//awgLIvalstr
 	//AWGvalstr
@@ -4652,9 +4658,6 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	
 	ListBox awgsetlist,pos={223,440},size={147,95},fsize=14,frame=2,widths={50,40}
 	ListBox awgsetlist,listwave=root:awgsetvalstr,selwave=root:awgsetattr,mode=1
-	
-	ListBox awgsetlist2,pos={70,570},size={300,50},fsize=14,frame=2,widths={40,40,40,40}
-	ListBox awgsetlist2,listwave=root:awgsetvalstr2,selwave=root:awgsetattr2,mode=1
 	
 	
 	///AWG
@@ -4680,7 +4683,7 @@ Function TabProc(tca) : TabControl
 			Variable isTab1 = tabNum==1
 			
 			
-			ModifyControl LIList disable=!isTab0 // Hide if not Tab 0
+			ModifyControl LIList2 disable=!isTab0 // Hide if not Tab 0
 			ModifyControl setupLI disable=!isTab0 // Hide if not Tab 0	
 			
 			if(tabNumAW == 0)
@@ -4734,26 +4737,6 @@ Function TabProc2(tca) : TabControl
 	return 0
 End
 
-
-
-//Function CreatePanel()
-//DoWindow/K TabPanel
-//NewPanel/N=TabPanel/W=(596,59,874,175) as "Tab Demo Panel"
-//TabControl tb,pos={15,19},size={250,80},proc=TabProc
-//TabControl tb,tabLabel(0)="Settings"
-//TabControl tb,tabLabel(1)="More Settings",value= 0
-//CheckBox thisCheck,pos={53,52},size={39,14},title="This"
-//CheckBox thisCheck,value= 1,mode=1
-//CheckBox thatCheck,pos={53,72},size={39,14},title="That"
-//CheckBox thatCheck,value= 0,mode=1
-//PopupMenu colorPop,pos={126,60},size={82,20},title="Color"
-//PopupMenu colorPop,mode=1,popColor= (65535,0,0)
-//PopupMenu colorPop,value= #"\"*COLORPOP*\""
-//CheckBox multCheck,pos={50,60},size={16,14},disable=1
-//CheckBox multCheck,title="",value= 1
-//SetVariable multVar,pos={69,60},size={120,15},disable=1
-//SetVariable multVar,title="Multiplier",value=multiplier
-//End
 
 
 	// set update speed for ADCs
@@ -4984,16 +4967,27 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	concatenate/o {fadcattr0,fadcattr0,fadcattr2,fadcattr1,fadcattr1, fadcattr2, fadcattr2, fadcattr1, fadcattr2}, fadcattr // added fadcattr2 twice for two checkbox commands?
 	
 	
-	// create waves for LI
-	make/o/t/n=(2,5) LIvalstr
-	LIvalstr[0][0] = "fdID"
-	LIvalstr[0][1] = "Amp"
-	LIvalstr[0][2] = "Freq (Hz)"
-	LIvalstr[0][3] = "DACs"
-	LIvalstr[0][4] = "Cycles"
+//	// create waves for LI
+//	make/o/t/n=(2,5) LIvalstr
+//	LIvalstr[0][0] = "fdID"
+//	LIvalstr[0][1] = "Amp"
+//	LIvalstr[0][2] = "Freq (Hz)"
+//	LIvalstr[0][3] = "DACs"
+//	LIvalstr[0][4] = "Cycles"
+//	
+//	make/o/n=(2,5) LIattr = 0
+//	LIattr[1][] = 2
 	
-	make/o/n=(2,5) LIattr = 0
-	LIattr[1][] = 2
+	// create waves for LI
+	make/o/t/n=(4,2) LIvalstr2
+	LIvalstr2[0][0] = "Amp"
+	LIvalstr2[1][0] = "Freq (Hz)"
+	LIvalstr2[2][0] = "DACs"
+	LIvalstr2[3][0] = "Cycles"
+	
+	make/o/n=(4,2) LIattr2 = 0
+	LIattr2[][1] = 2
+	
 
 	// create waves for AWG
 	make/o/t/n=(10,2) AWGvalstr
