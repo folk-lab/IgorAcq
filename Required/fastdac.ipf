@@ -1408,9 +1408,9 @@ function setFdacAWGSquareWave(instrID, amps, times, wave_num)
 	make/o/free/n=(numpnts(amps), 2) awg_sqw          //awg_sqw will hold the information about the squarewave
 	variable samplingFreq = getFADCspeed(instrID)     //sampling frequency is needed to properly implement time
 	variable numSamples = 0, i=0, j=0
-   
+   variable numADCs = scf_getNumRecordedADCs()
    for(i=0;i<numpnts(amps);i++)                            
-   		numSamples = round(times[i]*samplingFreq)   // Convert to # samples
+   		numSamples = round(times[i]*samplingFreq/numADCs)   // Convert to # samples
          
       	if(numSamples == 0)                         // Prevent adding zero length setpoint
        	abort "ERROR[setFdacAWGSquareWave]: trying to add setpoint with zero length, duration too short for sampleFreq"
@@ -1455,33 +1455,33 @@ end
 //   endif
 
    // make wave to store setpoints/sample_lengths
-   make/o/free/n=(2, 2) awg_sqw  // First 2 is number of setpoints, second 2 is for setpoints/sample_lens
-
-   variable samplingFreq = getFADCspeed(instrID)  // Gets sampling rate of FD (Note: NOT measureFreq here)
-   variable numSamples = 0
-
-   variable i=0, j=0
-   for(i=0;i<numpnts(sps);i++)
-      if(lens[i] != 0)  // Only add to wave if duration is non-zero
-         numSamples = round(lens[i]*samplingFreq)  // Convert to # samples
-         if(numSamples == 0)  // Prevent adding zero length setpoint
-            abort "ERROR[setFdacAWGSquareWave]: trying to add setpoint with zero length, duration too short for sampleFreq"
-         endif
-         awg_sqw[j][0] = {sps[i]}
-         awg_sqw[j][1] = {numSamples}
-         j++
-      endif
-   endfor
-
-   if(numpnts(awg_sqw) == 0)
-      abort "ERROR[setFdacAWGSquareWave]: No setpoints added to awg_sqw"
-   endif
-
-   fd_clearAWGwave(instrID, wave_num)
-   fd_addAWGwave(instrID, wave_num, awg_sqw)
-   printf "Set square wave on AWG_wave%d\r", wave_num
-   
-end
+//   make/o/free/n=(2, 2) awg_sqw  // First 2 is number of setpoints, second 2 is for setpoints/sample_lens
+//
+//   variable samplingFreq = getFADCspeed(instrID)  // Gets sampling rate of FD (Note: NOT measureFreq here)
+//   variable numSamples = 0
+//	
+//   variable i=0, j=0
+//   for(i=0;i<numpnts(sps);i++)
+//      if(lens[i] != 0)  // Only add to wave if duration is non-zero
+//         numSamples = round(lens[i]*samplingFreq)  // Convert to # samples
+//         if(numSamples == 0)  // Prevent adding zero length setpoint
+//            abort "ERROR[setFdacAWGSquareWave]: trying to add setpoint with zero length, duration too short for sampleFreq"
+//         endif
+//         awg_sqw[j][0] = {sps[i]}
+//         awg_sqw[j][1] = {numSamples}
+//         j++
+//      endif
+//   endfor
+//
+//   if(numpnts(awg_sqw) == 0)
+//      abort "ERROR[setFdacAWGSquareWave]: No setpoints added to awg_sqw"
+//   endif
+//
+//   fd_clearAWGwave(instrID, wave_num)
+//   fd_addAWGwave(instrID, wave_num, awg_sqw)
+//   printf "Set square wave on AWG_wave%d\r", wave_num
+//   
+//end
 
 
 function setupAWG(instrID, [AWs, DACs, numCycles, verbose])
