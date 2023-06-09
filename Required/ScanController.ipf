@@ -4508,8 +4508,8 @@ end
 window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	variable v_left,v_right,v_top,v_bottom
 	PauseUpdate; Silent 1 // pause everything else, while building the window
-	//NewPanel/w=(0,0,790,630)/n=ScanControllerFastDAC // window size ////// EDIT 570 -> 600
-	NewPanel/w=(0,0,1010,610)/n=ScanControllerFastDAC
+	
+	NewPanel/w=(0,0,1010,585)/n=ScanControllerFastDAC
 	if(v_left+v_right+v_top+v_bottom > 0)
 		MoveWindow/w=ScanControllerFastDAC v_left,v_top,V_right,v_bottom
 	endif
@@ -4519,7 +4519,7 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	DrawText 160, 45, "DAC"
 	SetDrawEnv fsize=25, fstyle=1
 	DrawText 650, 45, "ADC"
-	DrawLine 385,15,385,600 
+	DrawLine 385,15,385,575 
 	DrawLine 395,415,1000,415 /////EDIT 385-> 415
 	DrawLine 355,415,375,415
 	DrawLine 10,415,220,415
@@ -4590,8 +4590,7 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	// identical to ScanController window
 	// all function calls are to ScanController functions
 	// instrument communication
-	//SetDrawEnv fsize=14, fstyle=1
-	//DrawText 15, 545, "Arbitrary Wave Generator"
+	
 	SetDrawEnv fsize=14, fstyle=1
 	DrawText 415, 445, "Connect Instrument" 
 	SetDrawEnv fsize=14, fstyle=1 
@@ -4600,8 +4599,7 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	DrawText 825, 445, "Log Status" 
 	ListBox sc_InstrFdac,pos={400,450},size={600,100},fsize=14,frame=2,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1, editStyle=1
 
-	// buttons
-		  
+	// buttons  
 	button connectfdac,pos={400,555},size={110,20},proc=scw_OpenInstrButton,title="Connect Instr" 
 	button guifdac,pos={520,555},size={110,20},proc=scw_OpenGUIButton,title="Open All GUI" 
 	button killaboutfdac, pos={640,555},size={120,20},proc=sc_controlwindows,title="Kill Sweep Controls" 
@@ -4609,7 +4607,7 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	button updatebuttonfdac, pos={890,555},size={110,20},proc=scw_updatewindow,title="Update" 
 
 	// helpful text
-	DrawText 820, 595, "Press Update to save changes."
+	//DrawText 820, 595, "Press Update to save changes."
 	
 	
 	/// Lock in stuff
@@ -4622,14 +4620,9 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	tabControl tb2,tabLabel(1) = "AW0"
 	tabControl tb2,tabLabel(2) = "AW1"
 	
-	//ListBox sc_InstrFdac,pos={400,450},size={600,100},fsize=14,frame=2,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1, editStyle=1
-	//ListBox LIlist,pos={70,450},size={300,50},fsize=14,frame=2,widths={40,40,65,40,50}
-	//ListBox LIlist,listwave=root:LIvalstr,selwave=root:LIattr,mode=1
+	button setupLI,pos={10,510},size={55,40},proc=scw_setupLockIn,title="Set\rLock-In"
 	
-	
-	button setupLI,pos={10,500},size={55,40},proc=scw_setupLockIn,title="Set\rLock-In"
-	
-	ListBox LIlist,pos={70,455},size={140,100},fsize=14,frame=2,widths={60,40}
+	ListBox LIlist,pos={70,455},size={140,95},fsize=14,frame=2,widths={60,40}
 	ListBox LIlist,listwave=root:LIvalstr,selwave=root:LIattr,mode=1
 	
 	ListBox LIlist0,pos={223,455},size={147,95},fsize=14,frame=2,widths={40,60}
@@ -4654,7 +4647,7 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	button clearAW,pos={10,555},size={55,20},proc=scw_clearAWinputs,title="Clear", disable = 1
 	button setupAW,pos={10,525},size={55,20},proc=scw_setupsquarewave,title="Create", disable = 1
 	SetVariable sc_wnumawgBox,pos={10,499},size={55,25},value=sc_wnumawg,side=1,title ="\Z14AW", help={"any whole number -> 0, 1, 2"}, disable = 1
-	SetVariable sc_fdIDBox, pos={10,465},size={55,20}, value=sc_fdID ,side=1,title="\Z14fdID", disable = 1, help={"CSV sets for DACS e.g. \"02, 1\" for DACs 0, 2 to output AW0, and DAC 1 to output AW1"}
+	SetVariable sc_fdIDBox, pos={10,465},size={55,20}, value=sc_fdID ,side=1,title="\Z14fdID", help={"CSV sets for DACS e.g. \"02, 1\" for DACs 0, 2 to output AW0, and DAC 1 to output AW1"}
 	
 	button setupAWGfdac,pos={260,555},size={110,20},proc=scw_setupAWG,title="Setup AWG", disable = 1
 	
@@ -4964,15 +4957,17 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	LIvalstr[1][0] = "Freq (Hz)"
 	LIvalstr[2][0] = "DACs"
 	LIvalstr[3][0] = "Cycles"
+	LIvalstr[][1] = ""
 	
 	make/o/n=(4,2) LIattr = 0
 	LIattr[][1] = 2
 	
 	make/o/t/n=(4,2) LIvalstr0
-	LIvalstr0[0][0] = "Square"
-	LIvalstr0[0][1] = "Wave"
+	LIvalstr0[0][0] = "\Z14AW0"
+	LIvalstr0[0][1] = ""
 	LIvalstr0[1][0] = "Amp"
 	LIvalstr0[1][1] = "Time (ms)"
+	LIvalstr0[2,3][] = ""
 	
 	make/o/n=(4,2) LIattr0 = 0
 
@@ -5003,18 +4998,12 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	AWGsetvalstr[1][0] = "AWs"
 	AWGsetvalstr[2][0] = "DACs"
 	AWGsetvalstr[3][0] = "Cycles"
+	AWGsetvalstr[][1] = ""
 	
 	make/o/n=(4,2) AWGsetattr = 0
 	AWGsetattr[][1] = 2
 	
-	make/o/t/n=(2,4) AWGsetvalstr2
-	AWGsetvalstr2[0][0] = "fdID"
-	AWGsetvalstr2[0][1] = "AWs"
-	AWGsetvalstr2[0][2] = "DACs"
-	AWGsetvalstr2[0][3] = "Cycles"
-	
-	make/o/n=(2,4) AWGsetattr2 = 0
-	AWGsetattr2[1][] = 2
+
 	
 	
 	variable/g sc_printfadc = 0
