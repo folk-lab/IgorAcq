@@ -4042,36 +4042,29 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 	struct ScanVars &ScanVars
 	struct AWGVars &AWGVars
 	variable rowNum
-		
-	// Get all raw 1D wave names in a list
+	
+	variable i = 0
 	string RawWaveNames1D = sci_get1DWaveNames(1, 1)
 	string CalcWaveNames1D = sci_get1DWaveNames(0, 1)
 	string CalcStrings = scf_getRecordedFADCinfo("calc_funcs")
-	if (itemsinList(RawWaveNames1D) != itemsinList(CalCWaveNames1D))
-		abort "Different number of raw wave names compared to calc wave names"
-	endif
-
 	nvar sc_ResampleFreqfadc, sc_demody, sc_plotRaw
 	svar sc_nfreq, sc_nQs
-		
-	variable i = 0
-	string rwn, cwn
-	string calc_string, calc_str
-	
+	string rwn, cwn, calc_string, calc_str 
 	wave fadcattr
 	wave /T fadcvalstr
 	
-	for (i=0; i<itemsinlist(RawWaveNames1D); i++)
+	if (itemsinList(RawWaveNames1D) != itemsinList(CalCWaveNames1D))
+		abort "Different number of raw wave names compared to calc wave names"
+	endif
 	
+	for (i=0; i<itemsinlist(RawWaveNames1D); i++)
 
 			rwn = StringFromList(i, RawWaveNames1D)
 			cwn = StringFromList(i, CalcWaveNames1D)		
 			calc_string = StringFromList(i, CalcStrings)
 			duplicate/o $rwn sc_tempwave
 			string ADCnum = rwn[3,INF]
-			
-
-			
+						
 			if (fadcattr[str2num(ADCnum)][5] == 48) // checks which notch box is checked
 				scfd_notch_filters(sc_tempwave, ScanVars.measureFreq,Hzs=sc_nfreq, Qs=sc_nQs)
 			endif
@@ -4083,10 +4076,7 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			if (fadcattr[str2num(ADCnum)][8] == 48) // checks which resample box is checked
 				scfd_resampleWaves(sc_tempwave, ScanVars.measureFreq, sc_ResampleFreqfadc)
 			endif
-			
-			
-	
-			
+
 			calc_str = ReplaceString(rwn, calc_string, "sc_tempwave")
 			execute("sc_tempwave ="+calc_string)
 			execute(cwn+" = sc_tempwave")
@@ -4094,7 +4084,6 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			//calc function for demod x
 			calc_str = ReplaceString(rwn, calc_string, cwn + "x")
 			execute(cwn+"x ="+calc_str)
-			
 			
 			//calc function for demod y
 			calc_str = ReplaceString(rwn, calc_string, cwn + "y")
@@ -4109,8 +4098,7 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 				// Copy 1D calc into 2D
 				string cwn2d = cwn+"_2d"
 				wave calc2d = $cwn2d
-				calc2d[][rowNum] = sc_tempwave[p]
-				
+				calc2d[][rowNum] = sc_tempwave[p]	
 				
 				// Copy 1D demod into 2D
 				if (fadcattr[str2num(ADCnum)][6] == 48)
@@ -4129,28 +4117,26 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 					endif
 					
 				endif
-						
+							
 			endif
 			
-			
-			//for powerspec//
+			// for powerspec //
 			variable avg_over = 5 //can specify the amount of rows that should be averaged over
 			
 			if (sc_plotRaw == 1)
-	
 				if (rowNum < avg_over)			
 					duplicate /O/R = [][0,rowNum] $(rwn + "_2d") powerspec2D
 				else
 					duplicate /O/R = [][rowNum-avg_over,rowNum] $(rwn + "_2d") powerspec2D
 				endif
-				
 				scfd_spectrum_analyzer(powerspec2D, ScanVars.measureFreq, "pwrspec" + ADCnum)
 			endif
-			
 	endfor	
+	
 	if (!ScanVars.prevent_2d_graph_updates)
 		doupdate // Update all the graphs with their new data
 	endif
+	
 end
 
 
