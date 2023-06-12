@@ -3885,7 +3885,11 @@ function scfd_demodulate(wav, harmonic, nofcycles, period, wnam)//, [append2hdf]
 	wave wav_x=$wn_x
 	wave wav_y=$wn_y
 	
+	
 	duplicate /o wav, wav_copy
+	wav_copy = x
+	variable last_x = wav_copy[INF]
+	wav_copy = wav
 	Redimension/N=(-1,2) wav_copy
 	cols=dimsize(wav_copy,0)
 	rows=dimsize(wav_copy,1)
@@ -3900,6 +3904,7 @@ function scfd_demodulate(wav, harmonic, nofcycles, period, wnam)//, [append2hdf]
 	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,wn_x)
 	wave wav_x=$wn_x
 	Redimension/N=(-1) wav_x //demod.x wave
+	setscale/I x, 0, last_x, wav_x //Manually setting scale to be inclusive of last point
 	
 	//Demodulation in y
 	sine1d=cos(2*pi*(harmonic*p/period) + sc_demodphi /180 *pi)
@@ -3910,6 +3915,7 @@ function scfd_demodulate(wav, harmonic, nofcycles, period, wnam)//, [append2hdf]
 	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,wn_y)
 	wave wav_y=$wn_y
 	Redimension/N=(-1) wav_y //demod.y wave
+	setscale/I x, 0, last_x, wav_y //Manually setting scale to be inclusive of last point
 
 end 
 
