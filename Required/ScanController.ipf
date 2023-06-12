@@ -2339,6 +2339,7 @@ function scw_setupLockIn(action) : Buttoncontrol
 	LIvalstr0[2,3][1] = num2str(times[p-2] * 1000)
 	awgvalstr0[1,2][0] = num2str(amps[p-1])
 	awgvalstr0[1,2][1] = num2str(times[p-1] * 1000)
+	awgvalstr0[3,9][] = ""
 	
 	
 end

@@ -1396,8 +1396,11 @@ function setFdacAWGSquareWave(instrID, amps, times, wave_num)
 	   
 	variable instrID
 	wave amps, times
-	int wave_num 
-	
+	int wave_num
+	struct AWGVars S
+	fd_getGlobalAWG(S) 
+	S.numADCs = scf_getNumRecordedADCs()
+	fd_setGlobalAWG(S)
 	
 	// checking if amps and times are the same length
 	if (numpnts(amps) != numpnts(times))
@@ -1497,7 +1500,7 @@ function setupAWG(instrID, [AWs, DACs, numCycles, verbose])
 	
 	struct AWGVars S
 	fd_getGlobalAWG(S)
-
+	
 	// Note: This needs to be changed if using same AW on multiple DACs
 	DACs = scu_getChannelNumbers(DACs, fastdac=1)  // Convert from label to numbers 
 	DACs = ReplaceString(";", DACs, ",")  
@@ -1510,6 +1513,10 @@ function setupAWG(instrID, [AWs, DACs, numCycles, verbose])
 	S.numWaves = itemsinlist(AWs, ",")
 	
 	// For checking things don't change before scanning
+	if (S.numADCs != scf_getNumRecordedADCs())
+		abort "The number of ADCs being recorded changed, please set up the squarewaves again"
+	endif
+	
 	S.numADCs = scf_getNumRecordedADCs()  // Store number of ADCs selected in window so can check if this changes
 	S.samplingFreq = getfadcspeed(instrID)
 	S.measureFreq = S.samplingFreq/S.numADCs
