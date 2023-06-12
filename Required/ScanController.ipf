@@ -2233,8 +2233,8 @@ EndMacro
 function scw_setupsquarewave(action) : Buttoncontrol
 	string action
 	wave /t awgsetvalstr, LIvalstr0, awgvalstr, awgvalstr0, awgvalstr1
-	svar sc_fdID
-	nvar sc_wnumawg, fdID = $sc_fdID, sc_freqAW0, sc_freqAW1
+	svar sc_fdID, sc_freqAW0, sc_freqAW1
+	nvar sc_wnumawg, fdID = $sc_fdID
 	
 	int i, j=0, num_amps = dimsize(awgvalstr,0) - 1
 	make /free /n=(num_amps) amps = 0
@@ -2269,13 +2269,13 @@ function scw_setupsquarewave(action) : Buttoncontrol
 		awgvalstr0[1,j][1] = num2str(times[p-1] * 1000)
 		awgvalstr0[j+1,INF][] = ""
 		LIvalstr0[2,3][] = ""
-		sc_freqAW0 = 1/sum(times)
+		sc_freqAW0 = num2str(1/sum(times))
 	
 	elseif(sc_wnumawg == 1)
 		awgvalstr1[1,j][0] = num2str(amps[p-1])
 		awgvalstr1[1,j][1] = num2str(times[p-1] * 1000)
 		awgvalstr0[j+1,INF][] = ""
-		sc_freqAW1 = 1/sum(times)
+		sc_freqAW1 = num2str(1/sum(times))
 	endif
 	
 	//for populating AWs
@@ -2322,12 +2322,12 @@ end
 function scw_setupLockIn(action) : Buttoncontrol
 	string action
 	wave /t LIvalstr, LIvalstr0,awgvalstr0
-	svar sc_fdID
-	nvar fdID = $sc_fdID, sc_freqAW0
+	svar sc_fdID, sc_freqAW0
+	nvar fdID = $sc_fdID
 	
 	make /free /n=2 amps      = str2num(LIvalstr[0][1])
-	sc_freqAW0				   	= str2num(LIvalstr[1][1])
-	make /free /n=2 times     = 1/sc_freqAW0/2
+	sc_freqAW0				   	= LIvalstr[1][1]
+	make /free /n=2 times     = 1/str2num(sc_freqAW0)/2
 	string DACs               = LIvalstr[2][1]
 	variable Cycles           = str2num(LIvalstr[3][1])
 	amps[1] *= -1
@@ -4645,6 +4645,9 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	ListBox awgsetlist,pos={223,455},size={147,95},fsize=14,frame=2,widths={50,40}, disable = 1
 	ListBox awgsetlist,listwave=root:awgsetvalstr,selwave=root:awgsetattr,mode=1
 	
+	titleBox freqtextbox, pos={10,480}, size={100, 20}, title="Frequency", frame = 0, disable=1
+	titleBox Hztextbox, pos={48,503}, size={40, 20}, title="Hz", frame = 0, disable=1
+	
 	
 	///AWG
 	button clearAW,pos={10,555},size={55,20},proc=scw_clearAWinputs,title="Clear", disable = 1
@@ -4653,8 +4656,8 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	SetVariable sc_fdIDBox, pos={10,465},size={55,20}, value=sc_fdID ,side=1,title="\Z14fdID"
 	
 	
-	SetVariable sc_freqBox0, pos={10,500},size={59,20}, value=sc_freqAW0 ,side=0,title="\Z14 ", disable = 1, help = {"Shows the frequency of AW0"}
-	SetVariable sc_freqBox1, pos={10,500},size={59,20}, value=sc_freqAW1 ,side=1,title="\Z14 ", disable = 1, help = {"Shows the frequency of AW1"}
+	SetVariable sc_freqBox0, pos={6,500},size={40,20}, value=sc_freqAW0 ,side=0,title="\Z14 ", disable = 1, help = {"Shows the frequency of AW0"}
+	SetVariable sc_freqBox1, pos={6,500},size={40,20}, value=sc_freqAW1 ,side=1,title="\Z14 ", disable = 1, help = {"Shows the frequency of AW1"}
 	button setupAWGfdac,pos={260,555},size={110,20},proc=scw_setupAWG,title="Setup AWG", disable = 1
 	
 	 
@@ -4689,11 +4692,15 @@ Function TabProc(tca) : TabControl
 				ModifyControl sc_fdIDbox disable = isTab1
 				ModifyControl awglist0 disable=!isTab1
 				ModifyControl sc_freqBox0 disable =!isTab1
+				ModifyControl freqtextbox disable =!isTab1
+				ModifyControl Hztextbox disable =!isTab1
 				
 			elseif(tabNumAW==2)	
 				ModifyControl sc_fdIDbox disable = isTab1
 				ModifyControl awglist1 disable=!isTab1
 				ModifyControl sc_freqBox1 disable =!isTab1
+				ModifyControl freqtextbox disable =!isTab1
+				ModifyControl Hztextbox disable =!isTab1
 			
 			endif
 			
@@ -4724,6 +4731,8 @@ Function TabProc2(tca) : TabControl
 			ModifyControl sc_freqBox1 disable = !isTab2
 			ModifyControl awglist0 disable=!isTab1
 			ModifyControl awglist1 disable=!isTab2
+			ModifyControl freqtextbox disable = isTab0
+			ModifyControl Hztextbox disable =isTab0
 			
 			if(isTab1)
 				ModifyControl sc_freqBox0 disable = 2
@@ -5029,8 +5038,8 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	variable/g sc_wnumawg = 0
 	variable/g tabnumAW = 0
 	variable/g sc_ResampleFreqfadc = 100 // Resampling frequency if using resampling
-	variable/g sc_freqAW0 = 0
-	variable/g sc_freqAW1 = 0
+	string /g sc_freqAW0 = ""
+	string /g sc_freqAW1 = ""
 	string /g sc_nfreq = "60,180,300"
 	string /g sc_nQs = "50,150,250"
 	string /g sc_fdID = "" 
