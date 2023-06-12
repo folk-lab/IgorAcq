@@ -2335,8 +2335,8 @@ function scw_setupLockIn(action) : Buttoncontrol
 	setFdacAWGSquareWave(fdID, amps, times, 0)
 	setupAWG(fdID, AWs="0", DACs=DACs, numCycles=Cycles, verbose=1)
 	
-	LIvalstr0[1,2][0] = num2str(amps[p-2])
-	LIvalstr0[1,2][1] = num2str(times[p-2] * 1000)
+	LIvalstr0[1,2][0] = num2str(amps[p-1])
+	LIvalstr0[1,2][1] = num2str(times[p-1] * 1000)
 	awgvalstr0[1,2][0] = num2str(amps[p-1])
 	awgvalstr0[1,2][1] = num2str(times[p-1] * 1000)
 	awgvalstr0[3,9][] = ""
@@ -4050,7 +4050,7 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 		
 	variable i = 0
 	string rwn, cwn
-	string calc_string
+	string calc_string, calc_str
 	
 	wave fadcattr
 	wave /T fadcvalstr
@@ -4081,9 +4081,18 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			
 	
 			
-			calc_string = ReplaceString(rwn, calc_string, "sc_tempwave")
+			calc_str = ReplaceString(rwn, calc_string, "sc_tempwave")
 			execute("sc_tempwave ="+calc_string)
 			execute(cwn+" = sc_tempwave")
+			
+			//calc function for demod x
+			calc_str = ReplaceString(rwn, calc_string, cwn + "x")
+			execute(cwn+"x ="+calc_str)
+			
+			
+			//calc function for demod y
+			calc_str = ReplaceString(rwn, calc_string, cwn + "y")
+			execute(cwn+"y ="+calc_str)
 			
 			if (ScanVars.is2d)
 				// Copy 1D raw into 2D
