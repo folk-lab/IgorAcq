@@ -2268,7 +2268,7 @@ function scw_setupsquarewave(action) : Buttoncontrol
 		awgvalstr0[1,j][0] = num2str(amps[p-1])
 		awgvalstr0[1,j][1] = num2str(times[p-1] * 1000)
 		awgvalstr0[j+1,INF][] = ""
-		LIvalstr0[2,3][] = ""
+		LIvalstr0[1,2][] = ""
 		sc_freqAW0 = num2str(1/sum(times))
 	
 	elseif(sc_wnumawg == 1)
@@ -2335,8 +2335,8 @@ function scw_setupLockIn(action) : Buttoncontrol
 	setFdacAWGSquareWave(fdID, amps, times, 0)
 	setupAWG(fdID, AWs="0", DACs=DACs, numCycles=Cycles, verbose=1)
 	
-	LIvalstr0[2,3][0] = num2str(amps[p-2])
-	LIvalstr0[2,3][1] = num2str(times[p-2] * 1000)
+	LIvalstr0[1,2][0] = num2str(amps[p-2])
+	LIvalstr0[1,2][1] = num2str(times[p-2] * 1000)
 	awgvalstr0[1,2][0] = num2str(amps[p-1])
 	awgvalstr0[1,2][1] = num2str(times[p-1] * 1000)
 	awgvalstr0[3,9][] = ""
@@ -4629,9 +4629,10 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	ListBox LIlist,pos={70,455},size={140,95},fsize=14,frame=2,widths={60,40}
 	ListBox LIlist,listwave=root:LIvalstr,selwave=root:LIattr,mode=1
 	
-	ListBox LIlist0,pos={223,455},size={147,95},fsize=14,frame=2,widths={40,60}
+	ListBox LIlist0,pos={223,479},size={147,71},fsize=14,frame=2,widths={40,60}
 	ListBox LIlist0,listwave=root:LIvalstr0,selwave=root:LIattr0,mode=1
 	
+	titlebox AW0text,pos={223,455},size={60,20},Title = "AW0",frame=0, fsize=14
 	//awgLIvalstr
 	//AWGvalstr
 	ListBox awglist,pos={70,455},size={140,120},fsize=14,frame=2,widths={40,60}, disable = 1
@@ -4679,6 +4680,7 @@ Function TabProc(tca) : TabControl
 			ModifyControl LIList disable=!isTab0 // Hide if not Tab 0
 			ModifyControl LIList0 disable=!isTab0
 			ModifyControl setupLI disable=!isTab0 // Hide if not Tab 0	
+			ModifyControl AW0text disable =!isTab0
 			
 			if(tabNumAW == 0)
 				ModifyControl awglist disable=!isTab1 // Hide if not Tab 0
@@ -4987,14 +4989,12 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	make/o/n=(4,2) LIattr = 0
 	LIattr[][1] = 2
 	
-	make/o/t/n=(4,2) LIvalstr0
-	LIvalstr0[0][0] = "\Z14AW0"
-	LIvalstr0[0][1] = ""
-	LIvalstr0[1][0] = "Amp"
-	LIvalstr0[1][1] = "Time (ms)"
-	LIvalstr0[2,3][] = ""
+	make/o/t/n=(3,2) LIvalstr0
+	LIvalstr0[0][0] = "Amp"
+	LIvalstr0[0][1] = "Time (ms)"
+	LIvalstr0[1,2][] = ""
 	
-	make/o/n=(4,2) LIattr0 = 0
+	make/o/n=(3,2) LIattr0 = 0
 
 	// create waves for AWG
 	make/o/t/n=(10,2) AWGvalstr
