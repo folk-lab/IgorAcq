@@ -1323,10 +1323,20 @@ end
 
 
 
-function ScanLS625Magnet(instrID, startx, finx, numptsx, delayx, [y_label, comments, nosave]) 
-	variable instrID, startx, finx, numptsx, delayx,  nosave
+function ScanLS625Magnet(instrID, startx, finx, numptsx, delayx, [y_label, comments, nosave, fast]) //set fast=1 to run quickly
+	variable instrID, startx, finx, numptsx, delayx,  nosave, fast
 	string y_label, comments
+	nvar k2400t,k2400b
+	
+	
+	variable ramprate
+	
+	if(paramisdefault(fast))
+		fast=0
+	endif
 	//abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
+	
+	
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -1335,14 +1345,25 @@ function ScanLS625Magnet(instrID, startx, finx, numptsx, delayx, [y_label, comme
 	comments = selectstring(paramisdefault(comments), comments, "")
 	y_label = selectstring(paramisdefault(y_label), y_label, "")
 	
+	variable tg, bg, nue, D
+	tg = getK2400voltage(k2400t)
+	bg = getK2400voltage(k2400b)
+	nue=ConvertnTonu(ConvertVtVbTon(tg,bg))
+	D=ConvertVtVbToD(tg,bg)
+	
+	string temp
+	temp=num2str(tg)+","+num2str(bg)+","+num2str(nue)+","+num2str(D);
+	comments=temp;
+	
 	// Initialize ScanVars
 	struct ScanVars S
 	initScanVars(S, instrIDx=instrID, startx=startx, finx=finx, numptsx=numptsx, delayx=delayx, \
-	 						y_label=y_label, x_label = "Field /mT", comments=comments)
+	 						y_label=y_label, comments=comments)
 							
 
 	// Check software limits and ramprate limits
 	// PreScanChecksMagnet(S)
+	ramprate = getLS625rate(S.instrIDx)
 	
 	// Ramp to start without checks because checked above
 	setlS625fieldWait(S.instrIDx, S.startx)
@@ -1357,8 +1378,13 @@ function ScanLS625Magnet(instrID, startx, finx, numptsx, delayx, [y_label, comme
 	variable i=0, setpointx
 	do
 		setpointx = S.startx + (i*(S.finx-S.startx)/(S.numptsx-1))
-		setlS625fieldWait(S.instrIDx, setpointx, short_wait = 1) // Mr Ray changed this on August 04 
-		sc_sleep(S.delayx)
+		if(fast==1)
+			setlS625field(S.instrIDx, setpointx) 
+			sc_sleep(max(S.delayx, (0.05+60*abs(finx-startx)/numptsx/ramprate)))
+		else
+			setlS625fieldwait(S.instrIDx, setpointx) 
+			sc_sleep(S.delayx)
+		endif
 		RecordValues(S, i, i)
 		i+=1
 	while (i<S.numptsx)
