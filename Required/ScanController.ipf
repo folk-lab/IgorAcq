@@ -4070,7 +4070,15 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			endif
 			
 			if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
-				scfd_demodulate(sc_tempwave, str2num(fadcvalstr[str2num(ADCnum)][7]), AWGVars.numCycles, AWGVars.waveLen, cwn) 
+				scfd_demodulate(sc_tempwave, str2num(fadcvalstr[str2num(ADCnum)][7]), AWGVars.numCycles, AWGVars.waveLen, cwn)
+				
+				//calc function for demod x
+				calc_str = ReplaceString(rwn, calc_string, cwn + "x")
+				execute(cwn+"x ="+calc_str)
+			
+				//calc function for demod y
+				calc_str = ReplaceString(rwn, calc_string, cwn + "y")
+				execute(cwn+"y ="+calc_str)
 			endif
 				
 			if (fadcattr[str2num(ADCnum)][8] == 48) // checks which resample box is checked
@@ -4081,13 +4089,7 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			execute("sc_tempwave ="+calc_string)
 			execute(cwn+" = sc_tempwave")
 			
-			//calc function for demod x
-			calc_str = ReplaceString(rwn, calc_string, cwn + "x")
-			execute(cwn+"x ="+calc_str)
-			
-			//calc function for demod y
-			calc_str = ReplaceString(rwn, calc_string, cwn + "y")
-			execute(cwn+"y ="+calc_str)
+
 			
 			if (ScanVars.is2d)
 				// Copy 1D raw into 2D
