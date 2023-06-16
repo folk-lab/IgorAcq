@@ -1326,7 +1326,6 @@ end
 function ScanLS625Magnet(instrID, startx, finx, numptsx, delayx, [y_label, comments, nosave, fast]) //set fast=1 to run quickly
 	variable instrID, startx, finx, numptsx, delayx,  nosave, fast
 	string y_label, comments
-	nvar k2400t,k2400b
 	
 	
 	variable ramprate
@@ -1334,7 +1333,6 @@ function ScanLS625Magnet(instrID, startx, finx, numptsx, delayx, [y_label, comme
 	if(paramisdefault(fast))
 		fast=0
 	endif
-	//abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
 	
 	
 	
@@ -1345,15 +1343,7 @@ function ScanLS625Magnet(instrID, startx, finx, numptsx, delayx, [y_label, comme
 	comments = selectstring(paramisdefault(comments), comments, "")
 	y_label = selectstring(paramisdefault(y_label), y_label, "")
 	
-	variable tg, bg, nue, D
-	tg = getK2400voltage(k2400t)
-	bg = getK2400voltage(k2400b)
-	nue=ConvertnTonu(ConvertVtVbTon(tg,bg))
-	D=ConvertVtVbToD(tg,bg)
-	
-	string temp
-	temp=num2str(tg)+","+num2str(bg)+","+num2str(nue)+","+num2str(D);
-	comments=temp;
+
 	
 	// Initialize ScanVars
 	struct ScanVars S
