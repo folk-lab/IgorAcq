@@ -86,17 +86,30 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 	
 	
 	svar /z sc_fdackeys
+	string fdname, check
 	int numfdacs = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
 	
-	//if number of devices = 1, set it up as its own thing. If number of devices > 1 (and syncDACs) then select
-	// first device as master and other devices as slaves.
+	// Master/Slave set up for fastdacs
+	for(i = 0; i<numfdacs; i++)
+		fdname = stringbykey("name" + num2str(i+1),sc_fdackeys,":",",")
+		nvar fd = $fdname
+		if(syncDACs)
+			if(i == 0 && numfdacs == 1) 													// sets independent if theres only one device
+			check = queryInstr(fd, "SET_MODE,INDEP" + "\r\n")
+			printf " %s   on %s \r\n", check, fdname 
+			elseif(i == 0 && numfdacs > 1) 												// sets first device to master if theres multiple devices
+			check = queryInstr(fd, "SET_MODE,MASTER" + "\r\n")
+			printf " %s   on %s\r\n", check, fdname  
+			else																				// sets the remainder of devices to slaves
+			check = queryInstr(fd, "SET_MODE,SLAVE" + "\r\n")
+			printf " %s   on %s\r\n", check, fdname 
+			endif
+		else
+			check = queryInstr(fd, "SET_MODE,INDEP" + "\r\n")                   // sets all to independent
+			printf " %s   on %s \r\n", check, fdname 
+		endif
+	endfor
 	
-	if(syncDACs)
-		for(i = 0; i<numfdacs; i++)
-			//queryInstr(instrID, cmd,
-			
-		endfor
-	endif
 	return localRM
 end
 
