@@ -21,18 +21,46 @@
 //// Connection ////
 ////////////////////
 
-function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh,master, optical])
+function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh,master, optical, syncDACs])
 	// instrID is the name of the global variable that will be used for communication
 	// visa_address is the VISA address string, i.e. ASRL1::INSTR
 	// Most FastDAC communication relies on the info in "sc_fdackeys". Pass numDACCh and
 	// numADCCh to fill info into "sc_fdackeys"
 	string instrID, visa_address
-	variable verbose, numDACCh, numADCCh, master
+	variable verbose, numDACCh, numADCCh, master   //idk what the point of this master variable is.
 	variable optical  // Whether connected by optical (or usb)
+	int syncDACs
+	
+	variable i = 0
+	
+	
+	
+	
+	master   = paramisDefault(master)   ? 0 : master
+	optical  = paramisDefault(optical)  ? 1 : optical
+	verbose  = paramisDefault(verbose)  ? 1 : verbose
+	numDACCh = paramisDefault(numDACCh) ? 8 : numDACCh
+	numADCCh = paramisDefault(numADCCh) ? 4 : numADCCh
+	syncDACs = paramisDefault(syncDACs) ? 1 : syncDACs
+	
+//	if (svar_exists(instrIDs))
+//		instrIDs += ";" + instrID
+//	else
+//		string /g instrIDs = instrID
+//	endif
+	
+// sc_fdackeys already does what im trying to achieve
+	
+//	if(!paramIsDefault(instrID))
+//		for(i=0; i < 10; i++)
+//			nvar /z existingID = $instrID
+//			if(nvar_exists(existingID))
+//				instrID = instrID[0,1] + num2str(i+1)
+//			endif
+//		endfor
+//	endif
 
-	master = paramisDefault(master) ? 0 : master
-	optical = paramisDefault(optical) ? 1 : optical
-	verbose = paramisDefault(verbose) ? 1 : verbose
+	
 		
 	variable localRM
 	variable status = viOpenDefaultRM(localRM) // open local copy of resource manager
@@ -56,6 +84,19 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 		scf_addFDinfos(instrID,visa_address,numDACCh,numADCCh,master=master)
 	endif
 	
+	
+	svar /z sc_fdackeys
+	int numfdacs = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
+	
+	//if number of devices = 1, set it up as its own thing. If number of devices > 1 (and syncDACs) then select
+	// first device as master and other devices as slaves.
+	
+	if(syncDACs)
+		for(i = 0; i<numfdacs; i++)
+			//queryInstr(instrID, cmd,
+			
+		endfor
+	endif
 	return localRM
 end
 
