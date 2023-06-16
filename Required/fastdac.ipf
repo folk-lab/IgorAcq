@@ -21,7 +21,7 @@
 //// Connection ////
 ////////////////////
 
-function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh,master, optical, syncDACs])
+function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh,master, optical, sync])
 	// instrID is the name of the global variable that will be used for communication
 	// visa_address is the VISA address string, i.e. ASRL1::INSTR
 	// Most FastDAC communication relies on the info in "sc_fdackeys". Pass numDACCh and
@@ -29,38 +29,15 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 	string instrID, visa_address
 	variable verbose, numDACCh, numADCCh, master   //idk what the point of this master variable is.
 	variable optical  // Whether connected by optical (or usb)
-	int syncDACs
-	
-	variable i = 0
-	
-	
-	
-	
+	int sync
+	int i = 0
+
 	master   = paramisDefault(master)   ? 0 : master
 	optical  = paramisDefault(optical)  ? 1 : optical
 	verbose  = paramisDefault(verbose)  ? 1 : verbose
 	numDACCh = paramisDefault(numDACCh) ? 8 : numDACCh
 	numADCCh = paramisDefault(numADCCh) ? 4 : numADCCh
-	syncDACs = paramisDefault(syncDACs) ? 1 : syncDACs
-	
-//	if (svar_exists(instrIDs))
-//		instrIDs += ";" + instrID
-//	else
-//		string /g instrIDs = instrID
-//	endif
-	
-// sc_fdackeys already does what im trying to achieve
-	
-//	if(!paramIsDefault(instrID))
-//		for(i=0; i < 10; i++)
-//			nvar /z existingID = $instrID
-//			if(nvar_exists(existingID))
-//				instrID = instrID[0,1] + num2str(i+1)
-//			endif
-//		endfor
-//	endif
-
-	
+	sync     = paramisDefault(sync)     ? 1 : sync
 		
 	variable localRM
 	variable status = viOpenDefaultRM(localRM) // open local copy of resource manager
@@ -93,7 +70,7 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 	for(i = 0; i<numfdacs; i++)
 		fdname = stringbykey("name" + num2str(i+1),sc_fdackeys,":",",")
 		nvar fd = $fdname
-		if(syncDACs)
+		if(sync)
 			if(i == 0 && numfdacs == 1) 													// sets independent if theres only one device
 			check = queryInstr(fd, "SET_MODE,INDEP" + "\r\n")
 			printf " %s   on %s \r\n", check, fdname 
