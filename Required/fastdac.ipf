@@ -66,29 +66,89 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 	string fdname, check
 	int numfdacs = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
 	
-	// Master/Slave set up for fastdacs
-	for(i = 0; i<numfdacs; i++)
-		fdname = stringbykey("name" + num2str(i+1),sc_fdackeys,":",",")
-		nvar fd = $fdname
-		if(sync)
-			if(i == 0 && numfdacs == 1) 													// sets independent if theres only one device
-			check = queryInstr(fd, "SET_MODE,INDEP" + "\r\n")
-			printf " %s   on %s \r\n", check, fdname 
-			elseif(i == 0 && numfdacs > 1) 												// sets first device to master if theres multiple devices
-			check = queryInstr(fd, "SET_MODE,MASTER" + "\r\n")
-			printf " %s   on %s\r\n", check, fdname  
-			else																				// sets the remainder of devices to slaves
-			check = queryInstr(fd, "SET_MODE,SLAVE" + "\r\n")
-			printf " %s   on %s\r\n", check, fdname 
-			endif
-		else
-			check = queryInstr(fd, "SET_MODE,INDEP" + "\r\n")                   // sets all to independent
-			printf " %s   on %s \r\n", check, fdname 
-		endif
-	endfor
+//	// Master/Slave set up for fastdacs
+//	for(i = 0; i<numfdacs; i++)
+//		fdname = stringbykey("name" + num2str(i+1),sc_fdackeys,":",",")
+//		nvar fd = $fdname
+//		if(sync)
+//			if(i == 0 && numfdacs == 1) 													// sets independent if theres only one device
+//			check = queryInstr(fd, "SET_MODE,INDEP" + "\r\n")
+//			printf " %s   on %s \r\n", check, fdname 
+//			elseif(i == 0 && numfdacs > 1) 												// sets first device to master if theres multiple devices
+//			check = queryInstr(fd, "SET_MODE,MASTER" + "\r\n")
+//			printf " %s   on %s\r\n", check, fdname  
+//			else																				// sets the remainder of devices to slaves
+//			check = queryInstr(fd, "SET_MODE,SLAVE" + "\r\n")
+//			printf " %s   on %s\r\n", check, fdname 
+//			endif
+//		else
+//			check = queryInstr(fd, "SET_MODE,INDEP" + "\r\n")                   // sets all to independent
+//			printf " %s   on %s \r\n", check, fdname 
+//		endif
+//	endfor
 	
 	return localRM
 end
+
+
+////////////////////////////
+//// Master/Slave/Indep ////
+////////////////////////////
+
+
+function set_master_slave()
+/// This is an internal function, It will be called when scans are being run across multiple devices. It needs to account for a specific group
+/// Need to check what channels are being recorded i.e (only fd1 and fd2) and what channels are being ramped (only fd1)
+/// fd 1 and 2 in this case need to be set up to master and slave, leaving fd3 or any more independent.
+
+
+
+
+//	// Master/Slave set up for fastdacs
+//	for(i = 0; i<numfdacs; i++)
+//		fdname = stringbykey("name" + num2str(i+1),sc_fdackeys,":",",")
+//		nvar fd = $fdname
+//		if(sync)
+//			if(i == 0 && numfdacs == 1) 													// sets independent if theres only one device
+//			check = queryInstr(fd, "SET_MODE,INDEP" + "\r\n")
+//			printf " %s   on %s \r\n", check, fdname 
+//			elseif(i == 0 && numfdacs > 1) 												// sets first device to master if theres multiple devices
+//			check = queryInstr(fd, "SET_MODE,MASTER" + "\r\n")
+//			printf " %s   on %s\r\n", check, fdname  
+//			else																				// sets the remainder of devices to slaves
+//			check = queryInstr(fd, "SET_MODE,SLAVE" + "\r\n")
+//			printf " %s   on %s\r\n", check, fdname 
+//			endif
+//		else
+//			check = queryInstr(fd, "SET_MODE,INDEP" + "\r\n")                   // sets all to independent
+//			printf " %s   on %s \r\n", check, fdname 
+//		endif
+//	endfor
+ 
+end
+
+
+function set_indep()
+/// this in an internal function, This will reset all the fastDACs to work independently.
+
+	svar /z sc_fdackeys
+	string fdname, check
+	int i, numfdacs = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
+
+	for(i = 0; i<numfdacs; i++)
+		fdname = stringbykey("name" + num2str(i+1),sc_fdackeys,":",",")
+		nvar fd = $fdname
+		check = queryInstr(fd, "SET_MODE,INDEP" + "\r\n")                   // sets all to independent
+		if (cmpstr(check, "INDEP_SET\r\n"))
+			abort "unable to set independent mode on fastDAC:  " + fdname
+		else
+			printf " %s   on %s \r\n", check, fdname
+		endif 
+	endfor
+
+end
+
+
 
 
 ///////////////////////
@@ -484,7 +544,7 @@ function fd_rampOutputFDAC(instrID,channel,output, ramprate, [ignore_lims]) // U
 	// ramp channel to output
 	variable delay = abs(output-currentOutput)/ramprate
 	string cmd = "", response = ""
-	sprintf cmd, "RAMP_SMART,%d,%.4f,%.3f", devchannel, output, ramprate
+	sprintf cmd, "RAMP_SMART,%d,%.4f,%.3f", devchannel, output, ramprate 
 	if(delay > 2)
 		string delaymsg = ""
 		sprintf delaymsg, "Waiting for fastdac Ch%d\n\tto ramp to %dmV", channel, output
@@ -1840,6 +1900,9 @@ function/s fd_start_sweep(S, [AWG_list])
 		sprintf cmd, "SPEC_ANA,%s,%s\r", adcs, num2istr(S.numptsx)
 	else
 		// OPERATION, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF STEPS
+		
+		//fins = "0" // sus // suprisingly fake ramp works!
+		
 		sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, starts, fins, S.numptsx
 	endif
 	writeInstr(S.instrIDx,cmd)

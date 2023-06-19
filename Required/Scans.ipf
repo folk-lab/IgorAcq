@@ -382,7 +382,106 @@ function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, 
 
 
 	// Ramp to start without checks since checked above
-	RampStartFD(S, ignore_lims = 1)
+	RampStartFD(S, ignore_lims = 1) //ramp_smart for ramping to starting value. fd_rampOutputFDAC()
+
+	// Let gates settle
+	sc_sleep(S.delayy)
+
+	// Init Scan
+	initializeScan(S, y_label = y_label)
+		
+	// Main measurement loop
+	variable d=1
+	for (j=0; j<S.numptsy; j++)
+		S.direction = d  // Will determine direction of scan in fd_Record_Values
+
+		// Interlaced Scan Stuff
+		if (S.interlaced_y_flag)
+			if (use_awg)
+				Set_AWG_state(S, AWG, mod(j, S.interlaced_num_setpoints))
+			endif
+			Ramp_interlaced_channels(S, mod(j, S.interlaced_num_setpoints))
+		endif
+
+		// Ramp to start of fast axis
+		RampStartFD(S, ignore_lims=1, x_only=1)
+		sc_sleep(S.delayy)
+
+		// Record values for 1D sweep
+		scfd_RecordValues(S, j, AWG_List = AWG)
+
+		if (alternate!=0) // If want to alternate scan scandirection for next row
+			d = d*-1
+		endif
+	endfor
+
+	// Save by default
+	if (nosave == 0)
+		EndScan(S=S)
+		// SaveWaves(msg=comments, fastdac=1)
+	else
+		dowindow /k SweepControl
+	endif
+end
+
+
+function ScanFastDAC2(instrID, start, fin, channels, [numptsx, sweeprate, delay, ramprate, repeats, alternate, starts, fins, x_label, y_label, comments, nosave, use_awg, interlaced_channels, interlaced_setpoints])
+	// 1D repeat scan for FastDAC
+	// Note: to alternate scan direction set alternate=1
+	// Note: Ramprate is only for ramping gates between scans
+	variable instrID, start, fin, repeats, numptsx, sweeprate, delay, ramprate, alternate, nosave, use_awg
+	string channels, x_label, y_label, comments, starts, fins, interlaced_channels, interlaced_setpoints
+	variable j=0
+	nvar sc_Saverawfadc
+
+	// Reconnect instruments
+	sc_openinstrconnections(0)
+
+	// Set defaults
+	delay = ParamIsDefault(delay) ? 0.01 : delay
+	y_label = selectstring(paramisdefault(y_label), y_label, "nA")
+	x_label = selectstring(paramisdefault(x_label), x_label, "")
+	comments = selectstring(paramisdefault(comments), comments, "")
+	starts = selectstring(paramisdefault(starts), starts, "")
+	fins = selectstring(paramisdefault(fins), fins, "")
+	interlaced_channels = selectString(paramisdefault(interlaced_channels), interlaced_channels, "")
+	interlaced_setpoints = selectString(paramisdefault(interlaced_setpoints), interlaced_setpoints, "")
+	
+	
+	//check if rawdata needs to be saved
+	string notched_waves = scf_getRecordedFADCinfo("calc_names", column = 5)
+	string resamp_waves = scf_getRecordedFADCinfo("calc_names",column = 8)
+	
+	if(cmpstr(notched_waves,"") || cmpstr(resamp_waves,""))
+		sc_Saverawfadc = 1
+	else
+		sc_Saverawfadc = 0
+	endif
+	
+
+	// Set sc_ScanVars struct
+	struct ScanVars S
+	initScanVarsFD(S, instrID, start, fin, channelsx=channels, numptsx=numptsx, rampratex=ramprate, starty=1, finy=repeats, delayy=delay, sweeprate=sweeprate,  \
+					numptsy=repeats, startxs=starts, finxs=fins, x_label=x_label, y_label=y_label, alternate=alternate, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments)
+//	S.finy = S.starty+S.numptsy  // Repeats
+	if (s.is2d)
+		S.y_label = "Repeats" // Why is the 2D label passed here
+	endif
+	
+	// Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
+	PreScanChecksFD(S, x_only=1)  
+
+  	// If using AWG then get that now and check it
+	struct AWGVars AWG
+	if(use_AWG)	
+		fd_getGlobalAWG(AWG)
+		CheckAWG(AWG, S)  // Note: sets S.numptsx here and AWG.lims_checked = 1
+	endif
+	SetAWG(AWG, use_AWG)
+
+
+	// Ramp to start without checks since checked above
+	RampStartFD(S, ignore_lims = 1) //ramp_smart for ramping to starting value. fd_rampOutputFDAC()
 
 	// Let gates settle
 	sc_sleep(S.delayy)

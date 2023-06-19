@@ -2801,6 +2801,15 @@ function PreScanChecksFD(S, [x_only, y_only])
 	S.lims_checked = 1  		// So record_values knows that limits have been checked!
 end
 
+function PreScanChecksFD2(S, [x_only, y_only])
+   struct ScanVars &S
+   variable x_only, y_only  // Whether to only check specific axis (e.g. if other axis is a babydac or something else)
+	scc_checkSameDeviceFD(S) 	// Checks DACs and ADCs are on same device
+	scc_checkRampratesFD(S)	 	// Check ramprates of x and y
+	scc_checkLimsFD(S)			// Check within software lims for x and y
+	S.lims_checked = 1  		// So record_values knows that limits have been checked!
+end
+
 
 function PreScanChecksBD(S, [x_only, y_only])
   struct ScanVars &S
@@ -3058,6 +3067,37 @@ function scc_checkSameDeviceFD(S, [x_only, y_only])
 	endif	
 	return device_adc // Return adc device number
 end
+
+
+function scc_checkSameDeviceFD2(S, [x_only, y_only])
+	// Checks all rampChs and ADCs (selected in fd_scancontroller window)
+	// are on the same device. 
+	struct ScanVars &s
+	variable x_only, y_only // whether to check only one axis (e.g. other is babydac)
+	
+	variable device_x
+	variable device_y
+	variable device_adc
+	string channels
+	if (!y_only)
+		channels = scf_getChannelNumsOnFD(S.channelsx, device_x)  // Throws error if not all channels on one FastDAC
+	endif
+	if (!x_only)
+		channels = scf_getChannelNumsOnFD(S.channelsy, device_y)
+		if (device_x > 0 && device_y > 0 && device_y != device_x && S.instrIDx == S.instrIDy)
+			abort "ERROR[scc_checkSameDeviceFD]: X channels and Y channels are not on same device but InstrIDx/y are the same"
+//		elseif (device_dacs <= 0 && device_buffer > 0)
+//			device_dacs = device_buffer
+		endif
+	endif
+
+	channels = scf_getChannelNumsOnFD(s.AdcList, device_adc, adc=1)  // Raises error if ADCs aren't on same device
+	if (device_x > 0 && device_adc != device_x)
+		abort "ERROR[scc_checkSameDeviceFD]: ADCs are not on the same device as X axis DAC" 
+	endif	
+	return device_adc // Return adc device number
+end
+
 
 
 
