@@ -3081,8 +3081,7 @@ end
 
 function /S scc_checkDeviceNumber(S, [adc])
 	// checks which devices are used for ramping // or which devices are recording
-	// outcomes would be to return which  are used for ramping
-	// outputs a list of IDS
+	// outputs a list of IDS associated with the S.channelsx and S.ADClist
 	
 	struct ScanVars &S
 	int adc
