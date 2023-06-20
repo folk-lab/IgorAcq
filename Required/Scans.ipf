@@ -459,17 +459,19 @@ function ScanFastDAC2(instrID, start, fin, channels, [numptsx, sweeprate, delay,
 	endif
 	
 
-	// Set sc_ScanVars struct
+	// Set sc_ScanVars struct // scanvars might need a whole rewrite
+	
 	struct ScanVars S
 	initScanVarsFD(S, instrID, start, fin, channelsx=channels, numptsx=numptsx, rampratex=ramprate, starty=1, finy=repeats, delayy=delay, sweeprate=sweeprate,  \
 					numptsy=repeats, startxs=starts, finxs=fins, x_label=x_label, y_label=y_label, alternate=alternate, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments)
-//	S.finy = S.starty+S.numptsy  // Repeats
+
+   //	S.finy = S.starty+S.numptsy  // Repeats
 	if (s.is2d)
 		S.y_label = "Repeats" // Why is the 2D label passed here
 	endif
 	
 	// Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
-	PreScanChecksFD(S, x_only=1)  
+	PreScanChecksFD2(S, x_only=1)  
 
   	// If using AWG then get that now and check it
 	struct AWGVars AWG

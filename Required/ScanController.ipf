@@ -355,10 +355,15 @@ structure ScanVars
 	 string raw_wave_names  // Names of waves to override the names raw data is stored in for FastDAC scans
 	 
 	 // Backend use
-     variable direction   // For keeping track of scan direction when using alternating scan
+    variable direction   // For keeping track of scan direction when using alternating scan
 	 variable never_save   // Set to 1 to make sure these ScanVars are never saved (e.g. if using to get throw away values for getting an ADC reading)
 	 variable filenum 		// Filled when getting saved
-
+	 
+	 // master/slave sync use
+	 string instrIDs       // should contain a string list of the devices being used (ramping across devices or recording across devices)
+	 string maxADCrecorded // should contain the number with the most ADCs being recorded
+	 	
+		
 endstructure
 
 
@@ -2804,6 +2809,11 @@ end
 function PreScanChecksFD2(S, [x_only, y_only])
    struct ScanVars &S
    variable x_only, y_only  // Whether to only check specific axis (e.g. if other axis is a babydac or something else)
+	string check = scc_checkDeviceNumber(S)
+	print check
+	check = scc_checkDeviceNumber(S, adc = 1)
+	print check
+	
 	scc_checkSameDeviceFD(S) 	// Checks DACs and ADCs are on same device
 	scc_checkRampratesFD(S)	 	// Check ramprates of x and y
 	scc_checkLimsFD(S)			// Check within software lims for x and y
@@ -3069,33 +3079,46 @@ function scc_checkSameDeviceFD(S, [x_only, y_only])
 end
 
 
-function scc_checkSameDeviceFD2(S, [x_only, y_only])
-	// Checks all rampChs and ADCs (selected in fd_scancontroller window)
-	// are on the same device. 
-	struct ScanVars &s
-	variable x_only, y_only // whether to check only one axis (e.g. other is babydac)
+function /S scc_checkDeviceNumber(S, [adc])
+	// checks which devices are used for ramping // or which devices are recording
+	// outcomes would be to return which  are used for ramping
+	// outputs a list of IDS
 	
-	variable device_x
-	variable device_y
-	variable device_adc
-	string channels
-	if (!y_only)
-		channels = scf_getChannelNumsOnFD(S.channelsx, device_x)  // Throws error if not all channels on one FastDAC
-	endif
-	if (!x_only)
-		channels = scf_getChannelNumsOnFD(S.channelsy, device_y)
-		if (device_x > 0 && device_y > 0 && device_y != device_x && S.instrIDx == S.instrIDy)
-			abort "ERROR[scc_checkSameDeviceFD]: X channels and Y channels are not on same device but InstrIDx/y are the same"
-//		elseif (device_dacs <= 0 && device_buffer > 0)
-//			device_dacs = device_buffer
-		endif
-	endif
-
-	channels = scf_getChannelNumsOnFD(s.AdcList, device_adc, adc=1)  // Raises error if ADCs aren't on same device
-	if (device_x > 0 && device_adc != device_x)
-		abort "ERROR[scc_checkSameDeviceFD]: ADCs are not on the same device as X axis DAC" 
-	endif	
-	return device_adc // Return adc device number
+	struct ScanVars &S
+	int adc
+	adc = paramisDefault(adc) ? 0 : 1
+	
+	string key = selectstring(adc,"numDACCh","numADCCh")
+	string chs = selectstring(adc, S.channelsx, S.ADClist)
+	chs = replaceString(",", chs, ";")
+	
+	svar sc_fdacKeys  // Holds info about connected FastDACs
+	variable numDevices = scf_getNumFDs() // checking the number of devices connected
+	variable ch,numChs
+	int i, j
+	string ch_InstrID = ""
+	
+	
+	for(i=0;i<itemsinlist(chs); i++)
+		ch = str2num(stringfromList(i, chs))
+		
+		for(j=1; j<=numDevices; j++)
+			numChs = str2num(stringbykey(key+num2str(j),sc_fdackeys,":",","))
+			
+			if(floor(ch/numChs) == 0) //implies ch is in device number j
+				ch_InstrID += stringbykey("name"+num2str(j),sc_fdackeys,":",",")  + ";"
+				break
+				// i could change this so it has the same structure as sc_fdacKeys	
+			else
+				ch -= numChs
+			endif
+			
+		endfor
+		
+	endfor
+	
+	return ch_InstrID
+	
 end
 
 
@@ -3685,6 +3708,53 @@ function/S scf_getChannelNumsOnFD(channels, device, [adc])
 
 	return dev_channels
 end
+
+function/S scf_getChannelNumsOnFD2(channels, device, [adc])
+	// Returns device number in device variable
+	// Note: Comma separated list
+	// Note: Must be channel NUMBERS
+	// Note: Error thrown if not all channels are on the same device // removing this error
+	string channels // DACs or ADCs to check
+	variable adc  // Whether we are checking DACs or ADCs
+	variable &device // Returns device number in device (starting from 1)
+
+	svar sc_fdacKeys  // Holds info about connected FastDACs
+
+	channels = replaceString(",", channels, ";")  // DAC channels may be passed in with "," separator instead of ";" separator
+	scu_assertSeparatorType(channels, ";")
+
+	variable numDevices = scf_getNumFDs()
+	device = -1 // Init invalid (so can set when first channel is found)
+	variable i=0, j=0, numCh=0, startCh=0, Ch=0
+	string dev_channels=""
+	for(i=0;i<itemsInList(channels);i+=1)
+		ch = str2num(stringfromlist(i,channels))  // Looking for where this channel lives
+		startCh = 0
+		for(j=0;j<numDevices+1;j+=1)  // Cycle through connected devices
+			if(!adc) // Looking at DACs
+				numCh = scf_getFDInfoFromDeviceNum(j+1, "numDAC")
+			else  // Looking at ADCs
+				numCh = scf_getFDInfoFromDeviceNum(j+1, "numADC")
+			endif
+
+			if(startCh+numCh-1 >= Ch)
+				// this is the device
+				if(device <= 0)
+					device = j+1  // +1 to account for device numbering starting from 1 not zero
+				elseif (j+1 != device)
+					abort "ERROR[scf_getChannelNumsOnFD]: Channels are distributed across multiple devices. Not implemented"
+				endif
+				dev_channels = addlistitem(num2istr(Ch),dev_channels,";",INF)  // Add to list of Device Channels
+				break
+			endif
+			startCh += numCh
+		endfor
+	endfor
+
+	return dev_channels
+end
+
+
 
 
 function scf_getChannelStartNum(instrID, [adc])

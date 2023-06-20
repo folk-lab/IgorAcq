@@ -102,8 +102,6 @@ function set_master_slave()
 /// fd 1 and 2 in this case need to be set up to master and slave, leaving fd3 or any more independent.
 
 
-
-
 //	// Master/Slave set up for fastdacs
 //	for(i = 0; i<numfdacs; i++)
 //		fdname = stringbykey("name" + num2str(i+1),sc_fdackeys,":",",")
