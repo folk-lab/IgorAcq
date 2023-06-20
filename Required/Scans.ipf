@@ -471,8 +471,12 @@ function ScanFastDAC2(instrID, start, fin, channels, [numptsx, sweeprate, delay,
 	endif
 	
 	// Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
-	PreScanChecksFD2(S, x_only=1)  
-
+	wave syncIDs = PreScanChecksFD2(S, x_only=1)  
+	
+	set_master_slave(syncIDs)
+	
+  	abort "Hard Coded Abort: still in testing phase"
+  	
   	// If using AWG then get that now and check it
 	struct AWGVars AWG
 	if(use_AWG)	

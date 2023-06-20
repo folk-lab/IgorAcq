@@ -96,33 +96,27 @@ end
 ////////////////////////////
 
 
-function set_master_slave()
+function set_master_slave(IDs)
 /// This is an internal function, It will be called when scans are being run across multiple devices. It needs to account for a specific group
 /// Need to check what channels are being recorded i.e (only fd1 and fd2) and what channels are being ramped (only fd1)
 /// fd 1 and 2 in this case need to be set up to master and slave, leaving fd3 or any more independent.
-
-
-//	// Master/Slave set up for fastdacs
-//	for(i = 0; i<numfdacs; i++)
-//		fdname = stringbykey("name" + num2str(i+1),sc_fdackeys,":",",")
-//		nvar fd = $fdname
-//		if(sync)
-//			if(i == 0 && numfdacs == 1) 													// sets independent if theres only one device
-//			check = queryInstr(fd, "SET_MODE,INDEP" + "\r\n")
-//			printf " %s   on %s \r\n", check, fdname 
-//			elseif(i == 0 && numfdacs > 1) 												// sets first device to master if theres multiple devices
-//			check = queryInstr(fd, "SET_MODE,MASTER" + "\r\n")
-//			printf " %s   on %s\r\n", check, fdname  
-//			else																				// sets the remainder of devices to slaves
-//			check = queryInstr(fd, "SET_MODE,SLAVE" + "\r\n")
-//			printf " %s   on %s\r\n", check, fdname 
-//			endif
-//		else
-//			check = queryInstr(fd, "SET_MODE,INDEP" + "\r\n")                   // sets all to independent
-//			printf " %s   on %s \r\n", check, fdname 
-//		endif
-//	endfor
- 
+	wave /T IDs
+	int i, numfdacs = numpnts(IDs)
+	string check
+	
+	for(i = 0; i<numfdacs; i++)
+		nvar fd = $(IDs[i])
+		if(i == 0 && numfdacs == 1) 													// sets independent if theres only one device
+			check = queryInstr(fd, "SET_MODE,INDEP" + "\r\n")
+			printf " %s   on %s \r\n", check, IDs[i]
+		elseif(i == 0 && numfdacs > 1) 												// sets first device to master if theres multiple devices
+			check = queryInstr(fd, "SET_MODE,MASTER" + "\r\n")
+			printf " %s   on %s\r\n", check, IDs[i]  
+		else																				// sets the remainder of devices to slaves
+			check = queryInstr(fd, "SET_MODE,SLAVE" + "\r\n")
+			printf " %s   on %s\r\n", check, IDs[i] 
+		endif
+	endfor
 end
 
 

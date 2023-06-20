@@ -2806,18 +2806,27 @@ function PreScanChecksFD(S, [x_only, y_only])
 	S.lims_checked = 1  		// So record_values knows that limits have been checked!
 end
 
-function PreScanChecksFD2(S, [x_only, y_only])
+function /wave PreScanChecksFD2(S, [x_only, y_only])
    struct ScanVars &S
    variable x_only, y_only  // Whether to only check specific axis (e.g. if other axis is a babydac or something else)
 	string check = scc_checkDeviceNumber(S)
-	print check
-	check = scc_checkDeviceNumber(S, adc = 1)
-	print check
+	print "DAC channels = "  + check
+	check += scc_checkDeviceNumber(S, adc = 1)
+	print "ADC & DAC = " + check
+	wave /t IDs = listToTextWave(check, ";")
+	print IDs
+	findDuplicates /free /rt = syncIDs IDs
+	print ""
+	print "devices to be synced ="
+	print  syncIDs
 	
-	scc_checkSameDeviceFD(S) 	// Checks DACs and ADCs are on same device
+	
+	//scc_checkSameDeviceFD(S) 	// Checks DACs and ADCs are on same device
 	scc_checkRampratesFD(S)	 	// Check ramprates of x and y
 	scc_checkLimsFD(S)			// Check within software lims for x and y
 	S.lims_checked = 1  		// So record_values knows that limits have been checked!
+	
+	return syncIDs
 end
 
 
