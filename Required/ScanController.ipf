@@ -897,6 +897,9 @@ function sci_initializeWaves(S)  // TODO: rename
 	//	(This will be after calc (i.e. don't need before and after calc wave))
 	
     struct ScanVars &S
+    struct AWGVars AWG
+    fd_getGlobalAWG(AWG)
+    
     variable fastdac
     variable numpts  //Numpts to initialize wave with, note: for Filtered data, this number is reduced
     string wavenames, wn, rawwavenames, rwn
@@ -930,15 +933,15 @@ function sci_initializeWaves(S)  // TODO: rename
           
           //initializing 1d waves for demodulation
           if (S.using_fastdac && raw == 0 && fadcattr[str2num(wavenum)][6] == 48)
-          	sci_init1DWave(wn+"x", numpts, S.startx, S.finx)
-          	sci_init1DWave(wn+"y", numpts, S.startx, S.finx)
+          	//sci_init1DWave(wn+"x", numpts, S.startx, S.finx)
+          	//sci_init1DWave(wn+"y", numpts, S.startx, S.finx)
           	
           	//initializing 2d waves for demodulation
           	if (s.is2d == 1)
-          		sci_init2DWave(wn+"x_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+          		sci_init2DWave(wn+"x_2d", S.numptsx/AWG.waveLen/AWG.numCycles, S.startx, S.finx, S.numptsy, S.starty, S.finy)
           		
           		if (sc_demody == 1)
-          			sci_init2DWave(wn+"y_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+          			sci_init2DWave(wn+"y_2d", S.numptsx/AWG.waveLen/AWG.numCycles, S.startx, S.finx, S.numptsy, S.starty, S.finy)
           		endif
           		
           	endif
@@ -3952,6 +3955,8 @@ function scfd_RecordValues(S, rowNum, [AWG_list, linestart, skip_data_distributi
 	variable rowNum, linestart
 	variable skip_data_distribution // For recording data without doing any calculation or distribution of data
 	struct AWGVars &AWG_list
+	
+		
 	// If passed AWG_list with AWG_list.lims_checked == 1 then it will run with the Arbitrary Wave Generator on
 	// Note: Only works for 1 FastDAC! Not sure what implementation will look like for multiple yet
 
@@ -4071,6 +4076,7 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			
 			if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
 				scfd_demodulate(sc_tempwave, str2num(fadcvalstr[str2num(ADCnum)][7]), AWGVars.numCycles, AWGVars.waveLen, cwn)
+				
 				
 				//calc function for demod x
 				calc_str = ReplaceString(rwn, calc_string, cwn + "x")
