@@ -472,7 +472,6 @@ function ScanFastDAC2(instrID, start, fin, channels, [numptsx, sweeprate, delay,
 	
 	// Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
 	wave syncIDs = PreScanChecksFD2(S, x_only=1)  
-	
 	set_master_slave(syncIDs)
 	
   	abort "Hard Coded Abort: still in testing phase"

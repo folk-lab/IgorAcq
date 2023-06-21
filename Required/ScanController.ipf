@@ -361,7 +361,10 @@ structure ScanVars
 	 
 	 // master/slave sync use
 	 string instrIDs       // should contain a string list of the devices being used (ramping across devices or recording across devices)
+	 string adcListIDs     // Ids for adcList (under //specific to fastDAC comment)
+	 string dacListIDs     // Ids for channelx (for now, not sure ill change this yet)
 	 string maxADCrecorded // should contain the number with the most ADCs being recorded
+	 string fakeRampIDs		// fakeRamps for syncronized measurement.
 	 	
 		
 endstructure
@@ -2809,16 +2812,37 @@ end
 function /wave PreScanChecksFD2(S, [x_only, y_only])
    struct ScanVars &S
    variable x_only, y_only  // Whether to only check specific axis (e.g. if other axis is a babydac or something else)
-	string check = scc_checkDeviceNumber(S)
-	print "DAC channels = "  + check
-	check += scc_checkDeviceNumber(S, adc = 1)
-	print "ADC & DAC = " + check
-	wave /t IDs = listToTextWave(check, ";")
+	S.dacListIDs = scc_checkDeviceNumber(S)
+	print "DAC channels = "  + S.dacListIDs
+	S.adcListIDs = scc_checkDeviceNumber(S, adc = 1)
+	print "ADC & DAC = " + S.dacListIDs + S.adcListIDs
+	wave /t IDs = listToTextWave(S.dacListIDs + S.adcListIDs, ";")
 	print IDs
 	findDuplicates /free /rt = syncIDs IDs
 	print ""
 	print "devices to be synced ="
 	print  syncIDs
+	S.instrIDs = textWave2StrArray(syncIDs) //this is turning it into an actual list in python
+	
+	int i, j
+	make /free /n = (numpnts(syncIDs)) ADCcounts 
+	S.fakeRampIDs = ""
+	for(i=0; i<itemsinlist(S.instrIDs); i++)
+		string ID = stringFromList(i,S.instrIDs)
+		
+		if(WhichListItem(ID, S.daclistIDs) == -1)
+			S.fakeRampIDs += ID + ";"
+		endif
+		
+		for(j=0; j<itemsinlist(S.adcListIDs); i++)
+			string adcID = stringFromList(i,S.adcListIDs)
+			
+			if(!cmpstr(adcID,ID))
+				ADCcounts[i] += 1
+			endif	
+		endfor
+	endfor
+	//S.ADCcounts = textwave2StrArray //I have an regular array, this also does not do what i want it to do.
 	
 	
 	//scc_checkSameDeviceFD(S) 	// Checks DACs and ADCs are on same device
