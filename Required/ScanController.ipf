@@ -1177,8 +1177,9 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 	    wn = selectString(cmpstr(append_wn, ""), StringFromList(i, wavenames), StringFromList(i, wavenames)+";" +append_wn)
 	    
 		if (spectrum)
+			wn = stringfromlist(0,wn)
 			string ADCnum = wn[3,INF] //would fail if this was done with calculated waves, but we dont care about it
-			openGraphID = scg_graphExistsForWavename(wn + ";pwrspec" + ADCnum)
+			openGraphID = scg_graphExistsForWavename(wn + ";pwrspec" + ADCnum +";..." ) // weird naming convention on igors end.
 		else
 			openGraphID = scg_graphExistsForWavename(wn)
 		endif
@@ -1188,13 +1189,18 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 			scg_setupGraph1D(openGraphID, x_label, y_label= selectstring(cmpstr(y_label_1d,""), wn, wn +" ("+y_label_1d +")"))
 			wn = StringFromList(i, wavenames) 
 		else
-			wn = StringFromList(i, wavenames) 
-	      	scg_open1Dgraph(wn, x_label, y_label=selectstring(cmpstr(y_label_1d,""), wn, wn +" ("+y_label_1d+")"),append_wn = append_wn)
-	      	openGraphID = winname(0,1)
+			wn = StringFromList(i, wavenames)
+			
 	      	if (spectrum)
+	      		scg_open1Dgraph(wn, x_label, y_label=selectstring(cmpstr(y_label_1d,""), wn, wn +" ("+y_label_1d+")"))
+	      		openGraphID = winname(0,1)
 				string wn_powerspec = scfd_spectrum_analyzer($wn, mFreq, "pwrspec" + ADCnum)
-				scg_twosubplot(openGraphID, wn_powerspec, logy = 1, labelx = "Frequency (Hz)")
+				scg_twosubplot(openGraphID, wn_powerspec, logy = 1, labelx = "Frequency (Hz)",labely ="pwr", append_wn = wn_powerspec + "int", append_labely = "cumul. pwr")
+			else 
+	      		scg_open1Dgraph(wn, x_label, y_label=selectstring(cmpstr(y_label_1d,""), wn, wn +" ("+y_label_1d+")"),append_wn = append_wn)
+	      		openGraphID = winname(0,1)			
 			endif 
+			
 	   endif
 		
 		graphIDs = addlistItem(openGraphID, graphIDs, ";", INF) 	
@@ -1234,19 +1240,20 @@ function scg_arrangeWindows(graphIDs)
     doupdate
 end
 
-function scg_twosubplot(graphID, wave2name,[logy, logx, labelx, labely])
+function scg_twosubplot(graphID, wave2name,[logy, logx, labelx, labely, append_wn, append_labely])
 //creates a subplot with an existing wave and GraphID with wave2
-//wave2 will appear on top
-	string graphID, wave2name, labelx, labely
+//wave2 will appear on top, append_Wn will be appended to wave2 position
+	string graphID, wave2name, labelx, labely, append_wn, append_labely
 	variable logy,logx
 	wave wave2 = $wave2name
 	
 	labelx = selectString(paramIsDefault(labelx), labelx, "")
 	labely = selectString(paramIsDefault(labely), labely, "")
-	//variable minwave2 = wavemin(wave2)
+	append_wn = selectString(paramIsDefault(append_wn), append_wn, "")
+	append_labely = selectString(paramIsDefault(append_labely), append_labely, "")
 	
-	ModifyGraph /W = $graphID axisEnab(left)={0,0.40} //graphID wont work
-	AppendToGraph /W = $graphID /L=l2/B=b2 wave2 // vs something
+	ModifyGraph /W = $graphID axisEnab(left)={0,0.40}
+	AppendToGraph /W = $graphID /r=l2/B=b2 wave2 
 	label b2 labelx
 	label l2 labely
 	
@@ -1260,9 +1267,35 @@ function scg_twosubplot(graphID, wave2name,[logy, logx, labelx, labely])
 	
 	ModifyGraph /W = $graphID axisEnab(l2)={0.60,1}
 	ModifyGraph /W = $graphID freePos(l2)=0
-	//ModifyGraph /W = $graphID freePos(b2)={minwave2,l2}
 	ModifyGraph /W = $graphID freePos(b2)={0,l2}
-
+	ModifyGraph rgb($wave2name)=(39321,39321,39321)
+    
+    if (cmpstr(append_wn, ""))
+    	appendtograph /W = $graphID /l= r1 /b=b3  $append_wn
+    	legend
+    	label r1 append_labely
+    	ModifyGraph /W = $graphID axisEnab(r1)={0.60,1}
+		ModifyGraph /W = $graphID freePos(r1)=0
+		ModifyGraph /W = $graphID freePos(b3)={0,r1}
+		ModifyGraph noLabel(b3)=2
+		
+		if(!paramisDefault(logy))
+			ModifyGraph log(r1)=1
+		endif
+	
+		if(!paramisDefault(logx))
+			ModifyGraph log(b3)=1
+		endif
+    	
+    endif
+	
+	Modifygraph /W = $graphID axisontop(l2)=1
+	Modifygraph /W = $graphID axisontop(b2)=1
+	Modifygraph /W = $graphID axisontop(r1)=1
+	ModifyGraph lblPosMode(l2)=2
+	ModifyGraph lblPosMode(b2)=4
+	ModifyGraph lblPosMode(r1)=2
+	
 end
 
 
@@ -3946,6 +3979,7 @@ function /s scfd_spectrum_analyzer(wave data, variable samp_freq, string wn)
 	//powerspec[0]=nan
 	//display powerspec; // SetAxis bottom 0,500
 	duplicate /o powerspec, $wn
+	integrate powerspec /D = $(wn + "int") // new line
 	return wn
 end
 
