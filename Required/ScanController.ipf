@@ -933,8 +933,8 @@ function sci_initializeWaves(S)  // TODO: rename
           
           //initializing 1d waves for demodulation
           if (S.using_fastdac && raw == 0 && fadcattr[str2num(wavenum)][6] == 48)
-          	//sci_init1DWave(wn+"x", numpts, S.startx, S.finx)
-          	//sci_init1DWave(wn+"y", numpts, S.startx, S.finx)
+          	sci_init1DWave(wn+"x", S.numptsx/AWG.waveLen/AWG.numCycles, S.startx, S.finx)
+          	sci_init1DWave(wn+"y", S.numptsx/AWG.waveLen/AWG.numCycles, S.startx, S.finx)
           	
           	//initializing 2d waves for demodulation
           	if (s.is2d == 1)
