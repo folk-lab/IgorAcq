@@ -365,6 +365,7 @@ structure ScanVars
 	 string dacListIDs     // Ids for channelx (for now, not sure ill change this yet)
 	 string maxADCrecorded // should contain the number with the most ADCs being recorded
 	 string fakeRampIDs		// fakeRamps for syncronized measurement.
+	 string ADCcounts		// ADCcounts to ensure theres equal amount of recordings between instruments
 	 	
 		
 endstructure
@@ -2822,7 +2823,7 @@ function /wave PreScanChecksFD2(S, [x_only, y_only])
 	print ""
 	print "devices to be synced ="
 	print  syncIDs
-	S.instrIDs = textWave2StrArray(syncIDs) //this is turning it into an actual list in python
+	S.instrIDs = textWavetolist(syncIDs) //this is turning it into an actual list in python
 	
 	int i, j
 	make /free /n = (numpnts(syncIDs)) ADCcounts 
@@ -2834,7 +2835,7 @@ function /wave PreScanChecksFD2(S, [x_only, y_only])
 			S.fakeRampIDs += ID + ";"
 		endif
 		
-		for(j=0; j<itemsinlist(S.adcListIDs); i++)
+		for(j=0; j<itemsinlist(S.adcListIDs); j++)
 			string adcID = stringFromList(i,S.adcListIDs)
 			
 			if(!cmpstr(adcID,ID))
@@ -2842,7 +2843,7 @@ function /wave PreScanChecksFD2(S, [x_only, y_only])
 			endif	
 		endfor
 	endfor
-	//S.ADCcounts = textwave2StrArray //I have an regular array, this also does not do what i want it to do.
+	S.ADCcounts = numwavetolist(ADCcounts) //I have an regular array, this also does not do what i want it to do.
 	
 	
 	//scc_checkSameDeviceFD(S) 	// Checks DACs and ADCs are on same device

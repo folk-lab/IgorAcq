@@ -1626,6 +1626,38 @@ function/s textWave2StrArray(w)
 end
 
 
+function/s TextWavetolist(w)
+	// returns an array and makes sure quotes and commas are parsed correctly.
+	// supports 1d and 2d arrays
+	wave/t w
+	string list=""
+
+	// loop over wave
+	variable i , n = dimsize(w, 0)
+
+	for (i=0; i<n; i++)
+		list += w[i] + ";"
+	endfor
+	list = list[0,strlen(list)-2] // remove last semicolon
+	return list
+end
+
+function /s numWavetolist(w)
+	// returns an array and makes sure quotes and commas are parsed correctly.
+	// supports 1d and 2d arrays
+	wave w
+	string list=""
+
+	// loop over wave
+	variable i , n = dimsize(w, 0)
+
+	for (i=0; i<n; i++)
+		list += num2str(w[i]) + ";"
+	endfor
+	list = list[0,strlen(list)-2] // remove last semicolon
+	return list
+end
+
 function/s addJSONkeyval(JSONstr,key,value,[addquotes])
 	// returns a valid JSON string with a new key,value pair added.
 	// if JSONstr is empty, start a new JSON object

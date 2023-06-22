@@ -507,8 +507,9 @@ function ScanFastDAC2(instrID, start, fin, channels, [numptsx, sweeprate, delay,
 			Ramp_interlaced_channels(S, mod(j, S.interlaced_num_setpoints))
 		endif
 
-		// Ramp to start of fast axis
-		RampStartFD(S, ignore_lims=1, x_only=1)
+		// Ramp to start of fast axis // this would need to ramp all the DACs being used to their starting position (do we need synchronization)
+		RampStartFD(S, ignore_lims=1, x_only=1) // This uses ramp smart, Which does not account for synchronization. the important thing would be
+													    // to have all the dacs return to their respective starting positions
 		sc_sleep(S.delayy)
 
 		// Record values for 1D sweep
