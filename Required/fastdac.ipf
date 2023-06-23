@@ -96,25 +96,27 @@ end
 ////////////////////////////
 
 
-function set_master_slave(IDs)
+function set_master_slave(S)
 /// This is an internal function, It will be called when scans are being run across multiple devices. It needs to account for a specific group
 /// Need to check what channels are being recorded i.e (only fd1 and fd2) and what channels are being ramped (only fd1)
 /// fd 1 and 2 in this case need to be set up to master and slave, leaving fd3 or any more independent.
-	wave /T IDs
-	int i, numfdacs = numpnts(IDs)
+	struct scanvars &S
+	int i, numfdacs = itemsinlist(S.instrIDs)
 	string check
 	
 	for(i = 0; i<numfdacs; i++)
-		nvar fd = $(IDs[i])
+		string fdname = stringfromlist(i,S.instrIDs)
+		nvar fd = $(fdname)
 		if(i == 0 && numfdacs == 1) 													// sets independent if theres only one device
 			check = queryInstr(fd, "SET_MODE,INDEP" + "\r\n")
-			printf " %s   on %s \r\n", check, IDs[i]
+			printf " %s   on %s \r\n", check, fdname
 		elseif(i == 0 && numfdacs > 1) 												// sets first device to master if theres multiple devices
 			check = queryInstr(fd, "SET_MODE,MASTER" + "\r\n")
-			printf " %s   on %s\r\n", check, IDs[i]  
+			printf " %s   on %s\r\n", check, fdname
+			S.sync = 1																	// Showing sync will be used  
 		else																				// sets the remainder of devices to slaves
 			check = queryInstr(fd, "SET_MODE,SLAVE" + "\r\n")
-			printf " %s   on %s\r\n", check, IDs[i] 
+			printf " %s   on %s\r\n", check, fdname 
 		endif
 	endfor
 end
@@ -1897,7 +1899,22 @@ function/s fd_start_sweep(S, [AWG_list])
 		
 		sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, starts, fins, S.numptsx
 	endif
-	writeInstr(S.instrIDx,cmd)
+	
+	if(S.sync)
+		nvar fdID = $(stringfromlist(0,S.instrIDs)) 
+		string response = queryInstr(fdID, "ARM_SYNC\r\n")
+		print response
+		if(!cmpstr(response,"SYNC_ARMED"))
+		abort "Unable to arm sync :("
+		else
+		// a shit ton of commands will have to go here I think	//
+		// I will need to send commands to slave first // - > i need to figure out if they are fake/realramps and if i need fake adcs
+		abort "for now"
+		endif
+	else
+		writeInstr(S.instrIDx,cmd) // this existed outside the if-statement
+	endif
+	
 	return cmd
 end
 

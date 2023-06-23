@@ -434,10 +434,10 @@ function ScanFastDAC2(instrID, start, fin, channels, [numptsx, sweeprate, delay,
 	variable j=0
 	nvar sc_Saverawfadc
 	
-	set_indep()
+	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
-
+	set_indep()
 	// Set defaults
 	delay = ParamIsDefault(delay) ? 0.01 : delay
 	y_label = selectstring(paramisdefault(y_label), y_label, "nA")
@@ -472,11 +472,11 @@ function ScanFastDAC2(instrID, start, fin, channels, [numptsx, sweeprate, delay,
 	endif
 	
 	// Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
-	wave syncIDs = PreScanChecksFD2(S, x_only=1)  
-	set_master_slave(syncIDs)
+	PreScanChecksFD2(S, x_only=1)  
 	
-  	abort "Hard Coded Abort: still in testing phase"
-  	
+	// sets master/slave between the devices that are used.
+	set_master_slave(S)
+	
   	// If using AWG then get that now and check it
 	struct AWGVars AWG
 	if(use_AWG)	
@@ -485,10 +485,10 @@ function ScanFastDAC2(instrID, start, fin, channels, [numptsx, sweeprate, delay,
 	endif
 	SetAWG(AWG, use_AWG)
 
-
 	// Ramp to start without checks since checked above
-	RampStartFD(S, ignore_lims = 1) //ramp_smart for ramping to starting value. fd_rampOutputFDAC()
+	RampStartFD(S, ignore_lims = 1) //ramp_smart for ramping to starting value. This does not get affected by 
 
+	abort "Hard Coded Abort: still in testing phase"
 	// Let gates settle
 	sc_sleep(S.delayy)
 

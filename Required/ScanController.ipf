@@ -360,6 +360,7 @@ structure ScanVars
 	 variable filenum 		// Filled when getting saved
 	 
 	 // master/slave sync use
+	 variable sync			// 1 if sync is being used, 0 if every fastDAC is independent
 	 string instrIDs       // should contain a string list of the devices being used (ramping across devices or recording across devices)
 	 string adcListIDs     // Ids for adcList (under //specific to fastDAC comment)
 	 string dacListIDs     // Ids for channelx (for now, not sure ill change this yet)
@@ -2810,7 +2811,7 @@ function PreScanChecksFD(S, [x_only, y_only])
 	S.lims_checked = 1  		// So record_values knows that limits have been checked!
 end
 
-function /wave PreScanChecksFD2(S, [x_only, y_only])
+function PreScanChecksFD2(S, [x_only, y_only])
    struct ScanVars &S
    variable x_only, y_only  // Whether to only check specific axis (e.g. if other axis is a babydac or something else)
 	S.dacListIDs = scc_checkDeviceNumber(S)
@@ -2851,7 +2852,6 @@ function /wave PreScanChecksFD2(S, [x_only, y_only])
 	scc_checkLimsFD(S)			   // Check within software lims for x and y
 	S.lims_checked = 1  		   // So record_values knows that limits have been checked!
 	
-	return syncIDs
 end
 
 
@@ -2925,7 +2925,12 @@ function RampStartFD(S, [ignore_lims, x_only, y_only])
 			else
 				abort "ERROR[RampStartFD]: S.direction not set to 1 or -1"
 			endif
-			rampMultipleFDAC(S.instrIDx,stringfromlist(i,S.channelsx,","),setpoint,ramprate=S.rampratex, ignore_lims=ignore_lims)
+			if(S.sync)
+				nvar fdID = $(stringfromlist(i,S.instrIDs))
+				rampMultipleFDAC(fdID, stringfromlist(i,S.channelsx,","),setpoint,ramprate=S.rampratex, ignore_lims=ignore_lims)
+			else
+				rampMultipleFDAC(S.instrIDx, stringfromlist(i,S.channelsx,","),setpoint,ramprate=S.rampratex, ignore_lims=ignore_lims) //is this important?
+			endif
 		endfor
 	endif  
 	
@@ -2953,7 +2958,12 @@ function scc_checkRampStartFD(S)
 	   elseif(S.direction == -1)
 	      sp = str2num(stringfromlist(i, S.finxs, ","))
 	   endif
-      diff = getFDACOutput(S.instrIDx, ch)-sp
+      if(S.sync)
+      		nvar fdID = $(stringfromlist(i,S.instrIDs))
+      		diff = getFDACOutput(fdID, ch)-sp
+      else
+      		diff = getFDACOutput(S.instrIDx, ch)-sp
+      	endif
       if(abs(diff) > 0.5)  // if DAC is more than 0.5mV from start of ramp
          require_ramp = 1
       endif
