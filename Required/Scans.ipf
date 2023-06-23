@@ -433,7 +433,8 @@ function ScanFastDAC2(instrID, start, fin, channels, [numptsx, sweeprate, delay,
 	string channels, x_label, y_label, comments, starts, fins, interlaced_channels, interlaced_setpoints
 	variable j=0
 	nvar sc_Saverawfadc
-
+	
+	set_indep()
 	// Reconnect instruments
 	sc_openinstrconnections(0)
 
@@ -527,6 +528,9 @@ function ScanFastDAC2(instrID, start, fin, channels, [numptsx, sweeprate, delay,
 	else
 		dowindow /k SweepControl
 	endif
+	
+	set_indep()
+	
 end
 
 

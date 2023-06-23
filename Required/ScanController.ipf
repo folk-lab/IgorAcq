@@ -363,7 +363,7 @@ structure ScanVars
 	 string instrIDs       // should contain a string list of the devices being used (ramping across devices or recording across devices)
 	 string adcListIDs     // Ids for adcList (under //specific to fastDAC comment)
 	 string dacListIDs     // Ids for channelx (for now, not sure ill change this yet)
-	 string maxADCrecorded // should contain the number with the most ADCs being recorded
+	 variable maxADCs      // should contain the number with the most ADCs being recorded // I dont use this 
 	 string fakeRampIDs		// fakeRamps for syncronized measurement.
 	 string ADCcounts		// ADCcounts to ensure theres equal amount of recordings between instruments
 	 	
@@ -2823,7 +2823,7 @@ function /wave PreScanChecksFD2(S, [x_only, y_only])
 	print ""
 	print "devices to be synced ="
 	print  syncIDs
-	S.instrIDs = textWavetolist(syncIDs) //this is turning it into an actual list in python
+	S.instrIDs = textWavetolist(syncIDs)
 	
 	int i, j
 	make /free /n = (numpnts(syncIDs)) ADCcounts 
@@ -2843,13 +2843,13 @@ function /wave PreScanChecksFD2(S, [x_only, y_only])
 			endif	
 		endfor
 	endfor
-	S.ADCcounts = numwavetolist(ADCcounts) //I have an regular array, this also does not do what i want it to do.
-	
+	S.ADCcounts = numwavetolist(ADCcounts)
+	S.maxADCs = wavemax(ADCcounts)
 	
 	//scc_checkSameDeviceFD(S) 	// Checks DACs and ADCs are on same device
 	scc_checkRampratesFD(S)	 	// Check ramprates of x and y
-	scc_checkLimsFD(S)			// Check within software lims for x and y
-	S.lims_checked = 1  		// So record_values knows that limits have been checked!
+	scc_checkLimsFD(S)			   // Check within software lims for x and y
+	S.lims_checked = 1  		   // So record_values knows that limits have been checked!
 	
 	return syncIDs
 end
