@@ -1878,12 +1878,27 @@ function/s fd_start_sweep(S, [AWG_list])
 	
 	scu_assertSeparatorType(S.ADCList, ";")
 	
+	if(S.sync)
+		nvar fdID = $(stringfromlist(itemsinlist(S.instrIDs)-1,S.instrIDs)) //first ID is the master, Last ID might be better
+		string response = queryInstr(fdID, "ARM_SYNC\r\n")
+		print response
+		if(cmpstr(response,"SYNC_ARMED\r\n"))
+		abort "Unable to arm sync :("
+		endif
+		
+		/// check if sync is good // might be a do - while loop for some iterations? we will see
+		response = queryInstr(fdID, "CHECK_SYNC\r\n")
+		print response
+		if(cmpstr(response,"CLOCK_SYNC_READY\r\n"))
+		abort "clock sync bad :("
+		endif
+	endif	
+	
 	for(i=0;i<itemsinlist(S.instrIDs);i++)
 	
 		string fdIDname = stringfromlist(i,S.instrIDs)
 		nvar fdID = $fdIDname
 		string adcs = scu_getDeviceChannels(fdID, S.adclist, adc_flag=1)
-		//adcs = replacestring(";",adcs,"")
 
 		if (!S.readVsTime)
 			scu_assertSeparatorType(S.channelsx, ",")
@@ -1931,6 +1946,7 @@ function/s fd_start_sweep(S, [AWG_list])
 			endif
 			adcs = replacestring(";",adcs,"")
 			
+			sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, starts, fins, S.numptsx
 			// might need the channels picked for the fake recordings stored somewhere
 			
 		else
