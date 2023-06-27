@@ -1866,84 +1866,100 @@ function/s fd_start_sweep(S, [AWG_list])
 	Struct ScanVars &S
 	Struct AWGVars &AWG_List
 	int i
-
-	scu_assertSeparatorType(S.ADCList, ";")	
-	string adcs = scu_getDeviceChannels(S.adcListIDs, S.adclist, adc_flag=1)
-	adcs = replacestring(";",adcs,"")
-
-	if (!S.readVsTime)
-		scu_assertSeparatorType(S.channelsx, ",")
-		string starts, fins, temp
-		if(S.direction == 1)
-			starts = S.startxs
-			fins = S.finxs
-		elseif(S.direction == -1)
-			starts = S.finxs
-			fins = S.startxs
-		else
-			abort "ERROR[fd_start_sweep]: S.direction must be 1 or -1, not " + num2str(S.direction)
-		endif
-
-		string dacs = scu_getDeviceChannels(s.daclistIDs, S.channelsx)
-	   dacs = replacestring(",",dacs,"")
-	endif
-
-	string cmd = ""
-
-	if (!paramisDefault(AWG_list) && AWG_List.use_AWG == 1 && AWG_List.lims_checked == 1)  
-		// Example:
-		// AWG_RAMP,2,012,345,67,0,-1000,1000,-2000,2000,50,50
-		// Response:
-		// <(2500 * waveform length) samples from ADC0>RAMP_FINISHED
-		//
-		// OPERATION, #N AWs, AW_dacs, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF Wave cycles per step, # ramp steps
-		// Note: AW_dacs is formatted (dacs_for_wave0, dacs_for_wave1, .... e.g. '01,23' for Dacs 0,1 to output wave0, Dacs 2,3 to output wave1)
-		sprintf cmd, "AWG_RAMP,%d,%s,%s,%s,%s,%s,%d,%d\r", AWG_list.numWaves, AWG_list.AW_dacs, dacs, adcs, starts, fins, AWG_list.numCycles, AWG_list.numSteps
-	elseif (S.readVsTime == 1)
-		sprintf cmd, "SPEC_ANA,%s,%s\r", adcs, num2istr(S.numptsx)
-	else
-		// OPERATION, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF STEPS
-		
-		//fins = "0" // sus // suprisingly fake ramp works!
-		
-		sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, starts, fins, S.numptsx
-	endif
 	
-	if(S.sync)
-		nvar fdID = $(stringfromlist(0,S.instrIDs)) //first ID is the master, Last ID might be better
-		string response = queryInstr(fdID, "ARM_SYNC\r\n")
-		print response
-		if(!cmpstr(response,"SYNC_ARMED"))
-		abort "Unable to arm sync :("
-		else
-		
-			for(i=0;i<itemsinlist(S.instrIDs);i++)
-				string fdIDname = stringfromlist(i,S.instrIDs)
-				nvar fdID = $fdIDname
-				if(whichlistitem(fdIDname, S.fakerampIDs) != -1)
-					///find global value of channel 0 in that ID, set it to start and fin, and dac = 0
-					string value = num2str(getfdacOutput(fdID,0, same_as_window = 0)) //this gave me the start and fins and dac
-					starts = value //changing this would mean i have to change it back
-					fins = value // same for this
-					dacs = "0"  //same for this?
-				else
-					/// it would need to stay at 
-				endif		
-				 
-			//// i need to check if its a
-			
-			if(cmpstr(S.fakerampIDs,""))
+	scu_assertSeparatorType(S.ADCList, ";")
+	
+	for(i=0;i<itemsinlist(S.instrIDs);i++)
+	
+		string fdIDname = stringfromlist(i,S.instrIDs)
+		nvar fdID = $fdIDname
+		string adcs = scu_getDeviceChannels(fdID, S.adclist, adc_flag=1)
+		adcs = replacestring(";",adcs,"")
+
+		if (!S.readVsTime)
+			scu_assertSeparatorType(S.channelsx, ",")
+			string starts, fins, temp
+			if(S.direction == 1)
+				starts = S.startxs
+				fins = S.finxs
+			elseif(S.direction == -1)
+				starts = S.finxs
+				fins = S.startxs
+			else
+				abort "ERROR[fd_start_sweep]: S.direction must be 1 or -1, not " + num2str(S.direction)
 			endif
-			
-			endfor
-		// a shit ton of commands will have to go here I think	//
-		// I will need to send commands to slave first // - > i need to figure out if they are fake/realramps and if i need fake adcs
-		
-		abort "for now"
+
+			string dacs = scu_getDeviceChannels(fdID, S.channelsx)
+	   		dacs = replacestring(",",dacs,"")
 		endif
-	else
-		writeInstr(S.instrIDx,cmd) // this existed outside the if-statement
-	endif
+
+		string cmd = ""
+	
+		if(S.sync)
+		
+		else
+			if (!paramisDefault(AWG_list) && AWG_List.use_AWG == 1 && AWG_List.lims_checked == 1)  
+				// Example:
+				// AWG_RAMP,2,012,345,67,0,-1000,1000,-2000,2000,50,50
+				// Response:
+				// <(2500 * waveform length) samples from ADC0>RAMP_FINISHED
+				//
+				// OPERATION, #N AWs, AW_dacs, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF Wave cycles per step, # ramp steps
+				// Note: AW_dacs is formatted (dacs_for_wave0, dacs_for_wave1, .... e.g. '01,23' for Dacs 0,1 to output wave0, Dacs 2,3 to output wave1)
+				sprintf cmd, "AWG_RAMP,%d,%s,%s,%s,%s,%s,%d,%d\r", AWG_list.numWaves, AWG_list.AW_dacs, dacs, adcs, starts, fins, AWG_list.numCycles, AWG_list.numSteps
+			elseif (S.readVsTime == 1)
+				sprintf cmd, "SPEC_ANA,%s,%s\r", adcs, num2istr(S.numptsx)
+			else
+				// OPERATION, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF STEPS
+		
+				//fins = "0" // sus // suprisingly fake ramp works!
+			
+				sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, starts, fins, S.numptsx
+			endif
+		endif
+		
+		
+		//writeInstr(fdID,cmd)
+	endfor
+	
+	abort "no writing to intrument, testing phase"
+//				
+//
+//	if(S.sync)
+//		nvar fdID = $(stringfromlist(0,S.instrIDs)) //first ID is the master, Last ID might be better
+//		string response = queryInstr(fdID, "ARM_SYNC\r\n")
+//		print response
+//		if(!cmpstr(response,"SYNC_ARMED"))
+//		abort "Unable to arm sync :("
+//		else
+//		
+//			for(i=0;i<itemsinlist(S.instrIDs);i++)
+//				string fdIDname = stringfromlist(i,S.instrIDs)
+//				nvar fdID = $fdIDname
+//				if(whichlistitem(fdIDname, S.fakerampIDs) != -1)
+//					///find global value of channel 0 in that ID, set it to start and fin, and dac = 0
+//					string value = num2str(getfdacOutput(fdID,0, same_as_window = 0)) //this gave me the start and fins and dac
+//					starts = value //changing this would mean i have to change it back
+//					fins = value // same for this
+//					dacs = "0"  //same for this?
+//				else
+//					/// it would need to stay at 
+//				endif		
+//				 
+//			//// i need to check if its a
+//			
+//			if(cmpstr(S.fakerampIDs,""))
+//			endif
+//			
+////			endfor
+//		// a shit ton of commands will have to go here I think	//
+//		// I will need to send commands to slave first // - > i need to figure out if they are fake/realramps and if i need fake adcs
+//		
+//		abort "for now"
+//		endif
+//	else
+//		writeInstr(S.instrIDx,cmd) // this existed outside the if-statement
+//	endif
 	
 	return cmd
 end
