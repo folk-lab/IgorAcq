@@ -109,13 +109,22 @@ function set_master_slave(S)
 		nvar fd = $(fdname)
 		if(i == 0 && numfdacs == 1) 													// sets independent if theres only one device
 			check = queryInstr(fd, "SET_MODE,INDEP" + "\r\n")
+			if (cmpstr(check, "INDEP_SET\r\n"))
+				abort "unable to set independent mode on fastDAC:  " + fdname
+			endif
 			printf " %s   on %s \r\n", check, fdname
-		elseif(i == 0 && numfdacs > 1) 												// sets first device to master if theres multiple devices
+		elseif(i == numfdacs-1 && numfdacs > 1) 									// sets last device to master if theres multiple devices
 			check = queryInstr(fd, "SET_MODE,MASTER" + "\r\n")
+			if (cmpstr(check, "MASTER_SET\r\n"))
+				abort "unable to set independent mode on fastDAC:  " + fdname
+			endif
 			printf " %s   on %s\r\n", check, fdname
 			S.sync = 1																	// Showing sync will be used  
 		else																				// sets the remainder of devices to slaves
 			check = queryInstr(fd, "SET_MODE,SLAVE" + "\r\n")
+			if (cmpstr(check, "SLAVE_SET\r\n"))
+				abort "unable to set independent mode on fastDAC:  " + fdname
+			endif
 			printf " %s   on %s\r\n", check, fdname 
 		endif
 	endfor
@@ -1874,7 +1883,7 @@ function/s fd_start_sweep(S, [AWG_list])
 		string fdIDname = stringfromlist(i,S.instrIDs)
 		nvar fdID = $fdIDname
 		string adcs = scu_getDeviceChannels(fdID, S.adclist, adc_flag=1)
-		adcs = replacestring(";",adcs,"")
+		//adcs = replacestring(";",adcs,"")
 
 		if (!S.readVsTime)
 			scu_assertSeparatorType(S.channelsx, ",")
@@ -1897,6 +1906,33 @@ function/s fd_start_sweep(S, [AWG_list])
 	
 		if(S.sync)
 		
+			//checking the need for a fakeramp
+			if(!cmpstr(dacs,"") && whichlistitem(fdIDname, S.fakerampIDs) != -1) //two checks (redundant), but maybe only one is needed
+					///find global value of channel 0 in that ID, set it to start and fin, and dac = 0
+					string value = num2str(getfdacOutput(fdID,0, same_as_window = 0)) //this gave me the start and fins and dac
+					starts = value //changing this would mean i have to change it back
+					fins = value // same for this
+					dacs = "0"  //same for this?
+			endif
+			
+			//checking the need for fake recordings
+			if(itemsInList(adcs) != S.maxADCs)
+				
+				int j = 0
+				
+				do	
+					if(whichlistItem(num2str(j),adcs) == -1)
+						adcs = addListItem(num2str(j), adcs)
+					endif
+					j++
+					
+				while (itemsInList(adcs) != S.maxADCs)
+				
+			endif
+			adcs = replacestring(";",adcs,"")
+			
+			// might need the channels picked for the fake recordings stored somewhere
+			
 		else
 			if (!paramisDefault(AWG_list) && AWG_List.use_AWG == 1 && AWG_List.lims_checked == 1)  
 				// Example:

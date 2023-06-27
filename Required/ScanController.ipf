@@ -2844,7 +2844,7 @@ function PreScanChecksFD2(S, [x_only, y_only])
 		endif
 		
 		for(j=0; j<itemsinlist(S.adcListIDs); j++)
-			string adcID = stringFromList(i,S.adcListIDs)
+			string adcID = stringFromList(j,S.adcListIDs)
 			
 			if(!cmpstr(adcID,ID))
 				ADCcounts[i] += 1
