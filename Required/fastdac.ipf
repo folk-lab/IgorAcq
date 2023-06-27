@@ -271,13 +271,21 @@ function getFADCChannelSingle(instrID,channel) // Units: mV
 	endif
 end
 
-function getFDACOutput(instrID,channel) // Units: mV
-	// NOTE: Channel is the same as in FasDAC window 
-	variable instrID, channel
+function getFDACOutput(instrID,channel,[same_as_window]) // Units: mV
+	// NOTE: Channel is the same as in FasDAC window
+	// same_as_window (1/0) - > checks if CHstart needs to be calculated.
+	variable instrID, channel, same_as_window
 	
+	variable CHstart
 	
-	variable CHstart = scf_getChannelStartNum(instrID, adc=0)
+	same_as_window = paramisDefault(same_as_window)  ? 1 : same_as_window
 	
+	if(same_as_window)
+		CHstart = scf_getChannelStartNum(instrID, adc=0)
+	else
+		CHstart = 0
+	endif
+		
 	wave/t old_fdacvalstr, fdacvalstr
 	string cmd="", response="",warn=""
 	sprintf cmd, "GET_DAC,%d", channel - CHstart
@@ -1857,9 +1865,10 @@ function/s fd_start_sweep(S, [AWG_list])
 	// readvstime sweep (SPEC_ANA in arduino)
 	Struct ScanVars &S
 	Struct AWGVars &AWG_List
+	int i
 
 	scu_assertSeparatorType(S.ADCList, ";")	
-	string adcs = scu_getDeviceChannels(s.instrIDx, S.adclist, adc_flag=1)
+	string adcs = scu_getDeviceChannels(S.adcListIDs, S.adclist, adc_flag=1)
 	adcs = replacestring(";",adcs,"")
 
 	if (!S.readVsTime)
@@ -1875,7 +1884,7 @@ function/s fd_start_sweep(S, [AWG_list])
 			abort "ERROR[fd_start_sweep]: S.direction must be 1 or -1, not " + num2str(S.direction)
 		endif
 
-		string dacs = scu_getDeviceChannels(s.instrIDx, S.channelsx)
+		string dacs = scu_getDeviceChannels(s.daclistIDs, S.channelsx)
 	   dacs = replacestring(",",dacs,"")
 	endif
 
@@ -1901,14 +1910,35 @@ function/s fd_start_sweep(S, [AWG_list])
 	endif
 	
 	if(S.sync)
-		nvar fdID = $(stringfromlist(0,S.instrIDs)) 
+		nvar fdID = $(stringfromlist(0,S.instrIDs)) //first ID is the master, Last ID might be better
 		string response = queryInstr(fdID, "ARM_SYNC\r\n")
 		print response
 		if(!cmpstr(response,"SYNC_ARMED"))
 		abort "Unable to arm sync :("
 		else
+		
+			for(i=0;i<itemsinlist(S.instrIDs);i++)
+				string fdIDname = stringfromlist(i,S.instrIDs)
+				nvar fdID = $fdIDname
+				if(whichlistitem(fdIDname, S.fakerampIDs) != -1)
+					///find global value of channel 0 in that ID, set it to start and fin, and dac = 0
+					string value = num2str(getfdacOutput(fdID,0, same_as_window = 0)) //this gave me the start and fins and dac
+					starts = value //changing this would mean i have to change it back
+					fins = value // same for this
+					dacs = "0"  //same for this?
+				else
+					/// it would need to stay at 
+				endif		
+				 
+			//// i need to check if its a
+			
+			if(cmpstr(S.fakerampIDs,""))
+			endif
+			
+			endfor
 		// a shit ton of commands will have to go here I think	//
 		// I will need to send commands to slave first // - > i need to figure out if they are fake/realramps and if i need fake adcs
+		
 		abort "for now"
 		endif
 	else

@@ -217,16 +217,21 @@ function/s scu_getChannelNumbers(channels, [fastdac])
 end
 
 
-function/s scu_getDeviceChannels(instrID, channels, [adc_flag])
+function/s scu_getDeviceChannels(instrIDs, channels, [adc_flag])
 	// Convert from absolute channel number to device specific channel number (i.e. channel 8 is probably fd2's channel 0)
-	variable instrID, adc_flag  //adc_flag = 1 for ADC channels, = 0 for DAC channels
-	string channels
+	//changed to take a stringlist of instrIDs instead of one ID - 06/26/2023 - Raveel (for multiple fastDAC implementation)
+	
+	variable adc_flag  //adc_flag = 1 for ADC channels, = 0 for DAC channels
+	string channels, instrIDs
 
+	string instrIDname
 	string new_channels = ""
 	variable real_channel_val
 	string sep = selectString(adc_flag, ",", ";")
 	variable i
 	for (i = 0; i<itemsinlist(channels, sep); i++)
+		instrIDname = stringfromlist(i,instrIDs)
+		nvar instrID = $instrIDname
 		real_channel_val = str2num(stringfromList(i, channels, sep)) - scf_getChannelStartNum(instrID, adc=adc_flag)
 		if (real_channel_val < 0)
 			printf "ERROR: Channels passed were [%s]. After subtracting the start value for the device for the %d item in list, this resulted in a real value of %d which is not valid\r", channels, i, real_channel_val
@@ -2926,7 +2931,7 @@ function RampStartFD(S, [ignore_lims, x_only, y_only])
 				abort "ERROR[RampStartFD]: S.direction not set to 1 or -1"
 			endif
 			if(S.sync)
-				nvar fdID = $(stringfromlist(i,S.instrIDs))
+				nvar fdID = $(stringfromlist(i,S.daclistIDs))
 				rampMultipleFDAC(fdID, stringfromlist(i,S.channelsx,","),setpoint,ramprate=S.rampratex, ignore_lims=ignore_lims)
 			else
 				rampMultipleFDAC(S.instrIDx, stringfromlist(i,S.channelsx,","),setpoint,ramprate=S.rampratex, ignore_lims=ignore_lims) //is this important?

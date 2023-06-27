@@ -488,7 +488,7 @@ function ScanFastDAC2(instrID, start, fin, channels, [numptsx, sweeprate, delay,
 	// Ramp to start without checks since checked above
 	RampStartFD(S, ignore_lims = 1) //ramp_smart for ramping to starting value. This does not get affected by 
 
-	abort "Hard Coded Abort: still in testing phase"
+	//abort "Hard Coded Abort: still in testing phase"
 	// Let gates settle
 	sc_sleep(S.delayy)
 
