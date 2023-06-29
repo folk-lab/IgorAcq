@@ -1872,6 +1872,8 @@ function/s fd_start_sweep(S, [AWG_list])
 	// regular sweep (INT_RAMP in arduino) 
 	// sweep with arbitrary wave generator on (AWG_RAMP in arduino)
 	// readvstime sweep (SPEC_ANA in arduino)
+	
+	// updated for multiple fastdacs, but should work in  the case of working with one fast dac
 	Struct ScanVars &S
 	Struct AWGVars &AWG_List
 	int i
@@ -1971,10 +1973,10 @@ function/s fd_start_sweep(S, [AWG_list])
 		endif
 		
 		
-		//writeInstr(fdID,cmd)
+		writeInstr(fdID,cmd)
 	endfor
 	
-	abort "no writing to intrument, testing phase"
+	//abort "no writing to intrument, testing phase"
 //				
 //
 //	if(S.sync)

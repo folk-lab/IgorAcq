@@ -4180,15 +4180,17 @@ function scfd_SendCommandAndRead(S, AWG_list, rowNum)
 	endtry	
 
 	string endstr
-	endstr = readInstr(S.instrIDx)
+	endstr = readInstr(S.instrIDx) // would be useful to check in silvia branch if the response is different, here it is a blank string 
 	endstr = sc_stripTermination(endstr,"\r\n")	
 	if (S.readVsTime)
 		scf_checkFDResponse(endstr,cmd_sent,isString=1,expectedResponse="READ_FINISHED")
 		// No need to update DACs
 	else
-		scf_checkFDResponse(endstr,cmd_sent,isString=1,expectedResponse="RAMP_FINISHED")
+		scf_checkFDResponse(endstr,cmd_sent,isString=1,expectedResponse="RAMP_FINISHED") // getting a bad response here 
+	   
 	   // update DAC values in window (request values from FastDAC directly in case ramp failed)
-		scfd_updateWindow(S, S.numADCs) 
+		
+		scfd_updateWindow(S, S.numADCs) // get fdacoutput is likely failing here. 
 	endif
 	
 	if(AWG_list.use_awg == 1)  // Reset AWs back to zero (no reason to leave at end of AW)
@@ -4315,14 +4317,17 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only])
    variable bufferDumpStart = stopMSTimer(-2)
 
    variable bytesSec = roundNum(2*S.samplingFreq,0)
-   variable read_chunk = scfd_getReadChunkSize(S.numADCs, S.numptsx, bytesSec, totalByteReturn)
+   
+   variable read_chunk = scfd_getReadChunkSize(S.maxADCs, S.numptsx, bytesSec, totalByteReturn) //numADCs is probably wrong, it should be maxADC count I belive
+   
    variable panic_mode = record_only  // If Igor gets behind on reading at any point, it will go into panic mode and focus all efforts on clearing buffer.
    variable expected_bytes_in_buffer = 0 // For storing how many bytes are expected to be waiting in buffer
    do
       scfd_readChunk(S.instrIDx, read_chunk, buffer)  // puts data into buffer
       scfd_distributeData1(buffer, S, bytes_read, totalByteReturn, read_chunk, rowNum)
       scfd_checkSweepstate(S.instrIDx)
-
+	   //abort "abort in recordbuffer, testing phase"
+      
       bytes_read += read_chunk      
       expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)      
       if(!panic_mode && expected_bytes_in_buffer < saveBuffer)  // if we aren't too far behind then update Raw 1D graphs
