@@ -1947,11 +1947,11 @@ function/s fd_start_sweep(S, [AWG_list])
 				
 			endif
 			adcs = replacestring(";",adcs,"")
-			
 			sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, starts, fins, S.numptsx
 			// might need the channels picked for the fake recordings stored somewhere
 			
 		else
+			adcs = replacestring(";",adcs,"")
 			if (!paramisDefault(AWG_list) && AWG_List.use_AWG == 1 && AWG_List.lims_checked == 1)  
 				// Example:
 				// AWG_RAMP,2,012,345,67,0,-1000,1000,-2000,2000,50,50
@@ -1965,8 +1965,6 @@ function/s fd_start_sweep(S, [AWG_list])
 				sprintf cmd, "SPEC_ANA,%s,%s\r", adcs, num2istr(S.numptsx)
 			else
 				// OPERATION, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF STEPS
-		
-				//fins = "0" // sus // suprisingly fake ramp works!
 			
 				sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, starts, fins, S.numptsx
 			endif
