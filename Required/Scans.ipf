@@ -803,7 +803,6 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 	variable setpointy, sy, fy
 	string chy
 	variable k = 0
-	
 	for(i=0; i<S.numptsy; i++)
 
 		///// LOOP FOR INTERLACE SCANS ///// 
@@ -895,12 +894,10 @@ function Ramp_interlaced_channels(S, i)
 				continue 
 			endif
 		endif
-		
 		// Figure out which FastDAC the channel belongs to
 		channel_num = scu_getChannelNumbers(interlace_channel, fastdac=1)
 		scf_getChannelNumsOnFD(channel_num, device) // Sets device to device num
 		string deviceAddress = stringbykey("visa"+num2istr(device), sc_fdacKeys, ":", ",")
-		
 		// Open connection to that FastDAC and ramp
 		viRM = openFastDACconnection("fdac_window_resource", deviceAddress, verbose=0)
 		nvar tempinstrID = $"fdac_window_resource"
