@@ -53,49 +53,49 @@ function dotcond_avg(wave wav, int refit,string kenner_out)
 	print ms/1e6
 end
 
-
-function/wave split_wave(wave wav, variable flag)
-	wave kenner
-	redimension/n=-1 kenner
-	Duplicate/o kenner,idx
-	idx = kenner[p] > flag ? p : NaN
-	WaveTransform zapnans idx
-
-	string wn=nameofwave(wav)
-	string newname =wn+"_pos"
-	variable	nr = dimsize(wav,0) //number of rows (sweep length)
-
-	duplicate/o wav $newname
-	wave out_wav = $newname
-	Redimension/E=1/N=(-1,dimsize(idx,0)) out_wav
-
-	variable i=0
-	do
-		out_wav[][i]=wav[p][idx[i]]
-
-		i=i+1
-
-	while(i<dimsize(idx,0))
-
-
-	//now look for negative values
-	Duplicate/o kenner,idx
-	idx = kenner[p][q] < flag ? p : NaN
-	WaveTransform zapnans idx
-
-	string newname1 =wn+"_neg"
-	duplicate/o wav $newname1
-	wave out_wav1 = $newname1
-	Redimension/E=1/N=(-1,dimsize(idx,0)) out_wav1
-
-	i=0
-	wave out_wav1 = $newname1
-	do
-		out_wav1[][i]=wav[p][idx[i]]
-		i=i+1
-	while(i<dimsize(idx,0))
-end
-
+//
+//function/wave split_wave(wave wav, variable flag)
+//	wave kenner
+//	redimension/n=-1 kenner
+//	Duplicate/o kenner,idx
+//	idx = kenner[p] > flag ? p : NaN
+//	WaveTransform zapnans idx
+//
+//	string wn=nameofwave(wav)
+//	string newname =wn+"_pos"
+//	variable	nr = dimsize(wav,0) //number of rows (sweep length)
+//
+//	duplicate/o wav $newname
+//	wave out_wav = $newname
+//	Redimension/E=1/N=(-1,dimsize(idx,0)) out_wav
+//
+//	variable i=0
+//	do
+//		out_wav[][i]=wav[p][idx[i]]
+//
+//		i=i+1
+//
+//	while(i<dimsize(idx,0))
+//
+//
+//	//now look for negative values
+//	Duplicate/o kenner,idx
+//	idx = kenner[p][q] < flag ? p : NaN
+//	WaveTransform zapnans idx
+//
+//	string newname1 =wn+"_neg"
+//	duplicate/o wav $newname1
+//	wave out_wav1 = $newname1
+//	Redimension/E=1/N=(-1,dimsize(idx,0)) out_wav1
+//
+//	i=0
+//	wave out_wav1 = $newname1
+//	do
+//		out_wav1[][i]=wav[p][idx[i]]
+//		i=i+1
+//	while(i<dimsize(idx,0))
+//end
+//
 
 //what does this mean in Igor pro: [p][q] > flag ? p : NaN
 //In Igor Pro, the expression "[p][q] > flag ? p : NaN" is a conditional statement that checks if the value of the two-dimensional array element located at [p][q] is greater than the value of the variable "flag".
@@ -204,35 +204,35 @@ function find_plot_gammas(string fit_params_name, variable N)
 
 
 end
- 
-function plot_badgammas(wave wav)
-
-	int i
-	int nr
-	wave badgammasx
-	string w2d
-	string dataset=nameOfWave(wav)
-
-
-
-	nr = dimsize(badgammasx,0)
-
-	display
-if(nr>0)
-	for(i=0; i < nr; i +=1)
-		appendtograph wav[][badgammasx[i]]
-
-	endfor
-
-makecolorful()
-	ModifyGraph fSize=24
-	ModifyGraph gFont="Gill Sans Light"
-	//    ModifyGraph width={Aspect,1.62},height=300
-	Label bottom "voltage"
-	Label left dataset
-	TextBox/C/N=text1/A=MT/E=2 "bad gammas of "+dataset
-endif
-end
+// 
+//function plot_badgammas(wave wav)
+//
+//	int i
+//	int nr
+//	wave badgammasx
+//	string w2d
+//	string dataset=nameOfWave(wav)
+//
+//
+//
+//	nr = dimsize(badgammasx,0)
+//
+//	display
+//if(nr>0)
+//	for(i=0; i < nr; i +=1)
+//		appendtograph wav[][badgammasx[i]]
+//
+//	endfor
+//
+//makecolorful()
+//	ModifyGraph fSize=24
+//	ModifyGraph gFont="Gill Sans Light"
+//	//    ModifyGraph width={Aspect,1.62},height=300
+//	Label bottom "voltage"
+//	Label left dataset
+//	TextBox/C/N=text1/A=MT/E=2 "bad gammas of "+dataset
+//endif
+//end
 
 
 

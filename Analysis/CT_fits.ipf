@@ -94,107 +94,106 @@ end
 
 
 
-
 //what does this mean in Igor pro: [p][q] > flag ? p : NaN
 //In Igor Pro, the expression "[p][q] > flag ? p : NaN" is a conditional statement that checks if the value of the two-dimensional array element located at [p][q] is greater than the value of the variable "flag".
 //If the condition is true, the statement returns the value of "p". If the condition is false, the statement returns "NaN", which stands for "Not a Number" and is used to represent undefined or unrepresentable numerical values.
-
-function /wave get_initial_params(sweep)
-
-	// for a given sweep returns a guess of initial parameters for the fit function: Charge transiton
-
-	wave sweep
-	duplicate /o sweep x_array
-	x_array = x
-
-	variable amp = wavemax(sweep) - wavemin(sweep) //might be worthwile looking for a maximum/minimum with differentiation
-	//variable amp = 0.001
-	variable const = mean(sweep)
-	variable theta = 50
-
-	duplicate /o sweep sweepsmooth
-	Smooth/S=4 201, sweepsmooth ;DelayUpdate
-
-	differentiate sweepsmooth
-	extract/INDX sweepsmooth, extractedwave, sweepsmooth == wavemin(sweepsmooth)
-	variable mid = x_array[extractedwave[0]]
-
-	//extract/INDX sweepsmooth, extractedwave, sweepsmooth == 0 //new
-	//variable amp = sweep[extractedwave[0]] - sweep[extractedwave[1]] // new
-
-
-	variable lin = 0.001  // differentiated value of flat area?
-
-	Make /D/N=6/O W_coef
-	W_coef[0] = {amp,const,theta,mid,lin,0}
-
-	killwaves extractedwave, sweepsmooth
-	return W_coef
-
-end
-
-
+//
+//function /wave get_initial_params(sweep)
+//
+//	// for a given sweep returns a guess of initial parameters for the fit function: Charge transiton
+//
+//	wave sweep
+//	duplicate /o sweep x_array
+//	x_array = x
+//
+//	variable amp = wavemax(sweep) - wavemin(sweep) //might be worthwile looking for a maximum/minimum with differentiation
+//	//variable amp = 0.001
+//	variable const = mean(sweep)
+//	variable theta = 50
+//
+//	duplicate /o sweep sweepsmooth
+//	Smooth/S=4 201, sweepsmooth ;DelayUpdate
+//
+//	differentiate sweepsmooth
+//	extract/INDX sweepsmooth, extractedwave, sweepsmooth == wavemin(sweepsmooth)
+//	variable mid = x_array[extractedwave[0]]
+//
+//	//extract/INDX sweepsmooth, extractedwave, sweepsmooth == 0 //new
+//	//variable amp = sweep[extractedwave[0]] - sweep[extractedwave[1]] // new
+//
+//
+//	variable lin = 0.001  // differentiated value of flat area?
+//
+//	Make /D/N=6/O W_coef
+//	W_coef[0] = {amp,const,theta,mid,lin,0}
+//
+//	killwaves extractedwave, sweepsmooth
+//	return W_coef
+//
+//end
 
 
-function /wave fit_transition(current_array,minx,maxx)
-	// fits the current_array, If condition is 0 it will get initial params, If 1:
-	// define a variable named W_coef_guess = {} with the correct number of arguments
-
-
-	wave current_array
-	variable minx,maxx
-
-
-	wave W_coef
-
-	//duplicate /o current_array x_array
-	//x_array = x
-	//FuncFit/q Chargetransition W_coef current_array[][0] /D   //removed the x_array
-	//	FuncFit/q CT_faster W_coef current_array[][0] /D    //removed the x_array
-	
-	FuncFit/q /TBOX=768 CT_faster W_coef current_array[minx,maxx][0] /D
-end
-
-
-
-
-function /wave get_fit_params(wave wavenm, string fit_params_name,variable minx, variable maxx)
-	// returns wave with the name wave "dat"+ wavenum +"fit_params" eg. dat3320fit_params
-
-	//If condition is 0 it will get initial params, If 1:
-	// define a variable named W_coef_guess = {} with the correct number of arguments
-
-
-	variable i
-	string w2d=nameofwave(wavenm)
-	int wavenum=getfirstnum(w2d)
-	int nc
-	int nr
-	wave temp_wave
-	wave W_coef
-	wave W_sigma
+//
+//
+//function /wave fit_transition(current_array,minx,maxx)
+//	// fits the current_array, If condition is 0 it will get initial params, If 1:
+//	// define a variable named W_coef_guess = {} with the correct number of arguments
+//
+//
+//	wave current_array
+//	variable minx,maxx
+//
+//
+//	wave W_coef
+//
+//	//duplicate /o current_array x_array
+//	//x_array = x
+//	//FuncFit/q Chargetransition W_coef current_array[][0] /D   //removed the x_array
+//	//	FuncFit/q CT_faster W_coef current_array[][0] /D    //removed the x_array
+//	
+//	FuncFit/q /TBOX=768 CT_faster W_coef current_array[minx,maxx][0] /D
+//end
 
 
 
-	nr = dimsize(wavenm,0) //number of rows (total sweeps)
-	nc = dimsize(wavenm,1) //number of columns (data points)
-	make /N= (nc , 12) /o $fit_params_name
-	wave fit_params = $fit_params_name
-	print W_coef
-
-	duplicate/o wavenm temp_wave
-	for (i=0; i < nc ; i+=1)
-
-		temp_wave = wavenm[p][i]
-		fit_transition(temp_wave,minx,maxx)
-		fit_params[1 * i][,5] = W_coef[q]
-		fit_params[1 * i][6,] = W_sigma[q-6]         //I genuinely cant believe this worked
-		// i dont think the q-5 does anything, should double check
-	endfor
-
-	return fit_params
-
-end
+//
+//function /wave get_fit_params(wave wavenm, string fit_params_name,variable minx, variable maxx)
+//	// returns wave with the name wave "dat"+ wavenum +"fit_params" eg. dat3320fit_params
+//
+//	//If condition is 0 it will get initial params, If 1:
+//	// define a variable named W_coef_guess = {} with the correct number of arguments
+//
+//
+//	variable i
+//	string w2d=nameofwave(wavenm)
+//	int wavenum=getfirstnum(w2d)
+//	int nc
+//	int nr
+//	wave temp_wave
+//	wave W_coef
+//	wave W_sigma
+//
+//
+//
+//	nr = dimsize(wavenm,0) //number of rows (total sweeps)
+//	nc = dimsize(wavenm,1) //number of columns (data points)
+//	make /N= (nc , 12) /o $fit_params_name
+//	wave fit_params = $fit_params_name
+//	print W_coef
+//
+//	duplicate/o wavenm temp_wave
+//	for (i=0; i < nc ; i+=1)
+//
+//		temp_wave = wavenm[p][i]
+//		fit_transition(temp_wave,minx,maxx)
+//		fit_params[1 * i][,5] = W_coef[q]
+//		fit_params[1 * i][6,] = W_sigma[q-6]         //I genuinely cant believe this worked
+//		// i dont think the q-5 does anything, should double check
+//	endfor
+//
+//	return fit_params
+//
+//end
 
 
 function find_plot_thetas(int wavenum,variable N,string fit_params_name)
@@ -282,34 +281,34 @@ function find_plot_thetas(int wavenum,variable N,string fit_params_name)
 
 end
 
-
-function plot_badthetas(wave wavenm)
-
-	int i
-	int nr
-	wave badthetasx
-	string w2d=nameofwave(wavenm)
-
-	duplicate /o wavenm, wavenmcopy
-	nr = dimsize(badthetasx,0)
-
-	display
-if (nr>0)
-	for(i=0; i < nr; i +=1)
-		appendtograph wavenmcopy[][badthetasx[i]]
-
-	endfor
-
-	QuickColorSpectrum2()
-
-	ModifyGraph fSize=24
-	ModifyGraph gFont="Gill Sans Light"
-	//    ModifyGraph width={Aspect,1.62},height=300
-	Label bottom "voltage"
-	Label left "current"
-	TextBox/C/N=text1/A=MT/E=2 "\\Z14\\Z16 bad thetas of " +w2d
-endif
-end
+//
+//function plot_badthetas(wave wavenm)
+//
+//	int i
+//	int nr
+//	wave badthetasx
+//	string w2d=nameofwave(wavenm)
+//
+//	duplicate /o wavenm, wavenmcopy
+//	nr = dimsize(badthetasx,0)
+//
+//	display
+//if (nr>0)
+//	for(i=0; i < nr; i +=1)
+//		appendtograph wavenmcopy[][badthetasx[i]]
+//
+//	endfor
+//
+//	QuickColorSpectrum2()
+//
+//	ModifyGraph fSize=24
+//	ModifyGraph gFont="Gill Sans Light"
+//	//    ModifyGraph width={Aspect,1.62},height=300
+//	Label bottom "voltage"
+//	Label left "current"
+//	TextBox/C/N=text1/A=MT/E=2 "\\Z14\\Z16 bad thetas of " +w2d
+//endif
+//end
 
 
 
