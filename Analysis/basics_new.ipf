@@ -53,12 +53,12 @@ function lock_in_test(data)
 end
 
 
-function demodulate(datnum, harmonic, wave_kenner, [append2hdf, dat_kenner])
+function demodulate(datnum, harmonic, wave_kenner, [append2hdf, demod_wavename])
 	variable datnum, harmonic
 	string wave_kenner
 	variable append2hdf
-	string dat_kenner
-	dat_kenner = selectString(paramisdefault(dat_kenner), dat_kenner, "")
+	string demod_wavename
+	demod_wavename = selectString(paramisdefault(demod_wavename), demod_wavename, "demod")
 	variable nofcycles, period, cols, rows
 	string wn="dat" + num2str(datnum) + wave_kenner;
 	wave wav=$wn
@@ -84,24 +84,29 @@ function demodulate(datnum, harmonic, wave_kenner, [append2hdf, dat_kenner])
 	temp=temp*pi/2;
 	
 	
-//	display
-//	appendimage temp
+	display
+	appendimage temp
 
-//	display
-//	appendimage sinewave
+	display
+	appendimage sinewave
 
-//	Duplicate /o sine1d, wave0x
-//	wave0x = x
-//
-//	display wav vs wave0x
-//	appendtoGraph sine1d
-//
+	Duplicate /o sine1d, wave0x
+	wave0x = x
+
+	display wav vs wave0x
+	appendtoGraph sine1d
+
 
 	
 	print "cols = " + num2str(cols)
 	print "rows = " + num2str(rows)
 	print "(cols/period/nofcycles) = " + num2str(cols/period/nofcycles)
-	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1, "demod")
+	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1, demod_wavename)
+	
+	wave demod = $demod_wavename
+	
+	display; appendimage demod
+	ModifyImage demod ctab= {*,*,RedWhiteGreen,0}
 	
 //	display 
 ////	display wav
@@ -374,7 +379,7 @@ end
 function notch_filters(wave wav, [string Hzs, string Qs, string notch_name])
 	// wav is the wave to be filtered.  notch_name, if specified, is the name of the wave after notch filtering.
 	// If not specified the filtered wave will have the original name plus '_nf' 
-	// This function is used to apply the notch filter for a choice of frequencies and Q factors
+	// This function is used Hzto apply the notch filter for a choice of frequencies and Q factors
 	// if the length of Hzs and Qs do not match then Q is chosen as the first Q is the list
 	// It is expected that wav will have an associated JSON file to convert measurement times to points, via fd_getmeasfreq below
 	// EXAMPLE usage: notch_filters(dat6430cscurrent_2d, Hzs="60;180;300", Qs="50;150;250")
@@ -432,8 +437,7 @@ function notch_filters(wave wav, [string Hzs, string Qs, string notch_name])
 	redimension/N=(num_rows, -1) temp_ifft
 	copyscales wav, temp_ifft
 	duplicate /o temp_ifft $notch_name
-	 freq=fd_getmeasfreq(wavenum)
-return freq
+
 	
 end
 
@@ -442,23 +446,23 @@ function spectrum_analyzer(wave data, variable samp_freq)
 	// Built in powerspectrum function
 	duplicate/o data spectrum
 	SetScale/P x 0,1/samp_freq,"", spectrum
-	variable nr=dimsize(spectrum,0);  // number of points in x-direction
-	variable le=2^(floor(log(nr)/log(2))); // max factor of 2 less than total num points
+	variable numptsx = dimsize(spectrum,0);  // number of points in x-direction
+	variable new_numptsx = 2^(floor(log(numptsx)/log(2))); // max factor of 2 less than total num points
 	wave slice;
 	wave w_Periodogram
 
 	variable i=0
 	rowslice(spectrum,i)
-		DSPPeriodogram/R=[0,(le-1)]/PARS/NODC=2/DEST=W_Periodogram slice
+		DSPPeriodogram/R=[1,(new_numptsx)] /DB/NODC=1/DEST=W_Periodogram slice
 	duplicate/o w_Periodogram, powerspec
 	i=1
 	do
 		rowslice(spectrum,i)
-		DSPPeriodogram/R=[0,(le-1)]/PARS/NODC=2/DEST=W_Periodogram slice
+		DSPPeriodogram/R=[1,(new_numptsx)]/DB/NODC=1/DEST=W_Periodogram slice
 		powerspec=powerspec+W_periodogram
 		i=i+1
 	while(i<dimsize(spectrum,1))
-	//powerspec[0]=nan
+//	powerspec[0]=nan
 	display powerspec; // SetAxis bottom 0,500
 
 end
@@ -545,6 +549,25 @@ function /s avg_wav(wave wav) // /WAVE lets your return a wave
 	nr = dimsize($wn,0) //number of rows (sweep length)
 	nc = dimsize($wn,1) //number of columns (repeats)
 	ReduceMatrixSize(wav, 0, -1, nr, 0,-1, 1,1, avg_name)
+	redimension/n=-1 $avg_name
+	return avg_name
+end
+
+
+function /s avg_wav_N(wave wav, int N) // /WAVE lets your return a wave
+
+	//  averaging any wave over columns (in y direction)
+	// wave returned is avg_name
+	string wn=nameofwave(wav)
+	string avg_name=wn+"_avg";
+	int nc
+	int nr
+
+//	wn="dat"+num2str(wavenum)+dataset //current 2d array
+
+	nr = dimsize($wn,0) //number of rows (sweep length)
+	nc = dimsize($wn,1) //number of columns (repeats)
+	ReduceMatrixSize(wav, 0, -1, nr, 0,-1, N,1, avg_name)
 	redimension/n=-1 $avg_name
 	return avg_name
 end
@@ -928,16 +951,13 @@ function int_PSD(tim)
 
 end
 
-macro testLI(rep)
-
-variable rep
-
+macro testLI()
 closeallGraphs()
 sc_openInstrConnections(0)
-//setFdacAWGSquareWave(fd, 1000, -1000, 0.01, 0.01, 1)
-//setupAWG(fd, AWs="1", DACs="1", numCycles=1, verbose=1)
-ScanFastDAC(fd, 0, 1, "3", sweeprate=1, use_awg=1, nosave = 1, repeats = rep)
-//ScanFastDAC2D(fd, 0, 1, "3", 0, 2, "1", 10, sweeprate=1, use_AWG=1)
+setFdacAWGSquareWave(fd, 100, -100, 0.001, 0.001, 0)
+setupAWG(fd, AWs="0", DACs="0", numCycles=1, verbose=1);
+ScanFastDAC(fd, 0, 1, "3", sweeprate=1,  use_awg=1,nosave=1, repeats = 1)
+
 //lock_in_main_2d(wave0_2d,1)
 //demodulate(filenum,1,"wa,[append2hdf])
 //display average
