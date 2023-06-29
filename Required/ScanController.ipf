@@ -4468,9 +4468,15 @@ function scfd_updateWindow(S, numAdcs)
   endfor
 
   variable channel_num
+  string fdIDname    // attempt
+  
   for(i=0;i<numADCs;i+=1)
     channel_num = str2num(stringfromlist(i,S.adclist,";"))
-    getfadcChannel(S.instrIDx,channel_num, len_avg=0.001)  // This updates the window when called
+    fdIDname = stringfromlist(i,S.ADClistIDs)  //attempt
+    nvar fdID = $fdIDname						// attempt
+    
+    //getfadcChannel(S.instrIDx,channel_num, len_avg=0.001)  // This updates the window when called
+    getfadcChannel(fdID,channel_num, len_avg=0.001)  // attempt
   endfor
 end
 

@@ -437,7 +437,9 @@ function ScanFastDAC2(instrID, start, fin, channels, [numptsx, sweeprate, delay,
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
-	set_indep()
+	
+	set_indep() //not there
+	
 	// Set defaults
 	delay = ParamIsDefault(delay) ? 0.01 : delay
 	y_label = selectstring(paramisdefault(y_label), y_label, "nA")
