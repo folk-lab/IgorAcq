@@ -85,17 +85,19 @@ function demodulate(datnum, harmonic, wave_kenner, [append2hdf, demod_wavename])
 	temp=temp*pi/2;
 	
 	
-	display
-	appendimage temp
-
-	display
-	appendimage sinewave
-
+	
+	///// display steps of demod /////
+//	display
+//	appendimage temp
+//
+//	display
+//	appendimage sinewave
+//
 	Duplicate /o sine1d, wave0x
 	wave0x = x
 
-	display wav vs wave0x
-	appendtoGraph sine1d
+//	display wav vs wave0x
+//	appendtoGraph sine1d
 
 
 	
@@ -106,13 +108,17 @@ function demodulate(datnum, harmonic, wave_kenner, [append2hdf, demod_wavename])
 	
 	wave demod = $demod_wavename
 	
-	display; appendimage demod
-	ModifyImage demod ctab= {*,*,RedWhiteGreen,0}
+//	string demod_window = "demod_window"
 	
-//	display 
-////	display wav
-//	appendimage temp
-//	display temp
+//	Display
+	KillWindow /Z demod_window
+	Display
+	DoWindow/C demod_window
+	Appendimage /W=demod_window demod
+	ModifyImage /W=demod_window $demod_wavename ctab = {*, *, RedWhiteGreen, 0}
+	
+
+	///// append to hdf /////
 //wn="demod"
 //	if (append2hdf)
 //		variable fileid
@@ -124,6 +130,40 @@ function demodulate(datnum, harmonic, wave_kenner, [append2hdf, demod_wavename])
 end
 
 
+
+//string window_name
+//	Display 
+//	DoWindow/C conductance_vs_sweep 
+//	
+//	Display 
+//	window_name = WinName(0,1)
+//	DoWindow/C transition_vs_sweep
+//	
+//	string cond_avg, trans_avg
+//	variable i, datnum
+//	for (i=0;i<num_dats;i+=1)
+//		datnum = str2num(stringfromlist(i, datnums))
+//		
+//		try
+//			run_single_clean_average_procedure(datnum, plot=1, notch_on=notch_on)
+//		catch
+//			print "FAILED CLEAN AND AVERAGE :: DAT " + num2str(datnum)
+//		endtry 
+//		
+//		cond_avg = "dat" + num2str(datnum) + "_dot_cleaned_avg"
+//		trans_avg = "dat" + num2str(datnum) + "_cs_cleaned_avg"
+//		
+//		closeallGraphs(no_close_graphs = "conductance_vs_sweep;transition_vs_sweep")
+//		
+//		// append to graphs 
+//		AppendToGraph /W=conductance_vs_sweep $cond_avg;
+//		AppendToGraph /W=transition_vs_sweep $trans_avg;
+//		
+		
+		
+		
+		
+		
 
 function center_dSdN(int wavenum, string kenner)
 //wav is input wave, for example demod
