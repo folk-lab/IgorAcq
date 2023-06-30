@@ -19,9 +19,9 @@ function/wave sqw_analysis(wave wav, int delay, int wavelen)
 
 	do
 		rowslice(wav,i)
-		Redimension/N=(wavelen,4,N) slice
+		Redimension/N=(wavelen,4,N) slice //should be the dimension of fdAW AWG.Wavelen
 		DeletePoints/M=0 0,delay, slice
-		reducematrixSize(slice,0,-1,1,0,-1,4,1,"slice_new")
+		reducematrixSize(slice,0,-1,1,0,-1,4,1,"slice_new") // fdAW 
 
 		cold1[i][]=slice_new[0][0][q]
 		cold2[i][]=slice_new[0][2][q]

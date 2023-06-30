@@ -4166,8 +4166,12 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			variable avg_over = 5 //can specify the amount of rows that should be averaged over
 			
 			if (sc_plotRaw == 1)
-				if (rowNum < avg_over)			
-					duplicate /O/R = [][0,rowNum] $(rwn + "_2d") powerspec2D
+				if (rowNum < avg_over)
+					if(waveExists($(rwn + "_2d"))	)	
+						duplicate /O/R = [][0,rowNum] $(rwn + "_2d") powerspec2D
+					else
+						duplicate /O/R = [][0,rowNum] $(rwn) powerspec2D
+					endif
 				else
 					duplicate /O/R = [][rowNum-avg_over,rowNum] $(rwn + "_2d") powerspec2D
 				endif
