@@ -1400,6 +1400,7 @@ function setFdacAWGSquareWave(instrID, amps, times, wave_num)
 	struct AWGVars S
 	fd_getGlobalAWG(S) 
 	S.numADCs = scf_getNumRecordedADCs()
+	S.StepsinWaves = numpnts(amps) //this technically would only be the latest one
 	fd_setGlobalAWG(S)
 	
 	// checking if amps and times are the same length
@@ -1877,6 +1878,9 @@ Structure AWGVars
 	variable numWaves	// Number of AWs being used
 	variable numCycles 	// # wave cycles per DAC step for a full 1D scan
 	variable numSteps  	// # DAC steps for a full 1D scan
+	
+	//for hot/cold (Associated with AW_Waves)
+	variable StepsinWaves
 endstructure
 
 
@@ -1900,7 +1904,7 @@ function fd_setGlobalAWG(S)
 
 	// Store variable parts
 	make/o fd_AWGglobalVars = {S.initialized, S.use_AWG, S.lims_checked, S.waveLen, S.numADCs, S.samplingFreq,\
-		S.measureFreq, S.numWaves, S.numCycles, S.numSteps}
+		S.measureFreq, S.numWaves, S.numCycles, S.numSteps, S.StepsinWaves}
 end
 
 
@@ -1947,5 +1951,6 @@ function fd_getGlobalAWG(S)
 	S.numWaves = v[7]
 	S.numCycles = v[8]
 	S.numSteps = v[9]
+	S.StepsinWaves = v[10]
 end
 

@@ -4,7 +4,10 @@
 #include <Reduce Matrix Size>
 
 
-function/wave sqw_analysis(wave wav, int delay, int wavelen)
+
+
+
+function /wave sqw_analysis(wave wav, int delay, int wavelen)
 
 // this function separates hot (plus/minus) and cold(plus/minus) and returns  two waves for hot and cold //part of CT
 	variable nr, nc
@@ -44,6 +47,7 @@ function/wave sqw_analysis(wave wav, int delay, int wavelen)
 	nument=cold-hot;
 
 end
+
 
 
 

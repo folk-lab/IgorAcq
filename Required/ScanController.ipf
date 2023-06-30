@@ -905,7 +905,7 @@ function sci_initializeWaves(S)  // TODO: rename
     string wavenames, wn, rawwavenames, rwn
     variable raw, j
     wave fadcattr
-    nvar sc_demody
+    nvar sc_demody, sc_hotcold
     
     rawwavenames = sci_get1DWaveNames(1, S.using_fastdac)
     
@@ -930,6 +930,20 @@ function sci_initializeWaves(S)  // TODO: rename
           if (S.is2d == 1)
           	sci_init2DWave(wn+"_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
           endif
+          
+			
+			//initializing for hot/cold waves, not sure if i need to, if we are just saving in the end?          
+        if(sc_hotcold && raw == 0)
+        
+             //sci_init1DWave(wn+"hot", S.numptsx/(AWG.waveLen/AWG.stepsinWaves), S.startx, S.finx) //dont need to initialize since im not plotting
+          	//sci_init1DWave(wn+"cold", S.numptsx/(AWG.waveLen/AWG.stepsinWaves), S.startx, S.finx)
+          	
+          	if(S.is2d == 1)
+          		sci_init2DWave(wn+"hot_2d", S.numptsx/(AWG.waveLen/AWG.stepsinWaves), S.startx, S.finx, S.numptsy, S.starty, S.finy)
+          		sci_init2DWave(wn+"cold_2d", S.numptsx/(AWG.waveLen/AWG.stepsinWaves), S.startx, S.finx, S.numptsy, S.starty, S.finy)
+          	endif
+          	
+        endif
           
           //initializing 1d waves for demodulation
           if (S.using_fastdac && raw == 0 && fadcattr[str2num(wavenum)][6] == 48)
@@ -2490,7 +2504,7 @@ function scw_CheckboxClicked(ControlName, Value)
 	string indexstring
 	wave sc_RawRecord, sc_RawPlot, sc_CalcRecord, sc_CalcPlot, sc_measAsync
 	nvar sc_PrintRaw, sc_PrintCalc
-	nvar/z sc_Printfadc, sc_Saverawfadc, sc_demodx, sc_demody, sc_plotRaw // FastDAC specific
+	nvar/z sc_Printfadc, sc_Saverawfadc, sc_demodx, sc_demody, sc_plotRaw, sc_hotcold // FastDAC specific
 	variable index
 	string expr
 	if (stringmatch(ControlName,"sc_RawRecordCheckBox*"))
@@ -2530,6 +2544,8 @@ function scw_CheckboxClicked(ControlName, Value)
 		sc_plotRaw = value
 	elseif(stringmatch(ControlName,"sc_demodyBox")) // FastDAC window
 		sc_demody = value
+	elseif(stringmatch(ControlName,"sc_hotcoldBox")) // FastDAC window
+		sc_hotcold = value
 
 	endif
 end
@@ -3905,7 +3921,44 @@ function scfd_notch_filters(wave wav, variable measureFreq, [string Hzs, string 
 	
 end
 
+function scfd_sqw_analysis(wave wav, int delay, int wavelen, int StepsInCycle, string wave_out)
 
+// this function separates hot (plus/minus) and cold(plus/minus) and returns  two waves for hot and cold //part of CT
+
+	variable numpts = numpnts(wav)
+	duplicate /free /o wav, wav_copy
+	variable N = numpts/(wavelen/StepsInCycle) // i believe this was not done right in silvias code
+	
+	Make/o/N=(N) cold1, cold2, hot1, hot2
+	wave wav_new
+
+	Redimension/N=(wavelen,StepsInCycle,N) wav_copy //should be the dimension of fdAW AWG.Wavelen
+	DeletePoints/M=0 0,delay, wav_copy
+	reducematrixSize(wav_copy,0,-1,1,0,-1,StepsInCycle,1,"wav_new") // fdAW 
+
+	cold1 = wav_new[0][0][q] // this would have to make rows of stepsincycle, 
+	cold2 = wav_new[0][2][q] // but how would it know which ones to average over?
+	hot1 = wav_new[0][1][q]  // what would happen if we are using multiple AWs? (fd_AWs) 
+	hot2 = wav_new[0][3][q]   
+	
+	duplicate/o cold1, $(wave_out + "cold")
+	duplicate/o hot1, $(wave_out + "hot") 
+	
+	wave coldwave = $(wave_out + "cold")
+	wave hotwave = $(wave_out + "hot")
+	
+	coldwave=(cold1+cold2)/2
+	hotwave=(hot1+hot2)/2
+
+	matrixtranspose hotwave
+	matrixtranspose coldwave
+
+	CopyScales wav_copy, coldwave, hotwave
+	
+	//duplicate/o hot, nument
+	//nument=cold-hot;
+
+end
 
 
 function scfd_demodulate(wav, harmonic, nofcycles, period, wnam)//, [append2hdf])
@@ -4086,7 +4139,7 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 	string RawWaveNames1D = sci_get1DWaveNames(1, 1)
 	string CalcWaveNames1D = sci_get1DWaveNames(0, 1)
 	string CalcStrings = scf_getRecordedFADCinfo("calc_funcs")
-	nvar sc_ResampleFreqfadc, sc_demody, sc_plotRaw
+	nvar sc_ResampleFreqfadc, sc_demody, sc_plotRaw, sc_hotcold, sc_hotcolddelay
 	svar sc_nfreq, sc_nQs
 	string rwn, cwn, calc_string, calc_str 
 	wave fadcattr
@@ -4107,6 +4160,11 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			if (fadcattr[str2num(ADCnum)][5] == 48) // checks which notch box is checked
 				scfd_notch_filters(sc_tempwave, ScanVars.measureFreq,Hzs=sc_nfreq, Qs=sc_nQs)
 			endif
+			
+			if(sc_hotcold == 1)
+				scfd_sqw_analysis(sc_tempwave, sc_hotcolddelay, AWGVars.waveLen, AWGVars.StepsinWaves, cwn) //stepsinwaves is not perfect
+			endif
+			
 			
 			if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
 				scfd_demodulate(sc_tempwave, str2num(fadcvalstr[str2num(ADCnum)][7]), AWGVars.numCycles, AWGVars.waveLen, cwn)
@@ -4141,6 +4199,23 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 				string cwn2d = cwn+"_2d"
 				wave calc2d = $cwn2d
 				calc2d[][rowNum] = sc_tempwave[p]	
+				
+				
+				//Copy 1D hotcold into 2d
+				if (sc_hotcold == 1)
+					string cwnhot = cwn + "hot"
+					string cwn2dhot = cwnhot + "_2d"
+					wave cw2dhot = $cwn2dhot
+					wave cwhot = $cwnhot
+					cw2dhot[][rowNum] = cwhot[p]
+					
+					string cwncold = cwn + "cold"
+					string cwn2dcold = cwncold + "_2d"
+					wave cw2dcold = $cwn2dcold
+					wave cwcold = $cwncold
+					cw2dcold[][rowNum] = cwcold[p]
+				endif
+				
 				
 				// Copy 1D demod into 2D
 				if (fadcattr[str2num(ADCnum)][6] == 48)
@@ -4618,10 +4693,12 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	button updatefadc,pos={400,265},size={90,20},proc=scfw_update_fadc,title="Update ADC"
 	checkbox sc_plotRawBox,pos={505,265},proc=scw_CheckboxClicked,variable=sc_plotRaw,side=1,title="\Z14Plot Raw"
 	checkbox sc_demodyBox,pos={585,265},proc=scw_CheckboxClicked,variable=sc_demody,side=1,title="\Z14Save Demod.y"
+	checkbox sc_hotcoldBox,pos={820,300},proc=scw_CheckboxClicked,variable=sc_hotcold,side=1,title="\Z14 Hot/Cold"
+	SetVariable sc_hotcolddelayBox,pos={900,298},size={70,20},value=sc_hotcolddelay,side=1,title="\Z14Delay"
 	SetVariable sc_FilterfadcBox,pos={828,264},size={150,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resamp Freq ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
 	SetVariable sc_demodphiBox,pos={705,264},size={100,20},value=sc_demodphi,side=1,title="\Z14Demod \$WMTEX$ \Phi $/WMTEX$"//help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
-	SetVariable sc_nfreqBox,pos={698,300},size={150,20}, value=sc_nfreq ,side=1,title="\Z14 Notch Freqs" ,help={"seperate frequencies (Hz) with , "}
-	SetVariable sc_nQsBox,pos={540,300},size={140,20}, value=sc_nQs ,side=1,title="\Z14 Notch Qs" ,help={"seperate Qs with , "}
+	SetVariable sc_nfreqBox,pos={648,300},size={150,20}, value=sc_nfreq ,side=1,title="\Z14 Notch Freqs" ,help={"seperate frequencies (Hz) with , "}
+	SetVariable sc_nQsBox,pos={490,300},size={140,20}, value=sc_nQs ,side=1,title="\Z14 Notch Qs" ,help={"seperate Qs with , "}
 	DrawText 807,277, "\Z14\$WMTEX$ {}^{o} $/WMTEX$" 
 	DrawText 982,283, "\Z14Hz" 
 	
@@ -5082,6 +5159,8 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	variable/g sc_saverawfadc = 0
 	variable/g sc_demodphi = 0
 	variable/g sc_demody = 0
+	variable/g sc_hotcold = 0
+	variable/g sc_hotcolddelay = 0
 	variable/g sc_plotRaw = 0
 	variable/g sc_wnumawg = 0
 	variable/g tabnumAW = 0
