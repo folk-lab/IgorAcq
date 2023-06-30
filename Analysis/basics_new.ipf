@@ -55,6 +55,7 @@ end
 
 
 function demodulate(datnum, harmonic, wave_kenner, [append2hdf, demod_wavename])
+	///// if demod_wavename is use this name for demod wave. Otherwise default is "demod"
 	variable datnum, harmonic
 	string wave_kenner
 	variable append2hdf
@@ -98,23 +99,16 @@ function demodulate(datnum, harmonic, wave_kenner, [append2hdf, demod_wavename])
 
 //	display wav vs wave0x
 //	appendtoGraph sine1d
-
-
 	
 	print "cols = " + num2str(cols)
 	print "rows = " + num2str(rows)
 	print "(cols/period/nofcycles) = " + num2str(cols/period/nofcycles)
 	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1, demod_wavename)
 	
-	wave demod = $demod_wavename
-	
-//	string demod_window = "demod_window"
-	
-//	Display
 	KillWindow /Z demod_window
 	Display
 	DoWindow/C demod_window
-	Appendimage /W=demod_window demod
+	Appendimage /W=demod_window $demod_wavename
 	ModifyImage /W=demod_window $demod_wavename ctab = {*, *, RedWhiteGreen, 0}
 	
 
@@ -1052,10 +1046,10 @@ end
 
 
 
-function/wave rowslice(wave wav,int rownumb)
-duplicate /o/rmd=[][rownumb,rownumb] wav, slice
-redimension/n=(dimsize(slice,0)) slice
-return slice
+function/wave rowslice(wave wav, int rownumb)
+	duplicate /o/rmd=[][rownumb,rownumb] wav, slice
+	redimension /n=(dimsize(slice, 0)) slice
+	return slice
 end
 
 
