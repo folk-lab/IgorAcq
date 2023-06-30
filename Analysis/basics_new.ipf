@@ -53,6 +53,7 @@ function lock_in_test(data)
 end
 
 
+
 function demodulate(datnum, harmonic, wave_kenner, [append2hdf, demod_wavename])
 	variable datnum, harmonic
 	string wave_kenner
@@ -121,6 +122,8 @@ function demodulate(datnum, harmonic, wave_kenner, [append2hdf, demod_wavename])
 //	endif
 
 end
+
+
 
 function center_dSdN(int wavenum, string kenner)
 //wav is input wave, for example demod
@@ -279,10 +282,10 @@ function resampleWave(wave wav,variable targetFreq )
 	string temp_name="dat"+num2str(wavenum)+"x_array"
 	
 	variable measureFreq
-//	struct ScanVars S
-//	fd_getScanVars(S,wavenum)
-struct AWGVars S
-fd_getoldAWG(S,wavenum)
+	//	struct ScanVars S
+	//	fd_getScanVars(S,wavenum)
+	struct AWGVars S
+	fd_getoldAWG(S,wavenum)
 
 	measureFreq=S.measureFreq
 	variable N=measureFreq/targetFreq
@@ -308,7 +311,6 @@ end
 
 
 
-
 function notch_filter(wave wav, variable Hz, [variable Q, string notch_name, variable overwrite_wave])
 	// wav is the wave to be notch filtered, which must have the accompanying json specifying measurement frequency
 	// Hz ithe frequency to notch filter, with quality factor Q
@@ -329,9 +331,6 @@ function notch_filter(wave wav, variable Hz, [variable Q, string notch_name, var
 //			duplicate/o wav $notch_name
 		endif
 	endif
-		
-
-	
 	
 	//Creating main wave copy and wave to display transform
 	int wavenum = getfirstnum(wav_name)
@@ -442,6 +441,7 @@ function notch_filters(wave wav, [string Hzs, string Qs, string notch_name])
 end
 
 
+
 function spectrum_analyzer(wave data, variable samp_freq)
 	// Built in powerspectrum function
 	duplicate/o data spectrum
@@ -470,45 +470,6 @@ end
 
 
 
-///// DEPRECATED ///// 
-//function remove_noise(wave wav)
-//	//argument/variable Declaration
-//	String wavestring=nameOfWave(wav)
-//	wave wav1,wav2,wav3
-//	string name=wavestring+"_nf"
-//	string wn,wn1,wn2,wn3
-//	int wavenum=getfirstnum(wavestring)
-//
-////notch_filter(wave wav, variable Hz, int wavenum)
-//	notch_filter(wav,60);
-//	notch_filter($name,180)
-//	name=wavestring+"_nf_nf";notch_filter($name,300)
-//
-//
-//	//assigning variables
-//	wn=wavestring
-//	wn1=wavestring+"_nf" // the notchfiltered wave
-//	wn2=wavestring+"_nf_nf" // the notchfiltered wave
-//	wn3=wavestring+"_nf_nf_nf" // the notchfiltered wave
-//
-//	wave wav1=$wn1; 	wave wav2=$wn2; 	wave wav3=$wn3
-//	wav1=wav3;
-//	killwaves wav3,wav2
-//	wave slice
-//	rowslice(wav,0); duplicate/o slice slice1; 
-//	rowslice(wav1,0); duplicate/o slice slice2; 
-//	
-//	rowslice(wav,30); duplicate/o slice slice3; 
-//	rowslice(wav1,30); duplicate/o slice slice4; 
-//	
-//	rowslice(wav,60); duplicate/o slice slice5; 
-//	rowslice(wav1,60); duplicate/o slice slice6; 
-//	
-//	//print "run noise_check to check the result"
-//
-//end
-
-
 
 Window Noise_check() : Graph
 	PauseUpdate; Silent 1		// building window...
@@ -521,35 +482,21 @@ Window Noise_check() : Graph
 EndMacro
 
 
-//function scfd_postFilterNumpts(raw_numpts, measureFreq)  // TODO: Rename to NumptsAfterFilter
-//    // Returns number of points that will exist after applying lowpass filter specified in ScanController_Fastdac
-//    variable raw_numpts, measureFreq
-//	
-//	nvar boxChecked = sc_ResampleFreqCheckFadc
-//	nvar targetFreq = sc_ResampleFreqFadc
-//	if (boxChecked)
-//	  	RatioFromNumber (targetFreq / measureFreq)
-//	  	return round(raw_numpts*(V_numerator)/(V_denominator))  // TODO: Is this actually how many points are returned?
-//	else
-//		return raw_numpts
-//	endif
-//end
 
 function /s avg_wav(wave wav) // /WAVE lets your return a wave
-
 	//  averaging any wave over columns (in y direction)
 	// wave returned is avg_name
-	string wn=nameofwave(wav)
-	string avg_name=wn+"_avg";
+	string wn = nameofwave(wav)
+	string avg_name = wn + "_avg";
 	int nc
 	int nr
 
 //	wn="dat"+num2str(wavenum)+dataset //current 2d array
 
-	nr = dimsize($wn,0) //number of rows (sweep length)
-	nc = dimsize($wn,1) //number of columns (repeats)
-	ReduceMatrixSize(wav, 0, -1, nr, 0,-1, 1,1, avg_name)
-	redimension/n=-1 $avg_name
+	nr = dimsize($wn, 0) //number of rows (sweep length)
+	nc = dimsize($wn, 1) //number of columns (repeats)
+	ReduceMatrixSize(wav, 0, -1, nr, 0, -1, 1, 1, avg_name)
+	redimension/n = -1 $avg_name
 	return avg_name
 end
 
@@ -762,6 +709,7 @@ function centerwave(wavenm)
 	display data
 end 
 	
+	
 function subtract_bg(rs, bias, current,[identifier])
 variable rs, bias
 variable identifier
@@ -804,14 +752,6 @@ ModifyGraph grid=2
 ModifyGraph width={Aspect,1},height=400
 
 endmacro
-
-
-
-
-
-
-
-	
 
 
 
@@ -860,10 +800,6 @@ End
 
 
 
-
-
-
-
 Function save_specwave(waveno)
 	variable waveno
 	
@@ -888,6 +824,8 @@ Function save_specwave(waveno)
 	
 	
 End
+
+
 
 function save_waves(Anfang,Ende)
 	variable Anfang, Ende
@@ -1083,24 +1021,12 @@ end
 
 
 
-function centering(wave waved,string centered, wave mids)
-	duplicate/o waved $centered
-	wave new2dwave=$centered
+function centering(wave waved, string centered_wavename, wave mids)
+	duplicate/o waved $centered_wavename
+	wave new2dwave = $centered_wavename
 	copyscales waved new2dwave
 	//new2dwave=interp2d(waved,(x+fit_params[q][3]),(y)) // column 3 is the center fit parameter
-	new2dwave=interp2d(waved,(x+mids[q]),(y)) // mids is the shift in x
+	new2dwave=interp2d(waved, (x + mids[q]), (y)) // mids is the shift in x
 end
 
-//function cst_centering(wave waved,string kenner_out)
-//	string w2d=nameofwave(waved)
-//	int wavenum=getfirstnum(w2d)
-//	string centered=kenner_out+num2str(wavenum)+"centered"
-//	string fit_params_name = kenner_out+num2str(wavenum)+"fit_params"
-//	wave fit_params = $fit_params_name
-//	
-//	//	duplicate /o /r = [][0] waved wavex;redimension/N=(nr) wavex; wavex = x
-//	duplicate/o waved $centered
-//	wave new2dwave=$centered
-//	copyscales waved new2dwave
-//	new2dwave=interp2d(waved,(x+fit_params[q][3]),(y)) // column 3 is the center fit parameter
-//end
+
