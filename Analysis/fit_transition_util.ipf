@@ -48,6 +48,7 @@ function master_ct_clean_average(wave wav, int refit,int dotcondcentering, strin
 	string quickavg = avg_wav($datasetname) // averages datasetname and returns the name of the averaged wave
 
 	if (refit==1)
+		get_initial_params($quickavg)
 		if(average==1)
 			fit_transition($quickavg, minx, maxx);// print W_coef
 		endif
@@ -88,12 +89,6 @@ function master_ct_clean_average(wave wav, int refit,int dotcondcentering, strin
 end
 
 
-
-
-
-//what does this mean in Igor pro: [p][q] > flag ? p : NaN
-//In Igor Pro, the expression "[p][q] > flag ? p : NaN" is a conditional statement that checks if the value of the two-dimensional array element located at [p][q] is greater than the value of the variable "flag".
-//If the condition is true, the statement returns the value of "p". If the condition is false, the statement returns "NaN", which stands for "Not a Number" and is used to represent undefined or unrepresentable numerical values.
 
 function /wave get_initial_params(sweep)
 
@@ -137,7 +132,7 @@ function /wave fit_transition(current_array, minx, maxx)
 	// define a variable named W_coef_guess = {} with the correct number of arguments
 	// outputs wave named "fit_" + current_array
 	wave current_array
-	variable minx,maxx
+	variable minx, maxx
 	wave W_coef
 	
 	FuncFit/q /TBOX=768 ct_fit_function W_coef current_array[minx,maxx][0] /D
@@ -156,25 +151,24 @@ function /wave get_fit_params(wave wavenm, string fit_params_name,variable minx,
 	int wavenum=getfirstnum(w2d)
 	int nc
 	int nr
-	wave temp_wave
 	wave W_coef
 	wave W_sigma
 
 
-	nr = dimsize(wavenm,0) //number of rows (total sweeps)
-	nc = dimsize(wavenm,1) //number of columns (data points)
+	nr = dimsize(wavenm, 0) //number of rows (total sweeps)
+	nc = dimsize(wavenm, 1) //number of columns (data points)
 	make /N= (nc , 12) /o $fit_params_name
 	wave fit_params = $fit_params_name
-	print W_coef
 
 	duplicate/o wavenm temp_wave
+	wave temp_wave
+	
 	for (i=0; i < nc ; i+=1)
 
 		temp_wave = wavenm[p][i]
-		fit_transition(temp_wave,minx,maxx)
+		fit_transition(temp_wave, minx, maxx)
 		fit_params[1 * i][,5] = W_coef[q]
-		fit_params[1 * i][6,] = W_sigma[q-6]         //I genuinely cant believe this worked
-		// i dont think the q-5 does anything, should double check
+		fit_params[1 * i][6,] = W_sigma[q-6]
 	endfor
 
 	return fit_params
@@ -370,7 +364,7 @@ Function ct_fit_function(w,ys,xs) : FitFunc
 	// w[4] = Linear
 	// w[5] = Quad
 
-	ys= w[0]*tanh((xs - w[3])/(-2*w[2])) + w[4]*xs + w[1]+w(5)*xs^2
+	ys= w[0] * tanh((xs - w[3])/(-2 * w[2])) + w[4]*xs + w[1] + w(5)*xs^2
 End
 
 
