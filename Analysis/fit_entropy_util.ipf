@@ -4,62 +4,78 @@
 #include <Reduce Matrix Size>
 
 
-function center_demod(int filenum, int delay, int wavelen, [int demodulate_on])
+function center_demod(int filenum, int delay, int wavelen, [int average_repeats, int demodulate_on])
+	average_repeats = paramisdefault(average_repeats) ? 1 : average_repeats // assuming repeats to average into 1 trace
 	demodulate_on = paramisdefault(demodulate_on) ? 0 : demodulate_on // demodulate OFF is default
 	string raw_wavename = "dat" + num2str(filenum) + "cscurrent_2d";
 	
-	///// seperate out hot and cold /////
-	wave cold, hot
-	sqw_analysis($raw_wavename, delay, wavelen)
-	
-	///// fit cold trace to centre transitions /////
-	string cold_wavename = "dat" + num2str(filenum) + "cscurrent_2d" + "_cold"
-	duplicate /o cold $cold_wavename
-	wave cold_wave = $cold_wavename
-	master_ct_clean_average(cold_wave, 1, 0, "dat", average = 0)
-	string cold_params_wavename = "dat" + num2str(filenum) + "_cs_fit_params"
-	wave cold_params_wave = $cold_params_wavename
-	duplicate/o/r=[][3] cold_params_wave mids
+	wave numerical_entropy
+	wave entropy_centered, numerical_entropy_centered
 	
 	
 	///// demodulate data if necessary /////
 	string demodx_wavename = "dat" + num2str(filenum) + "cscurrentx_2d";
-	wave demodx_wave = $demodx_wavename
 	if (demodulate_on == 1)
 		demodulate(filenum, 2, "cscurrent_2d", demod_wavename = demodx_wavename)
 	endif
+	wave demodx_wave = $demodx_wavename
 	
 	
-	///// centre the 2d traces /////
-	wave numerical_entropy
-	wave entropy_centered, numerical_entropy_centered
-	centering(demodx_wave, "entropy_centered", mids) // centred plot and average plot
-	centering(numerical_entropy, "numerical_entropy_centered", mids) // centred plot and average plot
-	
-	
-	///// average to a 1d trace /////
-	wave entropy_centered_avg, numerical_entropy_centered_avg
-	avg_wav(entropy_centered); 
-	avg_wav(numerical_entropy_centered)
+	///// seperate out hot and cold (CREATES numerical_entropy) /////
+	wave cold, hot
+	sqw_analysis($raw_wavename, delay, wavelen)
+		
+		
+	///// center and average /////
+	if (average_repeats == 1)
+		///// fit cold trace to centre transitions /////
+		string cold_wavename = "dat" + num2str(filenum) + "cscurrent_2d" + "_cold"
+		duplicate /o cold $cold_wavename
+		wave cold_wave = $cold_wavename
+		master_ct_clean_average(cold_wave, 1, 0, "dat", average = 0)
+		string cold_params_wavename = "dat" + num2str(filenum) + "_cs_fit_params"
+		wave cold_params_wave = $cold_params_wavename
+		duplicate/o/r=[][3] cold_params_wave mids
 
-	
-	///// take care of scaling and remove nans /////
-	entropy_centered_avg *= 2
-	wavetransform/o zapnans entropy_centered_avg
-	wavetransform/o zapnans numerical_entropy_centered_avg
-	
-	Integrate entropy_centered_avg /D = entropy_centered_avg_int;
-	Integrate numerical_entropy_centered_avg /D = numerical_entropy_centered_avg_int;
 
+		///// centre the 2d traces /////
+		centering(demodx_wave, "entropy_centered", mids) // centred plot and average plot
+		centering(numerical_entropy, "numerical_entropy_centered", mids) // centred plot and average plot
+		
+		
+		///// average to a 1d trace /////
+		wave entropy_centered_avg, numerical_entropy_centered_avg
+		avg_wav(entropy_centered); 
+		avg_wav(numerical_entropy_centered)
 	
-	///// scale entropy /////
-	variable entropy_scaling_factor = calc_scaling(cold, hot, mids)
-	entropy_centered_avg_int *= entropy_scaling_factor;
-	numerical_entropy_centered_avg_int *= entropy_scaling_factor;
+		
+		///// take care of scaling and remove nans /////
+		entropy_centered_avg *= 2
+		wavetransform/o zapnans entropy_centered_avg
+		wavetransform/o zapnans numerical_entropy_centered_avg
+		
+		Integrate entropy_centered_avg /D = entropy_centered_avg_int;
+		Integrate numerical_entropy_centered_avg /D = numerical_entropy_centered_avg_int;
 	
+		
+		///// scale entropy /////
+		variable entropy_scaling_factor = calc_scaling(cold, hot, mids)
+		entropy_centered_avg_int *= entropy_scaling_factor;
+		numerical_entropy_centered_avg_int *= entropy_scaling_factor;
+		
+		
+		///// plot entropy graph /////
+		execute("graph_entropy_analysis()")
+	elseif (average_repeats == 0)
+		Integrate demodx_wave /D = entropy_centered_int;
+		Integrate numerical_entropy /D = numerical_entropy_centered_int;
 	
-	///// plot entropy graph /////
-	execute("graph_entropy_analysis()")
+		display; appendimage entropy_centered_int
+		ModifyImage entropy_centered_int ctab = {*, *, RedWhiteGreen, 0}
+		
+		display; appendimage numerical_entropy_centered_int
+		ModifyImage numerical_entropy_centered_int ctab = {*, *, RedWhiteGreen, 0}
+	endif
 
 end
 
