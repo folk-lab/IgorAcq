@@ -4154,7 +4154,9 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			rwn = StringFromList(i, RawWaveNames1D)
 			cwn = StringFromList(i, CalcWaveNames1D)		
 			calc_string = StringFromList(i, CalcStrings)
+			
 			duplicate/o $rwn sc_tempwave
+			
 			string ADCnum = rwn[3,INF]
 						
 			if (fadcattr[str2num(ADCnum)][5] == 48) // checks which notch box is checked
@@ -4184,11 +4186,10 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			endif
 
 			calc_str = ReplaceString(rwn, calc_string, "sc_tempwave")
-			execute("sc_tempwave ="+calc_string)
-			execute(cwn+" = sc_tempwave")
+			execute("sc_tempwave ="+calc_str)
 			
+			duplicate /o sc_tempwave $cwn
 
-			
 			if (ScanVars.is2d)
 				// Copy 1D raw into 2D
 				wave raw1d = $rwn
