@@ -4694,12 +4694,12 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	button updatefadc,pos={400,265},size={90,20},proc=scfw_update_fadc,title="Update ADC"
 	checkbox sc_plotRawBox,pos={505,265},proc=scw_CheckboxClicked,variable=sc_plotRaw,side=1,title="\Z14Plot Raw"
 	checkbox sc_demodyBox,pos={585,265},proc=scw_CheckboxClicked,variable=sc_demody,side=1,title="\Z14Save Demod.y"
-	checkbox sc_hotcoldBox,pos={820,300},proc=scw_CheckboxClicked,variable=sc_hotcold,side=1,title="\Z14 Hot/Cold"
-	SetVariable sc_hotcolddelayBox,pos={900,298},size={70,20},value=sc_hotcolddelay,side=1,title="\Z14Delay"
+	checkbox sc_hotcoldBox,pos={823,302},proc=scw_CheckboxClicked,variable=sc_hotcold,side=1,title="\Z14 Hot/Cold"
+	SetVariable sc_hotcolddelayBox,pos={908,300},size={70,20},value=sc_hotcolddelay,side=1,title="\Z14Delay"
 	SetVariable sc_FilterfadcBox,pos={828,264},size={150,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resamp Freq ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
 	SetVariable sc_demodphiBox,pos={705,264},size={100,20},value=sc_demodphi,side=1,title="\Z14Demod \$WMTEX$ \Phi $/WMTEX$"//help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
-	SetVariable sc_nfreqBox,pos={648,300},size={150,20}, value=sc_nfreq ,side=1,title="\Z14 Notch Freqs" ,help={"seperate frequencies (Hz) with , "}
-	SetVariable sc_nQsBox,pos={490,300},size={140,20}, value=sc_nQs ,side=1,title="\Z14 Notch Qs" ,help={"seperate Qs with , "}
+	SetVariable sc_nfreqBox,pos={500,300},size={150,20}, value=sc_nfreq ,side=1,title="\Z14 Notch Freqs" ,help={"seperate frequencies (Hz) with , "}
+	SetVariable sc_nQsBox,pos={665,300},size={140,20}, value=sc_nQs ,side=1,title="\Z14 Notch Qs" ,help={"seperate Qs with , "}
 	DrawText 807,277, "\Z14\$WMTEX$ {}^{o} $/WMTEX$" 
 	DrawText 982,283, "\Z14Hz" 
 	
@@ -5153,26 +5153,21 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	make/o/n=(4,2) AWGsetattr = 0
 	AWGsetattr[][1] = 2
 	
-
-	
-	
-	variable/g sc_printfadc = 0
-	variable/g sc_saverawfadc = 0
-	variable/g sc_demodphi = 0
-	variable/g sc_demody = 0
-	variable/g sc_hotcold = 0
-	variable/g sc_hotcolddelay = 0
-	variable/g sc_plotRaw = 0
-	variable/g sc_wnumawg = 0
-	variable/g tabnumAW = 0
-	variable/g sc_ResampleFreqfadc = 100 // Resampling frequency if using resampling
-	string /g sc_freqAW0 = ""
-	string /g sc_freqAW1 = ""
-	string /g sc_nfreq = "60,180,300"
-	string /g sc_nQs = "50,150,250"
-	string /g sc_fdID = "" 
-	   
-
+	variable /g sc_printfadc = 0
+	variable /g sc_saverawfadc = 0
+	variable /g sc_demodphi = 0
+	variable /g sc_demody = 0
+	variable /g sc_hotcold = 0
+	variable /g sc_hotcolddelay = 0
+	variable /g sc_plotRaw = 0
+	variable /g sc_wnumawg = 0
+	variable /g tabnumAW = 0
+	variable /g sc_ResampleFreqfadc = 100 // Resampling frequency if using resampling
+	string   /g sc_freqAW0 = ""
+	string   /g sc_freqAW1 = ""
+	string   /g sc_nfreq = "60,180,300"
+	string   /g sc_nQs = "50,150,250"
+	string   /g sc_fdID = "" 
 
 	// clean up
 	killwaves fdacval0,fdacval1,fdacval2,fdacval3,fdacval4
@@ -5219,25 +5214,3 @@ function scfw_SetGUIinteraction(numDevices)
 			endif
 	endswitch
 end
-	
-	
-
-
-//example of subplotting
-
-//Make/N=3 data = p
-//Make/N=3/T category = {"A", "B", "C"}
-//Display data
-//ModifyGraph axisEnab(left)={0.55,1}
-//ModifyGraph freePos(left)=0
-//ModifyGraph freePos(bottom)={0,left}
-//ModifyGraph freePos(bottom)={1,left}
-//Display /L = l1 /B = B1 data
-//ModifyGraph axisEnab(l1)={0.55,1}
-//ModifyGraph freePos(l1)=0
-//ModifyGraph freePos(B1)={0,l1}
-//AppendToGraph/L=l2/B=b2 data vs category
-//ModifyGraph axisEnab(l2)={0,0.45}
-//ModifyGraph freepos(l2)=0
-//ModifyGraph freePos(b2)={0,l2}
-//ModifyGraph axisEnab(l2)={0,0.40}
