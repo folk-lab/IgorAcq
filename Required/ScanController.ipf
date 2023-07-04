@@ -3936,10 +3936,10 @@ function scfd_sqw_analysis(wave wav, int delay, int wavelen, int StepsInCycle, s
 	DeletePoints/M=0 0,delay, wav_copy
 	reducematrixSize(wav_copy,0,-1,1,0,-1,StepsInCycle,1,"wav_new") // fdAW 
 
-	cold1 = wav_new[0][0][q] // this would have to make rows of stepsincycle, 
-	cold2 = wav_new[0][2][q] // but how would it know which ones to average over?
-	hot1 = wav_new[0][1][q]  // what would happen if we are using multiple AWs? (fd_AWs) 
-	hot2 = wav_new[0][3][q]   
+	cold1 = wav_new[0][0][p] // this would have to make rows of stepsincycle, 
+	cold2 = wav_new[0][2][p] // but how would it know which ones to average over?
+	hot1 = wav_new[0][1][p]  // what would happen if we are using multiple AWs? (fd_AWs) 
+	hot2 = wav_new[0][3][p]   
 	
 	duplicate/o cold1, $(wave_out + "cold")
 	duplicate/o hot1, $(wave_out + "hot") 
