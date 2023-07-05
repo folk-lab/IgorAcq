@@ -409,7 +409,8 @@ function SaveToHDF(S, [additional_wavenames])
 			if(sc_hotcold == 1)
 				CalcWaves += cwn[0,strlen(cwn)-4] + "hot_2d;"
 				CalcWaves += cwn[0,strlen(cwn)-4] + "cold_2d;"
-				calcWaves = removelistItem(0,calcWaves)
+				rawWaves  = addlistitem(stringfromList(0,calcwaves), rawWaves) //adding notched/resamp waves to raw dat
+				calcWaves = removelistItem(0,calcWaves) // removing it from main dat
 				j++	
 			endif
 		 
@@ -419,7 +420,13 @@ function SaveToHDF(S, [additional_wavenames])
 		abort "Not implemented"
 	endif
 	if (S.using_fastdac)  // Figure out better names for the raw data for fastdac scans (before adding additional_wavenames)
-		string rawSaveNames = Calcwaves//getRawSaveNames(CalcWaves)  
+		string rawSaveNames = Calcwaves//getRawSaveNames(CalcWaves)
+		if(sc_hotcold)
+			for(i=0;i<itemsinlist(RawWaves);i++)
+				rawSaveNames += stringfromlist(i,calcwaves) + "_cl"   // added names for notched/resamp waves in raw dat
+			endfor
+		endif
+		  
 	endif
 
 	// Add additional_wavenames to CalcWaves
