@@ -333,7 +333,7 @@ function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, 
 	variable instrID, start, fin, repeats, numptsx, sweeprate, delay, ramprate, alternate, nosave, use_awg
 	string channels, x_label, y_label, comments, starts, fins, interlaced_channels, interlaced_setpoints
 	variable j=0
-	nvar sc_Saverawfadc
+	nvar sc_Saverawfadc, sc_hotcold
 
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -353,7 +353,7 @@ function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, 
 	string notched_waves = scf_getRecordedFADCinfo("calc_names", column = 5)
 	string resamp_waves = scf_getRecordedFADCinfo("calc_names",column = 8)
 	
-	if(cmpstr(notched_waves,"") || cmpstr(resamp_waves,""))
+	if(cmpstr(notched_waves,"") || cmpstr(resamp_waves,"") || sc_hotcold)
 		sc_Saverawfadc = 1
 	else
 		sc_Saverawfadc = 0

@@ -935,12 +935,12 @@ function sci_initializeWaves(S)  // TODO: rename
 			//initializing for hot/cold waves, not sure if i need to, if we are just saving in the end?          
         if(sc_hotcold && raw == 0)
         
-             //sci_init1DWave(wn+"hot", S.numptsx/(AWG.waveLen/AWG.stepsinWaves), S.startx, S.finx) //dont need to initialize since im not plotting
-          	//sci_init1DWave(wn+"cold", S.numptsx/(AWG.waveLen/AWG.stepsinWaves), S.startx, S.finx)
+             //sci_init1DWave(wn+"hot", S.numptsx/AWG.waveLen, S.startx, S.finx) //dont need to initialize since im not plotting
+          	//sci_init1DWave(wn+"cold", S.numptsx/AWG.waveLen, S.startx, S.finx)
           	
           	if(S.is2d == 1)
-          		sci_init2DWave(wn+"hot_2d", S.numptsx/(AWG.waveLen/AWG.stepsinWaves), S.startx, S.finx, S.numptsy, S.starty, S.finy)
-          		sci_init2DWave(wn+"cold_2d", S.numptsx/(AWG.waveLen/AWG.stepsinWaves), S.startx, S.finx, S.numptsy, S.starty, S.finy)
+          		sci_init2DWave(wn+"hot_2d", S.numptsx/AWG.waveLen, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+          		sci_init2DWave(wn+"cold_2d", S.numptsx/AWG.waveLen, S.startx, S.finx, S.numptsy, S.starty, S.finy)
           	endif
           	
         endif
@@ -3921,24 +3921,25 @@ function scfd_notch_filters(wave wav, variable measureFreq, [string Hzs, string 
 	
 end
 
-function scfd_sqw_analysis(wave wav, int delay, int wavelen, int StepsInCycle, string wave_out)
+function scfd_sqw_analysis(wave wav, int delay, int wavelen, string wave_out)
 
 // this function separates hot (plus/minus) and cold(plus/minus) and returns  two waves for hot and cold //part of CT
 
 	variable numpts = numpnts(wav)
 	duplicate /free /o wav, wav_copy
-	variable N = numpts/(wavelen/StepsInCycle) // i believe this was not done right in silvias code
+	//variable N = numpts/(wavelen/StepsInCycle) // i believe this was not done right in silvias code
+	variable N = numpts/wavelen
 	
 	Make/o/N=(N) cold1, cold2, hot1, hot2
 	wave wav_new
 
-	Redimension/N=(wavelen,StepsInCycle,N) wav_copy //should be the dimension of fdAW AWG.Wavelen
+	Redimension/N=(wavelen/4,4,N) wav_copy //should be the dimension of fdAW AWG.Wavelen
 	DeletePoints/M=0 0,delay, wav_copy
-	reducematrixSize(wav_copy,0,-1,1,0,-1,StepsInCycle,1,"wav_new") // fdAW 
+	reducematrixSize(wav_copy,0,-1,1,0,-1,4,1,"wav_new") // fdAW 
 
-	cold1 = wav_new[0][0][p] // this would have to make rows of stepsincycle, 
-	cold2 = wav_new[0][2][p] // but how would it know which ones to average over?
-	hot1 = wav_new[0][1][p]  // what would happen if we are using multiple AWs? (fd_AWs) 
+	cold1 = wav_new[0][0][p] 
+	cold2 = wav_new[0][2][p] 
+	hot1 = wav_new[0][1][p]   
 	hot2 = wav_new[0][3][p]   
 	
 	duplicate/o cold1, $(wave_out + "cold")
@@ -3950,10 +3951,10 @@ function scfd_sqw_analysis(wave wav, int delay, int wavelen, int StepsInCycle, s
 	coldwave=(cold1+cold2)/2
 	hotwave=(hot1+hot2)/2
 
-	matrixtranspose hotwave
-	matrixtranspose coldwave
+	//matrixtranspose hotwave
+	//matrixtranspose coldwave
 
-	CopyScales wav_copy, coldwave, hotwave
+	CopyScales /I wav, coldwave, hotwave
 	
 	//duplicate/o hot, nument
 	//nument=cold-hot;
@@ -4164,7 +4165,7 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			endif
 			
 			if(sc_hotcold == 1)
-				scfd_sqw_analysis(sc_tempwave, sc_hotcolddelay, AWGVars.waveLen, AWGVars.StepsinWaves, cwn) //stepsinwaves is not perfect
+				scfd_sqw_analysis(sc_tempwave, sc_hotcolddelay, AWGVars.waveLen, cwn)
 			endif
 			
 			
