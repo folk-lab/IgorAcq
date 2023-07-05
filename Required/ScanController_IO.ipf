@@ -362,8 +362,8 @@ function SaveToHDF(S, [additional_wavenames])
 	// Get waveList to save
 	string RawWaves, CalcWaves, rwn, cwn, ADCnum
 	wave fadcattr
-	nvar sc_demody
-	int i
+	nvar sc_demody, sc_hotcold
+	int i,j=0
 	
 	if(S.is2d == 0)
 		RawWaves = sci_get1DWaveNames(1, S.using_fastdac)
@@ -371,12 +371,19 @@ function SaveToHDF(S, [additional_wavenames])
 		
 		for(i=0; i<itemsinlist(RawWaves); i++)
 			rwn = StringFromList(i, RawWaves)
-			cwn = StringFromList(i, CalcWaves)
+			cwn = StringFromList(i-j, CalcWaves)
 			ADCnum = rwn[3,INF]
 			
 			if (fadcattr[str2num(ADCnum)][6] == 48)
 				CalcWaves += cwn + "x;"
 				CalcWaves += cwn + "y;"
+			endif
+			
+			if (sc_hotcold == 1)
+				CalcWaves += cwn + "hot;"
+				CalcWaves += cwn + "cold;"
+				calcWaves = removelistItem(0,calcWaves)
+				j++	
 			endif
 			
 		 endfor
@@ -387,7 +394,7 @@ function SaveToHDF(S, [additional_wavenames])
 		
 		for(i=0; i<itemsinlist(RawWaves); i++)
 			rwn = StringFromList(i, RawWaves)
-			cwn = StringFromList(i, CalcWaves)
+			cwn = StringFromList(i-j, CalcWaves)
 			ADCnum = rwn[3,strlen(rwn)-4]
 			
 			if (fadcattr[str2num(ADCnum)][6] == 48)
@@ -396,8 +403,16 @@ function SaveToHDF(S, [additional_wavenames])
 				if (sc_demody == 1)
 					CalcWaves += cwn[0,strlen(cwn)-4] + "y_2d;"
 				endif
+				
 			endif
 			
+			if(sc_hotcold == 1)
+				CalcWaves += cwn[0,strlen(cwn)-4] + "hot_2d;"
+				CalcWaves += cwn[0,strlen(cwn)-4] + "cold_2d;"
+				calcWaves = removelistItem(0,calcWaves)
+				j++	
+			endif
+		 
 		 endfor
 	
 	else
