@@ -21,7 +21,7 @@
 //// Connection ////
 ////////////////////
 
-function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh,master, optical, sync])
+function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh,master, optical])
 	// instrID is the name of the global variable that will be used for communication
 	// visa_address is the VISA address string, i.e. ASRL1::INSTR
 	// Most FastDAC communication relies on the info in "sc_fdackeys". Pass numDACCh and
@@ -29,15 +29,13 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 	string instrID, visa_address
 	variable verbose, numDACCh, numADCCh, master   //idk what the point of this master variable is.
 	variable optical  // Whether connected by optical (or usb)
-	int sync
-	int i = 0
+
 
 	master   = paramisDefault(master)   ? 0 : master
 	optical  = paramisDefault(optical)  ? 1 : optical
 	verbose  = paramisDefault(verbose)  ? 1 : verbose
 	numDACCh = paramisDefault(numDACCh) ? 8 : numDACCh
 	numADCCh = paramisDefault(numADCCh) ? 4 : numADCCh
-	sync     = paramisDefault(sync)     ? 1 : sync
 		
 	variable localRM
 	variable status = viOpenDefaultRM(localRM) // open local copy of resource manager
@@ -60,32 +58,6 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 	if(!paramisdefault(numDACCh) && !paramisdefault(numADCCh))
 		scf_addFDinfos(instrID,visa_address,numDACCh,numADCCh,master=master)
 	endif
-	
-	
-	svar /z sc_fdackeys
-	string fdname, check
-	int numfdacs = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
-	
-//	// Master/Slave set up for fastdacs
-//	for(i = 0; i<numfdacs; i++)
-//		fdname = stringbykey("name" + num2str(i+1),sc_fdackeys,":",",")
-//		nvar fd = $fdname
-//		if(sync)
-//			if(i == 0 && numfdacs == 1) 													// sets independent if theres only one device
-//			check = queryInstr(fd, "SET_MODE,INDEP" + "\r\n")
-//			printf " %s   on %s \r\n", check, fdname 
-//			elseif(i == 0 && numfdacs > 1) 												// sets first device to master if theres multiple devices
-//			check = queryInstr(fd, "SET_MODE,MASTER" + "\r\n")
-//			printf " %s   on %s\r\n", check, fdname  
-//			else																				// sets the remainder of devices to slaves
-//			check = queryInstr(fd, "SET_MODE,SLAVE" + "\r\n")
-//			printf " %s   on %s\r\n", check, fdname 
-//			endif
-//		else
-//			check = queryInstr(fd, "SET_MODE,INDEP" + "\r\n")                   // sets all to independent
-//			printf " %s   on %s \r\n", check, fdname 
-//		endif
-//	endfor
 	
 	return localRM
 end
@@ -208,10 +180,11 @@ function getFADCspeed(instrID)
 	return 1.0/(str2num(response)*1.0e-6) // return value in Hz
 end
 
-function getFADCchannel(fdid, channel, [len_avg])
+function getFADCchannel(fdid, channel, [len_avg, fdIDname])
 	// Instead of just grabbing one single datapoint which is susceptible to high f noise, this averages data over len_avg and returns a single value
 	variable fdid, channel, len_avg
-	
+	string fdIDname
+	fdIDname = selectstring(paramisdefault(fdIDname), fdIDname, "")
 	len_avg = paramisdefault(len_avg) ? 0.05 : len_avg
 	
 	variable numpts = ceil(getFADCspeed(fdid)*len_avg)
@@ -219,7 +192,7 @@ function getFADCchannel(fdid, channel, [len_avg])
 		numpts = 1
 	endif
 	
-	fd_readChunk(fdid, num2str(channel), numpts)  // Creates fd_readChunk_# wave	
+	fd_readChunk(fdid, num2str(channel), numpts, fdIDname = fdIDname)  // Creates fd_readChunk_# wave	
 
 	wave w = $"fd_readChunk_"+num2str(channel)
 	wavestats/q w
@@ -310,8 +283,9 @@ function getFDACOutput(instrID,channel,[same_as_window]) // Units: mV
 	endif
 end
 
-function/s getFDstatus(instrID)
+function/s getFDstatus(instrID, [fdIDname])
 	variable instrID
+	string fdIDname
 	string  buffer = "", key = ""
 	wave/t fdacvalstr	
 	svar sc_fdackeys
@@ -334,7 +308,7 @@ function/s getFDstatus(instrID)
 	// ADC values
 	CHstart = scf_getChannelStartNum(instrID, adc=1)
 	for(i=0;i<scf_getFDInfoFromID(instrID, "numADC");i+=1)
-		buffer = addJSONkeyval(buffer, "ADC"+num2istr(CHstart+i), num2numstr(getfadcChannel(instrID,CHstart+i)))
+		buffer = addJSONkeyval(buffer, "ADC"+num2istr(CHstart+i), num2numstr(getfadcChannel(instrID,CHstart+i, fdIDname = fdIDname)))
 	endfor
 	
 	// AWG info
@@ -1881,14 +1855,14 @@ function/s fd_start_sweep(S, [AWG_list])
 	scu_assertSeparatorType(S.ADCList, ";")
 	
 	if(S.sync)
-		nvar fdID = $(stringfromlist(itemsinlist(S.instrIDs)-1,S.instrIDs)) //first ID is the master, Last ID might be better
+		nvar fdID = $(stringfromlist(itemsinlist(S.instrIDs)-1,S.instrIDs)) //last ID is master
 		string response = queryInstr(fdID, "ARM_SYNC\r\n")
 		print response
 		if(cmpstr(response,"SYNC_ARMED\r\n"))
 		abort "Unable to arm sync :("
 		endif
 		
-		/// check if sync is good // might be a do - while loop for some iterations? we will see
+		/// check if sync is good // might be a do - while loop for multiple fdacs?
 		response = queryInstr(fdID, "CHECK_SYNC\r\n")
 		print response
 		if(cmpstr(response,"CLOCK_SYNC_READY\r\n"))
@@ -1923,33 +1897,37 @@ function/s fd_start_sweep(S, [AWG_list])
 	
 		if(S.sync)
 		
-			//checking the need for a fakeramp
-			if(!cmpstr(dacs,"") && whichlistitem(fdIDname, S.fakerampIDs) != -1) //two checks (redundant), but maybe only one is needed
+			if (S.readVsTime == 1) // i dont think this is ever passed, i can activitly only worry about the else stuff as before
+				adcs = replacestring(";",adcs,"")
+				sprintf cmd, "SPEC_ANA,%s,%s\r", adcs, num2istr(S.numptsx)
+			else
+				//checking the need for a fakeramp
+				if(!cmpstr(dacs,"") && whichlistitem(fdIDname, S.fakerampIDs) != -1) //two checks (redundant), but maybe only one is needed
 					///find global value of channel 0 in that ID, set it to start and fin, and dac = 0
 					string value = num2str(getfdacOutput(fdID,0, same_as_window = 0)) //this gave me the start and fins and dac
 					starts = value //changing this would mean i have to change it back
 					fins = value // same for this
 					dacs = "0"  //same for this?
-			endif
+				endif
 			
-			//checking the need for fake recordings
-			if(itemsInList(adcs) != S.maxADCs)
+				//checking the need for fake recordings
+				if(itemsInList(adcs) != S.maxADCs)
 				
-				int j = 0
+					int j = 0
 				
-				do	
-					if(whichlistItem(num2str(j),adcs) == -1)
-						adcs = addListItem(num2str(j), adcs)
-					endif
-					j++
+					do	
+						if(whichlistItem(num2str(j),adcs) == -1)
+							adcs = addListItem(num2str(j), adcs)
+						endif
+						j++
 					
-				while (itemsInList(adcs) != S.maxADCs)
+					while (itemsInList(adcs) != S.maxADCs)
 				
+				endif
+				adcs = replacestring(";",adcs,"")
+				sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, starts, fins, S.numptsx
+				// might need the channels picked for the fake recordings stored somewhere
 			endif
-			adcs = replacestring(";",adcs,"")
-			sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, starts, fins, S.numptsx
-			// might need the channels picked for the fake recordings stored somewhere
-			
 		else
 			adcs = replacestring(";",adcs,"")
 			if (!paramisDefault(AWG_list) && AWG_List.use_AWG == 1 && AWG_List.lims_checked == 1)  
@@ -1970,58 +1948,20 @@ function/s fd_start_sweep(S, [AWG_list])
 			endif
 		endif
 		
-		
 		writeInstr(fdID,cmd)
 	endfor
-	
-	//abort "no writing to intrument, testing phase"
-//				
-//
-//	if(S.sync)
-//		nvar fdID = $(stringfromlist(0,S.instrIDs)) //first ID is the master, Last ID might be better
-//		string response = queryInstr(fdID, "ARM_SYNC\r\n")
-//		print response
-//		if(!cmpstr(response,"SYNC_ARMED"))
-//		abort "Unable to arm sync :("
-//		else
-//		
-//			for(i=0;i<itemsinlist(S.instrIDs);i++)
-//				string fdIDname = stringfromlist(i,S.instrIDs)
-//				nvar fdID = $fdIDname
-//				if(whichlistitem(fdIDname, S.fakerampIDs) != -1)
-//					///find global value of channel 0 in that ID, set it to start and fin, and dac = 0
-//					string value = num2str(getfdacOutput(fdID,0, same_as_window = 0)) //this gave me the start and fins and dac
-//					starts = value //changing this would mean i have to change it back
-//					fins = value // same for this
-//					dacs = "0"  //same for this?
-//				else
-//					/// it would need to stay at 
-//				endif		
-//				 
-//			//// i need to check if its a
-//			
-//			if(cmpstr(S.fakerampIDs,""))
-//			endif
-//			
-////			endfor
-//		// a shit ton of commands will have to go here I think	//
-//		// I will need to send commands to slave first // - > i need to figure out if they are fake/realramps and if i need fake adcs
-//		
-//		abort "for now"
-//		endif
-//	else
-//		writeInstr(S.instrIDx,cmd) // this existed outside the if-statement
-//	endif
 	
 	return cmd
 end
 
-function fd_readChunk(fdid, adc_channels, numpts)
+function fd_readChunk(fdid, adc_channels, numpts, [fdIDname])
 	// Reads numpnts data without ramping anywhere, does not update graphs or anything, just returns full waves in 
 	// waves named fd_readChunk_# where # is 0, 1 etc for ADC0, 1 etc
 	variable fdid, numpts
 	string adc_channels
+	string fdIDname
 
+	fdIDname = selectstring(paramisdefault(fdIDname), fdIDname, "") 
 	adc_channels = replaceString(",", adc_channels, ";")  // Going to list with this separator later anyway
 	adc_channels = replaceString(" ", adc_channels, "")  // Remove blank spaces
 	variable i
@@ -2043,8 +1983,8 @@ function fd_readChunk(fdid, adc_channels, numpts)
 	S.samplingFreq = getFADCspeed(S.instrIDx)
 	S.raw_wave_names = wavenames  	// Override the waves the rawdata gets saved to
 	S.never_save = 1
-	S.instrIDs = "fd" //attempt
-
+	S.instrIDs = fdIDname //attempt
+	
 	scfd_RecordValues(S, 0, skip_data_distribution=1)
 end
 

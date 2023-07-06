@@ -6,7 +6,8 @@ ipf#pragma rtGlobals=3		// Use modern global access method and strict wave acces
 // Version 2.0 May, 2018
 // Version 3.0 March, 2020
 // Version 4.0 Oct, 2021 -- Tim Child, Johann Drayne
-// Authors: Mohammad Samani, Nik Hartman, Christian Olsen, Tim Child, Johann Drayne
+// Version 5.0 August, 2023 -- Raveel Tejani
+// Authors: Mohammad Samani, Nik Hartman, Christian Olsen, Tim Child, Johann Drayne, Raveel Tejani
 
 // Updates in 2.0:
 
@@ -26,6 +27,10 @@ ipf#pragma rtGlobals=3		// Use modern global access method and strict wave acces
 // 		-- Improved support for FastDACs (mostly works with multiple fastDACs connected now, although cannot sweep multiple at the same time)
 // 		-- Significant refactoring of functions related to a Scan (i.e. initWaves, saveWaves etc) including opening graphs etc. 
 //			All scans functions work with a ScanVars Struct which contains information about the current scan (instead of many globals)
+
+// Updates in 5.0:
+//		-- hopefully master slave stuff (pending) - FastDac
+//		-- realtime analysis (notch filtering, demodulation), AWG and LI built into fastDAC window 
 
 
 ////////////////////////////////
@@ -4258,6 +4263,7 @@ function scfd_SendCommandAndRead(S, AWG_list, rowNum)
 	totalByteReturn = S.numADCs*2*S.numptsx
 	variable entered_panic_mode = 0
 	try
+		print 1
    		entered_panic_mode = scfd_RecordBuffer(S, rowNum, totalByteReturn)
    	catch  // One chance to do the sweep again if it failed for some reason (likely from a buffer overflow)
 		variable errCode = GetRTError(1)  // Clear the error
@@ -4597,7 +4603,7 @@ function scfd_updateWindow(S, numAdcs)
     nvar fdID = $fdIDname						// attempt
     
     //getfadcChannel(S.instrIDx,channel_num, len_avg=0.001)  // This updates the window when called
-    getfadcChannel(fdID,channel_num, len_avg=0.001)  // attempt
+    getfadcChannel(fdID,channel_num, len_avg=0.001, fdIDname = fdIDname)  // attempt
   endfor
 end
 
@@ -5207,7 +5213,7 @@ function scfw_update_fadc(action) : ButtonControl
 			nvar tempname = $tempnamestr
 			try
 				for(j=0;j<numADCCh;j+=1)
-					getfadcChannel(tempname,startCh+j)
+					getfadcChannel(tempname,startCh+j, fdIDname = tempnamestr)
 				endfor
 			catch
 				// reset error

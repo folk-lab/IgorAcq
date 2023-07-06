@@ -522,7 +522,9 @@ function ScanFastDAC2(instrID, start, fin, channels, [numptsx, sweeprate, delay,
 			d = d*-1
 		endif
 	endfor
-
+	
+	set_indep()
+	
 	// Save by default
 	if (nosave == 0)
 		EndScan(S=S)
@@ -531,7 +533,7 @@ function ScanFastDAC2(instrID, start, fin, channels, [numptsx, sweeprate, delay,
 		dowindow /k SweepControl
 	endif
 	
-	set_indep()
+	//set_indep()
 	
 end
 
