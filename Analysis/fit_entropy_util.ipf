@@ -80,6 +80,22 @@ function center_demod(int filenum, int delay, int wavelen, [int average_repeats,
 end
 
 
+function offset_2d_traces(wave wav)
+	// pass in a 2d wave and offset each trace so the first value is at set_y_point
+	variable set_y_point = 0
+	variable row_value
+	
+	variable num_rows = dimsize(wav, 1)
+	
+	variable i
+	for (i=0; i < num_rows; i++)
+//		duplicate /RMD=[][i] /o wav single_row
+		row_value = wav[0][i]
+		wav[][i] = wav[p][i] - (row_value - set_y_point)
+	endfor
+end
+
+
 function/wave sqw_analysis(wave wav, int delay, int wavelen)
 // this function separates hot (plus/minus) and cold(plus/minus) and returns  two waves for hot and cold //part of CT
 // CREATES wave numerical_entropy as a GLOBAL wave
