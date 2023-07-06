@@ -360,52 +360,78 @@ function SaveToHDF(S, [additional_wavenames])
 	endif
 	
 	// Get waveList to save
-	string RawWaves, CalcWaves, rwn, cwn, ADCnum
+	string RawWaves, CalcWaves, rwn, cwn, ADCnum, rawWaves2, rawSaveNames
 	wave fadcattr
-	nvar sc_demody
-	int i
+	nvar sc_demody, sc_hotcold
+	int i,j=0
 	
 	if(S.is2d == 0)
+	
 		RawWaves = sci_get1DWaveNames(1, S.using_fastdac)
 		CalcWaves = sci_get1DWaveNames(0, S.using_fastdac)
+		RawWaves2 = RawWaves
 		
-		for(i=0; i<itemsinlist(RawWaves); i++)
-			rwn = StringFromList(i, RawWaves)
-			cwn = StringFromList(i, CalcWaves)
-			ADCnum = rwn[3,INF]
-			
-			if (fadcattr[str2num(ADCnum)][6] == 48)
-				CalcWaves += cwn + "x;"
-				CalcWaves += cwn + "y;"
-			endif
-			
-		 endfor
+		if(S.using_fastdac)
+			rawSaveNames = Calcwaves
+			for(i=0; i<itemsinlist(RawWaves); i++)
+				rwn = StringFromList(i, RawWaves)
+				cwn = StringFromList(i-j, CalcWaves)
+				ADCnum = rwn[3,INF]
+				if (fadcattr[str2num(ADCnum)][6] == 48)
+					CalcWaves += cwn + "x;"
+					CalcWaves += cwn + "y;"
+				endif
+				if (sc_hotcold)
+					CalcWaves += cwn + "hot;"
+					CalcWaves += cwn + "cold;"
+					rawWaves2  = addlistitem(stringfromList(0,calcwaves), rawWaves2) //adding notched/resamp waves to raw dat
+					rawSaveNames= addlistitem(stringfromlist(0,calcwaves) + "_cl", rawSaveNames)
+					calcWaves = removelistItem(0,calcWaves) // removing it from main dat
+					j++	
+				endif
+		 	endfor
+		 	if(sc_hotcold)
+		 		rawWaves = rawWaves2
+		 	endif
+		 endif
 		
 	elseif (S.is2d == 1)
 		RawWaves = sci_get2DWaveNames(1, S.using_fastdac)
 		CalcWaves = sci_get2DWaveNames(0, S.using_fastdac)
-		
-		for(i=0; i<itemsinlist(RawWaves); i++)
-			rwn = StringFromList(i, RawWaves)
-			cwn = StringFromList(i, CalcWaves)
-			ADCnum = rwn[3,strlen(rwn)-4]
-			
-			if (fadcattr[str2num(ADCnum)][6] == 48)
-				CalcWaves += cwn[0,strlen(cwn)-4] + "x_2d;"
-			
-				if (sc_demody == 1)
-					CalcWaves += cwn[0,strlen(cwn)-4] + "y_2d;"
+		RawWaves2 = RawWaves
+		if(S.using_fastdac)
+			rawSaveNames = Calcwaves
+			for(i=0; i<itemsinlist(RawWaves); i++)
+				rwn = StringFromList(i, RawWaves)
+				cwn = StringFromList(i-j, CalcWaves)
+				ADCnum = rwn[3,strlen(rwn)-4]
+				
+				if (fadcattr[str2num(ADCnum)][6] == 48)
+					CalcWaves += cwn[0,strlen(cwn)-4] + "x_2d;"
+					if (sc_demody == 1)
+						CalcWaves += cwn[0,strlen(cwn)-4] + "y_2d;"
+					endif
 				endif
-			endif
 			
-		 endfor
+				if(sc_hotcold)
+					CalcWaves += cwn[0,strlen(cwn)-4] + "hot_2d;"
+					CalcWaves += cwn[0,strlen(cwn)-4] + "cold_2d;"
+					rawWaves2  = addlistitem(stringfromList(0,calcwaves), rawWaves2) //adding notched/resamp waves to raw dat
+					rawSaveNames= addlistitem(stringfromlist(0,calcwaves) + "_cl", rawSaveNames)
+					calcWaves = removelistItem(0,calcWaves) // removing it from main dat
+					j++	
+				endif
+		 	endfor
+		 
+		 	if(sc_hotcold)
+		 		rawWaves = rawWaves2
+		 	endif
+		 endif
 	
 	else
 		abort "Not implemented"
 	endif
-	if (S.using_fastdac)  // Figure out better names for the raw data for fastdac scans (before adding additional_wavenames)
-		string rawSaveNames = Calcwaves//getRawSaveNames(CalcWaves)  
-	endif
+	
 
 	// Add additional_wavenames to CalcWaves
 	if (!paramIsDefault(additional_wavenames) && strlen(additional_wavenames) > 0)

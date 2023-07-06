@@ -914,12 +914,15 @@ function sci_initializeWaves(S)  // TODO: rename
 	//	(This will be after calc (i.e. don't need before and after calc wave))
 	
     struct ScanVars &S
+    struct AWGVars AWG
+    fd_getGlobalAWG(AWG)
+    
     variable fastdac
     variable numpts  //Numpts to initialize wave with, note: for Filtered data, this number is reduced
     string wavenames, wn, rawwavenames, rwn
     variable raw, j
     wave fadcattr
-    nvar sc_demody
+    nvar sc_demody, sc_hotcold
     
     rawwavenames = sci_get1DWaveNames(1, S.using_fastdac)
     
@@ -945,17 +948,31 @@ function sci_initializeWaves(S)  // TODO: rename
           	sci_init2DWave(wn+"_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
           endif
           
+			
+			//initializing for hot/cold waves, not sure if i need to, if we are just saving in the end?          
+        if(sc_hotcold && raw == 0)
+        
+             //sci_init1DWave(wn+"hot", S.numptsx/AWG.waveLen, S.startx, S.finx) //dont need to initialize since im not plotting
+          	//sci_init1DWave(wn+"cold", S.numptsx/AWG.waveLen, S.startx, S.finx)
+          	
+          	if(S.is2d == 1)
+          		sci_init2DWave(wn+"hot_2d", S.numptsx/AWG.waveLen, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+          		sci_init2DWave(wn+"cold_2d", S.numptsx/AWG.waveLen, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+          	endif
+          	
+        endif
+          
           //initializing 1d waves for demodulation
           if (S.using_fastdac && raw == 0 && fadcattr[str2num(wavenum)][6] == 48)
-          	sci_init1DWave(wn+"x", numpts, S.startx, S.finx)
-          	sci_init1DWave(wn+"y", numpts, S.startx, S.finx)
+          	sci_init1DWave(wn+"x", S.numptsx/AWG.waveLen/AWG.numCycles, S.startx, S.finx)
+          	sci_init1DWave(wn+"y", S.numptsx/AWG.waveLen/AWG.numCycles, S.startx, S.finx)
           	
           	//initializing 2d waves for demodulation
           	if (s.is2d == 1)
-          		sci_init2DWave(wn+"x_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+          		sci_init2DWave(wn+"x_2d", S.numptsx/AWG.waveLen/AWG.numCycles, S.startx, S.finx, S.numptsy, S.starty, S.finy)
           		
           		if (sc_demody == 1)
-          			sci_init2DWave(wn+"y_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+          			sci_init2DWave(wn+"y_2d", S.numptsx/AWG.waveLen/AWG.numCycles, S.startx, S.finx, S.numptsy, S.starty, S.finy)
           		endif
           		
           	endif
@@ -1191,8 +1208,9 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 	    wn = selectString(cmpstr(append_wn, ""), StringFromList(i, wavenames), StringFromList(i, wavenames)+";" +append_wn)
 	    
 		if (spectrum)
+			wn = stringfromlist(0,wn)
 			string ADCnum = wn[3,INF] //would fail if this was done with calculated waves, but we dont care about it
-			openGraphID = scg_graphExistsForWavename(wn + ";pwrspec" + ADCnum)
+			openGraphID = scg_graphExistsForWavename(wn + ";pwrspec" + ADCnum +";..." ) // weird naming convention on igors end.
 		else
 			openGraphID = scg_graphExistsForWavename(wn)
 		endif
@@ -1202,13 +1220,18 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 			scg_setupGraph1D(openGraphID, x_label, y_label= selectstring(cmpstr(y_label_1d,""), wn, wn +" ("+y_label_1d +")"))
 			wn = StringFromList(i, wavenames) 
 		else
-			wn = StringFromList(i, wavenames) 
-	      	scg_open1Dgraph(wn, x_label, y_label=selectstring(cmpstr(y_label_1d,""), wn, wn +" ("+y_label_1d+")"),append_wn = append_wn)
-	      	openGraphID = winname(0,1)
+			wn = StringFromList(i, wavenames)
+			
 	      	if (spectrum)
+	      		scg_open1Dgraph(wn, x_label, y_label=selectstring(cmpstr(y_label_1d,""), wn, wn +" ("+y_label_1d+")"))
+	      		openGraphID = winname(0,1)
 				string wn_powerspec = scfd_spectrum_analyzer($wn, mFreq, "pwrspec" + ADCnum)
-				scg_twosubplot(openGraphID, wn_powerspec, logy = 1, labelx = "Frequency (Hz)")
+				scg_twosubplot(openGraphID, wn_powerspec, logy = 1, labelx = "Frequency (Hz)",labely ="pwr", append_wn = wn_powerspec + "int", append_labely = "cumul. pwr")
+			else 
+	      		scg_open1Dgraph(wn, x_label, y_label=selectstring(cmpstr(y_label_1d,""), wn, wn +" ("+y_label_1d+")"),append_wn = append_wn)
+	      		openGraphID = winname(0,1)			
 			endif 
+			
 	   endif
 		
 		graphIDs = addlistItem(openGraphID, graphIDs, ";", INF) 	
@@ -1248,19 +1271,20 @@ function scg_arrangeWindows(graphIDs)
     doupdate
 end
 
-function scg_twosubplot(graphID, wave2name,[logy, logx, labelx, labely])
+function scg_twosubplot(graphID, wave2name,[logy, logx, labelx, labely, append_wn, append_labely])
 //creates a subplot with an existing wave and GraphID with wave2
-//wave2 will appear on top
-	string graphID, wave2name, labelx, labely
+//wave2 will appear on top, append_Wn will be appended to wave2 position
+	string graphID, wave2name, labelx, labely, append_wn, append_labely
 	variable logy,logx
 	wave wave2 = $wave2name
 	
 	labelx = selectString(paramIsDefault(labelx), labelx, "")
 	labely = selectString(paramIsDefault(labely), labely, "")
-	//variable minwave2 = wavemin(wave2)
+	append_wn = selectString(paramIsDefault(append_wn), append_wn, "")
+	append_labely = selectString(paramIsDefault(append_labely), append_labely, "")
 	
-	ModifyGraph /W = $graphID axisEnab(left)={0,0.40} //graphID wont work
-	AppendToGraph /W = $graphID /L=l2/B=b2 wave2 // vs something
+	ModifyGraph /W = $graphID axisEnab(left)={0,0.40}
+	AppendToGraph /W = $graphID /r=l2/B=b2 wave2 
 	label b2 labelx
 	label l2 labely
 	
@@ -1274,9 +1298,35 @@ function scg_twosubplot(graphID, wave2name,[logy, logx, labelx, labely])
 	
 	ModifyGraph /W = $graphID axisEnab(l2)={0.60,1}
 	ModifyGraph /W = $graphID freePos(l2)=0
-	//ModifyGraph /W = $graphID freePos(b2)={minwave2,l2}
 	ModifyGraph /W = $graphID freePos(b2)={0,l2}
-
+	ModifyGraph rgb($wave2name)=(39321,39321,39321)
+    
+    if (cmpstr(append_wn, ""))
+    	appendtograph /W = $graphID /l= r1 /b=b3  $append_wn
+    	legend
+    	label r1 append_labely
+    	ModifyGraph /W = $graphID axisEnab(r1)={0.60,1}
+		ModifyGraph /W = $graphID freePos(r1)=0
+		ModifyGraph /W = $graphID freePos(b3)={0,r1}
+		ModifyGraph noLabel(b3)=2
+		
+		if(!paramisDefault(logy))
+			ModifyGraph log(r1)=1
+		endif
+	
+		if(!paramisDefault(logx))
+			ModifyGraph log(b3)=1
+		endif
+    	
+    endif
+	
+	Modifygraph /W = $graphID axisontop(l2)=1
+	Modifygraph /W = $graphID axisontop(b2)=1
+	Modifygraph /W = $graphID axisontop(r1)=1
+	ModifyGraph lblPosMode(l2)=2
+	ModifyGraph lblPosMode(b2)=4
+	ModifyGraph lblPosMode(r1)=2
+	
 end
 
 
@@ -2471,7 +2521,7 @@ function scw_CheckboxClicked(ControlName, Value)
 	string indexstring
 	wave sc_RawRecord, sc_RawPlot, sc_CalcRecord, sc_CalcPlot, sc_measAsync
 	nvar sc_PrintRaw, sc_PrintCalc
-	nvar/z sc_Printfadc, sc_Saverawfadc, sc_demodx, sc_demody, sc_plotRaw // FastDAC specific
+	nvar/z sc_Printfadc, sc_Saverawfadc, sc_demodx, sc_demody, sc_plotRaw, sc_hotcold // FastDAC specific
 	variable index
 	string expr
 	if (stringmatch(ControlName,"sc_RawRecordCheckBox*"))
@@ -2511,6 +2561,8 @@ function scw_CheckboxClicked(ControlName, Value)
 		sc_plotRaw = value
 	elseif(stringmatch(ControlName,"sc_demodyBox")) // FastDAC window
 		sc_demody = value
+	elseif(stringmatch(ControlName,"sc_hotcoldBox")) // FastDAC window
+		sc_hotcold = value
 
 	endif
 end
@@ -4029,7 +4081,45 @@ function scfd_notch_filters(wave wav, variable measureFreq, [string Hzs, string 
 	
 end
 
+function scfd_sqw_analysis(wave wav, int delay, int wavelen, string wave_out)
 
+// this function separates hot (plus/minus) and cold(plus/minus) and returns  two waves for hot and cold //part of CT
+
+	variable numpts = numpnts(wav)
+	duplicate /free /o wav, wav_copy
+	//variable N = numpts/(wavelen/StepsInCycle) // i believe this was not done right in silvias code
+	variable N = numpts/wavelen
+	
+	Make/o/N=(N) cold1, cold2, hot1, hot2
+	wave wav_new
+
+	Redimension/N=(wavelen/4,4,N) wav_copy //should be the dimension of fdAW AWG.Wavelen
+	DeletePoints/M=0 0,delay, wav_copy
+	reducematrixSize(wav_copy,0,-1,1,0,-1,4,1,"wav_new") // fdAW 
+
+	cold1 = wav_new[0][0][p] 
+	cold2 = wav_new[0][2][p] 
+	hot1 = wav_new[0][1][p]   
+	hot2 = wav_new[0][3][p]   
+	
+	duplicate/o cold1, $(wave_out + "cold")
+	duplicate/o hot1, $(wave_out + "hot") 
+	
+	wave coldwave = $(wave_out + "cold")
+	wave hotwave = $(wave_out + "hot")
+	
+	coldwave=(cold1+cold2)/2
+	hotwave=(hot1+hot2)/2
+
+	//matrixtranspose hotwave
+	//matrixtranspose coldwave
+
+	CopyScales /I wav, coldwave, hotwave
+	
+	//duplicate/o hot, nument
+	//nument=cold-hot;
+
+end
 
 
 function scfd_demodulate(wav, harmonic, nofcycles, period, wnam)//, [append2hdf])
@@ -4103,6 +4193,7 @@ function /s scfd_spectrum_analyzer(wave data, variable samp_freq, string wn)
 	//powerspec[0]=nan
 	//display powerspec; // SetAxis bottom 0,500
 	duplicate /o powerspec, $wn
+	integrate powerspec /D = $(wn + "int") // new line
 	return wn
 end
 
@@ -4112,6 +4203,8 @@ function scfd_RecordValues(S, rowNum, [AWG_list, linestart, skip_data_distributi
 	variable rowNum, linestart
 	variable skip_data_distribution // For recording data without doing any calculation or distribution of data
 	struct AWGVars &AWG_list
+	
+		
 	// If passed AWG_list with AWG_list.lims_checked == 1 then it will run with the Arbitrary Wave Generator on
 	// Note: Only works for 1 FastDAC! Not sure what implementation will look like for multiple yet
 
@@ -4209,7 +4302,7 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 	string RawWaveNames1D = sci_get1DWaveNames(1, 1)
 	string CalcWaveNames1D = sci_get1DWaveNames(0, 1)
 	string CalcStrings = scf_getRecordedFADCinfo("calc_funcs")
-	nvar sc_ResampleFreqfadc, sc_demody, sc_plotRaw
+	nvar sc_ResampleFreqfadc, sc_demody, sc_plotRaw, sc_hotcold, sc_hotcolddelay
 	svar sc_nfreq, sc_nQs
 	string rwn, cwn, calc_string, calc_str 
 	wave fadcattr
@@ -4224,15 +4317,23 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			rwn = StringFromList(i, RawWaveNames1D)
 			cwn = StringFromList(i, CalcWaveNames1D)		
 			calc_string = StringFromList(i, CalcStrings)
+			
 			duplicate/o $rwn sc_tempwave
+			
 			string ADCnum = rwn[3,INF]
 						
 			if (fadcattr[str2num(ADCnum)][5] == 48) // checks which notch box is checked
 				scfd_notch_filters(sc_tempwave, ScanVars.measureFreq,Hzs=sc_nfreq, Qs=sc_nQs)
 			endif
 			
+			if(sc_hotcold == 1)
+				scfd_sqw_analysis(sc_tempwave, sc_hotcolddelay, AWGVars.waveLen, cwn)
+			endif
+			
+			
 			if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
 				scfd_demodulate(sc_tempwave, str2num(fadcvalstr[str2num(ADCnum)][7]), AWGVars.numCycles, AWGVars.waveLen, cwn)
+				
 				
 				//calc function for demod x
 				calc_str = ReplaceString(rwn, calc_string, cwn + "x")
@@ -4248,11 +4349,10 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			endif
 
 			calc_str = ReplaceString(rwn, calc_string, "sc_tempwave")
-			execute("sc_tempwave ="+calc_string)
-			execute(cwn+" = sc_tempwave")
+			execute("sc_tempwave ="+calc_str)
 			
+			duplicate /o sc_tempwave $cwn
 
-			
 			if (ScanVars.is2d)
 				// Copy 1D raw into 2D
 				wave raw1d = $rwn
@@ -4263,6 +4363,23 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 				string cwn2d = cwn+"_2d"
 				wave calc2d = $cwn2d
 				calc2d[][rowNum] = sc_tempwave[p]	
+				
+				
+				//Copy 1D hotcold into 2d
+				if (sc_hotcold == 1)
+					string cwnhot = cwn + "hot"
+					string cwn2dhot = cwnhot + "_2d"
+					wave cw2dhot = $cwn2dhot
+					wave cwhot = $cwnhot
+					cw2dhot[][rowNum] = cwhot[p]
+					
+					string cwncold = cwn + "cold"
+					string cwn2dcold = cwncold + "_2d"
+					wave cw2dcold = $cwn2dcold
+					wave cwcold = $cwncold
+					cw2dcold[][rowNum] = cwcold[p]
+				endif
+				
 				
 				// Copy 1D demod into 2D
 				if (fadcattr[str2num(ADCnum)][6] == 48)
@@ -4288,8 +4405,12 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			variable avg_over = 5 //can specify the amount of rows that should be averaged over
 			
 			if (sc_plotRaw == 1)
-				if (rowNum < avg_over)			
-					duplicate /O/R = [][0,rowNum] $(rwn + "_2d") powerspec2D
+				if (rowNum < avg_over)
+					if(waveExists($(rwn + "_2d"))	)	
+						duplicate /O/R = [][0,rowNum] $(rwn + "_2d") powerspec2D
+					else
+						duplicate /O/R = [][0,rowNum] $(rwn) powerspec2D
+					endif
 				else
 					duplicate /O/R = [][rowNum-avg_over,rowNum] $(rwn + "_2d") powerspec2D
 				endif
@@ -4745,10 +4866,12 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	button updatefadc,pos={400,265},size={90,20},proc=scfw_update_fadc,title="Update ADC"
 	checkbox sc_plotRawBox,pos={505,265},proc=scw_CheckboxClicked,variable=sc_plotRaw,side=1,title="\Z14Plot Raw"
 	checkbox sc_demodyBox,pos={585,265},proc=scw_CheckboxClicked,variable=sc_demody,side=1,title="\Z14Save Demod.y"
+	checkbox sc_hotcoldBox,pos={823,302},proc=scw_CheckboxClicked,variable=sc_hotcold,side=1,title="\Z14 Hot/Cold"
+	SetVariable sc_hotcolddelayBox,pos={908,300},size={70,20},value=sc_hotcolddelay,side=1,title="\Z14Delay"
 	SetVariable sc_FilterfadcBox,pos={828,264},size={150,20},value=sc_ResampleFreqfadc,side=1,title="\Z14Resamp Freq ",help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
 	SetVariable sc_demodphiBox,pos={705,264},size={100,20},value=sc_demodphi,side=1,title="\Z14Demod \$WMTEX$ \Phi $/WMTEX$"//help={"Re-samples to specified frequency, 0 Hz == no re-sampling"} /////EDIT ADDED
-	SetVariable sc_nfreqBox,pos={698,300},size={150,20}, value=sc_nfreq ,side=1,title="\Z14 Notch Freqs" ,help={"seperate frequencies (Hz) with , "}
-	SetVariable sc_nQsBox,pos={540,300},size={140,20}, value=sc_nQs ,side=1,title="\Z14 Notch Qs" ,help={"seperate Qs with , "}
+	SetVariable sc_nfreqBox,pos={500,300},size={150,20}, value=sc_nfreq ,side=1,title="\Z14 Notch Freqs" ,help={"seperate frequencies (Hz) with , "}
+	SetVariable sc_nQsBox,pos={665,300},size={140,20}, value=sc_nQs ,side=1,title="\Z14 Notch Qs" ,help={"seperate Qs with , "}
 	DrawText 807,277, "\Z14\$WMTEX$ {}^{o} $/WMTEX$" 
 	DrawText 982,283, "\Z14Hz" 
 	
@@ -5202,24 +5325,21 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	make/o/n=(4,2) AWGsetattr = 0
 	AWGsetattr[][1] = 2
 	
-
-	
-	
-	variable/g sc_printfadc = 0
-	variable/g sc_saverawfadc = 0
-	variable/g sc_demodphi = 0
-	variable/g sc_demody = 0
-	variable/g sc_plotRaw = 0
-	variable/g sc_wnumawg = 0
-	variable/g tabnumAW = 0
-	variable/g sc_ResampleFreqfadc = 100 // Resampling frequency if using resampling
-	string /g sc_freqAW0 = ""
-	string /g sc_freqAW1 = ""
-	string /g sc_nfreq = "60,180,300"
-	string /g sc_nQs = "50,150,250"
-	string /g sc_fdID = "" 
-	   
-
+	variable /g sc_printfadc = 0
+	variable /g sc_saverawfadc = 0
+	variable /g sc_demodphi = 0
+	variable /g sc_demody = 0
+	variable /g sc_hotcold = 0
+	variable /g sc_hotcolddelay = 0
+	variable /g sc_plotRaw = 0
+	variable /g sc_wnumawg = 0
+	variable /g tabnumAW = 0
+	variable /g sc_ResampleFreqfadc = 100 // Resampling frequency if using resampling
+	string   /g sc_freqAW0 = ""
+	string   /g sc_freqAW1 = ""
+	string   /g sc_nfreq = "60,180,300"
+	string   /g sc_nQs = "50,150,250"
+	string   /g sc_fdID = "" 
 
 	// clean up
 	killwaves fdacval0,fdacval1,fdacval2,fdacval3,fdacval4
@@ -5266,25 +5386,3 @@ function scfw_SetGUIinteraction(numDevices)
 			endif
 	endswitch
 end
-	
-	
-
-
-//example of subplotting
-
-//Make/N=3 data = p
-//Make/N=3/T category = {"A", "B", "C"}
-//Display data
-//ModifyGraph axisEnab(left)={0.55,1}
-//ModifyGraph freePos(left)=0
-//ModifyGraph freePos(bottom)={0,left}
-//ModifyGraph freePos(bottom)={1,left}
-//Display /L = l1 /B = B1 data
-//ModifyGraph axisEnab(l1)={0.55,1}
-//ModifyGraph freePos(l1)=0
-//ModifyGraph freePos(B1)={0,l1}
-//AppendToGraph/L=l2/B=b2 data vs category
-//ModifyGraph axisEnab(l2)={0,0.45}
-//ModifyGraph freepos(l2)=0
-//ModifyGraph freePos(b2)={0,l2}
-//ModifyGraph axisEnab(l2)={0,0.40}

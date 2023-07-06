@@ -113,15 +113,16 @@ end
 ////////////////////////
 //// Get functions ////
 ///////////////////////
-
 threadsafe function getLS625current(instrID) // Units: A
 	variable instrID
 	variable current
 
 	current = str2num(queryInstr(instrID,"RDGI?\r\n"))//, read_term = "\r\n"))
-	
+
 	return current
 end
+
+
 
 function getLS625field(instrID) // Units: mT
 	variable instrID

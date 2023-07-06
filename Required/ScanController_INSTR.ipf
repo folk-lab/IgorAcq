@@ -13,7 +13,6 @@ end
 function /s getResourceAddress(instrID)
 	variable instrID
 	string address=""
-
 	viGetAttributeString(instrID, VI_ATTR_RSRC_NAME , address  )
 
 	return address

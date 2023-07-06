@@ -333,7 +333,7 @@ function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, 
 	variable instrID, start, fin, repeats, numptsx, sweeprate, delay, ramprate, alternate, nosave, use_awg
 	string channels, x_label, y_label, comments, starts, fins, interlaced_channels, interlaced_setpoints
 	variable j=0
-	nvar sc_Saverawfadc
+	nvar sc_Saverawfadc, sc_hotcold
 
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -353,7 +353,7 @@ function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, 
 	string notched_waves = scf_getRecordedFADCinfo("calc_names", column = 5)
 	string resamp_waves = scf_getRecordedFADCinfo("calc_names",column = 8)
 	
-	if(cmpstr(notched_waves,"") || cmpstr(resamp_waves,""))
+	if(cmpstr(notched_waves,"") || cmpstr(resamp_waves,"") || sc_hotcold)
 		sc_Saverawfadc = 1
 	else
 		sc_Saverawfadc = 0
@@ -914,7 +914,6 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 	variable setpointy, sy, fy
 	string chy
 	variable k = 0
-	
 	for(i=0; i<S.numptsy; i++)
 
 		///// LOOP FOR INTERLACE SCANS ///// 
@@ -1006,12 +1005,10 @@ function Ramp_interlaced_channels(S, i)
 				continue 
 			endif
 		endif
-		
 		// Figure out which FastDAC the channel belongs to
 		channel_num = scu_getChannelNumbers(interlace_channel, fastdac=1)
 		scf_getChannelNumsOnFD(channel_num, device) // Sets device to device num
 		string deviceAddress = stringbykey("visa"+num2istr(device), sc_fdacKeys, ":", ",")
-		
 		// Open connection to that FastDAC and ramp
 		viRM = openFastDACconnection("fdac_window_resource", deviceAddress, verbose=0)
 		nvar tempinstrID = $"fdac_window_resource"

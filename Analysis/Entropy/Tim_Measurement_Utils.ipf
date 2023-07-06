@@ -126,8 +126,8 @@ function makeSquareWaveAWG(instrID, v0, vP, vM, v0len, vPlen, vMlen, wave_num, [
 end
 
 
-function SetupEntropySquareWaves([freq, cycles, hqpc_plus, hqpc_minus, channel_ratio, balance_multiplier, hqpc_bias_multiplier, ramplen])
-	variable freq, cycles, hqpc_plus, hqpc_minus, channel_ratio, balance_multiplier, hqpc_bias_multiplier, ramplen
+function SetupEntropySquareWaves([freq, cycles,hqpc_zero, hqpc_plus, hqpc_minus, channel_ratio, balance_multiplier, hqpc_bias_multiplier, ramplen])
+	variable freq, cycles,hqpc_zero, hqpc_plus, hqpc_minus, channel_ratio, balance_multiplier, hqpc_bias_multiplier, ramplen
 
 	balance_multiplier = paramIsDefault(balance_multiplier) ? 1 : balance_multiplier
 	hqpc_bias_multiplier = paramIsDefault(hqpc_bias_multiplier) ? 1 : hqpc_bias_multiplier
@@ -137,7 +137,7 @@ function SetupEntropySquareWaves([freq, cycles, hqpc_plus, hqpc_minus, channel_r
 	hqpc_minus = paramisdefault(hqpc_minus) ? -50 : hqpc_minus
 	channel_ratio = paramisdefault(channel_ratio) ? -1.478 : channel_ratio  //Using OHC, OHV
 	ramplen = paramisdefault(ramplen) ? 0 : ramplen
-
+	hqpc_zero = paramisdefault(hqpc_zero) ? 0 : hqpc_zero
 	nvar fd
 
 	variable splus = hqpc_plus*hqpc_bias_multiplier, sminus=hqpc_minus*hqpc_bias_multiplier
@@ -146,9 +146,9 @@ function SetupEntropySquareWaves([freq, cycles, hqpc_plus, hqpc_minus, channel_r
 	variable spt
 	// Make square wave 0
 	spt = 1/(4*freq)  // Convert from freq to setpoint time /s  (4 because 4 setpoints per wave)
-	makeSquareWaveAWG(fd, 0, splus, sminus, spt, spt, spt, 0, ramplen=ramplen)
+	makeSquareWaveAWG(fd, hqpc_zero, splus, sminus, spt, spt, spt, 0, ramplen=ramplen)
 	// Make square wave 1
-	makeSquareWaveAWG(fd, 0, cplus, cminus, spt, spt, spt, 1, ramplen=ramplen)
+	makeSquareWaveAWG(fd, hqpc_zero, cplus, cminus, spt, spt, spt, 1, ramplen=ramplen)
 
 	// Setup AWG
 	setupAWG(fd, AWs="0,1", DACs="OHC(10M),OHV*9950", numCycles=cycles, verbose=1)

@@ -2079,6 +2079,7 @@ Structure AWGVars
 	variable numWaves	// Number of AWs being used
 	variable numCycles 	// # wave cycles per DAC step for a full 1D scan
 	variable numSteps  	// # DAC steps for a full 1D scan
+	
 endstructure
 
 
