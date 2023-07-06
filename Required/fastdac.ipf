@@ -1979,7 +1979,8 @@ function fd_readChunk(fdid, adc_channels, numpts, [fdIDname])
 	S.instrIDx = fdid
 	S.readVsTime = 1  					// No ramping
 	S.adcList = adc_channels  		// Recording specified channels, not ticked boxes in ScanController_Fastdac
-	S.numADCs = itemsInList(S.adcList)
+	S.numADCs = itemsInList(S.adcList) // gives me an error if i leave this out
+	S.maxADCs = itemsInList(S.adcList) 
 	S.samplingFreq = getFADCspeed(S.instrIDx)
 	S.raw_wave_names = wavenames  	// Override the waves the rawdata gets saved to
 	S.never_save = 1

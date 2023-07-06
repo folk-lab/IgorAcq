@@ -4260,7 +4260,8 @@ function scfd_SendCommandAndRead(S, AWG_list, rowNum)
 	
 	cmd_sent = fd_start_sweep(S, AWG_list=AWG_list)
 	
-	totalByteReturn = S.numADCs*2*S.numptsx
+	//totalByteReturn = S.numADCs*2*S.numptsx // would likely be the maxADCs number
+	totalByteReturn = S.maxADCs*2*S.numptsx // would likely be the maxADCs number
 	variable entered_panic_mode = 0
 	try
 		print 1
@@ -4289,7 +4290,7 @@ function scfd_SendCommandAndRead(S, AWG_list, rowNum)
 	   
 	   // update DAC values in window (request values from FastDAC directly in case ramp failed)
 		
-		scfd_updateWindow(S, S.numADCs) // get fdacoutput is likely failing here. 
+		scfd_updateWindow(S, S.maxADCs) // get fdacoutput is likely failing here. 
 	endif
 	
 	if(AWG_list.use_awg == 1)  // Reset AWs back to zero (no reason to leave at end of AW)
@@ -4449,46 +4450,56 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only])
    
    variable panic_mode = record_only  // If Igor gets behind on reading at any point, it will go into panic mode and focus all efforts on clearing buffer.
    variable expected_bytes_in_buffer = 0 // For storing how many bytes are expected to be waiting in buffer
-   do
-      scfd_readChunk(S.instrIDx, read_chunk, buffer)  // puts data into buffer
-      scfd_distributeData1(buffer, S, bytes_read, totalByteReturn, read_chunk, rowNum)
-      scfd_checkSweepstate(S.instrIDx)
-	   //abort "abort in recordbuffer, testing phase"
-      
-      bytes_read += read_chunk      
-      expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)      
-      if(!panic_mode && expected_bytes_in_buffer < saveBuffer)  // if we aren't too far behind then update Raw 1D graphs
-         scg_updateRawGraphs() 
-	      expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)  // Basically checking how long graph updates took
-			if (expected_bytes_in_buffer > 4096)
-         		printf "ERROR[scfd_RecordBuffer]: After updating graphs, buffer is expected to overflow... Expected buffer size = %d (max = 4096). Bytes read so far = %d\r" expected_bytes_in_buffer, bytes_read
-         elseif (expected_bytes_in_buffer > 2500)
-//				printf "WARNING[scfd_RecordBuffer]: Last graph update resulted in buffer becoming close to full (%d of 4096 bytes). Entering panic_mode (no more graph updates)\r", expected_bytes_in_buffer
-				panic_mode = 1         
-         	endif
-		else
-			if (expected_bytes_in_buffer > 1000)
-//				printf "DEBUGGING: getting behind: Expecting %d bytes in buffer (max 4096)\r" expected_bytes_in_buffer		
-				if (panic_mode == 0)
-					panic_mode = 1
-//					printf "WARNING[scfd_RecordBuffer]: Getting behind on reading buffer, entering panic mode (no more graph updates until end of sweep)\r"				
-				endif			
-			endif
-		endif
-   while(totalByteReturn-bytes_read > read_chunk)
+	
+	int i
+	string fdIDname
+	for(i=0; i<itemsinlist(S.instrIDs); i++)  //this forloop is fine
+		
+		fdIDname = stringfromlist(i,S.instrIDs)
+		nvar fdID = $fdIDname
 
-   // do one last read if any data left to read
-   variable bytes_left = totalByteReturn-bytes_read
-   if(bytes_left > 0)
-      scfd_readChunk(S.instrIDx, bytes_left, buffer)  // puts data into buffer
-      scfd_distributeData1(buffer, S, bytes_read, totalByteReturn, bytes_left, rowNum)
-   endif
-   
-   scfd_checkSweepstate(S.instrIDx)
-//   variable st = stopMSTimer(-2)
-   scg_updateRawGraphs() 
-//   printf "scg_updateRawGraphs took %.2f ms\r", (stopMSTimer(-2) - st)/1000
-   return panic_mode
+	   do
+	      scfd_readChunk(fdID, read_chunk, buffer)  // puts data into buffer
+	      scfd_distributeData1(buffer, S, bytes_read, totalByteReturn, read_chunk, rowNum)
+	      scfd_checkSweepstate(fdID)
+		   //abort "abort in recordbuffer, testing phase"
+	      
+	      bytes_read += read_chunk      
+	      expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)      
+	      if(!panic_mode && expected_bytes_in_buffer < saveBuffer)  // if we aren't too far behind then update Raw 1D graphs
+	         scg_updateRawGraphs() 
+		      expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)  // Basically checking how long graph updates took
+				if (expected_bytes_in_buffer > 4096)
+	         		printf "ERROR[scfd_RecordBuffer]: After updating graphs, buffer is expected to overflow... Expected buffer size = %d (max = 4096). Bytes read so far = %d\r" expected_bytes_in_buffer, bytes_read
+	         elseif (expected_bytes_in_buffer > 2500)
+	//				printf "WARNING[scfd_RecordBuffer]: Last graph update resulted in buffer becoming close to full (%d of 4096 bytes). Entering panic_mode (no more graph updates)\r", expected_bytes_in_buffer
+					panic_mode = 1         
+	         	endif
+			else
+				if (expected_bytes_in_buffer > 1000)
+	//				printf "DEBUGGING: getting behind: Expecting %d bytes in buffer (max 4096)\r" expected_bytes_in_buffer		
+					if (panic_mode == 0)
+						panic_mode = 1
+	//					printf "WARNING[scfd_RecordBuffer]: Getting behind on reading buffer, entering panic mode (no more graph updates until end of sweep)\r"				
+					endif			
+				endif
+			endif
+	   while(totalByteReturn-bytes_read > read_chunk)
+	
+	   // do one last read if any data left to read
+	   variable bytes_left = totalByteReturn-bytes_read
+	   if(bytes_left > 0)
+	      scfd_readChunk(fdID, bytes_left, buffer)  // puts data into buffer
+	      scfd_distributeData1(buffer, S, bytes_read, totalByteReturn, bytes_left, rowNum)
+	   endif
+	   
+	   scfd_checkSweepstate(fdID)
+	//   variable st = stopMSTimer(-2)
+	   scg_updateRawGraphs() 
+	//   printf "scg_updateRawGraphs took %.2f ms\r", (stopMSTimer(-2) - st)/1000
+	
+	endfor
+	return panic_mode
 end
 
 function scfd_ExpectedBytesInBuffer(start_time, bytes_per_sec, total_bytes_read)
