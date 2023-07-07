@@ -215,8 +215,10 @@ function DotTuneAround2(x, y, width_x, width_y, channelx, channely, [sweeprate, 
 		CorrectChargeSensor(fd=fdcs, fdchannelstr=csname, fadcID=fd, fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15) //added cutoff time so we don't have to wait while de-bugging
 		corners = AddListItem(num2str(fdacvalstr[csq_channel_num][1]), corners, ",", INF) // CSQ gate values
 	endfor
-
 	
+	///// make parallelogram from corners /////
+	corners = make_parallelogram_from_corners(corners)
+
 	ScanFastDAC2D_virtual(fd, x-width_x, x+width_x, channelx, y-width_y, y+width_y, channely, numptsy, corners, csname, fdcs_id=fdcs_id, sweeprate=sweeprate, rampratex=ramprate_x, fdyid=fdy, nosave=nosave, comments="Dot Tuning, "+additional_comments, delayy=delayy, use_AWG=use_AWG)
 ////	ScanFastDAC2D_virtual(fd, x+width_x, x-width_x, channelx, y-width_y, y+width_y, channely, numptsy, corners, csname, fdcs_id=fdcs_id, sweeprate=sweeprate, rampratex=ramprate_x, fdyid=fdy, nosave=nosave, comments="Dot Tuning, "+additional_comments)
 
@@ -229,18 +231,42 @@ end
 
 
 
-function make_square_from_corners(string corners)
-	string new_corners
+function/S make_parallelogram_from_corners(string virtual_corners)
+	// Turn any 4 corners into a parallelogram
+	// corners are defined in the order [BL, BR, TL, TR]
+	// BL: bottom left
+	// TR: top right
+	// e.g. make_parallelogram_from_corners("0,3,4,5") returns "0.5,2.5,3.5,5.5"
+	string corners
 	variable c0, c1, c2, c3
+	variable new_mid_start, new_mid_end, new_half_width
 	
-	variable c0_new = (c0 + c2) / 2
-	variable c2_new = c0_new
+	string new_virtual_corners = ""
 	
-	variable c1_new = (c1 + c3) / 2
-	variable c3_new = c1_new
-	
-//			new_start = c0 + ((c2-c0) + (c3-c1))/2 * i/(S.numptsy-1)
-//			new_fin = new_start + ((c1-c0) + (c3-c2))/2
+	variable k
+	for (k=0; k < ItemsInList(virtual_corners, ";"); k++)
+		corners = StringFromList(k, virtual_corners, ";")
+	   	c0 = str2num(StringFromList(0, corners, ","))
+   		c1 = str2num(StringFromList(1, corners, ","))
+   		c2 = str2num(StringFromList(2, corners, ","))
+   		c3 = str2num(StringFromList(3, corners, ","))
+   		
+		new_half_width = (((c1-c0) + (c3-c2)) / 2) / 2
+		new_mid_start = (c0 + c1) / 2
+		new_mid_end = (c2 + c3) / 2
+		
+		c0 = new_mid_start - new_half_width
+		c1 = new_mid_start + new_half_width
+		c2 = new_mid_end - new_half_width
+		c3 = new_mid_end + new_half_width
+		
+		new_virtual_corners = new_virtual_corners + num2str(c0) + "," + num2str(c1) + ","	 + num2str(c2) + "," + num2str(c3) + ";"							
+   	endfor
+   		
+   	///// remove trailing semicolon... could be dangerous /////
+   	new_virtual_corners = new_virtual_corners[0, strlen(new_virtual_corners) - 2]
+   		
+   	return new_virtual_corners
 end
 
 
@@ -567,9 +593,6 @@ function ScanFastDAC2D_virtual(fdID, startx, finx, channelsx, starty, finy, chan
 	   		
 	   		new_start = c0 + (c2-c0) * i / (S.numptsy-1)
 			new_fin = c1 + (c3-c1) * i / (S.numptsy-1)
-	
-//			new_start = c0 + ((c2-c0) + (c3-c1))/2 * i/(S.numptsy-1)
-//			new_fin = new_start + ((c1-c0) + (c3-c2))/2
 			
 			S.channelsx = AddListItem(virtual_gate, S.channelsx, ",", INF)
 			S.startxs = AddListItem(num2str(new_start), S.startxs, ",", INF)			
