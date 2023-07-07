@@ -381,6 +381,7 @@ structure ScanVars
 	 string fakeRecordIDs  // IDs for fakeRecording
 	 string fakeRecords    // ADC channels used for fakeRecording
 	 string ADCcounts		// ADCcounts to ensure theres equal amount of recordings between instruments
+	 string adcLists       // adclist by id -> attempting to use stringbykey
 	 	
 		
 endstructure
@@ -4570,9 +4571,9 @@ function scfd_distributeData1(buffer, S, bytes_read, totalByteReturn, read_chunk
 
   variable col_num_start
   if (direction == 1)
-    col_num_start = bytes_read/(2*S.numADCs)
+    col_num_start = bytes_read/(2*S.maxADCs)
   elseif (direction == -1)
-    col_num_start = (totalByteReturn-bytes_read)/(2*S.numADCs)-1
+    col_num_start = (totalByteReturn-bytes_read)/(2*S.maxADCs)-1
   endif
   scfd_distributeData2(buffer,S.adcList,read_chunk,rowNum,col_num_start, direction=direction, named_waves=S.raw_wave_names)
 end

@@ -1897,6 +1897,7 @@ function/s fd_start_sweep(S, [AWG_list])
 	
 		if(S.sync)
 			//checking the need for a fakeramp
+			S.adcLists = "" //trying a string by keys approach
 			if(!cmpstr(dacs,"") && whichlistitem(fdIDname, S.fakerampIDs) != -1) //two checks (redundant), but maybe only one is needed
 				///find global value of channel 0 in that ID, set it to start and fin, and dac = 0
 				string value = num2str(getfdacOutput(fdID,0, same_as_window = 0)) //this gave me the start and fins and dac
@@ -1921,6 +1922,11 @@ function/s fd_start_sweep(S, [AWG_list])
 			endif
 			
 			adcs = replacestring(";",adcs,"")
+			//adcLists += str2num(stringbykey(fdIDname,sc_fdackeys,":",","))
+			S.adcLists = addlistitem(fdIDname + ":" + adcs, S.adcLists, ";", INF) // might be better to have two, one before addition of fake channels to record and one after
+			//then by comparison it would make it easy to see the ordering of how the command is sent to the dac and which ones to toss/keep.
+			
+			
 			sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, starts, fins, S.numptsx
 			// might need the channels picked for the fake recordings stored somewhere
 		else
