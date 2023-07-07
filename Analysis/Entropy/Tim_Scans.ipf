@@ -230,11 +230,11 @@ end
 
 
 
-function DotTuneAroundVirtual(x_str, y_str, width_x_str, width_y_str, channelx_str, channely_str, [sweeprate, ramprate_x, numptsy, csname, nosave, additional_comments, fadcchannel, natarget, gate_divider, display_diff, use_AWG])
+function DotTuneAroundVirtual(x_str, y_str, width_x_str, width_y_str, channelx_str, channely_str, [sweeprate, ramprate_x, numptsy, csname, nosave, additional_comments, fadcchannel, natarget, gate_divider, display_diff, use_AWG, use_only_corners])
 // Goes to x, y. Sets charge sensor to target_current. Scans2D around x, y +- width.
 	string x_str, y_str, width_x_str, width_y_str, channelx_str, channely_str
 	// OPTIONAL	
-	variable sweeprate, ramprate_x, numptsy, display_diff, use_AWG, nosave, fadcchannel, gate_divider, natarget
+	variable sweeprate, ramprate_x, numptsy, display_diff, use_AWG, nosave, fadcchannel, gate_divider, natarget, use_only_corners
 	string csname, additional_comments
 
 	sweeprate = paramisdefault(sweeprate) ? 300 : sweeprate
@@ -246,6 +246,7 @@ function DotTuneAroundVirtual(x_str, y_str, width_x_str, width_y_str, channelx_s
 	display_diff = paramisdefault(display_diff) ? 1 : display_diff
 	natarget = paramisdefault(natarget) ? 0.99 : natarget
 	use_AWG = paramisdefault(use_AWG) ? 0 : use_AWG
+	use_only_corners = paramisdefault(use_only_corners) ? 0 : use_only_corners
 
 	nvar fd=fd
 
@@ -365,13 +366,13 @@ end
 
 
 
-function ScanFastDAC2D_virtual(fdID, startx, finx, channelsx, starty, finy, channelsy, numptsy, virtual_corners, virtual_gates, [fdcs_id, numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave, use_AWG])
+function ScanFastDAC2D_virtual(fdID, startx, finx, channelsx, starty, finy, channelsy, numptsy, virtual_corners, virtual_gates, [fdcs_id, numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave, use_AWG, use_only_corners])
 	// 2D Scan for FastDAC only OR FastDAC on fast axis and BabyDAC on slow axis
 	// Note: Must provide numptsx OR sweeprate in optional parameters instead
 	// Note: To ramp with babyDAC on slow axis provide the BabyDAC variable in bdID
 	// Note: channels should be a comma-separated string ex: "0,4,5"
 	// Note: Virtual corner gates MUST be on the fast axis (since they are swept during the scan)
-	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, rampratex, rampratey, delayy, nosave, use_AWG, fdyID, fdcs_id
+	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, rampratex, rampratey, delayy, nosave, use_AWG, fdyID, fdcs_id, use_only_corners
 	string channelsx, channelsy, comments, startxs, finxs, startys, finys
 	string virtual_corners  // , separated list of 4 corner values for each virtual gate. ; separated for multiple virtual gates -- Corners should be specified as a single value for each of "StartX|StartY, FinX|StartY, StartX|FinY, FinX|FinY"
 	string virtual_gates  // , separated list of virtual gates (each needs a set of virtual_corners)
@@ -384,8 +385,19 @@ function ScanFastDAC2D_virtual(fdID, startx, finx, channelsx, starty, finy, chan
 	startys = selectstring(paramisdefault(startys), startys, "")
 	finys = selectstring(paramisdefault(finys), finys, "")
 	fdcs_id = paramisdefault(sweeprate) ? 0 : fdcs_id
+	use_only_corners = paramisdefault(use_only_corners) ? 0 : use_only_corners
 	variable use_bd = paramisdefault(bdid) ? 0 : 1 		// Whether using both FD and BD or just FD
 	variable use_second_fd = paramisdefault(fdyID) ? 0 : 1  // Whether using a second FD for the y axis gates
+	
+	
+	///// If using virtual sweeps only /////
+	///// WARNING DANGEROUS NEED TO PROPERLY DO CHECKS HERE /////
+	if (use_only_corners == 1)
+		startx = 0
+		finx = 0
+		starty = 0
+		finy = 0
+	endif
 
 
 	// Reconnect instruments
@@ -502,6 +514,13 @@ function ScanFastDAC2D_virtual(fdID, startx, finx, channelsx, starty, finy, chan
 		S.channelsx = original_channelsx
 		S.startxs = original_startxs
 		S.finxs = original_finxs
+		
+		if (use_only_corners == 1)
+			S.channelsx = ""
+			S.startxs = ""
+			S.finxs = ""
+		endif
+		
 		for (k=0; k<ItemsInList(virtual_gates, ","); k++)
 			virtual_gate = scu_getChannelNumbers(StringFromList(k, virtual_gates, ","), fastdac=1)
    			corners = StringFromList(k, virtual_corners, ";")
@@ -509,25 +528,30 @@ function ScanFastDAC2D_virtual(fdID, startx, finx, channelsx, starty, finy, chan
 	   		c1 = str2num(StringFromList(1, corners, ","))
 	   		c2 = str2num(StringFromList(2, corners, ","))
 	   		c3 = str2num(StringFromList(3, corners, ","))
+	   		
+	   		new_start = c0 + (c2-c0) * i / (S.numptsy-1)
+			new_fin = c1 + (c3-c1) * i / (S.numptsy-1)
 	
-			new_start = c0 + ((c2-c0)+(c3-c1))/2 * i/(S.numptsy-1)
-			new_fin = new_start + ((c1-c0)+(c3-c2))/2
+//			new_start = c0 + ((c2-c0) + (c3-c1))/2 * i/(S.numptsy-1)
+//			new_fin = new_start + ((c1-c0) + (c3-c2))/2
 			
 			S.channelsx = AddListItem(virtual_gate, S.channelsx, ",", INF)
 			S.startxs = AddListItem(num2str(new_start), S.startxs, ",", INF)			
 			S.finxs = AddListItem(num2str(new_fin), S.finxs, ",", INF)						
    		endfor
    		// Remove the commas Igor stupidly puts at the end of lists...
-   		S.channelsx = S.channelsx[0,strlen(S.channelsx)-2]  
-   		S.startxs = S.startxs[0,strlen(S.startxs)-2]
-   		S.finxs = S.finxs[0,strlen(S.finxs)-2]
+   		S.channelsx = S.channelsx[0, strlen(S.channelsx) - 2]  
+   		S.startxs = S.startxs[0, strlen(S.startxs) - 2]
+   		S.finxs = S.finxs[0, strlen(S.finxs) - 2]
    		///////////////////////////////////////////////////////////
+   		
+   		ABORT 
 		
 		// Ramp fast axis to start
-		rampToNextSetpoint(S, 0, fastdac=1, ignore_lims=1)
+		rampToNextSetpoint(S, 0, fastdac=1, ignore_lims=0)
 
 		// Ramp slow axis
-		rampToNextSetpoint(S, 0, outer_index=i, y_only=1, fastdac=!use_bd, ignore_lims=1)
+		rampToNextSetpoint(S, 0, outer_index=i, y_only=1, fastdac=!use_bd, ignore_lims=0)
 		
 
 		// Let gates settle
