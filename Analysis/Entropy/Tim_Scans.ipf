@@ -392,11 +392,21 @@ function ScanFastDAC2D_virtual(fdID, startx, finx, channelsx, starty, finy, chan
 	
 	///// If using virtual sweeps only /////
 	///// WARNING DANGEROUS NEED TO PROPERLY DO CHECKS HERE /////
+	string corners, virtual_gate
+   	variable c0, c1, c2, c3 
+   	
 	if (use_only_corners == 1)
-		startx = 0
-		finx = 0
-		starty = 0
-		finy = 0
+		corners = StringFromList(0, virtual_corners, ";")
+		   	c0 = str2num(StringFromList(0, corners, ","))
+	   		c1 = str2num(StringFromList(1, corners, ","))
+	   		c2 = str2num(StringFromList(2, corners, ","))
+	   		c3 = str2num(StringFromList(3, corners, ","))
+	   		
+		startx = c0
+		finx = c1
+		starty = c0
+		finy = c2
+		
 	endif
 
 
@@ -440,8 +450,6 @@ function ScanFastDAC2D_virtual(fdID, startx, finx, channelsx, starty, finy, chan
    	
    	////////////////////////// Check virtual gates //////////////////
    	variable k
-   	string corners, virtual_gate
-   	variable c0, c1, c2, c3 
    	for (k=0; k<ItemsInList(virtual_gates, ","); k++)
    		virtual_gate = scu_getChannelNumbers(StringFromList(k, virtual_gates, ","), fastdac=1)
    		corners = StringFromList(k, virtual_corners, ";")
@@ -544,8 +552,7 @@ function ScanFastDAC2D_virtual(fdID, startx, finx, channelsx, starty, finy, chan
    		S.startxs = S.startxs[0, strlen(S.startxs) - 2]
    		S.finxs = S.finxs[0, strlen(S.finxs) - 2]
    		///////////////////////////////////////////////////////////
-   		
-   		ABORT 
+ 
 		
 		// Ramp fast axis to start
 		rampToNextSetpoint(S, 0, fastdac=1, ignore_lims=0)
