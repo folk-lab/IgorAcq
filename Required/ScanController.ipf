@@ -378,6 +378,8 @@ structure ScanVars
 	 string dacListIDs     // Ids for channelx (for now, not sure ill change this yet)
 	 variable maxADCs      // should contain the number with the most ADCs being recorded // I dont use this 
 	 string fakeRampIDs		// fakeRamps for syncronized measurement.
+	 string fakeRecordIDs  // IDs for fakeRecording
+	 string fakeRecords    // ADC channels used for fakeRecording
 	 string ADCcounts		// ADCcounts to ensure theres equal amount of recordings between instruments
 	 	
 		
@@ -2878,16 +2880,11 @@ end
 function PreScanChecksFD2(S, [x_only, y_only])
    struct ScanVars &S
    variable x_only, y_only  // Whether to only check specific axis (e.g. if other axis is a babydac or something else)
+	
 	S.dacListIDs = scc_checkDeviceNumber(S)
-	print "DAC channels = "  + S.dacListIDs
 	S.adcListIDs = scc_checkDeviceNumber(S, adc = 1)
-	print "ADC & DAC = " + S.dacListIDs + S.adcListIDs
 	wave /t IDs = listToTextWave(S.dacListIDs + S.adcListIDs, ";")
-	print IDs
 	findDuplicates /free /rt = syncIDs IDs
-	print ""
-	print "devices to be synced ="
-	print  syncIDs
 	S.instrIDs = textWavetolist(syncIDs)
 	
 	int i, j
