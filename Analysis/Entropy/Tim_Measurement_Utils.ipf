@@ -597,3 +597,43 @@ function/s wave2str(w)
 	
 	return w2str[1,strlen(w2str)-2]
 end
+
+
+function make_virtual_entropy_corners(x_start, y_start, x_len, y_len, y_over_x, [datnum])
+	variable x_start, y_start, x_len, y_len, y_over_x, datnum
+	
+	
+	string xs, ys
+	
+	///// calculate xs /////
+	variable x0, x1, x2, x3
+	x0 = x_start
+	x1 = x_start + x_len
+	x2 = x0
+	x3 = x1
+	xs = num2str(x0) + "," + num2str(x1) + ","	 + num2str(x2) + "," + num2str(x3) + ";"
+	print xs
+	
+	
+	///// calculate ys /////
+	variable y0, y1, y2, y3
+	y0 = y_start
+	variable c = y0 - y_over_x*x0
+	y1 = y_over_x*x1 + c
+	
+	y2 = y_start + y_len
+	y3 = y1 + y_len
+	ys = num2str(y0) + "," + num2str(y1) + ","	 + num2str(y2) + "," + num2str(y3) + ";"
+	print ys
+	
+	if (ParamIsDefault(datnum) == 0)
+		displaymultiple({datnum}, "cscurrent_2d", diff=1)
+		make /o/n=4 tempfullx = {x0, x1, x2, x3}
+		make /o/n=4 tempfully = {y0, y1, y2, y3}
+		AppendToGraph tempfully vs tempfullx
+		ModifyGraph mode(tempfully)=4, mrkThick(tempfully)=3, rgb(tempfully)=(0,65535,65535)
+		
+	endif
+	
+	
+end

@@ -173,8 +173,8 @@ function/wave DiffWave(w, [numpts])
 	numpts = paramisdefault(numpts) ? 150 : numpts
 	
 	duplicate/o w, tempwave
-	print dimsize(w, 0)
-	print ceil(dimsize(w,0)/numpts)
+//	print dimsize(w, 0)
+//	print ceil(dimsize(w,0)/numpts)
 	resample/DIM=0 /down=(ceil(dimsize(w,0)/numpts)) tempwave
 	differentiate/DIM=0 tempwave	
 	return tempwave
@@ -188,13 +188,21 @@ function DisplayMultiple(datnums, name_of_wave, [diff, x_label, y_label])
 
 	if (paramisDefault(x_label))
 		struct ScanVars S
-		scv_getLastScanVars(S)   
-		x_label = S.x_label
+		try
+			scv_getLastScanVars(S)
+			x_label = S.x_label
+		catch
+			x_label = ""
+		endtry
 	endif
 	if (paramisDefault(y_label))
 		struct ScanVars S2
-		scv_getLastScanVars(S2)   
-		y_label = S2.y_label
+		try
+			scv_getLastScanVars(S2)   
+			y_label = S2.y_label
+		catch
+			y_label = ""
+		endtry
 	endif
 
 //	x_label = selectstring(paramisdefault(x_label), x_label, "")
@@ -212,8 +220,10 @@ function DisplayMultiple(datnums, name_of_wave, [diff, x_label, y_label])
 	string tempwn
 	for(i=0; i < numpnts(datnums); i++)
 		datnum = datnums[i]
-		sprintf wn, "dat%d%s", datnum, name_of_wave
-		sprintf tempwn, "tempwave_%s", wn
+//		sprintf wn, "dat%d%s", datnum, name_of_wave
+//		sprintf tempwn, "tempwave_%s", wn
+		wn = "dat" + num2str(datnum) + name_of_wave
+		tempwn = "tempwave_" + wn
 		duplicate/o $wn, $tempwn
 		if (diff == 1)
 			wave tempwave = diffwave($tempwn)
