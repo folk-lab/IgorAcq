@@ -125,23 +125,6 @@ end
 
 
 
-function average_every_n_rows(wave wav, variable n)
-	// takes a 2d wave and averages every n rows (IGOR columns)
-	// creates a wave with _avg appended to the end
-	// assumes the wav has a multiple of n points
-	
-	string wave_name = nameOfWave(wav)
-	string wave_name_averaged = wave_name + "_avg"
-	
-	variable num_rows = dimsize(wav, 1)
-	variable num_columns = dimsize(wav, 0)
-	
-	variable num_rows_post_average = num_rows/n
-	
-	ReduceMatrixSize(wav, 0, -1, num_columns, 0,-1, num_rows_post_average, 1, wave_name_averaged)
-
-end
-
 //string window_name
 //	Display 
 //	DoWindow/C conductance_vs_sweep 
@@ -569,6 +552,26 @@ function /s avg_wav_N(wave wav, int N) // /WAVE lets your return a wave
 	redimension/n=-1 $avg_name
 	return avg_name
 end
+
+
+function average_every_n_rows(wave wav, variable n)
+	// takes a 2d wave and averages every n rows (IGOR columns)
+	// creates a wave with _avg appended to the end
+	// assumes the wav has a multiple of n points
+	
+	string wave_name = nameOfWave(wav)
+	string wave_name_averaged = wave_name + "_avg"
+	
+	variable num_rows = dimsize(wav, 1)
+	variable num_columns = dimsize(wav, 0)
+	
+	variable num_rows_post_average = num_rows/n
+	
+	ReduceMatrixSize(wav, 0, -1, num_columns, 0,-1, num_rows_post_average, 1, wave_name_averaged)
+
+end
+
+
 
 function stopalltimers()
 variable i

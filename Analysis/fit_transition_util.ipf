@@ -26,7 +26,7 @@ function master_ct_clean_average(wave wav, int refit,int dotcondcentering, strin
 	wave fit_params = $fit_params_name
 	
 
-	variable N = 20; // how many sdevs are acceptable?
+	variable N = 3; // how many sdevs are acceptable?
 	
 	//	option to limit fit to indexes [minx,maxx]
 	if (paramisdefault(minx))
@@ -101,7 +101,7 @@ function /wave get_initial_params(sweep)
 	variable amp = wavemax(sweep) - wavemin(sweep) //might be worthwile looking for a maximum/minimum with differentiation
 	//variable amp = 0.001
 	variable const = mean(sweep)
-	variable theta = 50
+	variable theta = 10
 
 	duplicate /o sweep sweepsmooth
 	Smooth/S=4 201, sweepsmooth ;DelayUpdate
