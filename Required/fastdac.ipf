@@ -1898,7 +1898,7 @@ function/s fd_start_sweep(S, [AWG_list])
 		if(S.sync)
 			//checking the need for a fakeramp
 			S.adcLists = "" //trying a string by keys approach
-			if(!cmpstr(dacs,"") && whichlistitem(fdIDname, S.fakerampIDs) != -1) //two checks (redundant), but maybe only one is needed
+			if(!cmpstr(dacs,"")) //&& whichlistitem(fdIDname, S.fakerampIDs) != -1) //two checks (redundant), but maybe only one is needed
 				///find global value of channel 0 in that ID, set it to start and fin, and dac = 0
 				string value = num2str(getfdacOutput(fdID,0, same_as_window = 0)) //this gave me the start and fins and dac
 				starts = value //changing this would mean i have to change it back

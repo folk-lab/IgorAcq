@@ -224,6 +224,7 @@ end
 
 function/s scu_getDeviceChannels(instrID, channels, [adc_flag])
 	// Convert from absolute channel number to device specific channel number (i.e. channel 8 is probably fd2's channel 0)
+	//updated to skip the channels not belonging to instrID - 2023
 	
 	variable adc_flag, instrID  //adc_flag = 1 for ADC channels, = 0 for DAC channels
 	string channels
@@ -373,15 +374,17 @@ structure ScanVars
 	 
 	 // master/slave sync use
 	 variable sync			// 1 if sync is being used, 0 if every fastDAC is independent
-	 string instrIDs       // should contain a string list of the devices being used (ramping across devices or recording across devices)
-	 string adcListIDs     // Ids for adcList (under //specific to fastDAC comment)
-	 string dacListIDs     // Ids for channelx (for now, not sure ill change this yet)
-	 variable maxADCs      // should contain the number with the most ADCs being recorded // I dont use this 
-	 string fakeRampIDs		// fakeRamps for syncronized measurement.
-	 string fakeRecordIDs  // IDs for fakeRecording
-	 string fakeRecords    // ADC channels used for fakeRecording
+	 string instrIDs      	// should contain a string list of the devices being used (ramping across devices or recording across devices)
+	 string adcListIDs    	// Ids for adcList (under //specific to fastDAC comment)
+	 string dacListIDs    	// Ids for channelx (for now, not sure ill change this yet)
+	 variable maxADCs     	// should contain the number with the most ADCs being recorded // I dont use this 
+	 string fakeRecordIDs 	// IDs for fakeRecording
+	 string fakeRecords   	// ADC channels used for fakeRecording
 	 string ADCcounts		// ADCcounts to ensure theres equal amount of recordings between instruments
-	 string adcLists       // adclist by id -> attempting to use stringbykey
+	 string adcLists      	// adclist by id -> attempting to use stringbykey
+	 string adcListKeys	  	// keystring containing the fdIDs for the adcList
+	 string adcListFakes  	//	keystring containing the fdIDs for the adcs that are not recorded but are sent to the fastDac for sync purposes
+	 
 	 	
 		
 endstructure
@@ -2881,32 +2884,93 @@ end
 function PreScanChecksFD2(S, [x_only, y_only])
    struct ScanVars &S
    variable x_only, y_only  // Whether to only check specific axis (e.g. if other axis is a babydac or something else)
+	int i, j
+	svar sc_fdackeys
+	string instrIDs
+	
+	///// Checks what devices need to be synced ////////////////////////////////////////////////////////////////////////////////////////
+	
+	// things to add -> ramping devices in between i.e. if you scan on fd1,fd3 (ramp and record), you would need to fakeramp/record fd2
+	// this assumes fd3 is not the last device and thus is not daisychained back to fd1. 
 	
 	S.dacListIDs = scc_checkDeviceNumber(S)
 	S.adcListIDs = scc_checkDeviceNumber(S, adc = 1)
 	wave /t IDs = listToTextWave(S.dacListIDs + S.adcListIDs, ";")
 	findDuplicates /free /rt = syncIDs IDs
-	S.instrIDs = textWavetolist(syncIDs)
+	//S.instrIDs = textWavetolist(syncIDs)
+	instrIDs = textWavetolist(syncIDs)
+	S.instrIDs = ""
+	instrIDs = "fd;fd3;fd4;"  /// delete this, it should not be there, only for testing
 	
-	int i, j
-	make /free /n = (numpnts(syncIDs)) ADCcounts 
-	S.fakeRampIDs = ""
-	for(i=0; i<itemsinlist(S.instrIDs); i++)
-		string ID = stringFromList(i,S.instrIDs)
+	/// sorting all instrIDs by sc_fdackeys <- this implies the ordering of the fdac connections are important.
+	int numDevices = numberByKey("numDevices", sc_fdackeys, ":",",") + 2 ///delete the plus 2
+	string ID
+	for(i=0; i < numDevices; i++)
+		ID = stringbykey("name" + num2str(i+1), sc_fdackeys, ":", ",") 
+		if(whichlistitem(ID, instrIDs) != -1)
+			S.instrIDs = replacenumberByKey(ID, S.instrIDs, i+1)
+		endif
+	endfor
+	
+	///minimizing the amount of fdacs that need to be synced
+	int start, finish, total, syncNum = 100, delim, startIDindex
+	string check
+	for(i=0; i<itemsinlist(instrIDs); i++)
+		check = stringfromlist(i, S.instrIDs) 
+		delim = strsearch(check,":",0)
+		start = str2num(check[delim+1, INF])
 		
-		if(WhichListItem(ID, S.daclistIDs) == -1)
-			S.fakeRampIDs += ID + ";"
+		if(i == 0)
+			check = stringfromlist(itemsinlist(instrIDs)-1, S.instrIDs)
+		else
+			check = stringfromlist(i-1, S.instrIDs)
 		endif
 		
+		delim = strsearch(check,":",0)
+		finish = str2num(check[delim+1, INF]) 
+		total = finish - start + 1
+		
+		if(total <= 0)
+			total += numDevices
+		endif
+		if(syncNum > total)
+			syncNum = total
+			startIDindex = i
+		endif
+		if(total == itemsinlist(instrIDs))
+			break
+		endif
+	endfor
+	
+	instrIDs = ""
+
+	for(i=0; i<syncNum; i++)
+		if(startIDindex + i >= numDevices - 1)
+			startIDindex -= numDevices - 1
+		endif
+		ID = stringfromlist(startIDindex + i,S.instrIDs)
+		instrIDs = AddListItem(ID, instrIDs, ";", Inf)	
+	endfor
+	
+	S.instrIDs = instrIDs //// should contain the final order and minimum amount of devices to be synced
+	
+	abort "checks PreScanChecksFD2"	
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	
+	
+	make /free /n = (numpnts(syncIDs)) ADCcounts
+	S.fakerecords = ""
+	for(i=0; i<itemsinlist(S.instrIDs); i++)
+		ID = stringFromList(i,S.instrIDs)	
 		for(j=0; j<itemsinlist(S.adcListIDs); j++)
 			string adcID = stringFromList(j,S.adcListIDs)
-			
 			if(!cmpstr(adcID,ID))
 				ADCcounts[i] += 1
 			endif	
 		endfor
 	endfor
-	S.ADCcounts = numwavetolist(ADCcounts)
+	
+	S.ADCcounts = numwavetolist(ADCcounts) // probably d not need this in scanvars
 	S.maxADCs = wavemax(ADCcounts)
 	
 	//scc_checkSameDeviceFD(S) 	// Checks DACs and ADCs are on same device
