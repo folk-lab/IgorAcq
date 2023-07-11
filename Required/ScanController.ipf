@@ -2900,7 +2900,7 @@ function PreScanChecksFD2(S, [x_only, y_only])
 	//S.instrIDs = textWavetolist(syncIDs)
 	instrIDs = textWavetolist(syncIDs)
 	S.instrIDs = ""
-	instrIDs = "fd;fd3;fd4;"  /// delete this, it should not be there, only for testing
+	instrIDs = "fd;fd3;fd4;"  /// delete this, it should not be there, only for testing // try 1,2,4 and 1, 4, maybe 2,4 as well or 1,3
 	
 	/// sorting all instrIDs by sc_fdackeys <- this implies the ordering of the fdac connections are important.
 	int numDevices = numberByKey("numDevices", sc_fdackeys, ":",",") + 2 ///delete the plus 2

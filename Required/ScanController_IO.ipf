@@ -1652,6 +1652,36 @@ function/s textWave2StrArray(w)
 end
 
 
+function/s get_values(string kwListStr, [int keys, string keydel, string listdel])
+	// given a kwListStr, will return only the values. If keys is specified,
+	// it will return the keys instead.
+	// inputs: 	kwListStr 	-> key - value pair string
+	// 			 	keys 			-> set to one to retrieve keys instead of values
+	// 			 	keydel 		-> specify key delimiter, default is ":"
+	//			 	listdel 		-> specify list delimiter, default is ";"
+	// example: 	get_values("A:1,B:4", keys = 1, listdel = ",") -> "A,B"
+	
+	keys		= paramisDefault(keys) ? 1 : 0
+	keydel		= selectString(paramIsDefault(keydel) ,  keydel, ":")
+	listdel	= selectString(paramIsDefault(listdel), listdel, ";")
+	
+	int i, delim
+	string kw, keysOrVals = ""
+	for(i=0; i<itemsinlist(kwListStr, listdel); i++)
+		kw = stringfromlist(i, kwlistStr, listdel)
+		delim = strsearch(kw,keydel,0)
+		if(!keys)
+			kw 				= kw[delim+1, INF]
+			keysOrVals	= addlistitem(kw, keysOrVals, listdel, INF)
+		else
+			kw 				= kw[0, delim-1]
+			keysOrVals	= addlistitem(kw, keysOrVals, listdel, INF)
+		endif	
+	endfor
+	
+	return keysOrVals
+end
+
 function/s TextWavetolist(w)
 	// returns an array and makes sure quotes and commas are parsed correctly.
 	// supports 1d and 2d arrays
