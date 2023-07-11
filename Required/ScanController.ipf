@@ -378,13 +378,9 @@ structure ScanVars
 	 string adcListIDs    	// Ids for adcList (under //specific to fastDAC comment)
 	 string dacListIDs    	// Ids for channelx (for now, not sure ill change this yet)
 	 variable maxADCs     	// should contain the number with the most ADCs being recorded // I dont use this 
-	 string fakeRecordIDs 	// IDs for fakeRecording
 	 string fakeRecords   	// ADC channels used for fakeRecording
 	 string ADCcounts		// ADCcounts to ensure theres equal amount of recordings between instruments
-	 string adcLists      	// adclist by id -> attempting to use stringbykey
-	 string adcListKeys	  	// keystring containing the fdIDs for the adcList
-	 string adcListFakes  	//	keystring containing the fdIDs for the adcs that are not recorded but are sent to the fastDac for sync purposes
-	 
+	 string adcLists      	// adclist by id -> attempting to use stringbykey	
 	 	
 		
 endstructure
@@ -2889,21 +2885,15 @@ function PreScanChecksFD2(S, [x_only, y_only])
 	string instrIDs
 	
 	///// Checks what devices need to be synced ////////////////////////////////////////////////////////////////////////////////////////
-	
-	// things to add -> ramping devices in between i.e. if you scan on fd1,fd3 (ramp and record), you would need to fakeramp/record fd2
-	// this assumes fd3 is not the last device and thus is not daisychained back to fd1. 
-	
 	S.dacListIDs = scc_checkDeviceNumber(S)
 	S.adcListIDs = scc_checkDeviceNumber(S, adc = 1)
 	wave /t IDs = listToTextWave(S.dacListIDs + S.adcListIDs, ";")
-	findDuplicates /free /rt = syncIDs IDs
-	//S.instrIDs = textWavetolist(syncIDs)
+	findDuplicates /z /free /rt = syncIDs IDs
 	instrIDs = textWavetolist(syncIDs)
 	S.instrIDs = ""
-	instrIDs = "fd3;fd;"  /// delete this, it should not be there, only for testing // try 1,2,4 and 1, 4, maybe 2,4 as well or 1,3
 	
 	/// sorting all instrIDs by sc_fdackeys <- this implies the ordering of the fdac connections are important.
-	int numDevices = numberByKey("numDevices", sc_fdackeys, ":",",") + 2 ///delete the plus 2
+	int numDevices = numberByKey("numDevices", sc_fdackeys, ":",",")
 	string ID
 	for(i=0; i < numDevices; i++)
 		ID = stringbykey("name" + num2str(i+1), sc_fdackeys, ":", ",") 
@@ -2914,7 +2904,7 @@ function PreScanChecksFD2(S, [x_only, y_only])
 	
 	// minimizing the amount of fdacs that need to be synced //
 	int start, finish, total, syncNum = 100, delim, startingInstrNum
-	string instrIDvals = get_values(S.instrIDs) 										// getting all the values from S.instrIDs
+	string instrIDvals = get_values(S.instrIDs) 						
 	for(i=0; i<itemsinlist(instrIDvals); i++)
 		start = str2num(stringfromlist(i, instrIDvals)) 
 		if(i == 0)
@@ -2945,16 +2935,16 @@ function PreScanChecksFD2(S, [x_only, y_only])
 		endif
 		ID = stringByKey("name" + num2str(startingInstrNum + i), sc_fdackeys,":",",")
 		//ID = stringfromlist(startIDindex + i,S.instrIDs) // it shouldn't be getting it from S.instrIDs, it should be from numdevices
-		instrIDs = AddListItem(ID, instrIDs, ";", Inf)	
+		instrIDs = AddListItem(ID, instrIDs, ";", Inf)	//replacenumberByKey(ID, instrIDs, startingInstrNum + i)
 	endfor
 	
-	S.instrIDs = instrIDs //// its not a keystring anymore, might be useful to keep it as one? need to change the orientation of master slave again
+	S.instrIDs = instrIDs //// final result containing fastDacs names not a keystring 
 	
-	abort "checks PreScanChecksFD2"	
+	
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	
 	
-	make /free /n = (numpnts(syncIDs)) ADCcounts
+	make /free /n = (itemsinlist(S.instrIDs)) ADCcounts
 	S.fakerecords = ""
 	for(i=0; i<itemsinlist(S.instrIDs); i++)
 		ID = stringFromList(i,S.instrIDs)	
@@ -2967,7 +2957,7 @@ function PreScanChecksFD2(S, [x_only, y_only])
 	endfor
 	
 	S.ADCcounts = numwavetolist(ADCcounts) // probably d not need this in scanvars
-	S.maxADCs = wavemax(ADCcounts)
+	S.maxADCs = wavemax(ADCcounts)			// finding the max amount of ADCs being recorded
 	
 	//scc_checkSameDeviceFD(S) 	// Checks DACs and ADCs are on same device
 	scc_checkRampratesFD(S)	 	// Check ramprates of x and y

@@ -75,7 +75,6 @@ function set_master_slave(S)
 	struct scanvars &S
 	int i, numfdacs = itemsinlist(S.instrIDs)
 	string check
-	
 	for(i = 0; i<numfdacs; i++)
 		string fdname = stringfromlist(i,S.instrIDs)
 		nvar fd = $(fdname)
@@ -85,7 +84,7 @@ function set_master_slave(S)
 				abort "unable to set independent mode on fastDAC:  " + fdname
 			endif
 			printf " %s   on %s \r\n", check, fdname
-		elseif(i == numfdacs-1 && numfdacs > 1) 									// sets last device to master if theres multiple devices
+		elseif(i == 0 && numfdacs > 1) 									// sets first device to master if theres multiple devices
 			check = queryInstr(fd, "SET_MODE,MASTER" + "\r\n")
 			if (cmpstr(check, "MASTER_SET\r\n"))
 				abort "unable to set independent mode on fastDAC:  " + fdname
@@ -1855,7 +1854,7 @@ function/s fd_start_sweep(S, [AWG_list])
 	scu_assertSeparatorType(S.ADCList, ";")
 	
 	if(S.sync)
-		nvar fdID = $(stringfromlist(itemsinlist(S.instrIDs)-1,S.instrIDs)) //last ID is master
+		nvar fdID = $(stringfromlist(0,S.instrIDs)) //first ID is master
 		string response = queryInstr(fdID, "ARM_SYNC\r\n")
 		print response
 		if(cmpstr(response,"SYNC_ARMED\r\n"))
@@ -1870,9 +1869,16 @@ function/s fd_start_sweep(S, [AWG_list])
 		endif
 	endif	
 	
-	for(i=0;i<itemsinlist(S.instrIDs);i++)
+	string fdIDname; S.adcLists = ""; S.fakeRecords = ""
 	
-		string fdIDname = stringfromlist(i,S.instrIDs)
+	for(i=0;i<itemsinlist(S.instrIDs);i++)
+		
+		if(i != itemsinlist(S.instrIDs) - 1)
+			fdIDname = stringfromlist(i+1,S.instrIDs)
+		else
+			fdIDname = stringfromlist(0,S.instrIDs)
+		endif
+		
 		nvar fdID = $fdIDname
 		string adcs = scu_getDeviceChannels(fdID, S.adclist, adc_flag=1)
 
@@ -1897,7 +1903,7 @@ function/s fd_start_sweep(S, [AWG_list])
 	
 		if(S.sync)
 			//checking the need for a fakeramp
-			S.adcLists = "" //trying a string by keys approach
+			
 			if(!cmpstr(dacs,"")) //&& whichlistitem(fdIDname, S.fakerampIDs) != -1) //two checks (redundant), but maybe only one is needed
 				///find global value of channel 0 in that ID, set it to start and fin, and dac = 0
 				string value = num2str(getfdacOutput(fdID,0, same_as_window = 0)) //this gave me the start and fins and dac
@@ -1909,23 +1915,19 @@ function/s fd_start_sweep(S, [AWG_list])
 			//checking the need for fake recordings
 			if(itemsInList(adcs) != S.maxADCs)				
 				int j = 0
-				S.fakeRecords = ""
-				S.fakeRecordIDs = ""
+				
 				do	
 					if(whichlistItem(num2str(j),adcs) == -1)
 						adcs = addListItem(num2str(j), adcs,";", INF)
-						S.fakeRecords = addlistitem(num2str(j), S.fakeRecords, ";", INF)
-						S.fakeRecordIDs = addlistitem(fdIDname, S.fakeRecordIDs, ";", INF)
+						S.fakeRecords = replaceStringByKey(fdIDname, S.fakeRecords, stringbykey(fdIDname, S.fakeRecords) + num2str(j))
+
 					endif
 					j++
 				while (itemsInList(adcs) != S.maxADCs)			
 			endif
 			
 			adcs = replacestring(";",adcs,"")
-			//adcLists += str2num(stringbykey(fdIDname,sc_fdackeys,":",","))
-			S.adcLists = addlistitem(fdIDname + ":" + adcs, S.adcLists, ";", INF) // might be better to have two, one before addition of fake channels to record and one after
-			//then by comparison it would make it easy to see the ordering of how the command is sent to the dac and which ones to toss/keep.
-			
+			S.adcLists = replacestringbykey(fdIDname, S.adcLists, adcs)
 			
 			sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, starts, fins, S.numptsx
 			// might need the channels picked for the fake recordings stored somewhere
