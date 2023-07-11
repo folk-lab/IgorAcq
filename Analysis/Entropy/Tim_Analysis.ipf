@@ -352,7 +352,7 @@ function Display2DWaterfall(w, [offset, x_label, y_label, plot_every_n, y_min, y
 	
 	makecolorful()
 	
-	
+	string wavename_2d_contour = ""
 	///// adding contour lines /////
 	variable count = 0
 	for(i = 0; i < num_repeats; i++)
@@ -364,11 +364,15 @@ function Display2DWaterfall(w, [offset, x_label, y_label, plot_every_n, y_min, y
 		endif
 		
    	
-   	if ( (mod(i, plot_every_n) == 0) && (i >= y_min) && (i < y_max) && (plot_contour == 1))
-   		wave_2d_contour[][i] = wave_2d_contour[p][i]*0 + wave_2d_contour[0][i] + offset_to_apply
+   	if ((mod(i, plot_every_n) == 0) && (i >= y_min) && (i < y_max) && (plot_contour == 1))
+   	
+//   		wave_2d_contour[][i] = wave_2d_contour[p][i]*0  + wave_2d_contour[0][i] + offset_to_apply
+   		wave_2d_contour[][i] = wave_2d[0][i]
    		AppendToGraph/W=$name wave_2d_contour[][i]
    		
-   		ModifyGraph rgb(wave_2d_contour) = (0,0,0)
+   		wavename_2d_contour = "wave_2d_contour#" + num2str(count)
+   		
+   		ModifyGraph rgb($wavename_2d_contour) = (30583,30583,30583), lstyle($wavename_2d_contour)=3, lsize($wavename_2d_contour)=0.1
    		
    		count += 1
    	endif
