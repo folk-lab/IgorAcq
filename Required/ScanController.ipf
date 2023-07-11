@@ -2900,7 +2900,7 @@ function PreScanChecksFD2(S, [x_only, y_only])
 	//S.instrIDs = textWavetolist(syncIDs)
 	instrIDs = textWavetolist(syncIDs)
 	S.instrIDs = ""
-	instrIDs = "fd;fd3;fd4;"  /// delete this, it should not be there, only for testing // try 1,2,4 and 1, 4, maybe 2,4 as well or 1,3
+	instrIDs = "fd3;fd;"  /// delete this, it should not be there, only for testing // try 1,2,4 and 1, 4, maybe 2,4 as well or 1,3
 	
 	/// sorting all instrIDs by sc_fdackeys <- this implies the ordering of the fdac connections are important.
 	int numDevices = numberByKey("numDevices", sc_fdackeys, ":",",") + 2 ///delete the plus 2
@@ -2912,22 +2912,17 @@ function PreScanChecksFD2(S, [x_only, y_only])
 		endif
 	endfor
 	
-	///minimizing the amount of fdacs that need to be synced
-	int start, finish, total, syncNum = 100, delim, startIDindex
-	string check
-	for(i=0; i<itemsinlist(instrIDs); i++)
-		check = stringfromlist(i, S.instrIDs) 
-		delim = strsearch(check,":",0)
-		start = str2num(check[delim+1, INF])
-		
+	// minimizing the amount of fdacs that need to be synced //
+	int start, finish, total, syncNum = 100, delim, startingInstrNum
+	string instrIDvals = get_values(S.instrIDs) 										// getting all the values from S.instrIDs
+	for(i=0; i<itemsinlist(instrIDvals); i++)
+		start = str2num(stringfromlist(i, instrIDvals)) 
 		if(i == 0)
-			check = stringfromlist(itemsinlist(instrIDs)-1, S.instrIDs)
+			finish = str2num(stringfromlist(itemsinlist(instrIDvals)-1, instrIDvals))
 		else
-			check = stringfromlist(i-1, S.instrIDs)
+			finish = str2num(stringfromlist(i-1, instrIDvals))
 		endif
 		
-		delim = strsearch(check,":",0)
-		finish = str2num(check[delim+1, INF]) 
 		total = finish - start + 1
 		
 		if(total <= 0)
@@ -2935,9 +2930,9 @@ function PreScanChecksFD2(S, [x_only, y_only])
 		endif
 		if(syncNum > total)
 			syncNum = total
-			startIDindex = i
+			startingInstrNum = str2num(stringfromlist(i,instrIDvals))
 		endif
-		if(total == itemsinlist(instrIDs))
+		if(total == itemsinlist(instrIDvals))
 			break
 		endif
 	endfor
@@ -2945,14 +2940,15 @@ function PreScanChecksFD2(S, [x_only, y_only])
 	instrIDs = ""
 
 	for(i=0; i<syncNum; i++)
-		if(startIDindex + i >= numDevices - 1)
-			startIDindex -= numDevices - 1
+		if(startingInstrNum + i > numDevices)
+			startingInstrNum -= numDevices
 		endif
-		ID = stringfromlist(startIDindex + i,S.instrIDs)
+		ID = stringByKey("name" + num2str(startingInstrNum + i), sc_fdackeys,":",",")
+		//ID = stringfromlist(startIDindex + i,S.instrIDs) // it shouldn't be getting it from S.instrIDs, it should be from numdevices
 		instrIDs = AddListItem(ID, instrIDs, ";", Inf)	
 	endfor
 	
-	S.instrIDs = instrIDs //// should contain the final order and minimum amount of devices to be synced
+	S.instrIDs = instrIDs //// its not a keystring anymore, might be useful to keep it as one? need to change the orientation of master slave again
 	
 	abort "checks PreScanChecksFD2"	
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

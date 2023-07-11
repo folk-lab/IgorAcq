@@ -1661,7 +1661,7 @@ function/s get_values(string kwListStr, [int keys, string keydel, string listdel
 	//			 	listdel 		-> specify list delimiter, default is ";"
 	// example: 	get_values("A:1,B:4", keys = 1, listdel = ",") -> "A,B"
 	
-	keys		= paramisDefault(keys) ? 1 : 0
+	keys		= paramisDefault(keys) ? 0 : 1
 	keydel		= selectString(paramIsDefault(keydel) ,  keydel, ":")
 	listdel	= selectString(paramIsDefault(listdel), listdel, ";")
 	
