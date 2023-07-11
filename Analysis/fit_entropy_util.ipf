@@ -4,9 +4,12 @@
 #include <Reduce Matrix Size>
 
 
-function center_demod(int filenum, int delay, int wavelen, [int average_repeats, int demodulate_on])
+function master_entropy_clean_average(int filenum, int delay, int wavelen, [int average_repeats, int demodulate_on, int apply_scaling, int forced_theta])
 	average_repeats = paramisdefault(average_repeats) ? 1 : average_repeats // assuming repeats to average into 1 trace
 	demodulate_on = paramisdefault(demodulate_on) ? 0 : demodulate_on // demodulate OFF is default
+	apply_scaling = paramisdefault(apply_scaling) ? 1 : apply_scaling // scaling ON is default
+	int forced_theta_on = paramisdefault(forced_theta) ? 0 : 1 // forcing theta OFF is default
+	
 	string raw_wavename = "dat" + num2str(filenum) + "cscurrent_2d";
 	
 	wave numerical_entropy
@@ -24,23 +27,27 @@ function center_demod(int filenum, int delay, int wavelen, [int average_repeats,
 	///// seperate out hot and cold (CREATES numerical_entropy) /////
 	wave cold, hot
 	sqw_analysis($raw_wavename, delay, wavelen)
+	
+	///// plot thetas from cold wave /////
+	string cold_wavename = "dat" + num2str(filenum) + "cscurrent_2d" + "_cold"
+	duplicate /o cold $cold_wavename
+	wave cold_wave = $cold_wavename
+	
+	master_ct_clean_average(cold_wave, 1, 0, "dat", average = 0)
+	
+	string cold_params_wavename = "dat" + num2str(filenum) + "_cs_fit_params"
+	wave cold_params_wave = $cold_params_wavename
+
+	duplicate/o/r=[][3] cold_params_wave cold_mids
+	
 		
 		
 	///// center and average /////
 	if (average_repeats == 1)
-		///// fit cold trace to centre transitions /////
-		string cold_wavename = "dat" + num2str(filenum) + "cscurrent_2d" + "_cold"
-		duplicate /o cold $cold_wavename
-		wave cold_wave = $cold_wavename
-		master_ct_clean_average(cold_wave, 1, 0, "dat", average = 0)
-		string cold_params_wavename = "dat" + num2str(filenum) + "_cs_fit_params"
-		wave cold_params_wave = $cold_params_wavename
-		duplicate/o/r=[][3] cold_params_wave mids
-
 
 		///// centre the 2d traces /////
-		centering(demodx_wave, "entropy_centered", mids) // centred plot and average plot
-		centering(numerical_entropy, "numerical_entropy_centered", mids) // centred plot and average plot
+		centering(demodx_wave, "entropy_centered", cold_mids) // centred plot and average plot
+		centering(numerical_entropy, "numerical_entropy_centered", cold_mids) // centred plot and average plot
 		
 		
 		///// average to a 1d trace /////
@@ -59,22 +66,63 @@ function center_demod(int filenum, int delay, int wavelen, [int average_repeats,
 	
 		
 		///// scale entropy /////
-		variable entropy_scaling_factor = calc_scaling(cold, hot, mids)
-		entropy_centered_avg_int *= entropy_scaling_factor;
-		numerical_entropy_centered_avg_int *= entropy_scaling_factor;
+		if (apply_scaling == 1)
+		
+			if (forced_theta_on == 1)
+				wave entropy_scaling_factor = calc_scaling(cold, hot, cold_mids, average_repeats = 1, forced_theta = forced_theta)
+			else
+				wave entropy_scaling_factor = calc_scaling(cold, hot, cold_mids, average_repeats = 1)
+			endif
+			
+			entropy_centered_avg_int *= entropy_scaling_factor[0]
+			numerical_entropy_centered_avg_int *= entropy_scaling_factor[0]
+		endif 
 		
 		
 		///// plot entropy graph /////
 		execute("graph_entropy_analysis()")
-	elseif (average_repeats == 0)
-		Integrate demodx_wave /D = entropy_centered_int;
-		Integrate numerical_entropy /D = numerical_entropy_centered_int;
-	
-		display; appendimage entropy_centered_int
-		ModifyImage entropy_centered_int ctab = {*, *, RedWhiteGreen, 0}
 		
-		display; appendimage numerical_entropy_centered_int
-		ModifyImage numerical_entropy_centered_int ctab = {*, *, RedWhiteGreen, 0}
+	elseif (average_repeats == 0)
+	
+		Integrate demodx_wave /D = entropy_int;
+		Integrate numerical_entropy /D = numerical_entropy_int;
+		
+		///// scale entropy /////
+		if (apply_scaling == 1)
+		
+			if (forced_theta_on == 1)
+				wave entropy_scaling_factor = calc_scaling(cold, hot, cold_mids, average_repeats = 0, forced_theta = forced_theta)
+			else
+				wave entropy_scaling_factor = calc_scaling(cold, hot, cold_mids, average_repeats = 0)
+			endif
+			
+			variable num_rows = dimsize(entropy_int, 1)
+			
+			offset_2d_traces(entropy_int)
+			offset_2d_traces(numerical_entropy_int)
+			
+			variable i
+			for (i=0; i < num_rows; i++)
+				entropy_int[][i] = entropy_int[p][i] * entropy_scaling_factor[i]
+				numerical_entropy_int[][i] = numerical_entropy_int[p][i] * entropy_scaling_factor[i]
+			endfor
+			
+			display; appendimage entropy_int
+			ModifyImage entropy_int ctab = {*, *, RedWhiteGreen, 0}
+		
+			display; appendimage numerical_entropy_int
+			ModifyImage numerical_entropy_int ctab = {*, *, RedWhiteGreen, 0}
+		
+		else
+			display; appendimage entropy_int
+			ModifyImage entropy_int ctab = {*, *, RedWhiteGreen, 0}
+		
+			display; appendimage numerical_entropy_int
+			ModifyImage numerical_entropy_int ctab = {*, *, RedWhiteGreen, 0}
+			
+		endif 
+	
+		
 	endif
 
 end
@@ -89,7 +137,6 @@ function offset_2d_traces(wave wav)
 	
 	variable i
 	for (i=0; i < num_rows; i++)
-//		duplicate /RMD=[][i] /o wav single_row
 		row_value = wav[0][i]
 		wav[][i] = wav[p][i] - (row_value - set_y_point)
 	endfor
@@ -141,46 +188,100 @@ function/wave sqw_analysis(wave wav, int delay, int wavelen)
 end
 
 
-function calc_scaling(wave cold, wave hot, wave mids)
+function/WAVE calc_scaling(wave cold, wave hot, wave mids, [int average_repeats, variable  forced_theta])
 	//first we need to center cold and hot wave
+	average_repeats = paramisdefault(average_repeats) ? 1 : average_repeats // averaging ON is default
+	int forced_theta_on = paramisdefault(forced_theta) ? 0 : 1 // forcing theta OFF is default
 	
-	wave cold_centr, hot_centr
-	centering(cold, "cold_centr", mids) // centred plot and average plot
-	centering(hot, "hot_centr", mids) // centred plot and average plot
 	
-	wave cold_centr_avg, hot_centr_avg
-	avg_wav(cold_centr)
-	avg_wav(hot_centr)
+	///// centering by the mids then averaging /////
+	if (average_repeats == 1)
+				
+		wave cold_centr, hot_centr
+		centering(cold, "cold_centr", mids) // centred plot and average plot
+		centering(hot, "hot_centr", mids) // centred plot and average plot
 
+		wave cold_centr_avg, hot_centr_avg
+		avg_wav(cold_centr)
+		avg_wav(hot_centr)
+		
+		wavetransform/o zapnans cold_centr_avg
+		wavetransform/o zapnans hot_centr_avg
+	endif
+	
 	wave W_coef
-	
-	wavetransform/o zapnans cold_centr_avg
-	wavetransform/o zapnans hot_centr_avg
-	
-	get_initial_params(cold_centr_avg)
-	
 	variable minx = 0
-	variable maxx = dimsize(cold_centr_avg, 0) - 1
-	
-	fit_transition(cold_centr_avg, minx, maxx)
-	duplicate/o W_coef, cold_params
-	
-	fit_transition(hot_centr_avg, minx, maxx)
-	duplicate/o W_coef, hot_params
-	    
-	execute("graph_hot_cold()")
+	variable maxx = dimsize(cold, 0) - 1
 	
 	
-	///// calculate scaling factor /////
-	variable Go = (cold_params[0] + hot_params[0])
-	variable dT = ((hot_params[2] - cold_params[2]))
-	variable factor = abs(1 / Go / dT)
+	variable num_rows
+	if (average_repeats == 1)
+		num_rows = 1
+		make /O /N=1, Gos
+		make /O /N=1, dTs
+		make /O /N=1, factors
+		wave Gos, dTs, factors
+		
+	else
+		num_rows = dimsize(cold, 1)
+		make /O /N=(num_rows), Gos
+		make /O /N=(num_rows), dTs
+		make /O /N=(num_rows), factors
+		wave Gos, dTs, factors
+	endif
 	
+	
+	variable i, Go, dT, factor
+	for (i = 0; i < num_rows; i++)
+	
+		if (average_repeats == 1)
+			get_initial_params(cold_centr_avg)
+			wave cold_single_trace = cold_centr_avg
+			wave hot_single_trace = hot_centr_avg
+		else
+			duplicate /RMD=[][i] /o cold cold_single_trace
+			wave cold_single_trace
+			
+			duplicate /RMD=[][i] /o hot hot_single_trace
+			wave hot_single_trace
+			
+			get_initial_params(cold_single_trace)
+		endif
+		
+		
+		///// fit cold and hot trace /////
+		fit_transition(cold_single_trace, minx, maxx)
+		duplicate/o W_coef, cold_params
+		
+		fit_transition(hot_single_trace, minx, maxx)
+		duplicate/o W_coef, hot_params
+		
+		///// calculate scaling factor /////
+		Go = (cold_params[0] + hot_params[0])
+		
+		if (forced_theta_on == 1)
+			dT = forced_theta
+		else
+			dT = ((hot_params[2] - cold_params[2]))
+		endif
+		
+		factor = abs(1 / Go / dT)
+		
+		Gos[i] = Go
+		dTs[i] = dT
+		factors[i] = factor
+		
+	endfor
+	
+//	if (average_repeats == 1)
+//		execute("graph_hot_cold(hot_single_trace, cold_single_trace, fit_hot_single_trace, fit_cold_single_trace)")
+//	endif
+//	
 	print "Go = " + num2str(Go)
 	print "dT = " + num2str(dT)
 	print "factor = " + num2str(factor)
 	
-	return factor
+	return factors
 end
 
 
@@ -208,14 +309,18 @@ Window graph_entropy_analysis() : Graph
 EndMacro
 
 
-Window graph_hot_cold() : Graph
+Window graph_hot_cold(wave hot_wave, wave cold_wave, wave fit_hot_wave, wave fit_cold_wave) : Graph
+	wave hot_wave
+	wave cold_wave
+	wave fit_hot_wave
+	wave fit_cold_wave
 	PauseUpdate; Silent 1		// building window...
 //	wave hot_centr_avg, cold_centr_avg, fit_cold_centr_avg, fit_hot_centr_avg
-	Display /W=(711, 55, 1470, 497) hot_centr_avg, cold_centr_avg, fit_cold_centr_avg, fit_hot_centr_avg
+	Display /W=(711, 55, 1470, 497) hot_wave, cold_wave, fit_hot_wave, fit_cold_wave
 	ModifyGraph lSize = 2
-	ModifyGraph lStyle(fit_cold_centr_avg) = 7, lStyle(fit_hot_centr_avg) = 7
-	ModifyGraph rgb(cold_centr_avg) = (0, 0, 65535), rgb(fit_cold_centr_avg) = (26214, 26214, 26214)
-	ModifyGraph rgb(fit_hot_centr_avg) = (26214, 26214, 26214)
+	ModifyGraph lStyle(fit_cold_wave) = 7, lStyle(fit_hot_wave) = 7
+	ModifyGraph rgb(cold_wave) = (0, 0, 65535), rgb(fit_cold_wave) = (26214, 26214, 26214)
+	ModifyGraph rgb(fit_hot_wave) = (26214, 26214, 26214)
 //	TextBox/C/N=CF_cold_centr_avg/X=6.14/Y=6.89 "Coefficient values ± one standard deviation\r\tAmp   \t= -0.049555 ± 6.43e-05\r\tConst \t= 0.88481 ± 2.42e-05"
 //	AppendText "\tTheta \t= 7.8717 ± 0.0313\r\tMid   \t= 0.15659 ± 0.0306\r\tLinear\t= 9.1999e-05 ± 5.6e-07"
 //	TextBox/C/N=CF_hot_centr_avg/X=6.46/Y=35.81 "Coefficient values ± one standard deviation\r\tAmp   \t= -0.049523 ± 7.25e-05\r\tConst \t= 0.88481 ± 2.47e-05"

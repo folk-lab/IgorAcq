@@ -6,6 +6,7 @@
 // I am not sure how well these work. But if they have use then I will put them in a more general .ipf (not just Tim) 
 // as we don't want to be duplicating functions. 
 
+#include <Peak AutoFind>
 
 
 
@@ -179,6 +180,7 @@ function/wave DiffWave(w, [numpts])
 	differentiate/DIM=0 tempwave	
 	return tempwave
 end
+
 
 function DisplayMultiple(datnums, name_of_wave, [diff, x_label, y_label])
 // Plots data from each dat on same axes... Will differentiate first if diff = 1
