@@ -14,6 +14,36 @@
 ///////// My Analysis ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+Function ApplyFakeWaterfall(graphName, dx, dy, hidden)      // e.g., ApplyFakeWaterfall("Graph0", 2, 100, 1)
+	//hidden= h
+	//h =0: Turns hidden line off.
+	//h =1: Uses painter's algorithm.
+	//h =2: True hidden.
+	//h =3: Hides lines with bottom removed.
+	//h =4: Hides lines using a different color for the bottom. When specified, the top color is the normal color for lines and the bottom color is set using ModifyGraph negRGB=(r,g,b).
+
+	String graphName    // Name of graph or "" for top graph
+	Variable dx, dy     // Used to offset traces to create waterfall effect
+	Variable hidden     // If true, apply hidden line removal
+	
+	String traceList = TraceNameList(graphName, ";", 1)
+	Variable numberOfTraces = ItemsInLIst(traceList)
+	
+	Variable traceNumber
+	for(traceNumber=0; traceNumber<numberOfTraces; traceNumber+=1)
+		String trace = StringFromList(traceNumber, traceList)
+		Variable offsetX = (numberOfTraces-traceNumber-1) * dx
+		Variable offsetY = (numberOfTraces-traceNumber-1) * dy
+		ModifyGraph/W=$graphName offset($trace)={offsetX,offsetY}
+		ModifyGraph/W=$graphName plusRGB($trace)=(65535,65535,65535)    // Fill color is white
+		if (hidden)
+			ModifyGraph/W=$graphName mode($trace)=7, hbFill($trace)=1       // Fill to zero, erase mode
+		else
+			ModifyGraph/W=$graphName mode($trace)=0                     // Lines between points
+		endif
+	endfor
+End
+
 
 /////////////////////////////// Noise Spectrum ///////////////////////
 
@@ -269,10 +299,19 @@ function DisplayWave(w, [x_label, y_label])
 end
 
 
-function Display2DWaterfall(w, [x_label, y_label])
+function Display2DWaterfall(w, [offset, x_label, y_label, plot_every_n, y_min, y_max, plot_contour])
 	wave w
+	variable offset
 	string x_label, y_label
+	int plot_every_n, y_min, y_max, plot_contour
+	
 	variable num_repeats = DimSize(w, 1)
+	int apply_offset = paramisdefault(offset) ? 0 : 1 // forcing theta OFF is default
+	plot_every_n = paramisdefault(plot_every_n) ? 1 : plot_every_n // plotting every trace is default
+	y_min = paramisdefault(y_min) ? 0 : y_min // y_min index 0 is default
+	y_max = paramisdefault(y_max) ? dimsize(w, 1) : y_max // y_max index 0 is default
+	plot_contour = paramisdefault(plot_contour) ? 0 : 1 // plotting contour OFF is default
+	
 	
 	x_label = selectstring(paramisdefault(x_label), x_label, "")
 	y_label = selectstring(paramisdefault(y_label), y_label, "")
@@ -284,19 +323,65 @@ function Display2DWaterfall(w, [x_label, y_label])
 	display/N=$name
 	TextBox/W=$name/C/N=textid/A=LT/X=1.00/Y=1.00/E=2 name
 	
-//	Legend/C/N=text0/J/A=M
+
+	variable offset_to_apply
+	duplicate  /o w wave_2d
+	wave wave_2d
+	
+	duplicate  /o w wave_2d_contour
+	wave wave_2d_contour
+	
 	
 	variable i
 	for(i = 0; i < num_repeats; i++)
-       AppendToGraph/W=$name w[][i]
+
+		if (apply_offset == 1)
+			offset_to_apply = i * offset
+		else
+			offset_to_apply = 0
+		endif
+		
+		wave_2d[][i] = wave_2d[p][i] + offset_to_apply
+		
+		
+		if ((mod(i, plot_every_n) == 0) && (i >= y_min) && (i < y_max))
+   		AppendToGraph/W=$name wave_2d[][i]
+   	endif
+   	
 	endfor
 	
-//   Legend/C/N=text0/J/A=MC "\\s(dat187current_2d) repeat 1\r\\s(dat187current_2d#1) repeat 2\r\\s(dat187current_2d#2) repeat 3\r\\s(dat187current_2d#3) repeat 4";DelayUpdate
-//   AppendText "\\s(dat187current_2d#4) repeat 5"
-	Label/W=$name left y_label
-	Label/W=$name bottom, x_label
-	
 	makecolorful()
+	
+	
+	///// adding contour lines /////
+	variable count = 0
+	for(i = 0; i < num_repeats; i++)
+
+		if (apply_offset == 1)
+			offset_to_apply = i * offset
+		else
+			offset_to_apply = 0
+		endif
+		
+   	
+   	if ( (mod(i, plot_every_n) == 0) && (i >= y_min) && (i < y_max) && (plot_contour == 1))
+   		wave_2d_contour[][i] = wave_2d_contour[p][i]*0 + wave_2d_contour[0][i] + offset_to_apply
+   		AppendToGraph/W=$name wave_2d_contour[][i]
+   		
+   		ModifyGraph rgb(wave_2d_contour) = (0,0,0)
+   		
+   		count += 1
+   	endif
+   	
+	endfor
+	
+	
+	
+
+	Label /W=$name left y_label
+	Label /W=$name bottom x_label
+	
+
 	
 end
 
