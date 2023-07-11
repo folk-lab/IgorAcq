@@ -552,8 +552,12 @@ function/wave Linspace(start, fin, num)
 	//		concatenate/np/o {w1, w2}, tempwave
 	//
 	variable start, fin, num
-	Make/N=2/O/Free linspace_start_end = {start, fin}
-	Interpolate2/T=1/N=(num)/Y=linspaced linspace_start_end
+	if (num == 1)
+		Make/N=1/O/Free linspaced = {start}
+	else
+		Make/N=2/O/Free linspace_start_end = {start, fin}
+		Interpolate2/T=1/N=(num)/Y=linspaced linspace_start_end
+	endif
 	return linspaced
 end
 
@@ -631,7 +635,7 @@ function make_virtual_entropy_corners(x_start, y_start, x_len, y_len, y_over_x, 
 		make /o/n=4 tempfullx = {x0, x1, x2, x3}
 		make /o/n=4 tempfully = {y0, y1, y2, y3}
 		AppendToGraph tempfully vs tempfullx
-		ModifyGraph mode(tempfully)=4, mrkThick(tempfully)=3, rgb(tempfully)=(0,65535,65535)
+		ModifyGraph mode(tempfully)=4, mrkThick(tempfully)=3, rgb(tempfully)=(0,65535,65535), lsize=2
 		
 	endif
 	
