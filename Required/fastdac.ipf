@@ -1951,7 +1951,7 @@ function/s fd_start_sweep(S, [AWG_list])
 			endif
 		endif
 		
-		writeInstr(fdID,cmd)
+		//writeInstr(fdID,cmd) skipping instrument writing
 	endfor
 	
 	return cmd

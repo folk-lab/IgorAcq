@@ -222,21 +222,32 @@ function/s scu_getChannelNumbers(channels, [fastdac])
 end
 
 
-function/s scu_getDeviceChannels(instrID, channels, [adc_flag])
+function/s scu_getDeviceChannels(instrID, channels, [adc_flag, reversal])
 	// Convert from absolute channel number to device specific channel number (i.e. channel 8 is probably fd2's channel 0)
-	//updated to skip the channels not belonging to instrID - 2023
 	
-	variable adc_flag, instrID  //adc_flag = 1 for ADC channels, = 0 for DAC channels
+	// 2023 update:
+	// skips the channels not belonging to instrID rather than aborting
+	// adding option to go from specific channel number to absolute channel number - reversal needs to be specified
+	
+	variable adc_flag, instrID, reversal  //adc_flag = 1 for ADC channels, = 0 for DAC channels
 	string channels
 
 	string channel_type = selectstring(paramIsDefault(adc_flag), "numADC", "numDAC")
+	reversal = paramIsDefault(reversal)? 0 : 1 
+	
 	variable num_channels = scf_getFDInfoFromID(instrID, channel_type)
 	string instrIDname, new_channels = "", sep = selectString(adc_flag, ",", ";")
 	variable real_channel_val, i
 	
+	
 	for (i = 0; i<itemsinlist(channels, sep); i++)
-		real_channel_val = str2num(stringfromList(i, channels, sep)) - scf_getChannelStartNum(instrID, adc=adc_flag)
-		if (real_channel_val < 0 || real_channel_val >= num_channels)
+		if(reversal)
+			real_channel_val = str2num(stringfromList(i, channels, sep)) + scf_getChannelStartNum(instrID, adc=adc_flag)
+		else
+			real_channel_val = str2num(stringfromList(i, channels, sep)) - scf_getChannelStartNum(instrID, adc=adc_flag)
+		endif
+		
+		if ((real_channel_val < 0 || real_channel_val >= num_channels) && !reversal)
 			// skip the channel essentially
 			continue
 			//printf "ERROR: Channels passed were [%s]. After subtracting the start value for the device for the %d item in list, this resulted in a real value of %d which is not valid\r", channels, i, real_channel_val
@@ -245,6 +256,7 @@ function/s scu_getDeviceChannels(instrID, channels, [adc_flag])
 			new_channels = addlistItem(num2str(real_channel_val), new_channels, sep, INF)
 		endif
 	endfor
+	
 	if (strlen(new_channels) > 0 && cmpstr(channels[strlen(channels)-1], sep) != 0) // remove trailing ; or , if it WASN'T present initially
 		new_channels = new_channels[0,strlen(new_channels)-2] 
 	endif
