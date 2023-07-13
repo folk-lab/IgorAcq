@@ -1200,18 +1200,18 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 
 		// 1D graphs
 		if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-			scg_setupGraph1D(openGraphID, x_label, y_label= selectstring(cmpstr(y_label_1d,""), wn, wn +" ("+y_label_1d +")"))
+			scg_setupGraph1D(openGraphID, x_label, y_label= selectstring(cmpstr(y_label_1d, ""), wn, wn +" (" + y_label_1d + ")"))
 			wn = StringFromList(i, wavenames) 
 		else
 			wn = StringFromList(i, wavenames)
 			
 	      	if (spectrum)
-	      		scg_open1Dgraph(wn, x_label, y_label=selectstring(cmpstr(y_label_1d,""), wn, wn +" ("+y_label_1d+")"))
+	      		scg_open1Dgraph(wn, x_label, y_label=selectstring(cmpstr(y_label_1d,""), wn, wn +" (" + y_label_1d + ")"))
 	      		openGraphID = winname(0,1)
 				string wn_powerspec = scfd_spectrum_analyzer($wn, mFreq, "pwrspec" + ADCnum)
-				scg_twosubplot(openGraphID, wn_powerspec, logy = 1, labelx = "Frequency (Hz)",labely ="pwr", append_wn = wn_powerspec + "int", append_labely = "cumul. pwr")
+				scg_twosubplot(openGraphID, wn_powerspec, logy = 1, labelx = "Frequency (Hz)", labely ="pwr", append_wn = wn_powerspec + "int", append_labely = "cumul. pwr")
 			else 
-	      		scg_open1Dgraph(wn, x_label, y_label=selectstring(cmpstr(y_label_1d,""), wn, wn +" ("+y_label_1d+")"),append_wn = append_wn)
+	      		scg_open1Dgraph(wn, x_label, y_label=selectstring(cmpstr(y_label_1d, ""), wn, wn + " (" + y_label_1d + ")"), append_wn = append_wn)
 	      		openGraphID = winname(0,1)			
 			endif 
 			
