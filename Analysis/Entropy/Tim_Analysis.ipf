@@ -10,6 +10,217 @@
 
 
 
+/////////////////// Line path integrals /////////////
+
+
+//////////////////////
+///// JOHANN NEW /////
+//////////////////////
+function interpolate_polyline(poly_y, poly_x, [num_points_to_interp])
+	// interpolate poly_y and poly_x to form evernly space poly_y_interp and poly_x_interp
+	// use graphWaveDraw to create rough set of points which creates the waves w_ypoly1 and w_xpoly1 e.g. interpolate_polyline(w_ypoly1, w_xpoly1)
+	wave poly_x, poly_y
+	int num_points_to_interp
+	num_points_to_interp = paramisdefault(num_points_to_interp) ? 1000 : num_points_to_interp
+	
+	variable num_vals = dimsize(poly_x, 0)
+	print poly_x[0], poly_x[num_vals - 1]
+	wave linspaced = linspace(poly_x[0], poly_x[num_vals - 1], num_points_to_interp, make_global = 1)
+	duplicate /o linspaced poly_x_interp
+	
+	Interpolate2 /T=1 /I=3 /Y=poly_y_interp/X=poly_x_interp poly_x, poly_y //linear interpolation
+	
+end
+
+
+function/WAVE  get_z_from_xy(wave_2d, y_wave, x_wave)
+	// return 1d wave where the y values are picked by the z value at each coordinate from y_wave and x_wave
+	wave wave_2d, y_wave, x_wave
+	
+	duplicate /o y_wave z_wave
+	wave z_wave
+	
+	variable num_vals = dimsize(y_wave, 0)
+	variable x_val, y_val, x_coord, y_coord
+	
+	variable i
+	for (i = 0; i < num_vals; i++)
+		x_val = x_wave[i]
+		y_val = y_wave[i]
+		
+		x_coord = scaletoindex(wave_2d, x_val, 0)
+		y_coord = scaletoindex(wave_2d, y_val, 1)
+		
+		z_wave[i] = wave_2d[x_coord][y_coord]
+		
+	endfor
+
+	
+	SetScale/I x x_wave[0], x_wave[inf], "", z_wave
+	
+	return z_wave
+end
+
+
+
+function get_multiple_line_paths(wave_2d, y_wave, x_wave, [width_y, width_x, num_traces])
+	wave wave_2d, y_wave, x_wave
+	variable width_y, width_x
+	int num_traces
+	
+	width_y = paramisdefault(width_y) ? 10 : width_y
+	width_x = paramisdefault(width_y) ? 0 : width_x
+	num_traces = paramisdefault(width_y) ? 10 : num_traces
+	
+	///// create empty 2d wave to store multiple rows of the line paths
+	variable num_vals = dimsize(y_wave, 0)
+	make /o/n=(num_vals, num_traces) line_path_2d_z
+	make /o/n=(num_vals, num_traces) line_path_2d_y
+	make /o/n=(num_vals, num_traces) line_path_2d_x
+	
+	
+	///// calculate delta y to pull off each of the line paths
+	variable delta_y = (width_y*2) / num_traces
+	duplicate /o y_wave y_wave_offset
+	y_wave_offset[] = y_wave[p] - width_y
+	wave y_wave_offset
+	
+	///// calculate delta c to pull off each of the line paths
+	variable delta_x = (width_x*2) / num_traces
+	duplicate /o x_wave x_wave_offset
+	x_wave_offset[] = x_wave[p] - width_x
+	wave x_wave_offset
+	
+	
+	variable i, offset
+	for (i = 0; i < num_traces; i++)
+	
+		///// calculate the new y_wave_offset and x_wave_offset
+		y_wave_offset[] = y_wave_offset[p] + delta_y
+		x_wave_offset[] = x_wave_offset[p] + delta_x
+		
+		wave z_wave = get_z_from_xy(wave_2d, y_wave_offset, x_wave_offset)
+		
+		line_path_2d_z[][i] = z_wave[p]
+		line_path_2d_y[][i] = y_wave_offset[p]
+		line_path_2d_x[][i] = x_wave_offset[p]
+	
+	endfor
+end
+
+
+function plot_multiple_line_paths(wave_2d, y_wave, x_wave, [width_y, width_x, num_traces])
+	wave wave_2d, y_wave, x_wave
+	variable width_y, width_x
+	int num_traces
+	
+	width_y = paramisdefault(width_y) ? 10 : width_y
+	width_x = paramisdefault(width_y) ? 0 : width_x
+	num_traces = paramisdefault(width_y) ? 10 : num_traces
+	
+	get_multiple_line_paths(wave_2d, y_wave, x_wave, width_y = width_y, width_x = width_x, num_traces = num_traces)
+	
+	wave line_path_2d_z
+	
+	Display2DWaterfall(line_path_2d_z, offset = 0.001, plot_every_n=1, plot_contour=1)
+end
+
+
+
+function get_multiple_line_paths_int(wave_2d, y_wave, x_wave, [width_y, width_x, num_traces])
+	wave wave_2d, y_wave, x_wave
+	variable width_y, width_x
+	int num_traces
+	
+	width_y = paramisdefault(width_y) ? 10 : width_y
+	width_x = paramisdefault(width_y) ? 0 : width_x
+	num_traces = paramisdefault(width_y) ? 10 : num_traces
+	
+	string wave_name = nameofwave(wave_2d)
+	
+	get_multiple_line_paths(wave_2d, y_wave, x_wave, width_y = width_y, width_x = width_x, num_traces = num_traces)
+	
+	wave line_path_2d_z, line_path_2d_y, line_path_2d_x
+	
+	///// display original 2d image with each trace
+	string window_name = "line_path_traces"
+	dowindow/k window_name
+	display/N=window_name
+	appendimage /W=window_name wave_2d
+	ModifyImage /W=window_name $wave_name ctab= {-0.005, 0.005, RedWhiteGreen, 0}
+	variable num_columns = dimsize(line_path_2d_y, 1)
+	variable i
+	for (i = 0; i < num_columns; i++)
+		appendtograph /W=window_name line_path_2d_y[][i] vs line_path_2d_x[][i]
+	endfor
+	
+	
+	///// integrate line paths and remove y offset
+	Integrate line_path_2d_z /D = line_path_2d_z_int
+	
+	offset_2d_traces(line_path_2d_z_int)
+	
+	// display integrated line traces
+	display; appendimage line_path_2d_z_int
+	ModifyImage line_path_2d_z_int ctab= {*,*,RedWhiteGreen,0}	
+end
+
+
+//
+//
+//function interpolate_nrg_narrow(variable musmax, variable musmin)
+//	wave gammas_narrow_interp = g_n_narrow
+//	wave mus_narrow_interp = mu_n_narrow
+//	
+//	wave dndt_narrow_interp = dndt_n_narrow
+//	wave cond_narrow_interp = cond_n_narrow
+//	wave occ_narrow_interp = occ_n_narrow
+//	
+//	wave dndt_narrow_raw = dndt_narrow
+//	wave cond_narrow_raw = conductance_narrow
+//	wave occ_narrow_raw = occupation_narrow
+//
+//	
+//	variable gammamax, gammamin
+//	
+//	///// NEW /////
+//	wave mu_n_wide
+////	wavestats /q mu_n_wide
+////	musmax = v_max
+////	musmin = v_min
+//	///// /////
+//	SetScale/I x musmin, musmax, "", cond_narrow_interp, dndt_narrow_interp, occ_narrow_interp
+//	
+//	wavestats /q gammas_narrow_interp
+//	gammamax = v_max
+//	gammamin = v_min
+//	SetScale/I y gammamin, gammamax, "", cond_narrow_interp, dndt_narrow_interp, occ_narrow_interp
+//	
+//	make /o/n=(dimsize(mus_narrow_interp, 0)) datx, daty
+//	make /o/n=(dimsize(dndt_narrow_interp, 0)) interpwv
+//	SetScale/I x musmin, musmax, "", interpwv
+//	
+//	variable i
+//	for(i=0;i<dimsize(mus_narrow_interp, 1); i++)
+//		datx[] = mus_narrow_interp[p][i]
+//		daty[] = dndt_narrow_raw[p][i]
+//		Interpolate2/T=1/E=2/Y=interpwv/I=3 datx,daty //linear interpolation
+//		dndt_narrow_interp[][i] = interpwv[p]
+//		
+//		daty[] = cond_narrow_raw[p][i]
+//		Interpolate2/T=1/E=2/Y=interpwv/I=3 datx,daty //linear interpolation
+//		wavestats /q interpwv
+//		cond_narrow_interp[][i] = interpwv[p]/v_max
+//		
+//		daty[] = occ_narrow_raw[p][i]
+//		Interpolate2/T=1/E=2/Y=interpwv/I=3 datx,daty //linear interpolation
+//		occ_narrow_interp[][i] = interpwv[p]
+//	endfor
+//end
+
+
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////// My Analysis ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

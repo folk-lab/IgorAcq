@@ -534,7 +534,7 @@ end
 
 
 
-function/wave Linspace(start, fin, num)
+function/wave Linspace(start, fin, num, [make_global])
 	// An Igor substitute for np.linspace() (obviously with many caveats and drawbacks since it is in Igor...)
 	//
 	// To use this in command line:
@@ -552,10 +552,21 @@ function/wave Linspace(start, fin, num)
 	//		concatenate/np/o {w1, w2}, tempwave
 	//
 	variable start, fin, num
+	int make_global
+	make_global = paramisdefault(make_global) ? 0 : make_global  // default to not make global wave
+	
 	if (num == 1)
-		Make/N=1/O/Free linspaced = {start}
+		if (make_global == 1)
+			Make/N=1/O linspaced = {start}
+		else
+			Make/N=1/O/Free linspaced = {start}
+		endif
 	else
-		Make/N=2/O/Free linspace_start_end = {start, fin}
+		if (make_global == 1)
+			Make/N=2/O linspace_start_end = {start, fin}
+		else
+			Make/N=2/O/Free linspace_start_end = {start, fin}
+		endif
 		Interpolate2/T=1/N=(num)/Y=linspaced linspace_start_end
 	endif
 	return linspaced
