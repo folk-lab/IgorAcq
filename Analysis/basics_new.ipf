@@ -487,17 +487,30 @@ function spectrum_analyzer(wave data, variable samp_freq)
 
 	variable i=0
 	rowslice(spectrum,i)
-		DSPPeriodogram/R=[1,(new_numptsx)] /DB/NODC=1/DEST=W_Periodogram slice
+		DSPPeriodogram/R=[1,(new_numptsx)] /PARS/NODC=2/DEST=W_Periodogram slice
 	duplicate/o w_Periodogram, powerspec
 	i=1
 	do
 		rowslice(spectrum,i)
-		DSPPeriodogram/R=[1,(new_numptsx)]/DB/NODC=1/DEST=W_Periodogram slice
+		DSPPeriodogram/R=[1,(new_numptsx)]/PARS/NODC=2/DEST=W_Periodogram slice
 		powerspec=powerspec+W_periodogram
 		i=i+1
 	while(i<dimsize(spectrum,1))
 //	powerspec[0]=nan
+
+	duplicate /o powerspec powerspec_int
+	wave powerspec_int
+	integrate powerspec_int
+	
 	display powerspec; // SetAxis bottom 0,500
+	appendtoGraph /r=l2 powerspec_int
+	ModifyGraph freePos(l2)={inf,bottom}
+	ModifyGraph rgb(powerspec_int)=(0,0,0)
+	ModifyGraph log(left)=1
+	
+	Label left "nA^2/Hz"
+	Label l2 "integrated nA^2/Hz"
+	
 
 end
 
