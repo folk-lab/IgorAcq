@@ -655,6 +655,154 @@ function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
 end
 
 
+function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, duration, rampratex, delayx, starty, finy, channelsy, numptsy, rampratey, delayy, startxs, finxs, startys, finys, x_label, y_label, alternate,  interlaced_channels, interlaced_setpoints, comments])
+    // Function to make setting up scanVars struct easier for FastDAC scans
+    // PARAMETERS:
+    // startx, finx, starty, finy -- Single start/fin point for all channelsx/channelsy
+    // startxs, finxs, startys, finys -- For passing in multiple start/fin points for each channel as a comma separated string instead of a single start/fin for all channels
+    //		Note: Just pass anything for startx/finx if using startxs/finxs, they will be overwritten
+    struct ScanVars &S
+    variable startx, finx, numptsx, delayx, rampratex
+    variable starty, finy, numptsy, delayy, rampratey
+	variable sweeprate  // If start != fin numpts will be calculated based on sweeprate
+	variable duration   // numpts will be caluculated to achieve duration
+    variable alternate
+    string channelsx, channelsy
+    string startxs, finxs, startys, finys
+    string  x_label, y_label
+    string interlaced_channels, interlaced_setpoints
+    string comments
+	
+	// Ensure optional strings aren't null
+	channelsy = selectString(paramIsDefault(channelsy), channelsy, "")
+	startys = selectString(paramIsDefault(startys), startys, "")
+	finys = selectString(paramIsDefault(finys), finys, "")
+	y_label = selectString(paramIsDefault(y_label), y_label, "")	
+
+	channelsx = selectString(paramIsDefault(channelsx), channelsx, "")
+	startxs = selectString(paramIsDefault(startxs), startxs, "")
+	finxs = selectString(paramIsDefault(finxs), finxs, "")
+	x_label = selectString(paramIsDefault(x_label), x_label, "")
+	
+	interlaced_channels = selectString(paramisdefault(interlaced_channels), interlaced_channels, "")
+	interlaced_setpoints = selectString(paramisdefault(interlaced_setpoints), interlaced_setpoints, "")
+
+	comments = selectString(paramIsDefault(comments), comments, "")
+
+
+	// Standard initialization
+	initScanVars(S, startx=startx, finx=finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, starty=starty, finy=finy, channelsy=channelsy, numptsy=numptsy, rampratey=rampratey, delayy=delayy, \
+	x_label=x_label, y_label=y_label, startxs=startxs, finxs=finxs, startys=startys, finys=finys, alternate=alternate, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments)
+	
+	
+	// Additional intialization for fastDAC scans
+	S.sweeprate = sweeprate
+	S.duration = duration
+    S.adcList = scf_getRecordedFADCinfo("channels")
+    S.using_fastdac = 1
+
+   	// Sets channelsx, channelsy to be lists of channel numbers instead of labels
+    scv_setChannels(S, channelsx, channelsy, fastdac=1)
+    
+   	// Get Labels for graphs
+   	S.x_label = selectString(strlen(x_label) > 0, scu_getDacLabel(S.channelsx, fastdac=1), x_label)  // Uses channels as list of numbers, and only if x_label not passed in
+   	if (S.is2d)
+   		S.y_label = selectString(strlen(y_label) > 0, scu_getDacLabel(S.channelsy, fastdac=1), y_label) 
+   	else
+   		S.y_label = y_label
+   	endif  		
+
+   	// Sets starts/fins (either using starts/fins given or from single startx/finx given)
+    scv_setSetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
+
+	
+	
+	///// checks what devices need to be synced /////////////////////// master/slave implementation //////////////////////////////
+	
+	string instrIDs; svar sc_fdackeys; int i, j
+	
+	S.dacListIDs = scc_checkDeviceNumber(S)
+	S.adcListIDs = scc_checkDeviceNumber(S, adc = 1)
+	wave /t IDs = listToTextWave(S.dacListIDs + S.adcListIDs, ";")
+	findDuplicates /z /free /rt = syncIDs IDs
+	instrIDs = textWavetolist(syncIDs)
+	S.instrIDs = ""
+	
+	/// sorting all instrIDs by sc_fdackeys <- this implies the ordering of the fdac connections are important.
+	int numDevices = numberByKey("numDevices", sc_fdackeys, ":",",")
+	string ID
+	for(i=0; i < numDevices; i++)
+		ID = stringbykey("name" + num2str(i+1), sc_fdackeys, ":", ",") 
+		if(whichlistitem(ID, instrIDs) != -1)
+			S.instrIDs = replacenumberByKey(ID, S.instrIDs, i+1)
+		endif
+	endfor
+	
+	// minimizing the amount of fdacs that need to be synced //
+	int start, finish, total, syncNum = 100, delim, startingInstrNum
+	string instrIDvals = get_values(S.instrIDs) 						
+	for(i=0; i<itemsinlist(instrIDvals); i++)
+		start = str2num(stringfromlist(i, instrIDvals)) 
+		if(i == 0)
+			finish = str2num(stringfromlist(itemsinlist(instrIDvals)-1, instrIDvals))
+		else
+			finish = str2num(stringfromlist(i-1, instrIDvals))
+		endif
+		
+		total = finish - start + 1
+		
+		if(total <= 0)
+			total += numDevices
+		endif
+		if(syncNum > total)
+			syncNum = total
+			startingInstrNum = str2num(stringfromlist(i,instrIDvals))
+		endif
+		if(total == itemsinlist(instrIDvals))
+			break
+		endif
+	endfor
+	
+	instrIDs = ""
+
+	for(i=0; i<syncNum; i++)
+		if(startingInstrNum + i > numDevices)
+			startingInstrNum -= numDevices
+		endif
+		ID = stringByKey("name" + num2str(startingInstrNum + i), sc_fdackeys,":",",")
+		//ID = stringfromlist(startIDindex + i,S.instrIDs) // it shouldn't be getting it from S.instrIDs, it should be from numdevices
+		instrIDs = AddListItem(ID, instrIDs, ";", Inf)	//replacenumberByKey(ID, instrIDs, startingInstrNum + i)
+	endfor
+	
+	S.instrIDs = instrIDs //// final result containing fastDacs names not a keystring 
+	
+	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	
+	
+	make /free /n = (itemsinlist(S.instrIDs)) ADCcounts
+	S.fakerecords = ""
+	for(i=0; i<itemsinlist(S.instrIDs); i++)
+		ID = stringFromList(i,S.instrIDs)	
+		for(j=0; j<itemsinlist(S.adcListIDs); j++)
+			string adcID = stringFromList(j,S.adcListIDs)
+			if(!cmpstr(adcID,ID))
+				ADCcounts[i] += 1
+			endif	
+		endfor
+	endfor
+	
+	S.ADCcounts = numwavetolist(ADCcounts) // probably d not need this in scanvars
+	S.maxADCs = wavemax(ADCcounts)			// finding the max amount of ADCs being recorded
+	
+	
+	// Set variables with some calculation
+    scv_setFreq(S) 		// Sets S.samplingFreq/measureFreq/numADCs	
+    scv_setNumptsSweeprateDuration(S) 	// Checks that either numpts OR sweeprate OR duration was provided, and sets ScanVars accordingly
+                                // Note: Valid for start/fin only (uses S.startx, S.finx NOT S.startxs, S.finxs)
+end
+
+
+
 function initScanVarsBD(S, instrID, startx, finx, [channelsx, numptsx, delayx, rampratex, starty, finy, channelsy, numptsy, rampratey, delayy, startxs, finxs, startys, finys, x_label, y_label, alternate, comments])
     // Function to make setting up scanVars struct easier for BabyDAC scans
     // PARAMETERS:
@@ -745,6 +893,28 @@ function scv_setFreq(S)
    S.samplingFreq = getfadcSpeed(S.instrIDx)
    S.numADCs = scf_getNumRecordedADCs()
    S.measureFreq = S.samplingFreq/S.numADCs  //Because sampling is split between number of ADCs being read //TODO: This needs to be adapted for multiple FastDacs
+end
+
+function scv_setFreq2(S)
+	// Set S.samplingFreq, S.numADCs, S.measureFreq //changing it to account for masterslave
+	Struct ScanVars &S
+	int i
+	for(i=0; i<itemsInList(S.instrIDs); i++)
+		string fdIDname = stringfromlist(i,S.instrIDs)
+		nvar fdID = $fdIDname
+		variable check_speed = getfadcSpeed(fdID)
+		if(i==0)
+			variable old_check = getfadcSpeed(fdID)
+		endif
+		if(check_speed != old_check)
+			abort "please set " + S.instrIDs + "to the same speed"
+		endif
+		
+		if(i==itemsInList(S.instrIDs)-1)
+			   S.samplingFreq = check_speed
+   				S.measureFreq = S.samplingFreq/S.maxADCs
+		endif
+	endfor
 end
 
 

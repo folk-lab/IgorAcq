@@ -465,7 +465,7 @@ function ScanFastDAC2(instrID, start, fin, channels, [numptsx, sweeprate, delay,
 	// Set sc_ScanVars struct // scanvars might need a whole rewrite
 	
 	struct ScanVars S
-	initScanVarsFD(S, instrID, start, fin, channelsx=channels, numptsx=numptsx, rampratex=ramprate, starty=1, finy=repeats, delayy=delay, sweeprate=sweeprate,  \
+	initScanVarsFD2(S, start, fin, channelsx=channels, numptsx=numptsx, rampratex=ramprate, starty=1, finy=repeats, delayy=delay, sweeprate=sweeprate,  \
 					numptsy=repeats, startxs=starts, finxs=fins, x_label=x_label, y_label=y_label, alternate=alternate, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments)
 
    //	S.finy = S.starty+S.numptsy  // Repeats
