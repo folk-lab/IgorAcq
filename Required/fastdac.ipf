@@ -1980,7 +1980,7 @@ function fd_readChunk(fdid, adc_channels, numpts, [fdIDname])
 
 	Struct ScanVars S
 	S.numptsx = numpts
-	S.instrIDx = fdid					// prolly not used 
+	S.instrIDx = fdid
 	S.readVsTime = 1  					// No ramping
 	S.adcList = adc_channels  		// Recording specified channels, not ticked boxes in ScanController_Fastdac
 	S.numADCs = itemsInList(S.adcList) // gives me an error if i leave this out

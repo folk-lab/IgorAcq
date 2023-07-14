@@ -425,11 +425,11 @@ function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, 
 end
 
 
-function ScanFastDAC2(start, fin, channels, [numptsx, sweeprate, delay, ramprate, repeats, alternate, starts, fins, x_label, y_label, comments, nosave, use_awg, interlaced_channels, interlaced_setpoints])
+function ScanFastDAC2(instrID, start, fin, channels, [numptsx, sweeprate, delay, ramprate, repeats, alternate, starts, fins, x_label, y_label, comments, nosave, use_awg, interlaced_channels, interlaced_setpoints])
 	// 1D repeat scan for FastDAC
 	// Note: to alternate scan direction set alternate=1
 	// Note: Ramprate is only for ramping gates between scans
-	variable start, fin, repeats, numptsx, sweeprate, delay, ramprate, alternate, nosave, use_awg
+	variable instrID, start, fin, repeats, numptsx, sweeprate, delay, ramprate, alternate, nosave, use_awg
 	string channels, x_label, y_label, comments, starts, fins, interlaced_channels, interlaced_setpoints
 	variable j=0
 	nvar sc_Saverawfadc
@@ -492,10 +492,8 @@ function ScanFastDAC2(start, fin, channels, [numptsx, sweeprate, delay, ramprate
 
 	//abort "Hard Coded Abort: still in testing phase"
 	// Let gates settle
-	
-	
-	sc_sleep(S.delayy) // might not be a good idea
-	
+	sc_sleep(S.delayy)
+
 	// Init Scan
 	initializeScan(S, y_label = y_label)
 		
