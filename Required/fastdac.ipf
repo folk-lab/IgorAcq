@@ -78,26 +78,25 @@ function set_master_slave(S)
 	for(i = 0; i<numfdacs; i++)
 		string fdname = stringfromlist(i,S.instrIDs)
 		nvar fd = $(fdname)
-		clearFdacBuffer(fd)
 		if(i == 0 && numfdacs == 1) 													// sets independent if theres only one device
 			check = queryInstr(fd, "SET_MODE,INDEP" + "\r\n")
 			if (cmpstr(check, "INDEP_SET\r\n"))
 				abort "unable to set independent mode on fastDAC:  " + fdname
 			endif
-			//printf " %s   on %s \r\n", check, fdname
+			printf " %s   on %s \r\n", check, fdname
 		elseif(i == 0 && numfdacs > 1) 									// sets first device to master if theres multiple devices
 			check = queryInstr(fd, "SET_MODE,MASTER" + "\r\n")
 			if (cmpstr(check, "MASTER_SET\r\n"))
 				abort "unable to set independent mode on fastDAC:  " + fdname
 			endif
-			//printf " %s   on %s\r\n", check, fdname
+			printf " %s   on %s\r\n", check, fdname
 			S.sync = 1																	// Showing sync will be used  
 		else																				// sets the remainder of devices to slaves
 			check = queryInstr(fd, "SET_MODE,SLAVE" + "\r\n")
 			if (cmpstr(check, "SLAVE_SET\r\n"))
 				abort "unable to set independent mode on fastDAC:  " + fdname
 			endif
-			//printf " %s   on %s\r\n", check, fdname 
+			printf " %s   on %s\r\n", check, fdname 
 		endif
 	endfor
 end
@@ -116,8 +115,8 @@ function set_indep()
 		check = queryInstr(fd, "SET_MODE,INDEP" + "\r\n")                   // sets all to independent
 		if (cmpstr(check, "INDEP_SET\r\n"))
 			abort "unable to set independent mode on fastDAC:  " + fdname
-		//else
-			//printf " %s   on %s \r\n", check, fdname
+		else
+			printf " %s   on %s \r\n", check, fdname
 		endif 
 	endfor
 
