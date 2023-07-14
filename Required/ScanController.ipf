@@ -796,7 +796,7 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
 	
 	
 	// Set variables with some calculation
-    scv_setFreq(S) 		// Sets S.samplingFreq/measureFreq/numADCs	
+    scv_setFreq2(S) 		// Sets S.samplingFreq/measureFreq/numADCs	
     scv_setNumptsSweeprateDuration(S) 	// Checks that either numpts OR sweeprate OR duration was provided, and sets ScanVars accordingly
                                 // Note: Valid for start/fin only (uses S.startx, S.finx NOT S.startxs, S.finxs)
 end
@@ -907,7 +907,7 @@ function scv_setFreq2(S)
 			variable old_check = getfadcSpeed(fdID)
 		endif
 		if(check_speed != old_check)
-			abort "please set " + S.instrIDs + "to the same speed"
+			abort "please set " + ReplaceString(";", S.instrIDs, " ") + "to the same speed"
 		endif
 		
 		if(i==itemsInList(S.instrIDs)-1)
@@ -3062,84 +3062,6 @@ end
 function PreScanChecksFD2(S, [x_only, y_only])
    struct ScanVars &S
    variable x_only, y_only  // Whether to only check specific axis (e.g. if other axis is a babydac or something else)
-	int i, j
-	svar sc_fdackeys
-	string instrIDs
-	
-	///// Checks what devices need to be synced ////////////////////////////////////////////////////////////////////////////////////////
-	S.dacListIDs = scc_checkDeviceNumber(S)
-	S.adcListIDs = scc_checkDeviceNumber(S, adc = 1)
-	wave /t IDs = listToTextWave(S.dacListIDs + S.adcListIDs, ";")
-	findDuplicates /z /free /rt = syncIDs IDs
-	instrIDs = textWavetolist(syncIDs)
-	S.instrIDs = ""
-	
-	/// sorting all instrIDs by sc_fdackeys <- this implies the ordering of the fdac connections are important.
-	int numDevices = numberByKey("numDevices", sc_fdackeys, ":",",")
-	string ID
-	for(i=0; i < numDevices; i++)
-		ID = stringbykey("name" + num2str(i+1), sc_fdackeys, ":", ",") 
-		if(whichlistitem(ID, instrIDs) != -1)
-			S.instrIDs = replacenumberByKey(ID, S.instrIDs, i+1)
-		endif
-	endfor
-	
-	// minimizing the amount of fdacs that need to be synced //
-	int start, finish, total, syncNum = 100, delim, startingInstrNum
-	string instrIDvals = get_values(S.instrIDs) 						
-	for(i=0; i<itemsinlist(instrIDvals); i++)
-		start = str2num(stringfromlist(i, instrIDvals)) 
-		if(i == 0)
-			finish = str2num(stringfromlist(itemsinlist(instrIDvals)-1, instrIDvals))
-		else
-			finish = str2num(stringfromlist(i-1, instrIDvals))
-		endif
-		
-		total = finish - start + 1
-		
-		if(total <= 0)
-			total += numDevices
-		endif
-		if(syncNum > total)
-			syncNum = total
-			startingInstrNum = str2num(stringfromlist(i,instrIDvals))
-		endif
-		if(total == itemsinlist(instrIDvals))
-			break
-		endif
-	endfor
-	
-	instrIDs = ""
-
-	for(i=0; i<syncNum; i++)
-		if(startingInstrNum + i > numDevices)
-			startingInstrNum -= numDevices
-		endif
-		ID = stringByKey("name" + num2str(startingInstrNum + i), sc_fdackeys,":",",")
-		//ID = stringfromlist(startIDindex + i,S.instrIDs) // it shouldn't be getting it from S.instrIDs, it should be from numdevices
-		instrIDs = AddListItem(ID, instrIDs, ";", Inf)	//replacenumberByKey(ID, instrIDs, startingInstrNum + i)
-	endfor
-	
-	S.instrIDs = instrIDs //// final result containing fastDacs names not a keystring 
-	
-	
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	
-	
-	make /free /n = (itemsinlist(S.instrIDs)) ADCcounts
-	S.fakerecords = ""
-	for(i=0; i<itemsinlist(S.instrIDs); i++)
-		ID = stringFromList(i,S.instrIDs)	
-		for(j=0; j<itemsinlist(S.adcListIDs); j++)
-			string adcID = stringFromList(j,S.adcListIDs)
-			if(!cmpstr(adcID,ID))
-				ADCcounts[i] += 1
-			endif	
-		endfor
-	endfor
-	
-	S.ADCcounts = numwavetolist(ADCcounts) // probably d not need this in scanvars
-	S.maxADCs = wavemax(ADCcounts)			// finding the max amount of ADCs being recorded
 	
 	//scc_checkSameDeviceFD(S) 	// Checks DACs and ADCs are on same device
 	scc_checkRampratesFD(S)	 	// Check ramprates of x and y
@@ -3219,12 +3141,9 @@ function RampStartFD(S, [ignore_lims, x_only, y_only])
 			else
 				abort "ERROR[RampStartFD]: S.direction not set to 1 or -1"
 			endif
-			if(S.sync)
-				nvar fdID = $(stringfromlist(i,S.daclistIDs))
-				rampMultipleFDAC(fdID, stringfromlist(i,S.channelsx,","),setpoint,ramprate=S.rampratex, ignore_lims=ignore_lims)
-			else
-				rampMultipleFDAC(S.instrIDx, stringfromlist(i,S.channelsx,","),setpoint,ramprate=S.rampratex, ignore_lims=ignore_lims) //is this important?
-			endif
+
+			nvar fdID = $(stringfromlist(i,S.daclistIDs))
+			rampMultipleFDAC(fdID, stringfromlist(i,S.channelsx,","),setpoint,ramprate=S.rampratex, ignore_lims=ignore_lims)
 		endfor
 	endif  
 	
@@ -3252,12 +3171,8 @@ function scc_checkRampStartFD(S)
 	   elseif(S.direction == -1)
 	      sp = str2num(stringfromlist(i, S.finxs, ","))
 	   endif
-      if(S.sync)
-      		nvar fdID = $(stringfromlist(i,S.instrIDs))
-      		diff = getFDACOutput(fdID, ch)-sp
-      else
-      		diff = getFDACOutput(S.instrIDx, ch)-sp
-      	endif
+      	nvar fdID = $(stringfromlist(i,S.daclistIDs))
+      	diff = getFDACOutput(fdID, ch)-sp
       if(abs(diff) > 0.5)  // if DAC is more than 0.5mV from start of ramp
          require_ramp = 1
       endif
@@ -4500,8 +4415,12 @@ function scfd_SendCommandAndRead(S, AWG_list, rowNum)
 		variable errCode = GetRTError(1)  // Clear the error
 		if (v_AbortCode != 10)  // 10 is returned when user clicks abort button mid sweep
 			printf "WARNING[scfd_SendCommandAndRead]: Error during sweep at row %d. Attempting once more without updating graphs.\r" rowNum
-			doupdate
-			fd_stopFDACsweep(S.instrIDx)   // Make sure the previous scan is stopped
+			doupdate; int i
+			for(i=0;i<itemsinlist(S.instrIDs);i++)
+				string IDname = stringfromlist(i,S.instrIDs)
+				nvar fdID = $IDname
+				fd_stopFDACsweep(fdID)   // Make sure the previous scan is stopped
+			endfor
 			cmd_sent = fd_start_sweep(S, AWG_list=AWG_list)
 			entered_panic_mode = scfd_RecordBuffer(S, rowNum, totalByteReturn, record_only=1)  // Try again to record the sweep
 		else
@@ -4720,7 +4639,7 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only])
 	   variable bytes_left = totalByteReturn-bytes_read
 	   if(bytes_left > 0)
 	      scfd_readChunk(fdID, bytes_left, buffer)  // puts data into buffer
-	      scfd_distributeData1(buffer, S, bytes_read, totalByteReturn, bytes_left, rowNum)
+	      scfd_distributeData1(buffer, S, bytes_read, totalByteReturn, bytes_left, rowNum, fdIDname = fdIDname)
 	   endif
 	   
 	   scfd_checkSweepstate(fdID)
@@ -4824,14 +4743,16 @@ function scfd_updateWindow(S, numAdcs)
   wave/T fdacvalstr
 
   variable i, device_num
-  string channel, device_channel
+  string channel, device_channel, IDname
   for(i=0;i<itemsinlist(S.channelsx,",");i+=1)
     channel = stringfromlist(i,S.channelsx,",")
+    IDname  = stringfromlist(i,S.daclistIDs)
+    nvar fdID = $IDname
 	device_channel = scf_getChannelNumsOnFD(channel, device_num)  // Get channel for specific fastdac (and device_num of that fastdac)
-	if (cmpstr(scf_getFDVisaAddress(device_num), getResourceAddress(S.instrIDx)) != 0)
+	if (cmpstr(scf_getFDVisaAddress(device_num), getResourceAddress(fdID)) != 0)
 		print("ERROR[scfd_updateWindow]: channel device address doesn't match instrID address")
 	else
-		scfw_updateFdacValStr(str2num(channel), getFDACOutput(S.instrIDx, str2num(device_channel)), update_oldValStr=1)  // + scf_getChannelStartNum( scf_getFDVisaAddress(device_num))
+		scfw_updateFdacValStr(str2num(channel), getFDACOutput(fdID, str2num(device_channel)), update_oldValStr=1)  // + scf_getChannelStartNum( scf_getFDVisaAddress(device_num))
 	endif
   endfor
 
@@ -4866,7 +4787,7 @@ function scfd_distributeData2(buffer,adcList,bytes,rowNum,colNumStart,[direction
 	
 	/// rewrite ////////////////////////////////////////////////////////////////////////////////////////////////
 	variable j, k, dataPoint
-	string wave1d, s1, s2
+	string wave1d, s1, s2, waveslist = ""
 	
 	nvar /z fdID = $fdIDname
 	string adcs = stringbyKey(fdIDname, S.adclists)
@@ -4875,13 +4796,13 @@ function scfd_distributeData2(buffer,adcList,bytes,rowNum,colNumStart,[direction
 	
 	if (!paramisDefault(named_waves) && strlen(named_waves) > 0)  // Use specified wavenames instead of default ADC#
 	///// Not sure when this is passed, will put in an abort to see
-
-//		scu_assertSeparatorType(named_waves, ";")
-//		if (itemsInList(named_waves) != numADCch)
-//			abort "ERROR[scfd_distributeData2]: wrong number of named_waves for numADCch being recorded"
-//		endif
-//		waveslist = named_waves
-		abort "in scfd_distributedata2"
+		numADCCh = itemsinlist(adcList)
+		scu_assertSeparatorType(named_waves, ";")
+		if (itemsInList(named_waves) != numADCch)
+			abort "ERROR[scfd_distributeData2]: wrong number of named_waves for numADCch being recorded"
+		endif
+		waveslist = named_waves
+		//abort "in scfd_distributedata2"
 	else
 		for(i=0;i<numADCCh;i++)
 			if(whichlistItem(adcs[i],fake) == -1) /// this should imply we want to distribute the data
