@@ -112,6 +112,7 @@ function set_indep()
 	for(i = 0; i<numfdacs; i++)
 		fdname = stringbykey("name" + num2str(i+1),sc_fdackeys,":",",")
 		nvar fd = $fdname
+		clearfdacBuffer(fd)
 		check = queryInstr(fd, "SET_MODE,INDEP" + "\r\n")                   // sets all to independent
 		if (cmpstr(check, "INDEP_SET\r\n"))
 			abort "unable to set independent mode on fastDAC:  " + fdname

@@ -4550,7 +4550,7 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only])
 	   variable bytes_left = totalByteReturn-bytes_read
 	   if(bytes_left > 0)
 	      scfd_readChunk(fdID, bytes_left, buffer)  // puts data into buffer
-	      scfd_distributeData1(buffer, S, bytes_read, totalByteReturn, bytes_left, rowNum)
+	      scfd_distributeData1(buffer, S, bytes_read, totalByteReturn, bytes_left, rowNum, fdIDname = fdIDname)
 	   endif
 	   
 	   scfd_checkSweepstate(fdID)
@@ -4702,16 +4702,30 @@ function scfd_distributeData2(buffer,adcList,bytes,rowNum,colNumStart,[direction
 	string adcs = stringbyKey(fdIDname, S.adclists)
 	variable numADCCh = strlen(adcs)
 	string fake = stringbykey(FdIDname, S.fakerecords)
+	string waveslist = ""
 	
 	if (!paramisDefault(named_waves) && strlen(named_waves) > 0)  // Use specified wavenames instead of default ADC#
-	///// Not sure when this is passed, will put in an abort to see
-
-//		scu_assertSeparatorType(named_waves, ";")
-//		if (itemsInList(named_waves) != numADCch)
-//			abort "ERROR[scfd_distributeData2]: wrong number of named_waves for numADCch being recorded"
-//		endif
-//		waveslist = named_waves
-		abort "in scfd_distributedata2"
+		///This is used for the update ADC button in the fastDAC window
+		numADCCh = itemsinlist(adcList)
+		scu_assertSeparatorType(named_waves, ";")
+		if (itemsInList(named_waves) != numADCch)
+			abort "ERROR[scfd_distributeData2]: wrong number of named_waves for numADCch being recorded"
+		endif
+		waveslist = named_waves
+		// load data into raw wave
+		for(i=0;i<numADCCh;i+=1)
+			wave1d = stringFromList(i, waveslist)
+			wave rawwave = $wave1d
+			k = 0
+			for(j=0;j<bytes;j+=numADCCh*2)
+			// convert to floating point
+				s1 = buffer[j + (i*2)]
+				s2 = buffer[j + (i*2) + 1]
+				datapoint = fd_Char2Num(s1, s2)
+				rawwave[colNumStart+k] = dataPoint
+				k += 1*direction
+			endfor
+		endfor
 	else
 		for(i=0;i<numADCCh;i++)
 			if(whichlistItem(adcs[i],fake) == -1) /// this should imply we want to distribute the data
@@ -4731,6 +4745,8 @@ function scfd_distributeData2(buffer,adcList,bytes,rowNum,colNumStart,[direction
 		endfor
 	endif
 	
+	
+
 	
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	
