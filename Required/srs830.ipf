@@ -247,6 +247,18 @@ function AutoSRSPhase(instrID) // Units: deg
 	writeInstr(instrID, "APHS \n")
 end
 
+function AutoSRSSens(instrID) 
+	variable instrID
+	string response
+
+	
+	writeInstr(instrID, "AGAN \n")
+	do 
+	response = queryInstr(instrID, "*STB? \n")
+	asleep(0.5)
+	while (str2num(response) < 1)
+end
+
 function SetSRSreadout(instrID, readout, [ch, ratio]) //e.g. for Ch1: readout 0 = x, 1 = r, 2 = xnoise etc
 	variable instrID, readout
 	variable ch, ratio
