@@ -1934,6 +1934,7 @@ function/s fd_start_sweep(S, [AWG_list])
 			// might need the channels picked for the fake recordings stored somewhere
 		else
 			adcs = replacestring(";",adcs,"")
+			S.adcLists = replacestringbykey(fdIDname, S.adcLists, adcs)
 			if (!paramisDefault(AWG_list) && AWG_List.use_AWG == 1 && AWG_List.lims_checked == 1)  
 				// Example:
 				// AWG_RAMP,2,012,345,67,0,-1000,1000,-2000,2000,50,50

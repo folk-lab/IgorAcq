@@ -634,7 +634,7 @@ function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
     S.using_fastdac = 1
 
    	// Sets channelsx, channelsy to be lists of channel numbers instead of labels
-    scv_setChannels(S, channelsx, channelsy, fastdac=1)
+   scv_setChannels(S, channelsx, channelsy, fastdac=1)
     
    	// Get Labels for graphs
    	S.x_label = selectString(strlen(x_label) > 0, scu_getDacLabel(S.channelsx, fastdac=1), x_label)  // Uses channels as list of numbers, and only if x_label not passed in
