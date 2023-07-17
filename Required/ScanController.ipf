@@ -630,8 +630,8 @@ function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
 	// Additional intialization for fastDAC scans
 	S.sweeprate = sweeprate
 	S.duration = duration
-    S.adcList = scf_getRecordedFADCinfo("channels")
-    S.using_fastdac = 1
+   S.adcList = scf_getRecordedFADCinfo("channels")
+   S.using_fastdac = 1
 
    	// Sets channelsx, channelsy to be lists of channel numbers instead of labels
    scv_setChannels(S, channelsx, channelsy, fastdac=1)
@@ -839,6 +839,7 @@ function scv_setFreq2(S)
 			variable old_check = getfadcSpeed(fdID)
 		endif
 		if(check_speed != old_check)
+			S.instrIDs = replaceString(";",S.instrIDs, " ") 
 			abort "please set " + S.instrIDs + "to the same speed"
 		endif
 		
@@ -4547,7 +4548,6 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only])
 	      scfd_readChunk(fdID, read_chunk, buffer)  // puts data into buffer
 	      scfd_distributeData1(buffer, S, bytes_read, totalByteReturn, read_chunk, rowNum, fdIDname = fdIDname)
 	      scfd_checkSweepstate(fdID)
-		   //abort "abort in recordbuffer, testing phase"
 	      
 	      bytes_read += read_chunk      
 	      expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)      
