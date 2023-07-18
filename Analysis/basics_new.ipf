@@ -67,7 +67,7 @@ function demodulate(datnum, harmonic, wave_kenner, [append2hdf, demod_wavename])
 	struct AWGVars AWGLI
 	fd_getoldAWG(AWGLI, datnum)
 
-	print AWGLI
+//	print AWGLI
 
 	cols=dimsize(wav,0); print cols
 	rows=dimsize(wav,1); print rows

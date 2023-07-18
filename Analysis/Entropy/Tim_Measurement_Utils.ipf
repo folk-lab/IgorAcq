@@ -614,39 +614,54 @@ function/s wave2str(w)
 end
 
 
-function make_virtual_entropy_corners(x_start, y_start, x_len, y_len, y_over_x, [datnum])
-	variable x_start, y_start, x_len, y_len, y_over_x, datnum
-	
+function make_virtual_entropy_corners(x_start, y_start, x_len, y_len, fast_sweep_y_over_x, slow_sweep_y_over_x, [datnum])
+	variable x_start, y_start, x_len, y_len, fast_sweep_y_over_x, slow_sweep_y_over_x, datnum
 	
 	string xs, ys
+	variable c
 	
-	///// calculate xs /////
+	///// setup xs /////
 	variable x0, x1, x2, x3
 	x0 = x_start
 	x1 = x_start + x_len
-	x2 = x0
-	x3 = x1
+	
+	
+	//// setup ys /////
+	variable y0, y1, y2, y3
+	y0 = y_start
+	c = y0 - fast_sweep_y_over_x*x0
+	y1 = fast_sweep_y_over_x*x1 + c
+	y2 = y_start + y_len
+	
+	
+	///// calculate xs /////
+	c = y0 - slow_sweep_y_over_x*x0
+	x2 = (y2 - c) / slow_sweep_y_over_x
+	x3 = x2 + x_len
 	xs = num2str(x0) + "," + num2str(x1) + ","	 + num2str(x2) + "," + num2str(x3) + ";"
 	print xs
 	
 	
 	///// calculate ys /////
-	variable y0, y1, y2, y3
-	y0 = y_start
-	variable c = y0 - y_over_x*x0
-	y1 = y_over_x*x1 + c
-	
-	y2 = y_start + y_len
-	y3 = y1 + y_len
+	c = y2 - fast_sweep_y_over_x*x2
+	y3 = fast_sweep_y_over_x*x3 + c
 	ys = num2str(y0) + "," + num2str(y1) + ","	 + num2str(y2) + "," + num2str(y3) + ";"
 	print ys
 	
+	
 	if (ParamIsDefault(datnum) == 0)
 		displaymultiple({datnum}, "cscurrent_2d", diff=1)
-		make /o/n=4 tempfullx = {x0, x1, x2, x3}
-		make /o/n=4 tempfully = {y0, y1, y2, y3}
-		AppendToGraph tempfully vs tempfullx
-		ModifyGraph mode(tempfully)=4, mrkThick(tempfully)=3, rgb(tempfully)=(0,65535,65535), lsize=2
+		make /o/n=2 tempfullx_start = {x0, x1}
+		make /o/n=2 tempfully_start = {y0, y1}
+		
+		make /o/n=2 tempfullx_end = {x2, x3}
+		make /o/n=2 tempfully_end = {y2, y3}
+		
+		AppendToGraph tempfully_start vs tempfullx_start
+		AppendToGraph tempfully_end vs tempfullx_end
+		
+		ModifyGraph mode(tempfully_start)=4, mrkThick(tempfully_start)=3, rgb(tempfully_start)=(0,65535,65535), lsize=2
+		ModifyGraph mode(tempfully_end)=4, mrkThick(tempfully_end)=3, rgb(tempfully_end)=(0,65535,65535), lsize=2
 		
 	endif
 	
