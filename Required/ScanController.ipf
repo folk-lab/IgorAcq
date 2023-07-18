@@ -4351,7 +4351,7 @@ function scfd_SendCommandAndRead(S, AWG_list, rowNum)
 	variable entered_panic_mode = 0
 	try
 		print 1
-   		entered_panic_mode = scfd_RecordBuffer(S, rowNum, totalByteReturn)
+   		entered_panic_mode = scfd_RecordBuffer(S, rowNum, totalByteReturn)// record_only=1)
    	catch  // One chance to do the sweep again if it failed for some reason (likely from a buffer overflow)
 		variable errCode = GetRTError(1)  // Clear the error
 		if (v_AbortCode != 10)  // 10 is returned when user clicks abort button mid sweep
@@ -4539,51 +4539,63 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only])
 	
 	int i
 	string fdIDname
-	for(i=0; i<itemsinlist(S.instrIDs); i++)  //this forloop is fine
+	//for(i=0; i<itemsinlist(S.instrIDs); i++)  //this forloop is not fine
 		
-		fdIDname = stringfromlist(i,S.instrIDs)
-		nvar fdID = $fdIDname
+	//	fdIDname = stringfromlist(i,S.instrIDs)
+	//	nvar fdID = $fdIDname
 
 	   do
-	      scfd_readChunk(fdID, read_chunk, buffer)  // puts data into buffer
-	      scfd_distributeData1(buffer, S, bytes_read, totalByteReturn, read_chunk, rowNum, fdIDname = fdIDname)
-	      scfd_checkSweepstate(fdID)
+	   		for(i=0; i<itemsinlist(S.instrIDs); i++)
+	   			fdIDname = stringfromlist(i,S.instrIDs)
+				nvar fdID = $fdIDname
+	      		
+	      		scfd_readChunk(fdID, read_chunk, buffer)  // puts data into buffer
+	      		scfd_distributeData1(buffer, S, bytes_read, totalByteReturn, read_chunk, rowNum, fdIDname = fdIDname)
+	      		scfd_checkSweepstate(fdID)
 	      
-	      bytes_read += read_chunk      
-	      expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)      
-	      if(!panic_mode && expected_bytes_in_buffer < saveBuffer)  // if we aren't too far behind then update Raw 1D graphs
-	         scg_updateRawGraphs() 
-		      expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)  // Basically checking how long graph updates took
-				if (expected_bytes_in_buffer > 4096)
-	         		printf "ERROR[scfd_RecordBuffer]: After updating graphs, buffer is expected to overflow... Expected buffer size = %d (max = 4096). Bytes read so far = %d\r" expected_bytes_in_buffer, bytes_read
-	         elseif (expected_bytes_in_buffer > 2500)
-	//				printf "WARNING[scfd_RecordBuffer]: Last graph update resulted in buffer becoming close to full (%d of 4096 bytes). Entering panic_mode (no more graph updates)\r", expected_bytes_in_buffer
-					panic_mode = 1         
-	         	endif
-			else
-				if (expected_bytes_in_buffer > 1000)
-	//				printf "DEBUGGING: getting behind: Expecting %d bytes in buffer (max 4096)\r" expected_bytes_in_buffer		
-					if (panic_mode == 0)
-						panic_mode = 1
-	//					printf "WARNING[scfd_RecordBuffer]: Getting behind on reading buffer, entering panic mode (no more graph updates until end of sweep)\r"				
-					endif			
+	      		bytes_read += read_chunk      
+	      		expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)      
+	      		if(!panic_mode && expected_bytes_in_buffer < saveBuffer)  // if we aren't too far behind then update Raw 1D graphs
+	         		scg_updateRawGraphs() 
+		      		expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)  // Basically checking how long graph updates took
+					if(expected_bytes_in_buffer > 4096)
+	         			printf "ERROR[scfd_RecordBuffer]: After updating graphs, buffer is expected to overflow... Expected buffer size = %d (max = 4096). Bytes read so far = %d\r" expected_bytes_in_buffer, bytes_read
+	         		elseif (expected_bytes_in_buffer > 2500)
+	//					printf "WARNING[scfd_RecordBuffer]: Last graph update resulted in buffer becoming close to full (%d of 4096 bytes). Entering panic_mode (no more graph updates)\r", expected_bytes_in_buffer
+						panic_mode = 1         
+	         		endif
+				else
+					if (expected_bytes_in_buffer > 1000)
+	//					printf "DEBUGGING: getting behind: Expecting %d bytes in buffer (max 4096)\r" expected_bytes_in_buffer		
+						if (panic_mode == 0)
+							panic_mode = 1
+	//						printf "WARNING[scfd_RecordBuffer]: Getting behind on reading buffer, entering panic mode (no more graph updates until end of sweep)\r"				
+						endif			
+					endif
 				endif
-			endif
+				
+				if(i != itemsinlist(S.instrIDs)-1)
+					bytes_read -= read_chunk
+				endif
+			endfor	
 	   while(totalByteReturn-bytes_read > read_chunk)
-	
-	   // do one last read if any data left to read
-	   variable bytes_left = totalByteReturn-bytes_read
-	   if(bytes_left > 0)
-	      scfd_readChunk(fdID, bytes_left, buffer)  // puts data into buffer
-	      scfd_distributeData1(buffer, S, bytes_read, totalByteReturn, bytes_left, rowNum, fdIDname = fdIDname)
-	   endif
-	   
-	   scfd_checkSweepstate(fdID)
+		
+		// do one last read if any data left to read
+		variable bytes_left = totalByteReturn-bytes_read
+		for(i=0; i<itemsinlist(S.instrIDs); i++)
+	   		fdIDname = stringfromlist(i,S.instrIDs)
+			nvar fdID = $fdIDname
+	   		if(bytes_left > 0)
+	      		scfd_readChunk(fdID, bytes_left, buffer)  // puts data into buffer
+	      		scfd_distributeData1(buffer, S, bytes_read, totalByteReturn, bytes_left, rowNum, fdIDname = fdIDname)
+	   		endif
+	   		scfd_checkSweepstate(fdID)
+	   	endfor
 	//   variable st = stopMSTimer(-2)
 	   scg_updateRawGraphs() 
 	//   printf "scg_updateRawGraphs took %.2f ms\r", (stopMSTimer(-2) - st)/1000
 	
-	endfor
+	//endfor
 	return panic_mode
 end
 
