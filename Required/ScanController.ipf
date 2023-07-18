@@ -4612,7 +4612,7 @@ function scfd_getReadChunkSize(numADCs, numpts, bytesSec, totalByteReturn)
   // Returns the size of chunks that should be read at a time
   variable numADCs, numpts, bytesSec, totalByteReturn
 
-  variable read_duration = 0.5  // Make readchunk s.t. it nominally take this time to fill
+  variable read_duration = 0.1  // Make readchunk s.t. it nominally take this time to fill
   variable chunksize = (round(bytesSec*read_duration) - mod(round(bytesSec*read_duration),numADCs*2))  
 
   variable read_chunk=0
