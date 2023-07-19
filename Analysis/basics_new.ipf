@@ -538,11 +538,11 @@ function /s avg_wav(wave wav) // /WAVE lets your return a wave
 	int nc
 	int nr
 
-//	wn="dat"+num2str(wavenum)+dataset //current 2d array
-
 	nr = dimsize($wn, 0) //number of rows (sweep length)
 	nc = dimsize($wn, 1) //number of columns (repeats)
+	
 	ReduceMatrixSize(wav, 0, -1, nr, 0, -1, 1, 1, avg_name)
+	
 	redimension/n = -1 $avg_name
 	return avg_name
 end
@@ -567,7 +567,7 @@ function /s avg_wav_N(wave wav, int N) // /WAVE lets your return a wave
 end
 
 
-function average_every_n_rows(wave wav, variable n)
+function average_every_n_rows(wave wav, int n)
 	// takes a 2d wave and averages every n rows (IGOR columns)
 	// creates a wave with _avg appended to the end
 	// assumes the wav has a multiple of n points
@@ -575,8 +575,8 @@ function average_every_n_rows(wave wav, variable n)
 	string wave_name = nameOfWave(wav)
 	string wave_name_averaged = wave_name + "_avg"
 	
-	variable num_rows = dimsize(wav, 1)
-	variable num_columns = dimsize(wav, 0)
+	variable num_rows = dimsize(wav, 1) // (repeats)
+	variable num_columns = dimsize(wav, 0) // (sweep length)
 	
 	variable num_rows_post_average = num_rows/n
 	
@@ -584,6 +584,29 @@ function average_every_n_rows(wave wav, variable n)
 
 end
 
+
+function crop_wave(wave wav, variable x_mid, variable y_mid, variable x_width, variable y_width)
+	// takes a 2d wave and creates a new cropped wave with name "_crop" appended
+	// cropped mask is determined by the centre and lengths (in gate dimensions) of the x and y
+	
+	string wave_name = nameOfWave(wav)
+	string wave_name_averaged = wave_name + "_crop"
+	
+	variable num_columns = dimsize(wav, 0) // (sweep length)
+	variable num_rows = dimsize(wav, 1) // (repeats)
+	
+	int x_coord_start, x_coord_end, y_coord_start, y_coord_end
+	
+	x_coord_start = scaletoindex(wav, x_mid - x_width, 0)
+	x_coord_end = scaletoindex(wav, x_mid + x_width, 0)
+	y_coord_start = scaletoindex(wav, y_mid - y_width, 1)
+	y_coord_end = scaletoindex(wav, y_mid + y_width, 1)
+	
+	int num_crop_columns = (x_coord_end - x_coord_start) + 1
+	int num_crop_rows = (y_coord_end - y_coord_start) + 1
+	
+	ReduceMatrixSize(wav, x_coord_start, x_coord_end, num_crop_columns, y_coord_start, y_coord_end, num_crop_rows, 1, wave_name_averaged)
+end
 
 
 function stopalltimers()
