@@ -838,7 +838,6 @@ function get_sweeplogs(datnum, [kenner])
 	string kenner
 	kenner = selectString(paramisdefault(kenner), kenner, "")
 	variable fileID, metadataID, i, result
-	wave/t sc_sweeplogs
 	
 	string HDF_filename = "dat" + num2str(datnum) + kenner + ".h5"
 	
@@ -846,6 +845,7 @@ function get_sweeplogs(datnum, [kenner])
 	HDF5LoadData /Q/O/Type=1/N=sc_sweeplogs /A="sweep_logs" fileID, "metadata"
 	HDF5CloseFile fileID
 	
+	wave/t sc_sweeplogs
 	variable sweeplogsID
 	sweeplogsID = JSON_Parse(sc_sweeplogs[0])
 

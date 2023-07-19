@@ -25,8 +25,8 @@ function master_entropy_clean_average(int filenum, int delay, int wavelen, [int 
 	
 	
 	///// seperate out hot and cold (CREATES numerical_entropy) /////
-	wave cold, hot
 	sqw_analysis($raw_wavename, delay, wavelen)
+	wave cold, hot
 	
 	///// plot thetas from cold wave /////
 	string cold_wavename = "dat" + num2str(filenum) + "cscurrent_2d" + "_cold"
@@ -155,14 +155,16 @@ function/wave sqw_analysis(wave wav, int delay, int wavelen)
 	N = nr / wavelen / 4;
 
 	Make/o/N=(nc,(N)) cold1, cold2, hot1, hot2
-	wave slice, slice_new
 
 	do
 		rowslice(wav, i)
+		wave slice
+		
 		Redimension/N=(wavelen, 4, N) slice
 		DeletePoints/M=0 0,delay, slice
 		reducematrixSize(slice, 0, -1, 1, 0, -1, 4, 1, "slice_new")
-
+		
+		wave slice_new
 		cold1[i][] = slice_new[0][0][q]
 		cold2[i][] = slice_new[0][2][q]
 		hot1[i][] = slice_new[0][1][q]

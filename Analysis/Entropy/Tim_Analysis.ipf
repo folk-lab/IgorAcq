@@ -144,14 +144,14 @@ function get_multiple_line_paths_int(wave_2d, y_wave, x_wave, [width_y, width_x,
 	
 	///// display original 2d image with each trace
 	string window_name = "line_path_traces"
-	dowindow/k window_name
-	display/N=window_name
-	appendimage /W=window_name wave_2d
-	ModifyImage /W=window_name $wave_name ctab= {-0.005, 0.005, RedWhiteGreen, 0}
+	dowindow/k $window_name
+	display/N=$window_name
+	appendimage /W=$window_name wave_2d
+	ModifyImage /W=$window_name $wave_name ctab= {-0.005, 0.005, RedWhiteGreen, 0}
 	variable num_columns = dimsize(line_path_2d_y, 1)
 	variable i
 	for (i = 0; i < num_columns; i++)
-		appendtograph /W=window_name line_path_2d_y[][i] vs line_path_2d_x[][i]
+		appendtograph /W=$window_name line_path_2d_y[][i] vs line_path_2d_x[][i]
 	endfor
 	
 	
@@ -161,8 +161,11 @@ function get_multiple_line_paths_int(wave_2d, y_wave, x_wave, [width_y, width_x,
 	offset_2d_traces(line_path_2d_z_int)
 	
 	// display integrated line traces
-	display; appendimage line_path_2d_z_int
-	ModifyImage line_path_2d_z_int ctab= {*,*,RedWhiteGreen,0}	
+	window_name = "line_path_traces_z_int"
+	dowindow/k $window_name
+	display/N=$window_name
+	appendimage /W=$window_name line_path_2d_z_int
+	ModifyImage /W=$window_name line_path_2d_z_int ctab= {*,*,RedWhiteGreen,0}	
 end
 
 
