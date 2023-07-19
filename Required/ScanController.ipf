@@ -4380,8 +4380,12 @@ function scfd_SendCommandAndRead(S, AWG_list, rowNum)
 		variable errCode = GetRTError(1)  // Clear the error
 		if (v_AbortCode != 10)  // 10 is returned when user clicks abort button mid sweep
 			printf "WARNING[scfd_SendCommandAndRead]: Error during sweep at row %d. Attempting once more without updating graphs.\r" rowNum
-			doupdate
-			fd_stopFDACsweep(S.instrIDx)   // Make sure the previous scan is stopped
+			doupdate; int i
+			for(i=0;i<itemsinlist(S.instrIDs);i++)
+				string fdIDname = stringfromlist(i, S.instrIDs)
+				nvar fdID = $fdIDname
+				fd_stopFDACsweep(fdID)   // Make sure the previous scan is stopped
+			endfor
 			cmd_sent = fd_start_sweep(S, AWG_list=AWG_list)
 			entered_panic_mode = scfd_RecordBuffer(S, rowNum, totalByteReturn, record_only=1)  // Try again to record the sweep
 		else
@@ -4390,18 +4394,23 @@ function scfd_SendCommandAndRead(S, AWG_list, rowNum)
 	endtry	
 
 	string endstr
-	endstr = readInstr(S.instrIDx) // would be useful to check in silvia branch if the response is different, here it is a blank string 
-	endstr = sc_stripTermination(endstr,"\r\n")	
-	if (S.readVsTime)
-		scf_checkFDResponse(endstr,cmd_sent,isString=1,expectedResponse="READ_FINISHED")
-		// No need to update DACs
-	else
-		scf_checkFDResponse(endstr,cmd_sent,isString=1,expectedResponse="RAMP_FINISHED") // getting a bad response here 
+	
+	for(i=0;i<itemsinlist(S.instrIDs);i++)
+		fdIDname = stringfromlist(i, S.instrIDs)
+		nvar fdID = $fdIDname
+		endstr = readInstr(fdID) // would be useful to check in silvia branch if the response is different, here it is a blank string 
+		endstr = sc_stripTermination(endstr,"\r\n")	
+		if (S.readVsTime)
+			scf_checkFDResponse(endstr,cmd_sent,isString=1,expectedResponse="READ_FINISHED")
+			// No need to update DACs
+		else
+			scf_checkFDResponse(endstr,cmd_sent,isString=1,expectedResponse="RAMP_FINISHED") // getting a bad response here 
 	   
-	   // update DAC values in window (request values from FastDAC directly in case ramp failed)
+	   		// update DAC values in window (request values from FastDAC directly in case ramp failed)
 		
-		scfd_updateWindow(S, S.maxADCs) // get fdacoutput is likely failing here. 
-	endif
+			//scfd_updateWindow(S, S.maxADCs) // get fdacoutput is likely failing here. 
+		endif
+	endfor
 	
 	if(AWG_list.use_awg == 1)  // Reset AWs back to zero (no reason to leave at end of AW)
 		rampmultiplefdac(S.instrIDx, AWG_list.AW_DACs, 0)
@@ -4715,19 +4724,20 @@ function scfd_updateWindow(S, numAdcs)
   wave/T fdacvalstr
 
   variable i, device_num
-  string channel, device_channel
+  string channel, device_channel, fdIDname
   for(i=0;i<itemsinlist(S.channelsx,",");i+=1)
-    channel = stringfromlist(i,S.channelsx,",")
+   channel = stringfromlist(i,S.channelsx,",")
+   fdIDname = stringfromlist(i,S.daclistIDs)
+   nvar fdID = $fdIDname
 	device_channel = scf_getChannelNumsOnFD(channel, device_num)  // Get channel for specific fastdac (and device_num of that fastdac)
-	if (cmpstr(scf_getFDVisaAddress(device_num), getResourceAddress(S.instrIDx)) != 0)
+	if (cmpstr(scf_getFDVisaAddress(device_num), getResourceAddress(fdID)) != 0)
 		print("ERROR[scfd_updateWindow]: channel device address doesn't match instrID address")
 	else
-		scfw_updateFdacValStr(str2num(channel), getFDACOutput(S.instrIDx, str2num(device_channel)), update_oldValStr=1)  // + scf_getChannelStartNum( scf_getFDVisaAddress(device_num))
+		scfw_updateFdacValStr(str2num(channel), getFDACOutput(fdID, str2num(device_channel)), update_oldValStr=1)  // + scf_getChannelStartNum( scf_getFDVisaAddress(device_num))
 	endif
   endfor
 
   variable channel_num
-  string fdIDname    // attempt
   
   for(i=0;i<numADCs;i+=1)
     channel_num = str2num(stringfromlist(i,S.adclist,";"))
