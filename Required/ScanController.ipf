@@ -393,6 +393,7 @@ structure ScanVars
 	 string fakeRecords   	// ADC channels used for fakeRecording
 	 string ADCcounts		// ADCcounts to ensure theres equal amount of recordings between instruments
 	 string adcLists      	// adclist by id -> attempting to use stringbykey	
+	 string IDstartxs, IDfinxs  // If sweeping from different start/end points for each channel or instrument / This one is a stringkey with fdIDs
 	 	
 		
 endstructure
@@ -878,6 +879,8 @@ function scv_setSetpoints(S, itemsx, startx, finx, itemsy, starty, finy, startxs
 	string starts, fins  // Strings to modify in format_setpoints
 	int i
     // Set X
+   	
+   	S.IDstartxs = ""; S.IDfinxs = ""
    	if ((numtype(strlen(startxs)) != 0 || strlen(startxs) == 0) && (numtype(strlen(finxs)) != 0 || strlen(finxs) == 0))  // Then just a single start/end for itemsx
    		s.startx = startx
 		s.finx = finx	
@@ -885,12 +888,12 @@ function scv_setSetpoints(S, itemsx, startx, finx, itemsy, starty, finy, startxs
 		//this conditional creates as many startx needed for the channels, this needs to be changed.
 		
 		for(i=0;i<itemsinlist(S.daclistIDs);i++)
-			s.startxs = replacestringByKey(stringfromlist(i,S.daclistIDs), s.startxs, stringbykey(stringfromlist(i,S.daclistIDs), s.startxs) +","+ stringfromlist(i,starts,","))
-			s.finxs  = replacestringByKey(stringfromlist(i,S.daclistIDs), s.finxs, stringbykey(stringfromlist(i,S.daclistIDs), s.finxs) + "," + stringfromlist(i,fins,","))
+			s.IDstartxs = replacestringByKey(stringfromlist(i,S.daclistIDs), s.IDstartxs, stringbykey(stringfromlist(i,S.daclistIDs), s.IDstartxs) +","+ stringfromlist(i,starts,","))
+			s.IDfinxs  = replacestringByKey(stringfromlist(i,S.daclistIDs), s.IDfinxs, stringbykey(stringfromlist(i,S.daclistIDs), s.IDfinxs) + "," + stringfromlist(i,fins,","))
 		endfor
 		
-		//s.startxs = starts // this will not be needed anymore
-		//s.finxs = fins     // this will not be needed anymore
+		s.startxs = starts 
+		s.finxs = fins     
 		
 		
 	elseif (!(numtype(strlen(startxs)) != 0 || strlen(startxs) == 0) && !(numtype(strlen(finxs)) != 0 || strlen(finxs) == 0))
@@ -899,12 +902,12 @@ function scv_setSetpoints(S, itemsx, startx, finx, itemsy, starty, finy, startxs
 		s.finx = str2num(StringFromList(0, fins, ","))
 		
 		for(i=0;i<itemsinlist(S.daclistIDs);i++)
-			s.startxs = replacestringByKey(stringfromlist(i,S.daclistIDs), s.startxs, stringbykey(stringfromlist(i,S.daclistIDs), s.startxs) +","+ stringfromlist(i,starts,","))
-			s.finxs  = replacestringByKey(stringfromlist(i,S.daclistIDs), s.finxs, stringbykey(stringfromlist(i,S.daclistIDs), s.finxs) + "," + stringfromlist(i,fins,","))
+			s.IDstartxs = replacestringByKey(stringfromlist(i,S.daclistIDs), s.IDstartxs, stringbykey(stringfromlist(i,S.daclistIDs), s.IDstartxs) +","+ stringfromlist(i,starts,","))
+			s.IDfinxs  = replacestringByKey(stringfromlist(i,S.daclistIDs), s.IDfinxs, stringbykey(stringfromlist(i,S.daclistIDs), s.IDfinxs) + "," + stringfromlist(i,fins,","))
 		endfor		
 		
-		//s.startxs = starts
-		//s.finxs = fins
+		s.startxs = starts
+		s.finxs = fins
 	else
 		abort "If either of startxs/finxs is provided, both must be provided"
 	endif
@@ -3085,6 +3088,9 @@ function RampStartFD(S, [ignore_lims, x_only, y_only])
 	if(numtype(strlen(s.channelsx)) == 0 && strlen(s.channelsx) != 0 && y_only != 1)  // If not NaN and not ""
 		scu_assertSeparatorType(S.channelsx, ",")
 		for(i=0;i<itemsinlist(S.channelsx,",");i+=1)
+		
+			nvar fdID = $(stringfromlist(i,S.daclistIDs))
+			
 			if(S.direction == 1)
 				setpoint = str2num(stringfromlist(i,S.startxs,","))
 			elseif(S.direction == -1)
@@ -3092,12 +3098,13 @@ function RampStartFD(S, [ignore_lims, x_only, y_only])
 			else
 				abort "ERROR[RampStartFD]: S.direction not set to 1 or -1"
 			endif
-			if(S.sync)
-				nvar fdID = $(stringfromlist(i,S.daclistIDs))
-				rampMultipleFDAC(fdID, stringfromlist(i,S.channelsx,","),setpoint,ramprate=S.rampratex, ignore_lims=ignore_lims)
-			else
-				rampMultipleFDAC(S.instrIDx, stringfromlist(i,S.channelsx,","),setpoint,ramprate=S.rampratex, ignore_lims=ignore_lims) //is this important?
-			endif
+			
+			
+			rampMultipleFDAC(fdID, stringfromlist(i,S.channelsx,","),setpoint,ramprate=S.rampratex, ignore_lims=ignore_lims)
+			
+			//removed the else if stuff
+			//rampMultipleFDAC(S.instrIDx, stringfromlist(i,S.channelsx,","),setpoint,ramprate=S.rampratex, ignore_lims=ignore_lims) //is this important?
+			
 		endfor
 	endif  
 	
