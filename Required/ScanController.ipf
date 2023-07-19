@@ -1160,7 +1160,7 @@ function/S scg_initializeGraphs(S , [y_label])
 			endif
       	 endif
       	 
-      	if(raw==1) // Raw waves
+      	if((raw==1) || (plotraw==1)) // Raw waves
 	   		sc_rawGraphs1D = buffer
       	endif
       	  
@@ -4262,7 +4262,6 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 	
 end
 
-
 function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only])
 	// Returns whether recording entered into panic_mode during sweep
    struct ScanVars &S
@@ -4287,8 +4286,8 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only])
       bytes_read += read_chunk      
       expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)      
       if(!panic_mode && expected_bytes_in_buffer < saveBuffer)  // if we aren't too far behind then update Raw 1D graphs
+      	  scfd_raw2CalcQuickDistribute()
          scg_updateRawGraphs() 
-	      scs_checksweepstate()
 	      expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)  // Basically checking how long graph updates took
 			if (expected_bytes_in_buffer > 4096)
          		printf "ERROR[scfd_RecordBuffer]: After updating graphs, buffer is expected to overflow... Expected buffer size = %d (max = 4096). Bytes read so far = %d\r" expected_bytes_in_buffer, bytes_read
@@ -4349,7 +4348,36 @@ function scfd_getReadChunkSize(numADCs, numpts, bytesSec, totalByteReturn)
   return read_chunk
 end
 
+function scfd_raw2CalcQuickDistribute()
+    // Function to update graphs as data comes in temporarily, only applies the calc function for the scan 
 
+    variable i = 0
+    string RawWaveNames1D = sci_get1DWaveNames(1, 1)  // Get the names of 1D raw waves
+    string CalcWaveNames1D = sci_get1DWaveNames(0, 1)  // Get the names of 1D calc waves
+    string CalcStrings = scf_getRecordedFADCinfo("calc_funcs")  // Get the calc functions
+    string rwn, cwn, calc_string
+    wave fadcattr
+    wave /T fadcvalstr
+
+    if (itemsinList(RawWaveNames1D) != itemsinList(CalCWaveNames1D))
+        abort "Different number of raw wave names compared to calc wave names"
+    endif
+
+    for (i=0; i<itemsinlist(RawWaveNames1D); i++)
+        rwn = StringFromList(i, RawWaveNames1D)  // Get the current raw wave name
+        cwn = StringFromList(i, CalcWaveNames1D)  // Get the current calc wave name
+        calc_string = StringFromList(i, CalcStrings)  // Get the current calc function
+
+        duplicate/o $rwn sc_tempwave  // Duplicate the raw wave to a temporary wave
+
+        string ADCnum = rwn[3,INF]  // Extract the ADC number from the raw wave name
+
+        calc_string = ReplaceString(rwn, calc_string, "sc_tempwave")  // Replace the raw wave name with the temporary wave name in the calc function
+        execute("sc_tempwave = "+calc_string)  // Execute the calc function
+
+        duplicate /o sc_tempwave $cwn  // Duplicate the temporary wave to the calc wave
+    endfor
+end
 
 function scfd_checkSweepstate(instrID)
   	// if abort button pressed then stops FDAC sweep then aborts
