@@ -645,7 +645,7 @@ function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
    	endif  		
 
    	// Sets starts/fins (either using starts/fins given or from single startx/finx given)
-    scv_setSetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
+   // scv_setSetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys) had to move this
 	
 	//////////////////////////////////////// master/slave tracking /////////////////////////////////////////////////////////////////////
 	int i, j
@@ -726,7 +726,8 @@ function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
 	
 	S.ADCcounts = numwavetolist(ADCcounts) // probably d not need this in scanvars
 	S.maxADCs = wavemax(ADCcounts)			// finding the max amount of ADCs being recorded
-
+	
+	scv_setSetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
 	
 	// Set variables with some calculation
     scv_setFreq2(S) 		// Sets S.samplingFreq/measureFreq/numADCs	
@@ -875,19 +876,35 @@ function scv_setSetpoints(S, itemsx, startx, finx, itemsy, starty, finy, startxs
     string itemsx, startxs, finxs, itemsy, startys, finys
 
 	string starts, fins  // Strings to modify in format_setpoints
+	int i
     // Set X
    	if ((numtype(strlen(startxs)) != 0 || strlen(startxs) == 0) && (numtype(strlen(finxs)) != 0 || strlen(finxs) == 0))  // Then just a single start/end for itemsx
    		s.startx = startx
 		s.finx = finx	
-        scv_formatSetpoints(startx, finx, itemsx, starts, fins)  // Modifies starts, fins
-		s.startxs = starts
-		s.finxs = fins
+      scv_formatSetpoints(startx, finx, itemsx, starts, fins)  // Modifies starts, fins
+		//this conditional creates as many startx needed for the channels, this needs to be changed.
+		
+		for(i=0;i<itemsinlist(S.daclistIDs);i++)
+			s.startxs = replacestringByKey(stringfromlist(i,S.daclistIDs), s.startxs, stringbykey(stringfromlist(i,S.daclistIDs), s.startxs) +","+ stringfromlist(i,starts,","))
+			s.finxs  = replacestringByKey(stringfromlist(i,S.daclistIDs), s.finxs, stringbykey(stringfromlist(i,S.daclistIDs), s.finxs) + "," + stringfromlist(i,fins,","))
+		endfor
+		
+		//s.startxs = starts // this will not be needed anymore
+		//s.finxs = fins     // this will not be needed anymore
+		
+		
 	elseif (!(numtype(strlen(startxs)) != 0 || strlen(startxs) == 0) && !(numtype(strlen(finxs)) != 0 || strlen(finxs) == 0))
 		scv_sanitizeSetpoints(startxs, finxs, itemsx, starts, fins)  // Modifies starts, fins
 		s.startx = str2num(StringFromList(0, starts, ","))
 		s.finx = str2num(StringFromList(0, fins, ","))
-		s.startxs = starts
-		s.finxs = fins
+		
+		for(i=0;i<itemsinlist(S.daclistIDs);i++)
+			s.startxs = replacestringByKey(stringfromlist(i,S.daclistIDs), s.startxs, stringbykey(stringfromlist(i,S.daclistIDs), s.startxs) +","+ stringfromlist(i,starts,","))
+			s.finxs  = replacestringByKey(stringfromlist(i,S.daclistIDs), s.finxs, stringbykey(stringfromlist(i,S.daclistIDs), s.finxs) + "," + stringfromlist(i,fins,","))
+		endfor		
+		
+		//s.startxs = starts
+		//s.finxs = fins
 	else
 		abort "If either of startxs/finxs is provided, both must be provided"
 	endif
@@ -924,7 +941,7 @@ function scv_setSetpoints(S, itemsx, startx, finx, itemsy, starty, finy, startxs
 			
 			// Adjust the finys
 			string new_finys = ""
-			variable i
+
 			for (i=0;i<itemsinList(S.finys, ",");i++)
 	        	original_finy = str2num(stringfromList(i, S.finys, ","))
 	        	original_starty = str2num(stringfromList(i, S.startys, ","))
@@ -4612,7 +4629,7 @@ function scfd_getReadChunkSize(numADCs, numpts, bytesSec, totalByteReturn)
   // Returns the size of chunks that should be read at a time
   variable numADCs, numpts, bytesSec, totalByteReturn
 
-  variable read_duration = 0.1  // Make readchunk s.t. it nominally take this time to fill
+  variable read_duration = 0.05  // Make readchunk s.t. it nominally take this time to fill
   variable chunksize = (round(bytesSec*read_duration) - mod(round(bytesSec*read_duration),numADCs*2))  
 
   variable read_chunk=0

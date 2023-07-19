@@ -1887,11 +1887,11 @@ function/s fd_start_sweep(S, [AWG_list])
 			scu_assertSeparatorType(S.channelsx, ",")
 			string starts, fins, temp
 			if(S.direction == 1)
-				starts = S.startxs
-				fins = S.finxs
+				starts = stringByKey(fdIDname, S.startxs)
+				fins = stringByKey(fdIDname, S.startxs)
 			elseif(S.direction == -1)
-				starts = S.finxs
-				fins = S.startxs
+				starts = stringByKey(fdIDname, S.startxs)
+				fins = stringByKey(fdIDname, S.startxs)
 			else
 				abort "ERROR[fd_start_sweep]: S.direction must be 1 or -1, not " + num2str(S.direction)
 			endif
@@ -1930,7 +1930,7 @@ function/s fd_start_sweep(S, [AWG_list])
 			adcs = replacestring(";",adcs,"")
 			S.adcLists = replacestringbykey(fdIDname, S.adcLists, adcs)
 			
-			sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, starts, fins, S.numptsx
+			sprintf cmd, "INT_RAMP,%s,%s%s%s,%d\r", dacs, adcs, starts, fins, S.numptsx
 			// might need the channels picked for the fake recordings stored somewhere
 		else
 			adcs = replacestring(";",adcs,"")
