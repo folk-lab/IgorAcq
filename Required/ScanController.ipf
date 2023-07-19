@@ -4267,7 +4267,7 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only])
 	// Returns whether recording entered into panic_mode during sweep
    struct ScanVars &S
    variable rowNum, totalByteReturn
-   variable record_only // If set, then graphs will not be updated until all data has been read 
+   variable record_only // If set, then graphs will not be updated until all data has been read (defaults to 0)
 
    // hold incoming data chunks in string and distribute to data waves
    string buffer = ""
@@ -4288,6 +4288,7 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only])
       expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)      
       if(!panic_mode && expected_bytes_in_buffer < saveBuffer)  // if we aren't too far behind then update Raw 1D graphs
          scg_updateRawGraphs() 
+	      scs_checksweepstate()
 	      expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)  // Basically checking how long graph updates took
 			if (expected_bytes_in_buffer > 4096)
          		printf "ERROR[scfd_RecordBuffer]: After updating graphs, buffer is expected to overflow... Expected buffer size = %d (max = 4096). Bytes read so far = %d\r" expected_bytes_in_buffer, bytes_read
@@ -4300,7 +4301,7 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only])
 //				printf "DEBUGGING: getting behind: Expecting %d bytes in buffer (max 4096)\r" expected_bytes_in_buffer		
 				if (panic_mode == 0)
 					panic_mode = 1
-//					printf "WARNING[scfd_RecordBuffer]: Getting behind on reading buffer, entering panic mode (no more graph updates until end of sweep)\r"				
+					printf "WARNING[scfd_RecordBuffer]: Getting behind on reading buffer, entering panic mode (no more graph updates until end of sweep)\r"				
 				endif			
 			endif
 		endif
