@@ -425,11 +425,11 @@ function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, 
 end
 
 
-function ScanFastDAC2(instrID, start, fin, channels, [numptsx, sweeprate, delay, ramprate, repeats, alternate, starts, fins, x_label, y_label, comments, nosave, use_awg, interlaced_channels, interlaced_setpoints])
+function ScanFastDAC2(start, fin, channels, [numptsx, sweeprate, delay, ramprate, repeats, alternate, starts, fins, x_label, y_label, comments, nosave, use_awg, interlaced_channels, interlaced_setpoints])
 	// 1D repeat scan for FastDAC
 	// Note: to alternate scan direction set alternate=1
 	// Note: Ramprate is only for ramping gates between scans
-	variable instrID, start, fin, repeats, numptsx, sweeprate, delay, ramprate, alternate, nosave, use_awg
+	variable start, fin, repeats, numptsx, sweeprate, delay, ramprate, alternate, nosave, use_awg
 	string channels, x_label, y_label, comments, starts, fins, interlaced_channels, interlaced_setpoints
 	variable j=0
 	nvar sc_Saverawfadc
@@ -465,7 +465,7 @@ function ScanFastDAC2(instrID, start, fin, channels, [numptsx, sweeprate, delay,
 	// Set sc_ScanVars struct // scanvars might need a whole rewrite
 	
 	struct ScanVars S
-	initScanVarsFD(S, instrID, start, fin, channelsx=channels, numptsx=numptsx, rampratex=ramprate, starty=1, finy=repeats, delayy=delay, sweeprate=sweeprate,  \
+	initScanVarsFD2(S, start, fin, channelsx=channels, numptsx=numptsx, rampratex=ramprate, starty=1, finy=repeats, delayy=delay, sweeprate=sweeprate,  \
 					numptsy=repeats, startxs=starts, finxs=fins, x_label=x_label, y_label=y_label, alternate=alternate, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments)
 
    //	S.finy = S.starty+S.numptsy  // Repeats
@@ -531,8 +531,6 @@ function ScanFastDAC2(instrID, start, fin, channels, [numptsx, sweeprate, delay,
 	else
 		dowindow /k SweepControl
 	endif
-	
-	//set_indep()
 	
 end
 

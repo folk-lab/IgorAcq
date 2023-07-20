@@ -83,20 +83,18 @@ function set_master_slave(S)
 			if (cmpstr(check, "INDEP_SET\r\n"))
 				abort "unable to set independent mode on fastDAC:  " + fdname
 			endif
-			printf " %s   on %s \r\n", check, fdname
+			
 		elseif(i == 0 && numfdacs > 1) 									// sets first device to master if theres multiple devices
 			check = queryInstr(fd, "SET_MODE,MASTER" + "\r\n")
 			if (cmpstr(check, "MASTER_SET\r\n"))
 				abort "unable to set independent mode on fastDAC:  " + fdname
 			endif
-			printf " %s   on %s\r\n", check, fdname
 			S.sync = 1																	// Showing sync will be used  
 		else																				// sets the remainder of devices to slaves
 			check = queryInstr(fd, "SET_MODE,SLAVE" + "\r\n")
 			if (cmpstr(check, "SLAVE_SET\r\n"))
 				abort "unable to set independent mode on fastDAC:  " + fdname
 			endif
-			printf " %s   on %s\r\n", check, fdname 
 		endif
 	endfor
 end
@@ -116,8 +114,6 @@ function set_indep()
 		check = queryInstr(fd, "SET_MODE,INDEP" + "\r\n")                   // sets all to independent
 		if (cmpstr(check, "INDEP_SET\r\n"))
 			abort "unable to set independent mode on fastDAC:  " + fdname
-		else
-			printf " %s   on %s \r\n", check, fdname
 		endif 
 	endfor
 
@@ -1857,16 +1853,14 @@ function/s fd_start_sweep(S, [AWG_list])
 	if(S.sync)
 		nvar fdID = $(stringfromlist(0,S.instrIDs)) //first ID is master
 		string response = queryInstr(fdID, "ARM_SYNC\r\n")
-		print response
 		if(cmpstr(response,"SYNC_ARMED\r\n"))
-		abort "Unable to arm sync :("
+		abort "[fd_start_sweep()]: Unable to arm sync :("
 		endif
 		
 		/// check if sync is good // might be a do - while loop for multiple fdacs?
 		response = queryInstr(fdID, "CHECK_SYNC\r\n")
-		print response
 		if(cmpstr(response,"CLOCK_SYNC_READY\r\n"))
-		abort "clock sync bad :("
+		abort "[fd_start_sweep()]: clock sync bad :("
 		endif
 	endif	
 	
