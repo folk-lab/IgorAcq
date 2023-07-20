@@ -24,8 +24,7 @@ function interpolate_polyline(poly_y, poly_x, [num_points_to_interp])
 	num_points_to_interp = paramisdefault(num_points_to_interp) ? 1000 : num_points_to_interp
 	
 	variable num_vals = dimsize(poly_x, 0)
-	print poly_x[0], poly_x[num_vals - 1]
-	wave linspaced = linspace(poly_x[0], poly_x[num_vals - 1], num_points_to_interp, make_global = 1)
+	wave linspaced = linspace(poly_x[0], poly_x[num_vals - 1], num_points_to_interp, make_global = 0)
 	duplicate /o linspaced poly_x_interp
 	
 	Interpolate2 /T=1 /I=3 /Y=poly_y_interp/X=poly_x_interp poly_x, poly_y //linear interpolation
@@ -169,8 +168,54 @@ function get_multiple_line_paths_int(wave_2d, y_wave, x_wave, [width_y, width_x,
 end
 
 
-//
-//
+
+function replace_nans_with_avg(wave_2d, [overwrite])
+	// Replaces NaN values in a 2D wave with the average of the non-NaN values in each column
+    // wave_2d: The input 2D wave
+    // overwrite: Set to 1 to overwrite the input wave (Default is to create new wave with "_new" added)
+	wave wave_2d
+	int overwrite
+	
+	string wave_name = nameofwave(wave_2d)
+	
+	// Getting x-values from wave
+	string wave_name_x = wave_name + "_x"
+	duplicate /o /R=[][0] wave_2d $wave_name_x
+	wave wave_2d_x = $wave_name_x
+	wave_2d_x = x
+	
+	// Duplicating 2d wave
+	string wave_name_new = wave_name + "_new"
+	duplicate /o wave_2d $wave_name_new
+	wave wave_new = $wave_name_new 
+	
+	variable num_columns = dimsize(wave_2d, 1)
+	variable num_bad_rows = 0
+	variable i
+	for (i = 0; i < num_columns; i++)
+		duplicate /R=[][i] /o /free wave_2d wave_slice
+		wavestats /Q wave_slice
+		if (V_numNans/V_npnts > 0.33) // If 25% or more of data poitns are NaNs
+			DeletePoints/M=1 (i - num_bad_rows), 1, wave_new // delete row 
+			num_bad_rows += 1
+		else
+			Interpolate2 /T=1 /I=0 /Y=wave_slice wave_2d_x,  wave_slice // linear interpolation
+			wave_new[][i - num_bad_rows] = wave_slice[p]
+		endif
+	endfor
+	
+	
+	killwaves wave_2d_x
+	
+	
+	if (overwrite == 1)
+		duplicate /o wave_new $wave_name
+		killwaves wave_new
+	endif
+end
+
+
+
 //function interpolate_nrg_narrow(variable musmax, variable musmin)
 //	wave gammas_narrow_interp = g_n_narrow
 //	wave mus_narrow_interp = mu_n_narrow

@@ -531,7 +531,7 @@ EndMacro
 
 
 function /s avg_wav(wave wav) // /WAVE lets your return a wave
-	//  averaging any wave over columns (in y direction)
+	// averaging any wave over columns (in y direction)
 	// wave returned is avg_name
 	string wn = nameofwave(wav)
 	string avg_name = wn + "_avg";
@@ -544,8 +544,10 @@ function /s avg_wav(wave wav) // /WAVE lets your return a wave
 	ReduceMatrixSize(wav, 0, -1, nr, 0, -1, 1, 1, avg_name)
 	
 	redimension/n = -1 $avg_name
+	
 	return avg_name
 end
+
 
 
 function /s avg_wav_N(wave wav, int N) // /WAVE lets your return a wave
@@ -561,10 +563,11 @@ function /s avg_wav_N(wave wav, int N) // /WAVE lets your return a wave
 
 	nr = dimsize($wn,0) //number of rows (sweep length)
 	nc = dimsize($wn,1) //number of columns (repeats)
-	ReduceMatrixSize(wav, 0, -1, nr, 0,-1, N,1, avg_name)
+	ReduceMatrixSize(wav, 0, -1, nr, 0,-1, N, 1, avg_name)
 	redimension/n=-1 $avg_name
 	return avg_name
 end
+
 
 
 function average_every_n_rows(wave wav, int n)
@@ -578,7 +581,7 @@ function average_every_n_rows(wave wav, int n)
 	variable num_rows = dimsize(wav, 1) // (repeats)
 	variable num_columns = dimsize(wav, 0) // (sweep length)
 	
-	variable num_rows_post_average = num_rows/n
+	int num_rows_post_average = round(num_rows/n)
 	
 	ReduceMatrixSize(wav, 0, -1, num_columns, 0,-1, num_rows_post_average, 1, wave_name_averaged)
 
