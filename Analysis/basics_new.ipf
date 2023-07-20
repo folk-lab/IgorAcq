@@ -1123,3 +1123,24 @@ function centering(wave waved, string centered_wavename, wave mids)
 end
 
 
+function create_y_array(wave_2d)
+	// create global "y_array" given a 2d array
+	wave wave_2d
+	
+	string wave_2d_name = nameofwave(wave_2d)
+	
+	duplicate /o /RMD=[0][] $wave_2d_name y_array
+	y_array = y
+	redimension /n=(dimsize(y_array, 1)) y_array
+end
+
+
+function create_x_array(wave_2d)
+	// create global "x_array" given a 2d array
+	wave wave_2d
+	
+	string wave_2d_name = nameofwave(wave_2d)
+	
+	duplicate /o /RMD=[][0] $wave_2d_name x_array
+	x_array = x
+end
