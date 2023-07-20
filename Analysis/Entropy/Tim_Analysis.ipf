@@ -189,10 +189,10 @@ function replace_nans_with_avg(wave_2d, [overwrite])
 	duplicate /o wave_2d $wave_name_new
 	wave wave_new = $wave_name_new 
 	
-	variable num_columns = dimsize(wave_2d, 1)
+	variable num_rows = dimsize(wave_2d, 1) // IGOR column
 	variable num_bad_rows = 0
 	variable i
-	for (i = 0; i < num_columns; i++)
+	for (i = 0; i < num_rows; i++)
 		duplicate /R=[][i] /o /free wave_2d wave_slice
 		wavestats /Q wave_slice
 		if (V_numNans/V_npnts > 0.33) // If 25% or more of data poitns are NaNs

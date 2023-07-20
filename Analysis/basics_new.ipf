@@ -1118,8 +1118,8 @@ function centering(wave waved, string centered_wavename, wave mids)
 	duplicate/o waved $centered_wavename
 	wave new2dwave = $centered_wavename
 	copyscales waved new2dwave
-	//new2dwave=interp2d(waved,(x+fit_params[q][3]),(y)) // column 3 is the center fit parameter
-	new2dwave=interp2d(waved, (x + mids[q]), (y)) // mids is the shift in x
+	wavestats /q mids
+	new2dwave = interp2d(waved, (x + mids[q] - V_avg), (y)) // mids is the shift in x
 end
 
 

@@ -3,19 +3,44 @@
 #pragma DefaultTab={3,20,4}		// Set default tab width in Igor Pro 9 and later
 #include <Reduce Matrix Size>
 
-function master_ct_clean_average(wave wav, int refit,int dotcondcentering, string kenner_out,[string condfit_prefix, variable minx, variable maxx, int average])
+function master_ct_clean_average(wav, refit, dotcondcentering, kenner_out, [condfit_prefix, minx, maxx, average, fit_width])
 	// wav is the wave containing original CT data
 	// refit tells whether to do new fits to each CT line
 	// dotcondcentering tells whether to use conductance data to center the CT data
 	// kenner_out is the prefix to replace dat for this analysis
 	// kenner_out and condfit_prefix can not contain a number otherwise getfirstnu will not work
+	// fit_width: in points units rather than index. Will mask data to fit_width on either side of chosen mid point to attempt to fit. 
+	wave wav
+	int refit, dotcondcentering
+	string kenner_out
+	// optional params
+	string condfit_prefix
+	variable minx, maxx, fit_width
+	int average
 
+
+	///// start function timer
 	variable refnum, ms
 	refnum=startmstimer
 
+
+	///// optional params /////
+	//	option to limit fit to indexes [minx,maxx]
+	minx = paramisdefault(minx) ? 0 : minx // averaging ON is default
+	maxx = paramisdefault(maxx) ? (dimsize(wav, 0) - 1) : maxx // averaging ON is default
+	average = paramisdefault(average) ? 1 : average // averaging ON is default
+	fit_width = paramisdefault(fit_width) ? inf : fit_width // averaging ON is default
+	
+	
+	///// hard coded std setting
+	variable N = 3; // how many sdevs are acceptable?
+	
+	
+	///// setting wave names /////
 	string datasetname = nameofWave(wav) // typically datXXXcscurrent or similar
 	string kenner = getsuffix(datasetname) //  cscurrent in the above case
 	int wavenum = getfirstnum(datasetname) // XXX in the above case
+
 
 	// these are the new wave names to be made
 	string centered_wave_name = kenner_out + num2str(wavenum) + "_cs_centered"
@@ -24,23 +49,7 @@ function master_ct_clean_average(wave wav, int refit,int dotcondcentering, strin
 	
 	string fit_params_name = kenner_out + num2str(wavenum) + "_cs_fit_params"
 	wave fit_params = $fit_params_name
-	
 
-	variable N = 3; // how many sdevs are acceptable?
-	
-	//	option to limit fit to indexes [minx,maxx]
-	if (paramisdefault(minx))
-		minx=0
-	endif
-
-	if (paramisdefault(maxx))
-		maxx=dimsize(wav,0)-1
-	endif
-	
-	if(paramisdefault(average))
-		average=1
-	endif
-	
 	wave W_coef
 	wave badthetasx
 	wave badgammasx
@@ -50,16 +59,17 @@ function master_ct_clean_average(wave wav, int refit,int dotcondcentering, strin
 	if (refit==1)
 		get_initial_params($quickavg)
 		if(average==1)
-			fit_transition($quickavg, minx, maxx);// print W_coef
+			fit_transition($quickavg, minx, maxx, fit_width = fit_width); // print W_coef
 		endif
-		
-		get_fit_params($datasetname, fit_params_name, minx, maxx) 
+		// fit each row (IGOR column) to get fit params
+		get_fit_params($datasetname, fit_params_name, minx, maxx, fit_width = fit_width) 
 
 	endif
 
 	if (dotcondcentering==0)
+		zap_bad_params($datasetname, $fit_params_name, 6, overwrite = 1, zap_bad_mids = 1, zap_bad_thetas = 1) // remove rows with any fit param = INF or NaN
 		plot_thetas(wavenum, N, fit_params_name)
-		if(average==1)
+		if(average==1)	
 			duplicate/o/r=[][3] $fit_params_name mids
 			centering($datasetname, centered_wave_name, mids) // centred plot and average plot
 			remove_bad_thetas($centered_wave_name, badthetasx, cleaned_wave_name)
@@ -78,10 +88,14 @@ function master_ct_clean_average(wave wav, int refit,int dotcondcentering, strin
 	endif
 
 	if(average==1)
+//		replace_nans_with_avg($cleaned_wave_name, overwrite=0) // remove any row with > 25% NaNs in the row
 		avg_wav($cleaned_wave_name) // quick average plot
-		get_initial_params($quickavg); //print W_coef
-		fit_transition($avg_wave_name, minx, maxx)
-		plot_ct_figs(wavenum, N, kenner, kenner_out, minx, maxx)
+		
+		wavetransform/o zapnans $avg_wave_name
+		get_initial_params($avg_wave_name); //print W_coef
+		
+		fit_transition($avg_wave_name, minx, maxx, fit_width = fit_width)
+		plot_ct_figs(wavenum, N, kenner, kenner_out, minx, maxx, fit_width = fit_width)
 	endif
 
 	ms=stopmstimer(refnum)
@@ -90,50 +104,190 @@ end
 
 
 
-function /wave get_initial_params(sweep)
-
+function /wave get_initial_params(sweep, [update_amp_only, update_theta_only, update_mid_only])
 	// for a given sweep returns a guess of initial parameters for the fit function: Charge transiton
-
 	wave sweep
+	int update_amp_only, update_theta_only, update_mid_only
+		
+	update_amp_only = paramisdefault(update_amp_only) ? 0 : update_amp_only // updating amp only OFF is default
+	update_theta_only = paramisdefault(update_theta_only) ? 0 : update_theta_only // updating theta only OFF is default
+	update_mid_only = paramisdefault(update_mid_only) ? 0 : update_mid_only // updating mid only OFF is default
+	
+	// check if we want to only update wcoef rather than re-write
+	variable update_wcoef_only
+	if ((update_mid_only == 1) || (update_amp_only == 1) || (update_theta_only == 1))
+		update_wcoef_only = 1
+	else
+		update_wcoef_only = 0
+	endif
+	
 	duplicate /o sweep x_array
 	x_array = x
+	wave x_array
 
+	///// guess of amp term /////
 	variable amp = wavemax(sweep) - wavemin(sweep) //might be worthwile looking for a maximum/minimum with differentiation
-	//variable amp = 0.001
+	
+	///// guess of constant term /////
 	variable const = mean(sweep)
+	
+	///// guess of theta term /////
 	variable theta = 10
 
+	///// guess of mid term ////
 	duplicate /o sweep sweepsmooth
-	Smooth/S=4 201, sweepsmooth ;DelayUpdate
-
+	Smooth/S=4 201, sweepsmooth
 	differentiate sweepsmooth
-	extract/INDX sweepsmooth, extractedwave, sweepsmooth == wavemin(sweepsmooth)
-	variable mid = x_array[extractedwave[0]]
+	variable wave_min = wavemin(sweepsmooth)
+	FindLevel /Q sweepsmooth, wave_min
+	variable mid = V_LevelX
+	
+	// set mid to mid x value if calculated mid point outside range
+	if ((mid < x_array[0]) || (mid > x_array[inf]))
+		wavestats /Q x_array
+		mid = x_array[round(V_npnts/2)]
+	endif
 
-	//extract/INDX sweepsmooth, extractedwave, sweepsmooth == 0 //new
-	//variable amp = sweep[extractedwave[0]] - sweep[extractedwave[1]] // new
 
-
+	///// guess of linear term /////
 	variable lin = 0.001  // differentiated value of flat area?
 
-	Make /D/N=6/O W_coef
-	W_coef[0] = {amp,const,theta,mid,lin,0}
 
-	killwaves extractedwave, sweepsmooth
-	return W_coef
+	killwaves sweepsmooth
+	
+	// if we are updating any of the wcoefs
+	if (update_wcoef_only == 1)
+		Wave/Z w = W_coef
+		
+		// update amp
+		if (update_amp_only == 1)
+			w[0] = amp
+		endif	
+		
+		// update theta
+		if (update_theta_only == 1)
+			w[2] = theta
+		endif		
+		
+		// update mid
+		if (update_mid_only == 1)
+			w[3] = mid
+		endif
+		
+		return w
+	endif
+	
+	if (update_wcoef_only != 1)
+		Make /D/N=6/O W_coef
+		W_coef[0] = {amp,const,theta,mid,lin,0}
+		return W_coef
+	endif
+
+//	Wave/Z w = W_coef
+//	
+//	Make /D/N=6/O W_coef
+//	W_coef[0] = {amp,const,theta,mid,lin,0}
+//	
+//	killwaves sweepsmooth
+//	return W_coef
 
 end
 
 
+function zap_bad_params(wave_2d, params, num_params, [overwrite, zap_bad_mids, zap_bad_thetas])
+	wave wave_2d, params
+	variable num_params
+	int overwrite, zap_bad_mids, zap_bad_thetas
+		
+	variable num_cols = dimsize(wave_2d, 0)
+	variable num_rows = dimsize(wave_2d, 1)
 
+	duplicate /o /RMD=[][0] wave_2d x_array
+	x_array = x
+	wave x_array
+	variable scan_width = (x_array[INF] - x_array[0])/2
+	variable scan_mid = x_array[0] + scan_width
+	variable mid_percentage_within = 0.1
+	
+	// Duplicating 2d wave
+	string wave_2d_name = nameofwave(wave_2d)
+	string wave_2d_name_new = wave_2d_name + "_new"
+	duplicate /o wave_2d $wave_2d_name_new
+	wave wave_2d_new = $wave_2d_name_new 
+	
+	// Duplicating param wave
+	string params_name = nameofwave(params)
+	string params_name_new = params_name + "_new"
+	duplicate /o params $params_name_new
+	wave params_new = $params_name_new 
+	
+	variable num_bad_rows = 0
+	variable is_bad_mid, mid
+	variable is_bad_theta, theta
+	
+	variable i
+	for (i = 0; i < num_rows; i++)
+		is_bad_mid = 0
+		is_bad_theta = 0
+		// Create slice of param values (exclude uncertainties)
+		duplicate /o /RMD=[i][0, num_params - 1] params param_slice
+		wavestats /Q param_slice
+		
+		// assuming theta is index 2
+		if (zap_bad_mids == 1)
+			theta = param_slice[2]
+			if (abs(theta) > 600) // hard coded theta cutoff off of > 1000
+				is_bad_mid = 1
+			endif
+		endif
+		
+		// assuming mid is index 3
+		if (zap_bad_mids == 1)
+			mid = param_slice[3]
+			if ((mid < scan_mid - (scan_width*mid_percentage_within*2)) || (mid > scan_mid + (scan_width*mid_percentage_within*2)))
+				is_bad_theta = 1
+			endif
+		endif
+		
+		// if NaN or INF in params then delete row from data and param values	
+		if ((V_numNans > 0) || (V_numINFs > 0) || (is_bad_mid == 1) || (is_bad_theta == 1))
+			DeletePoints/M=1 (i - num_bad_rows), 1, wave_2d_new // delete row
+			DeletePoints/M=0 (i - num_bad_rows), 1, params_new  // delete row
+			num_bad_rows += 1
+		endif
+		
+	endfor
+	
+	// overwrite input waves 
+	if (overwrite == 1)
+		duplicate /o wave_2d_new $wave_2d_name
+		duplicate /o params_new $params_name
+		killwaves wave_2d_new, params_new
+	endif
+	
+end
 
-function /wave fit_transition(current_array, minx, maxx)
+function /wave fit_transition(current_array, minx, maxx, [fit_width])
 	// fits the current_array, If condition is 0 it will get initial params, If 1:
 	// define a variable named W_coef_guess = {} with the correct number of arguments
 	// outputs wave named "fit_" + current_array
 	wave current_array
 	variable minx, maxx
+	// optional param
+	variable fit_width
+	fit_width = paramisdefault(fit_width) ? inf : fit_width // averaging ON is default
+	
+	// update the minx and maxx based on the mid value and fit_width 
 	wave W_coef
+	variable mid, startx, endx
+	if (fit_width != inf)
+		mid = W_coef[3]
+		startx = mid - fit_width
+		endx = mid + fit_width
+		
+		minx = x2pnt(current_array, startx)
+		maxx = x2pnt(current_array, endx)
+	endif
 	
 	FuncFit/q /TBOX=768 ct_fit_function W_coef current_array[minx,maxx][0] /D
 end
@@ -141,32 +295,45 @@ end
 
 
 
-function /wave get_fit_params(wave wavenm, string fit_params_name,variable minx, variable maxx)
+function /wave get_fit_params(wavenm, fit_params_name, minx, maxx, [fit_width])
 	// returns wave with the name wave "dat"+ wavenum +"_cs_fit_params" eg. dat3320fit_params
-
-	//If condition is 0 it will get initial params, If 1:
-	// define a variable named W_coef_guess = {} with the correct number of arguments
+	// wavenm: The input wave
+    // fit_params_name: The name of the output wave (fit params)
+    // minx: The minimum x value (as an index) for fitting
+    // maxx: The maximum x value (as an index) for fitting
+    // fit_width: Optional parameter for fit width (default is infinity)
+	wave wavenm
+	string fit_params_name
+	variable minx, maxx
+	variable fit_width
+	
+	fit_width = paramisdefault(fit_width) ? inf : fit_width // averaging ON is default
+	
+	// Define variables
 	variable i
-	string w2d=nameofwave(wavenm)
-	int wavenum=getfirstnum(w2d)
+	string w2d = nameofwave(wavenm)
+	int wavenum = getfirstnum(w2d)
 	int nc
 	int nr
 	wave W_coef
 	wave W_sigma
 
-
+	// Get dimensions of input wave
 	nr = dimsize(wavenm, 0) //number of rows (total sweeps)
 	nc = dimsize(wavenm, 1) //number of columns (data points)
+	
+	// Create output wave
 	make /N= (nc , 12) /o $fit_params_name
 	wave fit_params = $fit_params_name
 
-	duplicate/o wavenm temp_wave
+	// Duplicate input wave
+	duplicate/o /R=[][0] wavenm temp_wave
 	wave temp_wave
 	
 	for (i=0; i < nc ; i+=1)
-
 		temp_wave = wavenm[p][i]
-		fit_transition(temp_wave, minx, maxx)
+		wave W_coef = get_initial_params(temp_wave, update_amp_only = 1, update_theta_only = 1, update_mid_only = 1)
+		fit_transition(temp_wave, minx, maxx, fit_width = fit_width)
 		fit_params[1 * i][,5] = W_coef[q]
 		fit_params[1 * i][6,] = W_sigma[q-6]
 	endfor
@@ -184,11 +351,10 @@ function plot_thetas(int wavenum, variable N, string fit_params_name)
 	variable i
 	int nr
 
-
 	wave fit_params = $fit_params_name
-	nr = dimsize(fit_params,0)
+	nr = dimsize(fit_params, 0)
 
-	duplicate /O/R =[0,nr][2] fit_params thetas
+	duplicate /O/R =[0, nr][2] fit_params thetas
 
 	thetamean = mean(thetas)
 	thetastd = sqrt(variance(thetas))
@@ -236,8 +402,7 @@ function plot_thetas(int wavenum, variable N, string fit_params_name)
 	Legend/C/N=text0/J/A=RT "\\s(meanwave) mean\r\\s(stdwave) 2*std\r\\s(goodthetas) good\r\\s(badthetas) outliers"
 	TextBox/C/N=text1/A=MT/E=2 "\\Z14\\Z16 thetas of dat" + num2str(wavenum)
 
-	Label bottom "repeat"
-	Label left "theta values"
+	Label bottom "Theta"
 
 end
 
@@ -264,8 +429,8 @@ function plot_badthetas(wave wavenm)
 	
 		ModifyGraph fSize=24
 		ModifyGraph gFont="Gill Sans Light"
-		Label bottom "voltage"
-		Label left "current"
+		Label bottom "Gate (mV)"
+		Label left "Current (nA)"
 		TextBox/C/N=text1/A=MT/E=2 "\\Z14\\Z16 bad thetas of " + dataset
 	endif
 end
@@ -294,11 +459,13 @@ function /wave remove_bad_thetas(wave center, wave badthetasx, string cleaned_wa
 end
 
 
-function plot_ct_figs(variable wavenum, variable N, string kenner, string kenner_out, variable minx, variable maxx)
+function plot_ct_figs(variable wavenum, variable N, string kenner, string kenner_out, variable minx, variable maxx, [variable fit_width])
 	string datasetname ="dat" + num2str(wavenum) + kenner // this was the original dataset name
 	string centered_wave_name = kenner_out + num2str(wavenum) + "_cs_centered" // this is the centered 2D wave
 	string cleaned_wave_name = kenner_out + num2str(wavenum) + "_cs_cleaned" // this is the centered 2D wave after removing outliers ("cleaning")
 	string avg_wave_name = cleaned_wave_name + "_avg" // this is the averaged wave produced by avg_wave($cleaned)
+	
+	fit_width = paramisdefault(fit_width) ? inf : fit_width // averaging ON is default
 	
 	string fit_params_name = kenner_out + num2str(wavenum) + "_cs_fit_params" // this is the fit parameters 
 	string quickavg = datasetname + "_avg" // this is the wave produced by avg_wave($datasetname)
@@ -306,13 +473,13 @@ function plot_ct_figs(variable wavenum, variable N, string kenner, string kenner
 
 
 	/////////////////// plot quick avg fig  //////////////////////////////////////
-
 	string quick_fit_name = "fit_" + quickavg 
 	
 	display $quickavg
-	fit_transition($quickavg,minx,maxx)
-	Label bottom "gate V"
-	Label left "csurrent"
+	fit_transition($quickavg, minx, maxx, fit_width = fit_width)
+	
+	Label bottom "Gate (mV)"
+	Label left "Current (nA)"
 	ModifyGraph fSize=24
 	ModifyGraph gFont="Gill Sans Light"
 	ModifyGraph mode($quick_fit_name)=0,lsize($quick_fit_name)=1,rgb($quick_fit_name)=(65535,0,0)
@@ -333,14 +500,13 @@ function plot_ct_figs(variable wavenum, variable N, string kenner, string kenner
 
 
 	/////////////////// plot avg fit  //////////////////////////////////////
-	
-	display $avg_wave_name; W_coef[3]=0
-
 	string fit_name = "fit_" + avg_wave_name
-	fit_transition($avg_wave_name, minx, maxx)
-
-	Label bottom "gate (V)"
-	Label left "csurrent (nA)"
+	
+	display $avg_wave_name
+	fit_transition($avg_wave_name, minx, maxx, fit_width = fit_width)
+	
+	Label bottom "Gate (mV)"
+	Label left "Current (nA)"
 	ModifyGraph fSize=24
 	ModifyGraph gFont="Gill Sans Light"
 	ModifyGraph mode($fit_name)=0, lsize($fit_name)=1, rgb($fit_name)=(65535,0,0)
