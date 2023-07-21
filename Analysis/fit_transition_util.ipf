@@ -3,37 +3,38 @@
 #pragma DefaultTab={3,20,4}		// Set default tab width in Igor Pro 9 and later
 #include <Reduce Matrix Size>
 
-function master_ct_clean_average(wav, refit, dotcondcentering, kenner_out, [condfit_prefix, minx, maxx, average, fit_width])
+function master_ct_clean_average(wav, refit, dotcondcentering, kenner_out, [condfit_prefix, minx, maxx, average, fit_width, N, repeats_on])
 	// wav is the wave containing original CT data
 	// refit tells whether to do new fits to each CT line
 	// dotcondcentering tells whether to use conductance data to center the CT data
 	// kenner_out is the prefix to replace dat for this analysis
 	// kenner_out and condfit_prefix can not contain a number otherwise getfirstnu will not work
-	// fit_width: in points units rather than index. Will mask data to fit_width on either side of chosen mid point to attempt to fit. 
+	// minx: The minimum x value (as an index) for fitting
+    // maxx: The maximum x value (as an index) for fitting
+    // average: Will average and fit the cleaned data. Default is average = 1
+	// fit_width: Will mask data to fit_width on either side of chosen mid point to attempt to fit. In points units rather than index
+	// N: Choose how many std on either side of mean theta to accept the theta from fit . Default is N = 3
+	// repeats_on: Choose whether to plot data as repeats or as gate voltage. Default is repeats_on = 1 (assuming 2d data is repeats)
 	wave wav
 	int refit, dotcondcentering
 	string kenner_out
 	// optional params
 	string condfit_prefix
-	variable minx, maxx, fit_width
-	int average
-
+	variable minx, maxx, fit_width, N
+	int average, repeats_on
 
 	///// start function timer
 	variable refnum, ms
-	refnum=startmstimer
+	refnum = startmstimer
 
 
-	///// optional params /////
 	//	option to limit fit to indexes [minx,maxx]
 	minx = paramisdefault(minx) ? 0 : minx // averaging ON is default
 	maxx = paramisdefault(maxx) ? (dimsize(wav, 0) - 1) : maxx // averaging ON is default
 	average = paramisdefault(average) ? 1 : average // averaging ON is default
 	fit_width = paramisdefault(fit_width) ? inf : fit_width // averaging ON is default
-	
-	
-	///// hard coded std setting
-	variable N = 3; // how many sdevs are acceptable?
+	repeats_on = paramisdefault(repeats_on) ? 1 : repeats_on // repeats_on ON is default
+	N = paramisdefault(N) ? 3 : N // averaging ON is default
 	
 	
 	///// setting wave names /////
@@ -68,18 +69,18 @@ function master_ct_clean_average(wav, refit, dotcondcentering, kenner_out, [cond
 
 	if (dotcondcentering==0)
 		zap_bad_params($datasetname, $fit_params_name, 6, overwrite = 1, zap_bad_mids = 1, zap_bad_thetas = 1) // remove rows with any fit param = INF or NaN
-		plot_thetas(wavenum, N, fit_params_name)
+		plot_thetas($datasetname, N, fit_params_name, repeats_on = repeats_on)
 		if(average==1)	
 			duplicate/o/r=[][3] $fit_params_name mids
 			centering($datasetname, centered_wave_name, mids) // centred plot and average plot
 			remove_bad_thetas($centered_wave_name, badthetasx, cleaned_wave_name)
 		endif
 
-	elseif(dotcondcentering==1)
+	elseif(dotcondcentering == 1)
 		string condfit_params_name = condfit_prefix + num2str(wavenum) + "_dot_fit_params"
 		wave condfit_params = $condfit_params_name
 		
-		plot_gammas(condfit_params_name, N)
+		plot_gammas(condfit_params_name, N) // TODO: Decide whether to use repeats or gate value functionality
 		plot_badgammas($centered_wave_name)
 		duplicate/o/r=[][2] condfit_params mids
 
@@ -95,7 +96,7 @@ function master_ct_clean_average(wav, refit, dotcondcentering, kenner_out, [cond
 		get_initial_params($avg_wave_name); //print W_coef
 		
 		fit_transition($avg_wave_name, minx, maxx, fit_width = fit_width)
-		plot_ct_figs(wavenum, N, kenner, kenner_out, minx, maxx, fit_width = fit_width)
+		plot_ct_figs(wavenum, N, kenner, kenner_out, minx, maxx, fit_width = fit_width, repeats_on = repeats_on)
 	endif
 
 	ms=stopmstimer(refnum)
@@ -182,19 +183,19 @@ function /wave get_initial_params(sweep, [update_amp_only, update_theta_only, up
 		W_coef[0] = {amp,const,theta,mid,lin,0}
 		return W_coef
 	endif
-
-//	Wave/Z w = W_coef
-//	
-//	Make /D/N=6/O W_coef
-//	W_coef[0] = {amp,const,theta,mid,lin,0}
-//	
-//	killwaves sweepsmooth
-//	return W_coef
-
+	
 end
 
 
 function zap_bad_params(wave_2d, params, num_params, [overwrite, zap_bad_mids, zap_bad_thetas])
+	// remove rows from wave_2d and params if there is a NaN or INF in the params
+	// num_params is required to specify how many columns in the params wave are the params (e.g. it could include std)
+	// wave_2d: 2d wave to remove rows from
+	// params: params wave to remove rows from and check param values
+	// num_params: number of columns in params wave that are only params
+	// overwrite: Default is overwrite = 0. overwrite = 1 will overwrite input wave and params wave.
+	// zap_bad_mids: Removes rows where the mid is bad. If mid value is greater than hard coded 'mid_percentage_within' variable from centre of scan.
+	// zap_bad_thetas: Removes rows where the theta is bad. Hard coded if absolute value of theta is > 600.
 	wave wave_2d, params
 	variable num_params
 	int overwrite, zap_bad_mids, zap_bad_thetas
@@ -267,11 +268,16 @@ function zap_bad_params(wave_2d, params, num_params, [overwrite, zap_bad_mids, z
 	
 end
 
-function /wave fit_transition(current_array, minx, maxx, [fit_width])
-	// fits the current_array, If condition is 0 it will get initial params, If 1:
+
+function /wave fit_transition(wave_to_fit, minx, maxx, [fit_width])
+	// fits the wave_to_fit, If condition is 0 it will get initial params, If 1:
 	// define a variable named W_coef_guess = {} with the correct number of arguments
-	// outputs wave named "fit_" + current_array
-	wave current_array
+	// outputs wave named "fit_" + wave_to_fit
+	// wave_to_fit: The wave that will be fit...
+	// minx: The minimum x value (as an index) for fitting
+    // maxx: The maximum x value (as an index) for fitting
+    // fit_width: Optional parameter for fit width (default is infinity)
+	wave wave_to_fit
 	variable minx, maxx
 	// optional param
 	variable fit_width
@@ -285,13 +291,12 @@ function /wave fit_transition(current_array, minx, maxx, [fit_width])
 		startx = mid - fit_width
 		endx = mid + fit_width
 		
-		minx = x2pnt(current_array, startx)
-		maxx = x2pnt(current_array, endx)
+		minx = x2pnt(wave_to_fit, startx)
+		maxx = x2pnt(wave_to_fit, endx)
 	endif
 	
-	FuncFit/q /TBOX=768 ct_fit_function W_coef current_array[minx,maxx][0] /D
+	FuncFit/q /TBOX=768 ct_fit_function W_coef wave_to_fit[minx,maxx][0] /D
 end
-
 
 
 
@@ -343,7 +348,14 @@ function /wave get_fit_params(wavenm, fit_params_name, minx, maxx, [fit_width])
 end
 
 
-function plot_thetas(int wavenum, variable N, string fit_params_name)
+function plot_thetas(wave_2d, N, fit_params_name, [repeats_on])
+	wave wave_2d
+	variable N
+	string fit_params_name
+	int repeats_on
+	
+	repeats_on = paramisdefault(repeats_on) ? 1 : repeats_on // repeats_on ON is default
+	
 	//If condition is 0 it will get initial params, If 1:
 	// define a variable named W_coef_guess = {} with the correct number of arguments
 	variable thetamean
@@ -370,25 +382,49 @@ function plot_thetas(int wavenum, variable N, string fit_params_name)
 	meanwave = thetamean
 	stdwave = thetamean - N * thetastd
 	stdwave2 = thetamean + N * thetastd
+	
+	// if repeats off then change thetasx to gate values
+	if (repeats_on == 0)
+		create_y_wave(wave_2d) // creates y_wave
+		wave y_wave
+	endif
 
-
+	variable thetax_val
 	for (i=0; i < nr ; i+=1)
+	
+		// work out what x values should be added to the theta x array
+		if (repeats_on == 1)
+			thetax_val = i
+		else
+			thetax_val = y_wave[i] 
+		endif
 
 		if (abs(thetas[i] - thetamean) < (N * thetastd))
 
 			insertPoints /v = (thetas[i]) nr, 1, goodthetas // value of theta
-			insertpoints /v = (i) nr, 1, goodthetasx        // the repeat
+			insertpoints /v = (thetax_val) nr, 1, goodthetasx        // the repeat
 
 		else
 
 			insertPoints /v = (thetas[i]) nr, 1, badthetas // value of theta
-			insertpoints /v = (i) nr, 1, badthetasx        // repeat
+			insertpoints /v = (thetax_val) nr, 1, badthetasx        // repeat
 
 		endif
 
 	endfor
+		
+	display
+	
+	if (repeats_on == 0)
+		appendtograph meanwave vs y_wave 
+		appendtograph stdwave vs y_wave
+		appendtograph stdwave2 vs y_wave
+	else
+		appendtograph meanwave
+		appendtograph stdwave
+		appendtograph stdwave2
+	endif
 
-	display meanwave, stdwave, stdwave2
 	appendtograph goodthetas vs goodthetasx
 	appendtograph badthetas vs badthetasx
 
@@ -400,41 +436,16 @@ function plot_thetas(int wavenum, variable N, string fit_params_name)
 	ModifyGraph mode(goodthetas)=3,lsize(goodthetas)=2, rgb(goodthetas)=(2,39321,1)
 	ModifyGraph mode(badthetas)=3
 	Legend/C/N=text0/J/A=RT "\\s(meanwave) mean\r\\s(stdwave) 2*std\r\\s(goodthetas) good\r\\s(badthetas) outliers"
-	TextBox/C/N=text1/A=MT/E=2 "\\Z14\\Z16 thetas of dat" + num2str(wavenum)
+	TextBox/C/N=text1/A=MT/E=2 "\\Z14\\Z16 thetas of " + fit_params_name
 
-	Label bottom "Theta"
-
-end
-
-
-
-function plot_badthetas(wave wavenm)
-	int i
-	int nr
-	wave badthetasx
-	string dataset = nameofwave(wavenm)
-
-	duplicate /o wavenm, wavenmcopy
-	
-	nr = dimsize(badthetasx,0)
-	display
-	
-	if (nr>0)
-		for(i=0; i < nr; i +=1)
-			appendtograph wavenmcopy[][badthetasx[i]]
-	
-		endfor
-	
-		QuickColorSpectrum2()
-	
-		ModifyGraph fSize=24
-		ModifyGraph gFont="Gill Sans Light"
+	Label Left "Theta"
+	if (repeats_on == 1)
+		Label bottom "Repeats"
+	else
 		Label bottom "Gate (mV)"
-		Label left "Current (nA)"
-		TextBox/C/N=text1/A=MT/E=2 "\\Z14\\Z16 bad thetas of " + dataset
 	endif
-end
 
+end
 
 
 function /wave remove_bad_thetas(wave center, wave badthetasx, string cleaned_wave_name)
@@ -459,13 +470,19 @@ function /wave remove_bad_thetas(wave center, wave badthetasx, string cleaned_wa
 end
 
 
-function plot_ct_figs(variable wavenum, variable N, string kenner, string kenner_out, variable minx, variable maxx, [variable fit_width])
+function plot_ct_figs( wavenum, N, kenner, kenner_out, minx, maxx, [fit_width, repeats_on])
+	variable wavenum, N, minx, maxx
+	string kenner, kenner_out
+	
+	variable fit_width, repeats_on
+	
+	fit_width = paramisdefault(fit_width) ? inf : fit_width // averaging ON is default
+	repeats_on = paramisdefault(repeats_on) ? 1 : repeats_on // repeats_on ON is default
+	
 	string datasetname ="dat" + num2str(wavenum) + kenner // this was the original dataset name
 	string centered_wave_name = kenner_out + num2str(wavenum) + "_cs_centered" // this is the centered 2D wave
 	string cleaned_wave_name = kenner_out + num2str(wavenum) + "_cs_cleaned" // this is the centered 2D wave after removing outliers ("cleaning")
 	string avg_wave_name = cleaned_wave_name + "_avg" // this is the averaged wave produced by avg_wave($cleaned)
-	
-	fit_width = paramisdefault(fit_width) ? inf : fit_width // averaging ON is default
 	
 	string fit_params_name = kenner_out + num2str(wavenum) + "_cs_fit_params" // this is the fit parameters 
 	string quickavg = datasetname + "_avg" // this is the wave produced by avg_wave($datasetname)
@@ -489,13 +506,12 @@ function plot_ct_figs(variable wavenum, variable N, string kenner, string kenner
 
 
 	/////////////////// plot thetas  //////////////////////////////////////
+	string x_label = "Gate (mV)"
+	string y_label = selectstring(repeats_on, "Gate (mV)", "Repeats")
 
-
-	//plot_thetas(wavenum,N,fit_params_name)
-	//plot_badthetas($datasetname) // thetas vs repeat plot and bad theta sweep plot
-	plot2d_heatmap($datasetname)
-	plot2d_heatmap($cleaned_wave_name)
-	plot2d_heatmap($centered_wave_name)
+	plot2d_heatmap($datasetname, x_label = x_label, y_label = y_label)
+	plot2d_heatmap($cleaned_wave_name, x_label = x_label, y_label = y_label)
+	plot2d_heatmap($centered_wave_name, x_label = x_label, y_label = y_label)
 
 
 
@@ -532,73 +548,3 @@ Function ct_fit_function(w,ys,xs) : FitFunc
 
 	ys= w[0] * tanh((xs - w[3])/(-2 * w[2])) + w[4]*xs + w[1] + w(5)*xs^2
 End
-
-
-
-//////////////////////
-///// DEPRECATED /////
-//////////////////////
-/////////////////////////////////////////////////////////
-///// Using fit_single_peak() in favour of the below/////
-/////////////////////////////////////////////////////////
-//Function Chargetransition(w,x) : FitFunc
-//	Wave w
-//	Variable x
-//
-//	//CurveFitDialog/ These comments were created by the Curve Fitting dialog. Altering them will
-//	//CurveFitDialog/ make the function less convenient to work with in the Curve Fitting dialog.
-//	//CurveFitDialog/ Equation:
-//	//CurveFitDialog/ f(x) = Amp*tanh((x - Mid)/(2*theta)) + Linear*x + Const
-//
-//	//CurveFitDialog/ End of Equation
-//	//CurveFitDialog/ Independent Variables 1
-//	//CurveFitDialog/ x
-//	//CurveFitDialog/ Coefficients 5
-//	//CurveFitDialog/ w[0] = Amp
-//	//CurveFitDialog/ w[1] = Const
-//	//CurveFitDialog/ w[2] = Theta
-//	//CurveFitDialog/ w[3] = Mid
-//	//CurveFitDialog/ w[4] = Linear
-//
-//
-//	return w[0]*tanh((x - w[3])/(2*w[2])) + w[4]*x + w[1]
-//End
-
-
-//
-//Function CT2(w,x) : FitFunc
-//	Wave w
-//	Variable x
-//
-//	//CurveFitDialog/ These comments were created by the Curve Fitting dialog. Altering them will
-//	//CurveFitDialog/ make the function less convenient to work with in the Curve Fitting dialog.
-//	//CurveFitDialog/ Equation:
-//	//CurveFitDialog/ f(x) = Amp*tanh((x - Mid)/(2*theta)) + Linear*x + Const+Quad*x^2
-//	//CurveFitDialog/ End of Equation
-//	//CurveFitDialog/ Independent Variables 1
-//	//CurveFitDialog/ x
-//	//CurveFitDialog/ Coefficients 6
-//	//CurveFitDialog/ w[0] = Amp
-//	//CurveFitDialog/ w[1] = Const
-//	//CurveFitDialog/ w[2] = Theta
-//	//CurveFitDialog/ w[3] = Mid
-//	//CurveFitDialog/ w[4] = Linear
-//	//CurveFitDialog/ w[5] = Quad
-//
-//
-//	return w[0]*tanh(-(x - w[3])/(2*w[2])) + w[4]*x + w[1]+w[5]*x^2
-//End
-
-
-
-//function dotcond_centering(wave waved, string kenner_out)
-//	string w2d = nameofwave(waved)
-//	int wavenum = getfirstnum(w2d)
-//	string centered = kenner_out + num2str(wavenum) + "_cs_centered"
-//	string fit_params_name = kenner_out + num2str(wavenum) + "_dot_fit_params"
-//	wave fit_params = $fit_params_name
-//	wave new2dwave = $centered
-//	copyscales waved new2dwave
-//	new2dwave=interp2d(waved,(x+fit_params[q][2]),(y)) // column 3 is the center fit parameter
-//End
-
