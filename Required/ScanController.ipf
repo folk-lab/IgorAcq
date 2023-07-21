@@ -394,6 +394,9 @@ structure ScanVars
 	 string ADCcounts		// ADCcounts to ensure theres equal amount of recordings between instruments
 	 string adcLists      	// adclist by id -> attempting to use stringbykey	
 	 string IDstartxs, IDfinxs  // If sweeping from different start/end points for each channel or instrument / This one is a stringkey with fdIDs
+	 string dacListIDs_y     // Ids for channely (for now, not sure ill change this yetY
+	 
+	 
 	 	
 		
 endstructure
@@ -804,7 +807,7 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
 	// Set variables with some calculation
     scv_setFreq2(S) 		// Sets S.samplingFreq/measureFreq/numADCs	
     scv_setNumptsSweeprateDuration(S) 	// Checks that either numpts OR sweeprate OR duration was provided, and sets ScanVars accordingly
-                                // Note: Valid for start/fin only (uses S.startx, S.finx NOT S.startxs, S.finxs)
+                                // Note: Valid for start/fin only (uses S.startx, S.finx NOT S.startxs, S.finxs)                            
 end
 
 
@@ -3183,7 +3186,8 @@ function RampStartFD(S, [ignore_lims, x_only, y_only])
 	if(numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0 && x_only != 1)  // If not NaN and not "" and not x only
 		scu_assertSeparatorType(S.channelsy, ",")
 		for(i=0;i<itemsinlist(S.channelsy,",");i+=1)
-			rampMultipleFDAC(S.instrIDy,stringfromlist(i,S.channelsy,","),str2num(stringfromlist(i,S.startys,",")),ramprate=S.rampratey, ignore_lims=ignore_lims)
+			nvar fdID = $(stringfromlist(i,S.daclistIDs_y))
+			rampMultipleFDAC(fdID, stringfromlist(i,S.channelsy,","),str2num(stringfromlist(i,S.startys,",")),ramprate=S.rampratey, ignore_lims=ignore_lims)
 		endfor
 	endif
   
@@ -3364,16 +3368,17 @@ function scc_checkSameDeviceFD(S, [x_only, y_only])
 end
 
 
-function /S scc_checkDeviceNumber(S, [adc])
+function /S scc_checkDeviceNumber(S, [adc, check_y])
 	// checks which devices are used for ramping // or which devices are recording
 	// outputs a list of IDS associated with the S.channelsx and S.ADClist
 	
 	struct ScanVars &S
-	int adc
+	int adc, check_y
 	adc = paramisDefault(adc) ? 0 : 1
+	check_y = paramisdefault(check_y) ? 0 : 1
 	
 	string key = selectstring(adc,"numDACCh","numADCCh")
-	string chs = selectstring(adc, S.channelsx, S.ADClist)
+	string chs = selectstring(adc, selectstring(check_y,S.channelsx, S.channelsy), S.ADClist)
 	chs = replaceString(",", chs, ";")
 	
 	svar sc_fdacKeys  // Holds info about connected FastDACs

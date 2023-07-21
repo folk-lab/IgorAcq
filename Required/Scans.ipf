@@ -472,7 +472,7 @@ function ScanFastDAC2(start, fin, channels, [numptsx, sweeprate, delay, ramprate
 		S.y_label = "Repeats" // Why is the 2D label passed here
 	endif
 	
-	// Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
+	// Check software limits and ramprate limits
 	PreScanChecksFD2(S, x_only=1)  
 	
 	// sets master/slave between the devices that are used.
@@ -991,16 +991,17 @@ function ScanFastDAC2D2(fdID, startx, finx, channelsx, starty, finy, channelsy, 
  	struct ScanVars S
  	if (use_bd == 0 && use_second_fd == 0)
 
-	 	initScanVarsFD(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
+	 	initScanVarsFD2(S, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
 		   						 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments)
 	
 	
 	else  				// Using second instrument for y-axis
-		initScanVarsFD(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
+		initScanVarsFD2(S, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
 		   						rampratey=rampratey, startxs=startxs, finxs=finxs, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments)
 		s.is2d = 1		   						
 		S.starty = starty
 		S.finy = finy		
+		S.dacListIDs_y = scc_checkDeviceNumber(S, check_y=1)
 		if (use_bd) //// how important is this?
 			S.instrIDy = bdID
 			S.channelsy = scu_getChannelNumbers(channelsy, fastdac=0)
@@ -1024,6 +1025,9 @@ function ScanFastDAC2D2(fdID, startx, finx, channelsx, starty, finy, channelsy, 
    	else  // Should work for 1 or 2 FDs
    	   PreScanChecksFD2(S)  
    	endif
+   	
+   	// sets master/slave between the devices that are used.
+	set_master_slave(S)
    	
   	// If using AWG then get that now and check it
 	struct AWGVars AWG
