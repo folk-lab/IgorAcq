@@ -1018,7 +1018,7 @@ function ScanFastDAC2D2(fdID, startx, finx, channelsx, starty, finy, channelsy, 
    // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
 
    if(use_bd == 1)
-//   		PreScanChecksBD(Bsv)
+//    PreScanChecksBD(Bsv)
 		PreScanChecksFD(S, x_only=1)
 		PreScanChecksBD(S, y_only=1)
    	else  // Should work for 1 or 2 FDs
@@ -1063,7 +1063,7 @@ function ScanFastDAC2D2(fdID, startx, finx, channelsx, starty, finy, channelsy, 
 			endif
 		else
 			// Ramp slow axis
-			rampToNextSetpoint(S, 0, outer_index=i, y_only=1, fastdac=!use_bd, ignore_lims=1)
+			rampToNextSetpoint(S, 0, outer_index=i, y_only=1, fastdac=!use_bd, ignore_lims=1) //uses the same, ramp multiple fdac but this function seems to be bd specific
 
 		endif
 		
