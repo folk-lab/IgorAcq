@@ -492,10 +492,37 @@ function crop_wave(wave wav, variable x_mid, variable y_mid, variable x_width, v
 	
 	int x_coord_start, x_coord_end, y_coord_start, y_coord_end
 	
-	x_coord_start = scaletoindex(wav, x_mid - x_width, 0)
-	x_coord_end = scaletoindex(wav, x_mid + x_width, 0)
-	y_coord_start = scaletoindex(wav, y_mid - y_width, 1)
-	y_coord_end = scaletoindex(wav, y_mid + y_width, 1)
+	// setting x coordinates (with checks for bounds)
+	if (x_width == INF)
+		x_coord_start = 0
+		x_coord_end = num_columns - 1
+	else
+		x_coord_start = scaletoindex(wav, x_mid - x_width, 0)
+		x_coord_end = scaletoindex(wav, x_mid + x_width, 0)
+	endif
+
+	if (x_coord_start < 0)
+		x_coord_start = 0
+	endif	
+	if (x_coord_end > num_columns - 1)
+		x_coord_end = num_columns - 1
+	endif
+	
+	// setting y coordinates (with checks for bounds)
+	if (y_width == INF)
+		y_coord_start = 0
+		y_coord_end = num_rows - 1
+	else
+		y_coord_start = scaletoindex(wav, y_mid - y_width, 1)
+		y_coord_end = scaletoindex(wav, y_mid + y_width, 1)
+	endif
+	
+	if (y_coord_start < 0)
+		y_coord_start = 0
+	endif
+	if (y_coord_end > num_rows - 1)
+		y_coord_end = num_rows - 1
+	endif
 	
 	int num_crop_columns = (x_coord_end - x_coord_start) + 1
 	int num_crop_rows = (y_coord_end - y_coord_start) + 1

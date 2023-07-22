@@ -364,10 +364,6 @@ function zap_bad_params(wave_2d, params, num_params, [overwrite, zap_bad_mids, z
 		
 	variable num_cols = dimsize(wave_2d, 0)
 	variable num_rows = dimsize(wave_2d, 1)
-
-//	duplicate /o /RMD=[][0] wave_2d x_wave
-//	x_wave = x
-//	wave x_wave
 	
 	create_x_wave(wave_2d)
 	wave x_wave
@@ -377,7 +373,7 @@ function zap_bad_params(wave_2d, params, num_params, [overwrite, zap_bad_mids, z
 	
 	variable scan_width = (x_wave[INF] - x_wave[0])/2
 	variable scan_mid = x_wave[0] + scan_width
-	variable mid_percentage_within = 0.1
+	variable mid_percentage_within = 0.9
 	
 	// Duplicating 2d wave
 	string wave_2d_name = nameofwave(wave_2d)
@@ -473,7 +469,11 @@ function /wave fit_transition(wave_to_fit, minx, maxx, [fit_width])
 		maxx = x2pnt(wave_to_fit, endx)
 	endif
 	
-	FuncFit/q /TBOX=768 ct_fit_function W_coef wave_to_fit[minx,maxx][0] /D
+	
+//	string hold_string = "000001"; W_coef[5] = 0 // holding quadterm 0
+	string hold_string = "000000"; // not holding any terms fixed
+	
+	FuncFit/q /H=(hold_string) /TBOX=768 ct_fit_function W_coef wave_to_fit[minx,maxx][0] /D
 end
 
 
