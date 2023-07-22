@@ -82,16 +82,25 @@ function master_fit_multiple(dat_min_max, refit, dotcondcentering, kenner_out, [
 	duplicate /R=[][8] /o scanvar_table quad_wave
 	
 	string xaxis_name
-	duplicate /R=[][0] /o scanvar_table xaxis;  xaxis_name = "Datnum"
-//	duplicate /R=[][1] /o scanvar_table xaxis  xaxis_name = "Temperature (mK)"
+//	duplicate /R=[][0] /o scanvar_table xaxis;  xaxis_name = "Datnum"
+	duplicate /R=[][1] /o scanvar_table xaxis;  xaxis_name = "Temperature (mK)"
 //	duplicate /R=[][2] /o scanvar_table xaxis;  xaxis_name = "Magnetic Field (mT)"
+
+	int marker_mode = 3
 	
+	redimension /N = (-1) xaxis
+	redimension /N = (-1) amp_wave
+	redimension /N = (-1) const_wave
+	redimension /N = (-1) theta_wave
+	redimension /N = (-1) mid_wave
+	redimension /N = (-1) linear_wave
+	redimension /N = (-1) quad_wave
 	
 	// amplitude term
 	display amp_wave vs xaxis
 	Label left "Amp"
 	Label bottom xaxis_name
-	ModifyGraph mode=4,mrkThick=3,lsize=2
+	ModifyGraph mode=marker_mode,mrkThick=3,lsize=2
 	ModifyGraph rgb=(0,0,0)
 	ModifyGraph fSize=24
 	
@@ -99,7 +108,7 @@ function master_fit_multiple(dat_min_max, refit, dotcondcentering, kenner_out, [
 	display const_wave vs xaxis
 	Label left "Const"
 	Label bottom xaxis_name
-	ModifyGraph mode=4,mrkThick=3,lsize=2
+	ModifyGraph mode=marker_mode,mrkThick=3,lsize=2
 	ModifyGraph rgb=(0,0,0)
 	ModifyGraph fSize=24
 	
@@ -107,7 +116,7 @@ function master_fit_multiple(dat_min_max, refit, dotcondcentering, kenner_out, [
 	display theta_wave vs xaxis
 	Label left "Theta"
 	Label bottom xaxis_name
-	ModifyGraph mode=4,mrkThick=3,lsize=2
+	ModifyGraph mode=marker_mode,mrkThick=3,lsize=2
 	ModifyGraph rgb=(0,0,0)
 	ModifyGraph fSize=24
 	
@@ -115,7 +124,7 @@ function master_fit_multiple(dat_min_max, refit, dotcondcentering, kenner_out, [
 	display mid_wave vs xaxis
 	Label left "Mid"
 	Label bottom xaxis_name
-	ModifyGraph mode=4,mrkThick=3,lsize=2
+	ModifyGraph mode=marker_mode,mrkThick=3,lsize=2
 	ModifyGraph rgb=(0,0,0)
 	ModifyGraph fSize=24
 	
@@ -123,7 +132,7 @@ function master_fit_multiple(dat_min_max, refit, dotcondcentering, kenner_out, [
 	display linear_wave vs xaxis
 	Label left "Linear"
 	Label bottom xaxis_name
-	ModifyGraph mode=4,mrkThick=3,lsize=2
+	ModifyGraph mode=marker_mode,mrkThick=3,lsize=2
 	ModifyGraph rgb=(0,0,0)
 	ModifyGraph fSize=24
 	
@@ -131,7 +140,7 @@ function master_fit_multiple(dat_min_max, refit, dotcondcentering, kenner_out, [
 	display quad_wave vs xaxis
 	Label left "Quadratic"
 	Label bottom xaxis_name
-	ModifyGraph mode=4,mrkThick=3,lsize=2
+	ModifyGraph mode=marker_mode,mrkThick=3,lsize=2
 	ModifyGraph rgb=(0,0,0)
 	ModifyGraph fSize=24
 	
@@ -247,6 +256,45 @@ function master_ct_clean_average(wav, refit, dotcondcentering, kenner_out, [cond
 end
 
 
+function create_fit_mask(wave_to_mask, [y_min, y_max])
+	// given a wave and some bounds a mask wave is created where it is 1 when the wave value falls within the specified bounds
+	// and 0 when it is outside the bounds
+	// the mask wave has name ::  nameOfWave(wave_to_mask) + "_mask"
+	// wave_to_mask: wave to check masking
+	// y_min: min y bound in point units 
+	// y_max: max y bound in point units
+	wave  wave_to_mask
+	variable y_min, y_max
+	
+	y_min = paramisdefault(y_min) ? (wavemin(wave_to_mask)) : y_min // wavemin is default
+	y_max = paramisdefault(y_max) ? (wavemax(wave_to_mask)) : y_max // wavemax is default
+	
+	string wave_to_mask_name = nameOfWave(wave_to_mask)
+	string wave_mask_name = wave_to_mask_name + "_mask"
+	
+	duplicate /o $wave_to_mask_name $wave_mask_name
+	wave wave_mask = $wave_mask_name
+	
+	variable num_cols = dimsize(wave_to_mask, 0)
+	
+	variable wave_val
+	variable mask_val
+	
+	
+	// loop through wave to build the mask checking whether value is outside the bounds
+	variable i
+	for (i = 0; i < num_cols; i++)
+		wave_val = wave_to_mask[i]
+		mask_val = 1
+		
+		if ((wave_val < y_min) || (wave_val > y_max))
+			mask_val = 0
+		endif
+		
+		wave_mask[i] = mask_val
+		
+	endfor
+end
 
 function /wave get_initial_params(sweep, [update_amp_only, update_theta_only, update_mid_only])
 	// for a given sweep returns a guess of initial parameters for the fit function: Charge transiton
@@ -373,7 +421,7 @@ function zap_bad_params(wave_2d, params, num_params, [overwrite, zap_bad_mids, z
 	
 	variable scan_width = (x_wave[INF] - x_wave[0])/2
 	variable scan_mid = x_wave[0] + scan_width
-	variable mid_percentage_within = 0.9
+	variable mid_percentage_within = 0.2
 	
 	// Duplicating 2d wave
 	string wave_2d_name = nameofwave(wave_2d)
