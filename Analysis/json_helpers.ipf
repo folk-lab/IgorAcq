@@ -405,6 +405,8 @@ end
 
 
 function make_scanvar_table_from_dats(dat_min_max)
+	// create a table from the input string dat_min_max
+	// so far it is hard coded to add only the datnum, field and temperature
 	string dat_min_max
 	
 	variable dat_start = str2num(StringFromList(0, dat_min_max, ","))

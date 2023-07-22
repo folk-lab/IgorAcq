@@ -3859,7 +3859,7 @@ function scfd_resampleWaves(w, measureFreq, targetFreq)
 		string cmd
 		printf cmd "WARNING[scfd_resampleWaves]: Resampling will increase number of datapoints, not decrease! (ratio = %d/%d)\r", V_numerator, V_denominator
 	endif
-	resample/UP=(V_numerator)/DOWN=(V_denominator)/N=201/E=3 w
+	resample /UP=(V_numerator) /DOWN=(V_denominator) /N=201 /E=3 w
 	// TODO: Need to test N more (simple testing suggests we may need >200 in some cases!)
 	// TODO: Need to decide what to do with end effect. Possibly /E=2 (set edges to 0) and then turn those zeros to NaNs? 
 	// TODO: Or maybe /E=3 is safest (repeat edges). The default /E=0 (bounce) is awful.

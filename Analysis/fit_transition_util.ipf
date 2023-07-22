@@ -3,7 +3,144 @@
 #pragma DefaultTab={3,20,4}		// Set default tab width in Igor Pro 9 and later
 #include <Reduce Matrix Size>
 
-function master_ct_clean_average(wav, refit, dotcondcentering, kenner_out, [condfit_prefix, minx, maxx, average, fit_width, N, repeats_on])
+
+function master_fit_multiple(dat_min_max, refit, dotcondcentering, kenner_out, [condfit_prefix, minx, maxx, average, fit_width, theta_cutoff, N, repeats_on])
+	string dat_min_max
+	int refit, dotcondcentering
+	string kenner_out
+	// optional params
+	string condfit_prefix
+	variable minx, maxx, fit_width, theta_cutoff, N
+	int average, repeats_on
+
+	//	option to limit fit to indexes [minx,maxx]
+	condfit_prefix = selectstring(paramisdefault(condfit_prefix), condfit_prefix, "")
+	minx = paramisdefault(minx) ? 0 : minx // averaging ON is default
+	maxx = paramisdefault(maxx) ? INF : maxx // averaging ON is default
+	average = paramisdefault(average) ? 1 : average // averaging ON is default
+	fit_width = paramisdefault(fit_width) ? inf : fit_width // averaging ON is default
+	theta_cutoff = paramisdefault(theta_cutoff) ? 100 : theta_cutoff // averaging ON is default
+	repeats_on = paramisdefault(repeats_on) ? 1 : repeats_on // repeats_on ON is default
+	N = paramisdefault(N) ? 3 : N // averaging ON is default
+	
+	variable dat_start = str2num(StringFromList(0, dat_min_max, ","))
+	variable dat_end = str2num(StringFromList(1, dat_min_max, ",")) 
+	string wave_name
+	
+	make_scanvar_table_from_dats(dat_min_max)
+	wave scanvar_table
+	variable scanvar_table_column_offset = 3
+	insertpoints /M=1 scanvar_table_column_offset, 6, scanvar_table
+
+	variable scanvar_row = 0
+	variable i
+	for(i=dat_start; i<dat_end+1; i+=1)
+		closeallGraphs()
+		wave_name = "dat" + num2str(i) + "cscurrent_2d"
+		resampleWave($wave_name, 600)
+		
+		try
+			master_ct_clean_average($wave_name, refit, dotcondcentering, kenner_out, condfit_prefix = condfit_prefix, minx = minx, maxx = maxx, average = average, fit_width = fit_width, theta_cutoff = theta_cutoff, N = N, repeats_on = repeats_on)
+			
+			wave W_coef
+			
+			variable amp = W_coef[0]
+			variable const = W_coef[1]
+			variable theta = W_coef[2]
+			variable mid = W_coef[3]
+			variable linear = W_coef[4]
+			variable quad = W_coef[5]
+			
+			scanvar_table[scanvar_row][scanvar_table_column_offset + 0] = amp
+			scanvar_table[scanvar_row][scanvar_table_column_offset + 1] = const
+			scanvar_table[scanvar_row][scanvar_table_column_offset + 2] = theta
+			scanvar_table[scanvar_row][scanvar_table_column_offset + 3] = mid
+			scanvar_table[scanvar_row][scanvar_table_column_offset + 4] = linear
+			scanvar_table[scanvar_row][scanvar_table_column_offset + 5] = quad
+			
+		catch
+			scanvar_table[scanvar_row][scanvar_table_column_offset + 0] = Nan
+			scanvar_table[scanvar_row][scanvar_table_column_offset + 1] = Nan
+			scanvar_table[scanvar_row][scanvar_table_column_offset + 2] = Nan
+			scanvar_table[scanvar_row][scanvar_table_column_offset + 3] = Nan
+			scanvar_table[scanvar_row][scanvar_table_column_offset + 4] = Nan
+			scanvar_table[scanvar_row][scanvar_table_column_offset + 5] = Nan
+			
+			print "FAILED :: datnum" + num2str(i)
+		endtry
+		
+		scanvar_row += 1
+	endfor
+	
+	closeallGraphs()
+	
+	duplicate /R=[][3] /o scanvar_table amp_wave
+	duplicate /R=[][4] /o scanvar_table const_wave 
+	duplicate /R=[][5] /o scanvar_table theta_wave 
+	duplicate /R=[][6] /o scanvar_table mid_wave
+	duplicate /R=[][7] /o scanvar_table linear_wave
+	duplicate /R=[][8] /o scanvar_table quad_wave
+	
+	string xaxis_name
+	duplicate /R=[][0] /o scanvar_table xaxis;  xaxis_name = "Datnum"
+//	duplicate /R=[][1] /o scanvar_table xaxis  xaxis_name = "Temperature (mK)"
+//	duplicate /R=[][2] /o scanvar_table xaxis;  xaxis_name = "Magnetic Field (mT)"
+	
+	
+	// amplitude term
+	display amp_wave vs xaxis
+	Label left "Amp"
+	Label bottom xaxis_name
+	ModifyGraph mode=4,mrkThick=3,lsize=2
+	ModifyGraph rgb=(0,0,0)
+	ModifyGraph fSize=24
+	
+	// const term
+	display const_wave vs xaxis
+	Label left "Const"
+	Label bottom xaxis_name
+	ModifyGraph mode=4,mrkThick=3,lsize=2
+	ModifyGraph rgb=(0,0,0)
+	ModifyGraph fSize=24
+	
+	// theta term
+	display theta_wave vs xaxis
+	Label left "Theta"
+	Label bottom xaxis_name
+	ModifyGraph mode=4,mrkThick=3,lsize=2
+	ModifyGraph rgb=(0,0,0)
+	ModifyGraph fSize=24
+	
+	// mid term
+	display mid_wave vs xaxis
+	Label left "Mid"
+	Label bottom xaxis_name
+	ModifyGraph mode=4,mrkThick=3,lsize=2
+	ModifyGraph rgb=(0,0,0)
+	ModifyGraph fSize=24
+	
+	// linear term
+	display linear_wave vs xaxis
+	Label left "Linear"
+	Label bottom xaxis_name
+	ModifyGraph mode=4,mrkThick=3,lsize=2
+	ModifyGraph rgb=(0,0,0)
+	ModifyGraph fSize=24
+	
+	// quadratic term
+	display quad_wave vs xaxis
+	Label left "Quadratic"
+	Label bottom xaxis_name
+	ModifyGraph mode=4,mrkThick=3,lsize=2
+	ModifyGraph rgb=(0,0,0)
+	ModifyGraph fSize=24
+	
+	TileWindows/O=1/C/P
+end
+
+
+
+function master_ct_clean_average(wav, refit, dotcondcentering, kenner_out, [condfit_prefix, minx, maxx, average, fit_width, theta_cutoff, N, repeats_on])
 	// wav is the wave containing original CT data
 	// refit tells whether to do new fits to each CT line
 	// dotcondcentering tells whether to use conductance data to center the CT data
@@ -20,7 +157,7 @@ function master_ct_clean_average(wav, refit, dotcondcentering, kenner_out, [cond
 	string kenner_out
 	// optional params
 	string condfit_prefix
-	variable minx, maxx, fit_width, N
+	variable minx, maxx, fit_width, theta_cutoff, N
 	int average, repeats_on
 
 	///// start function timer
@@ -33,6 +170,7 @@ function master_ct_clean_average(wav, refit, dotcondcentering, kenner_out, [cond
 	maxx = paramisdefault(maxx) ? (dimsize(wav, 0) - 1) : maxx // averaging ON is default
 	average = paramisdefault(average) ? 1 : average // averaging ON is default
 	fit_width = paramisdefault(fit_width) ? inf : fit_width // averaging ON is default
+	theta_cutoff = paramisdefault(theta_cutoff) ? 100 : theta_cutoff // averaging ON is default
 	repeats_on = paramisdefault(repeats_on) ? 1 : repeats_on // repeats_on ON is default
 	N = paramisdefault(N) ? 3 : N // averaging ON is default
 	
@@ -68,11 +206,16 @@ function master_ct_clean_average(wav, refit, dotcondcentering, kenner_out, [cond
 	endif
 
 	if (dotcondcentering==0)
-		zap_bad_params($datasetname, $fit_params_name, 6, overwrite = 1, zap_bad_mids = 1, zap_bad_thetas = 1) // remove rows with any fit param = INF or NaN
-		plot_thetas($datasetname, N, fit_params_name, repeats_on = repeats_on)
+		zap_bad_params($datasetname, $fit_params_name, 6, overwrite = 0, zap_bad_mids = 1, zap_bad_thetas = 1, theta_cutoff = theta_cutoff, repeats_on = repeats_on) // remove rows with any fit param = INF or NaN
+		string zapped_dataset_name = datasetname + "_zap"
+		string zapped_params_name = fit_params_name + "_zap"
+		wave zapped_dataset = $zapped_dataset_name
+		wave zapped_params = $zapped_params_name
+		
+		plot_thetas($zapped_dataset_name, N, zapped_params_name, repeats_on = repeats_on)
 		if(average==1)	
-			duplicate/o/r=[][3] $fit_params_name mids
-			centering($datasetname, centered_wave_name, mids) // centred plot and average plot
+			duplicate/o/r=[][3] $zapped_params_name mids
+			centering($zapped_dataset_name, centered_wave_name, mids) // centred plot and average plot
 			remove_bad_thetas($centered_wave_name, badthetasx, cleaned_wave_name)
 		endif
 
@@ -100,7 +243,7 @@ function master_ct_clean_average(wav, refit, dotcondcentering, kenner_out, [cond
 	endif
 
 	ms=stopmstimer(refnum)
-	print "CT: time taken = " + num2str(ms/1e6) + "s"
+//	print "CT: time taken = " + num2str(ms/1e6) + "s"
 end
 
 
@@ -122,9 +265,10 @@ function /wave get_initial_params(sweep, [update_amp_only, update_theta_only, up
 		update_wcoef_only = 0
 	endif
 	
-	duplicate /o sweep x_array
-	x_array = x
-	wave x_array
+//	duplicate /o sweep x_array
+//	x_array = x
+	create_x_wave(sweep)
+	wave x_wave
 
 	///// guess of amp term /////
 	variable amp = wavemax(sweep) - wavemin(sweep) //might be worthwile looking for a maximum/minimum with differentiation
@@ -144,16 +288,30 @@ function /wave get_initial_params(sweep, [update_amp_only, update_theta_only, up
 	variable mid = V_LevelX
 	
 	// set mid to mid x value if calculated mid point outside range
-	if ((mid < x_array[0]) || (mid > x_array[inf]))
-		wavestats /Q x_array
-		mid = x_array[round(V_npnts/2)]
+	if ((mid < x_wave[0]) || (mid > x_wave[inf]))
+		wavestats /Q x_wave
+		mid = x_wave[round(V_npnts/2)]
 	endif
 
 
 	///// guess of linear term /////
 	variable lin = 0.001  // differentiated value of flat area?
-
-
+	// new method of calculating lin
+	duplicate /o sweep sweepsmooth
+	differentiate sweepsmooth
+	wavestats /q sweepsmooth
+	variable numpts = V_npnts
+	variable mid_index = x2pnt(sweep, mid)
+	
+	variable start_delete_index = round(mid_index - (numpts/4))
+	if (start_delete_index < 0)
+		start_delete_index = 0
+	endif
+	DeletePoints/M=0 (start_delete_index), (round(numpts/4)), sweepsmooth  // delete points from differentiated sweepsmooth
+	
+	wavestats /q sweepsmooth
+	lin = V_avg
+	
 	killwaves sweepsmooth
 	
 	// if we are updating any of the wcoefs
@@ -187,7 +345,7 @@ function /wave get_initial_params(sweep, [update_amp_only, update_theta_only, up
 end
 
 
-function zap_bad_params(wave_2d, params, num_params, [overwrite, zap_bad_mids, zap_bad_thetas])
+function zap_bad_params(wave_2d, params, num_params, [overwrite, zap_bad_mids, zap_bad_thetas, theta_cutoff, repeats_on])
 	// remove rows from wave_2d and params if there is a NaN or INF in the params
 	// num_params is required to specify how many columns in the params wave are the params (e.g. it could include std)
 	// wave_2d: 2d wave to remove rows from
@@ -199,32 +357,45 @@ function zap_bad_params(wave_2d, params, num_params, [overwrite, zap_bad_mids, z
 	wave wave_2d, params
 	variable num_params
 	int overwrite, zap_bad_mids, zap_bad_thetas
+	variable theta_cutoff, repeats_on
+	
+	theta_cutoff = paramisdefault(theta_cutoff) ? 100 : theta_cutoff // averaging ON is default
+	repeats_on = paramisdefault(repeats_on) ? 1 : repeats_on // repeats_on ON is default
 		
 	variable num_cols = dimsize(wave_2d, 0)
 	variable num_rows = dimsize(wave_2d, 1)
 
-	duplicate /o /RMD=[][0] wave_2d x_array
-	x_array = x
-	wave x_array
-	variable scan_width = (x_array[INF] - x_array[0])/2
-	variable scan_mid = x_array[0] + scan_width
+//	duplicate /o /RMD=[][0] wave_2d x_wave
+//	x_wave = x
+//	wave x_wave
+	
+	create_x_wave(wave_2d)
+	wave x_wave
+	
+	create_y_wave(wave_2d)
+	wave y_wave
+	
+	variable scan_width = (x_wave[INF] - x_wave[0])/2
+	variable scan_mid = x_wave[0] + scan_width
 	variable mid_percentage_within = 0.1
 	
 	// Duplicating 2d wave
 	string wave_2d_name = nameofwave(wave_2d)
-	string wave_2d_name_new = wave_2d_name + "_new"
+	string wave_2d_name_new = wave_2d_name + "_zap"
 	duplicate /o wave_2d $wave_2d_name_new
 	wave wave_2d_new = $wave_2d_name_new 
 	
 	// Duplicating param wave
 	string params_name = nameofwave(params)
-	string params_name_new = params_name + "_new"
+	string params_name_new = params_name + "_zap"
 	duplicate /o params $params_name_new
 	wave params_new = $params_name_new 
 	
 	variable num_bad_rows = 0
 	variable is_bad_mid, mid
 	variable is_bad_theta, theta
+	
+	make /o/n = 0 bad_params_row
 	
 	variable i
 	for (i = 0; i < num_rows; i++)
@@ -237,7 +408,7 @@ function zap_bad_params(wave_2d, params, num_params, [overwrite, zap_bad_mids, z
 		// assuming theta is index 2
 		if (zap_bad_mids == 1)
 			theta = param_slice[2]
-			if (abs(theta) > 600) // hard coded theta cutoff off of > 1000
+			if (abs(theta) > theta_cutoff) // remove if theta is larger than theta_cutoff
 				is_bad_mid = 1
 			endif
 		endif
@@ -254,6 +425,13 @@ function zap_bad_params(wave_2d, params, num_params, [overwrite, zap_bad_mids, z
 		if ((V_numNans > 0) || (V_numINFs > 0) || (is_bad_mid == 1) || (is_bad_theta == 1))
 			DeletePoints/M=1 (i - num_bad_rows), 1, wave_2d_new // delete row
 			DeletePoints/M=0 (i - num_bad_rows), 1, params_new  // delete row
+			
+			
+			if (repeats_on == 1)
+				insertPoints /v = (i) num_rows, 1, bad_params_row
+			else
+				insertPoints /v = (y_wave[i]) num_rows, 1, bad_params_row
+			endif
 			num_bad_rows += 1
 		endif
 		
@@ -402,7 +580,7 @@ function plot_thetas(wave_2d, N, fit_params_name, [repeats_on])
 		if (abs(thetas[i] - thetamean) < (N * thetastd))
 
 			insertPoints /v = (thetas[i]) nr, 1, goodthetas // value of theta
-			insertpoints /v = (thetax_val) nr, 1, goodthetasx        // the repeat
+			insertpoints /v = (thetax_val) nr, 1, goodthetasx // the repeat
 
 		else
 
@@ -470,7 +648,7 @@ function /wave remove_bad_thetas(wave center, wave badthetasx, string cleaned_wa
 end
 
 
-function plot_ct_figs( wavenum, N, kenner, kenner_out, minx, maxx, [fit_width, repeats_on])
+function plot_ct_figs(wavenum, N, kenner, kenner_out, minx, maxx, [fit_width, repeats_on])
 	variable wavenum, N, minx, maxx
 	string kenner, kenner_out
 	
@@ -510,6 +688,22 @@ function plot_ct_figs( wavenum, N, kenner, kenner_out, minx, maxx, [fit_width, r
 	string y_label = selectstring(repeats_on, "Gate (mV)", "Repeats")
 
 	plot2d_heatmap($datasetname, x_label = x_label, y_label = y_label)
+	
+	// add bad rows onto 'RAW' plot
+	create_x_wave($datasetname)
+	wave x_wave
+	
+	variable num_cols = dimsize(x_wave, 0)
+	
+	variable end_xval = x_wave[num_cols - 5]
+	wave bad_params_row
+	
+	duplicate /o bad_params_row bad_params_x
+	bad_params_x[] = end_xval
+	appendtograph bad_params_row vs bad_params_x
+	ModifyGraph mode(bad_params_row)=2, marker(bad_params_row)=41, lsize(bad_params_row)=2, rgb(bad_params_row)=(0,0,0)
+	
+	
 	plot2d_heatmap($cleaned_wave_name, x_label = x_label, y_label = y_label)
 	plot2d_heatmap($centered_wave_name, x_label = x_label, y_label = y_label)
 
