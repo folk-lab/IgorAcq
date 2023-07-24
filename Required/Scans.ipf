@@ -465,7 +465,8 @@ function ScanFastDAC2(start, fin, channels, [numptsx, sweeprate, delay, ramprate
 	// Set sc_ScanVars struct // scanvars might need a whole rewrite
 	struct ScanVars S
 	initScanVarsFD2(S, start, fin, channelsx=channels, numptsx=numptsx, rampratex=ramprate, starty=1, finy=repeats, delayy=delay, sweeprate=sweeprate,  \
-					numptsy=repeats, startxs=starts, finxs=fins, x_label=x_label, y_label=y_label, alternate=alternate, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments)
+					numptsy=repeats, startxs=starts, finxs=fins, x_label=x_label, y_label=y_label, alternate=alternate, interlaced_channels=interlaced_channels, \
+					interlaced_setpoints=interlaced_setpoints, comments=comments)
 
    //	S.finy = S.starty+S.numptsy  // Repeats
 	if (s.is2d)
@@ -473,7 +474,7 @@ function ScanFastDAC2(start, fin, channels, [numptsx, sweeprate, delay, ramprate
 	endif
 	
 	// Check software limits and ramprate limits
-	PreScanChecksFD2(S, x_only=1)  
+	PreScanChecksFD2(S)  
 	
 	// sets master/slave between the devices that are used.
 	set_master_slave(S)
@@ -953,6 +954,9 @@ end
 
 
 function ScanFastDAC2D2(fdID, startx, finx, channelsx, starty, finy, channelsy, numptsy, [numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave, use_AWG, interlaced_channels, interlaced_setpoints, y_label])
+	// need to remove fdID, fyID
+	
+	
 	// 2D Scan for FastDAC only OR FastDAC on fast axis and BabyDAC on slow axis
 	// Note: Must provide numptsx OR sweeprate in optional parameters instead
 	// Note: To ramp with babyDAC on slow axis provide the BabyDAC variable in bdID
@@ -979,6 +983,8 @@ function ScanFastDAC2D2(fdID, startx, finx, channelsx, starty, finy, channelsy, 
 	interlaced_setpoints = selectString(paramisdefault(interlaced_setpoints), interlaced_setpoints, "")
 	variable use_bd = paramisdefault(bdid) ? 0 : 1 			// Whether using both FD and BD or just FD
 	variable use_second_fd = paramisdefault(fdyID) ? 0 : 1  // Whether using a second FD for the y axis gates
+	
+	variable scan2d = 1
 
 	
 	// Reconnect instruments
@@ -991,13 +997,15 @@ function ScanFastDAC2D2(fdID, startx, finx, channelsx, starty, finy, channelsy, 
  	struct ScanVars S
  	if (use_bd == 0 && use_second_fd == 0)
 
-	 	initScanVarsFD2(S, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
-		   						 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments)
+	 	initScanVarsFD2(S, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy,\
+		   				 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys,\
+		   				 interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments)
 	
 	
 	else  				// Using second instrument for y-axis
-		initScanVarsFD2(S, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
-		   						rampratey=rampratey, startxs=startxs, finxs=finxs, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments)
+		initScanVarsFD2(S, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy,\
+		   				 rampratey=rampratey, startxs=startxs, finxs=finxs, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints,\
+		   				 comments=comments, x_only = 0)
 		s.is2d = 1		   						
 		S.starty = starty
 		S.finy = finy		
@@ -1019,12 +1027,11 @@ function ScanFastDAC2D2(fdID, startx, finx, channelsx, starty, finy, channelsy, 
    // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
 
    if(use_bd == 1)
-//    PreScanChecksBD(Bsv)
-		PreScanChecksFD(S, x_only=1)
 		PreScanChecksBD(S, y_only=1)
-   	else  // Should work for 1 or 2 FDs
-   	   PreScanChecksFD2(S)  
-   	endif
+   endif
+   
+   PreScanChecksFD2(S)  
+
    	
    	// sets master/slave between the devices that are used.
 	set_master_slave(S)

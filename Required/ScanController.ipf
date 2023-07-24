@@ -348,7 +348,7 @@ structure ScanVars
     string startxs, finxs  // If sweeping from different start/end points for each channel or instrument
 
     // For 2D scans
-    variable is2d
+    variable is2d  // this is checked if its a 1d scan with multiple repeats(in ScanFastDac) or if its a 2d scan (ScanFastDac2D)
     string channelsy 
     variable starty, finy, numptsy, rampratey 
     variable delayy  // delay after each step in y-axis (e.g. settling time after x-axis has just been ramped from fin to start quickly)
@@ -394,10 +394,7 @@ structure ScanVars
 	 string ADCcounts		// ADCcounts to ensure theres equal amount of recordings between instruments
 	 string adcLists      	// adclist by id -> attempting to use stringbykey	
 	 string IDstartxs, IDfinxs  // If sweeping from different start/end points for each channel or instrument / This one is a stringkey with fdIDs
-	 string dacListIDs_y     // Ids for channely (for now, not sure ill change this yetY
-	 
-	 
-	 	
+	 string dacListIDs_y     // Ids for channely (for now, not sure ill change this yet)	 
 		
 endstructure
 
@@ -660,14 +657,14 @@ end
 
 
 
-function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, duration, rampratex, delayx, starty, finy, channelsy, numptsy, rampratey, delayy, startxs, finxs, startys, finys, x_label, y_label, alternate,  interlaced_channels, interlaced_setpoints, comments])
+function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, duration, rampratex, delayx, starty, finy, channelsy, numptsy, rampratey, delayy, startxs, finxs, startys, finys, x_label, y_label, alternate,  interlaced_channels, interlaced_setpoints, comments, x_only])
     // Function to make setting up scanVars struct easier for FastDAC scans
     // PARAMETERS:
     // startx, finx, starty, finy -- Single start/fin point for all channelsx/channelsy
     // startxs, finxs, startys, finys -- For passing in multiple start/fin points for each channel as a comma separated string instead of a single start/fin for all channels
     //		Note: Just pass anything for startx/finx if using startxs/finxs, they will be overwritten
     struct ScanVars &S
-    variable startx, finx, numptsx, delayx, rampratex
+    variable x_only, startx, finx, numptsx, delayx, rampratex
     variable starty, finy, numptsy, delayy, rampratey
 	 variable sweeprate  // If start != fin numpts will be calculated based on sweeprate
 	 variable duration   // numpts will be caluculated to achieve duration
@@ -693,6 +690,7 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
 	interlaced_setpoints = selectString(paramisdefault(interlaced_setpoints), interlaced_setpoints, "")
 
 	comments = selectString(paramIsDefault(comments), comments, "")
+	x_only = paramisdefault(x_only) ? 1 : x_only  
 
 
 	// Standard initialization
@@ -807,7 +805,16 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
 	// Set variables with some calculation
     scv_setFreq2(S) 		// Sets S.samplingFreq/measureFreq/numADCs	
     scv_setNumptsSweeprateDuration(S) 	// Checks that either numpts OR sweeprate OR duration was provided, and sets ScanVars accordingly
-                                // Note: Valid for start/fin only (uses S.startx, S.finx NOT S.startxs, S.finxs)                            
+                                // Note: Valid for start/fin only (uses S.startx, S.finx NOT S.startxs, S.finxs)
+                                
+   ///// for 2D scans //////////////////////////////////////////////////////////////////////////////////////////////////
+   if(!x_only)
+   		
+   		s.channelsy = "" 
+   		
+   endif
+   
+                                                            
 end
 
 
@@ -3088,7 +3095,7 @@ function PreScanChecksFD(S, [x_only, y_only])
 	S.lims_checked = 1  		// So record_values knows that limits have been checked!
 end
 
-function PreScanChecksFD2(S, [x_only, y_only])
+function PreScanChecksFD2(S)
    struct ScanVars &S
    variable x_only, y_only  // Whether to only check specific axis (e.g. if other axis is a babydac or something else)
 
