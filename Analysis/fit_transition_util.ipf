@@ -82,8 +82,8 @@ function master_fit_multiple(dat_min_max, refit, dotcondcentering, kenner_out, [
 	duplicate /R=[][8] /o scanvar_table quad_wave
 	
 	string xaxis_name
-//	duplicate /R=[][0] /o scanvar_table xaxis;  xaxis_name = "Datnum"
-	duplicate /R=[][1] /o scanvar_table xaxis;  xaxis_name = "Temperature (mK)"
+	duplicate /R=[][0] /o scanvar_table xaxis;  xaxis_name = "Datnum"
+//	duplicate /R=[][1] /o scanvar_table xaxis;  xaxis_name = "Temperature (mK)"
 //	duplicate /R=[][2] /o scanvar_table xaxis;  xaxis_name = "Magnetic Field (mT)"
 
 	int marker_mode = 3
@@ -149,7 +149,7 @@ end
 
 
 
-function master_ct_clean_average(wav, refit, dotcondcentering, kenner_out, [condfit_prefix, minx, maxx, average, fit_width, theta_cutoff, N, repeats_on])
+function master_ct_clean_average(wav, refit, dotcondcentering, kenner_out, [condfit_prefix, minx, maxx, average, fit_width, theta_cutoff, N, repeats_on, zap_params])
 	// wav is the wave containing original CT data
 	// refit tells whether to do new fits to each CT line
 	// dotcondcentering tells whether to use conductance data to center the CT data
@@ -161,13 +161,14 @@ function master_ct_clean_average(wav, refit, dotcondcentering, kenner_out, [cond
 	// fit_width: Will mask data to fit_width on either side of chosen mid point to attempt to fit. In points units rather than index
 	// N: Choose how many std on either side of mean theta to accept the theta from fit . Default is N = 3
 	// repeats_on: Choose whether to plot data as repeats or as gate voltage. Default is repeats_on = 1 (assuming 2d data is repeats)
+	// zap_params: Choose whether to remove any row with INF or NaN param value. Default is 0
 	wave wav
 	int refit, dotcondcentering
 	string kenner_out
 	// optional params
 	string condfit_prefix
 	variable minx, maxx, fit_width, theta_cutoff, N
-	int average, repeats_on
+	int average, repeats_on, zap_params
 
 	///// start function timer
 	variable refnum, ms
@@ -181,6 +182,7 @@ function master_ct_clean_average(wav, refit, dotcondcentering, kenner_out, [cond
 	fit_width = paramisdefault(fit_width) ? inf : fit_width // averaging ON is default
 	theta_cutoff = paramisdefault(theta_cutoff) ? 100 : theta_cutoff // averaging ON is default
 	repeats_on = paramisdefault(repeats_on) ? 1 : repeats_on // repeats_on ON is default
+	zap_params = paramisdefault(zap_params) ? 0 : zap_params // repeats_on ON is default
 	N = paramisdefault(N) ? 3 : N // averaging ON is default
 	
 	
@@ -205,29 +207,39 @@ function master_ct_clean_average(wav, refit, dotcondcentering, kenner_out, [cond
 	string quickavg = avg_wav($datasetname) // averages datasetname and returns the name of the averaged wave
 
 	if (refit==1)
+		// get a rough fit of average
 		get_initial_params($quickavg)
-		if(average==1)
-			fit_transition($quickavg, minx, maxx, fit_width = fit_width); // print W_coef
-		endif
+		fit_transition($quickavg, minx, maxx, fit_width = fit_width); // print W_coef
+		
 		// fit each row (IGOR column) to get fit params
 		get_fit_params($datasetname, fit_params_name, minx, maxx, fit_width = fit_width) 
 
 	endif
 
 	if (dotcondcentering==0)
-		zap_bad_params($datasetname, $fit_params_name, 6, overwrite = 0, zap_bad_mids = 1, zap_bad_thetas = 1, theta_cutoff = theta_cutoff, repeats_on = repeats_on) // remove rows with any fit param = INF or NaN
-		string zapped_dataset_name = datasetname + "_zap"
-		string zapped_params_name = fit_params_name + "_zap"
-		wave zapped_dataset = $zapped_dataset_name
-		wave zapped_params = $zapped_params_name
+		if (zap_params == 1) // zap the bad rows and centre
+			zap_bad_params($datasetname, $fit_params_name, 6, overwrite = 0, zap_bad_mids = 1, zap_bad_thetas = 1, theta_cutoff = theta_cutoff, repeats_on = repeats_on) // remove rows with any fit param = INF or NaN
+			string zapped_dataset_name = datasetname + "_zap"
+			string zapped_params_name = fit_params_name + "_zap"
+			wave zapped_dataset = $zapped_dataset_name
+			wave zapped_params = $zapped_params_name
+			
+			plot_thetas($zapped_dataset_name, N, zapped_params_name, repeats_on = repeats_on)
+			if(average==1)	
+				duplicate/o/r=[][3] $zapped_params_name mids
+				centering($zapped_dataset_name, centered_wave_name, mids) // centred plot and average plot
+			endif
+		else // dont remove the bad rows still centre
+			plot_thetas($datasetname, N, fit_params_name, repeats_on = repeats_on)
+			if(average==1)	
+				duplicate/o/r=[][3] $fit_params_name mids
+				centering($datasetname, centered_wave_name, mids) // centred plot and average plot
+			endif
+		endif
 		
-		plot_thetas($zapped_dataset_name, N, zapped_params_name, repeats_on = repeats_on)
-		if(average==1)	
-			duplicate/o/r=[][3] $zapped_params_name mids
-			centering($zapped_dataset_name, centered_wave_name, mids) // centred plot and average plot
+		if(average==1) // remove bad thetas if averaging
 			remove_bad_thetas($centered_wave_name, badthetasx, cleaned_wave_name)
 		endif
-
 	elseif(dotcondcentering == 1)
 		string condfit_params_name = condfit_prefix + num2str(wavenum) + "_dot_fit_params"
 		wave condfit_params = $condfit_params_name
@@ -248,8 +260,9 @@ function master_ct_clean_average(wav, refit, dotcondcentering, kenner_out, [cond
 		get_initial_params($avg_wave_name); //print W_coef
 		
 		fit_transition($avg_wave_name, minx, maxx, fit_width = fit_width)
-		plot_ct_figs(wavenum, N, kenner, kenner_out, minx, maxx, fit_width = fit_width, repeats_on = repeats_on)
 	endif
+	
+	plot_ct_figs(wavenum, N, kenner, kenner_out, minx, maxx, fit_width = fit_width, repeats_on = repeats_on, average = average)
 
 	ms=stopmstimer(refnum)
 //	print "CT: time taken = " + num2str(ms/1e6) + "s"
@@ -696,12 +709,13 @@ function /wave remove_bad_thetas(wave center, wave badthetasx, string cleaned_wa
 end
 
 
-function plot_ct_figs(wavenum, N, kenner, kenner_out, minx, maxx, [fit_width, repeats_on])
+function plot_ct_figs(wavenum, N, kenner, kenner_out, minx, maxx, [average, fit_width, repeats_on])
 	variable wavenum, N, minx, maxx
 	string kenner, kenner_out
 	
-	variable fit_width, repeats_on
+	variable average, fit_width, repeats_on
 	
+	average = paramisdefault(average) ? 1 : average // averaging ON is default
 	fit_width = paramisdefault(fit_width) ? inf : fit_width // averaging ON is default
 	repeats_on = paramisdefault(repeats_on) ? 1 : repeats_on // repeats_on ON is default
 	
@@ -752,27 +766,31 @@ function plot_ct_figs(wavenum, N, kenner, kenner_out, minx, maxx, [fit_width, re
 	ModifyGraph mode(bad_params_row)=2, marker(bad_params_row)=41, lsize(bad_params_row)=2, rgb(bad_params_row)=(0,0,0)
 	
 	
-	plot2d_heatmap($cleaned_wave_name, x_label = x_label, y_label = y_label)
-	plot2d_heatmap($centered_wave_name, x_label = x_label, y_label = y_label)
-
+	if (average == 1)
+		plot2d_heatmap($cleaned_wave_name, x_label = x_label, y_label = y_label)
+		plot2d_heatmap($centered_wave_name, x_label = x_label, y_label = y_label)
+	endif
 
 
 	/////////////////// plot avg fit  //////////////////////////////////////
-	string fit_name = "fit_" + avg_wave_name
+	if (average == 1)
+		string fit_name = "fit_" + avg_wave_name
+		
+		display $avg_wave_name
+		fit_transition($avg_wave_name, minx, maxx, fit_width = fit_width)
+		
+		Label bottom "Gate (mV)"
+		Label left "Current (nA)"
+		ModifyGraph fSize=24
+		ModifyGraph gFont="Gill Sans Light"
+		ModifyGraph mode($fit_name)=0, lsize($fit_name)=1, rgb($fit_name)=(65535,0,0)
+		ModifyGraph mode($avg_wave_name)=2, lsize($avg_wave_name)=2, rgb($avg_wave_name)=(0,0,0)
+		legend
 	
-	display $avg_wave_name
-	fit_transition($avg_wave_name, minx, maxx, fit_width = fit_width)
+		Legend/C/N=text0/J/A=LB/X=59.50/Y=53.03
+	endif
 	
-	Label bottom "Gate (mV)"
-	Label left "Current (nA)"
-	ModifyGraph fSize=24
-	ModifyGraph gFont="Gill Sans Light"
-	ModifyGraph mode($fit_name)=0, lsize($fit_name)=1, rgb($fit_name)=(65535,0,0)
-	ModifyGraph mode($avg_wave_name)=2, lsize($avg_wave_name)=2, rgb($avg_wave_name)=(0,0,0)
-	legend
-
 	TileWindows/O=1/C/P
-	Legend/C/N=text0/J/A=LB/X=59.50/Y=53.03
 
 end
 

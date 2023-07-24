@@ -159,7 +159,7 @@ function get_multiple_line_paths_int(wave_2d, y_wave, x_wave, [width_y, width_x,
 	dowindow/k $window_name
 	display/N=$window_name
 	appendimage /W=$window_name wave_2d
-//	ModifyImage /W=$window_name $wave_name ctab= {-0.005, 0.005, RedWhiteGreen, 0}
+	ModifyImage /W=$window_name $wave_name ctab= {-0.005, 0.005, RedWhiteGreen, 0}
 	variable num_columns = dimsize(line_path_2d_y, 1)
 	variable i
 	for (i = 0; i < num_columns; i++)
@@ -176,7 +176,7 @@ function get_multiple_line_paths_int(wave_2d, y_wave, x_wave, [width_y, width_x,
 	dowindow/k $window_name
 	display/N=$window_name
 	appendimage /W=$window_name line_path_2d_z_int
-//	ModifyImage /W=$window_name line_path_2d_z_int ctab= {*,*,RedWhiteGreen,0}	
+	ModifyImage /W=$window_name line_path_2d_z_int ctab= {*,*,RedWhiteGreen,0}	
 end
 
 
