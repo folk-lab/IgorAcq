@@ -810,9 +810,8 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
    ///// for 2D scans //////////////////////////////////////////////////////////////////////////////////////////////////
    if(!x_only)
    		S.channelsy = scu_getChannelNumbers(channelsy, fastdac=1)
-   		S.dacListIDs_y = scc_checkDeviceNumber(S, check_y = 1)
-   		S.y_label = scu_getDacLabel(S.channelsy, fastdac=1)																									//this should stay I believe
-		
+			S.y_label = scu_getDacLabel(S.channelsy, fastdac=1)
+			S.dacListIDs_y = scc_checkDeviceNumber(S, check_y = 1)
    endif
                                                             
 end

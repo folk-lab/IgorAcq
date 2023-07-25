@@ -982,8 +982,6 @@ function ScanFastDAC2D2(startx, finx, channelsx, starty, finy, channelsy, numpts
 	interlaced_channels = selectString(paramisdefault(interlaced_channels), interlaced_channels, "")
 	interlaced_setpoints = selectString(paramisdefault(interlaced_setpoints), interlaced_setpoints, "")
 	variable use_bd = paramisdefault(bdid) ? 0 : 1 			// Whether using both FD and BD or just FD
-	variable use_second_fd = paramisdefault(fdyID) ? 0 : 1  // Whether using a second FD for the y axis gates
-	
 	variable scan2d = 1
 
 	
@@ -996,19 +994,22 @@ function ScanFastDAC2D2(startx, finx, channelsx, starty, finy, channelsy, numpts
 	// Put info into scanVars struct (to more easily pass around later)
  	struct ScanVars S
  	if (use_bd == 1)  // Using babydacs as second instrument
+		
+		initScanVarsFD2(S, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy,\
+		   				 rampratey=rampratey, startxs=startxs, finxs=finxs, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints,\
+		   				 comments=comments)
 
-	 	initScanVarsFD2(S, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy,\
-		   				 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys,\
-		   				 interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments)
 		S.instrIDy = bdID
 		S.channelsy = scu_getChannelNumbers(channelsy, fastdac=0)
 		S.y_label = scu_getDacLabel(S.channelsy, fastdac=0)
 		scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, starty, finy, S.startxs, S.finxs, startys, finys)
 	
 	else  				// Using fastdacs as second instrument
+
 		initScanVarsFD2(S, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy,\
-		   				 rampratey=rampratey, startxs=startxs, finxs=finxs, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints,\
-		   				 comments=comments, x_only = 0)
+		   				 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys,\
+		   				 interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments, x_only = 0)
+
 		s.is2d = 1		   						
 		S.starty = starty
 		S.finy = finy
