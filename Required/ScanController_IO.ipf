@@ -1655,6 +1655,68 @@ function/s textWave2StrArray(w)
 end
 
 
+function/s get_values(string kwListStr, [int keys, string keydel, string listdel])
+	// given a kwListStr, will return only the values. If keys is specified,
+	// it will return the keys instead.
+	// inputs: 	kwListStr 	-> key - value pair string
+	// 			 	keys 			-> set to one to retrieve keys instead of values
+	// 			 	keydel 		-> specify key delimiter, default is ":"
+	//			 	listdel 		-> specify list delimiter, default is ";"
+	// example: 	get_values("A:1,B:4", keys = 1, listdel = ",") -> "A,B"
+	
+	keys		= paramisDefault(keys) ? 0 : 1
+	keydel		= selectString(paramIsDefault(keydel) ,  keydel, ":")
+	listdel	= selectString(paramIsDefault(listdel), listdel, ";")
+	
+	int i, delim
+	string kw, keysOrVals = ""
+	for(i=0; i<itemsinlist(kwListStr, listdel); i++)
+		kw = stringfromlist(i, kwlistStr, listdel)
+		delim = strsearch(kw,keydel,0)
+		if(!keys)
+			kw 				= kw[delim+1, INF]
+			keysOrVals	= addlistitem(kw, keysOrVals, listdel, INF)
+		else
+			kw 				= kw[0, delim-1]
+			keysOrVals	= addlistitem(kw, keysOrVals, listdel, INF)
+		endif	
+	endfor
+	
+	return keysOrVals
+end
+
+function/s TextWavetolist(w)
+	// returns an array and makes sure quotes and commas are parsed correctly.
+	// supports 1d and 2d arrays
+	wave/t w
+	string list=""
+
+	// loop over wave
+	variable i , n = dimsize(w, 0)
+
+	for (i=0; i<n; i++)
+		list += w[i] + ";"
+	endfor
+	list = list[0,strlen(list)-2] // remove last semicolon
+	return list
+end
+
+function /s numWavetolist(w)
+	// returns an array and makes sure quotes and commas are parsed correctly.
+	// supports 1d and 2d arrays
+	wave w
+	string list=""
+
+	// loop over wave
+	variable i , n = dimsize(w, 0)
+
+	for (i=0; i<n; i++)
+		list += num2str(w[i]) + ";"
+	endfor
+	list = list[0,strlen(list)-2] // remove last semicolon
+	return list
+end
+
 function/s addJSONkeyval(JSONstr,key,value,[addquotes])
 	// returns a valid JSON string with a new key,value pair added.
 	// if JSONstr is empty, start a new JSON object
