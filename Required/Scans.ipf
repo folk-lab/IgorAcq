@@ -953,7 +953,7 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 end
 
 
-function ScanFastDAC2D2(fdID, startx, finx, channelsx, starty, finy, channelsy, numptsy, [numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave, use_AWG, interlaced_channels, interlaced_setpoints, y_label])
+function ScanFastDAC2D2(startx, finx, channelsx, starty, finy, channelsy, numptsy, [numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave, use_AWG, interlaced_channels, interlaced_setpoints, y_label])
 	// need to remove fdID, fyID
 	
 	
@@ -968,7 +968,7 @@ function ScanFastDAC2D2(fdID, startx, finx, channelsx, starty, finy, channelsy, 
 	// interlace_values = "500,10,0;10,10,10"
 	// ohmic1 will change between 500,10,0 each row
 	
-	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, nosave, use_AWG 
+	variable startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, nosave, use_AWG 
 	string channelsx, channelsy, comments, startxs, finxs, startys, finys, interlaced_channels, interlaced_setpoints, y_label 
 
 	// Set defaults
@@ -995,32 +995,25 @@ function ScanFastDAC2D2(fdID, startx, finx, channelsx, starty, finy, channelsy, 
 	
 	// Put info into scanVars struct (to more easily pass around later)
  	struct ScanVars S
- 	if (use_bd == 1)
+ 	if (use_bd == 1)  // Using babydacs as second instrument
 
 	 	initScanVarsFD2(S, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy,\
 		   				 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys,\
 		   				 interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments)
+		S.instrIDy = bdID
+		S.channelsy = scu_getChannelNumbers(channelsy, fastdac=0)
+		S.y_label = scu_getDacLabel(S.channelsy, fastdac=0)
+		scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, starty, finy, S.startxs, S.finxs, startys, finys)
 	
-	
-	else  				// Using second instrument for y-axis
+	else  				// Using fastdacs as second instrument
 		initScanVarsFD2(S, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy,\
 		   				 rampratey=rampratey, startxs=startxs, finxs=finxs, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints,\
 		   				 comments=comments, x_only = 0)
 		s.is2d = 1		   						
 		S.starty = starty
-		S.finy = finy		
-		S.dacListIDs_y = scc_checkDeviceNumber(S, check_y=1)
-		if (use_bd) //// how important is this?
-			S.instrIDy = bdID
-			S.channelsy = scu_getChannelNumbers(channelsy, fastdac=0)
-			S.y_label = scu_getDacLabel(S.channelsy, fastdac=0)
-			scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, starty, finy, S.startxs, S.finxs, startys, finys)
-		else  // use_second_fd																																				I want to remove this
-			//S.instrIDy = fdyID /// this should become a string like S.daclistIDs, because its in charge												I want to move this into scanvarsfd2?
-			//S.channelsy = scu_getChannelNumbers(channelsy, fastdac=1)
-			S.y_label = scu_getDacLabel(S.channelsy, fastdac=1)																									//this should stay I believe
-			scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, starty, finy, S.startxs, S.finxs, startys, finys)
-		endif
+		S.finy = finy
+		scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, starty, finy, S.startxs, S.finxs, startys, finys)
+		
 	endif
 	S.prevent_2d_graph_updates = 0 ////////////// SET TO 1 TO STOP 2D GRAPHS UPDATING ////////////////
       
@@ -1032,7 +1025,6 @@ function ScanFastDAC2D2(fdID, startx, finx, channelsx, starty, finy, channelsy, 
    
    PreScanChecksFD2(S)  
 
-   	
    // sets master/slave between the devices that are used.
 	set_master_slave(S)
    	
@@ -1046,8 +1038,8 @@ function ScanFastDAC2D2(fdID, startx, finx, channelsx, starty, finy, channelsy, 
    
    // Ramp to start without checks
    if(use_bd == 1)
-	   RampStartFD(S, x_only=1, ignore_lims=1)
-	   RampStartBD(S, y_only=1, ignore_lims=1)
+	   	RampStartFD(S, x_only=1, ignore_lims=1)
+	   	RampStartBD(S, y_only=1, ignore_lims=1)
    	else  // Should work for 1 or 2 FDs
    	   RampStartFD(S, ignore_lims=1)
    	endif
@@ -1092,14 +1084,18 @@ function ScanFastDAC2D2(fdID, startx, finx, channelsx, starty, finy, channelsy, 
 		scfd_RecordValues(S, i, AWG_list=AWG)
 		
 	endfor
-
+	
+	set_indep()
+	
 	// Save by default
 	if (nosave == 0)
 		EndScan(S=S)
   	else
   		dowindow /k SweepControl
 	endif
-
+	
+	
+	
 end
 
 

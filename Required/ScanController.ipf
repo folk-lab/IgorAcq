@@ -812,7 +812,7 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
    		S.channelsy = scu_getChannelNumbers(channelsy, fastdac=1)
    		S.dacListIDs_y = scc_checkDeviceNumber(S, check_y = 1)
    		S.y_label = scu_getDacLabel(S.channelsy, fastdac=1)																									//this should stay I believe
-		scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, starty, finy, S.startxs, S.finxs, startys, finys)
+		
    endif
                                                             
 end
@@ -3624,14 +3624,16 @@ function rampToNextSetpoint(S, inner_index, [outer_index, y_only, ignore_lims, f
 	if (!y_only)
 		checkStartsFinsChannels(S.startxs, S.finxs, S.channelsx)
 		variable sx, fx, setpointx
-		string chx
+		string chx, IDname
 		for(k=0; k<itemsinlist(S.channelsx,","); k++)
 			sx = str2num(stringfromList(k, S.startxs, ","))
 			fx = str2num(stringfromList(k, S.finxs, ","))
 			chx = stringfromList(k, S.channelsx, ",")
 			setpointx = sx + (inner_index*(fx-sx)/(S.numptsx-1))	
 			if (fastdac)
-				RampMultipleFDAC(S.instrIDx, chx, setpointx, ramprate=S.rampratex, ignore_lims=ignore_lims)
+				IDname = stringfromlist(k,S.daclistIDs)
+				nvar IDx = $IDname
+				RampMultipleFDAC(IDx, chx, setpointx, ramprate=S.rampratex, ignore_lims=ignore_lims)
 			else
 				RampMultipleBD(S.instrIDx, chx, setpointx, ramprate=S.rampratex, ignore_lims=ignore_lims)
 			endif
@@ -3648,7 +3650,9 @@ function rampToNextSetpoint(S, inner_index, [outer_index, y_only, ignore_lims, f
 			chy = stringfromList(k, S.channelsy, ",")
 			setpointy = sy + (outer_index*(fy-sy)/(S.numptsy-1))	
 			if (fastdac)
-				RampMultipleFDAC(S.instrIDy, chy, setpointy, ramprate=S.rampratey, ignore_lims=ignore_lims)
+				IDname = stringfromlist(k,S.daclistIDs_y)
+				nvar IDy = $IDname
+				RampMultipleFDAC(IDy, chy, setpointy, ramprate=S.rampratey, ignore_lims=ignore_lims)
 			else
 				RampMultipleBD(S.instrIDy, chy, setpointy, ramprate=S.rampratey, ignore_lims=ignore_lims)
 			endif
