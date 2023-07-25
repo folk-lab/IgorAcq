@@ -581,7 +581,7 @@ function Display2DWaterfall(w, [offset, x_label, y_label, plot_every_n, y_min, y
 	plot_every_n = paramisdefault(plot_every_n) ? 1 : plot_every_n // plotting every trace is default
 	y_min = paramisdefault(y_min) ? 0 : y_min // y_min index 0 is default
 	y_max = paramisdefault(y_max) ? dimsize(w, 1) : y_max // y_max index 0 is default
-	plot_contour = paramisdefault(plot_contour) ? 0 : 1 // plotting contour OFF is default
+	plot_contour = paramisdefault(plot_contour) ? 0 : plot_contour // plotting contour OFF is default
 	
 	
 	x_label = selectstring(paramisdefault(x_label), x_label, "")

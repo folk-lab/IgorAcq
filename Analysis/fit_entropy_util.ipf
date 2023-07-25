@@ -4,17 +4,20 @@
 #include <Reduce Matrix Size>
 
 
-function master_entropy_clean_average(int filenum, int delay, int wavelen, [int average_repeats, int demodulate_on, int apply_scaling, int forced_theta])
+function master_entropy_clean_average(filenum, delay, wavelen, [average_repeats, demodulate_on, apply_scaling, forced_theta, fit_width])
+	int filenum, delay, wavelen
+	int average_repeats, demodulate_on, apply_scaling, forced_theta
+	variable fit_width
+	
 	average_repeats = paramisdefault(average_repeats) ? 1 : average_repeats // assuming repeats to average into 1 trace
 	demodulate_on = paramisdefault(demodulate_on) ? 0 : demodulate_on // demodulate OFF is default
 	apply_scaling = paramisdefault(apply_scaling) ? 1 : apply_scaling // scaling ON is default
+	fit_width = paramisdefault(fit_width) ? INF : fit_width // averaging ON is default
+	
+	
 	int forced_theta_on = paramisdefault(forced_theta) ? 0 : 1 // forcing theta OFF is default
 	
 	string raw_wavename = "dat" + num2str(filenum) + "cscurrent_2d";
-	
-	wave numerical_entropy
-	wave entropy_centered, numerical_entropy_centered
-	
 	
 	///// demodulate data if necessary /////
 	string demodx_wavename = "dat" + num2str(filenum) + "cscurrentx_2d";
@@ -26,6 +29,7 @@ function master_entropy_clean_average(int filenum, int delay, int wavelen, [int 
 	
 	///// seperate out hot and cold (CREATES numerical_entropy) /////
 	sqw_analysis($raw_wavename, delay, wavelen)
+	wave numerical_entropy
 	wave cold, hot
 	
 	///// plot thetas from cold wave /////
@@ -41,20 +45,18 @@ function master_entropy_clean_average(int filenum, int delay, int wavelen, [int 
 	duplicate/o/r=[][3] cold_params_wave cold_mids
 	
 		
-		
 	///// center and average /////
 	if (average_repeats == 1)
-
+		
 		///// centre the 2d traces /////
 		centering(demodx_wave, "entropy_centered", cold_mids) // centred plot and average plot
 		centering(numerical_entropy, "numerical_entropy_centered", cold_mids) // centred plot and average plot
-		
+		wave entropy_centered, numerical_entropy_centered
 		
 		///// average to a 1d trace /////
-		wave entropy_centered_avg, numerical_entropy_centered_avg
 		avg_wav(entropy_centered); 
 		avg_wav(numerical_entropy_centered)
-	
+		wave entropy_centered_avg, numerical_entropy_centered_avg
 		
 		///// take care of scaling and remove nans /////
 		entropy_centered_avg *= 2
@@ -69,9 +71,9 @@ function master_entropy_clean_average(int filenum, int delay, int wavelen, [int 
 		if (apply_scaling == 1)
 		
 			if (forced_theta_on == 1)
-				wave entropy_scaling_factor = calc_scaling(cold, hot, cold_mids, average_repeats = 1, forced_theta = forced_theta)
+				wave entropy_scaling_factor = calc_scaling(cold, hot, cold_mids, average_repeats = 1, forced_theta = forced_theta, fit_width = fit_width)
 			else
-				wave entropy_scaling_factor = calc_scaling(cold, hot, cold_mids, average_repeats = 1)
+				wave entropy_scaling_factor = calc_scaling(cold, hot, cold_mids, average_repeats = 1, fit_width = fit_width)
 			endif
 			
 			entropy_centered_avg_int *= entropy_scaling_factor[0]
@@ -91,9 +93,9 @@ function master_entropy_clean_average(int filenum, int delay, int wavelen, [int 
 		if (apply_scaling == 1)
 		
 			if (forced_theta_on == 1)
-				wave entropy_scaling_factor = calc_scaling(cold, hot, cold_mids, average_repeats = 0, forced_theta = forced_theta)
+				wave entropy_scaling_factor = calc_scaling(cold, hot, cold_mids, average_repeats = 0, forced_theta = forced_theta, fit_width = fit_width)
 			else
-				wave entropy_scaling_factor = calc_scaling(cold, hot, cold_mids, average_repeats = 0)
+				wave entropy_scaling_factor = calc_scaling(cold, hot, cold_mids, average_repeats = 0, fit_width = fit_width)
 			endif
 			
 			variable num_rows = dimsize(entropy_int, 1)
@@ -190,9 +192,16 @@ function/wave sqw_analysis(wave wav, int delay, int wavelen)
 end
 
 
-function/WAVE calc_scaling(wave cold, wave hot, wave mids, [int average_repeats, variable  forced_theta])
+function/WAVE calc_scaling(cold, hot, mids, [average_repeats, forced_theta, fit_width])
 	//first we need to center cold and hot wave
+	wave cold, hot, mids
+	int average_repeats
+	variable forced_theta, fit_width
+	
 	average_repeats = paramisdefault(average_repeats) ? 1 : average_repeats // averaging ON is default
+	fit_width = paramisdefault(fit_width) ? INF : fit_width // averaging ON is default
+	
+
 	int forced_theta_on = paramisdefault(forced_theta) ? 0 : 1 // forcing theta OFF is default
 	
 	
@@ -252,10 +261,10 @@ function/WAVE calc_scaling(wave cold, wave hot, wave mids, [int average_repeats,
 		
 		
 		///// fit cold and hot trace /////
-		fit_transition(cold_single_trace, minx, maxx)
+		fit_transition(cold_single_trace, minx, maxx, fit_width = fit_width)
 		duplicate/o W_coef, cold_params
 		
-		fit_transition(hot_single_trace, minx, maxx)
+		fit_transition(hot_single_trace, minx, maxx, fit_width = fit_width)
 		duplicate/o W_coef, hot_params
 		
 		///// calculate scaling factor /////

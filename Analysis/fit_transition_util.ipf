@@ -262,7 +262,7 @@ function master_ct_clean_average(wav, refit, dotcondcentering, kenner_out, [cond
 		fit_transition($avg_wave_name, minx, maxx, fit_width = fit_width)
 	endif
 	
-	plot_ct_figs(wavenum, N, kenner, kenner_out, minx, maxx, fit_width = fit_width, repeats_on = repeats_on, average = average)
+	plot_ct_figs(wavenum, N, kenner, kenner_out, minx, maxx, fit_width = fit_width, repeats_on = repeats_on, average = average, zap_params = zap_params)
 
 	ms=stopmstimer(refnum)
 //	print "CT: time taken = " + num2str(ms/1e6) + "s"
@@ -516,7 +516,7 @@ function /wave fit_transition(wave_to_fit, minx, maxx, [fit_width])
 	variable minx, maxx
 	// optional param
 	variable fit_width
-	fit_width = paramisdefault(fit_width) ? inf : fit_width // averaging ON is default
+	fit_width = paramisdefault(fit_width) ? INF : fit_width // averaging ON is default
 	
 	// update the minx and maxx based on the mid value and fit_width 
 	wave W_coef
@@ -709,15 +709,16 @@ function /wave remove_bad_thetas(wave center, wave badthetasx, string cleaned_wa
 end
 
 
-function plot_ct_figs(wavenum, N, kenner, kenner_out, minx, maxx, [average, fit_width, repeats_on])
+function plot_ct_figs(wavenum, N, kenner, kenner_out, minx, maxx, [average, fit_width, repeats_on, zap_params])
 	variable wavenum, N, minx, maxx
 	string kenner, kenner_out
 	
-	variable average, fit_width, repeats_on
+	variable average, fit_width, repeats_on, zap_params
 	
 	average = paramisdefault(average) ? 1 : average // averaging ON is default
 	fit_width = paramisdefault(fit_width) ? inf : fit_width // averaging ON is default
 	repeats_on = paramisdefault(repeats_on) ? 1 : repeats_on // repeats_on ON is default
+	zap_params = paramisdefault(zap_params) ? 0 : zap_params // repeats_on ON is default
 	
 	string datasetname ="dat" + num2str(wavenum) + kenner // this was the original dataset name
 	string centered_wave_name = kenner_out + num2str(wavenum) + "_cs_centered" // this is the centered 2D wave
@@ -733,6 +734,7 @@ function plot_ct_figs(wavenum, N, kenner, kenner_out, minx, maxx, [average, fit_
 	string quick_fit_name = "fit_" + quickavg 
 	
 	display $quickavg
+	get_initial_params($quickavg)
 	fit_transition($quickavg, minx, maxx, fit_width = fit_width)
 	
 	Label bottom "Gate (mV)"
@@ -752,18 +754,20 @@ function plot_ct_figs(wavenum, N, kenner, kenner_out, minx, maxx, [average, fit_
 	plot2d_heatmap($datasetname, x_label = x_label, y_label = y_label)
 	
 	// add bad rows onto 'RAW' plot
-	create_x_wave($datasetname)
-	wave x_wave
-	
-	variable num_cols = dimsize(x_wave, 0)
-	
-	variable end_xval = x_wave[num_cols - 5]
-	wave bad_params_row
-	
-	duplicate /o bad_params_row bad_params_x
-	bad_params_x[] = end_xval
-	appendtograph bad_params_row vs bad_params_x
-	ModifyGraph mode(bad_params_row)=2, marker(bad_params_row)=41, lsize(bad_params_row)=2, rgb(bad_params_row)=(0,0,0)
+	if (zap_params == 1)
+		create_x_wave($datasetname)
+		wave x_wave
+		
+		variable num_cols = dimsize(x_wave, 0)
+		
+		variable end_xval = x_wave[num_cols - 5]
+		wave bad_params_row
+		
+		duplicate /o bad_params_row bad_params_x
+		bad_params_x[] = end_xval
+		appendtograph bad_params_row vs bad_params_x
+		ModifyGraph mode(bad_params_row)=2, marker(bad_params_row)=41, lsize(bad_params_row)=2, rgb(bad_params_row)=(0,0,0)
+	endif	
 	
 	
 	if (average == 1)
@@ -777,6 +781,7 @@ function plot_ct_figs(wavenum, N, kenner, kenner_out, minx, maxx, [average, fit_
 		string fit_name = "fit_" + avg_wave_name
 		
 		display $avg_wave_name
+		get_initial_params($avg_wave_name)
 		fit_transition($avg_wave_name, minx, maxx, fit_width = fit_width)
 		
 		Label bottom "Gate (mV)"
