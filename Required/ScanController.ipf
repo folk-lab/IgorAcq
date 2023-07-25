@@ -1402,7 +1402,7 @@ function/S scg_initializeGraphs(S , [y_label])
 			endif
       	 endif
       	 
-      	if(raw==1) // Raw waves
+      	if((raw==1) || (plotraw==1)) // Raw waves
 	   		sc_rawGraphs1D = buffer
       	endif
       	  
@@ -1442,18 +1442,18 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 
 		// 1D graphs
 		if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-			scg_setupGraph1D(openGraphID, x_label, y_label= selectstring(cmpstr(y_label_1d,""), wn, wn +" ("+y_label_1d +")"))
+			scg_setupGraph1D(openGraphID, x_label, y_label= selectstring(cmpstr(y_label_1d, ""), wn, wn +" (" + y_label_1d + ")"))
 			wn = StringFromList(i, wavenames) 
 		else
 			wn = StringFromList(i, wavenames)
 			
 	      	if (spectrum)
-	      		scg_open1Dgraph(wn, x_label, y_label=selectstring(cmpstr(y_label_1d,""), wn, wn +" ("+y_label_1d+")"))
+	      		scg_open1Dgraph(wn, x_label, y_label=selectstring(cmpstr(y_label_1d,""), wn, wn +" (" + y_label_1d + ")"))
 	      		openGraphID = winname(0,1)
 				string wn_powerspec = scfd_spectrum_analyzer($wn, mFreq, "pwrspec" + ADCnum)
-				scg_twosubplot(openGraphID, wn_powerspec, logy = 1, labelx = "Frequency (Hz)",labely ="pwr", append_wn = wn_powerspec + "int", append_labely = "cumul. pwr")
+				scg_twosubplot(openGraphID, wn_powerspec, logy = 1, labelx = "Frequency (Hz)", labely ="pwr", append_wn = wn_powerspec + "int", append_labely = "cumul. pwr")
 			else 
-	      		scg_open1Dgraph(wn, x_label, y_label=selectstring(cmpstr(y_label_1d,""), wn, wn +" ("+y_label_1d+")"),append_wn = append_wn)
+	      		scg_open1Dgraph(wn, x_label, y_label=selectstring(cmpstr(y_label_1d, ""), wn, wn + " (" + y_label_1d + ")"), append_wn = append_wn)
 	      		openGraphID = winname(0,1)			
 			endif 
 			
@@ -4213,7 +4213,7 @@ function scfd_resampleWaves(w, measureFreq, targetFreq)
 		string cmd
 		printf cmd "WARNING[scfd_resampleWaves]: Resampling will increase number of datapoints, not decrease! (ratio = %d/%d)\r", V_numerator, V_denominator
 	endif
-	resample/UP=(V_numerator)/DOWN=(V_denominator)/N=201/E=3 w
+	resample /UP=(V_numerator) /DOWN=(V_denominator) /N=201 /E=3 w
 	// TODO: Need to test N more (simple testing suggests we may need >200 in some cases!)
 	// TODO: Need to decide what to do with end effect. Possibly /E=2 (set edges to 0) and then turn those zeros to NaNs? 
 	// TODO: Or maybe /E=3 is safest (repeat edges). The default /E=0 (bounce) is awful.
@@ -4630,12 +4630,11 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 	
 end
 
-
 function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only])
 	// Returns whether recording entered into panic_mode during sweep
    struct ScanVars &S
    variable rowNum, totalByteReturn
-   variable record_only // If set, then graphs will not be updated until all data has been read 
+   variable record_only // If set, then graphs will not be updated until all data has been read (defaults to 0)
 
    // hold incoming data chunks in string and distribute to data waves
    string buffer = ""
@@ -4740,7 +4739,36 @@ function scfd_getReadChunkSize(numADCs, numpts, bytesSec, totalByteReturn)
   return read_chunk
 end
 
+function scfd_raw2CalcQuickDistribute()
+    // Function to update graphs as data comes in temporarily, only applies the calc function for the scan 
 
+    variable i = 0
+    string RawWaveNames1D = sci_get1DWaveNames(1, 1)  // Get the names of 1D raw waves
+    string CalcWaveNames1D = sci_get1DWaveNames(0, 1)  // Get the names of 1D calc waves
+    string CalcStrings = scf_getRecordedFADCinfo("calc_funcs")  // Get the calc functions
+    string rwn, cwn, calc_string
+    wave fadcattr
+    wave /T fadcvalstr
+
+    if (itemsinList(RawWaveNames1D) != itemsinList(CalCWaveNames1D))
+        abort "Different number of raw wave names compared to calc wave names"
+    endif
+
+    for (i=0; i<itemsinlist(RawWaveNames1D); i++)
+        rwn = StringFromList(i, RawWaveNames1D)  // Get the current raw wave name
+        cwn = StringFromList(i, CalcWaveNames1D)  // Get the current calc wave name
+        calc_string = StringFromList(i, CalcStrings)  // Get the current calc function
+
+        duplicate/o $rwn sc_tempwave  // Duplicate the raw wave to a temporary wave
+
+        string ADCnum = rwn[3,INF]  // Extract the ADC number from the raw wave name
+
+        calc_string = ReplaceString(rwn, calc_string, "sc_tempwave")  // Replace the raw wave name with the temporary wave name in the calc function
+        execute("sc_tempwave = "+calc_string)  // Execute the calc function
+
+        duplicate /o sc_tempwave $cwn  // Duplicate the temporary wave to the calc wave
+    endfor
+end
 
 function scfd_checkSweepstate(instrID)
   	// if abort button pressed then stops FDAC sweep then aborts

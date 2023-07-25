@@ -6,12 +6,314 @@
 // I am not sure how well these work. But if they have use then I will put them in a more general .ipf (not just Tim) 
 // as we don't want to be duplicating functions. 
 
+#include <Peak AutoFind>
+
+
+
+/////////////////// Line path integrals /////////////
+
+
+//////////////////////
+///// JOHANN NEW /////
+//////////////////////
+function interpolate_polyline(poly_y, poly_x, [num_points_to_interp])
+	// interpolate poly_y and poly_x to form evernly space poly_y_interp and poly_x_interp
+	// use graphWaveDraw to create rough set of points which creates the waves w_ypoly1 and w_xpoly1 e.g. interpolate_polyline(w_ypoly1, w_xpoly1)
+	wave poly_x, poly_y
+	int num_points_to_interp
+	num_points_to_interp = paramisdefault(num_points_to_interp) ? 1000 : num_points_to_interp
+	
+	variable num_vals = dimsize(poly_x, 0)
+	wave linspaced = linspace(poly_x[0], poly_x[num_vals - 1], num_points_to_interp, make_global = 0)
+	duplicate /o linspaced poly_x_interp
+	
+	Interpolate2 /T=1 /I=3 /Y=poly_y_interp/X=poly_x_interp poly_x, poly_y //linear interpolation
+	
+end
+
+
+function/WAVE  get_z_from_xy(wave_2d, y_wave, x_wave)
+	// return 1d wave where the y values are picked by the z value at each coordinate from y_wave and x_wave
+	wave wave_2d, y_wave, x_wave
+	
+	duplicate /o y_wave z_wave
+	wave z_wave
+	
+	variable num_vals = dimsize(y_wave, 0)
+	variable x_val, y_val, x_coord, y_coord
+	
+	variable i
+	for (i = 0; i < num_vals; i++)
+		x_val = x_wave[i]
+		y_val = y_wave[i]
+		
+		x_coord = scaletoindex(wave_2d, x_val, 0)
+		y_coord = scaletoindex(wave_2d, y_val, 1)
+		
+		z_wave[i] = wave_2d[x_coord][y_coord]
+		
+	endfor
+
+	
+	SetScale/I x x_wave[0], x_wave[inf], "", z_wave
+	
+	return z_wave
+end
+
+
+
+function get_multiple_line_paths(wave_2d, y_wave, x_wave, [width_y, width_x, num_traces])
+	wave wave_2d, y_wave, x_wave
+	variable width_y, width_x
+	int num_traces
+	
+	width_y = paramisdefault(width_y) ? 10 : width_y
+	width_x = paramisdefault(width_y) ? 0 : width_x
+	num_traces = paramisdefault(width_y) ? 10 : num_traces
+	
+	///// create empty 2d wave to store multiple rows of the line paths
+	variable num_vals = dimsize(y_wave, 0)
+	make /o/n=(num_vals, num_traces) line_path_2d_z
+	make /o/n=(num_vals, num_traces) line_path_2d_y
+	make /o/n=(num_vals, num_traces) line_path_2d_x
+	
+	
+	///// calculate delta y to pull off each of the line paths
+	variable delta_y = (width_y*2) / num_traces
+	duplicate /o y_wave y_wave_offset
+	y_wave_offset[] = y_wave[p] - width_y
+	wave y_wave_offset
+	
+	///// calculate delta c to pull off each of the line paths
+	variable delta_x = (width_x*2) / num_traces
+	duplicate /o x_wave x_wave_offset
+	x_wave_offset[] = x_wave[p] - width_x
+	wave x_wave_offset
+	
+	
+	variable i, offset
+	for (i = 0; i < num_traces; i++)
+	
+		///// calculate the new y_wave_offset and x_wave_offset
+		y_wave_offset[] = y_wave_offset[p] + delta_y
+		x_wave_offset[] = x_wave_offset[p] + delta_x
+		
+		wave z_wave = get_z_from_xy(wave_2d, y_wave_offset, x_wave_offset)
+		
+		line_path_2d_z[][i] = z_wave[p]
+		line_path_2d_y[][i] = y_wave_offset[p]
+		line_path_2d_x[][i] = x_wave_offset[p]
+	
+	endfor
+end
+
+
+function plot_multiple_line_paths(wave_2d, y_wave, x_wave, [width_y, width_x, offset, num_traces, plot_contour])
+	wave wave_2d, y_wave, x_wave
+	variable width_y, width_x, offset
+	int num_traces, plot_contour
+	
+	width_y = paramisdefault(width_y) ? 10 : width_y
+	width_x = paramisdefault(width_y) ? 0 : width_x
+	offset = paramisdefault(offset) ? 0.001 : offset
+	num_traces = paramisdefault(width_y) ? 10 : num_traces
+	plot_contour = paramisdefault(plot_contour) ? 1 : plot_contour
+	
+	get_multiple_line_paths(wave_2d, y_wave, x_wave, width_y = width_y, width_x = width_x, num_traces = num_traces)
+	
+	wave line_path_2d_z, line_path_2d_y, line_path_2d_x
+	
+	///// display original 2d image with each trace
+	string window_name = "line_path_traces"
+	dowindow/k $window_name
+	display/N=$window_name
+	appendimage /W=$window_name wave_2d
+	variable num_columns = dimsize(line_path_2d_y, 1)
+	variable i
+	for (i = 0; i < num_columns; i++)
+		appendtograph /W=$window_name line_path_2d_y[][i] vs line_path_2d_x[][i]
+	endfor
+	
+	Display2DWaterfall(line_path_2d_z, offset = offset, plot_every_n = 1, plot_contour = plot_contour)
+end
+
+
+
+function get_multiple_line_paths_int(wave_2d, y_wave, x_wave, [width_y, width_x, num_traces])
+	wave wave_2d, y_wave, x_wave
+	variable width_y, width_x
+	int num_traces
+	
+	width_y = paramisdefault(width_y) ? 10 : width_y
+	width_x = paramisdefault(width_y) ? 0 : width_x
+	num_traces = paramisdefault(width_y) ? 10 : num_traces
+	
+	string wave_name = nameofwave(wave_2d)
+	
+	get_multiple_line_paths(wave_2d, y_wave, x_wave, width_y = width_y, width_x = width_x, num_traces = num_traces)
+	
+	wave line_path_2d_z, line_path_2d_y, line_path_2d_x
+	
+	///// display original 2d image with each trace
+	string window_name = "line_path_traces"
+	dowindow/k $window_name
+	display/N=$window_name
+	appendimage /W=$window_name wave_2d
+	ModifyImage /W=$window_name $wave_name ctab= {-0.005, 0.005, RedWhiteGreen, 0}
+	variable num_columns = dimsize(line_path_2d_y, 1)
+	variable i
+	for (i = 0; i < num_columns; i++)
+		appendtograph /W=$window_name line_path_2d_y[][i] vs line_path_2d_x[][i]
+	endfor
+	
+	///// integrate line paths and remove y offset
+	Integrate line_path_2d_z /D = line_path_2d_z_int
+	
+	offset_2d_traces(line_path_2d_z_int)
+	
+	// display integrated line traces
+	window_name = "line_path_traces_z_int"
+	dowindow/k $window_name
+	display/N=$window_name
+	appendimage /W=$window_name line_path_2d_z_int
+	ModifyImage /W=$window_name line_path_2d_z_int ctab= {*,*,RedWhiteGreen,0}	
+end
+
+
+
+function replace_nans_with_avg(wave_2d, [overwrite])
+	// Replaces NaN values in a 2D wave with the average of the non-NaN values in each column
+    // wave_2d: The input 2D wave
+    // overwrite: Set to 1 to overwrite the input wave (Default is to create new wave with "_new" added)
+	wave wave_2d
+	int overwrite
+	
+	string wave_name = nameofwave(wave_2d)
+	
+	// Getting x-values from wave
+	string wave_name_x = wave_name + "_x"
+	duplicate /o /R=[][0] wave_2d $wave_name_x
+	wave wave_2d_x = $wave_name_x
+	wave_2d_x = x
+	
+	// Duplicating 2d wave
+	string wave_name_new = wave_name + "_new"
+	duplicate /o wave_2d $wave_name_new
+	wave wave_new = $wave_name_new 
+	
+	variable num_rows = dimsize(wave_2d, 1) // IGOR column
+	variable num_bad_rows = 0
+	variable i
+	for (i = 0; i < num_rows; i++)
+		duplicate /R=[][i] /o /free wave_2d wave_slice
+		wavestats /Q wave_slice
+		if (V_numNans/V_npnts > 0.33) // If 25% or more of data poitns are NaNs
+			DeletePoints/M=1 (i - num_bad_rows), 1, wave_new // delete row 
+			num_bad_rows += 1
+		else
+			Interpolate2 /T=1 /I=0 /Y=wave_slice wave_2d_x,  wave_slice // linear interpolation
+			wave_new[][i - num_bad_rows] = wave_slice[p]
+		endif
+	endfor
+	
+	
+	killwaves wave_2d_x
+	
+	
+	if (overwrite == 1)
+		duplicate /o wave_new $wave_name
+		killwaves wave_new
+	endif
+end
+
+
+
+//function interpolate_nrg_narrow(variable musmax, variable musmin)
+//	wave gammas_narrow_interp = g_n_narrow
+//	wave mus_narrow_interp = mu_n_narrow
+//	
+//	wave dndt_narrow_interp = dndt_n_narrow
+//	wave cond_narrow_interp = cond_n_narrow
+//	wave occ_narrow_interp = occ_n_narrow
+//	
+//	wave dndt_narrow_raw = dndt_narrow
+//	wave cond_narrow_raw = conductance_narrow
+//	wave occ_narrow_raw = occupation_narrow
+//
+//	
+//	variable gammamax, gammamin
+//	
+//	///// NEW /////
+//	wave mu_n_wide
+////	wavestats /q mu_n_wide
+////	musmax = v_max
+////	musmin = v_min
+//	///// /////
+//	SetScale/I x musmin, musmax, "", cond_narrow_interp, dndt_narrow_interp, occ_narrow_interp
+//	
+//	wavestats /q gammas_narrow_interp
+//	gammamax = v_max
+//	gammamin = v_min
+//	SetScale/I y gammamin, gammamax, "", cond_narrow_interp, dndt_narrow_interp, occ_narrow_interp
+//	
+//	make /o/n=(dimsize(mus_narrow_interp, 0)) datx, daty
+//	make /o/n=(dimsize(dndt_narrow_interp, 0)) interpwv
+//	SetScale/I x musmin, musmax, "", interpwv
+//	
+//	variable i
+//	for(i=0;i<dimsize(mus_narrow_interp, 1); i++)
+//		datx[] = mus_narrow_interp[p][i]
+//		daty[] = dndt_narrow_raw[p][i]
+//		Interpolate2/T=1/E=2/Y=interpwv/I=3 datx,daty //linear interpolation
+//		dndt_narrow_interp[][i] = interpwv[p]
+//		
+//		daty[] = cond_narrow_raw[p][i]
+//		Interpolate2/T=1/E=2/Y=interpwv/I=3 datx,daty //linear interpolation
+//		wavestats /q interpwv
+//		cond_narrow_interp[][i] = interpwv[p]/v_max
+//		
+//		daty[] = occ_narrow_raw[p][i]
+//		Interpolate2/T=1/E=2/Y=interpwv/I=3 datx,daty //linear interpolation
+//		occ_narrow_interp[][i] = interpwv[p]
+//	endfor
+//end
+
 
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////// My Analysis ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+Function ApplyFakeWaterfall(graphName, dx, dy, hidden)      // e.g., ApplyFakeWaterfall("Graph0", 2, 100, 1)
+	//hidden= h
+	//h =0: Turns hidden line off.
+	//h =1: Uses painter's algorithm.
+	//h =2: True hidden.
+	//h =3: Hides lines with bottom removed.
+	//h =4: Hides lines using a different color for the bottom. When specified, the top color is the normal color for lines and the bottom color is set using ModifyGraph negRGB=(r,g,b).
+
+	String graphName    // Name of graph or "" for top graph
+	Variable dx, dy     // Used to offset traces to create waterfall effect
+	Variable hidden     // If true, apply hidden line removal
+	
+	String traceList = TraceNameList(graphName, ";", 1)
+	Variable numberOfTraces = ItemsInLIst(traceList)
+	
+	Variable traceNumber
+	for(traceNumber=0; traceNumber<numberOfTraces; traceNumber+=1)
+		String trace = StringFromList(traceNumber, traceList)
+		Variable offsetX = (numberOfTraces-traceNumber-1) * dx
+		Variable offsetY = (numberOfTraces-traceNumber-1) * dy
+		ModifyGraph/W=$graphName offset($trace)={offsetX,offsetY}
+		ModifyGraph/W=$graphName plusRGB($trace)=(65535,65535,65535)    // Fill color is white
+		if (hidden)
+			ModifyGraph/W=$graphName mode($trace)=7, hbFill($trace)=1       // Fill to zero, erase mode
+		else
+			ModifyGraph/W=$graphName mode($trace)=0                     // Lines between points
+		endif
+	endfor
+End
 
 
 /////////////////////////////// Noise Spectrum ///////////////////////
@@ -173,12 +475,13 @@ function/wave DiffWave(w, [numpts])
 	numpts = paramisdefault(numpts) ? 150 : numpts
 	
 	duplicate/o w, tempwave
-	print dimsize(w, 0)
-	print ceil(dimsize(w,0)/numpts)
+//	print dimsize(w, 0)
+//	print ceil(dimsize(w,0)/numpts)
 	resample/DIM=0 /down=(ceil(dimsize(w,0)/numpts)) tempwave
 	differentiate/DIM=0 tempwave	
 	return tempwave
 end
+
 
 function DisplayMultiple(datnums, name_of_wave, [diff, x_label, y_label])
 // Plots data from each dat on same axes... Will differentiate first if diff = 1
@@ -188,13 +491,21 @@ function DisplayMultiple(datnums, name_of_wave, [diff, x_label, y_label])
 
 	if (paramisDefault(x_label))
 		struct ScanVars S
-		scv_getLastScanVars(S)   
-		x_label = S.x_label
+		try
+			scv_getLastScanVars(S)
+			x_label = S.x_label
+		catch
+			x_label = ""
+		endtry
 	endif
 	if (paramisDefault(y_label))
 		struct ScanVars S2
-		scv_getLastScanVars(S2)   
-		y_label = S2.y_label
+		try
+			scv_getLastScanVars(S2)   
+			y_label = S2.y_label
+		catch
+			y_label = ""
+		endtry
 	endif
 
 //	x_label = selectstring(paramisdefault(x_label), x_label, "")
@@ -212,8 +523,10 @@ function DisplayMultiple(datnums, name_of_wave, [diff, x_label, y_label])
 	string tempwn
 	for(i=0; i < numpnts(datnums); i++)
 		datnum = datnums[i]
-		sprintf wn, "dat%d%s", datnum, name_of_wave
-		sprintf tempwn, "tempwave_%s", wn
+//		sprintf wn, "dat%d%s", datnum, name_of_wave
+//		sprintf tempwn, "tempwave_%s", wn
+		wn = "dat" + num2str(datnum) + name_of_wave
+		tempwn = "tempwave_" + wn
 		duplicate/o $wn, $tempwn
 		if (diff == 1)
 			wave tempwave = diffwave($tempwn)
@@ -257,10 +570,19 @@ function DisplayWave(w, [x_label, y_label])
 end
 
 
-function Display2DWaterfall(w, [x_label, y_label])
+function Display2DWaterfall(w, [offset, x_label, y_label, plot_every_n, y_min, y_max, plot_contour])
 	wave w
+	variable offset
 	string x_label, y_label
+	int plot_every_n, y_min, y_max, plot_contour
+	
 	variable num_repeats = DimSize(w, 1)
+	int apply_offset = paramisdefault(offset) ? 0 : 1 // forcing theta OFF is default
+	plot_every_n = paramisdefault(plot_every_n) ? 1 : plot_every_n // plotting every trace is default
+	y_min = paramisdefault(y_min) ? 0 : y_min // y_min index 0 is default
+	y_max = paramisdefault(y_max) ? dimsize(w, 1) : y_max // y_max index 0 is default
+	plot_contour = paramisdefault(plot_contour) ? 0 : 1 // plotting contour OFF is default
+	
 	
 	x_label = selectstring(paramisdefault(x_label), x_label, "")
 	y_label = selectstring(paramisdefault(y_label), y_label, "")
@@ -272,19 +594,69 @@ function Display2DWaterfall(w, [x_label, y_label])
 	display/N=$name
 	TextBox/W=$name/C/N=textid/A=LT/X=1.00/Y=1.00/E=2 name
 	
-//	Legend/C/N=text0/J/A=M
+
+	variable offset_to_apply
+	duplicate  /o w wave_2d
+	wave wave_2d
+	
+	duplicate  /o w wave_2d_contour
+	wave wave_2d_contour
+	
 	
 	variable i
 	for(i = 0; i < num_repeats; i++)
-       AppendToGraph/W=$name w[][i]
+
+		if (apply_offset == 1)
+			offset_to_apply = i * offset
+		else
+			offset_to_apply = 0
+		endif
+		
+		wave_2d[][i] = wave_2d[p][i] + offset_to_apply
+		
+		
+		if ((mod(i, plot_every_n) == 0) && (i >= y_min) && (i < y_max))
+   		AppendToGraph/W=$name wave_2d[][i]
+   	endif
+   	
 	endfor
 	
-//   Legend/C/N=text0/J/A=MC "\\s(dat187current_2d) repeat 1\r\\s(dat187current_2d#1) repeat 2\r\\s(dat187current_2d#2) repeat 3\r\\s(dat187current_2d#3) repeat 4";DelayUpdate
-//   AppendText "\\s(dat187current_2d#4) repeat 5"
-	Label/W=$name left y_label
-	Label/W=$name bottom, x_label
-	
 	makecolorful()
+	
+	string wavename_2d_contour = ""
+	///// adding contour lines /////
+	variable count = 0
+	for(i = 0; i < num_repeats; i++)
+
+		if (apply_offset == 1)
+			offset_to_apply = i * offset
+		else
+			offset_to_apply = 0
+		endif
+		
+   	
+   	if ((mod(i, plot_every_n) == 0) && (i >= y_min) && (i < y_max) && (plot_contour == 1))
+   	
+//   		wave_2d_contour[][i] = wave_2d_contour[p][i]*0  + wave_2d_contour[0][i] + offset_to_apply
+   		wave_2d_contour[][i] = wave_2d[0][i]
+   		AppendToGraph/W=$name wave_2d_contour[][i]
+   		
+   		wavename_2d_contour = "wave_2d_contour#" + num2str(count)
+   		
+   		ModifyGraph rgb($wavename_2d_contour) = (30583,30583,30583), lstyle($wavename_2d_contour)=3, lsize($wavename_2d_contour)=0.1
+   		
+   		count += 1
+   	endif
+   	
+	endfor
+	
+	
+	
+
+	Label /W=$name left y_label
+	Label /W=$name bottom x_label
+	
+
 	
 end
 

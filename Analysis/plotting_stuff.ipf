@@ -178,34 +178,33 @@ Function QuickColorSpectrum2()                            // colors traces with 
 	endfor
 End
 
-function plot2d_heatmap(wave wav)
-
+function plot2d_heatmap(wav, [x_label, y_label])
 	//plots the repeats against the sweeps for dataset cscurrent_2d
+	wave wav
+
+	string x_label, y_label
+	
+	x_label = selectstring(paramisdefault(x_label), x_label, "Gate (mV)")
+	y_label = selectstring(paramisdefault(y_label), y_label, "Gate (mV)")
 
 	variable num
-	string dataset
-	string wvname
+	string wave_name
 
-	wvname=nameOfWave(wav)
+	wave_name = nameOfWave(wav)
+	wave wav = $wave_name
 
-	wave wav = $wvname
-
-
-
-	display; //start with empty graph
+	display //start with empty graph
 	appendimage wav //append image of data
-	ModifyImage $wvname ctab= {*,*,Turbo,0} //setting color (idk why it prefers the pointer)
+	ModifyImage $wave_name ctab= {*, *, Turbo,0} //setting color (idk why it prefers the pointer)
 	ColorScale /A=RC /E width=20 //puts it on the right centre, /E places it outside
 
-	Label bottom "gate(V)"
-	Label left "repeats"
+	Label bottom x_label
+	Label left y_label
 
 	ModifyGraph fSize=24
 	ModifyGraph gFont="Gill Sans Light"
-	//    ModifyGraph width={Aspect,1.62},height=300
-	//	TextBox/C/N=text1/A=MT/E=2 "raw 2D plot of dat" + num2str(num)
-
 end
+
 
 function setcolorscale2d(percent)
 	variable percent

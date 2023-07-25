@@ -67,7 +67,7 @@ function demodulate(datnum, harmonic, wave_kenner, [append2hdf, demod_wavename])
 	struct AWGVars AWGLI
 	fd_getoldAWG(AWGLI, datnum)
 
-	print AWGLI
+//	print AWGLI
 
 	cols=dimsize(wav,0); print cols
 	rows=dimsize(wav,1); print rows
@@ -219,130 +219,22 @@ end
 
 
 
-
-function demodulate2(datnum,harmonic,kenner,[append2hdf, axis])
-//if axis=0: demodulation in r
-//if axis=1: demodulation in x
-//if axis=2: demodulation in y
-	variable datnum,harmonic
-	string kenner
-	variable append2hdf, axis
-	axis = paramisdefault(axis) ? 0 : axis
-	variable nofcycles, period, cols, rows
-	string wn="dat"+num2str(datnum)+kenner;
-	string wn_x="temp_x"
-	string wn_y="temp_y"
-	wave wav=$wn
-	wave wav_x=$wn_x
-	wave wav_y=$wn_y
-	struct AWGVars AWGLI
-	fd_getoldAWG(AWGLI,datnum)
-	make /o demod2
+function resampleWave(wav, targetFreq)
+	// finds measure freq from scan vars and calls scfd_resampleWaves
+	wave wav 
+	variable targetFreq 
 	
+	string wn = nameOfWave(wav)
+	int wavenum = getfirstnum(wn)
 	
-	print AWGLI
-	
-	//Demodulate in x?
-	if ((axis==0)||(axis==1))
-	duplicate /o wav, wav_xx
-	cols=dimsize(wav,0); print cols
-	rows=dimsize(wav,1); print rows
-	nofcycles=AWGLI.numCycles;
-	period=AWGLI.waveLen;
-	//Original Measurement Wave
-	make /o/n=(cols) sine1d
-	sine1d=sin(2*pi*(harmonic*p/period))
-	matrixop /o sinewave=colrepeat(sine1d,rows)
-	matrixop /o temp=wav_xx*sinewave
-	copyscales wav_xx, temp
-	temp=temp*pi/2;
-	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,"demod_x")
-	wn_x="demod_x"
-	wave wav_x=$wn_x
-	endif
-	
-	//Demodulate in y?
-	if ((axis==0)||(axis==2))
-	duplicate /o wav, wav_yy
-	cols=dimsize(wav,0); print cols
-	rows=dimsize(wav,1); print rows
-	nofcycles=AWGLI.numCycles;
-	period=AWGLI.waveLen;
-	//Original Measurement Wave
-	make /o/n=(cols) sine1d
-	sine1d=cos(2*pi*(harmonic*p/period))
-	matrixop /o sinewave=colrepeat(sine1d,rows)
-	matrixop /o temp=wav_yy*sinewave
-	copyscales wav_yy, temp
-	temp=temp*pi/2;
-	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,"demod_y")
-	wn_y="demod_y"
-	wave wav_y=$wn_y
-	endif
-	
-	//Given wav_x and wav_y now refer to their respective demodulations, 
-	//associate the correct set with the output based on r/x/y 
-	
-	//wn="demod"
-	
-	if (axis==0)
-	demod2 =( (wav_x)^2 + (wav_y)^2 ) ^ (0.5)  //problematic line - operating on null wave?
-	endif
-	
-	if (axis==1)
-	demod2 = wav_x
-	endif
-	
-	if (axis==2)
-	demod2 = wav_y
-	endif
-	
-	//Store demodulated wave w.r.t. correct axis
-	//if (append2hdf)
-	//	variable fileid
-	//	fileid=get_hdfid(datnum) //opens the file
-	//	HDF5SaveData/o /IGOR=-1 /TRAN=1 /WRIT=1 /Z $wn, fileid
-	//	HDF5CloseFile/a fileid
-	//endif
-
-end  
-
-
-function resampleWave(wave wav,variable targetFreq )
-	// resamples wave w from measureFreq
-	// to targetFreq (which should be lower than measureFreq)	
-	string wn=nameOfWave(wav)
-	int wavenum=getfirstnum(wn)
-	string temp_name="dat"+num2str(wavenum)+"x_array"
-	
-	variable measureFreq
-	//	struct ScanVars S
-	//	fd_getScanVars(S,wavenum)
 	struct AWGVars S
-	fd_getoldAWG(S,wavenum)
+	fd_getoldAWG(S, wavenum)
 
-	measureFreq=S.measureFreq
-	variable N=measureFreq/targetFreq
-
+	variable measureFreq = S.measureFreq
 	
-	RatioFromNumber (targetFreq / measureFreq)
-	if (V_numerator > V_denominator)
-		string cmd
-		printf cmd "WARNING[scfd_resampleWaves]: Resampling will increase number of datapoints, not decrease! (ratio = %d/%d)\r", V_numerator, V_denominator
-	endif
-	resample/UP=(V_numerator)/DOWN=(V_denominator)/N=201/E=3 wav
-
-	//DeletePoints/M=1 25,370, wav
+	scfd_resampleWaves(wav, measureFreq, targetFreq)
 	
-
-
-	// TODO: Need to test N more (simple testing suggests we may need >200 in some cases!)
-	// TODO: Need to decide what to do with end effect. Possibly /E=2 (set edges to 0) and then turn those zeros to NaNs? 
-	// TODO: Or maybe /E=3 is safest (repeat edges). The default /E=0 (bounce) is awful.
 end
-
-
-
 
 
 function notch_filter(wave wav, variable Hz, [variable Q, string notch_name, variable overwrite_wave])
@@ -358,10 +250,10 @@ function notch_filter(wave wav, variable Hz, [variable Q, string notch_name, var
 	String wav_name = nameOfWave(wav)
 	
 	if (paramisdefault(notch_name))
-		if (overwrite_wave==1)
+		if (overwrite_wave == 1)
 			notch_name=wav_name
 		else
-			notch_name=wav_name+"_nf"
+			notch_name = wav_name + "_nf"
 //			duplicate/o wav $notch_name
 		endif
 	endif
@@ -487,17 +379,30 @@ function spectrum_analyzer(wave data, variable samp_freq)
 
 	variable i=0
 	rowslice(spectrum,i)
-		DSPPeriodogram/R=[1,(new_numptsx)] /DB/NODC=1/DEST=W_Periodogram slice
+		DSPPeriodogram/R=[1,(new_numptsx)] /PARS/NODC=2/DEST=W_Periodogram slice
 	duplicate/o w_Periodogram, powerspec
 	i=1
 	do
 		rowslice(spectrum,i)
-		DSPPeriodogram/R=[1,(new_numptsx)]/DB/NODC=1/DEST=W_Periodogram slice
+		DSPPeriodogram/R=[1,(new_numptsx)]/PARS/NODC=2/DEST=W_Periodogram slice
 		powerspec=powerspec+W_periodogram
 		i=i+1
 	while(i<dimsize(spectrum,1))
 //	powerspec[0]=nan
+
+	duplicate /o powerspec powerspec_int
+	wave powerspec_int
+	integrate powerspec_int
+	
 	display powerspec; // SetAxis bottom 0,500
+	appendtoGraph /r=l2 powerspec_int
+	ModifyGraph freePos(l2)={inf,bottom}
+	ModifyGraph rgb(powerspec_int)=(0,0,0)
+	ModifyGraph log(left)=1
+	
+	Label left "nA^2/Hz"
+	Label l2 "integrated nA^2/Hz"
+	
 
 end
 
@@ -518,21 +423,23 @@ EndMacro
 
 
 function /s avg_wav(wave wav) // /WAVE lets your return a wave
-	//  averaging any wave over columns (in y direction)
+	// averaging any wave over columns (in y direction)
 	// wave returned is avg_name
 	string wn = nameofwave(wav)
 	string avg_name = wn + "_avg";
 	int nc
 	int nr
 
-//	wn="dat"+num2str(wavenum)+dataset //current 2d array
-
 	nr = dimsize($wn, 0) //number of rows (sweep length)
 	nc = dimsize($wn, 1) //number of columns (repeats)
+	
 	ReduceMatrixSize(wav, 0, -1, nr, 0, -1, 1, 1, avg_name)
+	
 	redimension/n = -1 $avg_name
+	
 	return avg_name
 end
+
 
 
 function /s avg_wav_N(wave wav, int N) // /WAVE lets your return a wave
@@ -548,10 +455,81 @@ function /s avg_wav_N(wave wav, int N) // /WAVE lets your return a wave
 
 	nr = dimsize($wn,0) //number of rows (sweep length)
 	nc = dimsize($wn,1) //number of columns (repeats)
-	ReduceMatrixSize(wav, 0, -1, nr, 0,-1, N,1, avg_name)
+	ReduceMatrixSize(wav, 0, -1, nr, 0,-1, N, 1, avg_name)
 	redimension/n=-1 $avg_name
 	return avg_name
 end
+
+
+
+function average_every_n_rows(wave wav, int n)
+	// takes a 2d wave and averages every n rows (IGOR columns)
+	// creates a wave with _avg appended to the end
+	// assumes the wav has a multiple of n points
+	
+	string wave_name = nameOfWave(wav)
+	string wave_name_averaged = wave_name + "_avg"
+	
+	variable num_rows = dimsize(wav, 1) // (repeats)
+	variable num_columns = dimsize(wav, 0) // (sweep length)
+	
+	int num_rows_post_average = round(num_rows/n)
+	
+	ReduceMatrixSize(wav, 0, -1, num_columns, 0,-1, num_rows_post_average, 1, wave_name_averaged)
+
+end
+
+
+function crop_wave(wave wav, variable x_mid, variable y_mid, variable x_width, variable y_width)
+	// takes a 2d wave and creates a new cropped wave with name "_crop" appended
+	// cropped mask is determined by the centre and lengths (in gate dimensions) of the x and y
+	
+	string wave_name = nameOfWave(wav)
+	string wave_name_averaged = wave_name + "_crop"
+	
+	variable num_columns = dimsize(wav, 0) // (sweep length)
+	variable num_rows = dimsize(wav, 1) // (repeats)
+	
+	int x_coord_start, x_coord_end, y_coord_start, y_coord_end
+	
+	// setting x coordinates (with checks for bounds)
+	if (x_width == INF)
+		x_coord_start = 0
+		x_coord_end = num_columns - 1
+	else
+		x_coord_start = scaletoindex(wav, x_mid - x_width, 0)
+		x_coord_end = scaletoindex(wav, x_mid + x_width, 0)
+	endif
+
+	if (x_coord_start < 0)
+		x_coord_start = 0
+	endif	
+	if (x_coord_end > num_columns - 1)
+		x_coord_end = num_columns - 1
+	endif
+	
+	// setting y coordinates (with checks for bounds)
+	if (y_width == INF)
+		y_coord_start = 0
+		y_coord_end = num_rows - 1
+	else
+		y_coord_start = scaletoindex(wav, y_mid - y_width, 1)
+		y_coord_end = scaletoindex(wav, y_mid + y_width, 1)
+	endif
+	
+	if (y_coord_start < 0)
+		y_coord_start = 0
+	endif
+	if (y_coord_end > num_rows - 1)
+		y_coord_end = num_rows - 1
+	endif
+	
+	int num_crop_columns = (x_coord_end - x_coord_start) + 1
+	int num_crop_rows = (y_coord_end - y_coord_start) + 1
+	
+	ReduceMatrixSize(wav, x_coord_start, x_coord_end, num_crop_columns, y_coord_start, y_coord_end, num_crop_rows, 1, wave_name_averaged)
+end
+
 
 function stopalltimers()
 variable i
@@ -1059,8 +1037,29 @@ function centering(wave waved, string centered_wavename, wave mids)
 	duplicate/o waved $centered_wavename
 	wave new2dwave = $centered_wavename
 	copyscales waved new2dwave
-	//new2dwave=interp2d(waved,(x+fit_params[q][3]),(y)) // column 3 is the center fit parameter
-	new2dwave=interp2d(waved, (x + mids[q]), (y)) // mids is the shift in x
+	wavestats /q mids
+	new2dwave = interp2d(waved, (x + mids[q] - V_avg), (y)) // mids is the shift in x
 end
 
 
+function create_y_wave(wave_2d)
+	// create global "y_wave" given a 2d array
+	wave wave_2d
+	
+	string wave_2d_name = nameofwave(wave_2d)
+	
+	duplicate /o /RMD=[0][] $wave_2d_name y_wave
+	y_wave = y
+	redimension /n=(dimsize(y_wave, 1)) y_wave
+end
+
+
+function create_x_wave(wave_2d)
+	// create global "x_wave" given a 2d array
+	wave wave_2d
+	
+	string wave_2d_name = nameofwave(wave_2d)
+	
+	duplicate /o /RMD=[][0] $wave_2d_name x_wave
+	x_wave = x
+end

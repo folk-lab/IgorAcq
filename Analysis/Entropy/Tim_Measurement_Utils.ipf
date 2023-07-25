@@ -534,7 +534,7 @@ end
 
 
 
-function/wave Linspace(start, fin, num)
+function/wave Linspace(start, fin, num, [make_global])
 	// An Igor substitute for np.linspace() (obviously with many caveats and drawbacks since it is in Igor...)
 	//
 	// To use this in command line:
@@ -552,8 +552,23 @@ function/wave Linspace(start, fin, num)
 	//		concatenate/np/o {w1, w2}, tempwave
 	//
 	variable start, fin, num
-	Make/N=2/O/Free linspace_start_end = {start, fin}
-	Interpolate2/T=1/N=(num)/Y=linspaced linspace_start_end
+	int make_global
+	make_global = paramisdefault(make_global) ? 0 : make_global  // default to not make global wave
+	
+	if (num == 1)
+		if (make_global == 1)
+			Make/N=1/O linspaced = {start}
+		else
+			Make/N=1/O/Free linspaced = {start}
+		endif
+	else
+		if (make_global == 1)
+			Make/N=2/O linspace_start_end = {start, fin}
+		else
+			Make/N=2/O/Free linspace_start_end = {start, fin}
+		endif
+		Interpolate2/T=1/N=(num)/Y=linspaced linspace_start_end
+	endif
 	return linspaced
 end
 
@@ -596,4 +611,59 @@ function/s wave2str(w)
 	string w2str = wave2NumArray(w)
 	
 	return w2str[1,strlen(w2str)-2]
+end
+
+
+function make_virtual_entropy_corners(x_start, y_start, x_len, y_len, fast_sweep_y_over_x, slow_sweep_y_over_x, [datnum])
+	variable x_start, y_start, x_len, y_len, fast_sweep_y_over_x, slow_sweep_y_over_x, datnum
+	
+	string xs, ys
+	variable c
+	
+	///// setup xs /////
+	variable x0, x1, x2, x3
+	x0 = x_start
+	x1 = x_start + x_len
+	
+	
+	//// setup ys /////
+	variable y0, y1, y2, y3
+	y0 = y_start
+	c = y0 - fast_sweep_y_over_x*x0
+	y1 = fast_sweep_y_over_x*x1 + c
+	y2 = y_start + y_len
+	
+	
+	///// calculate xs /////
+	c = y0 - slow_sweep_y_over_x*x0
+	x2 = (y2 - c) / slow_sweep_y_over_x
+	x3 = x2 + x_len
+	xs = num2str(x0) + "," + num2str(x1) + ","	 + num2str(x2) + "," + num2str(x3) + ";"
+	print xs
+	
+	
+	///// calculate ys /////
+	c = y2 - fast_sweep_y_over_x*x2
+	y3 = fast_sweep_y_over_x*x3 + c
+	ys = num2str(y0) + "," + num2str(y1) + ","	 + num2str(y2) + "," + num2str(y3) + ";"
+	print ys
+	
+	
+	if (ParamIsDefault(datnum) == 0)
+		displaymultiple({datnum}, "cscurrent_2d", diff=1)
+		make /o/n=2 tempfullx_start = {x0, x1}
+		make /o/n=2 tempfully_start = {y0, y1}
+		
+		make /o/n=2 tempfullx_end = {x2, x3}
+		make /o/n=2 tempfully_end = {y2, y3}
+		
+		AppendToGraph tempfully_start vs tempfullx_start
+		AppendToGraph tempfully_end vs tempfullx_end
+		
+		ModifyGraph mode(tempfully_start)=4, mrkThick(tempfully_start)=3, rgb(tempfully_start)=(0,65535,65535), lsize=2
+		ModifyGraph mode(tempfully_end)=4, mrkThick(tempfully_end)=3, rgb(tempfully_end)=(0,65535,65535), lsize=2
+		
+	endif
+	
+	
 end

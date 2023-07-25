@@ -341,7 +341,7 @@ function fd_getmeasfreq(datnum,[fastdac_num])
 	endif
 
 	sl_id = get_sweeplogs(datnum)  // Get Sweep_logs JSON;
-	fd_id = getJSONXid(sl_id, "FastDAC "+num2istr(fastdac_num)) // Get FastDAC JSON from Sweeplogs
+	fd_id = getJSONXid(sl_id, "FastDAC " + num2istr(fastdac_num)) // Get FastDAC JSON from Sweeplogs
 
 	// Get variable parts
 
@@ -356,6 +356,91 @@ function fd_getmeasfreq(datnum,[fastdac_num])
 	return freq
 
 end
+
+
+function fd_gettemperature(datnum, [which_plate])
+	// Function to get old h5 values for Lakeshore temperatures
+	variable datnum
+	string which_plate // "MC K" :: "50K Plate K" :: "4K Plate K" :: "Magnet K" :: "Still K
+	
+	which_plate = selectString(paramisdefault(which_plate), which_plate, "MC K") // Mixing chamber temp is default
+	
+	variable sl_id, fd_id  //JSON ids
+	variable temperature
+
+	sl_id = get_sweeplogs(datnum)  // Get Sweep_logs JSON;
+	fd_id = getJSONXid(sl_id, "Lakeshore") // Get FastDAC JSON from Sweeplogs
+	fd_id = getJSONXid(fd_id, "Temperature") // Get FastDAC JSON from Sweeplogs
+
+	JSONXOP_GetValue/V fd_id, which_plate
+	temperature = V_value
+
+	JSONXOP_Release /A  //Clear all stored JSON strings
+	
+	return temperature
+
+end
+
+
+function fd_getfield(datnum)
+	// Function to get old h5 values for Lakeshore temperatures
+	variable datnum
+	
+	variable sl_id, fd_id  //JSON ids
+	variable field
+
+	sl_id = get_sweeplogs(datnum)  // Get Sweep_logs JSON;
+	fd_id = getJSONXid(sl_id, "LS625 Magnet Supply") // Get FastDAC JSON from Sweeplogs
+
+	JSONXOP_GetValue/V fd_id, "field mT"
+	field = V_value
+
+	JSONXOP_Release /A  //Clear all stored JSON strings
+	
+	return field
+
+end
+
+
+
+
+function make_scanvar_table_from_dats(dat_min_max)
+	// create a table from the input string dat_min_max
+	// so far it is hard coded to add only the datnum, field and temperature
+	string dat_min_max
+	
+	variable dat_start = str2num(StringFromList(0, dat_min_max, ","))
+	variable dat_end = str2num(StringFromList(1, dat_min_max, ","))  
+	
+	make /o /n=((dat_end - dat_start + 1), 3) scanvar_table 
+	variable datnum, scanvar_variable 
+	
+	variable scanvar_row = 0
+	variable i
+	for(i=dat_start; i<dat_end+1; i+=1)
+	
+			make /o /n=(3) scanvar_table_slice
+			wave scanvar_table_slice
+			
+			datnum = i
+			scanvar_table_slice[0] = datnum
+			
+			
+			scanvar_variable = fd_gettemperature(datnum, which_plate = "MC K")
+			scanvar_table_slice[1] = scanvar_variable * 1000
+			
+			scanvar_variable = fd_getfield(datnum)
+			scanvar_table_slice[2] = scanvar_variable
+			
+			
+			scanvar_table[scanvar_row][] = scanvar_table_slice[q]
+
+			scanvar_row += 1
+	endfor
+	
+end
+
+
 //
 ///////////////////////////////////////////////////
 ////////////////////  ScanVars /////////////////// (scv_...)
