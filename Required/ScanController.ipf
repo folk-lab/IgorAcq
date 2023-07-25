@@ -809,11 +809,11 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
                                 
    ///// for 2D scans //////////////////////////////////////////////////////////////////////////////////////////////////
    if(!x_only)
-   		
-   		s.channelsy = "" 
-   		
+   		S.channelsy = scu_getChannelNumbers(channelsy, fastdac=1)
+   		S.dacListIDs_y = scc_checkDeviceNumber(S, check_y = 1)
+   		S.y_label = scu_getDacLabel(S.channelsy, fastdac=1)																									//this should stay I believe
+		scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, starty, finy, S.startxs, S.finxs, startys, finys)
    endif
-   
                                                             
 end
 

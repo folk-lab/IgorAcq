@@ -995,7 +995,7 @@ function ScanFastDAC2D2(fdID, startx, finx, channelsx, starty, finy, channelsy, 
 	
 	// Put info into scanVars struct (to more easily pass around later)
  	struct ScanVars S
- 	if (use_bd == 0 && use_second_fd == 0)
+ 	if (use_bd == 1)
 
 	 	initScanVarsFD2(S, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy,\
 		   				 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys,\
@@ -1015,10 +1015,10 @@ function ScanFastDAC2D2(fdID, startx, finx, channelsx, starty, finy, channelsy, 
 			S.channelsy = scu_getChannelNumbers(channelsy, fastdac=0)
 			S.y_label = scu_getDacLabel(S.channelsy, fastdac=0)
 			scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, starty, finy, S.startxs, S.finxs, startys, finys)
-		else  // use_second_fd
-			S.instrIDy = fdyID /// this should become a string like S.daclistIDs, because its in charge
-			S.channelsy = scu_getChannelNumbers(channelsy, fastdac=1)
-			S.y_label = scu_getDacLabel(S.channelsy, fastdac=1)
+		else  // use_second_fd																																				I want to remove this
+			//S.instrIDy = fdyID /// this should become a string like S.daclistIDs, because its in charge												I want to move this into scanvarsfd2?
+			//S.channelsy = scu_getChannelNumbers(channelsy, fastdac=1)
+			S.y_label = scu_getDacLabel(S.channelsy, fastdac=1)																									//this should stay I believe
 			scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, starty, finy, S.startxs, S.finxs, startys, finys)
 		endif
 	endif
@@ -1033,7 +1033,7 @@ function ScanFastDAC2D2(fdID, startx, finx, channelsx, starty, finy, channelsy, 
    PreScanChecksFD2(S)  
 
    	
-   	// sets master/slave between the devices that are used.
+   // sets master/slave between the devices that are used.
 	set_master_slave(S)
    	
   	// If using AWG then get that now and check it
