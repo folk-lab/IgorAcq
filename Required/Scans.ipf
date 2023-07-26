@@ -546,7 +546,7 @@ function ScanFastDacSlow2(start, fin, channels, numpts, delay, ramprate, [starts
 end
 
 
-function ScanFastDacSlow2D(instrID, startx, finx, channelsx, numptsx, delayx, starty, finy, channelsy, numptsy, [rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave])
+function ScanFastDacSlow2D2(instrID, startx, finx, channelsx, numptsx, delayx, starty, finy, channelsy, numptsy, [rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave])
 	// sweep one or more FastDAC channels but in the ScanController way (not ScanControllerFastdac). I.e. ramp, measure, ramp, measure...
 	// channels should be a comma-separated string ex: "0, 4, 5"
 	variable instrID, startx, finx, starty, finy, numptsy, numptsx, rampratex, rampratey, delayx, delayy, nosave
@@ -554,7 +554,10 @@ function ScanFastDacSlow2D(instrID, startx, finx, channelsx, numptsx, delayx, st
 
 	// Reconnect instruments
 	sc_openinstrconnections(0)
-
+	
+	// set all fastdacs to independent
+	set_indep()
+	
 	// Set defaults
 	comments = selectstring(paramisdefault(comments), comments, "")
 	startxs = selectstring(paramisdefault(startxs), startxs, "")
@@ -564,9 +567,9 @@ function ScanFastDacSlow2D(instrID, startx, finx, channelsx, numptsx, delayx, st
 
 	// Initialize ScanVars
 	struct ScanVars S  
-	 	initScanVarsFD(S, instrID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numptsx, delayx=delayx,\
+	 	initScanVarsFD2(S, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numptsx, delayx=delayx,\
 		  numptsy=numptsy, delayy=delayy, starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey,\
-		  startxs=startxs, finxs=finxs, startys=startys, finys=finys, comments=comments)
+		  startxs=startxs, finxs=finxs, startys=startys, finys=finys, comments=comments, x_only = 0)
 	S.using_fastdac = 0   // This is not a normal fastDac scan
 	S.duration = S.numptsx*max(0.05, S.delayx) // At least 50ms per point is a good estimate 
 	S.sweeprate = abs((S.finx-S.startx)/S.duration) // Better estimate of sweeprate (Not really valid for a slow scan)
@@ -574,6 +577,9 @@ function ScanFastDacSlow2D(instrID, startx, finx, channelsx, numptsx, delayx, st
 	// Check limits (not as much to check when using FastDAC slow)
 	scc_checkLimsFD(S)
 	S.lims_checked = 1
+	
+	//set devices to master slave
+	set_master_slave(S)
 
 	// Ramp to start without checks because checked above
 	RampStartFD(S, ignore_lims=1)
@@ -596,7 +602,10 @@ function ScanFastDacSlow2D(instrID, startx, finx, channelsx, numptsx, delayx, st
 			RecordValues(S, i, j)
 		endfor
 	endfor
-
+	
+	//return all fastdacs to independent
+	set_indep()
+	
 	// Save by default
 	if (nosave == 0)
 		EndScan(S=S)
