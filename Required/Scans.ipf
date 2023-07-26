@@ -1052,12 +1052,11 @@ function ScanBabyDACMultipleK24002D(bdID, startx, finx, channelsx, numptsx, dela
 	endif
 end
 
-
-function ScanFastDACK24002D(fdID, startx, finx, keithleyID, starty, finy, numptsy, [numpts, sweeprate, rampratex, rampratey, delayy, startxs, finxs, y_label, comments, nosave, use_AWG])
+function ScanFastDACK24002D2(startx, finx, keithleyID, starty, finy, numptsy, [numpts, sweeprate, rampratex, rampratey, delayy, startxs, finxs, y_label, comments, nosave, use_AWG])
 	// 2D Scan with Fastdac on x-axis and keithley on y-axis
 	// Note: Must provide numptsx OR sweeprate in optional parameters instead
 	// Note: channels should be a comma-separated string ex: "0,4,5"
-	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, keithleyID, rampratex, rampratey, delayy, nosave, use_AWG
+	variable startx, finx, starty, finy, numptsy, numpts, sweeprate, keithleyID, rampratex, rampratey, delayy, nosave, use_AWG
 	string y_label, comments
 	string startxs, finxs // For different start/finish points for each channel (must match length of channels if used)
 	abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
@@ -1070,11 +1069,14 @@ function ScanFastDACK24002D(fdID, startx, finx, keithleyID, starty, finy, numpts
 
 	// Reconnect instruments
 	sc_openinstrconnections(0)
-
+	
+	// make sure all the devices start of independent
+	set_indep()
+	
 	// Put info into scanVars struct (to more easily pass around later)
  	struct ScanVars S
 	// Init FastDAC part like usual, then manually set the rest
-	initScanVarsFD(S, fdID, startx, finx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
+	initScanVarsFD2(S, startx, finx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
 							rampratey=rampratey, startxs=startxs, finxs=finxs, comments=comments)
 	S.instrIDy = keithleyID
 	s.is2d = 1
@@ -1083,8 +1085,10 @@ function ScanFastDACK24002D(fdID, startx, finx, keithleyID, starty, finy, numpts
 	S.y_label = selectString(paramIsDefault(y_label), y_label, "Keithley /mV")
       
    // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
-	PreScanChecksFD(S, x_only=1)
-	// PreScanChecksKeithley(S, y_only=1)
+	PreScanChecksFD2(S)
+	
+	// sets master/slave between the devices that are used.
+	set_master_slave(S)
    	
    // Ramp to start without checks
 	RampStartFD(S, x_only=1, ignore_lims=1)
