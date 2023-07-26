@@ -1835,7 +1835,7 @@ function scs_checksweepstate()
 		sc_abortsweep=0
 		sc_abortnosave=0
 		sc_pause=0
-		EndScan(save_experiment=0, aborting=1) 				
+		EndScan(save_experiment=0, aborting=1)				
 		abort "Measurement aborted by user. Data saved automatically."
 	elseif(NVAR_Exists(sc_abortnosave) && sc_abortnosave==1)
 		// Abort measurement without saving anything!

@@ -435,16 +435,19 @@ function ScanFastDAC2(start, fin, channels, [numptsx, sweeprate, delay, ramprate
 end
 
 
-function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate, [starts, fins, y_label, repeats, alternate, delayy, until_checkwave, until_stop_val, until_operator, comments, nosave]) //Units: mV
+function ScanFastDacSlow2(start, fin, channels, numpts, delay, ramprate, [starts, fins, y_label, repeats, alternate, delayy, until_checkwave, until_stop_val, until_operator, comments, nosave]) //Units: mV
 	// sweep one or more FastDAC channels but in the ScanController way (not ScanControllerFastdac). I.e. ramp, measure, ramp, measure...
 	// channels should be a comma-separated string ex: "0, 4, 5"
-	variable instrID, start, fin, numpts, delay, ramprate, nosave, until_stop_val, repeats, alternate, delayy
+	variable start, fin, numpts, delay, ramprate, nosave, until_stop_val, repeats, alternate, delayy
 	string channels, y_label, comments, until_operator, until_checkwave
 	string starts, fins // For different start/finish points for each channel (must match length of channels if used)
 
 	// Reconnect instruments
 	sc_openinstrconnections(0)
-
+	
+	// make sure all the fastdacs are independent
+	set_indep()
+	
 	// Set defaults
 	comments = selectstring(paramisdefault(comments), comments, "")
 	y_label = selectstring(paramisdefault(y_label), y_label, "")
@@ -475,7 +478,7 @@ function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate,
 
 	// Initialize ScanVars
 	struct ScanVars S  // Note, more like a BD scan if going slow
-	initScanVarsFD(S, instrID, start, fin, channelsx=channels, numptsx=numpts, delayx=delay, rampratex=ramprate, startxs = starts, finxs = fins, comments=comments, y_label=y_label,\
+	initScanVarsFD2(S, start, fin, channelsx=channels, numptsx=numpts, delayx=delay, rampratex=ramprate, startxs = starts, finxs = fins, comments=comments, y_label=y_label,\
 	 		starty=1, finy=repeats,  numptsy=repeats, alternate=alternate, delayy=delay)  
 	if (s.is2d && strlen(S.y_label) == 0)
 		S.y_label = "Repeats"
@@ -487,7 +490,10 @@ function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate,
 	// Check limits (not as much to check when using FastDAC slow)
 	scc_checkLimsFD(S)
 	S.lims_checked = 1
-
+	
+	// set devices needed to master slave
+	set_master_slave(S)
+	
 	// Ramp to start without checks because checked above
 	RampStartFD(S, ignore_lims=1)
 
@@ -528,7 +534,9 @@ function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate,
 		endif
 	endfor
 	
-
+	//set all fastdacs back to independent
+	set_indep()
+	
 	// Save by default
 	if (nosave == 0)
 		EndScan(S=S)
@@ -1116,7 +1124,10 @@ function ScanFastDACK24002D2(startx, finx, keithleyID, starty, finy, numptsy, [n
 		// Record fast axis
 		scfd_RecordValues(S, i)
 	endfor
-
+	
+	// return all devices to independent
+	set_indep()
+	
 	// Save by default
 	if (nosave == 0)
 		EndScan(S=S)
@@ -1355,7 +1366,7 @@ function ScanBabyDACLS625Magnet2D(bdID, startx, finx, channelsx, numptsx, delayx
 end
 
 
-function ScanFastDACLS625Magnet2D(fdID, startx, finx, channelsx, magnetID, starty, finy, numptsy, [numpts, sweeprate, rampratex, delayy, startxs, finxs, y_label, comments, nosave, use_AWG])
+function ScanFastDACLS625Magnet2D2(fdID, startx, finx, channelsx, magnetID, starty, finy, numptsy, [numpts, sweeprate, rampratex, delayy, startxs, finxs, y_label, comments, nosave, use_AWG])
 	// 2D Scan with Fastdac on x-axis and magnet on y-axis
 	// Note: Must provide numptsx OR sweeprate in optional parameters instead
 	// Note: channels should be a comma-separated string ex: "0,4,5"
@@ -1372,10 +1383,13 @@ function ScanFastDACLS625Magnet2D(fdID, startx, finx, channelsx, magnetID, start
 	// Reconnect instruments
 	sc_openinstrconnections(0)
 
+	// making sure the instruments start of independent
+	set_indep()
+	
 	// Put info into scanVars struct (to more easily pass around later)
  	struct ScanVars S
 	// Init FastDAC part like usual, then manually set the rest
-	initScanVarsFD(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
+	initScanVarsFD2(S, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
 							startxs=startxs, finxs=finxs, comments=comments)
 	S.instrIDy = magnetID
 	s.is2d = 1
@@ -1384,8 +1398,11 @@ function ScanFastDACLS625Magnet2D(fdID, startx, finx, channelsx, magnetID, start
 	S.y_label = selectString(paramIsDefault(y_label), y_label, "Magnet /mT")
       
    // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
-	PreScanChecksFD(S, x_only=1)
+	PreScanChecksFD2(S)
 	// PreScanChecksMagnet(S, y_only=1)
+	
+	// sets fastdacs to master slave if necessary, otherwise are kept independent
+	set_master_slave(S)
    	
    // Ramp to start without checks
 	RampStartFD(S, x_only=1, ignore_lims=1)
@@ -1413,7 +1430,10 @@ function ScanFastDACLS625Magnet2D(fdID, startx, finx, channelsx, magnetID, start
 		// Record fast axis
 		scfd_RecordValues(S, i)
 	endfor
-
+	
+	// return all fastdacs to independent
+	set_indep() 
+	
 	// Save by default
 	if (nosave == 0)
 		EndScan(S=S)

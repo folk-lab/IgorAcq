@@ -123,7 +123,7 @@ function checkPinchOffsSlow(instrID, start, fin, channels, numpts, delay, rampra
 		rampmultiplebd(instrID, channels, 0, ramprate=ramprate)
 	else
 		rampmultiplefdac(instrID, channels, 0, ramprate=ramprate)	
-		scanfastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate, until_checkwave=current_wave, until_stop_val=cutoff_nA, until_operator="<", y_label="Current /nA", comments=comment)
+		scanfastDacSlow2(start, fin, channels, numpts, delay, ramprate, until_checkwave=current_wave, until_stop_val=cutoff_nA, until_operator="<", y_label="Current /nA", comments=comment)
 		rampmultiplefdac(instrID, channels, 0, ramprate=ramprate)
 	endif
 end
