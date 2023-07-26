@@ -334,12 +334,11 @@ function ScanFastDAC2(start, fin, channels, [numptsx, sweeprate, delay, ramprate
 	variable j=0
 	nvar sc_Saverawfadc
 	
+	//setting every fastDAC to work independently
+	set_indep()
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
-	
-	//setting every fastDAC to work independently
-	set_indep()
 	
 	// Set defaults
 	delay = ParamIsDefault(delay) ? 0.01 : delay
@@ -546,17 +545,17 @@ function ScanFastDacSlow2(start, fin, channels, numpts, delay, ramprate, [starts
 end
 
 
-function ScanFastDacSlow2D2(instrID, startx, finx, channelsx, numptsx, delayx, starty, finy, channelsy, numptsy, [rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave])
+function ScanFastDacSlow2D2(startx, finx, channelsx, numptsx, delayx, starty, finy, channelsy, numptsy, [rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave])
 	// sweep one or more FastDAC channels but in the ScanController way (not ScanControllerFastdac). I.e. ramp, measure, ramp, measure...
 	// channels should be a comma-separated string ex: "0, 4, 5"
-	variable instrID, startx, finx, starty, finy, numptsy, numptsx, rampratex, rampratey, delayx, delayy, nosave
+	variable startx, finx, starty, finy, numptsy, numptsx, rampratex, rampratey, delayx, delayy, nosave
 	string channelsx, channelsy, comments, startxs, finxs, startys, finys
+
+	// set all fastdacs to independent
+	set_indep()
 
 	// Reconnect instruments
 	sc_openinstrconnections(0)
-	
-	// set all fastdacs to independent
-	set_indep()
 	
 	// Set defaults
 	comments = selectstring(paramisdefault(comments), comments, "")
@@ -648,13 +647,12 @@ function ScanFastDAC2D2(startx, finx, channelsx, starty, finy, channelsy, numpts
 	interlaced_setpoints = selectString(paramisdefault(interlaced_setpoints), interlaced_setpoints, "")
 	variable use_bd = paramisdefault(bdid) ? 0 : 1 			// Whether using both FD and BD or just FD
 	variable scan2d = 1
-
+	
+	//setting every fastDAC to work independently
+	set_indep()
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
-
-	//setting every fastDAC to work independently
-	set_indep()
 	
 	// Put info into scanVars struct (to more easily pass around later)
  	struct ScanVars S
@@ -1084,11 +1082,11 @@ function ScanFastDACK24002D2(startx, finx, keithleyID, starty, finy, numptsy, [n
 	startxs = selectstring(paramisdefault(startxs), startxs, "")
 	finxs = selectstring(paramisdefault(finxs), finxs, "")
 
-	// Reconnect instruments
-	sc_openinstrconnections(0)
-	
 	// make sure all the devices start of independent
 	set_indep()
+	
+	// Reconnect instruments
+	sc_openinstrconnections(0)
 	
 	// Put info into scanVars struct (to more easily pass around later)
  	struct ScanVars S
@@ -1389,11 +1387,11 @@ function ScanFastDACLS625Magnet2D2(fdID, startx, finx, channelsx, magnetID, star
 	startxs = selectstring(paramisdefault(startxs), startxs, "")
 	finxs = selectstring(paramisdefault(finxs), finxs, "")
 
-	// Reconnect instruments
-	sc_openinstrconnections(0)
-
 	// making sure the instruments start of independent
 	set_indep()
+	
+	// Reconnect instruments
+	sc_openinstrconnections(0)
 	
 	// Put info into scanVars struct (to more easily pass around later)
  	struct ScanVars S
@@ -1458,9 +1456,12 @@ function ScanFastDacSlowLS625Magnet2D(instrIDx, startx, finx, channelsx, numptsx
 	variable instrIDx, startx, finx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, nosave, rampratey
 	string channelsx, comments, y_label
 
+	//set all devices to independent
+	set_indep()
+	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
-
+	
 	// Set defaults
 	comments = selectstring(paramisdefault(comments), comments, "")
 	y_label = selectstring(paramisdefault(y_label), y_label, "")
@@ -1481,7 +1482,7 @@ function ScanFastDacSlowLS625Magnet2D(instrIDx, startx, finx, channelsx, numptsx
 	if (!paramIsDefault(rampratey))
 		setLS625rate(magnetID,rampratey)
 	endif
-	setlS625fieldWait(S.instrIDy, starty )
+	setlS625fieldWait(S.instrIDy, starty)
 	
 	// Let gates settle 
 	asleep(S.delayy*10)
