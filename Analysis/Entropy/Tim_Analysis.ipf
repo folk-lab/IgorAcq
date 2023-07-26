@@ -108,16 +108,17 @@ function get_multiple_line_paths(wave_2d, y_wave, x_wave, [width_y, width_x, num
 end
 
 
-function plot_multiple_line_paths(wave_2d, y_wave, x_wave, [width_y, width_x, offset, num_traces, plot_contour])
+function plot_multiple_line_paths(wave_2d, y_wave, x_wave, [width_y, width_x, offset, num_traces, plot_contour, make_markers])
 	wave wave_2d, y_wave, x_wave
 	variable width_y, width_x, offset
-	int num_traces, plot_contour
+	int num_traces, plot_contour, make_markers
 	
 	width_y = paramisdefault(width_y) ? 10 : width_y
 	width_x = paramisdefault(width_y) ? 0 : width_x
 	offset = paramisdefault(offset) ? 0.001 : offset
 	num_traces = paramisdefault(width_y) ? 10 : num_traces
 	plot_contour = paramisdefault(plot_contour) ? 1 : plot_contour
+	make_markers = paramisdefault(make_markers) ? 0 : make_markers
 	
 	get_multiple_line_paths(wave_2d, y_wave, x_wave, width_y = width_y, width_x = width_x, num_traces = num_traces)
 	
@@ -132,6 +133,9 @@ function plot_multiple_line_paths(wave_2d, y_wave, x_wave, [width_y, width_x, of
 	variable i
 	for (i = 0; i < num_columns; i++)
 		appendtograph /W=$window_name line_path_2d_y[][i] vs line_path_2d_x[][i]
+		if (make_markers == 1)
+			ModifyGraph mode=3, marker=13, mrkThick=2, rgb=(65535,0,52428)
+		endif
 	endfor
 	
 	Display2DWaterfall(line_path_2d_z, offset = offset, plot_every_n = 1, plot_contour = plot_contour)

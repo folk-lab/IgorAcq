@@ -434,7 +434,7 @@ function zap_bad_params(wave_2d, params, num_params, [overwrite, zap_bad_mids, z
 	
 	variable scan_width = (x_wave[INF] - x_wave[0])/2
 	variable scan_mid = x_wave[0] + scan_width
-	variable mid_percentage_within = 0.2
+	variable mid_percentage_within = 0.05
 	
 	// Duplicating 2d wave
 	string wave_2d_name = nameofwave(wave_2d)

@@ -663,6 +663,12 @@ function make_virtual_entropy_corners(x_start, y_start, x_len, y_len, fast_sweep
 		ModifyGraph mode(tempfully_start)=4, mrkThick(tempfully_start)=3, rgb(tempfully_start)=(0,65535,65535), lsize=2
 		ModifyGraph mode(tempfully_end)=4, mrkThick(tempfully_end)=3, rgb(tempfully_end)=(0,65535,65535), lsize=2
 		
+		Tag/C/N=start_x_start_row/A=MC/L=2 tempfully_start, 0, "start_x_start_row"
+		Tag/C/N=end_x_start_row/A=MC/L=2 tempfully_start, 1, "end_x_start_row"
+		
+		Tag/C/N=start_x_end_row/A=MC/L=2 tempfully_end, 0, "start_x_end_row"
+		Tag/C/N=end_x_end_row/A=MC/L=2 tempfully_end, 1, "end_x_end_row"
+
 	endif
 	
 	
