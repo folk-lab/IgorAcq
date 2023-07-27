@@ -2379,7 +2379,7 @@ function InitScanController([configFile])
 			// instrument wave
 			make /t/o/N=(sc_instrLimit,3) sc_Instr
 
-			sc_Instr[0][0] = "openFastDACconnection(\"fd\",\"ASRL36::INSTR\", numDACCh = 8, numADCCh = 4, master = 1, optical = 1)"
+			sc_Instr[0][0] = "openMultipleFastDACconnections(\"40,39,36\")"
 			sc_Instr[0][1] = ""
 			sc_Instr[0][2] = "getfdstatus(fd)"
 

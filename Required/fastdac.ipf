@@ -54,9 +54,8 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
 	
 	// fill info into "sc_fdackeys"
-	if(!paramisdefault(numDACCh) && !paramisdefault(numADCCh))
-		scf_addFDinfos(instrID,visa_address,numDACCh,numADCCh)
-	endif
+	
+	scf_addFDinfos(instrID,visa_address,numDACCh,numADCCh)
 	
 	return localRM
 end
@@ -70,7 +69,7 @@ function openMultipleFastDACconnections(VISAnums)
 	
 	string VISAnums
 	int i
-	for(i=0;i<itemsinlist(VISAnums);i++)	
+	for(i=0;i<itemsinlist(VISAnums, ",");i++)	
 		string instrID      = "fd" + num2str(i+1)
 		string visa_address = "ASRL" + stringfromlist(i,VISAnums, ",") + "::INSTR"
 		openFastDACconnection(instrID, visa_address)
