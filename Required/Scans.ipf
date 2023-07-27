@@ -348,17 +348,6 @@ function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, 
 	interlaced_channels = selectString(paramisdefault(interlaced_channels), interlaced_channels, "")
 	interlaced_setpoints = selectString(paramisdefault(interlaced_setpoints), interlaced_setpoints, "")
 	
-	
-	//check if rawdata needs to be saved
-	string notched_waves = scf_getRecordedFADCinfo("calc_names", column = 5)
-	string resamp_waves = scf_getRecordedFADCinfo("calc_names",column = 8)
-	
-	if(cmpstr(notched_waves,"") || cmpstr(resamp_waves,"") || sc_hotcold)
-		sc_Saverawfadc = 1
-	else
-		sc_Saverawfadc = 0
-	endif
-	
 
 	// Set sc_ScanVars struct
 	struct ScanVars S
