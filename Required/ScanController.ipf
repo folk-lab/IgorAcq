@@ -4085,6 +4085,20 @@ function scf_getChannelStartNum(instrID, [adc])
 end
 
 
+function scfd_checkRawSave()
+	
+	nvar sc_Saverawfadc
+	string notched_waves = scf_getRecordedFADCinfo("calc_names", column = 5)
+	string resamp_waves = scf_getRecordedFADCinfo("calc_names",column = 8)
+	
+	if(cmpstr(notched_waves,"") || cmpstr(resamp_waves,""))
+		sc_Saverawfadc = 1
+	else
+		sc_Saverawfadc = 0
+	endif
+
+end
+
 function scf_checkFDResponse(response,command,[isString,expectedResponse])
 	// Checks response (that fastdac returns at the end of most commands) meets expected response (e.g. "RAMP_FINISHED")
 	string response, command, expectedResponse
@@ -4903,7 +4917,7 @@ function scfd_distributeData2(buffer,adcList,bytes,rowNum,colNumStart,[direction
 		endfor
 	else
 		for(i=0;i<numADCCh;i++)
-			if(whichlistItem(adcs[i],fake) == -1) /// this should imply we want to distribute the data
+			if(strsearch(fake,adcs[i],0) == -1) /// this should imply we want to distribute the data
 				wave1d = scu_getDeviceChannels(fdID, adcs[i], adc_flag=1, reversal=1)
 				wave1d = "ADC" + wave1d
 				wave rawwave = $wave1d

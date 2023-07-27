@@ -293,13 +293,14 @@ function getFDACOutput(instrID,channel,[same_as_window]) // Units: mV
 	endif
 end
 
-function/s getFDstatus(instrID, [fdIDname])
-	variable instrID
+function/s getFDstatus(fdIDname)
+	//variable instrID
 	string fdIDname
 	string  buffer = "", key = ""
 	wave/t fdacvalstr	
 	svar sc_fdackeys
-	
+	nvar instrID = $fdIDname
+		
 	buffer = addJSONkeyval(buffer, "visa_address", getResourceAddress(instrID), addquotes=1)
 	buffer = addJSONkeyval(buffer, "SamplingFreq", num2str(getFADCspeed(instrID)), addquotes=0)
 	buffer = addJSONkeyval(buffer, "MeasureFreq", num2str(getFADCmeasureFreq(instrID)), addquotes=0)
