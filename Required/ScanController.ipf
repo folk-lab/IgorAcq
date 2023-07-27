@@ -4114,16 +4114,10 @@ function scf_checkFDResponse(response,command,[isString,expectedResponse])
 end
 
 
-function scf_addFDinfos(instrID,visa_address,numDACCh,numADCCh,[master])  
+function scf_addFDinfos(instrID,visa_address,numDACCh,numADCCh)  
 	// Puts FastDAC information into global sc_fdackeys which is a list of such entries for each connected FastDAC
 	string instrID, visa_address
-	variable numDACCh, numADCCh, master
-
-	if(paramisdefault(master))
-		master = 0
-	elseif(master > 1)
-		master = 1
-	endif
+	variable numDACCh, numADCCh
 
 	variable numDevices
 		svar/z sc_fdackeys
@@ -4147,7 +4141,6 @@ function scf_addFDinfos(instrID,visa_address,numDACCh,numADCCh,[master])
 	sc_fdackeys = replacestringbykey("visa"+num2istr(deviceNum),sc_fdackeys,visa_address,":",",")
 	sc_fdackeys = replacenumberbykey("numDACCh"+num2istr(deviceNum),sc_fdackeys,numDACCh,":",",")
 	sc_fdackeys = replacenumberbykey("numADCCh"+num2istr(deviceNum),sc_fdackeys,numADCCh,":",",")
-	sc_fdackeys = replacenumberbykey("master"+num2istr(deviceNum),sc_fdackeys,master,":",",")
 	sc_fdackeys = sortlist(sc_fdackeys,",")
 end
 

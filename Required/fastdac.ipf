@@ -21,17 +21,16 @@
 //// Connection ////
 ////////////////////
 
-function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh,master, optical])
+function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh, optical])
 	// instrID is the name of the global variable that will be used for communication
 	// visa_address is the VISA address string, i.e. ASRL1::INSTR
 	// Most FastDAC communication relies on the info in "sc_fdackeys". Pass numDACCh and
 	// numADCCh to fill info into "sc_fdackeys"
 	string instrID, visa_address
-	variable verbose, numDACCh, numADCCh, master   //idk what the point of this master variable is.
+	variable verbose, numDACCh, numADCCh   //idk what the point of this master variable is.
 	variable optical  // Whether connected by optical (or usb)
 
 
-	master   = paramisDefault(master)   ? 0 : master
 	optical  = paramisDefault(optical)  ? 1 : optical
 	verbose  = paramisDefault(verbose)  ? 1 : verbose
 	numDACCh = paramisDefault(numDACCh) ? 8 : numDACCh
@@ -56,12 +55,28 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 	
 	// fill info into "sc_fdackeys"
 	if(!paramisdefault(numDACCh) && !paramisdefault(numADCCh))
-		scf_addFDinfos(instrID,visa_address,numDACCh,numADCCh,master=master)
+		scf_addFDinfos(instrID,visa_address,numDACCh,numADCCh)
 	endif
 	
 	return localRM
 end
 
+
+function openMultipleFastDACconnections(VISAnums)
+	// This function is added to ease opening up multiple fastDAC connections in order
+	// It assumes the default options for verbose, numDACCh, numADCCh, and optical,
+	// The values can be found in the function openfastDACconnection()
+	// it will create the variables fd1,fd2,fd3.......
+	
+	string VISAnums
+	int i
+	for(i=0;i<itemsinlist(VISAnums);i++)	
+		string instrID      = "fd" + num2str(i+1)
+		string visa_address = "ASRL" + stringfromlist(i,VISAnums, ",") + "::INSTR"
+		openFastDACconnection(instrID, visa_address)
+	endfor
+
+end
 
 ////////////////////////////
 //// Master/Slave/Indep ////
