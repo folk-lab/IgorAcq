@@ -2149,6 +2149,8 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	variable aborting
 	string additional_wavenames // Any additional wavenames to be saved in the DatHDF (and copied in Igor)
 	
+	scfd_checkRawSave()
+	
 	save_experiment = paramisDefault(save_experiment) ? 1 : save_experiment
 	additional_wavenames = SelectString(ParamIsDefault(additional_wavenames), additional_wavenames, "")
 	
