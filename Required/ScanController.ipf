@@ -1908,6 +1908,8 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	variable aborting
 	string additional_wavenames // Any additional wavenames to be saved in the DatHDF (and copied in Igor)
 	
+	scfd_checkRawSave()
+	
 	save_experiment = paramisDefault(save_experiment) ? 1 : save_experiment
 	additional_wavenames = SelectString(ParamIsDefault(additional_wavenames), additional_wavenames, "")
 	
@@ -3727,6 +3729,20 @@ function scf_getChannelStartNum(instrID, [adc])
 	return startCh
 end
 
+
+function scfd_checkRawSave()
+
+	nvar sc_Saverawfadc
+	string notched_waves = scf_getRecordedFADCinfo("calc_names", column = 5)
+	string resamp_waves = scf_getRecordedFADCinfo("calc_names",column = 8)
+
+	if(cmpstr(notched_waves,"") || cmpstr(resamp_waves,""))
+		sc_Saverawfadc = 1
+	else
+		sc_Saverawfadc = 0
+	endif
+
+end
 
 function scf_checkFDResponse(response,command,[isString,expectedResponse])
 	// Checks response (that fastdac returns at the end of most commands) meets expected response (e.g. "RAMP_FINISHED")
