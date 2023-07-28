@@ -389,15 +389,20 @@ function fd_getfield(datnum)
 	variable sl_id, fd_id  //JSON ids
 	variable field
 
-	sl_id = get_sweeplogs(datnum)  // Get Sweep_logs JSON;
-	fd_id = getJSONXid(sl_id, "LS625 Magnet Supply") // Get FastDAC JSON from Sweeplogs
-
-	JSONXOP_GetValue/V fd_id, "field mT"
-	field = V_value
-
-	JSONXOP_Release /A  //Clear all stored JSON strings
+	try
+		sl_id = get_sweeplogs(datnum)  // Get Sweep_logs JSON;
+		fd_id = getJSONXid(sl_id, "LS625 Magnet Supply") // Get FastDAC JSON from Sweeplogs
 	
-	return field
+		JSONXOP_GetValue/V fd_id, "field mT"
+		field = V_value
+	
+		JSONXOP_Release /A  //Clear all stored JSON strings
+		
+		return field
+	catch
+		print "[WARNING] No Field found in JSON, returning 0"
+		return 0
+	endtry
 
 end
 

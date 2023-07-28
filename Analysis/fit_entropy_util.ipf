@@ -6,8 +6,8 @@
 
 function master_entropy_clean_average(filenum, delay, wavelen, [average_repeats, demodulate_on, apply_scaling, forced_theta, fit_width])
 	int filenum, delay, wavelen
-	int average_repeats, demodulate_on, apply_scaling, forced_theta
-	variable fit_width
+	int average_repeats, demodulate_on, apply_scaling
+	variable forced_theta, fit_width
 	
 	average_repeats = paramisdefault(average_repeats) ? 1 : average_repeats // assuming repeats to average into 1 trace
 	demodulate_on = paramisdefault(demodulate_on) ? 0 : demodulate_on // demodulate OFF is default
@@ -37,7 +37,7 @@ function master_entropy_clean_average(filenum, delay, wavelen, [average_repeats,
 	duplicate /o cold $cold_wavename
 	wave cold_wave = $cold_wavename
 	
-	master_ct_clean_average(cold_wave, 1, 0, "dat", average = 0)
+	master_ct_clean_average(cold_wave, 1, 0, "dat", average = 0, N=INF)
 	
 	string cold_params_wavename = "dat" + num2str(filenum) + "_cs_fit_params"
 	wave cold_params_wave = $cold_params_wavename

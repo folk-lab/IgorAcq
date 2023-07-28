@@ -1793,13 +1793,18 @@ Function protoFunc_StepTempScan()
 End
 
 
-function StepTempScanFunc(sFunc, targettemps, [mag_fields])
+function StepTempScanFunc(sFunc, targettemps, [mag_fields, base_temp])
+	// Master function for running scans at multiple temps and magnetic fields. Assumes the function has no input parameters.
+	// Will run function at set targettemps (including base) and mag_fields
+	// base_temp sets value at which fridge is at base. If fridge is below base_temp then it will run the scan function at the start of the measurement
+	// EXAMPLE USAGE:: stepTempScanFunc("feb17_Scan0to1Peaks_paper", {500, 300, 100}, mag_fields={70, 2000}, base_temp = 20)
 	String sFunc // string form of function you want to run
 	wave targettemps
 	wave mag_fields
-	// Master function for running scans at multiple temps and magnetic fields. Assumes the function has no input parameters.
-	// Will run function at set targettemps (including base) and mag_fields
-	// EXAMPLE USAGE:: stepTempScanFunc("feb17_Scan0to1Peaks_paper", {500, 300, 100}, mag_fields={70, 2000})
+	variable base_temp
+	
+	base_temp = paramisdefault(base_temp) ? 20 : base_temp // base_temp = 20 is default
+
    FUNCREF protoFunc_StepTempScan func_to_run = $sFunc
 	svar ls        
    	nvar fd, magz
@@ -1824,7 +1829,7 @@ function StepTempScanFunc(sFunc, targettemps, [mag_fields])
    	
 		// Do Low T scan first (if already at low T)
 		variable low_t_scanned = 0
-		if (getls370temp(ls, "MC")*1000 < 20)
+		if (getls370temp(ls, "MC")*1000 < base_temp)
 			func_to_run() //run the function
 			low_t_scanned = 1
 		endif
