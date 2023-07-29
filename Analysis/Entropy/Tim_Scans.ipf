@@ -643,6 +643,275 @@ function ScanFastDAC2D_virtual(fdID, startx, finx, channelsx, starty, finy, chan
 end
 
 
+function ScanFastDAC2D_virtual2(fdID, startx, finx, channelsx, starty, finy, channelsy, numptsy, virtual_corners, virtual_gates, [fdcs_id, numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave, use_AWG, use_only_corners, interlaced_channels, interlaced_setpoints])
+	// 2D Scan for FastDAC only OR FastDAC on fast axis and BabyDAC on slow axis
+	// Note: Must provide numptsx OR sweeprate in optional parameters instead
+	// Note: To ramp with babyDAC on slow axis provide the BabyDAC variable in bdID
+	// Note: channels should be a comma-separated string ex: "0,4,5"
+	// Note: Virtual corner gates MUST be on the fast axis (since they are swept during the scan)
+	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, rampratex, rampratey, delayy, nosave, use_AWG, fdyID, fdcs_id, use_only_corners
+	string channelsx, channelsy, comments, startxs, finxs, startys, finys, interlaced_channels, interlaced_setpoints
+	string virtual_corners  // , separated list of 4 corner values for each virtual gate. ; separated for multiple virtual gates -- Corners should be specified as a single value for each of "StartX|StartY, FinX|StartY, StartX|FinY, FinX|FinY"
+	string virtual_gates  // , separated list of virtual gates (each needs a set of virtual_corners)
+
+	// Set defaults
+	delayy = ParamIsDefault(delayy) ? 0.05 : delayy
+	comments = selectstring(paramisdefault(comments), comments, "")
+	startxs = selectstring(paramisdefault(startxs), startxs, "")
+	finxs = selectstring(paramisdefault(finxs), finxs, "")
+	startys = selectstring(paramisdefault(startys), startys, "")
+	finys = selectstring(paramisdefault(finys), finys, "")
+	fdcs_id = paramisdefault(sweeprate) ? 0 : fdcs_id
+	use_only_corners = paramisdefault(use_only_corners) ? 0 : use_only_corners
+	interlaced_channels = selectString(paramisdefault(interlaced_channels), interlaced_channels, "")
+	interlaced_setpoints = selectString(paramisdefault(interlaced_setpoints), interlaced_setpoints, "")
+	variable use_bd = paramisdefault(bdid) ? 0 : 1 		// Whether using both FD and BD or just FD
+	variable use_second_fd = paramisdefault(fdyID) ? 0 : 1  // Whether using a second FD for the y axis gates
+	
+	
+	///// If using virtual sweeps only /////
+	///// WARNING DANGEROUS NEED TO PROPERLY DO CHECKS HERE /////
+	string corners, virtual_gate
+   	variable c0, c1, c2, c3 
+   	
+	if (use_only_corners == 1)
+		corners = StringFromList(0, virtual_corners, ";")
+	   	c0 = str2num(StringFromList(0, corners, ","))
+   		c1 = str2num(StringFromList(1, corners, ","))
+   		c2 = str2num(StringFromList(2, corners, ","))
+   		c3 = str2num(StringFromList(3, corners, ","))
+	   	
+	   	// NOTE: These values are only for plotting if use_only_corners == 1
+	   	// Choosing to display extrema
+		startx = min(c0, c2)
+		finx = max(c1, c3)
+		starty = min(c0, c1)
+		finy = max(c2, c3)
+		
+		// making it clear the virtual gates are getting swept
+		channelsx = virtual_gates
+		channelsy = virtual_gates
+	endif
+
+	//// set all fds to independent ////
+	
+	set_indep()
+	
+	///// Reconnect instruments /////
+	sc_openinstrconnections(0)
+
+
+	////////////////// Add some info to the comments otherwise virtual gate info not stored in HDF
+	// TODO: Improve how this info is stored in HDF (probably requires adding something to ScanVars and then modifying EndScan)
+	sprintf comments, "%s, virtual_sweep, [virtual_gates=%s, virtual_corners=%s]", comments, virtual_gates, virtual_corners
+
+
+	///// Put info into scanVars struct (to more easily pass around later)	 /////
+// 	struct ScanVars S
+// 	if (use_bd == 0)
+//	 	initScanVarsFD(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
+//		   						 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments)
+//		if (use_second_fd)
+//			S.instrIDy = fdyID	
+//		endif
+//	
+//	else  				// Using BabyDAC for Y axis so init x in FD_ScanVars, and init y in BD_ScanVars
+//		initScanVarsFD(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
+//		   						rampratey=rampratey, startxs=startxs, finxs=finxs, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments)
+//		S.instrIDy = bdID
+//       s.is2d = 1
+//		S.starty = starty
+//		S.finy = finy
+//		S.channelsy = scu_getChannelNumbers(channelsy, fastdac=0)
+//		S.y_label = scu_getDacLabel(S.channelsy, fastdac=0)
+//		scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, S.starty, S.finy, S.startxs, S.finxs, S.startys, S.finys)
+//	endif
+//	
+	
+	struct ScanVars S
+ 	if (use_bd == 1)  // Using babydacs as second instrument
+		
+		initScanVarsFD2(S, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy,\
+		   				 rampratey=rampratey, startxs=startxs, finxs=finxs, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints,\
+		   				 comments=comments)
+
+		S.instrIDy = bdID
+		S.channelsy = scu_getChannelNumbers(channelsy, fastdac=0)
+		S.y_label = scu_getDacLabel(S.channelsy, fastdac=0)
+		scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, starty, finy, S.startxs, S.finxs, startys, finys)
+	
+	else  				// Using fastdacs as second instrument
+
+		initScanVarsFD2(S, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy,\
+		   				 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys,\
+		   				 interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments, x_only = 0)
+
+		s.is2d = 1		   						
+		S.starty = starty
+		S.finy = finy
+		scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, starty, finy, S.startxs, S.finxs, startys, finys)
+		
+	endif
+      
+   ///// Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC ///
+   // NOTE: No checks of the virtual gates done here
+   if(use_bd == 1)
+		PreScanChecksBD(S, y_only=1)
+   endif
+   
+   PreScanChecksFD2(S) 
+   	
+   	
+   	// sets master/slave between the devices that are used.
+	set_master_slave(S)
+	
+	
+   	///// Check virtual gates /////
+   	variable k
+   	for (k=0; k<ItemsInList(virtual_gates, ","); k++)
+   		virtual_gate = scu_getChannelNumbers(StringFromList(k, virtual_gates, ","), fastdac=1)
+   		corners = StringFromList(k, virtual_corners, ";")
+   		if (ItemsInList(corners, ",") != 4)
+   			abort "Must specify all 4 corner values for each virtual gate (StartX/Y, FinX/StartY, StartX/FinY, FinX/FinY)"
+   		endif
+   		c0 = str2num(StringFromList(0, corners, ","))
+   		c1 = str2num(StringFromList(1, corners, ","))
+   		c2 = str2num(StringFromList(2, corners, ","))
+   		c3 = str2num(StringFromList(3, corners, ","))
+   		scc_checkLimsSingleFD(virtual_gate, c0, c1)
+   		scc_checkLimsSingleFD(virtual_gate, c2, c3) 
+   		// NOTE: Not checking the sweeprate of virtual gates 		
+   	endfor
+
+   	
+  	///// If using AWG then get that now and check it /////
+	struct AWGVars AWG
+	if(use_AWG)	
+		fd_getGlobalAWG(AWG)
+		CheckAWG(AWG, S)  // Note: sets S.numptsx here and AWG.lims_checked = 1
+	endif
+	SetAWG(AWG, use_AWG)
+   
+   
+   ///// Ramp to start without checks /////
+   if(use_bd == 1)
+	   RampStartFD(S, x_only=1, ignore_lims=1)
+	   RampStartBD(S, y_only=1, ignore_lims=1)
+   	else
+   	   RampStartFD(S, ignore_lims=1)
+   	endif
+   	
+
+	///// Ramp Virtual gates to start /////
+	if (fdcs_id != 0)
+		for (k=0; k<ItemsInList(virtual_gates, ","); k++)
+			virtual_gate = scu_getChannelNumbers(StringFromList(k, virtual_gates, ","), fastdac=1)
+	   		corners = StringFromList(k, virtual_corners, ";")
+	   		c0 = str2num(StringFromList(0, corners, ","))
+	   		rampmultiplefDAC(fdcs_id, virtual_gate, c0, ignore_lims=1)
+	   	endfor
+   	else
+   		for (k=0; k<ItemsInList(virtual_gates, ","); k++)
+			virtual_gate = scu_getChannelNumbers(StringFromList(k, virtual_gates, ","), fastdac=1)
+	   		corners = StringFromList(k, virtual_corners, ";")
+	   		c0 = str2num(StringFromList(0, corners, ","))
+	   		rampmultiplefDAC(S.instrIDx, virtual_gate, c0, ignore_lims=1)
+	   	endfor
+	endif
+
+   	
+   	///// Let gates settle /////
+	sc_sleep(S.delayy)
+
+
+	///// Initialize waves and graphs /////
+	initializeScan(S)
+
+
+	///// Main measurement loop /////
+	variable i=0, j=0
+	variable setpointy, sy, fy
+	string chy
+	
+	variable new_start, new_fin
+	string original_channelsx = S.channelsx, original_startxs = S.startxs, original_finxs = S.finxs
+	for(i=0; i < S.numptsy; i++)
+	
+	
+		///// Add virtual gates into ScanVars /////
+		if (use_only_corners == 1) // if only using corners - remove other gates
+			S.channelsx = ""
+			S.startxs = ""
+			S.finxs = ""
+		else
+			S.channelsx = original_channelsx
+			S.startxs = original_startxs
+			S.finxs = original_finxs
+		endif
+		
+		
+		///// Calculate new Virtual gates start/end /////
+		for (k=0; k < ItemsInList(virtual_gates, ","); k++)
+			virtual_gate = scu_getChannelNumbers(StringFromList(k, virtual_gates, ","), fastdac=1)
+   			corners = StringFromList(k, virtual_corners, ";")
+		   	c0 = str2num(StringFromList(0, corners, ","))
+	   		c1 = str2num(StringFromList(1, corners, ","))
+	   		c2 = str2num(StringFromList(2, corners, ","))
+	   		c3 = str2num(StringFromList(3, corners, ","))
+	   		
+	   		new_start = c0 + (c2-c0) * i / (S.numptsy-1)
+			new_fin = c1 + (c3-c1) * i / (S.numptsy-1)
+			
+			S.channelsx = AddListItem(virtual_gate, S.channelsx, ",", INF)
+			S.startxs = AddListItem(num2str(new_start), S.startxs, ",", INF)			
+			S.finxs = AddListItem(num2str(new_fin), S.finxs, ",", INF)						
+   		endfor
+   		
+   		
+   		///// Remove the commas Igor puts at the end of lists /////
+   		S.channelsx = S.channelsx[0, strlen(S.channelsx) - 2]  
+   		S.startxs = S.startxs[0, strlen(S.startxs) - 2]
+   		S.finxs = S.finxs[0, strlen(S.finxs) - 2]
+   		
+   		
+   		///// Loop for interlaced scans ///// 
+		if (S.interlaced_y_flag)
+			Ramp_interlaced_channels(S, mod(i, S.interlaced_num_setpoints))
+			Set_AWG_state(S, AWG, mod(i, S.interlaced_num_setpoints))
+			///// Ramp slow axis only for first of interlaced setpoints /////
+			if (mod(i, S.interlaced_num_setpoints) == 0)
+				rampToNextSetpoint(S, 0, outer_index=i, y_only=1, fastdac=!use_bd, ignore_lims=1)
+			endif
+		else
+			///// Ramp slow axis /////
+			rampToNextSetpoint(S, 0, outer_index=i, y_only=1, fastdac=!use_bd, ignore_lims=1)
+		endif
+ 
+		
+		///// Ramp fast axis to start /////
+		rampToNextSetpoint(S, 0, fastdac=1, ignore_lims=1)
+
+
+		///// Let gates settle /////
+		sc_sleep(S.delayy)
+		
+		
+		///// RECORD fast axis /////
+		scfd_RecordValues(S, i, AWG_list=AWG)
+		
+	endfor
+
+	///// Save by default /////
+	if (nosave == 0)
+		EndScan(S=S)
+  	else
+  		dowindow /k SweepControl
+	endif
+
+end
+
+
+
 function ScanFastDacSlow_Interlaced(instrID, start, fin, channels, numpts, delay, ramprate, [starts, fins, y_label, repeats, alternate, delayy, until_checkwave, until_stop_val, until_operator, comments, nosave, interlace_channel, interlaced_setpoints]) //Units: mV
 	// sweep one or more FastDAC channels but in the ScanController way (not ScanControllerFastdac). I.e. ramp, measure, ramp, measure...
 	// channels should be a comma-separated string ex: "0, 4, 5"
