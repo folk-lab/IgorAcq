@@ -4181,35 +4181,21 @@ function scfd_resampleWaves2(w, measureFreq, targetFreq)
 	Wave w
 	variable measureFreq, targetFreq
 	struct scanvars S
-	scv_getLastScanVars(S); print S
-
+	scv_getLastScanVars(S)
 	wave wcopy
-	
 	duplicate /o  w wcopy
-	
 	w = x
-	
 	RatioFromNumber (targetFreq / measureFreq)
 	if (V_numerator > V_denominator)
 		string cmd
 		printf cmd "WARNING[scfd_resampleWaves]: Resampling will increase number of datapoints, not decrease! (ratio = %d/%d)\r", V_numerator, V_denominator
 	endif
-	//resample/UP=(V_numerator)/DOWN=(V_denominator)/N=201/E=3 w
-	
 	setscale x 0, ((w[dimsize(w,0) - 1] - w[0])/S.sweeprate), wcopy
-	
 	resample /rate=(targetfreq)/N=201/E=3 wcopy
-	
 	copyscales w wcopy
-	
 	duplicate /o wcopy w
-	
 	killwaves wcopy
-	
-	
-	// TODO: Need to test N more (simple testing suggests we may need >200 in some cases!)
-	// TODO: Need to decide what to do with end effect. Possibly /E=2 (set edges to 0) and then turn those zeros to NaNs? 
-	// TODO: Or maybe /E=3 is safest (repeat edges). The default /E=0 (bounce) is awful.
+
 end
 
 
