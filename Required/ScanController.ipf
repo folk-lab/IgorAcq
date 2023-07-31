@@ -5453,7 +5453,7 @@ function scfw_update_all_fdac([option])
 		numDACCh = str2num(stringbykey("numDACCh"+num2istr(i+1),sc_fdackeys,":",","))
 		if(numDACCh > 0)
 			visa_address = stringbykey("visa"+num2istr(i+1),sc_fdackeys,":",",")
-			viRM = openFastDACconnection(tempnamestr, visa_address, verbose=0)
+			viRM = openFastDACconnection(tempnamestr, visa_address, verbose=0, fill = 0)
 			nvar tempname = $tempnamestr
 			try
 				strswitch(option)
@@ -5528,7 +5528,7 @@ function scfw_update_fadc(action) : ButtonControl
 		if(numADCCh > 0)
 			visa_address = scf_getFDVisaAddress(i+1)
 //			visa_address = stringbykey("visa"+num2istr(i+1),sc_fdackeys,":",",")
-			viRm = openFastDACconnection(tempnamestr, visa_address, verbose=0)
+			viRm = openFastDACconnection(tempnamestr, visa_address, verbose=0, fill = 0)
 			nvar tempname = $tempnamestr
 			try
 				for(j=0;j<numADCCh;j+=1)

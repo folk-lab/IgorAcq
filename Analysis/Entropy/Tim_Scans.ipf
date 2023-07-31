@@ -900,7 +900,9 @@ function ScanFastDAC2D_virtual2(fdID, startx, finx, channelsx, starty, finy, cha
 		scfd_RecordValues(S, i, AWG_list=AWG)
 		
 	endfor
-
+	
+	set_indep()
+	
 	///// Save by default /////
 	if (nosave == 0)
 		EndScan(S=S)

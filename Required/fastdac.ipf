@@ -21,7 +21,7 @@
 //// Connection ////
 ////////////////////
 
-function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh, optical])
+function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh, optical,fill])
 	// instrID is the name of the global variable that will be used for communication
 	// visa_address is the VISA address string, i.e. ASRL1::INSTR
 	// Most FastDAC communication relies on the info in "sc_fdackeys". Pass numDACCh and
@@ -29,12 +29,13 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 	string instrID, visa_address
 	variable verbose, numDACCh, numADCCh   //idk what the point of this master variable is.
 	variable optical  // Whether connected by optical (or usb)
-
+	int fill
 
 	optical  = paramisDefault(optical)  ? 1 : optical
 	verbose  = paramisDefault(verbose)  ? 1 : verbose
 	numDACCh = paramisDefault(numDACCh) ? 8 : numDACCh
 	numADCCh = paramisDefault(numADCCh) ? 4 : numADCCh
+	fill     = paramIsDefault(fill)     ? 1 : fill	
 		
 	variable localRM
 	variable status = viOpenDefaultRM(localRM) // open local copy of resource manager
@@ -55,8 +56,9 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 	
 	// fill info into "sc_fdackeys"
 	
-	scf_addFDinfos(instrID,visa_address,numDACCh,numADCCh)
-	
+	if(fill)
+		scf_addFDinfos(instrID,visa_address,numDACCh,numADCCh)
+	endif
 	return localRM
 end
 
