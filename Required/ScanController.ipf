@@ -4490,7 +4490,11 @@ function scfd_SendCommandAndRead(S, AWG_list, rowNum)
 	endif
 	
 	if(AWG_list.use_awg == 1)  // Reset AWs back to zero (no reason to leave at end of AW)
-		rampmultiplefdac(S.instrIDx, AWG_list.AW_DACs, 0)
+		for(i=0;i<itemsinlist(S.instrIDs);i++)
+			fdIDname = stringfromlist(i, S.instrIDs)
+			nvar fdID = $fdIDname
+			rampmultiplefdac(fdID, AWG_list.AW_DACs, 0)
+		endfor
 	endif
 end
 

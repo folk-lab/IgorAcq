@@ -1966,6 +1966,14 @@ function/s fd_start_sweep(S, [AWG_list])
 			endif
 		endif
 		
+		//Tim and Josh are right, it seems to retrieve data with no issue. 
+		
+		if(i == 0 || i == 1)
+			cmd = "AWG_RAMP,2,0,1,2,01,0,1000,1,100\r"
+		else
+			cmd = "INT_RAMP,2,01,0,1000,24390\r"
+		endif
+		
 		writeInstr(fdID,cmd)
 	endfor
 	
