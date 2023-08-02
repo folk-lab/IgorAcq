@@ -249,7 +249,7 @@ function/s scu_getDeviceChannels(instrID, channels, [adc_flag, reversal])
 		
 		if ((real_channel_val < 0 || real_channel_val >= num_channels) && !reversal)
 			// skip the channel essentially
-			continue
+			continue  // should be replaced with an if !(), and the else should be removed
 			//printf "ERROR: Channels passed were [%s]. After subtracting the start value for the device for the %d item in list, this resulted in a real value of %d which is not valid\r", channels, i, real_channel_val
 			//abort "ERROR: Bad device channel given (see command history for more info)"
 		else
@@ -391,7 +391,6 @@ structure ScanVars
 	 string dacListIDs    	// Ids for channelx (for now, not sure ill change this yet)
 	 variable maxADCs     	// should contain the number with the most ADCs being recorded // I dont use this 
 	 string fakeRecords   	// ADC channels used for fakeRecording
-	 string ADCcounts		// ADCcounts to ensure theres equal amount of recordings between instruments
 	 string adcLists      	// adclist by id -> attempting to use stringbykey	
 	 string IDstartxs, IDfinxs  // If sweeping from different start/end points for each channel or instrument / This one is a stringkey with fdIDs
 	 string dacListIDs_y     // Ids for channely (for now, not sure ill change this yet)	 
@@ -784,21 +783,12 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
 	
 	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	
-	
-	make /free /n = (itemsinlist(S.instrIDs)) ADCcounts
-	S.fakerecords = ""
+	S.maxADCs = 0
 	for(i=0; i<itemsinlist(S.instrIDs); i++)
-		ID = stringFromList(i,S.instrIDs)	
-		for(j=0; j<itemsinlist(S.adcListIDs); j++)
-			string adcID = stringFromList(j,S.adcListIDs)
-			if(!cmpstr(adcID,ID))
-				ADCcounts[i] += 1
-			endif	
-		endfor
+		ID = stringFromList(i,S.instrIDs)
+		nvar fdID = $ID
+		S.maxADCs = (scf_getNumRecordedADCs(instrID = fdID) > S.maxADCs) ? scf_getNumRecordedADCs(instrID = fdID) : S.maxADCs
 	endfor
-	
-	S.ADCcounts = numwavetolist(ADCcounts) // probably d not need this in scanvars
-	S.maxADCs = wavemax(ADCcounts)			// finding the max amount of ADCs being recorded
 	
 	scv_setSetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
 	
@@ -2617,6 +2607,7 @@ function scw_setupLockIn(action) : Buttoncontrol
 	svar sc_fdID, sc_freqAW0
 	nvar fdID = $sc_fdID
 	
+	
 	make /free /n=2 amps      = str2num(LIvalstr[0][1])
 	sc_freqAW0				   	= LIvalstr[1][1]
 	make /free /n=2 times     = 1/str2num(sc_freqAW0)/2
@@ -2633,7 +2624,16 @@ function scw_setupLockIn(action) : Buttoncontrol
 	awgvalstr0[1,2][1] = num2str(times[p-1] * 1000)
 	awgvalstr0[3,9][] = ""
 	
+	svar sc_fdackeys; int i
+	int numDevices = str2num(stringbyKey("numDevices", sc_fdackeys))
 	
+	for(i=0; i<numDevices; i++)
+		nvar fdID = $(stringbyKey("name"+num2str(i+1), sc_fdackeys))
+		setFdacAWGSquareWave(fdID, amps, times, 0)
+		//string channels = LIvalstr[2][1]
+		//dacs = scu_getDeviceChannels(fdID, channels)
+			
+	endfor
 end
 
 
@@ -3951,16 +3951,39 @@ function/S scf_getRecordedScanControllerInfo(info_name)
 end
 
 
-function scf_getNumRecordedADCs() 
+function scf_getNumRecordedADCs([instrID, skipWarning]) 
 	// Returns how many ADCs are set to be recorded
 	// Note: Gets this info from ScanController_Fastdac
+	// added optional parameter to return numADCs checked only on a specific fastdac (instrID).
+	
+	variable instrID, skipWarning
+	skipwarning = paramisdefault(skipWarning)? 0 : 1
+	variable numadc = 0
 	string adcs = scf_getRecordedFADCinfo("channels")
-	variable numadc = itemsInList(adcs)
-	if(numadc == 0)
+	if(!paramisdefault(instrID))
+		adcs = scu_getDeviceChannels(instrID, adcs, adc_flag=1)
+		numadc = itemsinlist(adcs)
+	else
+		numadc = itemsinlist(adcs)
+	endif
+	if(numadc == 0 && skipWarning == 0)
 		print "WARNING[scf_getNumRecordedADCs]: No ADCs set to record. Behaviour may be unpredictable"
 	endif
 		
 	return numadc
+end
+
+
+function scf_getMaxRecordedADCs()
+	// checks how many ADCs are set to be recorded per FastDac, and returns the largest one.
+	
+	svar sc_fdackeys
+	int i, maxADCs = 0, numDevices = str2num(stringbykey("numDevices", sc_fdackeys, ":", ","))
+	for(i = 0; i <numDevices; i++)
+		nvar fdID = $(stringbykey("name"+num2str(i+1),sc_fdackeys, ":", ","))
+		maxADCs = (scf_getNumRecordedADCs(instrID = fdID, skipwarning = 1) > maxADCs) ? scf_getNumRecordedADCs(instrID = fdID, skipwarning = 1) : maxADCs
+	endfor
+	return maxADCs
 end
 
 

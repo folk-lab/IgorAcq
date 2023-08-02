@@ -1594,7 +1594,7 @@ function setupAWG(instrID, [AWs, DACs, numCycles, verbose])
 	DACs = scu_getChannelNumbers(DACs, fastdac=1)  // Convert from label to numbers 
 	DACs = ReplaceString(";", DACs, ",")  
 
-	
+	//dacs = scu_getDeviceChannels(fdID, channels)
 	S.AW_Waves = selectstring(paramisdefault(AWs), AWs, S.AW_Waves)
 	S.AW_DACs = selectstring(paramisdefault(DACs), DACs, S.AW_Dacs)  // Formatted 01,23  == wave 0 on channels 0 and 1, wave 1 on channels 2 and 3
 	S.numCycles = paramisDefault(numCycles) ? S.numCycles : numCycles
@@ -2046,6 +2046,12 @@ Structure AWGVars
 	variable numWaves	// Number of AWs being used
 	variable numCycles 	// # wave cycles per DAC step for a full 1D scan
 	variable numSteps  	// # DAC steps for a full 1D scan
+	
+	//for master/slave use
+	variable AW_dacs2    //stringkey with fdIDs
+	variable maxADCs     //max amount of ADCs
+	 
+	
 	
 endstructure
 
