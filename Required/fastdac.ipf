@@ -1488,7 +1488,8 @@ function setFdacAWGSquareWave(instrID, amps, times, wave_num)
 	int wave_num
 	struct AWGVars S
 	fd_getGlobalAWG(S) 
-	S.numADCs = scf_getNumRecordedADCs()
+	S.numADCs = scf_getnumRecordedADCs() // dont think I would need this anymore
+	S.maxADCs = scf_getMaxRecordedADCs()
 	fd_setGlobalAWG(S)
 	
 	// checking if amps and times are the same length
@@ -1500,9 +1501,8 @@ function setFdacAWGSquareWave(instrID, amps, times, wave_num)
 	make/o/free/n=(numpnts(amps), 2) awg_sqw          //awg_sqw will hold the information about the squarewave
 	variable samplingFreq = getFADCspeed(instrID)     //sampling frequency is needed to properly implement time
 	variable numSamples = 0, i=0, j=0
-   variable numADCs = scf_getNumRecordedADCs()
    for(i=0;i<numpnts(amps);i++)                            
-   		numSamples = round(times[i]*samplingFreq/numADCs)   // Convert to # samples
+   		numSamples = round(times[i]*samplingFreq/S.maxADCs)   // Convert to # samples
          
       	if(numSamples == 0)                         // Prevent adding zero length setpoint
        	abort "ERROR[setFdacAWGSquareWave]: trying to add setpoint with zero length, duration too short for sampleFreq"
@@ -1587,6 +1587,9 @@ function setupAWG(instrID, [AWs, DACs, numCycles, verbose])
 	variable numCycles // How many full waves to execute for each ramp step
 	variable verbose  // Whether to print setup of AWG
 	
+	
+	//might be useful to take an instrID as a string rather than a variable
+	
 	struct AWGVars S
 	fd_getGlobalAWG(S)
 	
@@ -1602,13 +1605,14 @@ function setupAWG(instrID, [AWs, DACs, numCycles, verbose])
 	S.numWaves = itemsinlist(AWs, ",")
 	
 	// For checking things don't change before scanning
-	if (S.numADCs != scf_getNumRecordedADCs())
+	if (S.maxADCs != scf_getMaxRecordedADCs())
 		abort "The number of ADCs being recorded changed, please set up the squarewaves again"
 	endif
 	
-	S.numADCs = scf_getNumRecordedADCs()  // Store number of ADCs selected in window so can check if this changes
+	S.numADCs = scf_getNumRecordedADCs()  // Store number of ADCs selected in window so can check if this changes // shouldnt matter anymore
+	S.maxADCs = scf_getMaxRecordedADCs()  // Store number of ADCs selected in window so can check if this changes
 	S.samplingFreq = getfadcspeed(instrID)
-	S.measureFreq = S.samplingFreq/S.numADCs
+	S.measureFreq = S.samplingFreq/S.maxADCs
 	
 	variable i, waveLen = 0
 	string wn

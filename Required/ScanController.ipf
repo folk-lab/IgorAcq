@@ -778,18 +778,8 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
 		instrIDs = AddListItem(ID, instrIDs, ";", Inf)	//replacenumberByKey(ID, instrIDs, startingInstrNum + i)
 	endfor
 	
-	S.instrIDs = instrIDs //// final result containing fastDacs names not a keystring 
-	
-	
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	
-	S.maxADCs = 0
-	for(i=0; i<itemsinlist(S.instrIDs); i++)
-		ID = stringFromList(i,S.instrIDs)
-		nvar fdID = $ID
-		S.maxADCs = (scf_getNumRecordedADCs(instrID = fdID) > S.maxADCs) ? scf_getNumRecordedADCs(instrID = fdID) : S.maxADCs
-	endfor
-	
+	S.instrIDs = instrIDs //// final result containing fastDacs names not a keystring
+	S.maxADCs = scf_getMaxRecordedADCs()
 	scv_setSetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
 	
 	// Set variables with some calculation
