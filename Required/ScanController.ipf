@@ -2576,10 +2576,10 @@ function scw_setupAWG(action) : Buttoncontrol
 	wave /t awgsetvalstr
 	nvar fdID = $(awgsetvalstr[0][1])
 	string AWs = awgsetvalstr[1][1]
-	string DACs = awgsetvalstr[2][1]
+	string channels = awgsetvalstr[2][1]
 	variable Cycles = str2num(awgsetvalstr[3][1])
 	
-	setupAWG(fdID, AWs=AWs, DACs=DACs, numCycles=Cycles, verbose=1)
+	setupAWG(fdID, AWs=AWs, channels=channels, numCycles=Cycles, verbose=1)
 end
 
 function scw_clearAWinputs(action) : Buttoncontrol
@@ -2601,12 +2601,12 @@ function scw_setupLockIn(action) : Buttoncontrol
 	make /free /n=2 amps      = str2num(LIvalstr[0][1])
 	sc_freqAW0				   	= LIvalstr[1][1]
 	make /free /n=2 times     = 1/str2num(sc_freqAW0)/2
-	string DACs               = LIvalstr[2][1]
+	string channels           = LIvalstr[2][1]
 	variable Cycles           = str2num(LIvalstr[3][1])
 	amps[1] *= -1
 	
 	setFdacAWGSquareWave(fdID, amps, times, 0)
-	setupAWG(fdID, AWs="0", DACs=DACs, numCycles=Cycles, verbose=1)
+	setupAWG(fdID, AWs="0", channels=channels, numCycles=Cycles, verbose=1)
 	
 	LIvalstr0[1,2][0] = num2str(amps[p-1])
 	LIvalstr0[1,2][1] = num2str(times[p-1] * 1000)

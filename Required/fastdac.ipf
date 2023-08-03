@@ -1525,65 +1525,15 @@ function setFdacAWGSquareWave(instrID, amps, times, wave_num)
    	
 end
 
-//function setFdacAWGSquareWave(instrID, v1, v2, v1len, v2len, wave_num)
-//   // Wrapper around fd_addAWGwave to make square waves with two setpoints (v1, v2) and durations (v1len, v2len)
-//   variable instrID, v1, v2, v1len, v2len, wave_num  // lens in seconds
-//
-//   // TODO: need to make a warning that if changing ADC frequency that AWG_frequency changes
-//
-//   // put into wave to make it easier to work with
-//   make/o/free sps = {v1, v2}
-//   make/o/free lens = {v1len, v2len}
-//
-//   // Sanity check on period
-//   // Note: limit checks happen in AWG_RAMP
-//   if (sum(lens) > 1)
-//      string msg
-//      sprintf msg "Do you really want to make a square wave with period %.3gs?", sum(lens)
-//      variable ans = ask_user(msg, type=1)
-//      if (ans == 2)
-//         abort "User aborted"
-//      endif
-//   endif
 
-   // make wave to store setpoints/sample_lengths
-//   make/o/free/n=(2, 2) awg_sqw  // First 2 is number of setpoints, second 2 is for setpoints/sample_lens
-//
-//   variable samplingFreq = getFADCspeed(instrID)  // Gets sampling rate of FD (Note: NOT measureFreq here)
-//   variable numSamples = 0
-//	
-//   variable i=0, j=0
-//   for(i=0;i<numpnts(sps);i++)
-//      if(lens[i] != 0)  // Only add to wave if duration is non-zero
-//         numSamples = round(lens[i]*samplingFreq)  // Convert to # samples
-//         if(numSamples == 0)  // Prevent adding zero length setpoint
-//            abort "ERROR[setFdacAWGSquareWave]: trying to add setpoint with zero length, duration too short for sampleFreq"
-//         endif
-//         awg_sqw[j][0] = {sps[i]}
-//         awg_sqw[j][1] = {numSamples}
-//         j++
-//      endif
-//   endfor
-//
-//   if(numpnts(awg_sqw) == 0)
-//      abort "ERROR[setFdacAWGSquareWave]: No setpoints added to awg_sqw"
-//   endif
-//
-//   fd_clearAWGwave(instrID, wave_num)
-//   fd_addAWGwave(instrID, wave_num, awg_sqw)
-//   printf "Set square wave on AWG_wave%d\r", wave_num
-//   
-//end
-
-
-function setupAWG(instrID, [AWs, DACs, numCycles, verbose])
+function setupAWG(instrID, [AWs, channels, numCycles, verbose])
 	// Function which initializes AWGVars s.t. selected DACs will use selected AWs when called in fd_Record_Values
 	// Required because fd_Record_Values needs to know the total number of samples it will get back, which is calculated from values in AWG_list
 	// IGOR AWs must be set in a separate function (which should reset AWG_List.initialized to 0)
 	// Sets AWG_list.initialized to 1 to allow fd_Record_Values to run
 	// If either parameter is not provided it will assume using previous settings
 	variable instrID  // For printing information about frequency etc
-	string AWs, DACs  // CSV for AWs to select which AWs (0,1) to use. // CSV sets for DACS e.g. "02, 1" for DACs 0, 2 to output AW0, and DAC 1 to output AW1
+	string AWs, channels  // CSV for AWs to select which AWs (0,1) to use. // CSV sets for DACS e.g. "02, 1" for DACs 0, 2 to output AW0, and DAC 1 to output AW1
 	variable numCycles // How many full waves to execute for each ramp step
 	variable verbose  // Whether to print setup of AWG
 	
@@ -1594,14 +1544,14 @@ function setupAWG(instrID, [AWs, DACs, numCycles, verbose])
 	fd_getGlobalAWG(S)
 	
 	// Note: This needs to be changed if using same AW on multiple DACs
-	DACs = scu_getChannelNumbers(DACs, fastdac=1)  // Convert from label to numbers 
+	string DACs = scu_getChannelNumbers(channels, fastdac=1)  // Convert from label to numbers 
 	DACs = ReplaceString(";", DACs, ",")  
 
 	//dacs = scu_getDeviceChannels(fdID, channels)
 	S.AW_Waves = selectstring(paramisdefault(AWs), AWs, S.AW_Waves)
-	S.AW_DACs = selectstring(paramisdefault(DACs), DACs, S.AW_Dacs)  // Formatted 01,23  == wave 0 on channels 0 and 1, wave 1 on channels 2 and 3
+	S.AW_DACs = selectstring(paramisdefault(channels), channels, S.AW_Dacs)  // Formatted 01,23  == wave 0 on channels 0 and 1, wave 1 on channels 2 and 3
 	S.numCycles = paramisDefault(numCycles) ? S.numCycles : numCycles
-	
+	S.channels = DACs      
 	S.numWaves = itemsinlist(AWs, ",")
 	
 	// For checking things don't change before scanning
@@ -1647,12 +1597,7 @@ function setupAWG(instrID, [AWs, DACs, numCycles, verbose])
 	for(i=0;i<S.numWaves;i++)
 		aw_num = stringfromlist(i, AWs, ",")
 		dacs4wave = stringfromlist(i, DACs, ",")
-		dac_list = ""
-		for(j=0;j<strlen(dacs4wave);j++)  // Go through DACs for AW#i (i.e. 012 means DACs 0,1,2)
-			dac_list = addlistitem(dacs4wave[j], dac_list, ",")
-		endfor
-		dac_list = dac_list[0,strlen(dac_list)-2] // remove comma at end
-		sprintf buffer "%s\tAW%s on DAC(s) %s\r", buffer, aw_num, dac_list
+		sprintf buffer "%s\tAW%s on channel(s) %s\r", buffer, aw_num, channels
 	endfor 
 
 	variable awFreq = 1/(s.waveLen/S.measureFreq)
@@ -2052,8 +1997,9 @@ Structure AWGVars
 	variable numSteps  	// # DAC steps for a full 1D scan
 	
 	//for master/slave use
-	variable AW_dacs2    //stringkey with fdIDs
-	variable maxADCs     //max amount of ADCs
+	string AW_dacs2    //stringkey with fdIDs
+	variable maxADCs   //max amount of ADCs
+	string channels     
 	 
 	
 	
@@ -2064,7 +2010,9 @@ function fd_initGlobalAWG()
 	Struct AWGVars S
 	// Set empty strings instead of null
 	S.AW_waves = ""
-	S.AW_dacs = ""
+	S.AW_dacs  = ""
+	S.AW_dacs2 = ""
+	S.channels = ""
 	
 	fd_setGlobalAWG(S)
 end
@@ -2076,11 +2024,11 @@ function fd_setGlobalAWG(S)
 	struct AWGVars &S
 
 	// Store String parts  
-	make/o/t fd_AWGglobalStrings = {S.AW_Waves, S.AW_dacs}
+	make/o/t fd_AWGglobalStrings = {S.AW_Waves, S.AW_dacs, S.AW_dacs2, S.channels}
 
 	// Store variable parts
 	make/o fd_AWGglobalVars = {S.initialized, S.use_AWG, S.lims_checked, S.waveLen, S.numADCs, S.samplingFreq,\
-		S.measureFreq, S.numWaves, S.numCycles, S.numSteps}
+		S.measureFreq, S.numWaves, S.numCycles, S.numSteps, S.maxADCs}
 end
 
 
@@ -2114,6 +2062,8 @@ function fd_getGlobalAWG(S)
 	
 	S.AW_waves = t[0]
 	S.AW_dacs = t[1]
+	S.AW_dacs2 = t[1]
+	S.channels = t[2]
 
 	// Get variable parts
 	wave v = fd_AWGglobalVars
@@ -2127,5 +2077,6 @@ function fd_getGlobalAWG(S)
 	S.numWaves = v[7]
 	S.numCycles = v[8]
 	S.numSteps = v[9]
+	S.maxADCs = v[10]
 end
 
