@@ -3566,23 +3566,21 @@ function scc_CheckAWG(AWG, S)
 		abort "ERROR[scc_CheckAWG]: numSteps must be an integer, not " + num2str(AWG.numSteps)
 	endif
 			
-	// Check there are DACs set for each AW_wave (i.e. if using 2 AWs, need at least 1 DAC for each)
-	if(itemsInList(AWG.AW_waves, ",") != (itemsinlist(AWG.AW_Dacs,",")))
-		sprintf err_msg "ERROR[scc_CheckAWG]: Number of AWs doesn't match sets of AW_Dacs. AW_Waves: %s; AW_Dacs: %s", AWG.AW_waves, AWG.AW_Dacs
-		abort err_msg
-	endif	
+//	// Check there are DACs set for each AW_wave (i.e. if using 2 AWs, need at least 1 DAC for each)
+//	if(itemsInList(AWG.AW_waves, ",") != (itemsinlist(AWG.AW_Dacs,",")))
+//		sprintf err_msg "ERROR[scc_CheckAWG]: Number of AWs doesn't match sets of AW_Dacs. AW_Waves: %s; AW_Dacs: %s", AWG.AW_waves, AWG.AW_Dacs
+//		abort err_msg
+//	endif	
 	
 	// Check no overlap between DACs for sweeping, and DACs for AWG
 	string channel // Single DAC channel
 	string FDchannels = addlistitem(S.Channelsy, S.Channelsx, ",") // combine channels lists
-	for(i=0;i<itemsinlist(AWG.AW_Dacs, ",");i++)
-		AWdacs = stringfromlist(i, AWG.AW_Dacs, ",")
-		for(j=0;j<strlen(AWdacs);j++)
-			channel = AWdacs[j]
-			if(findlistitem(channel, FDchannels, ",") != -1)
-				abort "ERROR[scc_CheckAWG]: Trying to use same DAC channel for FD scan and AWG at the same time"
-			endif
-		endfor
+	string AWGchannels = addlistitem(AWG.channels_AW0, AWG.channels_AW1, ",")
+	for(i=0;i<itemsinlist(AWGchannels, ",");i++)
+		channel = stringfromlist(i, AWGchannels, ",")
+		if(findlistitem(channel, FDchannels, ",") != -1)
+			abort "ERROR[scc_CheckAWG]: Trying to use same DAC channel for FD scan and AWG at the same time"
+		endif
 	endfor
 
 	// Check that all setpoints for each AW_Dac will stay within software limits

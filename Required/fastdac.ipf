@@ -1578,7 +1578,7 @@ function setupAWG([channels_AW0, channels_AW1, numCycles, verbose])
 	
 	S.numADCs = scf_getNumRecordedADCs()  // Store number of ADCs selected in window so can check if this changes // shouldnt matter anymore
 	S.maxADCs = scf_getMaxRecordedADCs()  // Store number of ADCs selected in window so can check if this changes
-	S.channelIDs = scc_checkDeviceNumber(channels = S.channels_AW0 + S.channels_AW1)
+	S.channelIDs = scc_checkDeviceNumber(channels = S.channels_AW0 +","+ S.channels_AW1)
 	wave /t IDs = listToTextWave(S.channelIDs, ";")
 	findDuplicates /z /free /rt = syncIDs IDs
 	S.instrIDs = textWavetolist(syncIDs)
