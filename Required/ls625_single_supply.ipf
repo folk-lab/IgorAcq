@@ -65,7 +65,8 @@ function openLS625connection(instrVarName, visa_address, amps_per_tesla, max_fie
 	string comm = ""
 	sprintf comm, "name=LS625,instrID=%s,visa_address=%s" instrVarName, visa_address
 //	string options = "baudrate=57600,databits=7,stopbits=1,parity=1,test_query=*IDN?"
-	string options = "test_query=*IDN?"	
+   string options = "baudrate=57600,databits=7,parity=1,test_query=*IDN?"
+//	string options = "test_query=*IDN?"	
 
 	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
 
