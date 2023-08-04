@@ -151,7 +151,7 @@ function SetupEntropySquareWaves([freq, cycles,hqpc_zero, hqpc_plus, hqpc_minus,
 	makeSquareWaveAWG(fd, hqpc_zero, cplus, cminus, spt, spt, spt, 1, ramplen=ramplen)
 
 	// Setup AWG
-	setupAWG(fd, AWs="0,1", channels="OHC(10M),OHV*9950", numCycles=cycles, verbose=1)
+	setupAWG(channels_AW0= "OHC(10M)", channels_AW1 = "OHV*9950", numCycles=cycles, verbose=1)
 end
 
 
@@ -181,7 +181,7 @@ function SetupEntropySquareWaves_unequal([freq, cycles, hqpc_plus, hqpc_minus, r
 	makeSquareWaveAWG(fd, 0, cplus, cminus, spt, spt, spt, 1, ramplen=ramplen)
 
 	// Setup AWG
-	setupAWG(fd, AWs="0,1", channels="HO1/10M,HO2*1000", numCycles=cycles)
+	setupAWG(channels_AW0="HO1/10M", channels_AW0="HO2*1000", numCycles=cycles)
 end
 
 

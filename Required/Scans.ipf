@@ -373,7 +373,7 @@ function ScanFastDAC2(start, fin, channels, [numptsx, sweeprate, delay, ramprate
 	struct AWGVars AWG
 	if(use_AWG)	
 		fd_getGlobalAWG(AWG)
-		CheckAWG(AWG, S)  // Note: sets S.numptsx here and AWG.lims_checked = 1
+		CheckAWG(AWG, S)  //Note: sets S.numptsx here and AWG.lims_checked = 1
 	endif
 	SetAWG(AWG, use_AWG)
 

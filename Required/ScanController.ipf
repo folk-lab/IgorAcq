@@ -725,8 +725,8 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
 	string instrIDs
 	
 	///// Checks what devices need to be synced //////
-	S.dacListIDs = scc_checkDeviceNumber(S)
-	S.adcListIDs = scc_checkDeviceNumber(S, adc = 1)
+	S.dacListIDs = scc_checkDeviceNumber(S = S)
+	S.adcListIDs = scc_checkDeviceNumber(S = S, adc = 1)
 	wave /t IDs = listToTextWave(S.dacListIDs + S.adcListIDs, ";")
 	findDuplicates /z /free /rt = syncIDs IDs
 	instrIDs = textWavetolist(syncIDs)
@@ -783,7 +783,7 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
 	scv_setSetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
 	
 	// Set variables with some calculation
-    scv_setFreq2(S) 		// Sets S.samplingFreq/measureFreq/numADCs	
+    scv_setFreq2(S=S) 		// Sets S.samplingFreq/measureFreq/numADCs	
     scv_setNumptsSweeprateDuration(S) 	// Checks that either numpts OR sweeprate OR duration was provided, and sets ScanVars accordingly
                                 // Note: Valid for start/fin only (uses S.startx, S.finx NOT S.startxs, S.finxs)
                                 
@@ -791,7 +791,7 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
    if(!x_only)
    		S.channelsy = scu_getChannelNumbers(channelsy, fastdac=1)
 			S.y_label = scu_getDacLabel(S.channelsy, fastdac=1)
-			S.dacListIDs_y = scc_checkDeviceNumber(S, check_y = 1)
+			S.dacListIDs_y = scc_checkDeviceNumber(S=S, check_y = 1)
    endif
                                                             
 end
@@ -889,29 +889,67 @@ function scv_setFreq(S)
    S.measureFreq = S.samplingFreq/S.numADCs  //Because sampling is split between number of ADCs being read //TODO: This needs to be adapted for multiple FastDacs
 end
 
-function scv_setFreq2(S)
+function scv_setFreq2([S,A])
 	// Set S.samplingFreq, S.numADCs, S.measureFreq //changing it to account for masterslave
 	Struct ScanVars &S
-	int i
-	for(i=0; i<itemsInList(S.instrIDs); i++)
-		string fdIDname = stringfromlist(i,S.instrIDs)
+	Struct AWGvars &A
+	int i; string instrIDs
+	
+	if(paramisdefault(A))
+		instrIDs = S.instrIDs
+	else
+		instrIDs = A.instrIDs
+	endif
+	
+	//string instrIDs =selectstring(paramisdefault(A), A.instrIDs, S.instrIDs)
+	
+	for(i=0; i<itemsInList(instrIDs); i++)
+		string fdIDname = stringfromlist(i,instrIDs)
 		nvar fdID = $fdIDname
 		variable check_speed = getfadcSpeed(fdID)
 		if(i==0)
 			variable old_check = getfadcSpeed(fdID)
 		endif
 		if(check_speed != old_check)
-			S.instrIDs = replaceString(";",S.instrIDs, " ") 
-			abort "please set " + S.instrIDs + "to the same speed"
+			instrIDs = replaceString(";",instrIDs, " ") 
+			abort "please set " + instrIDs + " to the same speed"
 		endif
 		
-		if(i==itemsInList(S.instrIDs)-1)
-			   S.samplingFreq = check_speed
+		if(i==itemsInList(instrIDs)-1)
+			if(paramisdefault(A))
+			   	S.samplingFreq = check_speed
    				S.measureFreq = S.samplingFreq/S.maxADCs
+   			else
+   				A.samplingFreq = check_speed
+   				A.measureFreq = A.samplingFreq/A.maxADCs
+   			endif
 		endif
 	endfor
 end
 
+
+//function awg_setFreq(S)
+//	// Set S.samplingFreq, S.numADCs, S.measureFreq //changing it to account for masterslave
+//	Struct AWGVars &S
+//	int i
+//	for(i=0; i<itemsInList(S.channels, ","); i++)
+//		string fdIDname = stringfromlist(i,S.channels) //wrong
+//		nvar fdID = $fdIDname
+//		variable check_speed = getfadcSpeed(fdID)
+//		if(i==0)
+//			variable old_check = getfadcSpeed(fdID)
+//		endif
+//		if(check_speed != old_check)
+//			S.channels = replaceString(";",S.instrIDs, " ") 
+//			abort "please set " + S.instrIDs + "to the same speed"
+//		endif
+//		
+//		if(i==itemsInList(S.instrIDs)-1)
+//			   S.samplingFreq = check_speed
+//   				S.measureFreq = S.samplingFreq/S.maxADCs
+//		endif
+//	endfor
+//end
 
 
 
@@ -2505,8 +2543,8 @@ EndMacro
 function scw_setupsquarewave(action) : Buttoncontrol
 	string action
 	wave /t awgsetvalstr, LIvalstr0, awgvalstr, awgvalstr0, awgvalstr1
-	svar sc_fdID, sc_freqAW0, sc_freqAW1
-	nvar sc_wnumawg, fdID = $sc_fdID
+	svar sc_freqAW0, sc_freqAW1, sc_fdackeys
+	nvar sc_wnumawg
 	
 	int i, j=0, num_amps = dimsize(awgvalstr,0) - 1
 	make /free /n=(num_amps) amps = 0
@@ -2534,7 +2572,12 @@ function scw_setupsquarewave(action) : Buttoncontrol
 	
 	times /= 1000
 	
-	setFdacAWGSquareWave(fdID, amps, times, sc_wnumawg)
+	int numDevices = str2num(stringbyKey("numDevices", sc_fdackeys, ":", ","))
+	for(i=0; i<numDevices; i++)
+		nvar fdID = $(stringbyKey("name"+num2str(i+1), sc_fdackeys, ":", ","))
+		setFdacAWGSquareWave(fdID, amps, times, sc_wnumawg, verbose = 0)
+	endfor
+	printf "Set square wave on fdAW_%d\r", sc_wnumawg
 	
 	if (sc_wnumawg == 0)
 		awgvalstr0[1,j][0] = num2str(amps[p-1])
@@ -2575,11 +2618,11 @@ function scw_setupAWG(action) : Buttoncontrol
 	
 	wave /t awgsetvalstr
 	nvar fdID = $(awgsetvalstr[0][1])
-	string AWs = awgsetvalstr[1][1]
-	string channels = awgsetvalstr[2][1]
+	string channels_AW0 = awgsetvalstr[1][1]
+	string channels_AW1 = awgsetvalstr[2][1]
 	variable Cycles = str2num(awgsetvalstr[3][1])
 	
-	setupAWG(fdID, AWs=AWs, channels=channels, numCycles=Cycles, verbose=1)
+	setupAWG(channels_AW0 = channels_AW0, channels_AW1 = channels_AW1, numCycles=Cycles, verbose=1)
 end
 
 function scw_clearAWinputs(action) : Buttoncontrol
@@ -2594,9 +2637,7 @@ end
 function scw_setupLockIn(action) : Buttoncontrol
 	string action
 	wave /t LIvalstr, LIvalstr0,awgvalstr0
-	svar sc_fdID, sc_freqAW0
-	nvar fdID = $sc_fdID
-	
+	int i; svar sc_freqAW0,sc_fdackeys
 	
 	make /free /n=2 amps      = str2num(LIvalstr[0][1])
 	sc_freqAW0				   	= LIvalstr[1][1]
@@ -2604,26 +2645,19 @@ function scw_setupLockIn(action) : Buttoncontrol
 	string channels           = LIvalstr[2][1]
 	variable Cycles           = str2num(LIvalstr[3][1])
 	amps[1] *= -1
-	
-	setFdacAWGSquareWave(fdID, amps, times, 0)
-	setupAWG(fdID, AWs="0", channels=channels, numCycles=Cycles, verbose=1)
+	 
+	int numDevices = str2num(stringbyKey("numDevices", sc_fdackeys, ":", ","))
+	for(i=0; i<numDevices; i++)
+		nvar fdID = $(stringbyKey("name"+num2str(i+1), sc_fdackeys, ":", ","))
+		setFdacAWGSquareWave(fdID, amps, times, 0, verbose = 0)
+	endfor
+	setupAWG(channels_AW0 = channels, numCycles=Cycles, verbose=1)
 	
 	LIvalstr0[1,2][0] = num2str(amps[p-1])
 	LIvalstr0[1,2][1] = num2str(times[p-1] * 1000)
 	awgvalstr0[1,2][0] = num2str(amps[p-1])
 	awgvalstr0[1,2][1] = num2str(times[p-1] * 1000)
 	awgvalstr0[3,9][] = ""
-	
-	svar sc_fdackeys; int i
-	int numDevices = str2num(stringbyKey("numDevices", sc_fdackeys))
-	
-	for(i=0; i<numDevices; i++)
-		nvar fdID = $(stringbyKey("name"+num2str(i+1), sc_fdackeys))
-		setFdacAWGSquareWave(fdID, amps, times, 0)
-		//string channels = LIvalstr[2][1]
-		//dacs = scu_getDeviceChannels(fdID, channels)
-			
-	endfor
 end
 
 
@@ -3365,25 +3399,29 @@ function scc_checkSameDeviceFD(S, [x_only, y_only])
 end
 
 
-function /S scc_checkDeviceNumber(S, [adc, check_y])
+function /S scc_checkDeviceNumber([S,adc, check_y, channels])
 	// checks which devices are used for ramping // or which devices are recording
 	// outputs a list of IDS associated with the S.channelsx and S.ADClist
 	
 	struct ScanVars &S
 	int adc, check_y
+	string channels
 	adc = paramisDefault(adc) ? 0 : 1
 	check_y = paramisdefault(check_y) ? 0 : 1
+	string chs, key = selectstring(adc,"numDACCh","numADCCh")
 	
-	string key = selectstring(adc,"numDACCh","numADCCh")
-	string chs = selectstring(adc, selectstring(check_y,S.channelsx, S.channelsy), S.ADClist)
+	if(paramisDefault(channels))
+		chs = selectstring(adc, selectstring(check_y,S.channelsx, S.channelsy), S.ADClist)
+	else
+		chs = channels
+	endif
+	
 	chs = replaceString(",", chs, ";")
-	
 	svar sc_fdacKeys  // Holds info about connected FastDACs
 	variable numDevices = scf_getNumFDs() // checking the number of devices connected
 	variable ch,numChs
 	int i, j
 	string ch_InstrID = ""
-	
 	
 	for(i=0;i<itemsinlist(chs); i++)
 		ch = str2num(stringfromList(i, chs))
@@ -5280,9 +5318,6 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	button clearAW,pos={10,555},size={55,20},proc=scw_clearAWinputs,title="Clear", disable = 1
 	button setupAW,pos={10,525},size={55,20},proc=scw_setupsquarewave,title="Create", disable = 1
 	SetVariable sc_wnumawgBox,pos={10,499},size={55,25},value=sc_wnumawg,side=1,title ="\Z14AW", help={"0 or 1"}, disable = 1
-	SetVariable sc_fdIDBox, pos={10,465},size={55,20}, value=sc_fdID ,side=1,title="\Z14fdID"
-	
-	
 	SetVariable sc_freqBox0, pos={6,500},size={40,20}, value=sc_freqAW0 ,side=0,title="\Z14 ", disable = 1, help = {"Shows the frequency of AW0"}
 	SetVariable sc_freqBox1, pos={6,500},size={40,20}, value=sc_freqAW1 ,side=1,title="\Z14 ", disable = 1, help = {"Shows the frequency of AW1"}
 	button setupAWGfdac,pos={260,555},size={110,20},proc=scw_setupAWG,title="Setup AWG", disable = 1
@@ -5316,15 +5351,12 @@ Function TabProc(tca) : TabControl
 				ModifyControl sc_wnumawgBox disable=!isTab1
 				
 			elseif(tabNumAW == 1)
-				
-				ModifyControl sc_fdIDbox disable = isTab1
 				ModifyControl awglist0 disable=!isTab1
 				ModifyControl sc_freqBox0 disable =!isTab1
 				ModifyControl freqtextbox disable =!isTab1
 				ModifyControl Hztextbox disable =!isTab1
 				
 			elseif(tabNumAW==2)	
-				ModifyControl sc_fdIDbox disable = isTab1
 				ModifyControl awglist1 disable=!isTab1
 				ModifyControl sc_freqBox1 disable =!isTab1
 				ModifyControl freqtextbox disable =!isTab1
@@ -5354,7 +5386,6 @@ Function TabProc2(tca) : TabControl
 			ModifyControl clearAW disable=!isTab0
 			ModifyControl setupAW disable=!isTab0
 			ModifyControl sc_wnumawgBox disable=!isTab0
-			ModifyControl sc_fdIDbox disable=!isTab0
 			ModifyControl sc_freqBox0 disable = !isTab1
 			ModifyControl sc_freqBox1 disable = !isTab2
 			ModifyControl awglist0 disable=!isTab1
@@ -5644,9 +5675,9 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	
 	// create waves for AWGset
 	make/o/t/n=(4,2) AWGsetvalstr
-	AWGsetvalstr[0][0] = "fdID"
-	AWGsetvalstr[1][0] = "AWs"
-	AWGsetvalstr[2][0] = "Channels"
+	AWGsetvalstr[0][0] = "no ID any"
+	AWGsetvalstr[1][0] = "AW0 Chs"
+	AWGsetvalstr[2][0] = "AW1 Chs"
 	AWGsetvalstr[3][0] = "Cycles"
 	AWGsetvalstr[][1] = ""
 	
@@ -5667,7 +5698,6 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	string   /g sc_freqAW1 = ""
 	string   /g sc_nfreq = "60,180,300"
 	string   /g sc_nQs = "50,150,250"
-	string   /g sc_fdID = "" 
 
 	// clean up
 	killwaves fdacval0,fdacval1,fdacval2,fdacval3,fdacval4
