@@ -1551,11 +1551,13 @@ function setupAWG([channels_AW0, channels_AW1, numCycles, verbose])
 	elseif(ParamIsDefault(channels_AW0) && !ParamisDefault(channels_AW1))
 		S.AW_Waves = "1"
 		S.channels_AW1 = scu_getChannelNumbers(channels_AW1, fastdac=1)
+		S.channels_AW0 = ""
 		S.numWaves = 1
 	elseif(!ParamIsDefault(channels_AW0) && ParamisDefault(channels_AW1))
 		S.AW_Waves = "0"
-		S.numWaves = 1
 		S.channels_AW0 = scu_getChannelNumbers(channels_AW0, fastdac=1)
+		S.channels_AW1 = ""
+		S.numWaves = 1
 	else
 		S.AW_Waves = "0,1"
 		S.channels_AW1 = scu_getChannelNumbers(channels_AW1, fastdac=1)
@@ -1564,7 +1566,7 @@ function setupAWG([channels_AW0, channels_AW1, numCycles, verbose])
 	endif
 	
 	S.channels_AW1 = ReplaceString(";", S.channels_AW1, ",")
-	S.channels_AW0= ReplaceString(";", S.channels_AW1, ",")   
+	S.channels_AW0= ReplaceString(";", S.channels_AW0, ",")   
 	
 	//S.AW_DACs = selectstring(paramisdefault(channels), channels, S.AW_Dacs) //im not using this // Formatted 01,23  == wave 0 on channels 0 and 1, wave 1 on channels 2 and 3
 	S.numCycles = paramisDefault(numCycles) ? S.numCycles : numCycles
@@ -1614,8 +1616,8 @@ function setupAWG([channels_AW0, channels_AW1, numCycles, verbose])
 	string dacs4wave, dac_list, aw_num
 	for(i=0;i<S.numWaves;i++)
 		aw_num = stringfromlist(i, S.AW_Waves, ",")
-		dacs4wave = selectstring(i, S.channels_AW0, S.channels_AW1)
-		sprintf buffer "%s\tAW%s on channel(s) %s\r", buffer, aw_num, channels
+		dacs4wave = selectstring(i, channels_AW0, channels_AW1)
+		sprintf buffer "%s\tAW%s on channel(s) %s\r", buffer, aw_num, dacs4wave
 	endfor 
 
 	variable awFreq = 1/(s.waveLen/S.measureFreq)

@@ -2542,7 +2542,7 @@ EndMacro
 
 function scw_setupsquarewave(action) : Buttoncontrol
 	string action
-	wave /t awgsetvalstr, LIvalstr0, awgvalstr, awgvalstr0, awgvalstr1
+	wave /t LIvalstr0, awgvalstr, awgvalstr0, awgvalstr1
 	svar sc_freqAW0, sc_freqAW1, sc_fdackeys
 	nvar sc_wnumawg
 	
@@ -2592,24 +2592,6 @@ function scw_setupsquarewave(action) : Buttoncontrol
 		awgvalstr0[j+1,INF][] = ""
 		sc_freqAW1 = num2str(1/sum(times))
 	endif
-	
-	//for populating AWs
-	j=1
-	for(i=0; i<=itemsInList(awgsetvalstr[1][1], ","); i++)
-		if(!cmpstr(stringFromList(i, awgsetvalstr[1][1], ","), num2str(sc_wnumawg)))
-			j=0
-			break
-		endif
-	endfor
-		
-	if(j==1)
-		if (cmpstr(awgsetvalstr[1][1], ""))
-		awgsetvalstr[1][1] += "," + num2str(sc_wnumawg)
-		else
-		awgsetvalstr[1][1] += num2str(sc_wnumawg)
-		endif
-	endif
-	
 end
 
 
