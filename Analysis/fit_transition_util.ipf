@@ -29,7 +29,7 @@ function master_fit_multiple(dat_min_max, refit, dotcondcentering, kenner_out, [
 	
 	make_scanvar_table_from_dats(dat_min_max)
 	wave scanvar_table
-	variable scanvar_table_column_offset = 3
+	variable scanvar_table_column_offset = 11
 	insertpoints /M=1 scanvar_table_column_offset, 6, scanvar_table
 
 	variable scanvar_row = 0
