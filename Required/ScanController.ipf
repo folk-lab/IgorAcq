@@ -1,5 +1,7 @@
 ipf#pragma rtGlobals=3		// Use modern global access method and strict wave access.
 
+#include <Reduce Matrix Size>
+
 // Scan Controller routines for 1d and 2d scans
 // Version 1.7 August 8, 2016
 // Version 1.8 XXXX X, 2017
