@@ -418,7 +418,7 @@ function /wave fd_getfd_keys_vals(datnum, [number_of_fastdac])
 	string fast_dac_string
 	
 	variable num_keys_in_fd
-	string key_in_fd, val_in_fd
+	string keys_in_fd, key_in_fd, DAC_num_index
 
 	make /free /n=(number_of_fastdac*8) all_dac_vals
 	int index
@@ -434,15 +434,21 @@ function /wave fd_getfd_keys_vals(datnum, [number_of_fastdac])
 			
 			JSONXOP_GetKeys jsonId, fast_dac_string, DAC_keys
 			
-			key_in_fd = textWave2StrArray(DAC_keys)
-			num_keys_in_fd = ItemsInList(key_in_fd,  ",")
+			keys_in_fd = textWave2StrArray(DAC_keys)
+			num_keys_in_fd = ItemsInList(keys_in_fd,  ",")
 						
 			for (j=5; j < num_keys_in_fd - 3; j++)
+				key_in_fd = StringFromList(j, keys_in_fd, ",")
+				key_in_fd = removeLiteralQuotes(key_in_fd)
+				JSONXOP_GetValue/V fd_id, key_in_fd
+				
+				// calculate index based on DAC index value
+				// keys returned by JSONXOP_GetKeys are in alphabetical order. NOT in the order placed in scanvars.
+				DAC_num_index = StringFromList(0, key_in_fd, "{")
+				DAC_num_index = DAC_num_index[3,INF]
+				
+				all_dac_vals[str2num(DAC_num_index)] = V_value
 				index += 1
-				val_in_fd = StringFromList(j, key_in_fd, ",")
-				val_in_fd = removeLiteralQuotes(val_in_fd)
-				JSONXOP_GetValue/V fd_id, val_in_fd
-				all_dac_vals[index] = V_value
 			endfor
 
 		endfor
@@ -487,7 +493,7 @@ function make_scanvar_table_from_dats(dat_min_max)
 			scanvar_table_slice[2] = scanvar_variable
 			
 			wave dac_vals = fd_getfd_keys_vals(datnum, number_of_fastdac = 3)
-			scanvar_table_slice[3, 3+8*3] = dac_vals[p - 2]
+			scanvar_table_slice[3, 3+8*3] = dac_vals[p - 3]
 			
 			scanvar_table[scanvar_row][] = scanvar_table_slice[q]
 
