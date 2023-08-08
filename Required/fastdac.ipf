@@ -1885,36 +1885,58 @@ function/s fd_start_sweep(S, [AWG_list])
 		string cmd = ""
 	
 		if(S.sync)
-			//checking the need for a fakeramp
-			
-			if(!cmpstr(dacs,"")) //&& whichlistitem(fdIDname, S.fakerampIDs) != -1) //two checks (redundant), but maybe only one is needed
-				///find global value of channel 0 in that ID, set it to start and fin, and dac = 0
-				string value = num2str(getfdacOutput(fdID,0, same_as_window = 0)) //this gave me the start and fins and dac
-				starts = value //changing this would mean i have to change it back
-				fins = value // same for this
-				dacs = "0"  //same for this?
-			endif
+			if (S.readVsTime == 1)
+				sprintf cmd, "SPEC_ANA,%s,%s\r", adcs, num2istr(S.numptsx)
+			else
+				//checking the need for a fakeramp
+				if(!cmpstr(dacs,""))
+					///find global value of channel 0 in that ID, set it to start and fin, and dac = 0
+					string value = num2str(getfdacOutput(fdID,0, same_as_window = 0)) //this gave me the start and fins and dac
+					starts = value //changing this would mean i have to change it back
+					fins = value // same for this
+					dacs = "0"  //same for this?
+				endif
 		
-			//checking the need for fake recordings
-			if(itemsInList(adcs) != S.maxADCs)				
-				int j = 0
-				
-				do	
-					if(whichlistItem(num2str(j),adcs) == -1)
-						adcs = addListItem(num2str(j), adcs,";", INF)
-						S.fakeRecords = replaceStringByKey(fdIDname, S.fakeRecords, stringbykey(fdIDname, S.fakeRecords) + num2str(j))
+				//checking the need for fake recordings
+				if(itemsInList(adcs) != S.maxADCs)				
+					int j = 0
+						
+					do	
+						if(whichlistItem(num2str(j),adcs) == -1)
+							adcs = addListItem(num2str(j), adcs,";", INF)
+							S.fakeRecords = replaceStringByKey(fdIDname, S.fakeRecords, stringbykey(fdIDname, S.fakeRecords) + num2str(j))
 
+						endif
+						j++
+					while (itemsInList(adcs) != S.maxADCs)			
+				endif
+			
+				adcs = replacestring(";",adcs,"")
+				S.adcLists = replacestringbykey(fdIDname, S.adcLists, adcs)
+				string AW_dacs
+				if(!paramisDefault(AWG_list) && AWG_List.use_AWG == 1 && AWG_List.lims_checked == 1)
+					string AW0_dacs = scu_getDeviceChannels(fdID, AWG_list.channels_AW0)
+					string AW1_dacs = scu_getDeviceChannels(fdID, AWG_list.channels_AW1)
+					
+					if(!cmpstr(AW0_dacs,"") && !cmpstr(AW1_dacs,""))
+						// i need to figure out a fake approach here
+					elseif(cmpstr(AW1_dacs,""))
+						AW_dacs = AW1_dacs
+					elseif(cmpstr(AW0_dacs,""))
+						AW_dacs = AW0_dacs
+					else
+						AW_dacs = AW0_dacs + "," + AW1_dacs
 					endif
-					j++
-				while (itemsInList(adcs) != S.maxADCs)			
+					// how does it know which AW to use, 0 or 1?
+
+					sprintf cmd, "AWG_RAMP,%d,%s,%s,%s,%s,%s,%d,%d\r", AWG_list.numWaves, AW_dacs, dacs, adcs, starts, fins, AWG_list.numCycles, AWG_list.numSteps
+				else			
+					sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, starts, fins, S.numptsx
+				endif
 			endif
-			
-			adcs = replacestring(";",adcs,"")
-			S.adcLists = replacestringbykey(fdIDname, S.adcLists, adcs)
-			
-			sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, starts, fins, S.numptsx
-			// might need the channels picked for the fake recordings stored somewhere
 		else
+		/// need to make sure this is never passed.
+		
 			adcs = replacestring(";",adcs,"")
 			S.adcLists = replacestringbykey(fdIDname, S.adcLists, adcs)
 			if (!paramisDefault(AWG_list) && AWG_List.use_AWG == 1 && AWG_List.lims_checked == 1)  
@@ -1933,14 +1955,6 @@ function/s fd_start_sweep(S, [AWG_list])
 			
 				sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, starts, fins, S.numptsx
 			endif
-		endif
-		
-		//Tim and Josh are right, it seems to retrieve data with no issue. 
-		
-		if(i == 0 || i == 1)
-			cmd = "AWG_RAMP,2,0,1,2,01,0,1000,1,100\r"
-		else
-			cmd = "INT_RAMP,2,01,0,1000,24390\r"
 		endif
 		
 		writeInstr(fdID,cmd)
