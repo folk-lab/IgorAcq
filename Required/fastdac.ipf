@@ -1546,14 +1546,15 @@ function setupAWG([channels_AW0, channels_AW1, numCycles, verbose])
 	struct AWGVars S
 	fd_getGlobalAWG(S)
 	string channels
-	if(ParamIsDefault(channels_AW0) && ParamisDefault(channels_AW1))
+	if(!cmpstr(channels_AW0, "") && !cmpstr(channels_AW1,""))
 		abort "atleast one channel should be specified"
-	elseif(ParamIsDefault(channels_AW0) && !ParamisDefault(channels_AW1))
+	elseif(!cmpstr(channels_AW0, "") && cmpstr(channels_AW1, ""))
 		S.AW_Waves = "1"
 		S.channels_AW1 = scu_getChannelNumbers(channels_AW1, fastdac=1)
 		S.channels_AW0 = ""
 		S.numWaves = 1
-	elseif(!ParamIsDefault(channels_AW0) && ParamisDefault(channels_AW1))
+		
+	elseif(cmpstr(channels_AW0, "") && !cmpstr(channels_AW1, ""))
 		S.AW_Waves = "0"
 		S.channels_AW0 = scu_getChannelNumbers(channels_AW0, fastdac=1)
 		S.channels_AW1 = ""
@@ -1614,8 +1615,11 @@ function setupAWG([channels_AW0, channels_AW1, numCycles, verbose])
 	variable j = 0
 	string buffer = ""
 	string dacs4wave, dac_list, aw_num
-	for(i=0;i<S.numWaves;i++)
-		aw_num = stringfromlist(i, S.AW_Waves, ",")
+	for(i=0;i<2;i++)
+		aw_num = num2str(i)
+		if((i == 0 && !cmpstr(channels_AW0, "")) || (i == 1 && !cmpstr(channels_AW1, "")))
+			continue
+		endif
 		dacs4wave = selectstring(i, channels_AW0, channels_AW1)
 		sprintf buffer "%s\tAW%s on channel(s) %s\r", buffer, aw_num, dacs4wave
 	endfor 
@@ -1913,13 +1917,22 @@ function/s fd_start_sweep(S, [AWG_list])
 			
 				adcs = replacestring(";",adcs,"")
 				S.adcLists = replacestringbykey(fdIDname, S.adcLists, adcs)
-				string AW_dacs
+				string AW_dacs; int numWaves
 				if(!paramisDefault(AWG_list) && AWG_List.use_AWG == 1 && AWG_List.lims_checked == 1)
 					string AW0_dacs = scu_getDeviceChannels(fdID, AWG_list.channels_AW0)
 					string AW1_dacs = scu_getDeviceChannels(fdID, AWG_list.channels_AW1)
 					
 					if(!cmpstr(AW0_dacs,"") && !cmpstr(AW1_dacs,""))
 						// i need to figure out a fake approach here
+						for(j=0 ; j<8 ; j++)
+							if(whichlistItem(num2str(j),dacs) == -1)
+								value = num2str(getfdacOutput(fdID,j, same_as_window = 0))
+								AW_dacs = num2str(j)
+								//setup squarewave to have this output
+								setupfakesquarewave(fdID, str2num(value))
+								break
+							endif
+						endfor
 					elseif(cmpstr(AW1_dacs,""))
 						AW_dacs = AW1_dacs
 					elseif(cmpstr(AW0_dacs,""))
@@ -1957,7 +1970,7 @@ function/s fd_start_sweep(S, [AWG_list])
 			endif
 		endif
 		
-		writeInstr(fdID,cmd)
+		//writeInstr(fdID,cmd)
 	endfor
 	
 	return cmd

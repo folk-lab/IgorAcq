@@ -2540,6 +2540,35 @@ Window ScanController(v_left,v_right,v_top,v_bottom) : Panel
 EndMacro
 
 
+function setupfakesquarewave(fdID, value)
+	variable fdID, value
+	wave /t awgvalstr0
+	
+	int i, j=0, num_amps = dimsize(awgvalstr0,0) - 1
+	make /free /n=(num_amps) amps = value
+	make /free /n=(num_amps) times = 0
+	 
+	for(i=1; i <= num_amps; i++)
+		//checks for empty str or invalid inputs in scancontroller window
+		variable amp_time = str2num(awgvalstr0[i][1])
+		
+		if(numtype(amp_time) == 0)	
+		   if(amp_time != 0)
+         		times[j] = amp_time
+         		j++
+         	endif
+		endif		
+	endfor
+	
+	//removing zero valued rows and changing times to seconds
+	deletepoints j, num_amps-j, amps
+	deletepoints j, num_amps-j, times
+	times /= 1000
+	setFdacAWGSquareWave(fdID, amps, times, 0, verbose = 0)
+end
+
+
+
 function scw_setupsquarewave(action) : Buttoncontrol
 	string action
 	wave /t LIvalstr0, awgvalstr, awgvalstr0, awgvalstr1
@@ -2603,6 +2632,41 @@ function scw_setupAWG(action) : Buttoncontrol
 	string channels_AW0 = awgsetvalstr[1][1]
 	string channels_AW1 = awgsetvalstr[2][1]
 	variable Cycles = str2num(awgsetvalstr[3][1])
+	
+	channels_AW0 = replaceString(" ", channels_AW0, "")
+	if(!cmpstr(channels_AW0, ""))
+		wave /t awgvalstr1; svar sc_fdackeys
+		int i, j=0, num_amps = dimsize(awgvalstr1,0) - 1
+		make /free /n=(num_amps) amps = 0
+		make /free /n=(num_amps) times = 0
+	
+		for(i=1; i <= num_amps; i++)
+			//checks for empty str or invalid inputs in scancontroller window
+			variable amp      = str2num(awgvalstr1[i][0])
+			variable amp_time = str2num(awgvalstr1[i][1])
+		
+			if(numtype(amp) == 0 && numtype(amp_time) == 0)	
+		   		if(amp_time != 0)
+		   			amps[j]  = amp
+         			times[j] = amp_time
+         			j++
+         		endif
+			endif		
+	
+		endfor
+	
+		//removing zero valued rows and changing times to seconds
+		deletepoints j, num_amps-j, amps
+		deletepoints j, num_amps-j, times
+	
+		times /= 1000
+	
+		int numDevices = str2num(stringbyKey("numDevices", sc_fdackeys, ":", ","))
+		for(i=0; i<numDevices; i++)
+			nvar fdID = $(stringbyKey("name"+num2str(i+1), sc_fdackeys, ":", ","))
+			setFdacAWGSquareWave(fdID, amps, times, 0, verbose = 0)
+		endfor
+	endif
 	
 	setupAWG(channels_AW0 = channels_AW0, channels_AW1 = channels_AW1, numCycles=Cycles, verbose=1)
 end
@@ -3578,7 +3642,7 @@ function scc_CheckAWG(AWG, S)
 	string AWGchannels = addlistitem(AWG.channels_AW0, AWG.channels_AW1, ",")
 	for(i=0;i<itemsinlist(AWGchannels, ",");i++)
 		channel = stringfromlist(i, AWGchannels, ",")
-		if(findlistitem(channel, FDchannels, ",") != -1)
+		if(findlistitem(channel, FDchannels, ",") != -1 && cmpstr(channel,""))
 			abort "ERROR[scc_CheckAWG]: Trying to use same DAC channel for FD scan and AWG at the same time"
 		endif
 	endfor
