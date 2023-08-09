@@ -2617,9 +2617,11 @@ function scw_setupsquarewave(action) : Buttoncontrol
 end
 
 
-function scw_setupAWG(action) : Buttoncontrol
+function scw_setupAWG(action, [instrID, mapOnetoZero]) : Buttoncontrol
 	string action
+	variable instrID, mapOnetoZero
 	
+	mapOnetoZero = paramisdefault(mapOnetoZero) ? 0 : 1
 	wave /t awgsetvalstr, awgvalstr0, awgvalstr1
 	nvar fdID = $(awgsetvalstr[0][1])
 	string channels_AW0 = awgsetvalstr[1][1]
@@ -2653,6 +2655,11 @@ function scw_setupAWG(action) : Buttoncontrol
 	svar sc_fdackeys
 	
 	for(k=0 ; k<2; k++)
+		
+		if(mapOnetoZero)
+			k=1
+		endif
+		
 		make /o /free /n=(num_amps) amps = 0
 		make /o /free /n=(num_amps) times = 0
 		int j=0
@@ -2678,15 +2685,23 @@ function scw_setupAWG(action) : Buttoncontrol
 		
 		times /= 1000
 		
-		int numDevices = str2num(stringbyKey("numDevices", sc_fdackeys, ":", ","))
-		for(i=0; i<numDevices; i++)
-			nvar fdID = $(stringbyKey("name"+num2str(i+1), sc_fdackeys, ":", ","))
-			setFdacAWGSquareWave(fdID, amps, times, k, verbose = 0)
-		endfor
-		printf "Set square wave on fdAW_%d\r", k
+		if(paramisdefault(instrID))
+			int numDevices = str2num(stringbyKey("numDevices", sc_fdackeys, ":", ","))
+			for(i=0; i<numDevices; i++)
+				nvar fdID = $(stringbyKey("name"+num2str(i+1), sc_fdackeys, ":", ","))
+				setFdacAWGSquareWave(fdID, amps, times, k, verbose = 0)
+			endfor
+			printf "Set square wave on fdAW_%d\r", k
+		elseif(mapOnetoZero)
+			setFdacAWGSquareWave(instrID, amps, times, 0, verbose = 0)
+		else
+			setFdacAWGSquareWave(instrID, amps, times, k, verbose = 0)
+		endif
 	endfor
-		
-	setupAWG(channels_AW0 = channels_AW0, channels_AW1 = channels_AW1, numCycles=Cycles, verbose=1)
+	
+	if(paramisdefault(instrID) && paramisdefault(mapOnetoZero))	
+		setupAWG(channels_AW0 = channels_AW0, channels_AW1 = channels_AW1, numCycles=Cycles, verbose=1)
+	endif
 end
 
 function scw_clearAWinputs(action) : Buttoncontrol
@@ -3226,6 +3241,27 @@ function CheckAWG(AWG, S)
 	// Check AWG for clashes/exceeding lims etc
 	scc_CheckAWG(AWG, S)	
 	AWG.lims_checked = 1
+	
+	
+//	//check for any use of AW1 without AWO per ID
+//	int i
+//	for(i=0 ; i <itemsinlist(S.instrIDs); i++)
+//		nvar fdID = $(stringfromlist(i, S.instrIDs)) 
+//		string AW0_dacs = scu_getDeviceChannels(fdID, AWG_list.channels_AW0)
+//		string AW1_dacs = scu_getDeviceChannels(fdID, AWG_list.channels_AW1)
+//					
+//		if(!cmpstr(AW0_dacs,"") && !cmpstr(AW1_dacs,""))
+//					elseif(cmpstr(AW1_dacs,""))
+//						AW_dacs = AW1_dacs
+//						//abort "[fd_start_sweep] Trying to run AWG with only AW1, somewhere in the setup process this should have been mapped to AW0"
+//						scw_setupAWG("setupAWG", instrID = fdID, mapOnetoZero = 1)
+//					elseif(cmpstr(AW0_dacs,""))
+//						AW_dacs = AW0_dacs
+//					else
+//						AW_dacs = AW0_dacs + "," + AW1_dacs
+//					endif
+//					// how does it know which AW to use, 0 or 1?
+	
 	
 end
 
@@ -4606,7 +4642,9 @@ function scfd_SendCommandAndRead(S, AWG_list, rowNum)
 		for(i=0;i<itemsinlist(S.instrIDs);i++)
 			fdIDname = stringfromlist(i, S.instrIDs)
 			nvar fdID = $fdIDname
-			rampmultiplefdac(fdID, AWG_list.AW_DACs, 0)
+			string AW_dacs = scu_getDeviceChannels(fdID, AWG_list.channels_AW0)
+			AW_dacs += "," + scu_getDeviceChannels(fdID, AWG_list.channels_AW1)
+			rampmultiplefdac(fdID, AW_dacs, 0)
 		endfor
 	endif
 end

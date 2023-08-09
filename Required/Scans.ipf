@@ -366,8 +366,7 @@ function ScanFastDAC2(start, fin, channels, [numptsx, sweeprate, delay, ramprate
 	// Check software limits and ramprate limits
 	PreScanChecksFD2(S)  
 	
-	// sets master/slave between the devices that are used.
-	set_master_slave(S)
+
 	
   	// If using AWG then get that now and check it
 	struct AWGVars AWG
@@ -377,6 +376,9 @@ function ScanFastDAC2(start, fin, channels, [numptsx, sweeprate, delay, ramprate
 	endif
 	SetAWG(AWG, use_AWG)
 
+	// sets master/slave between the devices that are used.
+	set_master_slave(S)
+	
 	// Ramp to start without checks since checked above
 	RampStartFD(S, ignore_lims = 1) //ramp_smart for ramping to starting value. This does not get affected by 
 
