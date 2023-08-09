@@ -1545,6 +1545,8 @@ function setupAWG([channels_AW0, channels_AW1, numCycles, verbose])
 	
 	struct AWGVars S
 	fd_getGlobalAWG(S)
+	channels_AW0 = selectString(paramisdefault(channels_AW0), channels_AW0, "")
+	channels_AW1 = selectString(paramisdefault(channels_AW1), channels_AW1, "")
 	string channels
 	string channels_AW0_check = scu_getChannelNumbers(channels_AW0, fastdac=1)
 	string channels_AW1_check = scu_getChannelNumbers(channels_AW1, fastdac=1)
