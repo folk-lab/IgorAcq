@@ -2623,10 +2623,9 @@ function scw_setupAWG(action, [instrID, mapOnetoZero]) : Buttoncontrol
 	
 	mapOnetoZero = paramisdefault(mapOnetoZero) ? 0 : 1
 	wave /t awgsetvalstr, awgvalstr0, awgvalstr1
-	nvar fdID = $(awgsetvalstr[0][1])
-	string channels_AW0 = awgsetvalstr[1][1]
-	string channels_AW1 = awgsetvalstr[2][1]
-	variable Cycles = str2num(awgsetvalstr[3][1])
+	string channels_AW0 = awgsetvalstr[0][1]
+	string channels_AW1 = awgsetvalstr[1][1]
+	variable Cycles = str2num(awgsetvalstr[2][1])
 	string question = ""
 	string channels_AW0_check = scu_getChannelNumbers(channels_AW0, fastdac=1)
 	
@@ -2640,10 +2639,10 @@ function scw_setupAWG(action, [instrID, mapOnetoZero]) : Buttoncontrol
 			duplicate /t /free awgvalstr0 awgvalstr0copy 
 			awgvalstr0 = awgvalstr1
 			awgvalstr1 = awgvalstr0copy
-			awgsetvalstr[1][1] = channels_AW1
-			awgsetvalstr[2][1] = channels_AW0
-			channels_AW0 = awgsetvalstr[1][1]
-			channels_AW1 = awgsetvalstr[2][1]	
+			awgsetvalstr[0][1] = channels_AW1
+			awgsetvalstr[1][1] = channels_AW0
+			channels_AW0 = awgsetvalstr[0][1]
+			channels_AW1 = awgsetvalstr[1][1]	
 		else
 			abort "AWG not set up"
 		endif
@@ -5409,7 +5408,7 @@ window FastDACWindow(v_left,v_right,v_top,v_bottom) : Panel
 	ListBox awglist1,pos={70,455},size={140,120},fsize=14,frame=2,widths={40,60}, disable = 1
 	ListBox awglist1,listwave=root:awgvalstr1,selwave=root:awgattr1,mode=1
 	
-	ListBox awgsetlist,pos={223,455},size={147,95},fsize=14,frame=2,widths={50,40}, disable = 1
+	ListBox awgsetlist,pos={223,479},size={147,71},fsize=14,frame=2,widths={50,40}, disable = 1
 	ListBox awgsetlist,listwave=root:awgsetvalstr,selwave=root:awgsetattr,mode=1
 	
 	titleBox freqtextbox, pos={10,480}, size={100, 20}, title="Frequency", frame = 0, disable=1
@@ -5776,14 +5775,13 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	make/o/n=(10,2) AWGattr1 = 0
 	
 	// create waves for AWGset
-	make/o/t/n=(4,2) AWGsetvalstr
-	AWGsetvalstr[0][0] = "no ID any"
-	AWGsetvalstr[1][0] = "AW0 Chs"
-	AWGsetvalstr[2][0] = "AW1 Chs"
-	AWGsetvalstr[3][0] = "Cycles"
+	make/o/t/n=(3,2) AWGsetvalstr
+	AWGsetvalstr[0][0] = "AW0 Chs"
+	AWGsetvalstr[1][0] = "AW1 Chs"
+	AWGsetvalstr[2][0] = "Cycles"
 	AWGsetvalstr[][1] = ""
 	
-	make/o/n=(4,2) AWGsetattr = 0
+	make/o/n=(3,2) AWGsetattr = 0
 	AWGsetattr[][1] = 2
 	
 	variable /g sc_printfadc = 0
