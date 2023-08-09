@@ -1893,105 +1893,83 @@ function/s fd_start_sweep(S, [AWG_list])
 
 		string cmd = ""
 	
-		//if(S.sync)
-			if (S.readVsTime == 1)
-				sprintf cmd, "SPEC_ANA,%s,%s\r", adcs, num2istr(S.numptsx)
-			else
-				//checking the need for a fakeramp
-				int fakeChRamp = 0; string AW_dacs; int j
-				if(!cmpstr(dacs,""))
-					///find global value of channel 0 in that ID, set it to start and fin, and dac = 0
-					if(!paramisDefault(AWG_list) && AWG_List.use_AWG == 1 && AWG_List.lims_checked == 1)
-							AW_dacs = scu_getDeviceChannels(fdID, AWG_list.channels_AW0)
-							AW_dacs += "," + scu_getDeviceChannels(fdID, AWG_list.channels_AW1)
-						for(j=0 ; j<8 ; j++)
-							if(whichlistItem(num2str(j),AW_dacs, ",") == -1)
-								fakeChRamp = j
-								break
-							endif
-						endfor
-					endif
-					string value = num2str(getfdacOutput(fdID,fakeChRamp, same_as_window = 0)) //this gave me the start and fins and dac
-					starts = value //changing this would mean i have to change it back
-					fins = value // same for this
-					dacs = num2str(fakeChRamp)  //same for this?
-				endif
-		
-				//checking the need for fake recordings
-				if(itemsInList(adcs) != S.maxADCs)				
-					j = 0
-					do	
-						if(whichlistItem(num2str(j),adcs) == -1)
-							adcs = addListItem(num2str(j), adcs,";", INF)
-							S.fakeRecords = replaceStringByKey(fdIDname, S.fakeRecords, stringbykey(fdIDname, S.fakeRecords) + num2str(j))
-
-						endif
-						j++
-					while (itemsInList(adcs) != S.maxADCs)			
-				endif
-			
-				adcs = replacestring(";",adcs,"")
-				S.adcLists = replacestringbykey(fdIDname, S.adcLists, adcs)
-				int numWaves
+		if (S.readVsTime == 1)
+			sprintf cmd, "SPEC_ANA,%s,%s\r", adcs, num2istr(S.numptsx)
+		else
+			//checking the need for a fakeramp
+			int fakeChRamp = 0; string AW_dacs; int j
+			if(!cmpstr(dacs,""))
+				///find global value of channel 0 in that ID, set it to start and fin, and dac = 0
 				if(!paramisDefault(AWG_list) && AWG_List.use_AWG == 1 && AWG_List.lims_checked == 1)
-					string AW0_dacs = replacestring(",",scu_getDeviceChannels(fdID, AWG_list.channels_AW0), "")
-					string AW1_dacs = replacestring(",",scu_getDeviceChannels(fdID, AWG_list.channels_AW1), "")
-					
-					if(!cmpstr(AW0_dacs,"") && !cmpstr(AW1_dacs,""))
-						// i need to figure out a fake approach here
-						for(j=0 ; j<8 ; j++)
-							if(strsearch(num2str(j),dacs,0) == -1)
-								value = num2str(getfdacOutput(fdID,j, same_as_window = 0))
-								AW_dacs = num2str(j)
-								//setup squarewave to have this output
-								setupfakesquarewave(fdID, str2num(value))
-								break
-							endif
-						endfor
-					elseif(cmpstr(AW1_dacs,""))
-						AW_dacs = AW1_dacs
-						//abort "[fd_start_sweep] Trying to run AWG with only AW1, somewhere in the setup process this should have been mapped to AW0"
-						//should probably be passed once, not multiple repeats
-						scw_setupAWG("setupAWG", instrID = fdID, mapOnetoZero = 1)
-						AWG_list.numWaves  = 1
-					elseif(cmpstr(AW0_dacs,""))
-						AW_dacs = AW0_dacs
-						AWG_list.numWaves  = 1
-					else
-					//need to remove
-						AW_dacs = AW0_dacs + "," + AW1_dacs
-						AWG_list.numWaves  = 2
-					endif
-					// how does it know which AW to use, 0 or 1?
-
-					sprintf cmd, "AWG_RAMP,%d,%s,%s,%s,%s,%s,%d,%d\r", AWG_list.numWaves, AW_dacs, dacs, adcs, starts, fins, AWG_list.numCycles, AWG_list.numSteps
-				else			
-					sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, starts, fins, S.numptsx
+					AW_dacs = scu_getDeviceChannels(fdID, AWG_list.channels_AW0)
+					AW_dacs = addlistitem(scu_getDeviceChannels(fdID, AWG_list.channels_AW1), AW_dacs, ",", INF)
+					AW_dacs = removeSeperator(AW_dacs, ",")
+					for(j=0 ; j<8 ; j++)
+						if(whichlistItem(num2str(j),AW_dacs, ",") == -1)
+							fakeChRamp = j
+							break
+						endif
+					endfor
 				endif
+				string value = num2str(getfdacOutput(fdID,fakeChRamp, same_as_window = 0)) //this gave me the start and fins and dac
+				starts = value //changing this would mean i have to change it back
+				fins = value // same for this
+				dacs = num2str(fakeChRamp)  //same for this?
 			endif
-//		else
-//		/// need to make sure this is never passed.
-//		
-//			adcs = replacestring(";",adcs,"")
-//			S.adcLists = replacestringbykey(fdIDname, S.adcLists, adcs)
-//			if (!paramisDefault(AWG_list) && AWG_List.use_AWG == 1 && AWG_List.lims_checked == 1)  
-//				// Example:
-//				// AWG_RAMP,2,012,345,67,0,-1000,1000,-2000,2000,50,50
-//				// Response:
-//				// <(2500 * waveform length) samples from ADC0>RAMP_FINISHED
-//				//
-//				// OPERATION, #N AWs, AW_dacs, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF Wave cycles per step, # ramp steps
-//				// Note: AW_dacs is formatted (dacs_for_wave0, dacs_for_wave1, .... e.g. '01,23' for Dacs 0,1 to output wave0, Dacs 2,3 to output wave1)
-//				sprintf cmd, "AWG_RAMP,%d,%s,%s,%s,%s,%s,%d,%d\r", AWG_list.numWaves, AWG_list.AW_dacs, dacs, adcs, starts, fins, AWG_list.numCycles, AWG_list.numSteps
-//			elseif (S.readVsTime == 1)
-//				sprintf cmd, "SPEC_ANA,%s,%s\r", adcs, num2istr(S.numptsx)
-//			else
-//				// OPERATION, DAC CHANNELS, ADC CHANNELS, INITIAL VOLTAGES, FINAL VOLTAGES, # OF STEPS
-//			
-//				sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, starts, fins, S.numptsx
-//			endif
-//		endif
+	
+			//checking the need for fake recordings
+			if(itemsInList(adcs) != S.maxADCs)				
+				j = 0
+				do	
+					if(whichlistItem(num2str(j),adcs) == -1)
+						adcs = addListItem(num2str(j), adcs,";", INF)
+						S.fakeRecords = replaceStringByKey(fdIDname, S.fakeRecords, stringbykey(fdIDname, S.fakeRecords) + num2str(j))
+
+					endif
+					j++
+				while (itemsInList(adcs) != S.maxADCs)			
+			endif
 		
+			adcs = replacestring(";",adcs,"")
+			S.adcLists = replacestringbykey(fdIDname, S.adcLists, adcs)
+			int numWaves
+			if(!paramisDefault(AWG_list) && AWG_List.use_AWG == 1 && AWG_List.lims_checked == 1)
+				string AW0_dacs = replacestring(",",scu_getDeviceChannels(fdID, AWG_list.channels_AW0), "")
+				string AW1_dacs = replacestring(",",scu_getDeviceChannels(fdID, AWG_list.channels_AW1), "")
+				
+				if(!cmpstr(AW0_dacs,"") && !cmpstr(AW1_dacs,""))
+					// i need to figure out a fake approach here
+					for(j=0 ; j<8 ; j++)
+						if(strsearch(num2str(j),dacs,0) == -1)
+							value = num2str(getfdacOutput(fdID,j, same_as_window = 0))
+							AW_dacs = num2str(j)
+							//setup squarewave to have this output
+							setupfakesquarewave(fdID, str2num(value))
+							break
+						endif
+					endfor
+				elseif(cmpstr(AW1_dacs,""))
+					AW_dacs = AW1_dacs
+					//abort "[fd_start_sweep] Trying to run AWG with only AW1, somewhere in the setup process this should have been mapped to AW0"
+					//should probably be passed once, not multiple repeats
+					scw_setupAWG("setupAWG", instrID = fdID, mapOnetoZero = 1)
+					AWG_list.numWaves  = 1
+				elseif(cmpstr(AW0_dacs,""))
+					AW_dacs = AW0_dacs
+					AWG_list.numWaves  = 1
+				else
+				//need to remove
+					AW_dacs = AW0_dacs + "," + AW1_dacs
+					AWG_list.numWaves  = 2
+				endif
+				// how does it know which AW to use, 0 or 1?
+
+				sprintf cmd, "AWG_RAMP,%d,%s,%s,%s,%s,%s,%d,%d\r", AWG_list.numWaves, AW_dacs, dacs, adcs, starts, fins, AWG_list.numCycles, AWG_list.numSteps
+			else			
+				sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, starts, fins, S.numptsx
+			endif
+		endif
+	
 		writeInstr(fdID,cmd)
 	endfor
 	return cmd

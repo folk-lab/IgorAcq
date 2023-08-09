@@ -1848,6 +1848,35 @@ Function/S removeLeadingWhitespace(str)
     return str
 End
 
+
+function/S removeSeperator(str, sep)
+	string str, sep
+	if (strlen(str) == 0)
+        return ""
+   endif
+    
+   do
+   		String lastChar = str[strlen(str) - 1]
+       if (!cmpstr(lastChar, sep))
+       	str = str[0, strlen(str) - 2]
+       else
+        	break
+       endif
+   while (strlen(str) > 0)
+   
+   do
+   		String firstChar= str[0]
+      	if (!cmpstr(firstChar, sep))
+       	str= str[1,inf]
+      	else
+         	break
+      	endif
+   while (strlen(str) > 0)
+   
+   return str
+
+end 
+
 function/S removeTrailingWhitespace(str)
     String str
 

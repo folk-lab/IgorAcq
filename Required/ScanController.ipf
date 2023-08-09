@@ -4643,7 +4643,9 @@ function scfd_SendCommandAndRead(S, AWG_list, rowNum)
 			fdIDname = stringfromlist(i, S.instrIDs)
 			nvar fdID = $fdIDname
 			string AW_dacs = scu_getDeviceChannels(fdID, AWG_list.channels_AW0)
-			AW_dacs += "," + scu_getDeviceChannels(fdID, AWG_list.channels_AW1)
+			AW_dacs = addlistitem(scu_getDeviceChannels(fdID, AWG_list.channels_AW1), AW_dacs, ",", INF)
+			removeSeperator(AW_dacs, ",")
+			AW_dacs = scu_getDeviceChannels(fdID, AW_dacs, reversal = 1)
 			rampmultiplefdac(fdID, AW_dacs, 0)
 		endfor
 	endif

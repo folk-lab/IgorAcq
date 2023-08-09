@@ -1447,7 +1447,7 @@ function ScanFastDACLS625Magnet2D2(fdID, startx, finx, channelsx, magnetID, star
 	for(i=0; i<S.numptsy; i++)
 		// Ramp slow axis
 		setpointy = sy + (i*(S.finy-S.starty)/(S.numptsy-1))	
-		setlS625fieldWait(S.instrIDy, S.starty)  // Ramprate should be set beforehand for magnets
+		setlS625fieldWait(S.instrIDy, setpointy)  // Ramprate should be set beforehand for magnets
 
 		// Ramp to start of fast axis
 		RampStartFD(S, ignore_lims=1, x_only=1)
