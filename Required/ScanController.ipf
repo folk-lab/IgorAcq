@@ -186,7 +186,7 @@ function/s scu_getChannelNumbers(channels, [fastdac])
 			ch = stringfromlist(i, channels, ",")
 			ch = removeLeadingWhitespace(ch)
 			ch = removeTrailingWhiteSpace(ch)
-			if(numtype(str2num(ch)) != 0)
+			if(numtype(str2num(ch)) != 0 && cmpstr(ch,""))
 				duplicate/o/free/t/r=[][3] fdacvalstr fdacnames
 				findvalue/RMD=[][3]/TEXT=ch/TXOP=5 fdacnames
 				if(V_Value == -1)  // Not found
@@ -2601,13 +2601,6 @@ function scw_setupsquarewave(action) : Buttoncontrol
 	
 	times /= 1000
 	
-	int numDevices = str2num(stringbyKey("numDevices", sc_fdackeys, ":", ","))
-	for(i=0; i<numDevices; i++)
-		nvar fdID = $(stringbyKey("name"+num2str(i+1), sc_fdackeys, ":", ","))
-		setFdacAWGSquareWave(fdID, amps, times, sc_wnumawg, verbose = 0)
-	endfor
-	printf "Set square wave on fdAW_%d\r", sc_wnumawg
-	
 	if (sc_wnumawg == 0)
 		awgvalstr0[1,j][0] = num2str(amps[p-1])
 		awgvalstr0[1,j][1] = num2str(times[p-1] * 1000)
@@ -2627,47 +2620,72 @@ end
 function scw_setupAWG(action) : Buttoncontrol
 	string action
 	
-	wave /t awgsetvalstr
+	wave /t awgsetvalstr, awgvalstr0, awgvalstr1
 	nvar fdID = $(awgsetvalstr[0][1])
 	string channels_AW0 = awgsetvalstr[1][1]
 	string channels_AW1 = awgsetvalstr[2][1]
 	variable Cycles = str2num(awgsetvalstr[3][1])
+	string question = ""
+	string channels_AW0_check = scu_getChannelNumbers(channels_AW0, fastdac=1)
 	
-	channels_AW0 = replaceString(" ", channels_AW0, "")
-	if(!cmpstr(channels_AW0, ""))
-		wave /t awgvalstr1; svar sc_fdackeys
-		int i, j=0, num_amps = dimsize(awgvalstr1,0) - 1
-		make /free /n=(num_amps) amps = 0
-		make /free /n=(num_amps) times = 0
 	
+	
+	if(!cmpstr(channels_AW0_check, ""))
+		sprintf question, "Cannot setup AWG with just channels for AW1, would you like to remap AW1 to AW0?"
+		int answer = ask_user(question, type=1)
+		if(answer == 1)		
+			///setup awg in reverse
+			duplicate /t /free awgvalstr0 awgvalstr0copy 
+			awgvalstr0 = awgvalstr1
+			awgvalstr1 = awgvalstr0copy
+			awgsetvalstr[1][1] = channels_AW1
+			awgsetvalstr[2][1] = channels_AW0
+			channels_AW0 = awgsetvalstr[1][1]
+			channels_AW1 = awgsetvalstr[2][1]	
+		else
+			abort "AWG not set up"
+		endif
+	endif
+	
+	
+	int k, i, num_amps = dimsize(awgvalstr0,0) - 1
+
+	svar sc_fdackeys
+	
+	for(k=0 ; k<2; k++)
+		make /o /free /n=(num_amps) amps = 0
+		make /o /free /n=(num_amps) times = 0
+		int j=0
 		for(i=1; i <= num_amps; i++)
+			wave /t AW = $("awgvalstr"+num2str(k))
 			//checks for empty str or invalid inputs in scancontroller window
-			variable amp      = str2num(awgvalstr1[i][0])
-			variable amp_time = str2num(awgvalstr1[i][1])
-		
+			variable amp      = str2num(AW[i][0])
+			variable amp_time = str2num(AW[i][1])
+			
 			if(numtype(amp) == 0 && numtype(amp_time) == 0)	
-		   		if(amp_time != 0)
-		   			amps[j]  = amp
-         			times[j] = amp_time
-         			j++
-         		endif
+			   if(amp_time != 0)
+			   		amps[j]  = amp
+	         		times[j] = amp_time
+	         		j++
+	         	endif
 			endif		
-	
+		
 		endfor
-	
+		
 		//removing zero valued rows and changing times to seconds
 		deletepoints j, num_amps-j, amps
 		deletepoints j, num_amps-j, times
-	
+		
 		times /= 1000
-	
+		
 		int numDevices = str2num(stringbyKey("numDevices", sc_fdackeys, ":", ","))
 		for(i=0; i<numDevices; i++)
 			nvar fdID = $(stringbyKey("name"+num2str(i+1), sc_fdackeys, ":", ","))
-			setFdacAWGSquareWave(fdID, amps, times, 0, verbose = 0)
+			setFdacAWGSquareWave(fdID, amps, times, k, verbose = 0)
 		endfor
-	endif
-	
+		printf "Set square wave on fdAW_%d\r", k
+	endfor
+		
 	setupAWG(channels_AW0 = channels_AW0, channels_AW1 = channels_AW1, numCycles=Cycles, verbose=1)
 end
 

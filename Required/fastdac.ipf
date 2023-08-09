@@ -1546,23 +1546,23 @@ function setupAWG([channels_AW0, channels_AW1, numCycles, verbose])
 	struct AWGVars S
 	fd_getGlobalAWG(S)
 	string channels
-	if(!cmpstr(channels_AW0, "") && !cmpstr(channels_AW1,""))
-		abort "atleast one channel should be specified"
-	elseif(!cmpstr(channels_AW0, "") && cmpstr(channels_AW1, ""))
-		S.AW_Waves = "1"
-		S.channels_AW1 = scu_getChannelNumbers(channels_AW1, fastdac=1)
-		S.channels_AW0 = ""
-		S.numWaves = 1
+	string channels_AW0_check = scu_getChannelNumbers(channels_AW0, fastdac=1)
+	string channels_AW1_check = scu_getChannelNumbers(channels_AW1, fastdac=1)
+	
+	if(!cmpstr(channels_AW0_check, "") && !cmpstr(channels_AW1_check,""))
+		abort "atleast channels for AW0 should be specified"
+	elseif(!cmpstr(channels_AW0_check, "") && cmpstr(channels_AW1_check, ""))
+		abort "cant have channels just for AW1, if only using one, please use AW0"
 		
-	elseif(cmpstr(channels_AW0, "") && !cmpstr(channels_AW1, ""))
+	elseif(cmpstr(channels_AW0_check, "") && !cmpstr(channels_AW1_check, ""))
 		S.AW_Waves = "0"
-		S.channels_AW0 = scu_getChannelNumbers(channels_AW0, fastdac=1)
+		S.channels_AW0 = channels_AW0_check
 		S.channels_AW1 = ""
 		S.numWaves = 1
 	else
 		S.AW_Waves = "0,1"
-		S.channels_AW1 = scu_getChannelNumbers(channels_AW1, fastdac=1)
-		S.channels_AW0 = scu_getChannelNumbers(channels_AW0, fastdac=1)
+		S.channels_AW1 = channels_AW1_check
+		S.channels_AW0 = channels_AW0_check
 		S.numWaves = 2
 	endif
 	
@@ -1582,7 +1582,12 @@ function setupAWG([channels_AW0, channels_AW1, numCycles, verbose])
 	S.channelIDs = scc_checkDeviceNumber(channels = S.channels_AW0 +","+ S.channels_AW1)
 	wave /t IDs = listToTextWave(S.channelIDs, ";")
 	findDuplicates /z /free /rt = syncIDs IDs
-	S.instrIDs = textWavetolist(syncIDs)
+	if(!wavetype(syncIDs))
+		S.instrIDs = textWavetolist(IDs)
+	else
+		S.instrIDs = textWavetolist(syncIDs)
+	endif
+	
 	scv_setFreq2(A=S)
 	
 	variable i, waveLen = 0
@@ -1970,7 +1975,7 @@ function/s fd_start_sweep(S, [AWG_list])
 			endif
 		endif
 		
-		//writeInstr(fdID,cmd)
+		writeInstr(fdID,cmd)
 	endfor
 	
 	return cmd
