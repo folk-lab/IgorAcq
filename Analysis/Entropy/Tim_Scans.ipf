@@ -643,13 +643,13 @@ function ScanFastDAC2D_virtual(fdID, startx, finx, channelsx, starty, finy, chan
 end
 
 
-function ScanFastDAC2D_virtual2(fdID, startx, finx, channelsx, starty, finy, channelsy, numptsy, virtual_corners, virtual_gates, [fdcs_id, numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave, use_AWG, use_only_corners, interlaced_channels, interlaced_setpoints])
+function ScanFastDAC2D_virtual2(startx, finx, channelsx, starty, finy, channelsy, numptsy, virtual_corners, virtual_gates, [numpts, sweeprate, bdID, rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave, use_AWG, use_only_corners, interlaced_channels, interlaced_setpoints])
 	// 2D Scan for FastDAC only OR FastDAC on fast axis and BabyDAC on slow axis
 	// Note: Must provide numptsx OR sweeprate in optional parameters instead
 	// Note: To ramp with babyDAC on slow axis provide the BabyDAC variable in bdID
 	// Note: channels should be a comma-separated string ex: "0,4,5"
 	// Note: Virtual corner gates MUST be on the fast axis (since they are swept during the scan)
-	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, rampratex, rampratey, delayy, nosave, use_AWG, fdyID, fdcs_id, use_only_corners
+	variable startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, rampratex, rampratey, delayy, nosave, use_AWG, use_only_corners
 	string channelsx, channelsy, comments, startxs, finxs, startys, finys, interlaced_channels, interlaced_setpoints
 	string virtual_corners  // , separated list of 4 corner values for each virtual gate. ; separated for multiple virtual gates -- Corners should be specified as a single value for each of "StartX|StartY, FinX|StartY, StartX|FinY, FinX|FinY"
 	string virtual_gates  // , separated list of virtual gates (each needs a set of virtual_corners)
@@ -661,12 +661,10 @@ function ScanFastDAC2D_virtual2(fdID, startx, finx, channelsx, starty, finy, cha
 	finxs = selectstring(paramisdefault(finxs), finxs, "")
 	startys = selectstring(paramisdefault(startys), startys, "")
 	finys = selectstring(paramisdefault(finys), finys, "")
-	fdcs_id = paramisdefault(sweeprate) ? 0 : fdcs_id
 	use_only_corners = paramisdefault(use_only_corners) ? 0 : use_only_corners
 	interlaced_channels = selectString(paramisdefault(interlaced_channels), interlaced_channels, "")
 	interlaced_setpoints = selectString(paramisdefault(interlaced_setpoints), interlaced_setpoints, "")
 	variable use_bd = paramisdefault(bdid) ? 0 : 1 		// Whether using both FD and BD or just FD
-	variable use_second_fd = paramisdefault(fdyID) ? 0 : 1  // Whether using a second FD for the y axis gates
 	
 	
 	///// If using virtual sweeps only /////
@@ -705,29 +703,6 @@ function ScanFastDAC2D_virtual2(fdID, startx, finx, channelsx, starty, finy, cha
 	// TODO: Improve how this info is stored in HDF (probably requires adding something to ScanVars and then modifying EndScan)
 	sprintf comments, "%s, virtual_sweep, [virtual_gates=%s, virtual_corners=%s]", comments, virtual_gates, virtual_corners
 
-
-	///// Put info into scanVars struct (to more easily pass around later)	 /////
-// 	struct ScanVars S
-// 	if (use_bd == 0)
-//	 	initScanVarsFD(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
-//		   						 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments)
-//		if (use_second_fd)
-//			S.instrIDy = fdyID	
-//		endif
-//	
-//	else  				// Using BabyDAC for Y axis so init x in FD_ScanVars, and init y in BD_ScanVars
-//		initScanVarsFD(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
-//		   						rampratey=rampratey, startxs=startxs, finxs=finxs, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments)
-//		S.instrIDy = bdID
-//       s.is2d = 1
-//		S.starty = starty
-//		S.finy = finy
-//		S.channelsy = scu_getChannelNumbers(channelsy, fastdac=0)
-//		S.y_label = scu_getDacLabel(S.channelsy, fastdac=0)
-//		scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, S.starty, S.finy, S.startxs, S.finxs, S.startys, S.finys)
-//	endif
-//	
-	
 	struct ScanVars S
  	if (use_bd == 1)  // Using babydacs as second instrument
 		
@@ -803,21 +778,15 @@ function ScanFastDAC2D_virtual2(fdID, startx, finx, channelsx, starty, finy, cha
    	
 
 	///// Ramp Virtual gates to start /////
-	if (fdcs_id != 0)
-		for (k=0; k<ItemsInList(virtual_gates, ","); k++)
-			virtual_gate = scu_getChannelNumbers(StringFromList(k, virtual_gates, ","), fastdac=1)
-	   		corners = StringFromList(k, virtual_corners, ";")
-	   		c0 = str2num(StringFromList(0, corners, ","))
-	   		rampmultiplefDAC(fdcs_id, virtual_gate, c0, ignore_lims=1)
-	   	endfor
-   	else
-   		for (k=0; k<ItemsInList(virtual_gates, ","); k++)
-			virtual_gate = scu_getChannelNumbers(StringFromList(k, virtual_gates, ","), fastdac=1)
-	   		corners = StringFromList(k, virtual_corners, ";")
-	   		c0 = str2num(StringFromList(0, corners, ","))
-	   		rampmultiplefDAC(S.instrIDx, virtual_gate, c0, ignore_lims=1)
-	   	endfor
-	endif
+	
+	for (k=0; k<ItemsInList(virtual_gates, ","); k++)
+		virtual_gate = scu_getChannelNumbers(StringFromList(k, virtual_gates, ","), fastdac=1)
+		string IDname = scc_checkDeviceNumber(channels = virtual_gate)
+		nvar fdID = $IDname
+	   	corners = StringFromList(k, virtual_corners, ";")
+	   	c0 = str2num(StringFromList(0, corners, ","))
+	   	rampmultiplefDAC(fdID, virtual_gate, c0, ignore_lims=1)
+	endfor
 
    	
    	///// Let gates settle /////

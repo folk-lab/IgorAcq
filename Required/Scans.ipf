@@ -826,7 +826,7 @@ function Ramp_interlaced_channels(S, i)
 		scf_getChannelNumsOnFD(channel_num, device) // Sets device to device num
 		string deviceAddress = stringbykey("visa"+num2istr(device), sc_fdacKeys, ":", ",")
 		// Open connection to that FastDAC and ramp
-		viRM = openFastDACconnection("fdac_window_resource", deviceAddress, verbose=0)
+		viRM = openFastDACconnection("fdac_window_resource", deviceAddress, verbose=0, fill = 0)
 		nvar tempinstrID = $"fdac_window_resource"
 		rampmultiplefDAC(tempinstrID, interlace_channel, interlace_value)
 		viClose(tempinstrID) // Don't know if it's important to close both, or even correct to do so... Just copying what I (or Christian) did before...
