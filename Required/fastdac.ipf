@@ -63,7 +63,7 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 end
 
 
-function openMultipleFastDACconnections(VISAnums)
+function openMultipleFDACs(VISAnums)
 	// This function is added to ease opening up multiple fastDAC connections in order
 	// It assumes the default options for verbose, numDACCh, numADCCh, and optical,
 	// The values can be found in the function openfastDACconnection()
@@ -296,7 +296,6 @@ function getFDACOutput(instrID,channel,[same_as_window]) // Units: mV
 end
 
 function/s getFDstatus(fdIDname)
-	//variable instrID
 	string fdIDname
 	string  buffer = "", key = ""
 	wave/t fdacvalstr	

@@ -2398,9 +2398,9 @@ function InitScanController([configFile])
 			// instrument wave
 			make /t/o/N=(sc_instrLimit,3) sc_Instr
 
-			sc_Instr[0][0] = "openMultipleFastDACconnections(\"40,39,36\")"
+			sc_Instr[0][0] = "openMultipleFDACs(\"serial port numbers here\")"
 			sc_Instr[0][1] = ""
-			sc_Instr[0][2] = "getfdstatus(fd)"
+			sc_Instr[0][2] = "getfdstatus(\"fd1\")"
 
 			nvar/z filenum
 			if(!nvar_exists(filenum))
@@ -3902,10 +3902,10 @@ function/S scf_getFDVisaAddress(device_num)
 end
 
 
-function scf_getFDInfoFromDeviceNum(device_num, info)
+function scf_getFDInfoFromDeviceNum(device_num, info, [str])
 	// Returns the value for selected info of numbered fastDAC device (i.e. 1, 2 etc)
 	// Valid requests ('master', 'name', 'numADC', 'numDAC')
-	variable device_num
+	variable device_num, str
 	string info
 
 	svar sc_fdacKeys
@@ -3934,7 +3934,9 @@ function scf_getFDInfoFromDeviceNum(device_num, info)
 			abort "ERROR[scf_getFDInfoFromID]: Requested info (" + info + ") not understood"
 			break
 	endswitch
+
 	return str2num(stringByKey(cmd+num2str(device_num), sc_fdacKeys, ":", ","))
+
 end
 
 
@@ -5576,40 +5578,40 @@ function scfw_update_all_fdac([option])
 	if (paramisdefault(option))
 		option = "fdacramp"
 	endif
+	
+	// reopen normal instrument connections
+	sc_OpenInstrConnections(0)
 
-	// TOOD: refactor with scf_getFDInfoFromID()/scf_getChannelNumsOnFD() etc
-
-	// open temporary connection to FastDACs
 	// Either ramp fastdacs or update fdacvalstr
 	variable i=0,j=0,output = 0, numDACCh = 0, startCh = 0, viRM = 0
-	string visa_address = "", tempnamestr = "fdac_window_resource"
+	string visa_address = "", fdIDname = ""
 	variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
 	for(i=0;i<numDevices;i+=1)
-		numDACCh = str2num(stringbykey("numDACCh"+num2istr(i+1),sc_fdackeys,":",","))
+		numDACCh = scf_getFDInfoFromDeviceNum(i+1, "numDAC")
+		fdIDname = stringByKey("name"+num2str(i+1), sc_fdacKeys, ":", ",")
+		nvar fdID = $fdIDname
 		if(numDACCh > 0)
 			visa_address = stringbykey("visa"+num2istr(i+1),sc_fdackeys,":",",")
-			viRM = openFastDACconnection(tempnamestr, visa_address, verbose=0, fill = 0)
-			nvar tempname = $tempnamestr
 			try
 				strswitch(option)
 					case "fdacramp":
 						for(j=0;j<numDACCh;j+=1)
 							output = str2num(fdacvalstr[startCh+j][1])
 							if(output != str2num(old_fdacvalstr[startCh+j]))
-								rampmultipleFDAC(tempname, num2str(startCh+j), output)
+								rampmultipleFDAC(fdID, num2str(startCh+j), output)
 							endif
 						endfor
 						break
 					case "fdacrampzero":
 						for(j=0;j<numDACCh;j+=1)
-							rampmultipleFDAC(tempname, num2str(startCh+j), 0)
+							rampmultipleFDAC(fdID, num2str(startCh+j), 0)
 						endfor
 						break
 					case "updatefdac":
 						variable value
 						for(j=0;j<numDACCh;j+=1)
 							// getfdacOutput(tempname,j)
-							value = getfdacOutput(tempname,j+startCh)
+							value = getfdacOutput(fdID,j+startCh)
 							scfw_updateFdacValStr(startCh+j, value, update_oldValStr=1)
 						endfor
 						break
@@ -5617,18 +5619,13 @@ function scfw_update_all_fdac([option])
 			catch
 				// reset error code, so VISA connection can be closed!
 				variable err = GetRTError(1)
-
-				viClose(tempname)
-				viClose(viRM)
+				viClose(fdID)
+				
 				// reopen normal instrument connections
 				sc_OpenInstrConnections(0)
 				// silent abort
 				abortonvalue 1,10
 			endtry
-
-				// close temp visa connection
-				viClose(tempname)
-				viClose(viRM)
 		endif
 		startCh += numDACCh
 	endfor
@@ -5652,43 +5649,35 @@ function scfw_update_fadc(action) : ButtonControl
 	svar sc_fdackeys
 	variable i=0, j=0
 
-	// TOOD: refactor with scf_getFDInfoFromID()/scf_getChannelNumsOnFD() etc
+	// reopen normal instrument connections
+	sc_OpenInstrConnections(0)
 
-	string visa_address = "", tempnamestr = "fdac_window_resource"
+	string visa_address = "", fdIDname = ""
 	variable numDevices = str2num(stringbykey("numDevices",sc_fdackeys,":",","))
 	variable numADCCh = 0, startCh = 0, viRm = 0
 	for(i=0;i<numDevices;i+=1)
 		numADCch = scf_getFDInfoFromDeviceNum(i+1, "numADC")
-//		numADCCh = str2num(stringbykey("numADCCh"+num2istr(i+1),sc_fdackeys,":",","))
 		if(numADCCh > 0)
 			visa_address = scf_getFDVisaAddress(i+1)
-//			visa_address = stringbykey("visa"+num2istr(i+1),sc_fdackeys,":",",")
-			viRm = openFastDACconnection(tempnamestr, visa_address, verbose=0, fill = 0)
-			nvar tempname = $tempnamestr
+			fdIDname = stringByKey("name"+num2str(i+1), sc_fdacKeys, ":", ",")
+			nvar fdID = $fdIDname
 			try
 				for(j=0;j<numADCCh;j+=1)
-					getfadcChannel(tempname,startCh+j, fdIDname = tempnamestr)
+					getfadcChannel(fdID,startCh+j, fdIDname = fdIDname)
 				endfor
 			catch
 				// reset error
 				variable err = GetRTError(1)
 
-				viClose(tempname)
-				viClose(viRM)
+				viClose(fdID)
 				// reopen normal instrument connections
 				sc_OpenInstrConnections(0)
 				// silent abort
 				abortonvalue 1,10
 			endtry
-
-			// close temp visa connection
-			viClose(tempname)
-			viClose(viRM)
 		endif
 		startCh += numADCCh
 	endfor
-	// reopen normal instrument connections
-	sc_OpenInstrConnections(0)
 end
 
 
