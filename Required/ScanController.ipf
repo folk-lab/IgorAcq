@@ -2682,6 +2682,10 @@ function scw_setupAWG(action, [instrID, mapOnetoZero]) : Buttoncontrol
 		deletepoints j, num_amps-j, amps
 		deletepoints j, num_amps-j, times
 		
+		if(numpnts(amps) == 0)
+			continue
+		endif
+		
 		times /= 1000
 		
 		if(paramisdefault(instrID))
@@ -4645,7 +4649,7 @@ function scfd_SendCommandAndRead(S, AWG_list, rowNum)
 			nvar fdID = $fdIDname
 			string AW_dacs = scu_getDeviceChannels(fdID, AWG_list.channels_AW0)
 			AW_dacs = addlistitem(scu_getDeviceChannels(fdID, AWG_list.channels_AW1), AW_dacs, ",", INF)
-			removeSeperator(AW_dacs, ",")
+			AW_dacs = removeSeperator(AW_dacs, ",")
 			AW_dacs = scu_getDeviceChannels(fdID, AW_dacs, reversal = 1)
 			rampmultiplefdac(fdID, AW_dacs, 0)
 		endfor
@@ -5512,52 +5516,48 @@ End
 	// set update speed for ADCs
 function scfw_scfw_update_fadcSpeed(s) : PopupMenuControl
 	struct wmpopupaction &s
+	
 
-	string visa_address = ""
+	
+	string fdIDname
 	svar sc_fdackeys
 	if(s.eventcode == 2)
 		// a menu item has been selected
 		strswitch(s.ctrlname)
 			case "fadcSetting1":
-				visa_address = stringbykey("visa1",sc_fdackeys,":",",")
+				fdIDname = stringbykey("name1",sc_fdackeys,":",",")
 				break
 			case "fadcSetting2":
-				visa_address = stringbykey("visa2",sc_fdackeys,":",",")
+				fdIDname = stringbykey("name2",sc_fdackeys,":",",")
 				break
 			case "fadcSetting3":
-				visa_address = stringbykey("visa3",sc_fdackeys,":",",")
+				fdIDname = stringbykey("name3",sc_fdackeys,":",",")
 				break
 			case "fadcSetting4":
-				visa_address = stringbykey("visa4",sc_fdackeys,":",",")
+				fdIDname = stringbykey("name4",sc_fdackeys,":",",")
 				break
 			case "fadcSetting5":
-				visa_address = stringbykey("visa5",sc_fdackeys,":",",")
+				fdIDname = stringbykey("name5",sc_fdackeys,":",",")
 				break
 			case "fadcSetting6":
-				visa_address = stringbykey("visa6",sc_fdackeys,":",",")
+				fdIDname = stringbykey("name6",sc_fdackeys,":",",")
 				break
 		endswitch
-
-		string tempnamestr = "fdac_window_resource"
+		// reopen normal instrument connections
+		sc_OpenInstrConnections(0)
 		try
-			variable viRM = openFastDACconnection(tempnamestr, visa_address, verbose=0)
-			nvar tempname = $tempnamestr
-			setfadcSpeed(tempname,str2num(s.popStr))
+			nvar fdID = $fdIDname
+			setfadcSpeed(fdID,str2num(s.popStr))
 		catch
 			// reset error code, so VISA connection can be closed!
 			variable err = GetRTError(1)
 
-			viClose(tempname)
-			viClose(viRM)
+			viClose(fdID)
 			// reopen normal instrument connections
 			sc_OpenInstrConnections(0)
 			// silent abort
 			abortonvalue 1,10
 		endtry
-			// close temp visa connection
-			viClose(tempname)
-			viClose(viRM)
-			sc_OpenInstrConnections(0)
 			return 0
 	else
 		// do nothing
