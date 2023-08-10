@@ -2400,7 +2400,7 @@ function InitScanController([configFile])
 
 			sc_Instr[0][0] = "openMultipleFDACs(\"serial port numbers here\")"
 			sc_Instr[0][1] = ""
-			sc_Instr[0][2] = "getfdstatus(\"fd1\")"
+			sc_Instr[0][2] = "getFDstatus(\"fd1\")"
 
 			nvar/z filenum
 			if(!nvar_exists(filenum))

@@ -73,7 +73,7 @@ function openMultipleFDACs(VISAnums)
 	int i
 	for(i=0;i<itemsinlist(VISAnums, ",");i++)	
 		string instrID      = "fd" + num2str(i+1)
-		string visa_address = "ASRL" + stringfromlist(i,VISAnums, ",") + "::INSTR"
+		string visa_address = "ASRL" + removewhitespace(stringfromlist(i,VISAnums, ",")) + "::INSTR"
 		openFastDACconnection(instrID, visa_address)
 	endfor
 
@@ -293,6 +293,16 @@ function getFDACOutput(instrID,channel,[same_as_window]) // Units: mV
 	else
 		abort
 	endif
+end
+
+function getmultipleFDstatus(fdIDnames)
+	string fdIDnames
+	int i
+	for(i=0; i<itemsinlist(fdIDnames, ","); i++)
+		string fdIDname = stringfromlist(i, fdIDnames, ",")
+		fdIDname = removewhiteSpace(fdIDname)
+		getfdstatus(fdIDname)
+	endfor
 end
 
 function/s getFDstatus(fdIDname)
