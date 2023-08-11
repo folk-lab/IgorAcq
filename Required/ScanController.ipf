@@ -4544,7 +4544,8 @@ end
 
 
 function scfd_RecordValues(S, rowNum, [AWG_list, linestart, skip_data_distribution])  // TODO: Rename to fd_record_values
-	struct ScanVars &S
+	// this function is predominantly used in scanfastdac functions. It is for ramping and recording a certain axis 
+	struct ScanVars &S              // Contains all scan details such as instrIDs, xchannels, ychannels...
 	variable rowNum, linestart
 	variable skip_data_distribution // For recording data without doing any calculation or distribution of data
 	struct AWGVars &AWG_list

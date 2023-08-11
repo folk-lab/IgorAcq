@@ -1849,39 +1849,51 @@ function/s fd_start_sweep(S, [AWG_list])
 	// sweep with arbitrary wave generator on (AWG_RAMP in arduino)
 	// readvstime sweep (SPEC_ANA in arduino)
 	
-	// updated for multiple fastdacs, but should work in  the case of working with one fast dac
+	// updated for multiple fastdacs
 	Struct ScanVars &S
 	Struct AWGVars &AWG_List
 	int i
 
-	scu_assertSeparatorType(S.ADCList, ";")
+	scu_assertSeparatorType(S.ADCList, ";") // this is the full 
 	
 	if(S.sync)
-		nvar fdID = $(stringfromlist(0,S.instrIDs)) //first ID is master
+		// here we check if master/slave has been initiated
+		// and we send commands to the first ID in S.instrIDs (Because this ID is set to Master) 
+		nvar fdID = $(stringfromlist(0,S.instrIDs))
+		
+		// we send a command to master to arm sync and we check if we get the expected response
 		string response = queryInstr(fdID, "ARM_SYNC\r\n")
 		if(cmpstr(response,"SYNC_ARMED\r\n"))
-		abort "[fd_start_sweep()]: Unable to arm sync :("
+			abort "[fd_start_sweep()]: Unable to arm sync :("
 		endif
 		
-		/// check if sync is good // might be a do - while loop for multiple fdacs?
+		// we send a command to master to check sync and we check if we get the expected response
 		response = queryInstr(fdID, "CHECK_SYNC\r\n")
 		if(cmpstr(response,"CLOCK_SYNC_READY\r\n"))
-		abort "[fd_start_sweep()]: clock sync bad :("
+			abort "[fd_start_sweep()]: clock sync bad :("
 		endif
 	endif	
 	
 	string fdIDname; S.adcLists = ""; S.fakeRecords = ""
 	
+	// here we loop through all the fastdacs that are used for the scan and send commands
 	for(i=0;i<itemsinlist(S.instrIDs);i++)
 		
+		
+		// the master needs to get the command last, so first we go through all fdacs that are 
+		// slaves first. The first item in S.instrIDs is always set to master. We do this through
+		// the if-statement below. We first retrieve the IDname. 
+		 
 		if(i != itemsinlist(S.instrIDs) - 1)
 			fdIDname = stringfromlist(i+1,S.instrIDs)
 		else
 			fdIDname = stringfromlist(0,S.instrIDs)
 		endif
 		
-		nvar fdID = $fdIDname
-		string adcs = scu_getDeviceChannels(fdID, S.adclist, adc_flag=1)
+		nvar fdID = $fdIDname    // we point fdID to the global variable associated with fdIDname
+		
+		// the below function takes all the adcs selected to record in the fastdac Window
+		string adcs = scu_getDeviceChannels(fdID, S.adclist, adc_flag=1) 
 
 		if (!S.readVsTime)
 			scu_assertSeparatorType(S.channelsx, ",")
