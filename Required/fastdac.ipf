@@ -1892,10 +1892,14 @@ function/s fd_start_sweep(S, [AWG_list])
 		
 		nvar fdID = $fdIDname    // we point fdID to the global variable associated with fdIDname
 		
-		// the below function takes all the adcs selected to record in the fastdac Window
+		// the below function takes all the adcs selected to record in the fastdac Window and returns
+		// only the adcs associated with the fdID
 		string adcs = scu_getDeviceChannels(fdID, S.adclist, adc_flag=1) 
-
-		if (!S.readVsTime)
+		string cmd = ""
+	
+		if (S.readVsTime)
+			sprintf cmd, "SPEC_ANA,%s,%s\r", adcs, num2istr(S.numptsx)
+		else
 			scu_assertSeparatorType(S.channelsx, ",")
 			string starts, fins, temp
 			if(S.direction == 1)
@@ -1912,13 +1916,7 @@ function/s fd_start_sweep(S, [AWG_list])
 
 			string dacs = scu_getDeviceChannels(fdID, S.channelsx)
 	   		dacs = replacestring(",",dacs,"")
-		endif
-
-		string cmd = ""
-	
-		if (S.readVsTime == 1)
-			sprintf cmd, "SPEC_ANA,%s,%s\r", adcs, num2istr(S.numptsx)
-		else
+		
 			//checking the need for a fakeramp
 			int fakeChRamp = 0; string AW_dacs; int j
 			if(!cmpstr(dacs,""))
