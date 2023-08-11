@@ -1844,21 +1844,44 @@ end
 
 
 function/s fd_start_sweep(S, [AWG_list])
-	// Starts one of:
-	// regular sweep (INT_RAMP in arduino) 
-	// sweep with arbitrary wave generator on (AWG_RAMP in arduino)
-	// readvstime sweep (SPEC_ANA in arduino)
+// Starts one of:
+// regular sweep (INT_RAMP in arduino) 
+// sweep with arbitrary wave generator on (AWG_RAMP in arduino)
+// readvstime sweep (SPEC_ANA in arduino)
+// updated for multiple fastdacs:
+
+// before reading the code below, it is important to understand the strategy for syncing all the fastDACs. The sync
+// happens by sending the same command to all fastDACs. First sending it to devices set to slaves first and master
+// last. To ensure syncing is done correctly, the number of adcs selected to record must be equal across all fastDACs.
+// to ensure user flexibility, we do some "fakerecording" as well as "fakeramping" if neccesary.
+//
+// Fakerecording:
+// for example, if we use fastDAC1 to record 2 channels, and fastDAC2 to record 1 channel. The code below will find an
+// extra channel to select for recording and list the fastDAC ID and channel number in S.fakeRecords. This will be later
+// used to ensure the random channel selected to record is not distributed into any waves in Igor.
+// 
+// Fakeramping:
+// A fake ramp might be needed if an adc is selected for a device where a channel for ramping is not. For example if you
+// ramp a channel(dac) in fastDAC1 and record a channel(adc) in FastDAC2, we will need to select a channel(dac) to ramp to satisfy
+// the command sent. the channel(dac) selected to ramp will be held at its value for the duration of the ramp, thus "fakeramped".
+// A bonus from this example is that, it would require a fake recording as well in fastDAC1.
+// 
+// to sync for AWG_RAMP, we also need to consider dac channels that are selected for awg. A "fakeramp" or similiarly "fakeAWG" 
+// might be required as well. The dac channels are checked along with the AW_dacs to ensure no two channels are used twice. 
 	
-	// updated for multiple fastdacs
 	Struct ScanVars &S
 	Struct AWGVars &AWG_List
 	int i
 
-	scu_assertSeparatorType(S.ADCList, ";") // this is the full 
+	// this is a seperator check for the adclist selected to record in the fastdac Window
+	// might not be neccesary
+	scu_assertSeparatorType(S.ADCList, ";")
+	
 	
 	if(S.sync)
 		// here we check if master/slave has been initiated
-		// and we send commands to the first ID in S.instrIDs (Because this ID is set to Master) 
+		// and we send commands to the first ID in S.instrIDs (Because this ID is set to Master)
+		// this will not be passed if only using one fastdac. S.sync is set in set_master_slave(S) 
 		nvar fdID = $(stringfromlist(0,S.instrIDs))
 		
 		// we send a command to master to arm sync and we check if we get the expected response
@@ -1897,11 +1920,16 @@ function/s fd_start_sweep(S, [AWG_list])
 		string adcs = scu_getDeviceChannels(fdID, S.adclist, adc_flag=1) 
 		string cmd = ""
 	
-		if (S.readVsTime)
+		if (S.readVsTime) // this is passed at either the end of the scan (EndScan()) or it is passed
+			// when update ADC is pressed on the fastDac window. The point here is an ADC channel is 
+			// read for a small number of points to minimize noise and get a good average
 			sprintf cmd, "SPEC_ANA,%s,%s\r", adcs, num2istr(S.numptsx)
 		else
 			scu_assertSeparatorType(S.channelsx, ",")
 			string starts, fins, temp
+			
+			// here we decide which direction the sweeps are happening in, This is for sweeps
+			// to happen at alternating directions. Standard scans have S.direction = 1
 			if(S.direction == 1)
 				starts = stringByKey(fdIDname, S.IDstartxs)
 				fins = stringByKey(fdIDname, S.IDfinxs)
@@ -1911,12 +1939,17 @@ function/s fd_start_sweep(S, [AWG_list])
 			else
 				abort "ERROR[fd_start_sweep]: S.direction must be 1 or -1, not " + num2str(S.direction)
 			endif
+			
 			starts = starts[1,INF] //removing the comma at the start
-			fins = fins [1, INF] //removing the comma at the start
+			fins = fins [1, INF]   //removing the comma at the start
 
+			
+			// the below function takes all the dacs to be ramped (passed as a parameter in any scan function)
+			// and returns only the dacs associated with the fdID
 			string dacs = scu_getDeviceChannels(fdID, S.channelsx)
 	   		dacs = replacestring(",",dacs,"")
-		
+		 	
+		 	
 			//checking the need for a fakeramp
 			int fakeChRamp = 0; string AW_dacs; int j
 			if(!cmpstr(dacs,""))
