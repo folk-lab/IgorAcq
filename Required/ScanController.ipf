@@ -4532,21 +4532,24 @@ end
 
 function /s scfd_spectrum_analyzer(wave data, variable samp_freq, string wn)
 	// Built in powerspectrum function
-	duplicate/o data spectrum
+	duplicate /o /free data spectrum
 	SetScale/P x 0,1/samp_freq,"", spectrum
 	variable nr=dimsize(spectrum,0);  // number of points in x-direction
 	variable le=2^(floor(log(nr)/log(2))); // max factor of 2 less than total num points
-	wave slice
-	wave w_Periodogram
-	wave powerspec
+	make /o /free slice
+	make /o /free w_Periodogram
+	make /o /free powerspec
 	
 	variable i=0
-	rowslice(spectrum,i)
+	duplicate /free /o/rmd=[][i,i] spectrum, slice
+	redimension /n=(dimsize(slice, 0)) slice
+	
 	DSPPeriodogram/R=[0,(le-1)]/PARS/NODC=2/DEST=W_Periodogram slice  //there is a normalization flag
 	duplicate/o w_Periodogram, powerspec
 	i=1
 	do
-		rowslice(spectrum,i)
+		duplicate /free /o/rmd=[][i,i] spectrum, slice
+		redimension /n=(dimsize(slice, 0)) slice
 		DSPPeriodogram/R=[0,(le-1)]/PARS/NODC=2/DEST=W_Periodogram slice
 		powerspec = powerspec+W_periodogram
 		i=i+1
