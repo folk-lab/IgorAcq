@@ -455,7 +455,7 @@ function RampMultipleFDAC(InstrID, channels, setpoint, [ramprate, setpoints_str,
 	ramprate = numtype(ramprate) == 0 ? ramprate : 0  // If not a number, then set to zero (which means will be overridden by ramprate in window)
 
 	scu_assertSeparatorType(channels, ",")
-	channels = scu_getChannelNumbers(channels, fastdac=1) 
+	channels = scu_getChannelNumbers(channels, fastdac=1)
 	
 	if (!paramIsDefault(setpoints_str) && (itemsInList(channels, ",") != itemsInList(setpoints_str, ",")))
 		abort "ERROR[RampMultipleFdac]: number of channels does not match number of setpoints in setpoints_str"	
@@ -479,6 +479,9 @@ function fd_rampOutputFDAC(instrID,channel,output, ramprate, [ignore_lims]) // U
 	// ramps a channel to the voltage specified by "output".
 	// ramp is controlled locally on DAC controller.
 	// channel must be the channel set by the GUI.
+	
+	//update - if inputing actual DAC channel, it should not find the start channel
+	
 	variable instrID, channel, output, ramprate, ignore_lims
 	wave/t fdacvalstr, old_fdacvalstr
 	svar sc_fdackeys

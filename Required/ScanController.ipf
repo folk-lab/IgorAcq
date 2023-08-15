@@ -265,7 +265,6 @@ function/s scu_getDeviceChannels(instrID, channels, [adc_flag, reversal])
 	return new_channels
 end
 
-
 ///////////////////////////////////////////////////////////////
 ///////////////// Sleeps/Delays ///////////////////////////////
 ///////////////////////////////////////////////////////////////
@@ -4789,10 +4788,10 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			
 			if (sc_plotRaw == 1)
 				if (rowNum < avg_over)
-					if(waveExists($(rwn + "_2d"))	)	
-						duplicate /O/R = [][0,rowNum] $(rwn + "_2d") powerspec2D
-					else
+					if(rowNum == 0)	
 						duplicate /O/R = [][0,rowNum] $(rwn) powerspec2D
+					elseif(waveExists($(rwn + "_2d")))
+						duplicate /O/R = [][0,rowNum] $(rwn + "_2d") powerspec2D
 					endif
 				else
 					duplicate /O/R = [][rowNum-avg_over,rowNum] $(rwn + "_2d") powerspec2D
