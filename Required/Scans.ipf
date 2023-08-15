@@ -355,7 +355,7 @@ function ScanFastDAC2(start, fin, channels, [numptsx, sweeprate, delay, ramprate
 	struct ScanVars S
 	initScanVarsFD2(S, start, fin, channelsx=channels, numptsx=numptsx, rampratex=ramprate, starty=1, finy=repeats, delayy=delay, sweeprate=sweeprate,  \
 					numptsy=repeats, startxs=starts, finxs=fins, x_label=x_label, y_label=y_label, alternate=alternate, interlaced_channels=interlaced_channels, \
-					interlaced_setpoints=interlaced_setpoints, comments=comments)
+					interlaced_setpoints=interlaced_setpoints, comments=comments, use_awg = use_awg)
 
    //	S.finy = S.starty+S.numptsy  // Repeats
 	if (s.is2d)
@@ -364,8 +364,6 @@ function ScanFastDAC2(start, fin, channels, [numptsx, sweeprate, delay, ramprate
 	
 	// Check software limits and ramprate limits
 	PreScanChecksFD2(S)  
-	
-
 	
   	// If using AWG then get that now and check it
 	struct AWGVars AWG

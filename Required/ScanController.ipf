@@ -658,7 +658,7 @@ end
 
 
 
-function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, duration, rampratex, delayx, starty, finy, channelsy, numptsy, rampratey, delayy, startxs, finxs, startys, finys, x_label, y_label, alternate,  interlaced_channels, interlaced_setpoints, comments, x_only])
+function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, duration, rampratex, delayx, starty, finy, channelsy, numptsy, rampratey, delayy, startxs, finxs, startys, finys, x_label, y_label, alternate,  interlaced_channels, interlaced_setpoints, comments, x_only, use_awg])
     // Function to make setting up scanVars struct easier for FastDAC scans
     // PARAMETERS:
     // startx, finx, starty, finy -- Single start/fin point for all channelsx/channelsy
@@ -669,7 +669,7 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
     variable starty, finy, numptsy, delayy, rampratey
 	 variable sweeprate  // If start != fin numpts will be calculated based on sweeprate
 	 variable duration   // numpts will be caluculated to achieve duration
-    variable alternate
+    variable alternate, use_awg
     string channelsx, channelsy
     string startxs, finxs, startys, finys
     string  x_label, y_label
@@ -691,7 +691,8 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
 	interlaced_setpoints = selectString(paramisdefault(interlaced_setpoints), interlaced_setpoints, "")
 
 	comments = selectString(paramIsDefault(comments), comments, "")
-	x_only = paramisdefault(x_only) ? 1 : x_only  
+	x_only = paramisdefault(x_only) ? 1 : x_only
+	use_awg = paramisdefault(x_only) ? 0 : use_awg  
 
 
 	// Standard initialization
@@ -729,6 +730,9 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
 	///// Checks what devices need to be synced //////
 	S.dacListIDs = scc_checkDeviceNumber(S = S)
 	S.adcListIDs = scc_checkDeviceNumber(S = S, adc = 1)
+	if(use_awg)
+		string AWdacListIDs = scc_checkDeviceNumber(channels = "")
+	endif
 	wave /t IDs = listToTextWave(S.dacListIDs + S.adcListIDs, ";")
 	findDuplicates /z /free /rt = syncIDs IDs
 	instrIDs = textWavetolist(syncIDs)

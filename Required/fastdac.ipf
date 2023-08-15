@@ -1581,8 +1581,14 @@ function setupAWG([channels_AW0, channels_AW1, numCycles, verbose])
 	endif
 	
 	S.channels_AW1 = ReplaceString(";", S.channels_AW1, ",")
-	S.channels_AW0= ReplaceString(";", S.channels_AW0, ",")   
+	S.channels_AW0= ReplaceString(";", S.channels_AW0, ",")
 	
+	int i
+	for(i=0; i<itemsinlist(S.channels_AW1, ","); i++)
+	   	if(whichlistItem(stringfromlist(i, S.channels_AW1, ","), S.channels_AW0, ",") != -1)
+	   		abort "Please remove any channels existing in both AW0 and AW1, and setup AWG again"
+	   	endif
+	endfor
 	//S.AW_DACs = selectstring(paramisdefault(channels), channels, S.AW_Dacs) //im not using this // Formatted 01,23  == wave 0 on channels 0 and 1, wave 1 on channels 2 and 3
 	S.numCycles = paramisDefault(numCycles) ? S.numCycles : numCycles
 	
@@ -1604,7 +1610,7 @@ function setupAWG([channels_AW0, channels_AW1, numCycles, verbose])
 	
 	scv_setFreq2(A=S)
 	
-	variable i, waveLen = 0
+	variable waveLen = 0
 	string wn
 	variable min_samples = INF  // Minimum number of samples at a setpoint
 	for(i=0;i<S.numWaves;i++)
@@ -2005,16 +2011,16 @@ function/s fd_start_sweep(S, [AWG_list])
 							break
 						endif
 					endfor
-				elseif(cmpstr(AW1_dacs,""))
+				elseif(cmpstr(AW1_dacs,"") && !cmpstr(AW0_dacs,""))  //AW1 is populated, AW0 is not
 					AW_dacs = AW1_dacs
 					//abort "[fd_start_sweep] Trying to run AWG with only AW1, somewhere in the setup process this should have been mapped to AW0"
 					//should probably be passed once, not multiple repeats
 					scw_setupAWG("setupAWG", instrID = fdID, mapOnetoZero = 1)
 					AWG_list.numWaves  = 1
-				elseif(cmpstr(AW0_dacs,""))
+				elseif(cmpstr(AW0_dacs,"") && !cmpstr(AW1_dacs,"")) //AW0 is populated, AW1 is not
 					AW_dacs = AW0_dacs
 					AWG_list.numWaves  = 1
-				else
+				else															// both are populated
 				//need to remove
 					AW_dacs = AW0_dacs + "," + AW1_dacs
 					AWG_list.numWaves  = 2
