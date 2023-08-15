@@ -1,5 +1,7 @@
 ipf#pragma rtGlobals=3		// Use modern global access method and strict wave access.
 
+#include <Reduce Matrix Size>
+
 // Scan Controller routines for 1d and 2d scans
 // Version 1.7 August 8, 2016
 // Version 1.8 XXXX X, 2017
@@ -2168,6 +2170,7 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	string additional_wavenames // Any additional wavenames to be saved in the DatHDF (and copied in Igor)
 	
 	scfd_checkRawSave()
+	
 	save_experiment = paramisDefault(save_experiment) ? 1 : save_experiment
 	additional_wavenames = SelectString(ParamIsDefault(additional_wavenames), additional_wavenames, "")
 	
@@ -4243,11 +4246,11 @@ end
 
 
 function scfd_checkRawSave()
-	
+
 	nvar sc_Saverawfadc
 	string notched_waves = scf_getRecordedFADCinfo("calc_names", column = 5)
 	string resamp_waves = scf_getRecordedFADCinfo("calc_names",column = 8)
-	
+
 	if(cmpstr(notched_waves,"") || cmpstr(resamp_waves,""))
 		sc_Saverawfadc = 1
 	else

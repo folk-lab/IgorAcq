@@ -425,7 +425,7 @@ function ScanFastDAC2D_virtual(fdID, startx, finx, channelsx, starty, finy, chan
 	startys = selectstring(paramisdefault(startys), startys, "")
 	finys = selectstring(paramisdefault(finys), finys, "")
 	fdcs_id = paramisdefault(sweeprate) ? 0 : fdcs_id
-	use_only_corners = paramisdefault(use_only_corners) ? 0 : use_only_corners
+	use_only_corners = paramisdefault(use_only_corners) ? 0 : use_only_corners // only use virtual gates and remove channelsx, channelsy from the scan
 	interlaced_channels = selectString(paramisdefault(interlaced_channels), interlaced_channels, "")
 	interlaced_setpoints = selectString(paramisdefault(interlaced_setpoints), interlaced_setpoints, "")
 	variable use_bd = paramisdefault(bdid) ? 0 : 1 		// Whether using both FD and BD or just FD

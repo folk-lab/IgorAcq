@@ -389,15 +389,76 @@ function fd_getfield(datnum)
 	variable sl_id, fd_id  //JSON ids
 	variable field
 
-	sl_id = get_sweeplogs(datnum)  // Get Sweep_logs JSON;
-	fd_id = getJSONXid(sl_id, "LS625 Magnet Supply") // Get FastDAC JSON from Sweeplogs
-
-	JSONXOP_GetValue/V fd_id, "field mT"
-	field = V_value
-
-	JSONXOP_Release /A  //Clear all stored JSON strings
+	try
+		sl_id = get_sweeplogs(datnum)  // Get Sweep_logs JSON;
+		fd_id = getJSONXid(sl_id, "LS625 Magnet Supply") // Get FastDAC JSON from Sweeplogs
 	
-	return field
+		JSONXOP_GetValue/V fd_id, "field mT"
+		field = V_value
+	
+		JSONXOP_Release /A  //Clear all stored JSON strings
+		
+		return field
+	catch
+		print "[WARNING] No Field found in JSON, returning 0"
+		return 0
+	endtry
+
+end
+
+
+function /wave fd_getfd_keys_vals(datnum, [number_of_fastdac])
+	// Function to get DAC values from HDF file
+	variable datnum
+	int number_of_fastdac
+	
+	number_of_fastdac = paramisdefault(number_of_fastdac) ? 1 : number_of_fastdac 
+
+	variable jsonId, fd_id  
+	string fast_dac_string
+	
+	variable num_keys_in_fd
+	string keys_in_fd, key_in_fd, DAC_num_index
+
+	make /free /n=(number_of_fastdac*8) all_dac_vals
+	int index
+
+	int i, j
+	try
+		for (i = 1; i <= number_of_fastdac; i++)
+			index = (i - 1) * 8
+			fast_dac_string = "FastDAC " + num2str(i)
+			
+			jsonId = get_sweeplogs(datnum)
+			fd_id = getJSONXid(jsonId, fast_dac_string) // Get FastDAC JSON from Sweeplogs
+			
+			JSONXOP_GetKeys jsonId, fast_dac_string, DAC_keys
+			
+			keys_in_fd = textWave2StrArray(DAC_keys)
+			num_keys_in_fd = ItemsInList(keys_in_fd,  ",")
+						
+			for (j=5; j < num_keys_in_fd - 3; j++)
+				key_in_fd = StringFromList(j, keys_in_fd, ",")
+				key_in_fd = removeLiteralQuotes(key_in_fd)
+				JSONXOP_GetValue/V fd_id, key_in_fd
+				
+				// calculate index based on DAC index value
+				// keys returned by JSONXOP_GetKeys are in alphabetical order. NOT in the order placed in scanvars.
+				DAC_num_index = StringFromList(0, key_in_fd, "{")
+				DAC_num_index = DAC_num_index[3,INF]
+				
+				all_dac_vals[str2num(DAC_num_index)] = V_value
+				index += 1
+			endfor
+
+		endfor
+		
+		return all_dac_vals
+	catch
+		print "[WARNING] No FD found in JSON, returning empty wave"
+		make /free /n=1 empty_wave
+		return empty_wave
+	endtry
 
 end
 
@@ -412,19 +473,18 @@ function make_scanvar_table_from_dats(dat_min_max)
 	variable dat_start = str2num(StringFromList(0, dat_min_max, ","))
 	variable dat_end = str2num(StringFromList(1, dat_min_max, ","))  
 	
-	make /o /n=((dat_end - dat_start + 1), 3) scanvar_table 
+	make /o /n=((dat_end - dat_start + 1), 3+8*3) scanvar_table 
 	variable datnum, scanvar_variable 
-	
+		
 	variable scanvar_row = 0
 	variable i
 	for(i=dat_start; i<dat_end+1; i+=1)
 	
-			make /o /n=(3) scanvar_table_slice
+			make /o /n=(3+8*3) scanvar_table_slice
 			wave scanvar_table_slice
 			
 			datnum = i
 			scanvar_table_slice[0] = datnum
-			
 			
 			scanvar_variable = fd_gettemperature(datnum, which_plate = "MC K")
 			scanvar_table_slice[1] = scanvar_variable * 1000
@@ -432,6 +492,8 @@ function make_scanvar_table_from_dats(dat_min_max)
 			scanvar_variable = fd_getfield(datnum)
 			scanvar_table_slice[2] = scanvar_variable
 			
+			wave dac_vals = fd_getfd_keys_vals(datnum, number_of_fastdac = 3)
+			scanvar_table_slice[3, 3+8*3] = dac_vals[p - 3]
 			
 			scanvar_table[scanvar_row][] = scanvar_table_slice[q]
 
