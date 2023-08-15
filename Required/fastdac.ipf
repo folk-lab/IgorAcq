@@ -129,7 +129,7 @@ function set_indep()
 	for(i = 0; i<numfdacs; i++)
 		fdname = stringbykey("name" + num2str(i+1),sc_fdackeys,":",",")
 		nvar fd = $fdname
-		//clearfdacBuffer(fd)
+		clearfdacBuffer(fd)
 		check = queryInstr(fd, "SET_MODE,INDEP" + "\r\n")                   // sets all to independent
 		if (cmpstr(check, "INDEP_SET\r\n"))
 			abort "unable to set independent mode on fastDAC:  " + fdname
@@ -2011,6 +2011,7 @@ function/s fd_start_sweep(S, [AWG_list])
 							break
 						endif
 					endfor
+					AWG_list.numWaves  = 1
 				elseif(cmpstr(AW1_dacs,"") && !cmpstr(AW0_dacs,""))  //AW1 is populated, AW0 is not
 					AW_dacs = AW1_dacs
 					//abort "[fd_start_sweep] Trying to run AWG with only AW1, somewhere in the setup process this should have been mapped to AW0"
