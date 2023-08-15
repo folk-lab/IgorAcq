@@ -692,7 +692,7 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
 
 	comments = selectString(paramIsDefault(comments), comments, "")
 	x_only = paramisdefault(x_only) ? 1 : x_only
-	use_awg = paramisdefault(x_only) ? 0 : use_awg  
+	use_awg = paramisdefault(use_awg) ? 0 : use_awg  
 
 
 	// Standard initialization
@@ -730,10 +730,16 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
 	///// Checks what devices need to be synced //////
 	S.dacListIDs = scc_checkDeviceNumber(S = S)
 	S.adcListIDs = scc_checkDeviceNumber(S = S, adc = 1)
+	string AWdacListIDs
 	if(use_awg)
-		string AWdacListIDs = scc_checkDeviceNumber(channels = "")
+		wave /t awgsetvalstr
+		string channels_AW0 = awgsetvalstr[0][1]
+		string channels_AW1 = awgsetvalstr[1][1]
+		channels_AW0 = scu_getChannelNumbers(channels_AW0, fastdac=1)
+		channels_AW1 = scu_getChannelNumbers(channels_AW1, fastdac=1)
+		AWdacListIDs = scc_checkDeviceNumber(channels = channels_AW0 + "," + channels_AW1)
 	endif
-	wave /t IDs = listToTextWave(S.dacListIDs + S.adcListIDs, ";")
+	wave /t IDs = listToTextWave(S.dacListIDs + S.adcListIDs + AWdacListIDs, ";")
 	findDuplicates /z /free /rt = syncIDs IDs
 	instrIDs = textWavetolist(syncIDs)
 	S.instrIDs = ""
