@@ -269,6 +269,7 @@ end
 
 function/s getK2400Status(instrID)
 	variable instrID
+	print "WARNING[getk2400Status]: No status stored for K2400s"
 //	string  buffer = ""
 //
 //	string gpib = num2istr(getAddressGPIB(instrID))

@@ -1419,7 +1419,7 @@ function/S scg_initializeGraphs(S , [y_label])
 			endif
       	 endif
       	 
-      	if((raw==1) || (plotraw==1)) // Raw waves
+      	if((raw==1) && (sc_plotraw==1)) // Raw waves
 	   		sc_rawGraphs1D = buffer
       	endif
       	  
@@ -2399,8 +2399,10 @@ function InitScanController([configFile])
 			make /t/o/N=(sc_instrLimit,3) sc_Instr
 
 			sc_Instr[0][0] = "openMultipleFDACs(\"serial port numbers here\")"
+			sc_Instr[1][0] = "openK2400connection(\"keithley1\", \"GPIB0::23::INSTR\", verbose=0)"
 			sc_Instr[0][1] = ""
 			sc_Instr[0][2] = "getFDstatus(\"fd1\")"
+			sc_Instr[1][2] = "getK2400Status(keithley1)"
 
 			nvar/z filenum
 			if(!nvar_exists(filenum))
@@ -4799,7 +4801,7 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only])
    // hold incoming data chunks in string and distribute to data waves
    string buffer = ""
    variable bytes_read = 0, totaldump = 0 
-   variable saveBuffer = 1000 // Allow getting up to 1000 bytes behind. (Note: Buffer size is 4096 bytes and cannot be changed in Igor)
+   variable saveBuffer = 500 // Allow getting up to 1000 bytes behind. (Note: Buffer size is 4096 bytes and cannot be changed in Igor)
    variable bufferDumpStart = stopMSTimer(-2)
 
    variable bytesSec = roundNum(2*S.samplingFreq,0)
@@ -4832,16 +4834,16 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only])
 		      		expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)  // Basically checking how long graph updates took
 					if(expected_bytes_in_buffer > 4096)
 	         			printf "ERROR[scfd_RecordBuffer]: After updating graphs, buffer is expected to overflow... Expected buffer size = %d (max = 4096). Bytes read so far = %d\r" expected_bytes_in_buffer, bytes_read
-	         		elseif (expected_bytes_in_buffer > 2500)
-	//					printf "WARNING[scfd_RecordBuffer]: Last graph update resulted in buffer becoming close to full (%d of 4096 bytes). Entering panic_mode (no more graph updates)\r", expected_bytes_in_buffer
+	         		elseif (expected_bytes_in_buffer > 3000)
+						printf "WARNING[scfd_RecordBuffer]: Last graph update resulted in buffer becoming close to full (%d of 4096 bytes). Entering panic_mode (no more graph updates)\r", expected_bytes_in_buffer
 						panic_mode = 1         
 	         		endif
 				else
-					if (expected_bytes_in_buffer > 1000)
-	//					printf "DEBUGGING: getting behind: Expecting %d bytes in buffer (max 4096)\r" expected_bytes_in_buffer		
+					if (expected_bytes_in_buffer > 3500)
+//						printf "DEBUGGING: getting behind: Expecting %d bytes in buffer (max 4096)\r" expected_bytes_in_buffer		
 						if (panic_mode == 0)
 							panic_mode = 1
-	//						printf "WARNING[scfd_RecordBuffer]: Getting behind on reading buffer, entering panic mode (no more graph updates until end of sweep)\r"				
+							printf "WARNING[scfd_RecordBuffer]: Getting behind on reading buffer, entering panic mode (no more graph updates until end of sweep)Expecting %d bytes in buffer (max 4096)\r"  expected_bytes_in_buffer				
 						endif			
 					endif
 				endif

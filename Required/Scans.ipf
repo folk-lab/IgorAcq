@@ -335,7 +335,7 @@ function ScanFastDAC2(start, fin, channels, [numptsx, sweeprate, delay, ramprate
 	variable j=0
 	
 	//setting every fastDAC to work independently
-	set_indep()
+	//set_indep()
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)

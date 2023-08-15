@@ -63,18 +63,21 @@ function openFastDACconnection(instrID, visa_address, [verbose,numDACCh,numADCCh
 end
 
 
-function openMultipleFDACs(VISAnums)
+function openMultipleFDACs(VISAnums, [verbose])
 	// This function is added to ease opening up multiple fastDAC connections in order
 	// It assumes the default options for verbose, numDACCh, numADCCh, and optical,
 	// The values can be found in the function openfastDACconnection()
 	// it will create the variables fd1,fd2,fd3.......
-	
 	string VISAnums
+	variable verbose
+	
+	killstrings /z sc_fdackeys
+	
 	int i
 	for(i=0;i<itemsinlist(VISAnums, ",");i++)	
 		string instrID      = "fd" + num2str(i+1)
 		string visa_address = "ASRL" + removewhitespace(stringfromlist(i,VISAnums, ",")) + "::INSTR"
-		openFastDACconnection(instrID, visa_address)
+		openFastDACconnection(instrID, visa_address, verbose=verbose)
 	endfor
 
 end
@@ -126,7 +129,7 @@ function set_indep()
 	for(i = 0; i<numfdacs; i++)
 		fdname = stringbykey("name" + num2str(i+1),sc_fdackeys,":",",")
 		nvar fd = $fdname
-		clearfdacBuffer(fd)
+		//clearfdacBuffer(fd)
 		check = queryInstr(fd, "SET_MODE,INDEP" + "\r\n")                   // sets all to independent
 		if (cmpstr(check, "INDEP_SET\r\n"))
 			abort "unable to set independent mode on fastDAC:  " + fdname
