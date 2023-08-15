@@ -1181,7 +1181,9 @@ function/S scg_initializeGraphs(S , [y_label])
 			endif
       	 endif
       	 
-      	if((raw==1) || (plotraw==1)) // Raw waves
+      	if(raw==1) // Raw waves
+	   		sc_rawGraphs1D = buffer
+	   	elseif(sc_plotRaw == 0)
 	   		sc_rawGraphs1D = buffer
       	endif
       	  
