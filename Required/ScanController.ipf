@@ -1431,7 +1431,9 @@ function/S scg_initializeGraphs(S , [y_label])
 			endif
       	 endif
       	 
-      	if((raw==1) && (sc_plotraw==1)) // Raw waves
+      	if(raw==1) // Raw waves
+	   		sc_rawGraphs1D = buffer
+	   	elseif(sc_plotRaw == 0)
 	   		sc_rawGraphs1D = buffer
       	endif
       	  
@@ -4826,11 +4828,7 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only])
 	
 	int i
 	string fdIDname
-	//for(i=0; i<itemsinlist(S.instrIDs); i++)  //this forloop is not fine
-		
-	//	fdIDname = stringfromlist(i,S.instrIDs)
-	//	nvar fdID = $fdIDname
-
+	nvar sc_plotraw
 	   do
 	   		for(i=0; i<itemsinlist(S.instrIDs); i++)
 	   			fdIDname = stringfromlist(i,S.instrIDs)
@@ -4843,6 +4841,9 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only])
 	      		bytes_read += read_chunk      
 	      		expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)      
 	      		if(!panic_mode && expected_bytes_in_buffer < saveBuffer)  // if we aren't too far behind then update Raw 1D graphs
+	         		if(!sc_plotRaw)
+	         			scfd_raw2CalcQuickDistribute()
+	         		endif
 	         		scg_updateRawGraphs() 
 		      		expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)  // Basically checking how long graph updates took
 					if(expected_bytes_in_buffer > 4096)
