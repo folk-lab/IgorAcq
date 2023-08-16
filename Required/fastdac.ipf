@@ -441,6 +441,24 @@ function setFADCSpeed(instrID,speed,[loadCalibration]) // Units: Hz
 end
 
 
+function RampMultipleChannels(channels, setpoints)
+	// uses ramp RampMultipleFDAC() without worrying about the IDs, figures it out internally
+	
+	string channels
+	string setpoints
+	sc_openInstrConnections(0)
+	channels = scu_getChannelNumbers(channels, fastdac=1)
+	string channelIDs = scc_checkDeviceNumber(channels = channels)
+	int i
+	for(i=0;i<itemsinlist(channels, ","); i++)
+		nvar fdID = $(stringfromlist(i, channelIDs))
+		string channel = stringfromlist(i, channels, ",")
+		string setpoint = stringfromlist(i, setpoints, ",")
+		rampMultipleFDAC(fdID, channel, str2num(setpoint))
+	endfor
+	
+end
+
 function RampMultipleFDAC(InstrID, channels, setpoint, [ramprate, setpoints_str, ignore_lims])
 	// Ramps multiple channels to setpoint(s) (this is the ramp function that SHOULD be used)
 	// InstrID - FastDAC connection variable (e.g. fd)

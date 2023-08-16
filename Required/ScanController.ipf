@@ -729,7 +729,7 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
 	///// Checks what devices need to be synced //////
 	S.dacListIDs = scc_checkDeviceNumber(S = S)
 	S.adcListIDs = scc_checkDeviceNumber(S = S, adc = 1)
-	string AWdacListIDs
+	string AWdacListIDs = ""
 	if(use_awg)
 		wave /t awgsetvalstr
 		string channels_AW0 = awgsetvalstr[0][1]
