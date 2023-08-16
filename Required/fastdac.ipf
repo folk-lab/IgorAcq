@@ -443,6 +443,8 @@ end
 
 function RampMultipleChannels(channels, setpoints)
 	// uses ramp RampMultipleFDAC() without worrying about the IDs, figures it out internally
+	// inputs:   comma seperated channel labels or numbers
+	// examples: channels = "0, 1, 18" , setpoints = "0, 100, 1000" (mV)
 	
 	string channels
 	string setpoints

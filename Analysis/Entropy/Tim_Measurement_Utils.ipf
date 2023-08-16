@@ -219,7 +219,7 @@ function GetTargetCSCurrent([oldcscurr, lower_lim, upper_lim, nosave])
 	variable oldcenter = str2num(fdacvalstr[str2num(channelstr)][1])
 
 	// Sweep CSQ +/- 20 mV around the current setting to get the charge sensor curve
-	ScanFastDAC2(oldcenter-20, oldcenter+20, channelstr, numptsx=10000, nosave=nosave, comments="Finding steepest part of CSQ, CSQ scan")
+	ScanFastDAC(oldcenter-20, oldcenter+20, channelstr, numptsx=10000, nosave=nosave, comments="Finding steepest part of CSQ, CSQ scan")
 	wave cscurrent
 
 	duplicate/o/free cscurrent cscurrentdiff
@@ -450,11 +450,11 @@ function CenterOnTransition([gate, virtual_gates, width, single_only])
 	wave/t fdacvalstr
 	initial = str2num(fdacvalstr[str2num(gate)][1])
 
-	ScanFastDAC2(initial-width, initial+width, gate, sweeprate=width, nosave=1)
+	ScanFastDAC(initial-width, initial+width, gate, sweeprate=width, nosave=1)
 	mid = findtransitionmid($"cscurrent", threshold=2)
 
 	if (single_only == 0 && numtype(mid) != 2)
-		ScanFastDAC2(mid-width/10, mid+width/10, gate, sweeprate=width/10, nosave=1)
+		ScanFastDAC(mid-width/10, mid+width/10, gate, sweeprate=width/10, nosave=1)
 		mid = findtransitionmid($"cscurrent", threshold=2)
 	endif
 

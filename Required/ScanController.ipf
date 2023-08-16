@@ -3202,6 +3202,8 @@ function RecordValues(S, i, j, [fillnan])
 		//silent abort (with code 10 which can be checked if caught elsewhere)
 		abortonvalue 1,10 
 	endtry
+	
+	scg_updateRawGraphs()
 end
 
 

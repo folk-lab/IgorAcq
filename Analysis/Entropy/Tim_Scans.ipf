@@ -26,7 +26,7 @@ function QpcStabilitySweeps()
 	variable pinchoff = -450
 	variable depletion = -50
 
-	ScanfastDAC2(depletion, pinchoff, "CSQ,CSS", repeats=20, sweeprate=abs(depletion-pinchoff)/90, alternate=1, comments="repeat, alternating, checking stability of CS gates", nosave=0)
+	ScanfastDAC(depletion, pinchoff, "CSQ,CSS", repeats=20, sweeprate=abs(depletion-pinchoff)/90, alternate=1, comments="repeat, alternating, checking stability of CS gates", nosave=0)
 	rampmultipleFDAC(fd, "CSQ,CSS", 0)
 end
 
@@ -63,7 +63,7 @@ function NoiseOnOffTransition([num_repeats])
 		
 		// 1D scan before noise on transition
 		
-		ScanFastDAC2(mid-centering_width/2, mid+centering_width/2, sweepgate, sweeprate=sweeprate, y_label="Current /nA", comments="transition, Scan before on transition measurment num="+num2istr(i), nosave=0)
+		ScanFastDAC(mid-centering_width/2, mid+centering_width/2, sweepgate, sweeprate=sweeprate, y_label="Current /nA", comments="transition, Scan before on transition measurment num="+num2istr(i), nosave=0)
 
 		// Careful centering
 		wave w = $"cscurrent"
@@ -100,7 +100,7 @@ function checkPinchOffs(instrID, channels, gate_names, ohmic_names, max_bias, [r
 
 	string buffer
 	sprintf buffer, "Pinch off, Gates=%s, Ohmics=%s", gate_names, ohmic_names
-	ScanFastDAC2(0, max_bias, channels, sweeprate=300, x_label=gate_names+" /mV", y_label="Current /nA", comments=buffer, nosave=nosave, repeats=2, alternate=1)
+	ScanFastDAC(0, max_bias, channels, sweeprate=300, x_label=gate_names+" /mV", y_label="Current /nA", comments=buffer, nosave=nosave, repeats=2, alternate=1)
 	if (reset_zero)
 		rampmultiplefdac(instrID, channels, 0)
 	endif
@@ -123,7 +123,7 @@ function checkPinchOffsSlow(instrID, start, fin, channels, numpts, delay, rampra
 		rampmultiplebd(instrID, channels, 0, ramprate=ramprate)
 	else
 		rampmultiplefdac(instrID, channels, 0, ramprate=ramprate)	
-		scanfastDacSlow2(start, fin, channels, numpts, delay, ramprate, until_checkwave=current_wave, until_stop_val=cutoff_nA, until_operator="<", y_label="Current /nA", comments=comment)
+		scanfastDacSlow(start, fin, channels, numpts, delay, ramprate, until_checkwave=current_wave, until_stop_val=cutoff_nA, until_operator="<", y_label="Current /nA", comments=comment)
 		rampmultiplefdac(instrID, channels, 0, ramprate=ramprate)
 	endif
 end
@@ -159,9 +159,9 @@ function DotTuneAround(x, y, width_x, width_y, channelx, channely, [sweeprate, r
 	//CorrectChargeSensor(fd=fd, fdchannelstr=csname, fadcID=fd, fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1)
 	CorrectChargeSensor(fd=fdcs_id, fdchannelstr=csname, fadcID=fd, fadcchannel=fadcchannel, check=0,  direction=1)
 	if (y_is_bd)
-		ScanFastDAC2D2( x-width_x, x+width_x, channelx, y-width_y, y+width_y, channely, numptsy, bdID = bd, sweeprate=sweeprate, rampratex=ramprate_x, nosave=nosave, comments="Dot Tuning, "+additional_comments)
+		ScanFastDAC2D( x-width_x, x+width_x, channelx, y-width_y, y+width_y, channely, numptsy, bdID = bd, sweeprate=sweeprate, rampratex=ramprate_x, nosave=nosave, comments="Dot Tuning, "+additional_comments)
 	else
-		ScanFastDAC2D2( x-width_x, x+width_x, channelx, y-width_y, y+width_y, channely, numptsy, sweeprate=sweeprate, rampratex=ramprate_x, nosave=nosave, comments="Dot Tuning, "+additional_comments) // CHANGE FOR FD2 ON Y-AXIS
+		ScanFastDAC2D( x-width_x, x+width_x, channelx, y-width_y, y+width_y, channely, numptsy, sweeprate=sweeprate, rampratex=ramprate_x, nosave=nosave, comments="Dot Tuning, "+additional_comments) // CHANGE FOR FD2 ON Y-AXIS
 	endif
 	wave tempwave = $"cscurrent_2d"
 	nvar filenum
@@ -1134,7 +1134,7 @@ function ScanAlongTransition(step_gate, step_size, step_range, center_gate, swee
 		string virtual_mids
 		strswitch (scan_type)
 			case "center_test":
-				ScanFastDAC2( -1000, 1000, "ACC*400", sweeprate=10000, nosave=1)
+				ScanFastDAC( -1000, 1000, "ACC*400", sweeprate=10000, nosave=1)
 				rampmultiplefdac(fd, "ACC*400", 0)
 				break
 			case "transition":
@@ -1166,7 +1166,7 @@ function ScanAlongTransition(step_gate, step_size, step_range, center_gate, swee
 			case "csq only":
 				RampMultiplefdac(fd, "ACC*1000", -10000)
 				csq_val = str2num(fdacvalstr[str2num(scu_getChannelNumbers("CSQ", fastdac=1))][1])
-				ScanFastDAC2( csq_val-50, csq_val+50, "CSQ", sweeprate=100, nosave=0, comments="charge sensor trace")
+				ScanFastDAC( csq_val-50, csq_val+50, "CSQ", sweeprate=100, nosave=0, comments="charge sensor trace")
 				RampMultiplefdac(fd, "ACC*1000", 0)
 				RampMultiplefdac(fd, "CSQ", csq_val)
 				break
@@ -1292,7 +1292,7 @@ function ScanEntropyRepeat([num, center_first, balance_multiplier, width, hqpc_b
 		else
 			printf "Starting scan %d of %d\r", i+1, num
 		endif
-		ScanFastDAC2( mid-width1, mid+width1, sweepgate, repeats=repeats, sweeprate=sweeprate, delay=0.1, alternate=0, comments=comments, use_awg=1,  nosave=nosave)
+		ScanFastDAC( mid-width1, mid+width1, sweepgate, repeats=repeats, sweeprate=sweeprate, delay=0.1, alternate=0, comments=comments, use_awg=1,  nosave=nosave)
 		
 		rampmultiplefdac(fd, sweepgate, mid)
 		i++
@@ -1364,12 +1364,12 @@ function ScanTransition([num_scans, sweeprate, width, ramprate, repeats, center_
 			string starts, fins, sweep_channels
 			calculate_virtual_starts_fins_using_ratio(mid, width, sweep_gate, virtual_gates, virtual_mids, virtual_ratios, sweep_channels, starts, fins)	
 		
-			ScanFastDAC2( 0, 0, sweep_channels, repeats=repeats, sweeprate=sweeprate, ramprate=ramprate, starts=starts, fins=fins, delay=delayy, comments=comments + additional_comments, alternate=alternate, nosave=nosave, use_AWG=use_AWG)
+			ScanFastDAC( 0, 0, sweep_channels, repeats=repeats, sweeprate=sweeprate, ramprate=ramprate, starts=starts, fins=fins, delay=delayy, comments=comments + additional_comments, alternate=alternate, nosave=nosave, use_AWG=use_AWG)
 			rampmultiplefDAC(fd, virtual_gates, 0, setpoints_str=virtual_mids)
 			rampmultiplefdac(fd, sweep_gate, mid, ramprate=ramprate)	
 		
 		else 
-			ScanFastDAC2(mid-width, mid+width, sweep_gate, repeats=repeats, sweeprate=sweeprate, ramprate=ramprate, delay=delayy, comments=comments + additional_comments, alternate=alternate, nosave=nosave, use_AWG=use_AWG)
+			ScanFastDAC(mid-width, mid+width, sweep_gate, repeats=repeats, sweeprate=sweeprate, ramprate=ramprate, delay=delayy, comments=comments + additional_comments, alternate=alternate, nosave=nosave, use_AWG=use_AWG)
 			rampmultiplefdac(fd, sweep_gate, mid, ramprate=ramprate)	
 		endif
 	
@@ -1417,13 +1417,13 @@ function ScanWithVirtualRatios(fdID, mid_x, width_x, channelx, sweeprate, [comme
 	//// DECIDE WHICH SCAN FUNCTION TO PASS TO ////
 	// IF INTERLACED_Y
 	if (!paramisDefault(interlaced_channels) && !paramIsDefault(channely))
-		ScanFastDAC2D2(0, 0, channelsx, 0, 0, channelsy, numptsy,  sweeprate=sweeprate, delayy=delayy, startxs=startxs, finxs=finxs, startys=startys, finys=finys, comments=comments, nosave=0, use_AWG=use_awg, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints)
+		ScanFastDAC2D(0, 0, channelsx, 0, 0, channelsy, numptsy,  sweeprate=sweeprate, delayy=delayy, startxs=startxs, finxs=finxs, startys=startys, finys=finys, comments=comments, nosave=0, use_AWG=use_awg, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints)
 	// IF REGULAR 1D	
 	elseif (paramIsDefault(channely))
-		ScanFastDAC2(0, 0, channelsx, sweeprate=sweeprate, delay=delayy, repeats=repeats, alternate=alternate, starts=startxs, fins=finxs, comments=comments, nosave=0, use_awg=use_awg,  interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints)
+		ScanFastDAC(0, 0, channelsx, sweeprate=sweeprate, delay=delayy, repeats=repeats, alternate=alternate, starts=startxs, fins=finxs, comments=comments, nosave=0, use_awg=use_awg,  interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints)
 	// IF REGULAR 2D
 	else
-		ScanFastDAC2D2(0, 0, channelsx, 0, 0, channelsy, numptsy,  sweeprate=sweeprate, delayy=delayy, startxs=startxs, finxs=finxs, startys=startys, finys=finys, comments=comments, nosave=0, use_AWG=use_awg)
+		ScanFastDAC2D(0, 0, channelsx, 0, 0, channelsy, numptsy,  sweeprate=sweeprate, delayy=delayy, startxs=startxs, finxs=finxs, startys=startys, finys=finys, comments=comments, nosave=0, use_AWG=use_awg)
 	endif
 
 	/////// Gates back to Middle values (Usually nicer than having them left at the end of a scan)
@@ -1519,7 +1519,7 @@ function DCbiasRepeats(max_current, num_steps, duration, [voltage_ratio])
 	rampmultipleFDAC(fd, current_channel, 0)
 	rampmultipleFDAC(fd, voltage_channel, 0)
 	sprintf comments, "DCbias Repeat, zero bias"
-	ScanFastDAC2(-scan_width, scan_width, "ACC*400", repeats=repeats, sweeprate=sweeprate, comments=comments, nosave=0)
+	ScanFastDAC(-scan_width, scan_width, "ACC*400", repeats=repeats, sweeprate=sweeprate, comments=comments, nosave=0)
 
 	// Measure with non-zero bias
 	variable setpoint
@@ -1531,13 +1531,13 @@ function DCbiasRepeats(max_current, num_steps, duration, [voltage_ratio])
 		rampmultipleFDAC(fd, current_channel, setpoint)
 		rampmultipleFDAC(fd, voltage_channel, -setpoint*voltage_ratio)
 		sprintf comments, "DCbias Repeat, %.3f nA" setpoint/current_resistor
-		ScanFastDAC2(-scan_width, scan_width, "ACC*400", repeats=repeats, sweeprate=sweeprate, comments=comments, nosave=0)
+		ScanFastDAC(-scan_width, scan_width, "ACC*400", repeats=repeats, sweeprate=sweeprate, comments=comments, nosave=0)
 
 		// Measure negative bias
 		rampmultipleFDAC(fd, current_channel, -setpoint)
 		rampmultipleFDAC(fd, voltage_channel, setpoint*voltage_ratio)
 		sprintf comments, "DCbias Repeat, %.3f nA" -setpoint/current_resistor
-		ScanFastDAC2(-scan_width, scan_width, "ACC*400", repeats=repeats, sweeprate=sweeprate, comments=comments, nosave=0)
+		ScanFastDAC(-scan_width, scan_width, "ACC*400", repeats=repeats, sweeprate=sweeprate, comments=comments, nosave=0)
 
 	endfor
 
@@ -1568,7 +1568,7 @@ function QPCProbe(InstrID, channels, [scan_time, max_voltage, steps, delay, repe
 	for(i = -steps; abs(i) <= abs(max_voltage); i-=steps)
        printf "Scanning 0 -> %d\r"i
        sweeprate = abs(i/scan_time)
-       ScanFastDAC2(0, i, channels, sweeprate=sweeprate, delay=delay, repeats=repeats, alternate=1)
+       ScanFastDAC(0, i, channels, sweeprate=sweeprate, delay=delay, repeats=repeats, alternate=1)
 
 	endfor
 	

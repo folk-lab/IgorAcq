@@ -325,7 +325,7 @@ function ReadVsTimeFastdac(instrID, duration, [y_label, comments, nosave]) // Un
 	endif
 end
 
-function ScanFastDAC2(start, fin, channels, [numptsx, sweeprate, delay, ramprate, repeats, alternate, starts, fins, x_label, y_label, comments, nosave, use_awg, interlaced_channels, interlaced_setpoints])
+function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate, repeats, alternate, starts, fins, x_label, y_label, comments, nosave, use_awg, interlaced_channels, interlaced_setpoints])
 	// 1D repeat scan for FastDAC
 	// Note: to alternate scan direction set alternate=1
 	// Note: Ramprate is only for ramping gates between scans
@@ -424,7 +424,7 @@ function ScanFastDAC2(start, fin, channels, [numptsx, sweeprate, delay, ramprate
 end
 
 
-function ScanFastDacSlow2(start, fin, channels, numpts, delay, ramprate, [starts, fins, y_label, repeats, alternate, delayy, until_checkwave, until_stop_val, until_operator, comments, nosave]) //Units: mV
+function ScanFastDacSlow(start, fin, channels, numpts, delay, ramprate, [starts, fins, y_label, repeats, alternate, delayy, until_checkwave, until_stop_val, until_operator, comments, nosave]) //Units: mV
 	// sweep one or more FastDAC channels but in the ScanController way (not ScanControllerFastdac). I.e. ramp, measure, ramp, measure...
 	// channels should be a comma-separated string ex: "0, 4, 5"
 	
@@ -527,6 +527,7 @@ function ScanFastDacSlow2(start, fin, channels, numpts, delay, ramprate, [starts
 		if (alternate!=0) // If want to alternate scan scandirection for next row
 			d = d*-1
 		endif
+		
 	endfor
 	
 	//set all fastdacs back to independent
@@ -541,7 +542,7 @@ function ScanFastDacSlow2(start, fin, channels, numpts, delay, ramprate, [starts
 end
 
 
-function ScanFastDacSlow2D2(startx, finx, channelsx, numptsx, delayx, starty, finy, channelsy, numptsy, [rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave])
+function ScanFastDacSlow2D(startx, finx, channelsx, numptsx, delayx, starty, finy, channelsy, numptsy, [rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave])
 	// sweep one or more FastDAC channels but in the ScanController way (not ScanControllerFastdac). I.e. ramp, measure, ramp, measure...
 	// channels should be a comma-separated string ex: "0, 4, 5"
 	
@@ -616,7 +617,7 @@ end
 
 
 
-function ScanFastDAC2D2(startx, finx, channelsx, starty, finy, channelsy, numptsy, [numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave, use_AWG, interlaced_channels, interlaced_setpoints, y_label])
+function ScanFastDAC2D(startx, finx, channelsx, starty, finy, channelsy, numptsy, [numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave, use_AWG, interlaced_channels, interlaced_setpoints, y_label])
 	// need to remove fdID, fyID
 	
 	// EXAMPLE: scanfastdac2d2(0, 1000, "10, 2", 0, 500, "0,8", 4, startxs = "0, 100", startys = "0, 100", finxs = "1000,900", finys = "800,400", sweeprate = 250, interlaced_channels = "19", interlaced_setpoints = "100, 300")
@@ -1071,7 +1072,7 @@ function ScanBabyDACMultipleK24002D(bdID, startx, finx, channelsx, numptsx, dela
 	endif
 end
 
-function ScanFastDACK24002D2(startx, finx, keithleyID, starty, finy, numptsy, [numpts, sweeprate, rampratex, rampratey, delayy, startxs, finxs, y_label, comments, nosave, use_AWG])
+function ScanFastDACK24002D(startx, finx, keithleyID, starty, finy, numptsy, [numpts, sweeprate, rampratex, rampratey, delayy, startxs, finxs, y_label, comments, nosave, use_AWG])
 
 
 	// not tested but should likely work - master/slave updated.
@@ -1400,7 +1401,7 @@ function ScanBabyDACLS625Magnet2D(bdID, startx, finx, channelsx, numptsx, delayx
 end
 
 
-function ScanFastDACLS625Magnet2D2(fdID, startx, finx, channelsx, magnetID, starty, finy, numptsy, [numpts, sweeprate, rampratex, delayy, startxs, finxs, y_label, comments, nosave, use_AWG])
+function ScanFastDACLS625Magnet2D(fdID, startx, finx, channelsx, magnetID, starty, finy, numptsy, [numpts, sweeprate, rampratex, delayy, startxs, finxs, y_label, comments, nosave, use_AWG])
 
 	// not tested but should likely work - master/slave updated.
 	
@@ -1482,7 +1483,7 @@ function ScanFastDACLS625Magnet2D2(fdID, startx, finx, channelsx, magnetID, star
 end
 
 
-function ScanFastDacSlowLS625Magnet2D2(instrIDx, startx, finx, channelsx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, [rampratey, y_label, comments, nosave])
+function ScanFastDacSlowLS625Magnet2D(instrIDx, startx, finx, channelsx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, [rampratey, y_label, comments, nosave])
 	// sweep one or more FastDAC channels but in the ScanController way (not ScanControllerFastdac). I.e. ramp, measure, ramp, measure...
 	// channels should be a comma-separated string ex: "0, 4, 5"
 	
