@@ -58,7 +58,7 @@ function NoiseOnOffTransition([num_repeats])
 	variable i, mid
 	// Measure on transition
 	for (i=0; i<num_repeats; i++)
-		CorrectChargeSensor(fd=fd, fdchannelstr=CSQ_gate, fadcID=fd, fadcchannel=0, check=0, direction=1)
+		CorrectChargeSensor(fd=fd, fdchannelstr=CSQ_gate, fadcID="fd", fadcchannel=0, check=0, direction=1)
 		mid = CenterOnTransition(gate=sweepgate, width=centering_width, single_only=1)
 		
 		// 1D scan before noise on transition
@@ -157,7 +157,7 @@ function DotTuneAround(x, y, width_x, width_y, channelx, channely, [sweeprate, r
 	endif
 
 	//CorrectChargeSensor(fd=fd, fdchannelstr=csname, fadcID=fd, fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1)
-	CorrectChargeSensor(fd=fdcs_id, fdchannelstr=csname, fadcID=fd, fadcchannel=fadcchannel, check=0,  direction=1)
+	CorrectChargeSensor(fd=fdcs_id, fdchannelstr=csname, fadcID="fd", fadcchannel=fadcchannel, check=0,  direction=1)
 	if (y_is_bd)
 		ScanFastDAC2D( x-width_x, x+width_x, channelx, y-width_y, y+width_y, channely, numptsy, bdID = bd, sweeprate=sweeprate, rampratex=ramprate_x, nosave=nosave, comments="Dot Tuning, "+additional_comments)
 	else
@@ -200,7 +200,7 @@ function DotTuneAround2(x, y, width_x, width_y, channelx, channely, [sweeprate, 
 	// First go to middle of scan and get charges sensor roughly right (might want to remove this later)
 	rampmultiplefdac(fd, channelx, x, ramprate=ramprate_x)
 	rampmultiplefdac(fdy, channely, y)
-	CorrectChargeSensor(fd=fdcs, fdchannelstr=csname, fadcID=fd, fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15)
+	CorrectChargeSensor(fd=fdcs, fdchannelstr=csname, fadcID="fd", fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15)
 	
 	// Then go to each corner of the scan and record the CSQ gate value required for CS to be most sensitive
 	// Corners ordered (sx|sy, fx|sy, sx|fy, fx|fy)
@@ -212,7 +212,7 @@ function DotTuneAround2(x, y, width_x, width_y, channelx, channely, [sweeprate, 
 	for (i=0; i<numpnts(corner_xs);i++)
 		rampmultipleFDAC(fd, channelx, corner_xs[i]) // change to complicated 
 		rampmultipleFDAC(fdy, channely, corner_ys[i])
-		CorrectChargeSensor(fd=fdcs, fdchannelstr=csname, fadcID=fd, fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15) //added cutoff time so we don't have to wait while de-bugging
+		CorrectChargeSensor(fd=fdcs, fdchannelstr=csname, fadcID="fd", fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15) //added cutoff time so we don't have to wait while de-bugging
 		corners = AddListItem(num2str(fdacvalstr[csq_channel_num][1]), corners, ",", INF) // CSQ gate values
 	endfor
 	
@@ -307,7 +307,7 @@ function DotTuneAroundVirtual(x_str, y_str, width_x_str, width_y_str, channelx_s
 		rampmultipleFDAC(fd, StringFromList(i, channely_str, ","), str2num(StringFromList(i, y_str, ",")))
 	endfor
 
-	CorrectChargeSensor(fd=fd, fdchannelstr=csname, fadcID=fd, fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15)
+	CorrectChargeSensor(fd=fd, fdchannelstr=csname, fadcID="fd", fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15)
 
 
 
@@ -322,7 +322,7 @@ function DotTuneAroundVirtual(x_str, y_str, width_x_str, width_y_str, channelx_s
 		rampmultipleFDAC(fd, StringFromList(i, channely_str, ","), str2num(StringFromList(i, y_str, ",")) - str2num(StringFromList(i, width_y_str, ",")))
   endfor
   
-  CorrectChargeSensor(fd=fd, fdchannelstr=csname, fadcID=fd, fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15) //added cutoff time so we don't have to wait while de-bugging
+  CorrectChargeSensor(fd=fd, fdchannelstr=csname, fadcID="fd", fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15) //added cutoff time so we don't have to wait while de-bugging
   corners = AddListItem(num2str(fdacvalstr[csq_channel_num][1]), corners, ",", INF)
   
   
@@ -336,7 +336,7 @@ function DotTuneAroundVirtual(x_str, y_str, width_x_str, width_y_str, channelx_s
 		rampmultipleFDAC(fd, StringFromList(i, channely_str, ","), str2num(StringFromList(i, y_str, ",")) - str2num(StringFromList(i, width_y_str, ",")))
   endfor
   
-  CorrectChargeSensor(fd=fd, fdchannelstr=csname, fadcID=fd, fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15) //added cutoff time so we don't have to wait while de-bugging
+  CorrectChargeSensor(fd=fd, fdchannelstr=csname, fadcID="fd", fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15) //added cutoff time so we don't have to wait while de-bugging
   corners = AddListItem(num2str(fdacvalstr[csq_channel_num][1]), corners, ",", INF)
   
   
@@ -350,7 +350,7 @@ function DotTuneAroundVirtual(x_str, y_str, width_x_str, width_y_str, channelx_s
 		rampmultipleFDAC(fd, StringFromList(i, channely_str, ","), str2num(StringFromList(i, y_str, ",")) + str2num(StringFromList(i, width_y_str, ",")))
   endfor
   
-  CorrectChargeSensor(fd=fd, fdchannelstr=csname, fadcID=fd, fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15) //added cutoff time so we don't have to wait while de-bugging
+  CorrectChargeSensor(fd=fd, fdchannelstr=csname, fadcID="fd", fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15) //added cutoff time so we don't have to wait while de-bugging
   corners = AddListItem(num2str(fdacvalstr[csq_channel_num][1]), corners, ",", INF)
   
   
@@ -364,7 +364,7 @@ function DotTuneAroundVirtual(x_str, y_str, width_x_str, width_y_str, channelx_s
 		rampmultipleFDAC(fd, StringFromList(i, channely_str, ","), str2num(StringFromList(i, y_str, ",")) + str2num(StringFromList(i, width_y_str, ",")))
   endfor
   
-  CorrectChargeSensor(fd=fd, fdchannelstr=csname, fadcID=fd, fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15) //added cutoff time so we don't have to wait while de-bugging
+  CorrectChargeSensor(fd=fd, fdchannelstr=csname, fadcID="fd", fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15) //added cutoff time so we don't have to wait while de-bugging
   corners = AddListItem(num2str(fdacvalstr[csq_channel_num][1]), corners, ",", INF)
   
   
@@ -1102,17 +1102,17 @@ function ScanAlongTransition(step_gate, step_size, step_range, center_gate, swee
 			mid = cg_val
 		endif
 		
-		CorrectChargeSensor(fd=fd, fdchannelstr=correct_cs_gate, fadcID=fd, fadcchannel=correct_cs_fadcchannel, check=0, direction=1, natarget=natarget, gate_divider=correct_cs_gate_divider)
+		CorrectChargeSensor(fd=fd, fdchannelstr=correct_cs_gate, fadcID="fd", fadcchannel=correct_cs_fadcchannel, check=0, direction=1, natarget=natarget, gate_divider=correct_cs_gate_divider)
 		RampMultiplefdac(fd, sweep_gate, mid)
 		if(sg_val < center_limit)
 			cg_val = CenterOnTransition(gate=center_gate, width=centering_width, single_only=1)
 			if (cmpstr(center_gate, sweep_gate) != 0)
 				RampMultiplefdac(fd, sweep_gate, mid-200)
-				CorrectChargeSensor(fd=fd, fdchannelstr=correct_cs_gate, fadcID=fd, fadcchannel=correct_cs_fadcchannel, check=0, direction=1, natarget=natarget, gate_divider=correct_cs_gate_divider)
+				CorrectChargeSensor(fd=fd, fdchannelstr=correct_cs_gate, fadcID="fd", fadcchannel=correct_cs_fadcchannel, check=0, direction=1, natarget=natarget, gate_divider=correct_cs_gate_divider)
 				RampMultiplefdac(fd, sweep_gate, mid)
 				cg_val = CenterOnTransition(gate=center_gate, width=centering_width, single_only=1)
 			else
-				CorrectChargeSensor(fd=fd, fdchannelstr=correct_cs_gate, fadcID=fd, fadcchannel=correct_cs_fadcchannel, check=0, direction=1, natarget=natarget, gate_divider=correct_cs_gate_divider)
+				CorrectChargeSensor(fd=fd, fdchannelstr=correct_cs_gate, fadcID="fd", fadcchannel=correct_cs_fadcchannel, check=0, direction=1, natarget=natarget, gate_divider=correct_cs_gate_divider)
 				cg_val = CenterOnTransition(gate=center_gate, width=centering_width, single_only=1)
 			endif
 		endif
@@ -1126,7 +1126,7 @@ function ScanAlongTransition(step_gate, step_size, step_range, center_gate, swee
 		endif
 
 		RampMultiplefdac(fd, sweep_gate, mid-200)
-		CorrectChargeSensor(fd=fd, fdchannelstr=correct_cs_gate, fadcID=fd, fadcchannel=correct_cs_fadcchannel, check=0, direction=1, natarget=natarget, gate_divider=correct_cs_gate_divider)
+		CorrectChargeSensor(fd=fd, fdchannelstr=correct_cs_gate, fadcID="fd", fadcchannel=correct_cs_fadcchannel, check=0, direction=1, natarget=natarget, gate_divider=correct_cs_gate_divider)
 
 		string virtual_mids
 		strswitch (scan_type)
@@ -1268,9 +1268,9 @@ function ScanEntropyRepeat([num, center_first, balance_multiplier, width, hqpc_b
 		centerontransition(gate=centergate, width=center_width)
 		rampmultiplefdac(fd, sweepgate, center-200)
 		if (!paramisdefault(cs_target))
-			CorrectChargeSensor(fd=fd, fdchannelstr="CSQ", fadcID=fd, fadcchannel=0, check=0, direction=1, natarget=cs_target)
+			CorrectChargeSensor(fd=fd, fdchannelstr="CSQ", fadcID="fd", fadcchannel=0, check=0, direction=1, natarget=cs_target)
 		else
-			CorrectChargeSensor(fd=fd, fdchannelstr="CSQ", fadcID=fd, fadcchannel=0, check=0, direction=1)
+			CorrectChargeSensor(fd=fd, fdchannelstr="CSQ", fadcID="fd", fadcchannel=0, check=0, direction=1)
 		endif
 		rampmultiplefdac(fd, sweepgate, center)
 		mid = centerontransition(gate=sweepgate, width=sweepgate_center_width, single_only=1)
@@ -1344,9 +1344,9 @@ function ScanTransition([num_scans, sweeprate, width, ramprate, repeats, center_
 				rampmultiplefdac(fd, sweep_gate, -width*0.5, ramprate=ramprate) // only ramp to outside transition if not a virtual scan
 			endif
 			if (!paramisdefault(cs_target))
-				CorrectChargeSensor(fd=fdcs_id, fdchannelstr=csqpc_gate, fadcID=fd, fadcchannel=fadcchannel, check=0, direction=1, natarget=cs_target, gate_divider=gate_divider)
+				CorrectChargeSensor(fd=fdcs_id, fdchannelstr=csqpc_gate, fadcID="fd", fadcchannel=fadcchannel, check=0, direction=1, natarget=cs_target, gate_divider=gate_divider)
 			else
-				CorrectChargeSensor(fd=fdcs_id, fdchannelstr=csqpc_gate, fadcID=fd, fadcchannel=fadcchannel, check=0, direction=1, gate_divider=gate_divider)
+				CorrectChargeSensor(fd=fdcs_id, fdchannelstr=csqpc_gate, fadcID="fd", fadcchannel=fadcchannel, check=0, direction=1, gate_divider=gate_divider)
 			endif
 		endif
 		sprintf comments, "transition"

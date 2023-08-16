@@ -208,10 +208,10 @@ function GetTargetCSCurrent([oldcscurr, lower_lim, upper_lim, nosave])
 
 	// Begin by calling CorrectChargeSensor with default things
 	if (paramisDefault(oldcscurr))
-		CorrectChargeSensor(fd=fd, fdchannelstr=channelstr, fadcID=fd, fadcchannel=0, check=0, direction=1)
-		oldcscurr = getFADCvalue(fd, 0, len_avg=0.3)
+		CorrectChargeSensor(fd=fd, fdchannelstr=channelstr, fadcID="fd", fadcchannel=0, check=0, direction=1)
+		oldcscurr = getFADCvalue("fd", 0, len_avg=0.3)
 	else
-		CorrectChargeSensor(fd=fd, fdchannelstr=channelstr, fadcID=fd, fadcchannel=0, check=0, direction=1, natarget=oldcscurr)
+		CorrectChargeSensor(fd=fd, fdchannelstr=channelstr, fadcID="fd", fadcchannel=0, check=0, direction=1, natarget=oldcscurr)
 	endif
 
 	// Get the current value of CSQ
@@ -240,7 +240,7 @@ function GetTargetCSCurrent([oldcscurr, lower_lim, upper_lim, nosave])
 	endif
 
 	rampmultiplefdac(fd, channelstr, newcenter)
-	variable newcscurr = getFADCvalue(fd, 0, len_avg=0.3)
+	variable newcscurr = getFADCvalue("fd", 0, len_avg=0.3)
 
 	// If a strangely small or large cscurrent, ramp back to center and return
 	if(newcscurr > upper_lim || newcscurr < lower_lim)
@@ -257,8 +257,8 @@ end
 function CorrectChargeSensor([bd, bdchannelstr, dmmid, fd, fdchannelstr, fadcID, fadcchannel, i, check, natarget, direction, zero_tol, gate_divider, cutoff_time])
 //Corrects the charge sensor by ramping the CSQ in 1mV steps
 //(direction changes the direction it tries to correct in)
-	variable bd, dmmid, fd, fadcID, fadcchannel, i, check, natarget, direction, zero_tol, gate_divider, cutoff_time
-	string fdchannelstr, bdchannelstr
+	variable bd, dmmid, fd, fadcchannel, i, check, natarget, direction, zero_tol, gate_divider, cutoff_time
+	string fdchannelstr, bdchannelstr, fadcID
 	variable cdac, cfdac, current, new_current, nextdac, j
 	wave/T dacvalstr
 	wave/T fdacvalstr

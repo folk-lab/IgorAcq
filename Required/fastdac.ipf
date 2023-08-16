@@ -202,7 +202,13 @@ function getFADCchannel(fdid, channel, [len_avg, fdIDname])
 	fdIDname = selectstring(paramisdefault(fdIDname), fdIDname, "")
 	len_avg = paramisdefault(len_avg) ? 0.05 : len_avg
 	
-	variable numpts = ceil(getFADCspeed(fdid)*len_avg)
+	variable numpts
+	if(!paramisdefault(fdIDname))
+		nvar instrID = $fdIDname
+		numpts = ceil(getFADCspeed(instrID)*len_avg)
+	else
+		numpts = ceil(getFADCspeed(fdID)*len_avg)
+	endif
 	if(numpts <= 0)
 		numpts = 1
 	endif
@@ -216,14 +222,14 @@ function getFADCchannel(fdid, channel, [len_avg, fdIDname])
 	return V_avg
 end
 
-function getFADCvalue(fdid, channel, [len_avg])
+function getFADCvalue(fdIDname, channel, [len_avg])
 	// Same as FADCchannel except it also applies the Calc Function before returning
 	// Note: Min read time is ~60ms because of having to check SamplingFreq a couple of times -- Could potentially be optimized further if necessary
-	variable fdid, channel, len_avg
-	
+	variable channel, len_avg
+	string fdIDname
 	len_avg = paramisdefault(len_avg) ? 0.05 : len_avg
 
-	variable/g scfd_val_mv = getFADCchannel(fdid, channel, len_avg=len_avg)  // Must be global so can use execute
+	variable/g scfd_val_mv = getFADCchannel(0, channel, len_avg=len_avg, fdIDname = fdIDname)  // Must be global so can use execute
 	variable/g scfd_val_real
 	wave/t fadcvalstr
 	string func = fadcvalstr[channel][4]
@@ -2081,7 +2087,8 @@ function fd_readChunk(fdid, adc_channels, numpts, [fdIDname])
 		make/o/n=(numpts) $wn = NaN
 		wavenames = addListItem(wn, wavenames, ";", INF)
 	endfor
-
+	
+	nvar instrID = $fdIDname
 	Struct ScanVars S
 	S.numptsx = numpts
 	S.instrIDx = fdid
@@ -2089,7 +2096,7 @@ function fd_readChunk(fdid, adc_channels, numpts, [fdIDname])
 	S.adcList = adc_channels  		// Recording specified channels, not ticked boxes in ScanController_Fastdac
 	S.numADCs = itemsInList(S.adcList) // gives me an error if i leave this out
 	S.maxADCs = itemsInList(S.adcList) 
-	S.samplingFreq = getFADCspeed(S.instrIDx)
+	S.samplingFreq = getFADCspeed(instrID)
 	S.raw_wave_names = wavenames  	// Override the waves the rawdata gets saved to
 	S.never_save = 1
 	S.instrIDs = fdIDname //attempt
