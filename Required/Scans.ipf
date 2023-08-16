@@ -481,7 +481,7 @@ function ScanFastDacSlow(start, fin, channels, numpts, delay, ramprate, [starts,
 	S.lims_checked = 1
 	
 	// set devices needed to master slave
-	set_master_slave(S)
+	//set_master_slave(S)  We don't need master-slave for slow sweeps
 	
 	// Ramp to start without checks because checked above
 	RampStartFD(S, ignore_lims=1)
@@ -516,6 +516,7 @@ function ScanFastDacSlow(start, fin, channels, numpts, delay, ramprate, [starts,
 				endif
 			endif
 			i+=1
+			doupdate
 		while (i<S.numptsx)
 		
 		if (alternate!=0) // If want to alternate scan scandirection for next row
@@ -571,7 +572,7 @@ function ScanFastDacSlow2D(startx, finx, channelsx, numptsx, delayx, starty, fin
 	S.lims_checked = 1
 	
 	//set devices to master slave
-	set_master_slave(S)
+	//set_master_slave(S): we do not need master-slave for slow scans
 
 	// Ramp to start without checks because checked above
 	RampStartFD(S, ignore_lims=1)
@@ -1492,7 +1493,7 @@ function ScanFastDacSlowLS625Magnet2D(instrIDx, startx, finx, channelsx, numptsx
 	scc_checkLimsFD(S)
 	S.lims_checked = 1
 
-	set_master_slave(S)
+	//set_master_slave(S): we do not need master-slave for slow scans
 	
 	// Ramp to start without checks since checked above
 	RampStartFD(S, ignore_lims = 1)

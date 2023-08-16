@@ -2391,10 +2391,10 @@ function InitScanController([configFile])
 //		else
 			// if there are no config files, use defaults
 			// These arrays should have the same size. Their indeces correspond to each other.
-			make/t/o sc_RawWaveNames = {"g1x", "g1y"} // Wave names to be created and saved
-			make/o sc_RawRecord = {0,0} // Whether you want to record and save the data for this wave
-			make/o sc_RawPlot = {0,0} // Whether you want to plot the data for this wave
-			make/t/o sc_RawScripts = {"readSRSx(srs1)", "readSRSy(srs1)"}
+			make/t/o sc_RawWaveNames = {"g1x", "g1y","I_leak"} // Wave names to be created and saved
+			make/o sc_RawRecord = {0,0,0} // Whether you want to record and save the data for this wave
+			make/o sc_RawPlot = {0,0,0} // Whether you want to plot the data for this wave
+			make/t/o sc_RawScripts = {"readSRSx(srs)", "readSRSy(srs)","getK2400current(k2400)"}
 
 			// And these waves should be the same size too
 			make/t/o sc_CalcWaveNames = {"", ""} // Calculated wave names
@@ -2412,11 +2412,12 @@ function InitScanController([configFile])
 			// instrument wave
 			make /t/o/N=(sc_instrLimit,3) sc_Instr
 
-			sc_Instr[0][0] = "openMultipleFDACs(\"serial port numbers here\")"
-			sc_Instr[1][0] = "openK2400connection(\"keithley1\", \"GPIB0::23::INSTR\", verbose=0)"
-			sc_Instr[0][1] = ""
+			sc_Instr[0][0] = "openMultipleFDACs(\"3,4\", verbose=1)"
+			sc_Instr[1][0] = "openK2400connection(\"k2400\", \"GPIB0::4::INSTR\", verbose=1)"
+			sc_Instr[2][0] = "opensrsconnection(\"srs\",\"GPIB::1::INSTR\",verbose=1)"
 			sc_Instr[0][2] = "getFDstatus(\"fd1\")"
-			sc_Instr[1][2] = "getK2400Status(keithley1)"
+			sc_Instr[1][2] = "getFDstatus(\"fd2\")"
+			sc_Instr[2][2] = "GetSRSStatus(srs)"
 
 			nvar/z filenum
 			if(!nvar_exists(filenum))
@@ -5708,7 +5709,7 @@ function scfw_CreateControlWaves(numDACCh,numADCCh)
 	// create waves for DAC part
 	make/o/t/n=(numDACCh) fdacval0 = "0"				// Channel
 	make/o/t/n=(numDACCh) fdacval1 = "0"				// Output /mV
-	make/o/t/n=(numDACCh) fdacval2 = "-1000,1000"	// Limits /mV
+	make/o/t/n=(numDACCh) fdacval2 = "-10000,10000"	// Limits /mV
 	make/o/t/n=(numDACCh) fdacval3 = ""					// Labels
 	make/o/t/n=(numDACCh) fdacval4 = "10000"			// Ramprate limit /mV/s
 	variable i=0
