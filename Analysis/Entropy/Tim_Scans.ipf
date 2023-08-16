@@ -691,9 +691,6 @@ function ScanFastDAC2D_virtual2(startx, finx, channelsx, starty, finy, channelsy
 		channelsy = virtual_gates
 	endif
 
-	//// set all fds to independent ////
-	
-	set_indep()
 	
 	///// Reconnect instruments /////
 	sc_openinstrconnections(0)

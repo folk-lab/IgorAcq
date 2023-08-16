@@ -334,9 +334,6 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 	string channels, x_label, y_label, comments, starts, fins, interlaced_channels, interlaced_setpoints
 	variable j=0
 	
-	//setting every fastDAC to work independently
-	//set_indep()
-	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
 	
@@ -437,9 +434,6 @@ function ScanFastDacSlow(start, fin, channels, numpts, delay, ramprate, [starts,
 
 	// Reconnect instruments
 	sc_openinstrconnections(0)
-	
-	// make sure all the fastdacs are independent
-	set_indep()
 	
 	//check if rawdata needs to be saved
 	
@@ -551,9 +545,6 @@ function ScanFastDacSlow2D(startx, finx, channelsx, numptsx, delayx, starty, fin
 	variable startx, finx, starty, finy, numptsy, numptsx, rampratex, rampratey, delayx, delayy, nosave
 	string channelsx, channelsy, comments, startxs, finxs, startys, finys
 
-	// set all fastdacs to independent
-	set_indep()
-	
 	//check if rawdata needs to be saved
 
 	// Reconnect instruments
@@ -650,9 +641,6 @@ function ScanFastDAC2D(startx, finx, channelsx, starty, finy, channelsy, numptsy
 	interlaced_setpoints = selectString(paramisdefault(interlaced_setpoints), interlaced_setpoints, "")
 	variable use_bd = paramisdefault(bdid) ? 0 : 1 			// Whether using both FD and BD or just FD
 	variable scan2d = 1
-	
-	//setting every fastDAC to work independently
-	set_indep()
 	
 	//check if rawdata needs to be saved
 	
@@ -1073,8 +1061,6 @@ function ScanBabyDACMultipleK24002D(bdID, startx, finx, channelsx, numptsx, dela
 end
 
 function ScanFastDACK24002D(startx, finx, keithleyID, starty, finy, numptsy, [numpts, sweeprate, rampratex, rampratey, delayy, startxs, finxs, y_label, comments, nosave, use_AWG])
-
-
 	// not tested but should likely work - master/slave updated.
 	
 	
@@ -1091,11 +1077,6 @@ function ScanFastDACK24002D(startx, finx, keithleyID, starty, finy, numptsy, [nu
 	comments = selectstring(paramisdefault(comments), comments, "")
 	startxs = selectstring(paramisdefault(startxs), startxs, "")
 	finxs = selectstring(paramisdefault(finxs), finxs, "")
-
-	// make sure all the devices start of independent
-	set_indep()
-	
-	//check if rawdata needs to be saved
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -1417,9 +1398,6 @@ function ScanFastDACLS625Magnet2D(fdID, startx, finx, channelsx, magnetID, start
 	comments = selectstring(paramisdefault(comments), comments, "")
 	startxs = selectstring(paramisdefault(startxs), startxs, "")
 	finxs = selectstring(paramisdefault(finxs), finxs, "")
-
-	// making sure the instruments start of independent
-	set_indep()
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -1491,9 +1469,6 @@ function ScanFastDacSlowLS625Magnet2D(instrIDx, startx, finx, channelsx, numptsx
 	// not tested - should be tested - master/slave updated.
 	variable instrIDx, startx, finx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, nosave, rampratey
 	string channelsx, comments, y_label
-
-	//set all devices to independent
-	set_indep()
 	
 	//check if rawdata needs to be saved
 	
