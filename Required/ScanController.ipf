@@ -31,7 +31,7 @@ ipf#pragma rtGlobals=3		// Use modern global access method and strict wave acces
 //			All scans functions work with a ScanVars Struct which contains information about the current scan (instead of many globals)
 
 // Updates in 5.0:
-//		-- hopefully master slave stuff (pending) - FastDac
+//		-- master slave stuff - FastDac
 //		-- realtime analysis (notch filtering, demodulation), AWG and LI built into fastDAC window 
 
 

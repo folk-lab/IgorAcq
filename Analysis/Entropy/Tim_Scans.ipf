@@ -840,6 +840,7 @@ function ScanFastDAC2D_virtual2(startx, finx, channelsx, starty, finy, channelsy
    		S.startxs = S.startxs[0, strlen(S.startxs) - 2]
    		S.finxs = S.finxs[0, strlen(S.finxs) - 2]
    		
+   		scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, starty, finy, S.startxs, S.finxs, startys, finys)
    		
    		///// Loop for interlaced scans ///// 
 		if (S.interlaced_y_flag)
