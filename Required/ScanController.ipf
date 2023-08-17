@@ -731,12 +731,9 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
 	S.adcListIDs = scc_checkDeviceNumber(S = S, adc = 1)
 	string AWdacListIDs = ""
 	if(use_awg)
-		wave /t awgsetvalstr
-		string channels_AW0 = awgsetvalstr[0][1]
-		string channels_AW1 = awgsetvalstr[1][1]
-		channels_AW0 = scu_getChannelNumbers(channels_AW0, fastdac=1)
-		channels_AW1 = scu_getChannelNumbers(channels_AW1, fastdac=1)
-		AWdacListIDs = scc_checkDeviceNumber(channels = channels_AW0 + "," + channels_AW1)
+		struct AWGVars A
+		fd_getGlobalAWG(A)
+		AWdacListIDs = scc_checkDeviceNumber(channels = A.channels_AW0 + "," + A.channels_AW1)
 	endif
 	wave /t IDs = listToTextWave(S.dacListIDs + S.adcListIDs + AWdacListIDs, ";")
 	if(numpnts(IDs) == 1)
