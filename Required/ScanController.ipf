@@ -9,6 +9,7 @@ ipf#pragma rtGlobals=3		// Use modern global access method and strict wave acces
 // Version 3.0 March, 2020
 // Version 4.0 Oct, 2021 -- Tim Child, Johann Drayne
 // Version 5.0 August, 2023 -- Raveel Tejani
+
 // Authors: Mohammad Samani, Nik Hartman, Christian Olsen, Tim Child, Johann Drayne, Raveel Tejani
 
 // Updates in 2.0:
@@ -31,8 +32,21 @@ ipf#pragma rtGlobals=3		// Use modern global access method and strict wave acces
 //			All scans functions work with a ScanVars Struct which contains information about the current scan (instead of many globals)
 
 // Updates in 5.0:
-//		-- master slave stuff - FastDac
-//		-- realtime analysis (notch filtering, demodulation), AWG and LI built into fastDAC window 
+//		-- realtime analysis (notch filtering, demodulation), AWG and LI built into fastDAC window
+//            Main changes is in scfd_processAndDistribute()
+ 
+//		-- master slave for fastDAC syncs
+//				 internal functions that have been reworked for sync:
+//						scfd_RecordValues(), which implies scfd_sendCommandandRead(), fd_start_sweep(), scfd_recordbuffer() all changed
+//                  scv_setSetpoints() - creates stringkeys - stores fdIDs as keys and starts & fins as values
+// 						rampStartFd() - reworked to loop through fdIDs of channels
+// 						ramptoNextSetpoint() - reworked to loop through fdIDs
+//
+//				 new functions for sync:
+//						initScanVarsFD2() - figures out which fdIDs are being used, which ones to sync, stores other variables useful like daclistIDs
+//                  set_indep() - sets all fdacs to independent mode and clears buffer, can be used independently
+//  					set_master_slave() - sets master/slave based on the syncIDs found in initScanVarsFD2(), uses ScanVars
+
 
 
 ////////////////////////////////
@@ -3222,23 +3236,16 @@ end
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////// Pre Scan Checks /////////////////////////////////////////////////////////////// scc_... (ScanControlChecks...)
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
-function PreScanChecksFD(S, [x_only, y_only])
+function PreScanChecksFD(S, [same_device])
    struct ScanVars &S
-   variable x_only, y_only  // Whether to only check specific axis (e.g. if other axis is a babydac or something else)
-	scc_checkSameDeviceFD(S) 	// Checks DACs and ADCs are on same device
+   int same_device
+   same_device = paramisDefault(same_device) ? 1 : same_device
+	if(same_device)
+		scc_checkSameDeviceFD(S) 	// Checks DACs and ADCs are on same device
+	endif
 	scc_checkRampratesFD(S)	 	// Check ramprates of x and y
 	scc_checkLimsFD(S)			// Check within software lims for x and y
 	S.lims_checked = 1  		// So record_values knows that limits have been checked!
-end
-
-function PreScanChecksFD2(S)
-   struct ScanVars &S
-   variable x_only, y_only  // Whether to only check specific axis (e.g. if other axis is a babydac or something else)
-
-	scc_checkRampratesFD(S)	 	// Check ramprates of x and y
-	scc_checkLimsFD(S)			   // Check within software lims for x and y
-	S.lims_checked = 1  		   // So record_values knows that limits have been checked!
-	
 end
 
 

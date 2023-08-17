@@ -360,7 +360,7 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 	endif
 	
 	// Check software limits and ramprate limits
-	PreScanChecksFD2(S)  
+	PreScanChecksFD(S, same_device = 0)  
 	
   	// If using AWG then get that now and check it
 	struct AWGVars AWG
@@ -680,7 +680,7 @@ function ScanFastDAC2D(startx, finx, channelsx, starty, finy, channelsy, numptsy
 		PreScanChecksBD(S, y_only=1)
    endif
    
-   PreScanChecksFD2(S)  
+   PreScanChecksFD(S, same_device = 0)  
 
    // sets master/slave between the devices that are used.
 	set_master_slave(S)
@@ -1093,7 +1093,7 @@ function ScanFastDACK24002D(startx, finx, channelsx, keithleyID, starty, finy, n
 	S.y_label = selectString(paramIsDefault(y_label), y_label, "Keithley /mV")
       
    // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
-	PreScanChecksFD2(S)
+	PreScanChecksFD(S, same_device = 0)
 	
 	// sets master/slave between the devices that are used.
 	set_master_slave(S)
@@ -1416,7 +1416,7 @@ function ScanFastDACLS625Magnet2D(fdID, startx, finx, channelsx, magnetID, start
 	S.y_label = selectString(paramIsDefault(y_label), y_label, "Magnet /mT")
       
    // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
-	PreScanChecksFD2(S)
+	PreScanChecksFD(S, same_device = 0)
 	// PreScanChecksMagnet(S, y_only=1)
 	
 	// sets fastdacs to master slave if necessary, otherwise are kept independent
