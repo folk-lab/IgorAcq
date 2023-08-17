@@ -739,10 +739,16 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
 		AWdacListIDs = scc_checkDeviceNumber(channels = channels_AW0 + "," + channels_AW1)
 	endif
 	wave /t IDs = listToTextWave(S.dacListIDs + S.adcListIDs + AWdacListIDs, ";")
-	findDuplicates /z /free /rt = syncIDs IDs
-	instrIDs = textWavetolist(syncIDs)
-	S.instrIDs = ""
+	if(numpnts(IDs) == 1)
+		instrIDs = textwavetolist(IDs)
+	elseif(numpnts(IDs) == 0)
+		abort "should atleast have one fdID"
+	else
+		findDuplicates /z /free /rt = syncIDs IDs
+		instrIDs = textWavetolist(syncIDs)
+	endif
 	
+	S.instrIDs = ""
 	/// sorting all instrIDs by sc_fdackeys <- this implies the ordering of the fdac connections are important.
 	int numDevices = numberByKey("numDevices", sc_fdackeys, ":",",")
 	string ID
