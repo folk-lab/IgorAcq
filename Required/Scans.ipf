@@ -516,7 +516,6 @@ function ScanFastDacSlow(start, fin, channels, numpts, delay, ramprate, [starts,
 				endif
 			endif
 			i+=1
-			doupdate
 		while (i<S.numptsx)
 		
 		if (alternate!=0) // If want to alternate scan scandirection for next row

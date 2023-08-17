@@ -3210,6 +3210,14 @@ function RecordValues(S, i, j, [fillnan])
 		abortonvalue 1,10 
 	endtry
 	
+	wave /t sc_rawwavenames
+	svar sc_rawGraphs1D 
+	sc_rawgraphs1d = ""
+	for(i=0;i<numpnts(sc_rawwavenames); i++)
+		string wn = sc_rawwavenames[i]
+		string graphID = scg_graphExistsForWavename(wn)
+		sc_rawgraphs1D = addlistitem(graphID, sc_rawgraphs1D)
+	endfor
 	scg_updateRawGraphs()
 end
 
