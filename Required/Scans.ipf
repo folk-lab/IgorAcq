@@ -1060,7 +1060,7 @@ function ScanBabyDACMultipleK24002D(bdID, startx, finx, channelsx, numptsx, dela
 	endif
 end
 
-function ScanFastDACK24002D(startx, finx, keithleyID, starty, finy, numptsy, [numpts, sweeprate, rampratex, rampratey, delayy, startxs, finxs, y_label, comments, nosave, use_AWG])
+function ScanFastDACK24002D(startx, finx, channelsx, keithleyID, starty, finy, numptsy, [numpts, sweeprate, rampratex, rampratey, delayy, startxs, finxs, y_label, comments, nosave, use_AWG])
 	// not tested but should likely work - master/slave updated.
 	
 	
@@ -1069,8 +1069,7 @@ function ScanFastDACK24002D(startx, finx, keithleyID, starty, finy, numptsy, [nu
 	// Note: channels should be a comma-separated string ex: "0,4,5"
 	variable startx, finx, starty, finy, numptsy, numpts, sweeprate, keithleyID, rampratex, rampratey, delayy, nosave, use_AWG
 	string y_label, comments
-	string startxs, finxs // For different start/finish points for each channel (must match length of channels if used)
-	abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
+	string startxs, finxs, channelsx // For different start/finish points for each channel (must match length of channels if used)
 
 	// Set defaults
 	delayy = ParamIsDefault(delayy) ? 0.01 : delayy
@@ -1079,13 +1078,14 @@ function ScanFastDACK24002D(startx, finx, keithleyID, starty, finy, numptsy, [nu
 	finxs = selectstring(paramisdefault(finxs), finxs, "")
 	
 	// Reconnect instruments
-	sc_openinstrconnections(0)
+   sc_openinstrconnections(0)
 	
 	// Put info into scanVars struct (to more easily pass around later)
  	struct ScanVars S
 	// Init FastDAC part like usual, then manually set the rest
-	initScanVarsFD2(S, startx, finx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
+	initScanVarsFD2(S, startx, finx, channelsx = channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
 							rampratey=rampratey, startxs=startxs, finxs=finxs, comments=comments)
+							
 	S.instrIDy = keithleyID
 	s.is2d = 1
 	S.starty = starty

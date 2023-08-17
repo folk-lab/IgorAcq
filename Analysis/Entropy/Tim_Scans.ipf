@@ -779,6 +779,7 @@ function ScanFastDAC2D_virtual2(startx, finx, channelsx, starty, finy, channelsy
 	for (k=0; k<ItemsInList(virtual_gates, ","); k++)
 		virtual_gate = scu_getChannelNumbers(StringFromList(k, virtual_gates, ","), fastdac=1)
 		string IDname = scc_checkDeviceNumber(channels = virtual_gate)
+		IDname = removeseperator(IDname, ";")
 		nvar fdID = $IDname
 	   	corners = StringFromList(k, virtual_corners, ";")
 	   	c0 = str2num(StringFromList(0, corners, ","))
