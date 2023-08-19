@@ -408,8 +408,6 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 		endif
 	endfor
 	
-	set_indep()
-	
 	// Save by default
 	if (nosave == 0)
 		EndScan(S=S)
@@ -524,9 +522,6 @@ function ScanFastDacSlow(start, fin, channels, numpts, delay, ramprate, [starts,
 		
 	endfor
 	
-	//set all fastdacs back to independent
-	set_indep()
-	
 	// Save by default
 	if (nosave == 0)
 		EndScan(S=S)
@@ -594,9 +589,6 @@ function ScanFastDacSlow2D(startx, finx, channelsx, numptsx, delayx, starty, fin
 			RecordValues(S, i, j)
 		endfor
 	endfor
-	
-	//return all fastdacs to independent
-	set_indep()
 	
 	// Save by default
 	if (nosave == 0)
@@ -741,8 +733,6 @@ function ScanFastDAC2D(startx, finx, channelsx, starty, finy, channelsy, numptsy
 		scfd_RecordValues(S, i, AWG_list=AWG)
 		
 	endfor
-	
-	set_indep()
 	
 	// Save by default
 	if (nosave == 0)
@@ -1125,9 +1115,6 @@ function ScanFastDACK24002D(startx, finx, channelsx, keithleyID, starty, finy, n
 		scfd_RecordValues(S, i)
 	endfor
 	
-	// return all devices to independent
-	set_indep()
-	
 	// Save by default
 	if (nosave == 0)
 		EndScan(S=S)
@@ -1449,9 +1436,6 @@ function ScanFastDACLS625Magnet2D(fdID, startx, finx, channelsx, magnetID, start
 		scfd_RecordValues(S, i)
 	endfor
 	
-	// return all fastdacs to independent
-	set_indep() 
-	
 	// Save by default
 	if (nosave == 0)
 		EndScan(S=S)
@@ -1525,10 +1509,7 @@ function ScanFastDacSlowLS625Magnet2D(instrIDx, startx, finx, channelsx, numptsx
 		while (j<S.numptsx)
 	i++
 	while (i<S.numptsy)
-	
-	
-	set_indep()
-	
+
 	// Save by default
 	if (nosave == 0)
 		EndScan(S=S)

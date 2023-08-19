@@ -68,6 +68,9 @@ function openMultipleFDACs(VISAnums, [verbose])
 	// It assumes the default options for verbose, numDACCh, numADCCh, and optical,
 	// The values can be found in the function openfastDACconnection()
 	// it will create the variables fd1,fd2,fd3.......
+	// it also reorders the list seen in the FastDacWindow because sc_fdackeys is killed everytime
+	//  	implying if the order changes -> the channels in the GUI will represent the new order.
+	
 	string VISAnums
 	variable verbose
 	
@@ -88,9 +91,10 @@ end
 
 
 function set_master_slave(S)
-/// This is an internal function, It will be called when scans are being run across multiple devices. It needs to account for a specific group
-/// Need to check what channels are being recorded i.e (only fd1 and fd2) and what channels are being ramped (only fd1)
-/// fd 1 and 2 in this case need to be set up to master and slave, leaving fd3 or any more independent.
+/// This is an internal function, It should be called in scanFastDac functions (not in ScanFastDacSlow functions)
+/// Uses Scanvars string instrIDs to set fastdacs to either master/slave or independent.
+/// S.instrIDs is set in initScanVars2
+
 	struct scanvars &S
 	int i, numfdacs = itemsinlist(S.instrIDs)
 	string check
@@ -120,7 +124,7 @@ end
 
 
 function set_indep()
-/// this in an internal function, This will reset all the fastDACs to work independently.
+/// This will reset all the fastDACs to work independently. It is called in EndScan()
 
 	svar /z sc_fdackeys
 	string fdname, check
@@ -1988,10 +1992,11 @@ function/s fd_start_sweep(S, [AWG_list])
 	   		dacs = replacestring(",",dacs,"")
 		 	
 		 	
-			//checking the need for a fakeramp
+			// checking the need for a fakeramp, the voltage is held at the current value.
 			int fakeChRamp = 0; string AW_dacs; int j
 			if(!cmpstr(dacs,""))
-				///find global value of channel 0 in that ID, set it to start and fin, and dac = 0
+			
+				// find global value of channel 0 in that ID, set it to start and fin, and dac = 0
 				if(!paramisDefault(AWG_list) && AWG_List.use_AWG == 1 && AWG_List.lims_checked == 1)
 					AW_dacs = scu_getDeviceChannels(fdID, AWG_list.channels_AW0)
 					AW_dacs = addlistitem(scu_getDeviceChannels(fdID, AWG_list.channels_AW1), AW_dacs, ",", INF)
@@ -2003,10 +2008,10 @@ function/s fd_start_sweep(S, [AWG_list])
 						endif
 					endfor
 				endif
-				string value = num2str(getfdacOutput(fdID,fakeChRamp, same_as_window = 0)) //this gave me the start and fins and dac
-				starts = value //changing this would mean i have to change it back
-				fins = value // same for this
-				dacs = num2str(fakeChRamp)  //same for this?
+				string value = num2str(getfdacOutput(fdID,fakeChRamp, same_as_window = 0))
+				starts = value 
+				fins = value 
+				dacs = num2str(fakeChRamp)
 			endif
 	
 			//checking the need for fake recordings
@@ -2024,13 +2029,22 @@ function/s fd_start_sweep(S, [AWG_list])
 		
 			adcs = replacestring(";",adcs,"")
 			S.adcLists = replacestringbykey(fdIDname, S.adcLists, adcs)
-			int numWaves
+			
+			// this is all for AWG //////////////////////////////////////////////////////////////////////////////////////////////////////////
 			if(!paramisDefault(AWG_list) && AWG_List.use_AWG == 1 && AWG_List.lims_checked == 1)
+				int numWaves  // this numwaves must be one or two. If two, the command to the fastDAC assumes both AW0 and AW1 are being used.
+				
+				// we first figure out all the AW dacs corresponding to the current fdID
 				string AW0_dacs = replacestring(",",scu_getDeviceChannels(fdID, AWG_list.channels_AW0), "")
 				string AW1_dacs = replacestring(",",scu_getDeviceChannels(fdID, AWG_list.channels_AW1), "")
 				
+				// we need to run through some tests to see which one of AW0, AW1 is populated
+				// if both are unpopulated and we are using AWG then a fake squarewave will be implemented on a channel
+				
+				// if only AW1 is populated, it is remapped to AW0 because the command AWG_RAMP only knows how many waves to use. So if we say
+				// numWaves = 1, it will always assume AW0
+				
 				if(!cmpstr(AW0_dacs,"") && !cmpstr(AW1_dacs,""))
-					// i need to figure out a fake approach here
 					for(j=0 ; j<8 ; j++)
 						if(strsearch(num2str(j),dacs,0) == -1)
 							value = num2str(getfdacOutput(fdID,j, same_as_window = 0))
@@ -2043,19 +2057,15 @@ function/s fd_start_sweep(S, [AWG_list])
 					AWG_list.numWaves  = 1
 				elseif(cmpstr(AW1_dacs,"") && !cmpstr(AW0_dacs,""))  //AW1 is populated, AW0 is not
 					AW_dacs = AW1_dacs
-					//abort "[fd_start_sweep] Trying to run AWG with only AW1, somewhere in the setup process this should have been mapped to AW0"
-					//should probably be passed once, not multiple repeats
 					scw_setupAWG("setupAWG", instrID = fdID, mapOnetoZero = 1)
 					AWG_list.numWaves  = 1
 				elseif(cmpstr(AW0_dacs,"") && !cmpstr(AW1_dacs,"")) //AW0 is populated, AW1 is not
 					AW_dacs = AW0_dacs
 					AWG_list.numWaves  = 1
-				else															// both are populated
-				//need to remove
+				else															
 					AW_dacs = AW0_dacs + "," + AW1_dacs
 					AWG_list.numWaves  = 2
 				endif
-				// how does it know which AW to use, 0 or 1?
 
 				sprintf cmd, "AWG_RAMP,%d,%s,%s,%s,%s,%s,%d,%d\r", AWG_list.numWaves, AW_dacs, dacs, adcs, starts, fins, AWG_list.numCycles, AWG_list.numSteps
 			else			

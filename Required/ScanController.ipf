@@ -44,7 +44,7 @@ ipf#pragma rtGlobals=3		// Use modern global access method and strict wave acces
 //
 //				 new functions for sync:
 //						initScanVarsFD2() - figures out which fdIDs are being used, which ones to sync, stores other variables useful like daclistIDs
-//                  set_indep() - sets all fdacs to independent mode and clears buffer, can be used independently
+//                  set_indep() - sets all fdacs to independent mode and clears buffer, called in EndScan. Can be used independently when having errors
 //  					set_master_slave() - sets master/slave based on the syncIDs found in initScanVarsFD2(), uses ScanVars
 
 
@@ -735,32 +735,37 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
    	// Sets starts/fins (either using starts/fins given or from single startx/finx given)
    // scv_setSetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys) had to move this
 	
-	//////////////////////////////////////// master/slave tracking /////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////// master/slave tracking ////////////////////////////////////////////////////////////////////////////////////////
 	int i, j
 	svar sc_fdackeys
 	string instrIDs
 	
-	///// Checks what devices need to be synced //////
-	S.dacListIDs = scc_checkDeviceNumber(S = S)
-	S.adcListIDs = scc_checkDeviceNumber(S = S, adc = 1)
+
+	S.dacListIDs = scc_checkDeviceNumber(S = S)						// Getting all the fdIDs for DAC channels selected for ramp
+	S.adcListIDs = scc_checkDeviceNumber(S = S, adc = 1)			// getting all the fdIDs for ADC channels selected for recording
+	
+	// getting all the fdIDs for DAC channels selected for AWG
 	string AWdacListIDs = ""
 	if(use_awg)
 		struct AWGVars A
 		fd_getGlobalAWG(A)
 		AWdacListIDs = scc_checkDeviceNumber(channels = A.channels_AW0 + "," + A.channels_AW1)
 	endif
+	
+	// combining all IDs and removing any duplicates.
 	wave /t IDs = listToTextWave(S.dacListIDs + S.adcListIDs + AWdacListIDs, ";")
 	if(numpnts(IDs) == 1)
-		instrIDs = textwavetolist(IDs)
+		// in the situation where you only have one ID, findDuplicates returns errors, so this if statement was implemented.
+		instrIDs = textwavetolist(IDs)				 // convert textwave to stringlist
 	elseif(numpnts(IDs) == 0)
-		abort "should atleast have one fdID"
+		abort "should atleast have one fdID"       // I have never seen this abort happen but it should happen if you have zero IDs
 	else
-		findDuplicates /z /free /rt = syncIDs IDs
-		instrIDs = textWavetolist(syncIDs)
+		findDuplicates /z /free /rt = syncIDs IDs  // here we remove duplicates
+		instrIDs = textWavetolist(syncIDs)			 // convert textwave to stringlist
 	endif
 	
 	S.instrIDs = ""
-	/// sorting all instrIDs by sc_fdackeys <- this implies the ordering of the fdac connections are important.
+	/// sorting all instrIDs by sc_fdackeys <- this implies the ordering of the fdac connections are important in OpenMultipleFDACs().
 	int numDevices = numberByKey("numDevices", sc_fdackeys, ":",",")
 	string ID
 	for(i=0; i < numDevices; i++)
@@ -770,7 +775,8 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
 		endif
 	endfor
 	
-	// minimizing the amount of fdacs that need to be synced //
+	// minimizing the amount of fdacs that need to be synced. For example if using fd1, and fd3, It will make sure to send commands to
+	// fd3(master) -> fd1(slave), rather than fd1(master) -> fd2(slave) -> fd3(slave). This is important for not overloading the buffer.
 	int start, finish, total, syncNum = 100, delim, startingInstrNum
 	string instrIDvals = get_values(S.instrIDs) 						
 	for(i=0; i<itemsinlist(instrIDvals); i++)
@@ -802,24 +808,24 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
 			startingInstrNum -= numDevices
 		endif
 		ID = stringByKey("name" + num2str(startingInstrNum + i), sc_fdackeys,":",",")
-		//ID = stringfromlist(startIDindex + i,S.instrIDs) // it shouldn't be getting it from S.instrIDs, it should be from numdevices
-		instrIDs = AddListItem(ID, instrIDs, ";", Inf)	//replacenumberByKey(ID, instrIDs, startingInstrNum + i)
+		instrIDs = AddListItem(ID, instrIDs, ";", Inf)
 	endfor
 	
-	S.instrIDs = instrIDs //// final result containing fastDacs names not a keystring
-	S.maxADCs = scf_getMaxRecordedADCs()
+	S.instrIDs = instrIDs                        // final result containing fastDac IDs that will be set to sync.
+	S.maxADCs = scf_getMaxRecordedADCs()			// finds the max number of ADCs set for recording per FastDAC
+	
 	scv_setSetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
 	
 	// Set variables with some calculation
     scv_setFreq2(S=S) 		// Sets S.samplingFreq/measureFreq/numADCs	
     scv_setNumptsSweeprateDuration(S) 	// Checks that either numpts OR sweeprate OR duration was provided, and sets ScanVars accordingly
-                                // Note: Valid for start/fin only (uses S.startx, S.finx NOT S.startxs, S.finxs)
+                                       // Note: Valid for start/fin only (uses S.startx, S.finx NOT S.startxs, S.finxs)
                                 
    ///// for 2D scans //////////////////////////////////////////////////////////////////////////////////////////////////
    if(!x_only)
-   		S.channelsy = scu_getChannelNumbers(channelsy, fastdac=1)
-			S.y_label = scu_getDacLabel(S.channelsy, fastdac=1)
-			S.dacListIDs_y = scc_checkDeviceNumber(S=S, check_y = 1)
+   		S.channelsy = scu_getChannelNumbers(channelsy, fastdac=1)				// converting from channel labels to numbers
+		S.y_label = scu_getDacLabel(S.channelsy, fastdac=1)						// setting the y_label
+		S.dacListIDs_y = scc_checkDeviceNumber(S=S, check_y = 1)				// getting the fdIDs for each DAC channel
    endif
                                                             
 end
@@ -918,7 +924,10 @@ function scv_setFreq(S)
 end
 
 function scv_setFreq2([S,A])
-	// Set S.samplingFreq, S.numADCs, S.measureFreq //changing it to account for masterslave
+	// Set S.samplingFreq, S.numADCs, S.measureFreq
+	// measureFreq is set now based on maxADCs (numADCs per fastDAC selected for recording)
+	// an error is thrown if multiple fastDACS are used but are not set to the same speed.
+	
 	Struct ScanVars &S
 	Struct AWGvars &A
 	int i; string instrIDs
@@ -998,6 +1007,8 @@ end
 
 
 function scv_setSetpoints(S, itemsx, startx, finx, itemsy, starty, finy, startxs, finxs, startys, finys)
+    // this function has been modified to collect the starts and fins for each fdID. It is listed into stringKeys in S.IDstartxs and S.IDstartys
+   
     struct ScanVars &S
     variable startx, finx, starty, finy
     string itemsx, startxs, finxs, itemsy, startys, finys
@@ -2198,7 +2209,7 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	string additional_wavenames // Any additional wavenames to be saved in the DatHDF (and copied in Igor)
 	
 	scfd_checkRawSave()
-	
+	set_indep()
 	save_experiment = paramisDefault(save_experiment) ? 1 : save_experiment
 	additional_wavenames = SelectString(ParamIsDefault(additional_wavenames), additional_wavenames, "")
 	

@@ -630,8 +630,6 @@ function ScanFastDAC2D_virtual(startx, finx, channelsx, starty, finy, channelsy,
 		
 	endfor
 	
-	set_indep()
-	
 	///// Save by default /////
 	if (nosave == 0)
 		EndScan(S=S)
