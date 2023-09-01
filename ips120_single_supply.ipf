@@ -1,5 +1,4 @@
 #pragma rtGlobals=1		// Use modern global access method.
-
 //	Currents are returned in amps, while field values are return in mT
 //	Procedure written by Christian Olsen 2016-01-26
 // Updated to use VISA/async Nik/Christian 05-XX-2018

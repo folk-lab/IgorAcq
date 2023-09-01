@@ -1295,6 +1295,7 @@ function ScanFastDacSlowLS625Magnet2D(instrIDx, startx, finx, channelsx, numptsx
 	// Set defaults
 	comments = selectstring(paramisdefault(comments), comments, "")
 	y_label = selectstring(paramisdefault(y_label), y_label, "")
+	
 	// Initialize ScanVars
 	struct ScanVars S  
 		  
@@ -1315,7 +1316,7 @@ function ScanFastDacSlowLS625Magnet2D(instrIDx, startx, finx, channelsx, numptsx
 	setlS625fieldWait(S.instrIDy, starty )
 	
 	// Let gates settle 
-	asleep(S.delayy*10)
+	asleep(S.delayy)
 
 	// Make Waves and Display etc
 	InitializeScan(S)
@@ -1326,15 +1327,17 @@ function ScanFastDacSlowLS625Magnet2D(instrIDx, startx, finx, channelsx, numptsx
 	do
 		setpointx = S.startx
 		setpointy = S.starty + (i*(S.finy-S.starty)/(S.numptsy-1))
-		setlS625field(S.instrIDy, setpointy)
-		rampMultipleFDAC(S.instrIDx,channelsx,setpointx,ramprate=S.rampratex, ignore_lims=1)
-		setlS625fieldwait(S.instrIDy, setpointy, short_wait = 1)
+		rampMultipleFDAC(S.instrIDx,channelsx, setpointx, ramprate=S.rampratex, ignore_lims=1)
+		setlS625fieldwait(S.instrIDy, setpointy)
 		sc_sleep(S.delayy)
 		j=0
 		do
 			setpointx = S.startx + (j*(S.finx-S.startx)/(S.numptsx-1))
 			rampMultipleFDAC(S.instrIDx,channelsx,setpointx,ramprate=S.rampratex, ignore_lims=1)
 			sc_sleep(S.delayx)
+//          if (mod(j, 100) == 0)
+//               sc_sleep(S.delayx)
+//          endif 
 			RecordValues(S, i, j)
 			j+=1
 		while (j<S.numptsx)
