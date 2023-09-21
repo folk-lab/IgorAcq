@@ -291,10 +291,11 @@ end
 
 function/s getK2400Status(instrID)
 	variable instrID
-//	string  buffer = ""
-//
-//	string gpib = num2istr(getAddressGPIB(instrID))
-//	buffer = addJSONkeyvalpair(buffer, "gpib_address", gpib)
-//
-//	return addJSONkeyvalpair("", "K2400_"+gpib, buffer)
+	string  buffer = ""
+
+	string gpib = num2istr(getAddressGPIB(instrID))
+	buffer = addJSONkeyval(buffer, "gpib_address", gpib)
+	buffer = addJSONkeyval(buffer, "amplitude V", num2numStr(getk2400voltage(instrID)/1000))
+
+	return addJSONkeyval("", "K2400_"+gpib, buffer)
 end

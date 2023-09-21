@@ -739,7 +739,7 @@ function Scank24002D(instrIDx, startx, finx, numptsx, delayx, rampratex, instrID
 	
 	// Ramp to start without checks because checked above
 	rampK2400Voltage(S.instrIDx, startx, ramprate = rampratex)
-	rampK2400Voltage(S.instrIDy, starty, ramprate = rampratex)
+	rampK2400Voltage(S.instrIDy, starty, ramprate = rampratey)
 	
 	// Let gates settle 
 	sc_sleep(2)
