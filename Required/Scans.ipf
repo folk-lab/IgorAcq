@@ -719,9 +719,9 @@ function ScanFastDAC2D(startx, finx, channelsx, starty, finy, channelsy, numptsy
 
 		endif
 		
-		if (mod(i, 50) == 0)
+//		if (mod(i, 50) == 0)
 			DoUpdate // update graphs every 50 rows in y
-		endif
+//		endif
 		
 		// Ramp fast axis to start
 		rampToNextSetpoint(S, 0, fastdac=1, ignore_lims=1)
