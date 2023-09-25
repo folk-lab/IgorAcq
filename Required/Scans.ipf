@@ -333,27 +333,29 @@ function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, 
 	variable instrID, start, fin, repeats, numptsx, sweeprate, delay, ramprate, alternate, nosave, use_awg
 	string channels, x_label, y_label, comments, starts, fins, interlaced_channels, interlaced_setpoints
 	variable j=0
+	nvar sc_Saverawfadc, sc_hotcold
 
 	// Reconnect instruments
 	sc_openinstrconnections(0)
 
 	// Set defaults
 	delay = ParamIsDefault(delay) ? 0.01 : delay
-	y_label = selectstring(paramisdefault(y_label), y_label, "")
+	y_label = selectstring(paramisdefault(y_label), y_label, "nA")
 	x_label = selectstring(paramisdefault(x_label), x_label, "")
 	comments = selectstring(paramisdefault(comments), comments, "")
 	starts = selectstring(paramisdefault(starts), starts, "")
 	fins = selectstring(paramisdefault(fins), fins, "")
 	interlaced_channels = selectString(paramisdefault(interlaced_channels), interlaced_channels, "")
 	interlaced_setpoints = selectString(paramisdefault(interlaced_setpoints), interlaced_setpoints, "")
+	
 
 	// Set sc_ScanVars struct
 	struct ScanVars S
 	initScanVarsFD(S, instrID, start, fin, channelsx=channels, numptsx=numptsx, rampratex=ramprate, starty=1, finy=repeats, delayy=delay, sweeprate=sweeprate,  \
 					numptsy=repeats, startxs=starts, finxs=fins, x_label=x_label, y_label=y_label, alternate=alternate, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments)
 //	S.finy = S.starty+S.numptsy  // Repeats
-	if (s.is2d && strlen(S.y_label) == 0)
-		S.y_label = "Repeats"
+	if (s.is2d)
+		S.y_label = "Repeats" // Why is the 2D label passed here
 	endif
 	
 	// Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
@@ -375,7 +377,7 @@ function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, 
 	sc_sleep(S.delayy)
 
 	// Init Scan
-	initializeScan(S)
+	initializeScan(S, y_label = y_label)
 		
 	// Main measurement loop
 	variable d=1
@@ -693,7 +695,7 @@ end
 
 
 
-function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, numptsy, [numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave, use_AWG, interlaced_channels, interlaced_setpoints])
+function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, numptsy, [numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave, use_AWG, interlaced_channels, interlaced_setpoints, y_label])
 	// 2D Scan for FastDAC only OR FastDAC on fast axis and BabyDAC on slow axis
 	// Note: Must provide numptsx OR sweeprate in optional parameters instead
 	// Note: To ramp with babyDAC on slow axis provide the BabyDAC variable in bdID
@@ -706,9 +708,10 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 	// ohmic1 will change between 500,10,0 each row
 	
 	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, nosave, use_AWG 
-	string channelsx, channelsy, comments, startxs, finxs, startys, finys, interlaced_channels, interlaced_setpoints 
+	string channelsx, channelsy, comments, startxs, finxs, startys, finys, interlaced_channels, interlaced_setpoints, y_label 
 
 	// Set defaults
+	y_label = selectstring(paramisdefault(y_label), y_label, "nA")
 	delayy = ParamIsDefault(delayy) ? 0.01 : delayy
 	comments = selectstring(paramisdefault(comments), comments, "")
 	startxs = selectstring(paramisdefault(startxs), startxs, "")
@@ -782,14 +785,13 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 	sc_sleep(S.delayy)
 
 	// Initialize waves and graphs
-	initializeScan(S)
+	initializeScan(S, y_label = y_label)
 
 	// Main measurement loop
 	variable i=0, j=0
 	variable setpointy, sy, fy
 	string chy
 	variable k = 0
-	
 	for(i=0; i<S.numptsy; i++)
 
 		///// LOOP FOR INTERLACE SCANS ///// 
@@ -828,6 +830,7 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 	endif
 
 end
+
 
 function Set_AWG_State(S, AWG, index)
 	// Turn the AWG on/off based on "AWG" value in interlaced channels (otherwise leaves it untouched)
@@ -880,12 +883,10 @@ function Ramp_interlaced_channels(S, i)
 				continue 
 			endif
 		endif
-		
 		// Figure out which FastDAC the channel belongs to
 		channel_num = scu_getChannelNumbers(interlace_channel, fastdac=1)
 		scf_getChannelNumsOnFD(channel_num, device) // Sets device to device num
 		string deviceAddress = stringbykey("visa"+num2istr(device), sc_fdacKeys, ":", ",")
-		
 		// Open connection to that FastDAC and ramp
 		viRM = openFastDACconnection("fdac_window_resource", deviceAddress, verbose=0)
 		nvar tempinstrID = $"fdac_window_resource"
@@ -1797,13 +1798,18 @@ Function protoFunc_StepTempScan()
 End
 
 
-function StepTempScanFunc(sFunc, targettemps, [mag_fields])
+function StepTempScanFunc(sFunc, targettemps, [mag_fields, base_temp])
+	// Master function for running scans at multiple temps and magnetic fields. Assumes the function has no input parameters.
+	// Will run function at set targettemps (including base) and mag_fields
+	// base_temp sets value at which fridge is at base. If fridge is below base_temp then it will run the scan function at the start of the measurement
+	// EXAMPLE USAGE:: stepTempScanFunc("feb17_Scan0to1Peaks_paper", {500, 300, 100}, mag_fields={70, 2000}, base_temp = 20)
 	String sFunc // string form of function you want to run
 	wave targettemps
 	wave mag_fields
-	// Master function for running scans at multiple temps and magnetic fields. Assumes the function has no input parameters.
-	// Will run function at set targettemps (including base) and mag_fields
-	// EXAMPLE USAGE:: stepTempScanFunc("feb17_Scan0to1Peaks_paper", {500, 300, 100}, mag_fields={70, 2000})
+	variable base_temp
+	
+	base_temp = paramisdefault(base_temp) ? 20 : base_temp // base_temp = 20 is default
+
    FUNCREF protoFunc_StepTempScan func_to_run = $sFunc
 	svar ls        
    	nvar fd, magz
@@ -1828,7 +1834,7 @@ function StepTempScanFunc(sFunc, targettemps, [mag_fields])
    	
 		// Do Low T scan first (if already at low T)
 		variable low_t_scanned = 0
-		if (getls370temp(ls, "MC")*1000 < 20)
+		if (getls370temp(ls, "MC")*1000 < base_temp)
 			func_to_run() //run the function
 			low_t_scanned = 1
 		endif

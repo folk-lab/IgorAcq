@@ -168,12 +168,20 @@ function /s sc_createSweepLogs([S, comments])  // TODO: Rename
 	        jstr = addJsonKeyval(jstr, "y_channels", ReplaceString(";", S.channelsy, ","))        
 	     endif
         if (S.using_fastdac)
-        	  nvar sc_resampleFreqFadc
-        	  nvar sc_resampleFreqFadcCheck
+        	  nvar sc_resampleFreqFadc, sc_demodphi
+        	  nvar sc_demody
+        	  svar sc_nQs, sc_nfreq 
+        	  
    	        jstr = addJSONkeyval(jstr, "sweeprate", num2numStr(S.sweeprate))  	        
    	        jstr = addJSONkeyval(jstr, "measureFreq", num2numStr(S.measureFreq))  
-   	        jstr = addJSONkeyval(jstr, "resamplingState", num2numstr(sc_resampleFreqFadcCheck))
-		     jstr = addJSONkeyval(jstr, "resamplingFreq", num2numstr(sc_resampleFreqFadc))   	        	           	        
+		     jstr = addJSONkeyval(jstr, "resamplingFreq", num2numstr(sc_resampleFreqFadc))
+		     jstr = addJSONkeyval(jstr, "resampWaves", scf_getRecordedFADCinfo("calc_names", column = 8), addQuotes= 1)
+		     jstr = addJSONkeyval(jstr, "demodPhi", num2numstr(sc_demodphi))
+		     jstr = addJSONkeyval(jstr, "save_demody", num2numstr(sc_demody))
+		     jstr = addJSONkeyval(jstr, "demodWaves", scf_getRecordedFADCinfo("calc_names", column = 6), addQuotes= 1)
+		     jstr = addJSONkeyval(jstr, "notchQs", sc_nQs, addQuotes=1)
+		     jstr = addJSONkeyval(jstr, "notchFreqs", sc_nfreq, addQuotes=1)
+		     jstr = addJSONkeyval(jstr, "notchedWaves", scf_getRecordedFADCinfo("calc_names", column = 5), addQuotes= 1)
    	     endif
     endif
 
@@ -352,19 +360,78 @@ function SaveToHDF(S, [additional_wavenames])
 	endif
 	
 	// Get waveList to save
-	string RawWaves, CalcWaves
+	string RawWaves, CalcWaves, rwn, cwn, ADCnum, rawWaves2, rawSaveNames
+	wave fadcattr
+	nvar sc_demody, sc_hotcold
+	int i,j=0
+	
 	if(S.is2d == 0)
+	
 		RawWaves = sci_get1DWaveNames(1, S.using_fastdac)
 		CalcWaves = sci_get1DWaveNames(0, S.using_fastdac)
+		RawWaves2 = RawWaves
+		
+		if(S.using_fastdac)
+			rawSaveNames = Calcwaves
+			for(i=0; i<itemsinlist(RawWaves); i++)
+				rwn = StringFromList(i, RawWaves)
+				cwn = StringFromList(i-j, CalcWaves)
+				ADCnum = rwn[3,INF]
+				if (fadcattr[str2num(ADCnum)][6] == 48)
+					CalcWaves += cwn + "x;"
+					CalcWaves += cwn + "y;"
+				endif
+				if (sc_hotcold)
+					CalcWaves += cwn + "hot;"
+					CalcWaves += cwn + "cold;"
+					rawWaves2  = addlistitem(stringfromList(0,calcwaves), rawWaves2) //adding notched/resamp waves to raw dat
+					rawSaveNames= addlistitem(stringfromlist(0,calcwaves) + "_cl", rawSaveNames)
+					calcWaves = removelistItem(0,calcWaves) // removing it from main dat
+					j++	
+				endif
+		 	endfor
+		 	if(sc_hotcold)
+		 		rawWaves = rawWaves2
+		 	endif
+		 endif
+		
 	elseif (S.is2d == 1)
 		RawWaves = sci_get2DWaveNames(1, S.using_fastdac)
 		CalcWaves = sci_get2DWaveNames(0, S.using_fastdac)
+		RawWaves2 = RawWaves
+		if(S.using_fastdac)
+			rawSaveNames = Calcwaves
+			for(i=0; i<itemsinlist(RawWaves); i++)
+				rwn = StringFromList(i, RawWaves)
+				cwn = StringFromList(i-j, CalcWaves)
+				ADCnum = rwn[3,strlen(rwn)-4]
+				
+				if (fadcattr[str2num(ADCnum)][6] == 48)
+					CalcWaves += cwn[0,strlen(cwn)-4] + "x_2d;"
+					if (sc_demody == 1)
+						CalcWaves += cwn[0,strlen(cwn)-4] + "y_2d;"
+					endif
+				endif
+			
+				if(sc_hotcold)
+					CalcWaves += cwn[0,strlen(cwn)-4] + "hot_2d;"
+					CalcWaves += cwn[0,strlen(cwn)-4] + "cold_2d;"
+					rawWaves2  = addlistitem(stringfromList(0,calcwaves), rawWaves2) //adding notched/resamp waves to raw dat
+					rawSaveNames= addlistitem(stringfromlist(0,calcwaves) + "_cl", rawSaveNames)
+					calcWaves = removelistItem(0,calcWaves) // removing it from main dat
+					j++	
+				endif
+		 	endfor
+		 
+		 	if(sc_hotcold)
+		 		rawWaves = rawWaves2
+		 	endif
+		 endif
+	
 	else
 		abort "Not implemented"
 	endif
-	if (S.using_fastdac)  // Figure out better names for the raw data for fastdac scans (before adding additional_wavenames)
-		string rawSaveNames = getRawSaveNames(CalcWaves)  
-	endif
+	
 
 	// Add additional_wavenames to CalcWaves
 	if (!paramIsDefault(additional_wavenames) && strlen(additional_wavenames) > 0)
@@ -763,17 +830,22 @@ end
 /// Load Experiment Data ///
 ////////////////////////////
 
-function get_sweeplogs(datnum)
+function get_sweeplogs(datnum, [kenner])
 	// Opens HDF5 file from current data folder and returns sweeplogs jsonID
 	// Remember to JSON_Release(jsonID) or JSONXOP_release/A to release all objects
 	// Can be converted to JSON string by using JSON_dump(jsonID)
 	variable datnum
-	variable fileid, metadataID, i, result
+	string kenner
+	kenner = selectString(paramisdefault(kenner), kenner, "")
+	variable fileID, metadataID, i, result
+	
+	string HDF_filename = "dat" + num2str(datnum) + kenner + ".h5"
+	
+	HDF5OpenFile /R/P=data fileID as HDF_filename
+	HDF5LoadData /Q/O/Type=1/N=sc_sweeplogs /A="sweep_logs" fileID, "metadata"
+	HDF5CloseFile fileID
+	
 	wave/t sc_sweeplogs
-	
-	HDF5OpenFile /P=data fileid as "dat"+num2str(datnum)+".h5"
-	HDF5LoadData /Q/O/Type=1/N=sc_sweeplogs /A="sweep_logs" fileid, "metadata"
-	
 	variable sweeplogsID
 	sweeplogsID = JSON_Parse(sc_sweeplogs[0])
 
