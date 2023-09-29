@@ -1125,69 +1125,84 @@ end
 function/S scg_initializeGraphs(S , [y_label])
     // Initialize graphs that are going to be recorded
     // Returns list of Graphs that data is being plotted in
+    // Sets sc_frequentGraphs (the list of graphs that should be updated through a 1D scan, where the rest should only get updated at the end of 1D scans)
+    
+    // Note: For Fastdac
+    //     Raw is e.g. ADC0, ADC1. Calc is e.g. wave1, wave2 (or specified names)
+    //     Either the Raw 1D graphs or if not plot_raw, then the Calc 1D graphs should be updated
+    
+    
+    // Note: For Regular Scancontroller
+    //     Raw is the top half of ScanController, Calc is the middle part (with Calc scripts)
+    //     All 1D graphs should be updated
+    
     struct ScanVars &S
 	 string y_label
-	 string/g sc_rawGraphs1D = ""  // So that fd_record_values knows which graphs to update while reading
-
+	 y_label = selectstring(paramIsDefault(y_label), y_label, "")
+	 
+	 string/g sc_frequentGraphs = ""  // So that fd_record_values and RecordValues know which graphs to update while reading.
     string graphIDs = ""
     variable i,j
     string waveNames
     string buffer
-	 string ylabel
     variable raw
     nvar sc_plotRaw 
-    variable plotRaw = sc_plotRaw
     wave fadcattr
     
     string rawwaveNames = sci_get1DWaveNames(1, S.using_fastdac, for_plotting=1)
-    string CalcStrings = scf_getRecordedFADCinfo("calc_funcs")
     
-    for (i = 0; i<2; i++)  // i = 0, 1
-    	
-    	if(plotRaw == 0 && S.using_fastdac)
-    		plotRaw = 1
-    		continue
-    	endif
-    	
+    for (i = 0; i<2; i++)  // i = 0, 1 for raw = 1, 0 (i.e. go through raw graphs first, then calc graphs)
       	raw = !i
+      	
+		// Get the wavenames (raw or calc, fast or slow) that we need to make graphs for 
       	waveNames = sci_get1DWaveNames(raw, S.using_fastdac, for_plotting=1)
-		if (raw == 1 && S.using_fastdac)
-			ylabel = "mV"
-		else
-			ylabel = selectString(cmpstr(rawwaveNames, CalcStrings), "mV", y_label)
-		endif
-      
-      	if (raw)
-      		if (S.using_fastdac)
-      			buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label=ylabel, spectrum = 1, mFreq = S.measureFreq)
-      		else 
-      			buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label=ylabel,for_2d=S.is2d, y_label=ylabel, y_label_2d = S.y_label)
-      		endif
-      	
-     	else 	
-      		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, for_2d=S.is2d, y_label=ylabel, y_label_2d = S.y_label)
-      	
-      		if (S.using_fastdac)	
-      			for (j=0; j<itemsinlist(waveNames); j++)
-					string rwn = StringFromList(j, rawWaveNames)
-					string cwn = StringFromList(j, WaveNames)
-					string ADCnum = rwn[3,INF]
-			
-					if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
-						buffer += scg_initializeGraphsForWavenames(cwn + "x", S.x_label, for_2d=S.is2d, y_label=ylabel, append_wn = cwn + "y")
-					endif
-				
-				endfor
-			endif
-      	 endif
-      	 
-      	if(raw==1) // Raw waves
-	   		sc_rawGraphs1D = buffer
-	   	elseif(sc_plotRaw == 0)
-	   		sc_rawGraphs1D = buffer
+      	if (cmpstr(waveNames, "") == 0) // If the strings ARE equal
+      		continue
       	endif
-      	  
-        graphIDs = graphIDs + buffer
+      	
+      	// Specific to Fastdac
+      	if (S.using_fastdac)
+	      	// If plot raw not ticked, then skip making raw graphs
+	    	if(raw && sc_plotRaw == 0)
+	    		continue
+	    	endif
+	    	
+	    	if (raw)
+	    		// Plot 1D ONLY for raw (even if a 2D scan), but also show noise spectrum along with the 1D raw plot
+	    		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label="mV", spectrum = 1, mFreq = S.measureFreq)
+	    		sc_frequentGraphs = addlistItem(stringfromlist(0, buffer, ";"), sc_frequentGraphs, ";")
+	    	else
+	    		// Plot 1D (and 2D if 2D scan)
+	    		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label=y_label, for_2d=S.is2d, y_label_2d = S.y_label)
+	    		if (!sc_plotRaw)
+		      		sc_frequentGraphs = addlistItem(stringfromlist(0, buffer, ";"), sc_frequentGraphs, ";")
+		      	endif
+	      		
+	      		// Graphing specific to using demod
+	      		if (S.using_fastdac)	
+	      			for (j=0; j<itemsinlist(waveNames); j++)
+						string rwn = StringFromList(j, rawWaveNames)
+						string cwn = StringFromList(j, WaveNames)
+						string ADCnum = rwn[3,INF]
+				
+						if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
+							buffer += scg_initializeGraphsForWavenames(cwn + "x", S.x_label, for_2d=S.is2d, y_label=y_label, append_wn = cwn + "y")
+						endif
+					endfor
+				endif
+	    	endif
+	    	
+      	// Specific to Regular Scancontroller
+		else
+	   		// Plot 1D (and 2D if 2D scan)
+	   		
+			buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label=y_label, for_2d=S.is2d, y_label_2d = S.y_label)
+	
+			// Always add 1D graphs to plotting list
+			sc_frequentGraphs = addlistItem(stringfromlist(0, buffer, ";"), sc_frequentGraphs, ";")
+		endif
+	 
+       graphIDs = graphIDs + buffer
     endfor
 
     return graphIDs
@@ -1198,6 +1213,7 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 	// Ensures a graph is open and tiles graphs for each wave in comma separated wavenames
 	// Returns list of graphIDs of active graphs
 	// append_wavename would append a wave to every single wavename in wavenames (more useful for passing just one wavename)
+	// spectrum -- Also shows a noise spectrum of the data (useful for fastdac scans)
 	string wavenames, x_label, y_label, append_wn, y_label_2d
 	variable for_2d , spectrum, mFreq
 	
@@ -1467,14 +1483,14 @@ function scg_openAbortWindow()
 end
 
 
-function scg_updateRawGraphs()
+function scg_updateFrequentGraphs()
 	// updates activegraphs which takes about 15ms
 	// ONLY update 1D graphs for speed (if this takes too long, the buffer will overflow)
- 	svar/z sc_rawGraphs1D
-	if (svar_Exists(sc_rawGraphs1D))
+ 	svar/z sc_frequentGraphs
+	if (svar_Exists(sc_frequentGraphs))
 		variable i
-			for(i=0;i<itemsinlist(sc_rawGraphs1D,";");i+=1)
-			doupdate/w=$stringfromlist(i,sc_rawGraphs1D,";")
+			for(i=0;i<itemsinlist(sc_frequentGraphs,";");i+=1)
+			doupdate/w=$stringfromlist(i,sc_frequentGraphs,";")
 		endfor
 	endif
 end
@@ -2863,6 +2879,13 @@ function RecordValues(S, i, j, [fillnan])
 		//silent abort (with code 10 which can be checked if caught elsewhere)
 		abortonvalue 1,10 
 	endtry
+
+	// If the end of a 1D sweep, then update all graphs, otherwise only update the raw 1D graphs
+	if (j == S.numptsx - 1)
+		doupdate
+	else
+		scg_updateFrequentGraphs()
+	endif
 end
 
 
@@ -4330,6 +4353,8 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only])
    variable read_chunk = scfd_getReadChunkSize(S.numADCs, S.numptsx, bytesSec, totalByteReturn)
    variable panic_mode = record_only  // If Igor gets behind on reading at any point, it will go into panic mode and focus all efforts on clearing buffer.
    variable expected_bytes_in_buffer = 0 // For storing how many bytes are expected to be waiting in buffer
+
+	// 2023-09 -- NOTE FROM TIM TO JOHANN -- If you see a merge commit error around here, it's because I had a merge error around here when fixing the plotting stuff. I had to select the old version of this code again, but you'll want your newer version (that loops through all fastdacs rather than just the one with S.instrIDx)
    do
       scfd_readChunk(S.instrIDx, read_chunk, buffer)  // puts data into buffer
       scfd_distributeData1(buffer, S, bytes_read, totalByteReturn, read_chunk, rowNum)
@@ -4339,7 +4364,7 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only])
       expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)      
       if(!panic_mode && expected_bytes_in_buffer < saveBuffer)  // if we aren't too far behind then update Raw 1D graphs
       	  scfd_raw2CalcQuickDistribute()
-         scg_updateRawGraphs() 
+         scg_updateFrequentGraphs() 
 	      expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)  // Basically checking how long graph updates took
 			if (expected_bytes_in_buffer > 4096)
          		printf "ERROR[scfd_RecordBuffer]: After updating graphs, buffer is expected to overflow... Expected buffer size = %d (max = 4096). Bytes read so far = %d\r" expected_bytes_in_buffer, bytes_read
@@ -4367,7 +4392,7 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only])
    
    scfd_checkSweepstate(S.instrIDx)
 //   variable st = stopMSTimer(-2)
-   scg_updateRawGraphs() 
+   scg_updateFrequentGraphs() 
 //   printf "scg_updateRawGraphs took %.2f ms\r", (stopMSTimer(-2) - st)/1000
    return panic_mode
 end
