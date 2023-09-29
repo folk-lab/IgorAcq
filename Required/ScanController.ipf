@@ -741,15 +741,15 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
 	string instrIDs
 	
 
-	S.dacListIDs = scc_checkDeviceNumber(S = S)						// Getting all the fdIDs for DAC channels selected for ramp
-	S.adcListIDs = scc_checkDeviceNumber(S = S, adc = 1)			// getting all the fdIDs for ADC channels selected for recording
+	S.dacListIDs = scc_getDeviceIDs(S = S)						// Getting all the fdIDs for DAC channels selected for ramp
+	S.adcListIDs = scc_getDeviceIDs(S = S, adc = 1)			// getting all the fdIDs for ADC channels selected for recording
 	
 	// getting all the fdIDs for DAC channels selected for AWG
 	string AWdacListIDs = ""
 	if(use_awg)
 		struct AWGVars A
 		fd_getGlobalAWG(A)
-		AWdacListIDs = scc_checkDeviceNumber(channels = A.channels_AW0 + "," + A.channels_AW1)
+		AWdacListIDs = scc_getDeviceIDs(channels = A.channels_AW0 + "," + A.channels_AW1)
 	endif
 	
 	// combining all IDs and removing any duplicates.
@@ -825,7 +825,7 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
    if(!x_only)
    		S.channelsy = scu_getChannelNumbers(channelsy, fastdac=1)				// converting from channel labels to numbers
 		S.y_label = scu_getDacLabel(S.channelsy, fastdac=1)						// setting the y_label
-		S.dacListIDs_y = scc_checkDeviceNumber(S=S, check_y = 1)				// getting the fdIDs for each DAC channel
+		S.dacListIDs_y = scc_getDeviceIDs(S=S, check_y = 1)				// getting the fdIDs for each DAC channel
    endif
                                                             
 end
@@ -3571,10 +3571,15 @@ function scc_checkSameDeviceFD(S, [x_only, y_only])
 end
 
 
-function /S scc_checkDeviceNumber([S,adc, check_y, channels])
+function /S scc_getDeviceIDs([S, adc, check_y, channels])
 	// checks which devices are used for ramping // or which devices are recording
 	// outputs a list of IDS associated with the S.channelsx and S.ADClist
+	// S: ScanVars
+	// adc: 1 if channels are ADCs, 0 if channels are DACs
+	// check_y: 0 if looking at x DACs, 1 if looking at y DACs
+	// channels: which channels to get the device numbers of (if not providing S)
 	
+	// Returns the variable names of the Devices (fd1, fd2, etc)
 	struct ScanVars &S
 	int adc, check_y
 	string channels
@@ -3582,9 +3587,14 @@ function /S scc_checkDeviceNumber([S,adc, check_y, channels])
 	check_y = paramisdefault(check_y) ? 0 : 1
 	string chs, key = selectstring(adc,"numDACCh","numADCCh")
 	
-	if(paramisDefault(channels))
-		chs = selectstring(adc, selectstring(check_y,S.channelsx, S.channelsy), S.ADClist)
-	else
+	if (!paramisdefault(S) && !paramisdefault(channels))
+		abort "ERROR[scc_getDeviceIDs]: Specify only S or channels, not both"
+	endif
+	
+	if(paramisDefault(channels)) // If channels not specified, extract from S
+		// Depending on looking at ADCs vs DACs, where DACs also depend on whether looking at x or y
+		chs = selectstring(adc, selectstring(check_y, S.channelsx, S.channelsy), S.ADClist)
+	else 
 		chs = channels
 	endif
 	
@@ -3604,7 +3614,7 @@ function /S scc_checkDeviceNumber([S,adc, check_y, channels])
 			if(floor(ch/numChs) == 0) //implies ch is in device number j
 				ch_InstrID += stringbykey("name"+num2str(j),sc_fdackeys,":",",")  + ";"
 				break
-				// i could change this so it has the same structure as sc_fdacKeys	
+				// I could change this so it has the same structure as sc_fdacKeys	
 			else
 				ch -= numChs
 			endif
@@ -5081,10 +5091,9 @@ function scfd_updateWindow(S, numAdcs)
   for(i=0;i<numADCs;i+=1)
     channel_num = str2num(stringfromlist(i,S.adclist,";"))
     fdIDname = stringfromlist(i,S.ADClistIDs)  //attempt
-    nvar fdID = $fdIDname						// attempt
-    
+   
     //getfadcChannel(S.instrIDx,channel_num, len_avg=0.001)  // This updates the window when called
-    getfadcChannel(fdID,channel_num, len_avg=0.001, fdIDname = fdIDname)  // attempt
+    getfadcChannel(channel_num, len_avg=0.001)  // attempt
   endfor
 end
 
@@ -5732,15 +5741,14 @@ function scfw_update_fadc(action) : ButtonControl
 		if(numADCCh > 0)
 			visa_address = scf_getFDVisaAddress(i+1)
 			fdIDname = stringByKey("name"+num2str(i+1), sc_fdacKeys, ":", ",")
-			nvar fdID = $fdIDname
 			try
 				for(j=0;j<numADCCh;j+=1)
-					getfadcChannel(fdID,startCh+j, fdIDname = fdIDname)
+					getfadcChannel(startCh+j)
 				endfor
 			catch
 				// reset error
 				variable err = GetRTError(1)
-
+				nvar fdID = $fdIDname 
 				viClose(fdID)
 				// reopen normal instrument connections
 				sc_OpenInstrConnections(0)

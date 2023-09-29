@@ -208,10 +208,10 @@ function GetTargetCSCurrent([oldcscurr, lower_lim, upper_lim, nosave])
 
 	// Begin by calling CorrectChargeSensor with default things
 	if (paramisDefault(oldcscurr))
-		CorrectChargeSensor(fd=fd, fdchannelstr=channelstr, fadcID="fd", fadcchannel=0, check=0, direction=1)
-		oldcscurr = getFADCvalue("fd", 0, len_avg=0.3)
+		CorrectChargeSensor(fdchannelstr=channelstr, fadcchannel=0, check=0, direction=1)
+		oldcscurr = getFADCvalue(0, len_avg=0.3)
 	else
-		CorrectChargeSensor(fd=fd, fdchannelstr=channelstr, fadcID="fd", fadcchannel=0, check=0, direction=1, natarget=oldcscurr)
+		CorrectChargeSensor(fdchannelstr=channelstr, fadcchannel=0, check=0, direction=1, natarget=oldcscurr)
 	endif
 
 	// Get the current value of CSQ
@@ -240,7 +240,7 @@ function GetTargetCSCurrent([oldcscurr, lower_lim, upper_lim, nosave])
 	endif
 
 	rampmultiplefdac(fd, channelstr, newcenter)
-	variable newcscurr = getFADCvalue("fd", 0, len_avg=0.3)
+	variable newcscurr = getFADCvalue(0, len_avg=0.3)
 
 	// If a strangely small or large cscurrent, ramp back to center and return
 	if(newcscurr > upper_lim || newcscurr < lower_lim)
@@ -254,11 +254,11 @@ end
 
 
 
-function CorrectChargeSensor([bd, bdchannelstr, dmmid, fd, fdchannelstr, fadcID, fadcchannel, i, check, natarget, direction, zero_tol, gate_divider, cutoff_time])
+function CorrectChargeSensor([fdchannelstr, fadcchannel, i, check, natarget, direction, zero_tol, gate_divider, cutoff_time])
 //Corrects the charge sensor by ramping the CSQ in 1mV steps
 //(direction changes the direction it tries to correct in)
-	variable bd, dmmid, fd, fadcchannel, i, check, natarget, direction, zero_tol, gate_divider, cutoff_time
-	string fdchannelstr, bdchannelstr, fadcID
+	variable fadcchannel, i, check, natarget, direction, zero_tol, gate_divider, cutoff_time
+	string fdchannelstr
 	variable cdac, cfdac, current, new_current, nextdac, j
 	wave/T dacvalstr
 	wave/T fdacvalstr
@@ -273,18 +273,10 @@ function CorrectChargeSensor([bd, bdchannelstr, dmmid, fd, fdchannelstr, fadcID,
 	cutoff_time = paramisdefault(cutoff_time) ? 30 : cutoff_time
 	fadcchannel = paramisdefault(fadcchannel) ? 1 : fadcchannel
 
-	if ((paramisdefault(bd) && paramisdefault(fd)) || !paramisdefault(bd) && !paramisdefault(fd))
-		abort "Must provide either babydac OR fastdac id"
-	elseif  ((paramisdefault(dmmid) && paramisdefault(fadcID)) || !paramisdefault(fadcID) && !paramisdefault(dmmid))
-		abort "Must provide either dmmid OR fadcchannel"
-	elseif ((!paramisdefault(bd) && paramisDefault(bdchannelstr)) || (!paramisdefault(fd) && paramisDefault(fdchannelstr)))
-		abort "Must provide the channel to change for the babydac or fastdac"
-	elseif (!paramisdefault(fadcid) && paramisdefault(fadcchannel))
+	if (paramisdefault(fadcchannel))
 		abort "Must provide fdadcID if using fadc to read current"
-	elseif (!paramisdefault(fd) && paramisdefault(fdchannelstr))
+	elseif (paramisdefault(fdchannelstr))
 		abort "Must provide fdchannel if using fd"
-	elseif (!paramisdefault(bd) && paramisdefault(bdchannelstr))
-		abort "Must provide bdchannel if using bd"
 	endif
 
 	if (!paramisdefault(fdchannelstr))
@@ -294,24 +286,13 @@ function CorrectChargeSensor([bd, bdchannelstr, dmmid, fd, fdchannelstr, fadcID,
 		else
 			variable fdchannel = str2num(fdchannelstr)
 		endif
-	elseif (!paramisdefault(bdchannelstr))
-		bdchannelstr = scu_getChannelNumbers(bdchannelstr, fastdac=0)
-		if(itemsInList(bdchannelstr, ",") != 1)
-			abort "ERROR[CorrectChargeSensor]: Only works with 1 bdchannel"
-		else
-			variable bdchannel = str2num(bdchannelstr)
-		endif
 	endif
 
 	sc_openinstrconnections(0)
 
 	//get current
-	if (!paramisdefault(dmmid))
-		abort
-//		current = read34401A(dmmid)
-	else
-		current = getFADCvalue(fadcID, fadcchannel, len_avg=0.5)
-	endif
+	current = getFADCvalue(fadcchannel, len_avg=0.5)
+
 
 	variable end_condition = (naTarget == 0) ? zero_tol : 0.05*naTarget   // Either 5% or just an absolute zero_tol given
 	variable step_multiplier = 1
@@ -320,12 +301,8 @@ function CorrectChargeSensor([bd, bdchannelstr, dmmid, fd, fdchannelstr, fadcID,
 		variable start_time = datetime
 		do
 			//get current dac setting
-			if (!paramisdefault(bd))
-				cdac = str2num(dacvalstr[bdchannel][1])
+			cdac = str2num(fdacvalstr[fdchannel][1])
 
-			else
-				cdac = str2num(fdacvalstr[fdchannel][1])
-			endif
 
 			if (abs(current-natarget) > 15*end_condition)
 				step_multiplier = 10
@@ -343,34 +320,22 @@ function CorrectChargeSensor([bd, bdchannelstr, dmmid, fd, fdchannelstr, fadcID,
 
 			if (check==0) //no user input
 				if (-1000*gate_divider < nextdac && nextdac < 100*gate_divider) //Prevent it doing something crazy
-					if (!paramisdefault(bd))
-						rampmultiplebd(bd, num2str(bdchannel), nextdac)
-					else
-						rampmultipleFDAC(fd, num2str(fdchannel), nextdac)
-					endif
+					rampmultipleChannels(num2str(fdchannel), num2str(nextdac))
 				else
 					abort "Failed to correct charge sensor to target current"
 				endif
 			else //ask for user input
 				doAlert/T="About to change DAC" 1, "Scan wants to ramp DAC to " + num2str(nextdac) +"mV, is that OK?"
 				if (V_flag == 1)
-					if (!paramisdefault(bd))
-						rampmultiplebd(bd, num2str(bdchannel), nextdac)
-					else
-						rampmultipleFDAC(fd, num2str(fdchannel), nextdac)
-					endif
+					rampmultipleChannels(num2str(fdchannel), num2str(nextdac))
 				else
 					abort "Aborted"
 				endif
 			endif
 
 			//get current after dac step
-			if (!paramisdefault(dmmid))
-				abort "Not implemented DMM again yet"
-//				current = read34401A(dmmid)
-			else
-				current = getFADCvalue(fadcID, fadcchannel, len_avg=avg_len)
-			endif
+			current = getFADCvalue(fadcchannel, len_avg=avg_len)
+
 
 			doupdate  // Update scancontroller window
 
