@@ -1427,7 +1427,6 @@ function/S scg_initializeGraphs(S , [y_label])
     wave fadcattr
     
     string rawwaveNames = sci_get1DWaveNames(1, S.using_fastdac, for_plotting=1)
-    
     for (i = 0; i<2; i++)  // i = 0, 1 for raw = 1, 0 (i.e. go through raw graphs first, then calc graphs)
       	raw = !i
       	
@@ -1447,12 +1446,18 @@ function/S scg_initializeGraphs(S , [y_label])
 	    	if (raw)
 	    		// Plot 1D ONLY for raw (even if a 2D scan), but also show noise spectrum along with the 1D raw plot
 	    		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label="mV", spectrum = 1, mFreq = S.measureFreq)
-	    		sc_frequentGraphs = addlistItem(stringfromlist(0, buffer, ";"), sc_frequentGraphs, ";")
+	    		for (j=0; j<itemsinlist(waveNames); j++)
+	    			// No *2 in this loop, because only plots 1D graphs
+		    		sc_frequentGraphs = addlistItem(stringfromlist(j, buffer, ";"), sc_frequentGraphs, ";")	    		
+	    		endfor
 	    	else
 	    		// Plot 1D (and 2D if 2D scan)
 	    		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label=y_label, for_2d=S.is2d, y_label_2d = S.y_label)
 	    		if (!sc_plotRaw)
-		      		sc_frequentGraphs = addlistItem(stringfromlist(0, buffer, ";"), sc_frequentGraphs, ";")
+	    			for (j=0; j<itemsinlist(waveNames); j++)
+	    				// j*(1+S.is2d) so that only 1D graphs are collected in the sc_frequentGraphs
+			    		sc_frequentGraphs = addlistItem(stringfromlist(j*(1+S.is2d), buffer, ";"), sc_frequentGraphs, ";")	    		
+		    		endfor
 		      	endif
 	      		
 	      		// Graphing specific to using demod
@@ -1476,7 +1481,10 @@ function/S scg_initializeGraphs(S , [y_label])
 			buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label=y_label, for_2d=S.is2d, y_label_2d = S.y_label)
 	
 			// Always add 1D graphs to plotting list
-			sc_frequentGraphs = addlistItem(stringfromlist(0, buffer, ";"), sc_frequentGraphs, ";")
+			for (j=0; j<itemsinlist(waveNames); j++)
+				// j*(1+S.is2d) so that only 1D graphs are collected in the sc_frequentGraphs
+	    		sc_frequentGraphs = addlistItem(stringfromlist(j*(1+S.is2d), buffer, ";"), sc_frequentGraphs, ";")	    		
+    		endfor
 		endif
 	 
        graphIDs = graphIDs + buffer
