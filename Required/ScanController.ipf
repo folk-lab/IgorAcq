@@ -2446,7 +2446,7 @@ function InitScanController([configFile])
 			make/t/o sc_RawWaveNames = {"g1x", "g1y","I_leak","ADC"} // Wave names to be created and saved
 			make/o sc_RawRecord = {0,0,0,0} // Whether you want to record and save the data for this wave
 			make/o sc_RawPlot = {0,0,0,0} // Whether you want to plot the data for this wave
-			make/t/o sc_RawScripts = {"readSRSx(srs)", "readSRSy(srs)","getK2400current(k2400)","getfadcvalue(\"fd1\",0)"}
+			make/t/o sc_RawScripts = {"readSRSx(srs)", "readSRSy(srs)","getK2400current(k2400)","getfadcvalue(3)"}
 
 			// And these waves should be the same size too
 			make/t/o sc_CalcWaveNames = {"", ""} // Calculated wave names
