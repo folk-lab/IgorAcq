@@ -199,25 +199,21 @@ function getFADCspeed(instrID)
 	return 1.0/(str2num(response)*1.0e-6) // return value in Hz
 end
 
-function getFADCchannel(fdid, channel, [len_avg, fdIDname])
+function getFADCchannel(channel, [len_avg])
 	// Instead of just grabbing one single datapoint which is susceptible to high f noise, this averages data over len_avg and returns a single value
-	variable fdid, channel, len_avg
-	string fdIDname
-	fdIDname = selectstring(paramisdefault(fdIDname), fdIDname, "")
-	len_avg = paramisdefault(len_avg) ? 0.05 : len_avg
+	variable channel, len_avg
 	
-	variable numpts
-	if(!paramisdefault(fdIDname))
-		nvar instrID = $fdIDname
-		numpts = ceil(getFADCspeed(instrID)*len_avg)
-	else
-		numpts = ceil(getFADCspeed(fdID)*len_avg)
-	endif
+	len_avg = paramisdefault(len_avg) ? 0.05 : len_avg
+	// Get the fd ID based on the ADC channel number
+	string fdIDname = stringfromlist(0, scc_getDeviceIDs(adc=1, channels=num2str(channel)))
+	
+	nvar fdID = $fdIDname 
+	variable numpts = ceil(getFADCspeed(fdID)*len_avg)
 	if(numpts <= 0)
 		numpts = 1
 	endif
 	
-	fd_readChunk(fdid, num2str(channel), numpts, fdIDname = fdIDname)  // Creates fd_readChunk_# wave	
+	fd_readChunk(num2str(channel), numpts, fdIDname)  // Creates fd_readChunk_# wave	
 
 	wave w = $"fd_readChunk_"+num2str(channel)
 	wavestats/q w
@@ -226,14 +222,13 @@ function getFADCchannel(fdid, channel, [len_avg, fdIDname])
 	return V_avg
 end
 
-function getFADCvalue(fdIDname, channel, [len_avg])
+function getFADCvalue(channel, [len_avg])
 	// Same as FADCchannel except it also applies the Calc Function before returning
 	// Note: Min read time is ~60ms because of having to check SamplingFreq a couple of times -- Could potentially be optimized further if necessary
 	variable channel, len_avg
-	string fdIDname
 	len_avg = paramisdefault(len_avg) ? 0.05 : len_avg
 
-	variable/g scfd_val_mv = getFADCchannel(0, channel, len_avg=len_avg, fdIDname = fdIDname)  // Must be global so can use execute
+	variable/g scfd_val_mv = getFADCchannel(channel, len_avg=len_avg)  // Must be global so can use execute
 	variable/g scfd_val_real
 	wave/t fadcvalstr
 	string func = fadcvalstr[channel][4]
@@ -343,7 +338,7 @@ function/s getFDstatus(fdIDname)
 	// ADC values
 	CHstart = scf_getChannelStartNum(instrID, adc=1)
 	for(i=0;i<scf_getFDInfoFromID(instrID, "numADC");i+=1)
-		buffer = addJSONkeyval(buffer, "ADC"+num2istr(CHstart+i), num2numstr(getfadcChannel(instrID,CHstart+i, fdIDname = fdIDname)))
+		buffer = addJSONkeyval(buffer, "ADC"+num2istr(CHstart+i), num2numstr(getfadcChannel(CHstart+i)))
 	endfor
 	
 	// AWG info
@@ -458,9 +453,8 @@ function RampMultipleChannels(channels, setpoints)
 	
 	string channels
 	string setpoints
-	sc_openInstrConnections(0)
 	channels = scu_getChannelNumbers(channels, fastdac=1)
-	string channelIDs = scc_checkDeviceNumber(channels = channels)
+	string channelIDs = scc_getDeviceIDs(channels = channels)
 	int i
 	for(i=0;i<itemsinlist(channels, ","); i++)
 		nvar fdID = $(stringfromlist(i, channelIDs))
@@ -1632,7 +1626,7 @@ function setupAWG([channels_AW0, channels_AW1, numCycles, verbose])
 	
 	S.numADCs = scf_getNumRecordedADCs()  // Store number of ADCs selected in window so can check if this changes // shouldnt matter anymore
 	S.maxADCs = scf_getMaxRecordedADCs()  // Store number of ADCs selected in window so can check if this changes
-	S.channelIDs = scc_checkDeviceNumber(channels = S.channels_AW0 +","+ S.channels_AW1)
+	S.channelIDs = scc_getDeviceIDs(channels = S.channels_AW0 +","+ S.channels_AW1)
 	wave /t IDs = listToTextWave(S.channelIDs, ";")
 	findDuplicates /z /free /rt = syncIDs IDs
 	if(!wavetype(syncIDs))
@@ -1960,11 +1954,18 @@ function/s fd_start_sweep(S, [AWG_list])
 		// the below function takes all the adcs selected to record in the fastdac Window and returns
 		// only the adcs associated with the fdID
 		string adcs = scu_getDeviceChannels(fdID, S.adclist, adc_flag=1) 
+		if (cmpstr(adcs, "") == 0) // If adcs is an empty string
+			string err
+			sprintf err, "ERROR[fd_start_sweep]: ADClist = %s, Not on FD %s.\r\nRemeber, ADCs are indexed e.g. 0 - 11 for 3 fastdacs", S.adclist, fdIDname
+			abort err
+		endif
 		string cmd = ""
 	
 		if (S.readVsTime) // this is passed at either the end of the scan (EndScan()) or it is passed
 			// when update ADC is pressed on the fastDac window. The point here is an ADC channel is 
 			// read for a small number of points to minimize noise and get a good average
+			adcs = replacestring(";",adcs,"")
+			S.adcLists = replacestringbykey(fdIDname, S.adcLists, adcs)
 			sprintf cmd, "SPEC_ANA,%s,%s\r", adcs, num2istr(S.numptsx)
 		else
 			scu_assertSeparatorType(S.channelsx, ",")
@@ -2078,14 +2079,12 @@ function/s fd_start_sweep(S, [AWG_list])
 	return cmd
 end
 
-function fd_readChunk(fdid, adc_channels, numpts, [fdIDname])
+function fd_readChunk(adc_channels, numpts, fdIDname)
 	// Reads numpnts data without ramping anywhere, does not update graphs or anything, just returns full waves in 
 	// waves named fd_readChunk_# where # is 0, 1 etc for ADC0, 1 etc
-	variable fdid, numpts
+	variable numpts
 	string adc_channels
 	string fdIDname
-
-	fdIDname = selectstring(paramisdefault(fdIDname), fdIDname, "") 
 	adc_channels = replaceString(",", adc_channels, ";")  // Going to list with this separator later anyway
 	adc_channels = replaceString(" ", adc_channels, "")  // Remove blank spaces
 	variable i
@@ -2098,18 +2097,19 @@ function fd_readChunk(fdid, adc_channels, numpts, [fdIDname])
 		wavenames = addListItem(wn, wavenames, ";", INF)
 	endfor
 	
-	nvar instrID = $fdIDname
+	// Create a temporary minimal struct for doing a basic readvstime scan
 	Struct ScanVars S
 	S.numptsx = numpts
-	S.instrIDx = fdid
+	S.instrIDx = -1                 // Specifying fdIDs in S.instrIDs instead
 	S.readVsTime = 1  					// No ramping
 	S.adcList = adc_channels  		// Recording specified channels, not ticked boxes in ScanController_Fastdac
 	S.numADCs = itemsInList(S.adcList) // gives me an error if i leave this out
 	S.maxADCs = itemsInList(S.adcList) 
+	nvar instrID = $fdIDname
 	S.samplingFreq = getFADCspeed(instrID)
 	S.raw_wave_names = wavenames  	// Override the waves the rawdata gets saved to
 	S.never_save = 1
-	S.instrIDs = fdIDname //attempt
+	S.instrIDs = fdIDname
 	
 	scfd_RecordValues(S, 0, skip_data_distribution=1)
 end
