@@ -540,7 +540,7 @@ function ScanFastDAC2D_virtual(startx, finx, channelsx, starty, finy, channelsy,
 		nvar fdID = $IDname
 	   	corners = StringFromList(k, virtual_corners, ";")
 	   	c0 = str2num(StringFromList(0, corners, ","))
-	   	rampmultiplefDAC(fdID, virtual_gate, c0, ignore_lims=1)
+	   	rampmultipleChannels(virtual_gate, num2str(c0), ignore_lims=1)
 	endfor
 
    	
@@ -559,6 +559,8 @@ function ScanFastDAC2D_virtual(startx, finx, channelsx, starty, finy, channelsy,
 	
 	variable new_start, new_fin
 	string original_channelsx = S.channelsx, original_startxs = S.startxs, original_finxs = S.finxs
+	string original_daclistids = S.dacListIDs
+
 	for(i=0; i < S.numptsy; i++)
 	
 	
@@ -567,10 +569,13 @@ function ScanFastDAC2D_virtual(startx, finx, channelsx, starty, finy, channelsy,
 			S.channelsx = ""
 			S.startxs = ""
 			S.finxs = ""
+			S.dacListIDs = ""
 		else
 			S.channelsx = original_channelsx
 			S.startxs = original_startxs
 			S.finxs = original_finxs
+			S.dacListIDs = original_daclistids
+
 		endif
 		
 		
@@ -588,7 +593,8 @@ function ScanFastDAC2D_virtual(startx, finx, channelsx, starty, finy, channelsy,
 			
 			S.channelsx = AddListItem(virtual_gate, S.channelsx, ",", INF)
 			S.startxs = AddListItem(num2str(new_start), S.startxs, ",", INF)			
-			S.finxs = AddListItem(num2str(new_fin), S.finxs, ",", INF)						
+			S.finxs = AddListItem(num2str(new_fin), S.finxs, ",", INF)	
+			S.dacListIDs = AddListItem(stringfromlist(0, scc_getDeviceIDs(channels=virtual_gate)), S.dacListIDs, ";", INF) // add virtual_gate device ID to S.dacListIDs (use stringfromlist to strip semicolon)
    		endfor
    		
    		
