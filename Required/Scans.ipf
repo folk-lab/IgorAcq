@@ -332,7 +332,6 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 	
 	variable start, fin, repeats, numptsx, sweeprate, delay, ramprate, alternate, nosave, use_awg
 	string channels, x_label, y_label, comments, starts, fins, interlaced_channels, interlaced_setpoints
-	variable j=0
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -383,7 +382,7 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 	initializeScan(S, y_label = y_label)
 		
 	// Main measurement loop
-	variable d=1
+	int j, d = 1
 	for (j=0; j<S.numptsy; j++)
 		S.direction = d  // Will determine direction of scan in fd_Record_Values
 
