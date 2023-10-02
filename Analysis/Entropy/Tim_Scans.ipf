@@ -1073,16 +1073,13 @@ end
 
 
 
-function ScanTransition([num_scans, sweeprate, width, ramprate, repeats, center_first, center_gate, center_width, sweep_gate, additional_comments, mid, cs_target, csqpc_gate, fdcs_id, alternate, fadcchannel, gate_divider, delayy, nosave, virtual_gates, virtual_ratios, virtual_mids, use_AWG])
-	variable num_scans, sweeprate, width, ramprate, repeats, center_first, center_width, mid, cs_target, fdcs_id, alternate, fadcchannel, gate_divider, delayy, nosave, use_AWG
+function ScanTransition([num_scans, sweeprate, width, ramprate, repeats, center_first, center_gate, center_width, sweep_gate, additional_comments, mid, cs_target, csqpc_gate, alternate, fadcchannel, gate_divider, delayy, nosave, virtual_gates, virtual_ratios, virtual_mids, use_AWG])
+	variable num_scans, sweeprate, width, ramprate, repeats, center_first, center_width, mid, cs_target, alternate, fadcchannel, gate_divider, delayy, nosave, use_AWG
 	string center_gate, sweep_gate, additional_comments, csqpc_gate, virtual_gates, virtual_ratios, virtual_mids
-	nvar fd = fd
 	
 	if (!paramisdefault(virtual_gates) && (paramisdefault(virtual_mids) || paramisdefault(virtual_ratios) ))
 	 ABORT "ERROR[ScanTransition]: virtual_gates specified but virtual_mids or virtual_ratios MISSING"
 	endif
-	
-	
 
 	num_scans = (num_scans == 0) ? 1 : num_scans
 	sweeprate = paramisdefault(sweeprate) ? 100 : sweeprate
@@ -1091,7 +1088,6 @@ function ScanTransition([num_scans, sweeprate, width, ramprate, repeats, center_
 	gate_divider = paramisdefault(gate_divider) ? 20 : gate_divider
 	delayy = paramisdefault(delayy) ? 0.01 : delayy
 	fadcchannel = paramisdefault(fadcchannel) ? 1 : fadcchannel
-	fdcs_id = paramisdefault(fdcs_id) ? fd : fdcs_id
 	use_AWG = paramisdefault(use_AWG) ? 0 : use_AWG
 
 	// let center_first default to 0
@@ -1107,41 +1103,46 @@ function ScanTransition([num_scans, sweeprate, width, ramprate, repeats, center_
 		if (center_first)
 			variable center_gate_mid
 			if (!paramisdefault(virtual_gates) && !paramisdefault(virtual_mids))
-			   	rampmultiplefDAC(fd, virtual_gates, 0, setpoints_str=virtual_mids) // ramp virtual gates
+			   	rampmultipleChannels(virtual_gates, virtual_mids) // ramp virtual gates
 			endif
-			rampmultiplefdac(fd, sweep_gate, mid, ramprate=ramprate)
+			rampmultipleChannels(sweep_gate, num2str(mid))
 			center_gate_mid = centerontransition(gate=center_gate, width=center_width, single_only=1)
 			mid = (cmpstr(center_gate, sweep_gate) == 0) ? center_gate_mid : mid  // If centering with sweepgate, update the mid value
 			
 			printf "Centered at %s=%.2f mV\r" center_gate, center_gate_mid
 			if (paramisdefault(virtual_gates))
-				rampmultiplefdac(fd, sweep_gate, -width*0.5, ramprate=ramprate) // only ramp to outside transition if not a virtual scan
+				rampmultipleChannels(sweep_gate, num2str(-width*0.5)) // only ramp to outside transition if not a virtual scan
 			endif
+			
+			set_indep() // dirty fix
+			
 			if (!paramisdefault(cs_target))
-				CorrectChargeSensor(fdchannelstr=csqpc_gate, fadcchannel=fadcchannel, check=0, direction=1, natarget=cs_target, gate_divider=gate_divider)
+				CorrectChargeSensor(fdchannelstr=csqpc_gate, fadcchannel=fadcchannel, check=0, direction=1, gate_divider=gate_divider, natarget=cs_target)
 			else
 				CorrectChargeSensor(fdchannelstr=csqpc_gate, fadcchannel=fadcchannel, check=0, direction=1, gate_divider=gate_divider)
 			endif
 		endif
+		
 		sprintf comments, "transition"
 		if (repeats > 1)
 			sprintf comments, "%s, repeat, " comments
 		endif
+		
 		if (num_scans > 1)
 			sprintf comments, "%s, scan_num=%d, " comments, i
 		endif
+		
 		if (!paramisdefault(virtual_gates) && !paramisdefault(virtual_mids))
-
 			string starts, fins, sweep_channels
 			calculate_virtual_starts_fins_using_ratio(mid, width, sweep_gate, virtual_gates, virtual_mids, virtual_ratios, sweep_channels, starts, fins)	
 		
-			ScanFastDAC( 0, 0, sweep_channels, repeats=repeats, sweeprate=sweeprate, ramprate=ramprate, starts=starts, fins=fins, delay=delayy, comments=comments + additional_comments, alternate=alternate, nosave=nosave, use_AWG=use_AWG)
-			rampmultiplefDAC(fd, virtual_gates, 0, setpoints_str=virtual_mids)
-			rampmultiplefdac(fd, sweep_gate, mid, ramprate=ramprate)	
+			ScanFastDAC(0, 0, sweep_channels, repeats=repeats, sweeprate=sweeprate, ramprate=ramprate, starts=starts, fins=fins, delay=delayy, comments=comments + additional_comments, alternate=alternate, nosave=nosave, use_AWG=use_AWG)
+			rampmultipleChannels(virtual_gates, virtual_mids)
+			rampmultipleChannels(sweep_gate, num2str(mid))	
 		
 		else 
 			ScanFastDAC(mid-width, mid+width, sweep_gate, repeats=repeats, sweeprate=sweeprate, ramprate=ramprate, delay=delayy, comments=comments + additional_comments, alternate=alternate, nosave=nosave, use_AWG=use_AWG)
-			rampmultiplefdac(fd, sweep_gate, mid, ramprate=ramprate)	
+			rampmultipleChannels(sweep_gate, num2str(mid))	
 		endif
 	
 	endfor

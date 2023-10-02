@@ -404,16 +404,15 @@ function CenterOnTransition([gate, virtual_gates, width, single_only])
 	string gate, virtual_gates
 	variable width, single_only
 
-	nvar fd=fd
-
 	gate = selectstring(paramisdefault(gate), gate, "ACC*2")
 	width = paramisdefault(width) ? 20 : width
 
-	gate = scu_getChannelNumbers(gate, fastdac=1)
+	string gate_num
+	gate_num = scu_getChannelNumbers(gate, fastdac=1)
 
 	variable initial, mid
 	wave/t fdacvalstr
-	initial = str2num(fdacvalstr[str2num(gate)][1])
+	initial = str2num(fdacvalstr[str2num(gate_num)][1])
 
 	ScanFastDAC(initial-width, initial+width, gate, sweeprate=width, nosave=1)
 	mid = findtransitionmid($"cscurrent", threshold=2)
@@ -424,9 +423,9 @@ function CenterOnTransition([gate, virtual_gates, width, single_only])
 	endif
 
 	if (abs(mid-initial) < width && numtype(mid) != 2)
-		rampmultiplefdac(fd, gate, mid)
+		rampmultipleChannels(gate, num2str(mid))
 	else
-		rampmultiplefdac(fd, gate, initial)
+		rampmultipleChannels(gate, num2str(initial))
 		printf "CLOSE CALL: center on transition thought mid was at %dmV\r", mid
 		mid = initial
 	endif
