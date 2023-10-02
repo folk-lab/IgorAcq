@@ -3,11 +3,20 @@
 #pragma DefaultTab={3,20,4}		// Set default tab width in Igor Pro 9 and later
 #include <Reduce Matrix Size>
 
-function master_cond_clean_average(wave wav, int refit, string kenner_out)
-// wav is the wave containing original dotcurrent data
+function master_cond_clean_average(wav, refit, kenner_out, [alternate_bias, N, percent_width])
+	// wav is the wave containing original dotcurrent data
 	// refit tells whether to do new fits to each CT line
 	// kenner_out is the prefix to replace dat for this analysis
 	// kenner_out  can not contain a number otherwise getfirstnu will not work
+	wave wav
+	int refit
+	string kenner_out
+	int alternate_bias, N
+	variable percent_width
+
+	alternate_bias = paramisdefault(alternate_bias) ? 0 : alternate_bias // alternate_bias OFF is default
+	N = paramisdefault(N) ? 3 : N // 3 standard deviations is default
+	percent_width = paramisdefault(percent_width) ? 0.2 : percent_width // should be from 0 - 1. percent is misleading but more clear then 'frac_width'
 
 	variable refnum, ms
 	refnum=startmstimer
@@ -15,7 +24,7 @@ function master_cond_clean_average(wave wav, int refit, string kenner_out)
 //	closeallGraphs()
 
 	string datasetname = nameofwave(wav)
-	string kenner = getsuffix(datasetname) //  cscurrent in the above case
+	string kenner_in = getsuffix(datasetname) //  cscurrent in the above case
 	int wavenum = getfirstnum(datasetname) // XXX in the above case
 	
 	// these are the new wave names to be made
@@ -28,28 +37,125 @@ function master_cond_clean_average(wave wav, int refit, string kenner_out)
 	string pos_avg = split_pos + "_avg"
 	string neg_avg = split_neg + "_avg"
 	string fit_params_name = kenner_out + num2str(wavenum) + "_dot_fit_params"
-	variable N
-	N=40// how many sdevs in thetas are acceptable?
+
 
 
 	if (refit==1)
-		get_cond_fit_params($datasetname, kenner_out)// finds fit_params
+		get_cond_fit_params($datasetname, kenner_out, percent_width = percent_width)// finds fit_params
 		plot_gammas(fit_params_name, N) //need to do this to refind good and bad gammas
 		duplicate/o/r=[][2] $fit_params_name mids
 		centering($datasetname, centered_wave_name, mids)// only need to center after redoing fits, centred plot; returns centered_wave_name
 		remove_bad_gammas($centered_wave_name, cleaned_wave_name) // only need to clean after redoing fits; returns centered_wave_name
 	endif
 
-
-	split_wave($cleaned_wave_name, 0) //makes condxxxxcentered
-	avg_wav($split_pos) // pos average
-	avg_wav($split_neg) // neg average
-	get_conductance_from_current($pos_avg, $neg_avg, avg_wave_name) // condxxxxavg
+	if (alternate_bias == 1)
+		split_wave($cleaned_wave_name, 0) //makes XXX_dot_cleaned
 	
-	plot_cond_figs(wavenum, N, kenner, kenner_out)
+		zap_NaN_rows($split_pos, overwrite = 1, percentage_cutoff_inf = 0.15)
+		zap_NaN_rows($split_neg, overwrite = 1, percentage_cutoff_inf = 0.15)
+	
+		avg_wav($split_pos) // pos average
+		avg_wav($split_neg) // neg average
+	
+		get_conductance_from_current($pos_avg, $neg_avg, avg_wave_name) // XXX_dot_cleaned_avg
+	else
+		avg_wav($cleaned_wave_name)
+	endif
+	
+	plot_cond_figs(wavenum, N, kenner_in, kenner_out, alternate_bias = alternate_bias, percent_width = percent_width)
 
 	ms=stopmstimer(refnum)
 	print "Cond: time taken = " + num2str(ms/1e6) + "s"
+end
+
+
+function zap_NaN_rows(wave_2d, [overwrite, percentage_cutoff_inf])
+	// removes any row from wave_2d where the number of NaNs is greater than the cutoff specified in percentage_cutoff_inf
+	// wave_2d: 2d wave to remove rows from
+	// overwrite: Default is overwrite = 0. overwrite = 1 will overwrite input wave and params wave.
+	// percentage_cutoff_inf: Default is percentage_cutoff_inf = 0.15 :: 15%
+	wave wave_2d
+	int overwrite
+	variable percentage_cutoff_inf
+	
+	percentage_cutoff_inf = paramisdefault(percentage_cutoff_inf) ? 0.15 : percentage_cutoff_inf // remove row with more than 15% NaN default
+
+
+	// Duplicating 2d wave
+	if (overwrite == 0)
+		string wave_2d_name = nameofwave(wave_2d)
+		string wave_2d_name_new = wave_2d_name + "_zap"
+		duplicate /o wave_2d $wave_2d_name_new
+		wave wave_2d_new = $wave_2d_name_new 
+	endif
+	
+	
+	create_x_wave(wave_2d)
+	wave x_wave
+	
+	create_y_wave(wave_2d)
+	wave y_wave
+	
+	variable num_rows = dimsize(wave_2d, 1)
+	variable num_bad_rows = 0
+	
+	variable i 
+	for (i = 0; i < num_rows; i++)
+		duplicate /o /RMD=[][i - num_bad_rows] wave_2d data_slice
+		wavestats /Q data_slice
+		
+		if (V_numNans / (V_npnts + V_numNans + V_numINFs) >= percentage_cutoff_inf)
+		
+			if (overwrite == 0)
+				DeletePoints/M=1 (i - num_bad_rows), 1, wave_2d_new // delete row
+			else
+				DeletePoints/M=1 (i - num_bad_rows), 1, wave_2d // delete row
+			endif
+			
+			num_bad_rows += 1
+		endif
+		
+	endfor
+end
+
+
+
+function zapnan_scaling_overwrite(wave_1d, [overwrite])
+	// removes any NaNs from a wave and preserves the x-scaling, assumes NaNs are only at the ends.
+	// wave_1d: 2d wave to remove rows from
+	// overwrite: Default is overwrite = 0. overwrite = 1 will overwrite input wave and params wave.
+	// percentage_cutoff_inf: Default is percentage_cutoff_inf = 0.15 :: 15%
+	wave wave_1d
+	int overwrite
+
+	// Duplicating 2d wave
+	if (overwrite == 0)
+		string wave_1d_name = nameofwave(wave_1d)
+		string wave_1d_name_new = wave_1d_name + "_zap"
+		duplicate /o wave_1d $wave_1d_name_new
+		wave wave_1d_new = $wave_1d_name_new 
+	endif
+	
+	
+	create_x_wave(wave_1d)
+	wave x_wave
+
+	
+	variable num_cols = dimsize(wave_1d, 0)
+	variable value
+	variable num_nan = 0
+	
+	variable i 
+	for (i = 0; i < num_cols; i++)
+	
+		value = wave_1d[i]
+		
+		if (numtype(value) == 2)
+			DeletePoints/M=0 (i - num_nan), 1, wave_1d_new // delete row
+			DeletePoints/M=0 (i - num_nan), 1, x_wave // delete row
+			num_nan += 1
+		endif
+	endfor
 end
 
 
@@ -202,6 +308,10 @@ function /wave remove_bad_gammas(wave center, string cleaned_wave_name)
 	// any row with a 'badgammax' will be removed from the 2d wave center
 	wave badgammasx
 	duplicate/o center $cleaned_wave_name
+	
+	//////////////////////////////////////////
+	///// removing lines with bad gammas /////
+	//////////////////////////////////////////
 
 	//////////////////////////////////////////
 	///// removing lines with bad gammas /////
@@ -277,25 +387,18 @@ end
 
 
 
-function /wave fit_single_peak(wave current_array)
+function /wave fit_single_peak(current_array, [percent_width])
+	wave current_array
+	variable percent_width
+	
+	percent_width = paramisdefault(percent_width) ? 0.2 : percent_width // should be from 0 - 1. percent is misleading but more clear then 'frac_width'
+
 	// fits the 1D current_array by taking the absolute value of the data
 	// CHECK: Not ideal when the current is negative
 	redimension/n=-1 current_array
 	duplicate/o current_array temp
 	
-	//////////////////////
-	///// OLD METHOD /////
-	//////////////////////
-//	temp=abs(current_array)
-//	make/o/n=4 W_coef
-//	wavestats/q temp
-//	
-//	CurveFit/q lor current_array[round(V_maxrowloc-V_npnts/20), round(V_maxrowloc+V_npnts/20)] /D 
-//	
-	
-	//////////////////////
-	///// NEW METHOD /////
-	//////////////////////
+
 	// K0 = DC offset
 	// K1 = Amplitude
 	// K2 = x offset
@@ -312,13 +415,14 @@ function /wave fit_single_peak(wave current_array)
 	endif
 	
 	
+	// only fit to ±5% the number of points on either side of the peak
 	wavestats/q temp
-	variable min_fit_index = round(V_maxrowloc - V_npnts*0.050)
+	variable min_fit_index = round(V_maxrowloc - V_npnts*percent_width)
 	if (min_fit_index < 0)
 		min_fit_index = 0
 	endif
 	
-	variable max_fit_index = round(V_maxrowloc + V_npnts*0.050)
+	variable max_fit_index = round(V_maxrowloc + V_npnts*percent_width)
 	if (max_fit_index > V_npnts)
 		max_fit_index = V_npnts - 1
 	endif
@@ -329,13 +433,18 @@ end
 
 
 
-function /wave get_cond_fit_params(wave wav, string kenner_out)
-	string w2d = nameofwave(wav)
-	int wavenum = getfirstnum(w2d)
-	string fit_params_name = kenner_out + num2str(wavenum) + "_dot_fit_params" //new array
+function /wave get_cond_fit_params(wav, kenner_out, [percent_width])
+	wave wav
+	string kenner_out
+	variable percent_width
+	
+	percent_width = paramisdefault(percent_width) ? 0.2 : percent_width // should be from 0 - 1. percent is misleading but more clear then 'frac_width'
+
+	string wave_name = nameofwave(wav)
+	int wave_num = getfirstnum(wave_name)
+	string fit_params_name = kenner_out + num2str(wave_num) + "_dot_fit_params" //new array
 
 	variable i
-	string wavg
 	int nc
 	int nr
 	wave fit_params
@@ -351,9 +460,10 @@ function /wave get_cond_fit_params(wave wav, string kenner_out)
 	wave fit_params = $fit_params_name
 
 	for (i=0; i < nc ; i+=1) //nc
-		temp_wave = wav[p][i]	;	redimension/n=-1 temp_wave
+		temp_wave = wav[p][i]		
+		redimension/n=-1 temp_wave
 
-		fit_single_peak(temp_wave)
+		fit_single_peak(temp_wave, percent_width = percent_width)
 		fit_params[i][0,3] = W_coef[q]
 		fit_params[i][4] = W_sigma[0]
 		fit_params[i][5] = W_sigma[1]
@@ -367,8 +477,16 @@ end
 
 
 
-function plot_cond_figs(variable wavenum, variable N, string kenner, string kenner_out)	
-	string dataset = "dat" + num2str(wavenum) + kenner
+function plot_cond_figs(wavenum, N, kenner_in, kenner_out, [alternate_bias, percent_width])	
+	variable wavenum, N
+	string kenner_in, kenner_out
+	int alternate_bias
+	variable percent_width
+	
+	alternate_bias = paramisdefault(alternate_bias) ? 0 : alternate_bias // alternate_bias OFF is default
+	percent_width = paramisdefault(percent_width) ? 0.2 : percent_width // should be from 0 - 1. percent is misleading but more clear then 'frac_width'
+	
+	string dataset = "dat" + num2str(wavenum) + kenner_in
 	string centered_wave_name = kenner_out + num2str(wavenum) + "_dot_centered"
 	string cleaned_wave_name = kenner_out + num2str(wavenum) + "_dot_cleaned"
 	string avg_wave_name = cleaned_wave_name + "_avg"
@@ -378,14 +496,15 @@ function plot_cond_figs(variable wavenum, variable N, string kenner, string kenn
 	string pos_avg = split_pos + "_avg"
 	string neg_avg = split_neg + "_avg"
 	string fit_params_name = kenner_out + num2str(wavenum) + "_dot_fit_params" 
-//	closeallgraphs()
 
-	/////////////////// thetas  //////////////////////////////////////
 
+	/////////////////// 2D + bad gammas  //////////////////////////////////////
 	plot2d_heatmap($dataset); // raw data
 	
-	plot2d_heatmap($split_pos) // positive bias
-	plot2d_heatmap($split_neg) // negative bias
+	if (alternate_bias == 1)
+		plot2d_heatmap($split_pos) // positive bias
+		plot2d_heatmap($split_neg) // negative bias
+	endif
 	
 	plot2d_heatmap($centered_wave_name) // plot centered traces
 	
@@ -396,11 +515,10 @@ function plot_cond_figs(variable wavenum, variable N, string kenner, string kenn
 	
 	
 	/////////////////// plot avg fit  //////////////////////////////////////
-	
 	display $avg_wave_name;
 
 	string fit_name = "fit_" + avg_wave_name
-	fit_single_peak($avg_wave_name) // getting fit parameters of final averaged trace
+	fit_single_peak($avg_wave_name, percent_width = percent_width) // getting fit parameters of final averaged trace
 	
 	Label bottom "gate (V)"
 	Label left "cond (2e^2/h)"; // DelayUpdate

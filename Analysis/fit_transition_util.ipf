@@ -27,7 +27,7 @@ function master_fit_multiple(dat_min_max, refit, dotcondcentering, kenner_out, [
 	variable dat_end = str2num(StringFromList(1, dat_min_max, ",")) 
 	string wave_name
 	
-	make_scanvar_table_from_dats(dat_min_max)
+	make_scanvar_table_from_dats(dat_min_max, ignore_field=1)
 	wave scanvar_table
 	variable scanvar_table_column_offset = 11
 	insertpoints /M=1 scanvar_table_column_offset, 6, scanvar_table
@@ -183,7 +183,7 @@ function master_ct_clean_average(wav, refit, dotcondcentering, kenner_out, [cond
 	theta_cutoff = paramisdefault(theta_cutoff) ? 100 : theta_cutoff // averaging ON is default
 	repeats_on = paramisdefault(repeats_on) ? 1 : repeats_on // repeats_on ON is default
 	zap_params = paramisdefault(zap_params) ? 0 : zap_params // repeats_on ON is default
-	N = paramisdefault(N) ? 3 : N // averaging ON is default
+	N = paramisdefault(N) ? 3 : N // 3 standard deviations is default
 	
 	
 	///// setting wave names /////
@@ -256,7 +256,7 @@ function master_ct_clean_average(wav, refit, dotcondcentering, kenner_out, [cond
 //		replace_nans_with_avg($cleaned_wave_name, overwrite=0) // remove any row with > 25% NaNs in the row
 		avg_wav($cleaned_wave_name) // quick average plot
 		
-		wavetransform/o zapnans $avg_wave_name
+//		wavetransform/o zapnans $avg_wave_name // this is not always the best idea as it can shift the data
 		get_initial_params($avg_wave_name); //print W_coef
 		
 		fit_transition($avg_wave_name, minx, maxx, fit_width = fit_width)
@@ -342,7 +342,10 @@ function /wave get_initial_params(sweep, [update_amp_only, update_theta_only, up
 
 	///// guess of mid term ////
 	duplicate /o sweep sweepsmooth
-	Smooth/S=4 201, sweepsmooth
+	try
+		Smooth/S=4 201, sweepsmooth
+	catch
+	endtry
 	differentiate sweepsmooth
 	variable wave_min = wavemin(sweepsmooth)
 	FindLevel /Q sweepsmooth, wave_min
