@@ -15,7 +15,7 @@ function standardNoiseMeasurement([instrID, comments, nosave])
 
 	variable current_freq = getFADCspeed(instrID)
 	setFADCSpeed(instrID, 12195)
-	FDSpectrumAnalyzer(instrID,12,numAverage=5,comments="noise, spectrum, "+comments, nosave=nosave)
+	FDSpectrumAnalyzer(12,numAverage=5,comments="noise, spectrum, "+comments, nosave=nosave)
 	setFADCSpeed(instrID, current_freq)
 end
 
@@ -1149,17 +1149,16 @@ function ScanTransition([num_scans, sweeprate, width, ramprate, repeats, center_
 end
 
 
-function ScanWithVirtualRatios(fdID, mid_x, width_x, channelx, sweeprate, [comments, mid_y, width_y, channely, fdyid, numptsy, virtual_x_gates, virtual_x_ratios, virtual_x_mids, virtual_y_gates, virtual_y_ratios, virtual_y_mids, delayy, repeats, alternate, interlaced_channels, interlaced_setpoints, use_awg]) 
+function ScanWithVirtualRatios(mid_x, width_x, channelx, sweeprate, [comments, mid_y, width_y, channely, numptsy, virtual_x_gates, virtual_x_ratios, virtual_x_mids, virtual_y_gates, virtual_y_ratios, virtual_y_mids, delayy, repeats, alternate, interlaced_channels, interlaced_setpoints, use_awg]) 
 	// Basically a wrapper for the usual scan functions to allow for using virtual gates where the sweep ratio is known, but the exact start/end values are not
 	// Note: channelx (and channely) are intended to be a single channel only, if you want multiple channels to sweep the same, just add the second as a virtual gate with ratio 1
-	variable fdID, mid_x, width_x, sweeprate, mid_y, width_y, fdyid, numptsy, delayy, repeats, alternate, use_awg
+	variable mid_x, width_x, sweeprate, mid_y, width_y, numptsy, delayy, repeats, alternate, use_awg
 	string channelx, channely, comments, virtual_x_gates, virtual_x_ratios, virtual_x_mids, virtual_y_gates, virtual_y_ratios, virtual_y_mids, interlaced_channels, interlaced_setpoints
 
 	delayy = ParamIsDefault(delayy) ? 0.01 : delayy
 	comments = selectstring(paramisdefault(comments), comments, "")
 	interlaced_channels = selectString(paramisdefault(interlaced_channels), interlaced_channels, "")
 	interlaced_setpoints = selectString(paramisdefault(interlaced_setpoints), interlaced_setpoints, "")
-	fdyid = paramisdefault(fdyid) ? fdID : fdyid
 	
 	/////// Convert X (and Y) parameters into channels/starts/fins (that the other functions already take) ///////
 	//// Xs
@@ -1200,15 +1199,15 @@ function ScanWithVirtualRatios(fdID, mid_x, width_x, channelx, sweeprate, [comme
 
 	/////// Gates back to Middle values (Usually nicer than having them left at the end of a scan)
 	// X gates
-	rampmultiplefDAC(fdID, channelx, mid_x)
+	RampMultipleChannels(channelx, num2str(mid_x))
 	if (!paramIsDefault(virtual_x_gates))
-		rampmultiplefDAC(fdID, virtual_x_gates, 0, setpoints_str=virtual_x_mids)
+		RampMultipleChannels(virtual_x_gates, virtual_x_mids)
 	endif
 	// Y gates
 	if (!paramisdefault(channely))
-		rampmultiplefDAC(fdyid, channely, mid_y)
+		RampMultipleChannels(channely, num2str(mid_y))
 		if (!paramIsDefault(virtual_y_gates))
-			rampmultiplefDAC(fdyid, virtual_y_gates, 0, setpoints_str=virtual_y_mids)
+			RampMultipleChannels(virtual_y_gates, virtual_y_mids)
 		endif
 	endif
 
