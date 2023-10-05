@@ -27,7 +27,7 @@ function master_fit_multiple(dat_min_max, refit, dotcondcentering, kenner_out, [
 	variable dat_end = str2num(StringFromList(1, dat_min_max, ",")) 
 	string wave_name
 	
-	make_scanvar_table_from_dats(dat_min_max, ignore_field=1)
+	make_scanvar_table_from_dats(dat_min_max, ignore_field=0)
 	wave scanvar_table
 	variable scanvar_table_column_offset = 11
 	insertpoints /M=1 scanvar_table_column_offset, 6, scanvar_table
@@ -74,16 +74,16 @@ function master_fit_multiple(dat_min_max, refit, dotcondcentering, kenner_out, [
 	
 	closeallGraphs()
 	
-	duplicate /R=[][3] /o scanvar_table amp_wave
-	duplicate /R=[][4] /o scanvar_table const_wave 
-	duplicate /R=[][5] /o scanvar_table theta_wave 
-	duplicate /R=[][6] /o scanvar_table mid_wave
-	duplicate /R=[][7] /o scanvar_table linear_wave
-	duplicate /R=[][8] /o scanvar_table quad_wave
+	duplicate /R=[][scanvar_table_column_offset + 0] /o scanvar_table amp_wave
+	duplicate /R=[][scanvar_table_column_offset + 1] /o scanvar_table const_wave 
+	duplicate /R=[][scanvar_table_column_offset + 2] /o scanvar_table theta_wave 
+	duplicate /R=[][scanvar_table_column_offset + 3] /o scanvar_table mid_wave
+	duplicate /R=[][scanvar_table_column_offset + 4] /o scanvar_table linear_wave
+	duplicate /R=[][scanvar_table_column_offset + 5] /o scanvar_table quad_wave
 	
 	string xaxis_name
-	duplicate /R=[][0] /o scanvar_table xaxis;  xaxis_name = "Datnum"
-//	duplicate /R=[][1] /o scanvar_table xaxis;  xaxis_name = "Temperature (mK)"
+//	duplicate /R=[][0] /o scanvar_table xaxis;  xaxis_name = "Datnum"
+	duplicate /R=[][1] /o scanvar_table xaxis;  xaxis_name = "Temperature (mK)"
 //	duplicate /R=[][2] /o scanvar_table xaxis;  xaxis_name = "Magnetic Field (mT)"
 
 	int marker_mode = 3
@@ -256,7 +256,7 @@ function master_ct_clean_average(wav, refit, dotcondcentering, kenner_out, [cond
 //		replace_nans_with_avg($cleaned_wave_name, overwrite=0) // remove any row with > 25% NaNs in the row
 		avg_wav($cleaned_wave_name) // quick average plot
 		
-//		wavetransform/o zapnans $avg_wave_name // this is not always the best idea as it can shift the data
+		wavetransform/o zapnans $avg_wave_name // this is not always the best idea as it can shift the data
 		get_initial_params($avg_wave_name); //print W_coef
 		
 		fit_transition($avg_wave_name, minx, maxx, fit_width = fit_width)

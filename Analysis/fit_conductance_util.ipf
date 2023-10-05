@@ -3,7 +3,7 @@
 #pragma DefaultTab={3,20,4}		// Set default tab width in Igor Pro 9 and later
 #include <Reduce Matrix Size>
 
-function master_cond_clean_average(wav, refit, kenner_out, [alternate_bias, N, percent_width])
+function master_cond_clean_average(wav, refit, kenner_out, [alternate_bias, N, no_centering, percent_width])
 	// wav is the wave containing original dotcurrent data
 	// refit tells whether to do new fits to each CT line
 	// kenner_out is the prefix to replace dat for this analysis
@@ -11,11 +11,12 @@ function master_cond_clean_average(wav, refit, kenner_out, [alternate_bias, N, p
 	wave wav
 	int refit
 	string kenner_out
-	int alternate_bias, N
+	int alternate_bias, N, no_centering
 	variable percent_width
 
 	alternate_bias = paramisdefault(alternate_bias) ? 0 : alternate_bias // alternate_bias OFF is default
 	N = paramisdefault(N) ? 3 : N // 3 standard deviations is default
+	no_centering = paramisdefault(no_centering) ? 0 : no_centering // will attempt to centre by default
 	percent_width = paramisdefault(percent_width) ? 0.2 : percent_width // should be from 0 - 1. percent is misleading but more clear then 'frac_width'
 
 	variable refnum, ms
@@ -44,7 +45,11 @@ function master_cond_clean_average(wav, refit, kenner_out, [alternate_bias, N, p
 		get_cond_fit_params($datasetname, kenner_out, percent_width = percent_width)// finds fit_params
 		plot_gammas(fit_params_name, N) //need to do this to refind good and bad gammas
 		duplicate/o/r=[][2] $fit_params_name mids
-		centering($datasetname, centered_wave_name, mids)// only need to center after redoing fits, centred plot; returns centered_wave_name
+		if (no_centering == 1)
+			duplicate /o $datasetname $centered_wave_name
+		else
+			centering($datasetname, centered_wave_name, mids)// only need to center after redoing fits, centred plot; returns centered_wave_name
+		endif
 		remove_bad_gammas($centered_wave_name, cleaned_wave_name) // only need to clean after redoing fits; returns centered_wave_name
 	endif
 
@@ -59,6 +64,7 @@ function master_cond_clean_average(wav, refit, kenner_out, [alternate_bias, N, p
 	
 		get_conductance_from_current($pos_avg, $neg_avg, avg_wave_name) // XXX_dot_cleaned_avg
 	else
+		zap_NaN_rows($cleaned_wave_name, overwrite = 1, percentage_cutoff_inf = 0.15)
 		avg_wav($cleaned_wave_name)
 	endif
 	
@@ -379,7 +385,7 @@ function/wave get_conductance_from_current(wave pos, wave neg, string newname)
 	duplicate/o pos, $newname
 	wave temp = $newname;
 	temp = (pos-neg)
-	variable bias = (514.95-495.05)/9950000; // divider is 9950 and 1000 is for V instead of mV
+	variable bias = (2 * 77 * 5)/77000000; // divider is 9950 and 1000 is for V instead of mV
 	duplicate/o temp cond
 	temp = (bias/temp)*1e9-21150;
 	temp = 1/temp/7.7483e-05
@@ -397,37 +403,83 @@ function /wave fit_single_peak(current_array, [percent_width])
 	// CHECK: Not ideal when the current is negative
 	redimension/n=-1 current_array
 	duplicate/o current_array temp
+	Smooth/S=4 201, temp
 	
-
+	make /o/n=4 W_coef
+	wave W_coef
+	
 	// K0 = DC offset
 	// K1 = Amplitude
 	// K2 = x offset
 	// K3 = Gamma
 	variable K0, K1, K2, K3, K4
 	wavestats/q temp
-	variable mean_of_wave = mean(temp, pnt2x(temp, V_npnts*0.4), pnt2x(temp, V_npnts*0.6))
-	if (mean_of_wave >= 0)
-		temp -= wavemin(temp)
+	
+	int pos_bias_check = 1 // set to 1 if positive bias
+	if (abs(V_max) < abs(V_min)) // if most positive current is less in magnitude than most negative then probably biasing in other direction.
+		pos_bias_check = 0
+	endif
+	
+	// guesssing DC term
+	if (pos_bias_check == 1)
+		W_coef[0] = V_min
 	else
-		temp -= wavemax(temp)
-		temp *= -1
-		temp -= wavemin(temp)
+		W_coef[0] = V_max
 	endif
 	
 	
+	// guesssing Amplitude
+	if (pos_bias_check == 1)
+		W_coef[1] = V_max - V_min
+	else
+		W_coef[1] = V_min - V_max
+	endif
+	
+	
+	/// guesssing x-offset
+	variable mid_index
+	if (pos_bias_check == 1)
+		W_coef[2] = V_maxloc
+		mid_index = V_maxrowloc
+	else
+		W_coef[2] = V_minloc
+		mid_index = V_minrowloc
+	endif
+
+
+	/// guesssing gamma
+	W_coef[3] = 30
+
+	
+//	variable mean_of_wave = mean(temp, pnt2x(temp, V_npnts*0.4), pnt2x(temp, V_npnts*0.6))
+//	if (mean_of_wave >= 0)
+//		temp -= wavemin(temp)
+//	else
+//		temp -= wavemax(temp)
+//		temp *= -1
+//		temp -= wavemin(temp)
+//	endif
+	
+	
 	// only fit to ±5% the number of points on either side of the peak
-	wavestats/q temp
-	variable min_fit_index = round(V_maxrowloc - V_npnts*percent_width)
+	wavestats/q current_array
+	variable min_fit_index = round(x2pnt(current_array, W_coef[2]) - V_npnts*percent_width)
 	if (min_fit_index < 0)
 		min_fit_index = 0
 	endif
 	
-	variable max_fit_index = round(V_maxrowloc + V_npnts*percent_width)
+	variable max_fit_index = round(x2pnt(current_array, W_coef[2]) + V_npnts*percent_width)
 	if (max_fit_index > V_npnts)
 		max_fit_index = V_npnts - 1
 	endif
 	
-	CurveFit/q lor current_array[min_fit_index, max_fit_index] /D // fit with lor (Lorentzian) :: /q = quiet :: /D = destwaveName
+//	// NEW METHOD //
+	string hold_string = "0000"; // not holding any terms fixed
+	FuncFit/q /H=(hold_string) /TBOX=768 cond_fit_function W_coef temp /D
+	FuncFit/q /H=(hold_string) /TBOX=768 cond_fit_function W_coef current_array[min_fit_index, max_fit_index] /D
+	
+	// OLD METHOD //
+//	CurveFit/q /TBOX=768 lor current_array[min_fit_index, max_fit_index] /D // fit with lor (Lorentzian) :: /q = quiet :: /D = destwaveName
 end
 
 
@@ -526,16 +578,29 @@ function plot_cond_figs(wavenum, N, kenner_in, kenner_out, [alternate_bias, perc
 	ModifyGraph gFont="Gill Sans Light"
 	ModifyGraph mode($fit_name)=0, lsize($fit_name)=1, rgb($fit_name)=(65535,0,0)
 	ModifyGraph mode($avg_wave_name)=2, lsize($avg_wave_name)=2, rgb($avg_wave_name)=(0,0,0)
-	Legend
+	legend
 	Legend/C/N=text0/J/A=LB/X=59.50/Y=53.03
 
-	ModifyGraph log(left)=1,loglinear(left)=1
+//	ModifyGraph log(left)=1,loglinear(left)=1 // log the y-axis
 
 	TileWindows/O=1/C/P
 
 end
 
 
+
+
+Function cond_fit_function(w, ys, xs) : FitFunc
+	Wave w, xs, ys
+	// f(x) = Amp*tanh((x - Mid)/(2*theta)) + Linear*x + Const+Quad*x^2
+
+	// f(x) = Amp*(1/pi * 0.5gamma / ((x - mid)^2 + (0.5gamma)^2)) + DC offset
+	// K0 = DC offset
+	// K1 = Amplitude
+	// K2 = x offset
+	// K3 = Gamma
+	ys = w[1]*(1/pi)*(0.5*w[3] / ((xs - w[2])^2 + (0.5*w[3])^2)) + w[0]
+End
 	
 //////////////////////
 ///// DEPRECATED /////
