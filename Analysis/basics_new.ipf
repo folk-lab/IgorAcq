@@ -1032,14 +1032,16 @@ end
 
 
 
-
-function centering(wave waved, string centered_wavename, wave mids)
-	duplicate/o waved $centered_wavename
-	wave new2dwave = $centered_wavename
-	copyscales waved new2dwave
-	wavestats /q mids
-	new2dwave = interp2d(waved, (x + mids[q] - V_avg), (y)) // mids is the shift in x
+function centering(wave wave_not_centered, string centered_wave_name, wave mids)
+	// shift the wave 'wave_not_centered' by the 'mids' wave
+	// call the new wave 'centered_wave_name'
+	duplicate/o wave_not_centered $centered_wave_name
+	wave new2dwave=$centered_wave_name
+	copyscales wave_not_centered new2dwave
+	new2dwave=interp2d(wave_not_centered,(x+mids[q]),(y)) // mids is the shift in x
+//	new2dwave = interp2d(waved, (x + mids[q] - V_avg), (y)) // mids is the shift in x
 end
+
 
 
 function create_y_wave(wave_2d)
