@@ -63,7 +63,8 @@ function setLS370system(system)
 			ls_label = "XLD"					//plate				//labels	  			//IDs
 			string/g bfbd_ChannelLookUp = "mc;still;magnet;4K;50K;ch6;ch5;ch3;ch2;ch1;6;5;3;2;1"  
 			string/g bfheaterlookup = "mc;still;sc_mc;ao2"							 		//sc_mc only used internally, still label refers to API 	
-			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,290,1201,1800,10000}} 
+//			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,290,1201,1800,10000}} 
+			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,510,1201,1800,10000}} 
 			break
 		default:
 			abort "[ERROR] Please choose a supported LS370 system: [bfsmall, bfbig]"
@@ -810,7 +811,8 @@ end
 function LS370_estimateheaterrange(temp) // Units: mK
 	// sets the heater range based on the wanted output
 	// uses the range lookup table
-	// avaliable ranges: 1,2,3,4,5,6,7,8 --> 0,10,30,95,501,1200,5000,10000 mK
+	// avaliable ranges: 1,  2,  3,  4,   5,    6,    7,     8 --> 0,10,30,95,501,1200,5000,10000 mK
+	//                   0, 10, 30, 95, 501, 1200, 5000, 10000 mK
 	variable temp
 	wave mcheatertemp_lookup
 	make/o/n=8 heatervalues
@@ -819,11 +821,12 @@ function LS370_estimateheaterrange(temp) // Units: mK
 	variable maxcurrent
 
 	heatervalues = mcheatertemp_lookup[p][1]
-	mintempabs = abs(heatervalues-temp)
-	mintemp = heatervalues-temp
+	mintempabs = abs(heatervalues - temp)
+	mintemp = heatervalues - temp
 	FindValue/v=(wavemin(mintempabs)) mintempabs
+	
 	if(mintemp[v_value] < 0)
-		maxcurrent = mcheatertemp_lookup[v_value+1][0]
+		maxcurrent = mcheatertemp_lookup[v_value + 1][0]
 	else
 		maxcurrent = mcheatertemp_lookup[v_value][0]
 	endif
