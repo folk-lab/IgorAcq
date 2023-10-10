@@ -1027,6 +1027,10 @@ function/s getls370status_nosql(instrID)
 	make/free/t LS_keys = {"MC", "50K", "4K", "Magnet", "Still"}
 	make/free/t JSON_keys = {"MC K","50K Plate K","4K Plate K","Magnet K","Still K"}
 
+//	make/free/t LS_keys = {"MC"} //, "50K", "4K", "Magnet", "Still"}
+//	make/free/t JSON_keys = {"MC K"} //,"50K Plate K","4K Plate K","Magnet K","Still K"}
+
+
 	string temp="", Buffer=""
 	string LS_key, JSON_key
 	variable i

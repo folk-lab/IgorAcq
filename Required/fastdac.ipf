@@ -340,20 +340,32 @@ function setFADCSpeed(instrID,speed,[loadCalibration]) // Units: Hz
 end
 
 
-function RampMultipleFDAC(InstrID, channels, setpoint, [ramprate, ignore_lims])
-	// Ramps multiple channes to setpoint (this is the ramp function that SHOULD be used)
+function RampMultipleFDAC(InstrID, channels, setpoint, [ramprate, setpoints_str, ignore_lims])
+	// Ramps multiple channels to setpoint(s) (this is the ramp function that SHOULD be used)
+	// InstrID - FastDAC connection variable (e.g. fd)
+	// channels - comma separated list of channels to sweep
+	// setpoint - Value to sweep channels to (ignored if using setpoints_str)
+	// ramprate - sweeprate of channels to setpoint mV/s
+	// setpoints_str - comma separated list of setpoints for each channel in channels (setpoint ignored)
 	// Note: If ramprate is left default, then each channel will ramp at speed specified in FastDAC window
 	variable InstrID, setpoint, ramprate, ignore_lims
-	string channels
+	string channels, setpoints_str
 	
 	ramprate = numtype(ramprate) == 0 ? ramprate : 0  // If not a number, then set to zero (which means will be overridden by ramprate in window)
-	
+
 	scu_assertSeparatorType(channels, ",")
-	channels = scu_getChannelNumbers(channels, fastdac=1) 
+	channels = scu_getChannelNumbers(channels, fastdac=1)
+	
+	if (!paramIsDefault(setpoints_str) && (itemsInList(channels, ",") != itemsInList(setpoints_str, ",")))
+		abort "ERROR[RampMultipleFdac]: number of channels does not match number of setpoints in setpoints_str"	
+	endif
 	
 	variable i=0, channel, nChannels = ItemsInList(channels, ",")
 	variable channel_ramp
 	for(i=0;i<nChannels;i+=1)
+		if (!paramIsDefault(setpoints_str))
+			setpoint = str2num(StringFromList(i, setpoints_str, ","))
+		endif
 		channel = str2num(StringFromList(i, channels, ","))
 		channel_ramp = ramprate != 0 ? ramprate : str2num(scf_getDacInfo(num2str(channel), "ramprate"))
 		fd_rampOutputFDAC(instrID, channel, setpoint, channel_ramp, ignore_lims=ignore_lims)  
@@ -366,6 +378,9 @@ function fd_rampOutputFDAC(instrID,channel,output, ramprate, [ignore_lims]) // U
 	// ramps a channel to the voltage specified by "output".
 	// ramp is controlled locally on DAC controller.
 	// channel must be the channel set by the GUI.
+	
+	//update - if inputing actual DAC channel, it should not find the start channel
+	
 	variable instrID, channel, output, ramprate, ignore_lims
 	wave/t fdacvalstr, old_fdacvalstr
 	svar sc_fdackeys
@@ -576,14 +591,14 @@ function fd_loadFadcCalibration(instrID,speed)
 	sprintf regex, "fADC%dCalibration_%d", deviceNum, speed
 //	print regex
 	filelist = indexedfile(config,-1,".txt")
-	filelist = greplist(filelist,regex)
+	filelist = greplist(filelist,"^"+regex)  // ^ to force matching from start of string
 	if(itemsinlist(filelist) == 1)
 		// we have a calibration file
 		jstr = readtxtfile(stringfromlist(0,filelist),"config")
 	elseif(itemsinlist(filelist) > 1)
 		// somehow there is more than one file. Try to find the correct one!
 		for(i=0;i<itemsinlist(filelist);i+=1)
-			if(cmpstr(stringfromlist(i,filelist),regex) == 0)
+			if(cmpstr(stringfromlist(i,filelist),regex+".txt") == 0)
 				// this is the correct file
 				k = -1
 				break
@@ -1082,23 +1097,29 @@ function FDSpectrumAnalyzer(instrID, scanlength,[numAverage, raw_graphs, calc_gr
 	// Initialize all graphs
 	string all_graphIDs = ""
 	if (raw_graphs)
-		all_graphIDs += scg_initializeGraphsForWavenames(sci_get1DWaveNames(1,1), "Time /s", is2d=S.is2d, y_label="ADC /mV")  // RAW ADC readings
+		all_graphIDs += scg_initializeGraphsForWavenames(sci_get1DWaveNames(1,1), "Time /s", for_2d=0, y_label="ADC /mV")  // RAW ADC readings
+		if (S.is2d)
+			all_graphIDs += scg_initializeGraphsForWavenames(sci_get1DWaveNames(1,1), "Time /s", for_2d=1, y_label="Repeats")  // RAW ADC readings
+		endif
 	endif
 	if (calc_graphs)
-		all_graphIDs += scg_initializeGraphsForWavenames(sci_get1DWaveNames(0,1), "Time /s", is2d=S.is2d, y_label="Current /nA")    // Calculated data (should be in nA)
+		all_graphIDs += scg_initializeGraphsForWavenames(sci_get1DWaveNames(0,1), "Time /s", for_2d=0, y_label="Current /nA")    // Calculated data (should be in nA)
+		if (S.is2d)
+			all_graphIDs += scg_initializeGraphsForWavenames(sci_get1DWaveNames(1,1), "Time /s", for_2d=1, y_label="Repeats")  // RAW ADC readings
+		endif
 	endif
 	
 	string graphIDs
 //	graphIDs = scg_initializeGraphsForWavenames(log_freq_wavenames, "Frequency /Hz", is2d=0, y_label="dB nA/sqrt(Hz)")
 //	all_graphIDs = all_graphIDs+graphIDs
-	graphIDs = scg_initializeGraphsForWavenames(lin_freq_wavenames, "Frequency /Hz", is2d=0, y_label="nA^2/Hz")
+	graphIDs = scg_initializeGraphsForWavenames(lin_freq_wavenames, "Frequency /Hz", for_2d=0, y_label="nA^2/Hz")
 	string gid
 	for (i=0;i<itemsInList(graphIDs);i++)
 		gid = StringFromList(i, graphIDs)
 		modifyGraph/W=$gid log(left)=1
 	endfor
 	all_graphIDs = all_graphIDs+graphIDs
-	all_graphIDs += scg_initializeGraphsForWavenames(int_freq_wavenames, "Frequency /Hz", is2d=0, y_label="nA^2")
+	all_graphIDs += scg_initializeGraphsForWavenames(int_freq_wavenames, "Frequency /Hz", for_2d=0, y_label="nA^2")
 	scg_arrangeWindows(all_graphIDs)
 
 	// Record data
@@ -1188,6 +1209,7 @@ function plotPowerSpectrum(w, [scan_duration, linear, powerspec_name])
 	variable scan_duration, linear
 	string powerspec_name // Wavename to save powerspectrum in (useful if you want to display more than one at a time)
 	
+	linear = paramisDefault(linear) ? 1 : linear
 	wave powerspec = fd_calculate_spectrum(w, scan_duration=scan_duration, linear=linear)
 	
 	if(!paramIsDefault(powerspec_name))
@@ -1198,7 +1220,7 @@ function plotPowerSpectrum(w, [scan_duration, linear, powerspec_name])
 	endif
 
 	string y_label = selectString(linear, "Spectrum [dBnA/sqrt(Hz)]", "Spectrum [nA/sqrt(Hz)]")
-	scg_initializeGraphsForWavenames(NameOfWave(tempwave), "Frequency /Hz", is2d=0, y_label=y_label)
+	scg_initializeGraphsForWavenames(NameOfWave(tempwave), "Frequency /Hz", for_2d=0, y_label=y_label)
 	 doWindow/F $winName(0,1)
 end
 
@@ -1366,19 +1388,107 @@ EndMacro
 //////////// Arbitrary Wave Generator //////////////
 ////////////////////////////////////////////////////
 
-function fd_setAWGuninitialized()
-	// sets global AWG_list.initialized to 0 so that it will fail pre scan checks. (to be used when changing things like sample rate, AWs etc)
-	
-	// Get current AWG_list
-	struct AWGVars S
-	fd_getGlobalAWG(S)
-	
-	// Set initialized to zero to prevent fd_Record_values from running without AWG_list being set up again first
-	S.initialized = 0
 
-	// Store changes
+function setFdacAWGSquareWave(instrID, amps, times, wave_num)
+	// Wrapper around fd_addAWGwave to make waves with 'amps' and their durations indicated with 'times'
+	// inputs: instrID - FastDac ID variable
+	//         amps - wave with the setpoints in mV
+	//			 times - wave with all the durations (seconds) for the setpoints.
+	//         note* amps and times should be the same length
+	//         wave_num - used to name the wave holding the information about the squarewave, printed at the end of the function
+	   
+	variable instrID
+	wave amps, times
+	int wave_num
+	struct AWGVars S
+	fd_getGlobalAWG(S) 
+	S.numADCs = scf_getNumRecordedADCs()
 	fd_setGlobalAWG(S)
+	
+	// checking if amps and times are the same length
+	if (numpnts(amps) != numpnts(times))
+		abort nameofwave(amps) + " and " + nameofwave(times) +" are not the same size"  
+	endif
+
+	
+	make/o/free/n=(numpnts(amps), 2) awg_sqw          //awg_sqw will hold the information about the squarewave
+	variable samplingFreq = getFADCspeed(instrID)     //sampling frequency is needed to properly implement time
+	variable numSamples = 0, i=0, j=0
+   variable numADCs = scf_getNumRecordedADCs()
+   for(i=0;i<numpnts(amps);i++)                            
+   		numSamples = round(times[i]*samplingFreq/numADCs)   // Convert to # samples
+         
+      	if(numSamples == 0)                         // Prevent adding zero length setpoint
+       	abort "ERROR[setFdacAWGSquareWave]: trying to add setpoint with zero length, duration too short for sampleFreq"
+      	endif
+         
+       awg_sqw[j][0] = {amps[i]}
+       awg_sqw[j][1] = {numSamples}
+       j++
+        
+   endfor
+  
+	// aborts if awg_sqw has no information
+	if(numpnts(awg_sqw) == 0)
+      abort "ERROR[setFdacAWGSquareWave]: No setpoints added to awg_sqw"
+   endif
+   
+   fd_clearAWGwave(instrID, wave_num)                // clears any old existing wave named "fDAW_" + wave_num
+   fd_addAWGwave(instrID, wave_num, awg_sqw)         // creats wave named "fDAW_" + wave_num
+   printf "Set square wave on fdAW_%d\r", wave_num
+   	
 end
+
+//function setFdacAWGSquareWave(instrID, v1, v2, v1len, v2len, wave_num)
+//   // Wrapper around fd_addAWGwave to make square waves with two setpoints (v1, v2) and durations (v1len, v2len)
+//   variable instrID, v1, v2, v1len, v2len, wave_num  // lens in seconds
+//
+//   // TODO: need to make a warning that if changing ADC frequency that AWG_frequency changes
+//
+//   // put into wave to make it easier to work with
+//   make/o/free sps = {v1, v2}
+//   make/o/free lens = {v1len, v2len}
+//
+//   // Sanity check on period
+//   // Note: limit checks happen in AWG_RAMP
+//   if (sum(lens) > 1)
+//      string msg
+//      sprintf msg "Do you really want to make a square wave with period %.3gs?", sum(lens)
+//      variable ans = ask_user(msg, type=1)
+//      if (ans == 2)
+//         abort "User aborted"
+//      endif
+//   endif
+
+   // make wave to store setpoints/sample_lengths
+//   make/o/free/n=(2, 2) awg_sqw  // First 2 is number of setpoints, second 2 is for setpoints/sample_lens
+//
+//   variable samplingFreq = getFADCspeed(instrID)  // Gets sampling rate of FD (Note: NOT measureFreq here)
+//   variable numSamples = 0
+//	
+//   variable i=0, j=0
+//   for(i=0;i<numpnts(sps);i++)
+//      if(lens[i] != 0)  // Only add to wave if duration is non-zero
+//         numSamples = round(lens[i]*samplingFreq)  // Convert to # samples
+//         if(numSamples == 0)  // Prevent adding zero length setpoint
+//            abort "ERROR[setFdacAWGSquareWave]: trying to add setpoint with zero length, duration too short for sampleFreq"
+//         endif
+//         awg_sqw[j][0] = {sps[i]}
+//         awg_sqw[j][1] = {numSamples}
+//         j++
+//      endif
+//   endfor
+//
+//   if(numpnts(awg_sqw) == 0)
+//      abort "ERROR[setFdacAWGSquareWave]: No setpoints added to awg_sqw"
+//   endif
+//
+//   fd_clearAWGwave(instrID, wave_num)
+//   fd_addAWGwave(instrID, wave_num, awg_sqw)
+//   printf "Set square wave on AWG_wave%d\r", wave_num
+//   
+//end
+
 
 function setupAWG(instrID, [AWs, DACs, numCycles, verbose])
 	// Function which initializes AWGVars s.t. selected DACs will use selected AWs when called in fd_Record_Values
@@ -1393,7 +1503,7 @@ function setupAWG(instrID, [AWs, DACs, numCycles, verbose])
 	
 	struct AWGVars S
 	fd_getGlobalAWG(S)
-
+	
 	// Note: This needs to be changed if using same AW on multiple DACs
 	DACs = scu_getChannelNumbers(DACs, fastdac=1)  // Convert from label to numbers 
 	DACs = ReplaceString(";", DACs, ",")  
@@ -1406,6 +1516,10 @@ function setupAWG(instrID, [AWs, DACs, numCycles, verbose])
 	S.numWaves = itemsinlist(AWs, ",")
 	
 	// For checking things don't change before scanning
+	if (S.numADCs != scf_getNumRecordedADCs())
+		abort "The number of ADCs being recorded changed, please set up the squarewaves again"
+	endif
+	
 	S.numADCs = scf_getNumRecordedADCs()  // Store number of ADCs selected in window so can check if this changes
 	S.samplingFreq = getfadcspeed(instrID)
 	S.measureFreq = S.samplingFreq/S.numADCs
@@ -1460,6 +1574,20 @@ function setupAWG(instrID, [AWs, DACs, numCycles, verbose])
    
 end
 
+function fd_setAWGuninitialized()
+	// sets global AWG_list.initialized to 0 so that it will fail pre scan checks. (to be used when changing things like sample rate, AWs etc)
+	
+	// Get current AWG_list
+	struct AWGVars S
+	fd_getGlobalAWG(S)
+	
+	// Set initialized to zero to prevent fd_Record_values from running without AWG_list being set up again first
+	S.initialized = 0
+
+	// Store changes
+	fd_setGlobalAWG(S)
+end
+
 
 function fd_checkAW(w, [len])
 	// Internal function - not to be used directly by user
@@ -1499,7 +1627,7 @@ end
 
 function fd_addAWGwave(instrID, wave_num, add_wave)
 	// Internal function - not to be used directly by user
-	// See	"makeSquareWaveAWG()" as an example of how to use this
+	// See	"setFdacAWGSquareWave()" as an example of how to use this
 	// Very basic command which adds to the AWGs stored in the fastdac
 	variable instrID
 	variable wave_num  	// Which AWG to add to (currently allowed 0 or 1)
@@ -1636,7 +1764,7 @@ end
 
 ////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////// FastDAC Sweeps /////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
 
 function/s fd_start_sweep(S, [AWG_list])
 	// Starts one of:
@@ -1750,6 +1878,7 @@ Structure AWGVars
 	variable numWaves	// Number of AWs being used
 	variable numCycles 	// # wave cycles per DAC step for a full 1D scan
 	variable numSteps  	// # DAC steps for a full 1D scan
+	
 endstructure
 
 

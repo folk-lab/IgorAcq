@@ -1,0 +1,390 @@
+    <html>
+    <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/zoomooz/1.4.1/zoomooz.min.js"></script>
+    <style>
+        .mermaid {
+            height: 600px; /* Adjust the height as needed */
+            margin-bottom: 20px; /* Adjust the bottom margin as needed */
+        }
+    </style>
+    <pre class="mermaid">
+    graph TB;
+getfadcchannelsingle --> getfadcchannel;
+getfadcchannel --> getfadcspeed;
+getfadcspeed --> queryinstr;
+queryinstr --> writeinstr;
+writeinstr --> visaerrormsg;
+queryinstr --> readinstr;
+readinstr --> visasetreadterm;
+readinstr --> visasetreadtermenable;
+visasetreadtermenable --> visasetreadterm;
+readinstr --> visasetserialendin;
+readinstr --> visaerrormsg;
+getfadcspeed --> sc_striptermination;
+getfadcspeed --> scf_checkfdresponse;
+getfadcspeed --> scf_getfdnumber;
+scf_getfdnumber --> scf_getnumfds;
+scf_getfdnumber --> getresourceaddress;
+scf_getfdnumber --> scf_getfdvisaaddress;
+scf_getfdvisaaddress --> scf_getnumfds;
+getfadcspeed --> scf_getfdinfofromid;
+scf_getfdinfofromid --> scf_getfdnumber;
+scf_getfdinfofromid --> scf_getfdinfofromdevicenum;
+scf_getfdinfofromdevicenum --> scf_getnumfds;
+getfadcchannel --> fd_readchunk;
+fd_readchunk --> getfadcspeed;
+fd_readchunk --> recordvalues;
+recordvalues --> readvstime;
+readvstime --> initscanvars;
+readvstime --> initscanvarsbd;
+initscanvarsbd --> initscanvars;
+initscanvarsbd --> scv_setsetpoints;
+scv_setsetpoints --> scv_formatsetpoints;
+scv_setsetpoints --> scv_sanitizesetpoints;
+scv_sanitizesetpoints --> scu_assertseparatortype;
+initscanvarsbd --> scu_getdaclabel;
+scu_getdaclabel --> scu_assertseparatortype;
+readvstime --> initializescan;
+initializescan --> killvisa;
+initializescan --> sc_openinstrconnections;
+initializescan --> sci_initializewaves;
+sci_initializewaves --> sci_get1dwavenames;
+sci_get1dwavenames --> scf_getrecordedfadcinfo;
+sci_initializewaves --> sci_sanitycheckwavenames;
+sci_initializewaves --> scfd_postfilternumpts;
+sci_initializewaves --> sci_init1dwave;
+sci_initializewaves --> sci_init2dwave;
+sci_initializewaves --> sc_findasyncmeasurements;
+sc_findasyncmeasurements --> sc_checkasyncscript;
+initializescan --> scg_initializegraphs;
+scg_initializegraphs --> sci_get1dwavenames;
+scg_initializegraphs --> scg_initializegraphsforwavenames;
+scg_initializegraphsforwavenames --> scg_graphexistsforwavename;
+scg_graphexistsforwavename --> scg_getopengraphtitles;
+scg_graphexistsforwavename --> scg_getopengraphids;
+scg_initializegraphsforwavenames --> scg_setupgraph1d;
+scg_initializegraphsforwavenames --> scg_setupgraph2d;
+scg_initializegraphsforwavenames --> scg_open1dgraph;
+scg_open1dgraph --> scg_setupgraph1d;
+scg_initializegraphsforwavenames --> scg_open2dgraph;
+scg_open2dgraph --> scg_setupgraph2d;
+initializescan --> scg_arrangewindows;
+initializescan --> scg_openabortwindow;
+initializescan --> scv_setlastscanvars;
+readvstime --> asleep;
+asleep --> sc_sleep;
+sc_sleep --> scs_checksweepstate;
+scs_checksweepstate --> endscan;
+endscan --> scv_setlastscanvars;
+endscan --> scv_getlastscanvars;
+endscan --> savetohdf;
+savetohdf --> openhdffile;
+openhdffile --> endscan;
+savetohdf --> addmetafiles;
+addmetafiles --> scw_createconfig;
+scw_createconfig --> addjsonkeyval;
+addjsonkeyval --> escapequotes;
+scw_createconfig --> textwave2strarray;
+textwave2strarray --> escapequotes;
+scw_createconfig --> wave2boolarray;
+wave2boolarray --> num2bool;
+scw_createconfig --> num2bool;
+addmetafiles --> sc_createsweeplogs;
+sc_createsweeplogs --> addjsonkeyval;
+sc_createsweeplogs --> num2numstr;
+sc_createsweeplogs --> sc_instrumentlogs;
+sc_instrumentlogs --> sc_openinstrconnections;
+sc_instrumentlogs --> sc_createsweeplogs;
+sc_instrumentlogs --> addjsonkeyval;
+addmetafiles --> prettyjsonfmt;
+prettyjsonfmt --> getindent;
+addmetafiles --> sce_scanvarstojson;
+sce_scanvarstojson --> addjsonkeyval;
+sce_scanvarstojson --> prettyjsonfmt;
+addmetafiles --> sc_confirm_json;
+addmetafiles --> scw_saveconfig;
+scw_saveconfig --> scu_unixtime;
+scw_saveconfig --> writetofile;
+savetohdf --> savefastdacinfowaves;
+savefastdacinfowaves --> fd_getglobalawg;
+fd_getglobalawg --> fd_initglobalawg;
+fd_initglobalawg --> fd_setglobalawg;
+savefastdacinfowaves --> fd_getawgwave;
+savefastdacinfowaves --> savesinglewavetohdf;
+savetohdf --> savescanwaves;
+savescanwaves --> scfd_postfilternumpts;
+savetohdf --> sci_get1dwavenames;
+savetohdf --> sci_get2dwavenames;
+sci_get2dwavenames --> sci_get1dwavenames;
+savetohdf --> getrawsavenames;
+savetohdf --> scu_assertseparatortype;
+savetohdf --> createwavescopyigor;
+savetohdf --> savewavestohdf;
+savewavestohdf --> savesinglewavetohdf;
+savetohdf --> closehdffile;
+endscan --> saveexp;
+saveexp --> savefrompxp;
+endscan --> sc_checkbackup;
+sc_checkbackup --> getexppath;
+endscan --> sc_copynewfiles;
+sc_copynewfiles --> sc_copysinglefile;
+sc_copysinglefile --> getexppath;
+sc_copysinglefile --> executemaccmd;
+sc_copynewfiles --> getexppath;
+endscan --> sce_scanvarstojson;
+readvstime --> recordvalues;
+readvstime --> endscan;
+recordvalues --> sc_managethreads;
+sc_managethreads --> readvstime;
+sc_managethreads --> sc_worker;
+sc_worker --> sc_funcasync;
+recordvalues --> sc_killthreads;
+recordvalues --> scv_setlastscanvars;
+recordvalues --> scs_checksweepstate;
+fd_readchunk --> scfd_recordvalues;
+scfd_recordvalues --> recordvalues;
+scfd_recordvalues --> rampstartfd;
+rampstartfd --> scu_assertseparatortype;
+rampstartfd --> rampmultiplefdac;
+rampmultiplefdac --> scu_assertseparatortype;
+rampmultiplefdac --> scu_getchannelnumbers;
+scu_getchannelnumbers --> scu_assertseparatortype;
+scu_getchannelnumbers --> removetrailingwhitespace;
+rampmultiplefdac --> scf_getdacinfo;
+scf_getdacinfo --> scu_getchannelnumbers;
+rampmultiplefdac --> fd_rampoutputfdac;
+fd_rampoutputfdac --> getresourceaddress;
+fd_rampoutputfdac --> scfw_resetfdacwindow;
+fd_rampoutputfdac --> getfdacoutput;
+getfdacoutput --> scf_getchannelstartnum;
+scf_getchannelstartnum --> scf_getnumfds;
+scf_getchannelstartnum --> scf_getfdnumber;
+scf_getchannelstartnum --> scf_getfdinfofromid;
+getfdacoutput --> queryinstr;
+getfdacoutput --> sc_striptermination;
+getfdacoutput --> scf_checkfdresponse;
+fd_rampoutputfdac --> queryinstr;
+fd_rampoutputfdac --> queryinstrprogress;
+queryinstrprogress --> writeinstr;
+queryinstrprogress --> sc_progressbardelay;
+queryinstrprogress --> readinstr;
+fd_rampoutputfdac --> sc_striptermination;
+fd_rampoutputfdac --> scf_checkfdresponse;
+fd_rampoutputfdac --> scfw_updatefdacvalstr;
+scfd_recordvalues --> scc_checkrampstartfd;
+scc_checkrampstartfd --> rampstartfd;
+scc_checkrampstartfd --> scu_assertseparatortype;
+scc_checkrampstartfd --> getfdacoutput;
+scc_checkrampstartfd --> sc_sleep;
+scfd_recordvalues --> scfd_sendcommandandread;
+scfd_sendcommandandread --> fd_start_sweep;
+fd_start_sweep --> scu_assertseparatortype;
+fd_start_sweep --> scu_getdevicechannels;
+scu_getdevicechannels --> scf_getchannelstartnum;
+fd_start_sweep --> writeinstr;
+scfd_sendcommandandread --> scfd_recordbuffer;
+scfd_recordbuffer --> roundnum;
+scfd_recordbuffer --> scfd_getreadchunksize;
+scfd_recordbuffer --> scfd_readchunk;
+scfd_readchunk --> readinstr;
+scfd_readchunk --> fd_stopfdacsweep;
+fd_stopfdacsweep --> clearfdacbuffer;
+clearfdacbuffer --> writeinstr;
+scfd_recordbuffer --> scfd_distributedata1;
+scfd_distributedata1 --> scfd_distributedata2;
+scfd_distributedata2 --> scu_assertseparatortype;
+scfd_distributedata2 --> fd_char2num;
+scfd_recordbuffer --> scfd_checksweepstate;
+scfd_checksweepstate --> scs_checksweepstate;
+scfd_checksweepstate --> fd_stopfdacsweep;
+scfd_recordbuffer --> scfd_expectedbytesinbuffer;
+scfd_recordbuffer --> scg_updaterawgraphs;
+scfd_sendcommandandread --> fd_stopfdacsweep;
+scfd_sendcommandandread --> readinstr;
+scfd_sendcommandandread --> sc_striptermination;
+scfd_sendcommandandread --> scf_checkfdresponse;
+scfd_sendcommandandread --> scfd_updatewindow;
+scfd_updatewindow --> scu_assertseparatortype;
+scfd_updatewindow --> scf_getchannelnumsonfd;
+scf_getchannelnumsonfd --> scu_assertseparatortype;
+scf_getchannelnumsonfd --> scf_getnumfds;
+scf_getchannelnumsonfd --> scf_getfdinfofromdevicenum;
+scfd_updatewindow --> scf_getfdvisaaddress;
+scfd_updatewindow --> getresourceaddress;
+scfd_updatewindow --> scfw_updatefdacvalstr;
+scfd_updatewindow --> getfdacoutput;
+scfd_updatewindow --> getfadcchannel;
+scfd_sendcommandandread --> rampmultiplefdac;
+scfd_recordvalues --> scfd_processanddistribute;
+scfd_processanddistribute --> sci_get1dwavenames;
+scfd_processanddistribute --> scf_getrecordedfadcinfo;
+scfd_processanddistribute --> scfd_resamplewaves;
+getfadcchannelsingle --> scf_getchannelnumsonfd;
+getfadcchannelsingle --> scf_checkinstridmatchesdevice;
+scf_checkinstridmatchesdevice --> getresourceaddress;
+getfadcchannelsingle --> queryinstr;
+getfadcchannelsingle --> sc_striptermination;
+getfadcchannelsingle --> scf_checkfdresponse;
+subgraph ScanController.ipf
+scu_assertseparatortype
+scu_unixtime
+roundnum
+scu_getdaclabel
+scu_getchannelnumbers
+scu_getdevicechannels
+sc_sleep
+asleep
+scv_setlastscanvars
+scv_getlastscanvars
+initscanvars
+initscanvarsbd
+scv_setsetpoints
+scv_sanitizesetpoints
+scv_formatsetpoints
+initializescan
+sci_initializewaves
+sci_init1dwave
+sci_init2dwave
+sci_get1dwavenames
+sci_get2dwavenames
+sci_sanitycheckwavenames
+scg_initializegraphs
+scg_initializegraphsforwavenames
+scg_arrangewindows
+scg_graphexistsforwavename
+scg_open1dgraph
+scg_open2dgraph
+scg_setupgraph1d
+scg_setupgraph2d
+scg_getopengraphtitles
+scg_getopengraphids
+scg_openabortwindow
+scg_updaterawgraphs
+sc_openinstrconnections
+sc_checkbackup
+scs_checksweepstate
+sc_managethreads
+sc_worker
+sc_funcasync
+sc_killthreads
+sc_checkasyncscript
+sc_findasyncmeasurements
+endscan
+sce_scanvarstojson
+scw_createconfig
+scw_saveconfig
+recordvalues
+rampstartfd
+scc_checkrampstartfd
+scf_getdacinfo
+scf_checkinstridmatchesdevice
+scf_getfdnumber
+scf_getnumfds
+scf_getfdvisaaddress
+scf_getfdinfofromdevicenum
+scf_getfdinfofromid
+scf_getrecordedfadcinfo
+scf_getchannelnumsonfd
+scf_getchannelstartnum
+scf_checkfdresponse
+scfd_postfilternumpts
+scfd_resamplewaves
+scfd_recordvalues
+scfd_sendcommandandread
+scfd_processanddistribute
+scfd_recordbuffer
+scfd_expectedbytesinbuffer
+scfd_getreadchunksize
+scfd_checksweepstate
+scfd_readchunk
+scfd_distributedata1
+scfd_updatewindow
+scfd_distributedata2
+scfw_resetfdacwindow
+scfw_updatefdacvalstr
+end
+subgraph fastdac.ipf
+getfadcspeed
+getfadcchannel
+getfadcchannelsingle
+getfdacoutput
+rampmultiplefdac
+fd_rampoutputfdac
+clearfdacbuffer
+fd_stopfdacsweep
+fd_char2num
+fd_getawgwave
+fd_start_sweep
+fd_readchunk
+fd_initglobalawg
+fd_setglobalawg
+fd_getglobalawg
+end
+subgraph Scans.ipf
+readvstime
+end
+subgraph ScanController_IO.ipf
+openhdffile
+closehdffile
+savewavestohdf
+addmetafiles
+sc_createsweeplogs
+sc_instrumentlogs
+getrawsavenames
+createwavescopyigor
+savescanwaves
+savesinglewavetohdf
+savetohdf
+savefastdacinfowaves
+saveexp
+savefrompxp
+sc_copysinglefile
+sc_copynewfiles
+executemaccmd
+getexppath
+writetofile
+sc_confirm_json
+num2numstr
+num2bool
+wave2boolarray
+textwave2strarray
+addjsonkeyval
+getindent
+prettyjsonfmt
+removetrailingwhitespace
+escapequotes
+end
+subgraph ScanController_INSTR.ipf
+killvisa
+getresourceaddress
+visaerrormsg
+writeinstr
+readinstr
+queryinstr
+queryinstrprogress
+sc_striptermination
+sc_progressbardelay
+visasetreadterm
+visasetreadtermenable
+visasetserialendin
+end
+    </pre>
+    <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+        startOnLoad: true,
+        flowchart: {
+                useMaxWidth: true, // Disable maximum width for better zooming
+                htmlLabels: true, // Enable HTML-based labels for better styling
+                defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
+            },
+        });
+    $(document).ready(function() {
+            // Apply Zoomooz to the Mermaid diagram container
+            $('.mermaid').zoomTarget();
+        });
+    </script>
+    </body>
+    </html>
+    

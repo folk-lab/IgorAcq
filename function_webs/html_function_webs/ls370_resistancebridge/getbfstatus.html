@@ -1,0 +1,70 @@
+    <html>
+    <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/zoomooz/1.4.1/zoomooz.min.js"></script>
+    <style>
+        .mermaid {
+            height: 600px; /* Adjust the height as needed */
+            margin-bottom: 20px; /* Adjust the bottom margin as needed */
+        }
+    </style>
+    <pre class="mermaid">
+    graph TB;
+getbfstatus --> readtxtfile;
+getbfstatus --> getjsonvalue;
+getjsonvalue --> getjsonkeyoffset;
+getjsonvalue --> getjsonindices;
+getbfstatus --> sc_sqltimestamp;
+sc_sqltimestamp --> sc_sqldatabasetime;
+sc_sqldatabasetime --> requestsqlvalue;
+requestsqlvalue --> sc_opensqlconnection;
+sc_opensqlconnection --> sc_readsqlconnectionparameters;
+sc_readsqlconnectionparameters --> readtxtfile;
+sc_readsqlconnectionparameters --> getjsonvalue;
+requestsqlvalue --> sc_fetchsqlsingle;
+sc_fetchsqlsingle --> sc_closesqlconnection;
+requestsqlvalue --> sc_closesqlconnection;
+sc_sqltimestamp --> timestamp2secs;
+getbfstatus --> requestsqlvalue;
+getbfstatus --> addjsonkeyval;
+addjsonkeyval --> escapequotes;
+subgraph ScanController_SQL.ipf
+requestsqlvalue
+sc_opensqlconnection
+sc_fetchsqlsingle
+sc_closesqlconnection
+sc_readsqlconnectionparameters
+timestamp2secs
+sc_sqldatabasetime
+sc_sqltimestamp
+end
+subgraph ls370_resistancebridge.ipf
+getbfstatus
+end
+subgraph ScanController_IO.ipf
+readtxtfile
+getjsonvalue
+getjsonindices
+getjsonkeyoffset
+addjsonkeyval
+escapequotes
+end
+    </pre>
+    <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+        startOnLoad: true,
+        flowchart: {
+                useMaxWidth: true, // Disable maximum width for better zooming
+                htmlLabels: true, // Enable HTML-based labels for better styling
+                defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
+            },
+        });
+    $(document).ready(function() {
+            // Apply Zoomooz to the Mermaid diagram container
+            $('.mermaid').zoomTarget();
+        });
+    </script>
+    </body>
+    </html>
+    

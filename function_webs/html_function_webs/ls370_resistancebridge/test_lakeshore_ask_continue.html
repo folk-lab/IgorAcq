@@ -1,0 +1,135 @@
+    <html>
+    <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/zoomooz/1.4.1/zoomooz.min.js"></script>
+    <style>
+        .mermaid {
+            height: 600px; /* Adjust the height as needed */
+            margin-bottom: 20px; /* Adjust the bottom margin as needed */
+        }
+    </style>
+    <pre class="mermaid">
+    graph TB;
+test_lakeshore_ask_continue --> test_lakeshore;
+test_lakeshore --> setls370controlparameters;
+setls370controlparameters --> bd_channellookup;
+setls370controlparameters --> sendls370;
+sendls370 --> gethttp;
+sendls370 --> posthttp;
+posthttp --> getjsonvalue;
+getjsonvalue --> getjsonkeyoffset;
+getjsonvalue --> getjsonindices;
+sendls370 --> puthttp;
+puthttp --> getjsonvalue;
+sendls370 --> getjsonvalue;
+test_lakeshore --> test_lakeshore_ask_continue;
+test_lakeshore --> getls370controlparameters;
+getls370controlparameters --> sendls370;
+test_lakeshore --> getls370heaterpower;
+getls370heaterpower --> getls370analogdata;
+getls370analogdata --> sendls370;
+getls370heaterpower --> sendls370;
+test_lakeshore --> setls370heaterpower;
+setls370heaterpower --> sendls370;
+test_lakeshore --> setls370heateroff;
+setls370heateroff --> sendls370;
+test_lakeshore --> getls370pidparameters;
+getls370pidparameters --> sendls370;
+getls370pidparameters --> getjsonvalue;
+test_lakeshore --> setls370pidparameters;
+setls370pidparameters --> sendls370;
+test_lakeshore --> getls370controlmode;
+getls370controlmode --> sendls370;
+getls370controlmode --> ls370_mode_str_to_mode;
+test_lakeshore --> setls370controlmode;
+setls370controlmode --> ls370_mode_to_str;
+setls370controlmode --> sendls370;
+test_lakeshore --> getls370pidtemp;
+getls370pidtemp --> sendls370;
+test_lakeshore --> setls370tempsetpoint;
+setls370tempsetpoint --> setls370temp;
+setls370temp --> ls370_estimateheaterrange;
+setls370temp --> setls370controlmode;
+setls370temp --> setls370heaterrange;
+setls370heaterrange --> sendls370;
+setls370temp --> setls370tempsetpoint;
+setls370tempsetpoint --> sendls370;
+test_lakeshore --> setls370temp;
+test_lakeshore --> getls370heaterrange;
+getls370heaterrange --> sendls370;
+test_lakeshore --> setls370heaterrange;
+test_lakeshore --> getls370loggersschedule;
+getls370loggersschedule --> sendls370;
+test_lakeshore --> setls370loggersschedule;
+setls370loggersschedule --> ls370getloggingschedulefromconfig;
+ls370getloggingschedulefromconfig --> readtxtfile;
+ls370getloggingschedulefromconfig --> getjsonxid;
+getjsonxid --> getjsonxid_fromkey;
+getjsonxid_fromkey --> getjsonxid;
+getjsonxid_fromkey --> getjsonvalue;
+setls370loggersschedule --> sendls370;
+test_lakeshore_ask_continue --> ask_user;
+subgraph ScanController.ipf
+ask_user
+end
+subgraph ls370_resistancebridge.ipf
+getls370analogdata
+getls370loggersschedule
+getls370heaterpower
+getls370heaterrange
+getls370controlmode
+getls370controlparameters
+getls370pidtemp
+getls370pidparameters
+setls370loggersschedule
+setls370heaterpower
+setls370heaterrange
+setls370controlmode
+setls370controlparameters
+setls370tempsetpoint
+setls370pidparameters
+setls370heateroff
+setls370temp
+ls370getloggingschedulefromconfig
+ls370_mode_to_str
+ls370_mode_str_to_mode
+ls370_estimateheaterrange
+sendls370
+test_lakeshore
+test_lakeshore_ask_continue
+end
+subgraph babydac.ipf
+bd_channellookup
+end
+subgraph ScanController_IO.ipf
+readtxtfile
+getjsonxid
+getjsonxid_fromkey
+getjsonvalue
+getjsonindices
+getjsonkeyoffset
+end
+subgraph ScanController_INSTR.ipf
+posthttp
+puthttp
+gethttp
+end
+    </pre>
+    <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+        startOnLoad: true,
+        flowchart: {
+                useMaxWidth: true, // Disable maximum width for better zooming
+                htmlLabels: true, // Enable HTML-based labels for better styling
+                defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
+            },
+        });
+    $(document).ready(function() {
+            // Apply Zoomooz to the Mermaid diagram container
+            $('.mermaid').zoomTarget();
+        });
+    </script>
+    </body>
+    </html>
+    

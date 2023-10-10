@@ -1,0 +1,81 @@
+    <html>
+    <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/zoomooz/1.4.1/zoomooz.min.js"></script>
+    <style>
+        .mermaid {
+            height: 600px; /* Adjust the height as needed */
+            margin-bottom: 20px; /* Adjust the bottom margin as needed */
+        }
+    </style>
+    <pre class="mermaid">
+    graph TB;
+logsonlysave --> addmetafiles;
+addmetafiles --> scw_createconfig;
+scw_createconfig --> addjsonkeyval;
+addjsonkeyval --> escapequotes;
+scw_createconfig --> textwave2strarray;
+textwave2strarray --> escapequotes;
+scw_createconfig --> wave2boolarray;
+wave2boolarray --> num2bool;
+scw_createconfig --> num2bool;
+addmetafiles --> sc_createsweeplogs;
+sc_createsweeplogs --> addjsonkeyval;
+sc_createsweeplogs --> num2numstr;
+sc_createsweeplogs --> sc_instrumentlogs;
+sc_instrumentlogs --> sc_openinstrconnections;
+sc_instrumentlogs --> sc_createsweeplogs;
+sc_instrumentlogs --> addjsonkeyval;
+addmetafiles --> prettyjsonfmt;
+prettyjsonfmt --> getindent;
+addmetafiles --> sce_scanvarstojson;
+sce_scanvarstojson --> addjsonkeyval;
+sce_scanvarstojson --> prettyjsonfmt;
+addmetafiles --> sc_confirm_json;
+addmetafiles --> scw_saveconfig;
+scw_saveconfig --> scu_unixtime;
+scw_saveconfig --> writetofile;
+logsonlysave --> closehdffile;
+subgraph ScanController.ipf
+scu_unixtime
+sc_openinstrconnections
+sce_scanvarstojson
+scw_createconfig
+scw_saveconfig
+end
+subgraph ScanController_IO.ipf
+closehdffile
+addmetafiles
+sc_createsweeplogs
+sc_instrumentlogs
+logsonlysave
+writetofile
+sc_confirm_json
+num2numstr
+num2bool
+wave2boolarray
+textwave2strarray
+addjsonkeyval
+getindent
+prettyjsonfmt
+escapequotes
+end
+    </pre>
+    <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+        startOnLoad: true,
+        flowchart: {
+                useMaxWidth: true, // Disable maximum width for better zooming
+                htmlLabels: true, // Enable HTML-based labels for better styling
+                defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
+            },
+        });
+    $(document).ready(function() {
+            // Apply Zoomooz to the Mermaid diagram container
+            $('.mermaid').zoomTarget();
+        });
+    </script>
+    </body>
+    </html>
+    
