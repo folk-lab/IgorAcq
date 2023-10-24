@@ -10,6 +10,9 @@
     </style>
     <pre class="mermaid">
     graph TB;
+sci_initializewaves --> fd_getglobalawg;
+fd_getglobalawg --> fd_initglobalawg;
+fd_initglobalawg --> fd_setglobalawg;
 sci_initializewaves --> sci_get1dwavenames;
 sci_get1dwavenames --> scf_getrecordedfadcinfo;
 sci_initializewaves --> sci_sanitycheckwavenames;
@@ -18,6 +21,11 @@ sci_initializewaves --> sci_init1dwave;
 sci_initializewaves --> sci_init2dwave;
 sci_initializewaves --> sc_findasyncmeasurements;
 sc_findasyncmeasurements --> sc_checkasyncscript;
+subgraph fastdac.ipf
+fd_initglobalawg
+fd_setglobalawg
+fd_getglobalawg
+end
 subgraph ScanController.ipf
 sci_initializewaves
 sci_init1dwave
@@ -31,11 +39,11 @@ scfd_postfilternumpts
 end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

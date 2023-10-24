@@ -61,7 +61,6 @@ fd_updatefadccalibration --> scf_checkfdresponse;
 setfadcspeed --> calibratefadc;
 calibratefadc --> initfastdac;
 calibratefadc --> getresourceaddress;
-calibratefadc --> roundnum;
 calibratefadc --> getfadcspeed;
 getfadcspeed --> queryinstr;
 getfadcspeed --> sc_striptermination;
@@ -73,20 +72,20 @@ scf_getfdnumber --> scf_getfdvisaaddress;
 getfadcspeed --> scf_getfdinfofromid;
 scf_getfdinfofromid --> scf_getfdnumber;
 scf_getfdinfofromid --> scf_getfdinfofromdevicenum;
+calibratefadc --> roundnum;
 calibratefadc --> ask_user;
 calibratefadc --> queryinstr;
 calibratefadc --> sc_striptermination;
 calibratefadc --> readinstr;
 calibratefadc --> scf_checkfdresponse;
-calibratefadc --> scf_getchannelstartnum;
-scf_getchannelstartnum --> scf_getnumfds;
-scf_getchannelstartnum --> scf_getfdnumber;
-scf_getchannelstartnum --> scf_getfdinfofromid;
 calibratefadc --> fd_rampoutputfdac;
 fd_rampoutputfdac --> getresourceaddress;
 fd_rampoutputfdac --> scfw_resetfdacwindow;
 fd_rampoutputfdac --> getfdacoutput;
 getfdacoutput --> scf_getchannelstartnum;
+scf_getchannelstartnum --> scf_getnumfds;
+scf_getchannelstartnum --> scf_getfdnumber;
+scf_getchannelstartnum --> scf_getfdinfofromid;
 getfdacoutput --> queryinstr;
 getfdacoutput --> sc_striptermination;
 getfdacoutput --> scf_checkfdresponse;
@@ -98,6 +97,7 @@ queryinstrprogress --> readinstr;
 fd_rampoutputfdac --> sc_striptermination;
 fd_rampoutputfdac --> scf_checkfdresponse;
 fd_rampoutputfdac --> scfw_updatefdacvalstr;
+calibratefadc --> scf_getchannelstartnum;
 calibratefadc --> fd_savefadccalibration;
 fd_savefadccalibration --> addjsonkeyval;
 addjsonkeyval --> escapequotes;
@@ -113,6 +113,22 @@ setawg --> fd_setglobalawg;
 fd_setawguninitialized --> fd_getglobalawg;
 fd_setawguninitialized --> fd_setglobalawg;
 setfadcspeed --> setawg;
+subgraph fastdac.ipf
+openfastdacconnection
+getfadcspeed
+getfdacoutput
+setfadcspeed
+fd_rampoutputfdac
+fd_loadfadccalibration
+calibratefadc
+fd_savefadccalibration
+fd_updatefadccalibration
+fd_setawguninitialized
+fd_initglobalawg
+fd_setglobalawg
+setawg
+fd_getglobalawg
+end
 subgraph ScanController.ipf
 roundnum
 ask_user
@@ -131,33 +147,6 @@ scfw_fdaccheckforoldinit
 scfw_fdacaskuser
 scfw_createcontrolwaves
 scfw_setguiinteraction
-end
-subgraph fastdac.ipf
-openfastdacconnection
-getfadcspeed
-getfdacoutput
-setfadcspeed
-fd_rampoutputfdac
-fd_loadfadccalibration
-calibratefadc
-fd_savefadccalibration
-fd_updatefadccalibration
-fd_setawguninitialized
-fd_initglobalawg
-fd_setglobalawg
-setawg
-fd_getglobalawg
-end
-subgraph ScanController_IO.ipf
-writetofile
-readtxtfile
-getjsonvalue
-getjsonindices
-getjsonkeyoffset
-addjsonkeyval
-getindent
-prettyjsonfmt
-escapequotes
 end
 subgraph ScanController_INSTR.ipf
 getresourceaddress
@@ -180,13 +169,24 @@ visasetstopbits
 visasetserialendin
 visasetparity
 end
+subgraph ScanController_IO.ipf
+writetofile
+readtxtfile
+getjsonvalue
+getjsonindices
+getjsonkeyoffset
+addjsonkeyval
+getindent
+prettyjsonfmt
+escapequotes
+end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

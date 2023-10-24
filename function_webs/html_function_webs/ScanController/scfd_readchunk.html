@@ -20,12 +20,12 @@ scfd_readchunk --> fd_stopfdacsweep;
 fd_stopfdacsweep --> clearfdacbuffer;
 clearfdacbuffer --> writeinstr;
 writeinstr --> visaerrormsg;
-subgraph ScanController.ipf
-scfd_readchunk
-end
 subgraph fastdac.ipf
 clearfdacbuffer
 fd_stopfdacsweep
+end
+subgraph ScanController.ipf
+scfd_readchunk
 end
 subgraph ScanController_INSTR.ipf
 visaerrormsg
@@ -37,11 +37,11 @@ visasetserialendin
 end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

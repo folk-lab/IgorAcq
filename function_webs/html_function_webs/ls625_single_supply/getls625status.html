@@ -30,9 +30,6 @@ getls625status --> getls625rate;
 getls625rate --> ls625_lookupvarname;
 getls625rate --> queryinstr;
 getls625rate --> roundnum;
-subgraph ScanController.ipf
-roundnum
-end
 subgraph ls625_single_supply.ipf
 ls625_lookupvarname
 getls625current
@@ -40,9 +37,8 @@ getls625field
 getls625rate
 getls625status
 end
-subgraph ScanController_IO.ipf
-addjsonkeyval
-escapequotes
+subgraph ScanController.ipf
+roundnum
 end
 subgraph ScanController_INSTR.ipf
 visaerrormsg
@@ -53,13 +49,17 @@ visasetreadterm
 visasetreadtermenable
 visasetserialendin
 end
+subgraph ScanController_IO.ipf
+addjsonkeyval
+escapequotes
+end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

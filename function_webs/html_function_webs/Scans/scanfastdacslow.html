@@ -66,9 +66,10 @@ initscanvarsbd --> initscanvars;
 initscanvarsbd --> scv_setsetpoints;
 initscanvarsbd --> scu_getdaclabel;
 readvstime --> initializescan;
-initializescan --> killvisa;
-initializescan --> sc_openinstrconnections;
 initializescan --> sci_initializewaves;
+sci_initializewaves --> fd_getglobalawg;
+fd_getglobalawg --> fd_initglobalawg;
+fd_initglobalawg --> fd_setglobalawg;
 sci_initializewaves --> sci_get1dwavenames;
 sci_get1dwavenames --> scf_getrecordedfadcinfo;
 sci_initializewaves --> sci_sanitycheckwavenames;
@@ -84,9 +85,11 @@ scg_initializegraphsforwavenames --> scg_graphexistsforwavename;
 scg_graphexistsforwavename --> scg_getopengraphtitles;
 scg_graphexistsforwavename --> scg_getopengraphids;
 scg_initializegraphsforwavenames --> scg_setupgraph1d;
-scg_initializegraphsforwavenames --> scg_setupgraph2d;
 scg_initializegraphsforwavenames --> scg_open1dgraph;
 scg_open1dgraph --> scg_setupgraph1d;
+scg_initializegraphsforwavenames --> scfd_spectrum_analyzer;
+scg_initializegraphsforwavenames --> scg_twosubplot;
+scg_initializegraphsforwavenames --> scg_setupgraph2d;
 scg_initializegraphsforwavenames --> scg_open2dgraph;
 scg_open2dgraph --> scg_setupgraph2d;
 initializescan --> scg_arrangewindows;
@@ -96,6 +99,8 @@ readvstime --> asleep;
 asleep --> sc_sleep;
 sc_sleep --> scs_checksweepstate;
 scs_checksweepstate --> endscan;
+endscan --> scfd_checkrawsave;
+scfd_checkrawsave --> scf_getrecordedfadcinfo;
 endscan --> scv_setlastscanvars;
 endscan --> scv_getlastscanvars;
 endscan --> savetohdf;
@@ -113,6 +118,7 @@ scw_createconfig --> num2bool;
 addmetafiles --> sc_createsweeplogs;
 sc_createsweeplogs --> addjsonkeyval;
 sc_createsweeplogs --> num2numstr;
+sc_createsweeplogs --> scf_getrecordedfadcinfo;
 sc_createsweeplogs --> sc_instrumentlogs;
 sc_instrumentlogs --> sc_openinstrconnections;
 sc_instrumentlogs --> sc_createsweeplogs;
@@ -128,8 +134,6 @@ scw_saveconfig --> scu_unixtime;
 scw_saveconfig --> writetofile;
 savetohdf --> savefastdacinfowaves;
 savefastdacinfowaves --> fd_getglobalawg;
-fd_getglobalawg --> fd_initglobalawg;
-fd_initglobalawg --> fd_setglobalawg;
 savefastdacinfowaves --> fd_getawgwave;
 savefastdacinfowaves --> savesinglewavetohdf;
 savetohdf --> savescanwaves;
@@ -137,7 +141,6 @@ savescanwaves --> scfd_postfilternumpts;
 savetohdf --> sci_get1dwavenames;
 savetohdf --> sci_get2dwavenames;
 sci_get2dwavenames --> sci_get1dwavenames;
-savetohdf --> getrawsavenames;
 savetohdf --> scu_assertseparatortype;
 savetohdf --> createwavescopyigor;
 savetohdf --> savewavestohdf;
@@ -162,6 +165,7 @@ sc_worker --> sc_funcasync;
 recordvalues --> sc_killthreads;
 recordvalues --> scv_setlastscanvars;
 recordvalues --> scs_checksweepstate;
+recordvalues --> scg_updatefrequentgraphs;
 prescanchecksfd --> scc_checklimsfd;
 scc_checklimsfd --> scc_checklimssinglefd;
 scc_checklimssinglefd --> scu_getchannelnumbers;
@@ -176,6 +180,7 @@ scc_checkawg --> checkawg;
 scc_checkawg --> scu_assertseparatortype;
 scc_checkawg --> scf_getnumrecordedadcs;
 scc_checkawg --> fd_getawgwave;
+scc_checkawg --> scanfastdac;
 scc_checkawg --> ask_user;
 scanfastdac --> setawg;
 setawg --> fd_getglobalawg;
@@ -241,6 +246,7 @@ scfd_recordvalues --> scfd_sendcommandandread;
 scfd_sendcommandandread --> fd_start_sweep;
 fd_start_sweep --> scu_assertseparatortype;
 fd_start_sweep --> scu_getdevicechannels;
+scu_getdevicechannels --> scf_getfdinfofromid;
 scu_getdevicechannels --> scf_getchannelstartnum;
 fd_start_sweep --> writeinstr;
 scfd_sendcommandandread --> scfd_recordbuffer;
@@ -259,7 +265,10 @@ scfd_recordbuffer --> scfd_checksweepstate;
 scfd_checksweepstate --> scs_checksweepstate;
 scfd_checksweepstate --> fd_stopfdacsweep;
 scfd_recordbuffer --> scfd_expectedbytesinbuffer;
-scfd_recordbuffer --> scg_updaterawgraphs;
+scfd_recordbuffer --> scfd_raw2calcquickdistribute;
+scfd_raw2calcquickdistribute --> sci_get1dwavenames;
+scfd_raw2calcquickdistribute --> scf_getrecordedfadcinfo;
+scfd_recordbuffer --> scg_updatefrequentgraphs;
 scfd_sendcommandandread --> fd_stopfdacsweep;
 scfd_sendcommandandread --> readinstr;
 scfd_sendcommandandread --> sc_striptermination;
@@ -269,19 +278,24 @@ scfd_updatewindow --> scu_assertseparatortype;
 scfd_updatewindow --> scf_getchannelnumsonfd;
 scfd_updatewindow --> scf_getfdvisaaddress;
 scfd_updatewindow --> getresourceaddress;
-scfd_updatewindow --> scfw_updatefdacvalstr;
 scfd_updatewindow --> getfdacoutput;
+scfd_updatewindow --> scfw_updatefdacvalstr;
 scfd_updatewindow --> getfadcchannel;
 getfadcchannel --> getfadcspeed;
 getfadcchannel --> fd_readchunk;
 fd_readchunk --> getfadcspeed;
 fd_readchunk --> recordvalues;
 fd_readchunk --> scfd_recordvalues;
+scfd_sendcommandandread --> scu_getdevicechannels;
 scfd_sendcommandandread --> rampmultiplefdac;
 scfd_recordvalues --> scfd_processanddistribute;
 scfd_processanddistribute --> sci_get1dwavenames;
 scfd_processanddistribute --> scf_getrecordedfadcinfo;
+scfd_processanddistribute --> scfd_notch_filters;
+scfd_processanddistribute --> scfd_sqw_analysis;
+scfd_processanddistribute --> scfd_demodulate;
 scfd_processanddistribute --> scfd_resamplewaves;
+scfd_processanddistribute --> scfd_spectrum_analyzer;
 scanfastdac --> endscan;
 scanfastdacslow --> sc_openinstrconnections;
 scanfastdacslow --> initscanvars;
@@ -315,98 +329,6 @@ bd_rampoutputbd --> sc_sleep;
 rampmultiplebd --> bd_calccustomvalues;
 scanfastdacslow --> recordvalues;
 scanfastdacslow --> endscan;
-subgraph ScanController.ipf
-scu_assertseparatortype
-scu_unixtime
-roundnum
-ask_user
-scu_getdaclabel
-scu_getchannelnumbers
-scu_getdevicechannels
-sc_sleep
-asleep
-scv_setlastscanvars
-scv_getlastscanvars
-initscanvars
-initscanvarsfd
-initscanvarsbd
-scv_setnumptssweeprateduration
-scv_setfreq
-scv_setsetpoints
-scv_sanitizesetpoints
-scv_formatsetpoints
-initializescan
-sci_initializewaves
-sci_init1dwave
-sci_init2dwave
-sci_get1dwavenames
-sci_get2dwavenames
-sci_sanitycheckwavenames
-scg_initializegraphs
-scg_initializegraphsforwavenames
-scg_arrangewindows
-scg_graphexistsforwavename
-scg_open1dgraph
-scg_open2dgraph
-scg_setupgraph1d
-scg_setupgraph2d
-scg_getopengraphtitles
-scg_getopengraphids
-scg_openabortwindow
-scg_updaterawgraphs
-sc_openinstrconnections
-sc_checkbackup
-scs_checksweepstate
-sc_managethreads
-sc_worker
-sc_funcasync
-sc_killthreads
-sc_checkasyncscript
-sc_findasyncmeasurements
-endscan
-sce_scanvarstojson
-scw_createconfig
-scw_saveconfig
-recordvalues
-prescanchecksfd
-checkawg
-checkstartsfinschannels
-rampstartfd
-scc_checkrampstartfd
-scc_checkrampratesfd
-scc_checklimsfd
-scc_checklimssinglefd
-scc_checksamedevicefd
-scc_checkawg
-ramptonextsetpoint
-scf_getdacinfo
-scf_getfdnumber
-scf_getnumfds
-scf_getfdvisaaddress
-scf_getfdinfofromdevicenum
-scf_getfdinfofromid
-scf_getrecordedfadcinfo
-scf_getnumrecordedadcs
-scf_getchannelnumsonfd
-scf_getchannelstartnum
-scf_checkfdresponse
-scf_addfdinfos
-scfd_postfilternumpts
-scfd_resamplewaves
-scfd_recordvalues
-scfd_sendcommandandread
-scfd_processanddistribute
-scfd_recordbuffer
-scfd_expectedbytesinbuffer
-scfd_getreadchunksize
-scfd_checksweepstate
-scfd_readchunk
-scfd_distributedata1
-scfd_updatewindow
-scfd_distributedata2
-scfw_resetfdacwindow
-scfw_updatefdacvalstr
-end
 subgraph babydac.ipf
 bd_calccustomvalues
 bd_getboard
@@ -442,12 +364,125 @@ fd_setglobalawg
 setawg
 fd_getglobalawg
 end
-subgraph Scans.ipf
-readvstime
-scanfastdac
-scanfastdacslow
-set_awg_state
-ramp_interlaced_channels
+subgraph ScanController.ipf
+scu_assertseparatortype
+scu_unixtime
+roundnum
+ask_user
+scu_getdaclabel
+scu_getchannelnumbers
+scu_getdevicechannels
+sc_sleep
+asleep
+scv_setlastscanvars
+scv_getlastscanvars
+initscanvars
+initscanvarsfd
+initscanvarsbd
+scv_setnumptssweeprateduration
+scv_setfreq
+scv_setsetpoints
+scv_sanitizesetpoints
+scv_formatsetpoints
+initializescan
+sci_initializewaves
+sci_init1dwave
+sci_init2dwave
+sci_get1dwavenames
+sci_get2dwavenames
+sci_sanitycheckwavenames
+scg_initializegraphs
+scg_initializegraphsforwavenames
+scg_arrangewindows
+scg_twosubplot
+scg_graphexistsforwavename
+scg_open1dgraph
+scg_open2dgraph
+scg_setupgraph1d
+scg_setupgraph2d
+scg_getopengraphtitles
+scg_getopengraphids
+scg_openabortwindow
+scg_updatefrequentgraphs
+sc_openinstrconnections
+sc_checkbackup
+scs_checksweepstate
+sc_managethreads
+sc_worker
+sc_funcasync
+sc_killthreads
+sc_checkasyncscript
+sc_findasyncmeasurements
+endscan
+sce_scanvarstojson
+scw_createconfig
+scw_saveconfig
+recordvalues
+prescanchecksfd
+checkawg
+checkstartsfinschannels
+rampstartfd
+scc_checkrampstartfd
+scc_checkrampratesfd
+scc_checklimsfd
+scc_checklimssinglefd
+scc_checksamedevicefd
+scc_checkawg
+ramptonextsetpoint
+scf_getdacinfo
+scf_getfdnumber
+scf_getnumfds
+scf_getfdvisaaddress
+scf_getfdinfofromdevicenum
+scf_getfdinfofromid
+scf_getrecordedfadcinfo
+scf_getnumrecordedadcs
+scf_getchannelnumsonfd
+scf_getchannelstartnum
+scfd_checkrawsave
+scf_checkfdresponse
+scf_addfdinfos
+scfd_postfilternumpts
+scfd_resamplewaves
+scfd_notch_filters
+scfd_sqw_analysis
+scfd_demodulate
+scfd_spectrum_analyzer
+scfd_recordvalues
+scfd_sendcommandandread
+scfd_processanddistribute
+scfd_recordbuffer
+scfd_expectedbytesinbuffer
+scfd_getreadchunksize
+scfd_raw2calcquickdistribute
+scfd_checksweepstate
+scfd_readchunk
+scfd_distributedata1
+scfd_updatewindow
+scfd_distributedata2
+scfw_resetfdacwindow
+scfw_updatefdacvalstr
+end
+subgraph ScanController_INSTR.ipf
+getresourceaddress
+visaerrormsg
+openvisainstr
+closevisainstr
+writeinstr
+readinstr
+queryinstr
+queryinstrprogress
+sc_striptermination
+sc_progressbardelay
+setvisaoptions
+visasetreadterm
+visasetreadtermenable
+visasettimeout
+visasetbaudrate
+visasetdatabits
+visasetstopbits
+visasetserialendin
+visasetparity
 end
 subgraph ScanController_IO.ipf
 openhdffile
@@ -456,7 +491,6 @@ savewavestohdf
 addmetafiles
 sc_createsweeplogs
 sc_instrumentlogs
-getrawsavenames
 createwavescopyigor
 savescanwaves
 savesinglewavetohdf
@@ -480,35 +514,20 @@ prettyjsonfmt
 removetrailingwhitespace
 escapequotes
 end
-subgraph ScanController_INSTR.ipf
-killvisa
-getresourceaddress
-visaerrormsg
-openvisainstr
-closevisainstr
-writeinstr
-readinstr
-queryinstr
-queryinstrprogress
-sc_striptermination
-sc_progressbardelay
-setvisaoptions
-visasetreadterm
-visasetreadtermenable
-visasettimeout
-visasetbaudrate
-visasetdatabits
-visasetstopbits
-visasetserialendin
-visasetparity
+subgraph Scans.ipf
+readvstime
+scanfastdac
+scanfastdacslow
+set_awg_state
+ramp_interlaced_channels
 end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

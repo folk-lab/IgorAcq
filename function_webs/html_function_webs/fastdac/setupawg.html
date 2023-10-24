@@ -42,6 +42,15 @@ scf_getfdinfofromdevicenum --> scf_getnumfds;
 setupawg --> fd_getawgwave;
 setupawg --> fd_checkaw;
 setupawg --> fd_setglobalawg;
+subgraph fastdac.ipf
+getfadcspeed
+setupawg
+fd_checkaw
+fd_getawgwave
+fd_initglobalawg
+fd_setglobalawg
+fd_getglobalawg
+end
 subgraph ScanController.ipf
 scu_assertseparatortype
 scu_getchannelnumbers
@@ -54,18 +63,6 @@ scf_getrecordedfadcinfo
 scf_getnumrecordedadcs
 scf_checkfdresponse
 end
-subgraph fastdac.ipf
-getfadcspeed
-setupawg
-fd_checkaw
-fd_getawgwave
-fd_initglobalawg
-fd_setglobalawg
-fd_getglobalawg
-end
-subgraph ScanController_IO.ipf
-removetrailingwhitespace
-end
 subgraph ScanController_INSTR.ipf
 getresourceaddress
 visaerrormsg
@@ -77,13 +74,16 @@ visasetreadterm
 visasetreadtermenable
 visasetserialendin
 end
+subgraph ScanController_IO.ipf
+removetrailingwhitespace
+end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

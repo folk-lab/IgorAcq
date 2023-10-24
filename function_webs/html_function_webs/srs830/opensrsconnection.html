@@ -31,9 +31,6 @@ readinstr --> visasetreadtermenable;
 visasetreadtermenable --> visasetreadterm;
 readinstr --> visasetserialendin;
 readinstr --> visaerrormsg;
-subgraph srs830.ipf
-opensrsconnection
-end
 subgraph ScanController_INSTR.ipf
 visaerrormsg
 openvisainstr
@@ -51,13 +48,16 @@ visasetstopbits
 visasetserialendin
 visasetparity
 end
+subgraph srs830.ipf
+opensrsconnection
+end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

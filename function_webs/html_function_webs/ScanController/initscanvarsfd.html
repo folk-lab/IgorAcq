@@ -45,6 +45,11 @@ scf_getnumrecordedadcs --> scf_getrecordedfadcinfo;
 initscanvarsfd --> scv_setnumptssweeprateduration;
 scv_setnumptssweeprateduration --> fd_get_sweeprate_from_numpts;
 scv_setnumptssweeprateduration --> fd_get_numpts_from_sweeprate;
+subgraph fastdac.ipf
+getfadcspeed
+fd_get_numpts_from_sweeprate
+fd_get_sweeprate_from_numpts
+end
 subgraph ScanController.ipf
 scu_assertseparatortype
 scu_getdaclabel
@@ -64,11 +69,6 @@ scf_getrecordedfadcinfo
 scf_getnumrecordedadcs
 scf_checkfdresponse
 end
-subgraph fastdac.ipf
-getfadcspeed
-fd_get_numpts_from_sweeprate
-fd_get_sweeprate_from_numpts
-end
 subgraph ScanController_INSTR.ipf
 getresourceaddress
 visaerrormsg
@@ -82,11 +82,11 @@ visasetserialendin
 end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

@@ -30,6 +30,8 @@ setk2400voltage --> writeinstr;
 rampk2400voltage --> sc_sleep;
 sc_sleep --> scs_checksweepstate;
 scs_checksweepstate --> endscan;
+endscan --> scfd_checkrawsave;
+scfd_checkrawsave --> scf_getrecordedfadcinfo;
 endscan --> scv_setlastscanvars;
 endscan --> scv_getlastscanvars;
 endscan --> savetohdf;
@@ -47,6 +49,7 @@ scw_createconfig --> num2bool;
 addmetafiles --> sc_createsweeplogs;
 sc_createsweeplogs --> addjsonkeyval;
 sc_createsweeplogs --> num2numstr;
+sc_createsweeplogs --> scf_getrecordedfadcinfo;
 sc_createsweeplogs --> sc_instrumentlogs;
 sc_instrumentlogs --> sc_openinstrconnections;
 sc_instrumentlogs --> sc_createsweeplogs;
@@ -72,7 +75,6 @@ savetohdf --> sci_get1dwavenames;
 sci_get1dwavenames --> scf_getrecordedfadcinfo;
 savetohdf --> sci_get2dwavenames;
 sci_get2dwavenames --> sci_get1dwavenames;
-savetohdf --> getrawsavenames;
 savetohdf --> scu_assertseparatortype;
 savetohdf --> createwavescopyigor;
 savetohdf --> savewavestohdf;
@@ -90,9 +92,8 @@ sc_copynewfiles --> getexppath;
 endscan --> sce_scanvarstojson;
 scank2400 --> sc_sleep;
 scank2400 --> initializescan;
-initializescan --> killvisa;
-initializescan --> sc_openinstrconnections;
 initializescan --> sci_initializewaves;
+sci_initializewaves --> fd_getglobalawg;
 sci_initializewaves --> sci_get1dwavenames;
 sci_initializewaves --> sci_sanitycheckwavenames;
 sci_initializewaves --> scfd_postfilternumpts;
@@ -107,9 +108,11 @@ scg_initializegraphsforwavenames --> scg_graphexistsforwavename;
 scg_graphexistsforwavename --> scg_getopengraphtitles;
 scg_graphexistsforwavename --> scg_getopengraphids;
 scg_initializegraphsforwavenames --> scg_setupgraph1d;
-scg_initializegraphsforwavenames --> scg_setupgraph2d;
 scg_initializegraphsforwavenames --> scg_open1dgraph;
 scg_open1dgraph --> scg_setupgraph1d;
+scg_initializegraphsforwavenames --> scfd_spectrum_analyzer;
+scg_initializegraphsforwavenames --> scg_twosubplot;
+scg_initializegraphsforwavenames --> scg_setupgraph2d;
 scg_initializegraphsforwavenames --> scg_open2dgraph;
 scg_open2dgraph --> scg_setupgraph2d;
 initializescan --> scg_arrangewindows;
@@ -139,6 +142,7 @@ sc_worker --> sc_funcasync;
 recordvalues --> sc_killthreads;
 recordvalues --> scv_setlastscanvars;
 recordvalues --> scs_checksweepstate;
+recordvalues --> scg_updatefrequentgraphs;
 scank2400 --> endscan;
 scank24002d --> sc_openinstrconnections;
 scank24002d --> initscanvars;
@@ -148,6 +152,17 @@ scank24002d --> initializescan;
 scank24002d --> setk2400voltage;
 scank24002d --> recordvalues;
 scank24002d --> endscan;
+subgraph fastdac.ipf
+fd_getawgwave
+fd_initglobalawg
+fd_setglobalawg
+fd_getglobalawg
+end
+subgraph keithley2400.ipf
+setk2400voltage
+getk2400voltage
+rampk2400voltage
+end
 subgraph ScanController.ipf
 scu_assertseparatortype
 scu_unixtime
@@ -171,6 +186,7 @@ sci_sanitycheckwavenames
 scg_initializegraphs
 scg_initializegraphsforwavenames
 scg_arrangewindows
+scg_twosubplot
 scg_graphexistsforwavename
 scg_open1dgraph
 scg_open2dgraph
@@ -179,6 +195,7 @@ scg_setupgraph2d
 scg_getopengraphtitles
 scg_getopengraphids
 scg_openabortwindow
+scg_updatefrequentgraphs
 sc_openinstrconnections
 sc_checkbackup
 scs_checksweepstate
@@ -194,23 +211,18 @@ scw_createconfig
 scw_saveconfig
 recordvalues
 scf_getrecordedfadcinfo
+scfd_checkrawsave
 scfd_postfilternumpts
+scfd_spectrum_analyzer
 end
-subgraph keithley2400.ipf
-setk2400voltage
-getk2400voltage
-rampk2400voltage
-end
-subgraph fastdac.ipf
-fd_getawgwave
-fd_initglobalawg
-fd_setglobalawg
-fd_getglobalawg
-end
-subgraph Scans.ipf
-readvstime
-scank2400
-scank24002d
+subgraph ScanController_INSTR.ipf
+visaerrormsg
+writeinstr
+readinstr
+queryinstr
+visasetreadterm
+visasetreadtermenable
+visasetserialendin
 end
 subgraph ScanController_IO.ipf
 openhdffile
@@ -219,7 +231,6 @@ savewavestohdf
 addmetafiles
 sc_createsweeplogs
 sc_instrumentlogs
-getrawsavenames
 createwavescopyigor
 savescanwaves
 savesinglewavetohdf
@@ -242,23 +253,18 @@ getindent
 prettyjsonfmt
 escapequotes
 end
-subgraph ScanController_INSTR.ipf
-killvisa
-visaerrormsg
-writeinstr
-readinstr
-queryinstr
-visasetreadterm
-visasetreadtermenable
-visasetserialendin
+subgraph Scans.ipf
+readvstime
+scank2400
+scank24002d
 end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

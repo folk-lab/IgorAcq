@@ -32,11 +32,11 @@ visasetreadtermenable --> visasetreadterm;
 readinstr --> visasetserialendin;
 readinstr --> visaerrormsg;
 openfastdacconnection --> scf_addfdinfos;
-subgraph ScanController.ipf
-scf_addfdinfos
-end
 subgraph fastdac.ipf
 openfastdacconnection
+end
+subgraph ScanController.ipf
+scf_addfdinfos
 end
 subgraph ScanController_INSTR.ipf
 visaerrormsg
@@ -57,11 +57,11 @@ visasetparity
 end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

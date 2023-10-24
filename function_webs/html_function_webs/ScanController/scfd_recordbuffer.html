@@ -30,6 +30,8 @@ scfd_distributedata2 --> fd_char2num;
 scfd_recordbuffer --> scfd_checksweepstate;
 scfd_checksweepstate --> scs_checksweepstate;
 scs_checksweepstate --> endscan;
+endscan --> scfd_checkrawsave;
+scfd_checkrawsave --> scf_getrecordedfadcinfo;
 endscan --> scv_setlastscanvars;
 endscan --> scv_getlastscanvars;
 endscan --> savetohdf;
@@ -47,6 +49,7 @@ scw_createconfig --> num2bool;
 addmetafiles --> sc_createsweeplogs;
 sc_createsweeplogs --> addjsonkeyval;
 sc_createsweeplogs --> num2numstr;
+sc_createsweeplogs --> scf_getrecordedfadcinfo;
 sc_createsweeplogs --> sc_instrumentlogs;
 sc_instrumentlogs --> sc_openinstrconnections;
 sc_instrumentlogs --> sc_createsweeplogs;
@@ -72,7 +75,6 @@ savetohdf --> sci_get1dwavenames;
 sci_get1dwavenames --> scf_getrecordedfadcinfo;
 savetohdf --> sci_get2dwavenames;
 sci_get2dwavenames --> sci_get1dwavenames;
-savetohdf --> getrawsavenames;
 savetohdf --> scu_assertseparatortype;
 savetohdf --> createwavescopyigor;
 savetohdf --> savewavestohdf;
@@ -90,33 +92,10 @@ sc_copynewfiles --> getexppath;
 endscan --> sce_scanvarstojson;
 scfd_checksweepstate --> fd_stopfdacsweep;
 scfd_recordbuffer --> scfd_expectedbytesinbuffer;
-scfd_recordbuffer --> scg_updaterawgraphs;
-subgraph ScanController.ipf
-scu_assertseparatortype
-scu_unixtime
-roundnum
-scv_setlastscanvars
-scv_getlastscanvars
-sci_get1dwavenames
-sci_get2dwavenames
-scg_updaterawgraphs
-sc_openinstrconnections
-sc_checkbackup
-scs_checksweepstate
-endscan
-sce_scanvarstojson
-scw_createconfig
-scw_saveconfig
-scf_getrecordedfadcinfo
-scfd_postfilternumpts
-scfd_recordbuffer
-scfd_expectedbytesinbuffer
-scfd_getreadchunksize
-scfd_checksweepstate
-scfd_readchunk
-scfd_distributedata1
-scfd_distributedata2
-end
+scfd_recordbuffer --> scfd_raw2calcquickdistribute;
+scfd_raw2calcquickdistribute --> sci_get1dwavenames;
+scfd_raw2calcquickdistribute --> scf_getrecordedfadcinfo;
+scfd_recordbuffer --> scg_updatefrequentgraphs;
 subgraph fastdac.ipf
 clearfdacbuffer
 fd_stopfdacsweep
@@ -126,6 +105,42 @@ fd_initglobalawg
 fd_setglobalawg
 fd_getglobalawg
 end
+subgraph ScanController.ipf
+scu_assertseparatortype
+scu_unixtime
+roundnum
+scv_setlastscanvars
+scv_getlastscanvars
+sci_get1dwavenames
+sci_get2dwavenames
+scg_updatefrequentgraphs
+sc_openinstrconnections
+sc_checkbackup
+scs_checksweepstate
+endscan
+sce_scanvarstojson
+scw_createconfig
+scw_saveconfig
+scf_getrecordedfadcinfo
+scfd_checkrawsave
+scfd_postfilternumpts
+scfd_recordbuffer
+scfd_expectedbytesinbuffer
+scfd_getreadchunksize
+scfd_raw2calcquickdistribute
+scfd_checksweepstate
+scfd_readchunk
+scfd_distributedata1
+scfd_distributedata2
+end
+subgraph ScanController_INSTR.ipf
+visaerrormsg
+writeinstr
+readinstr
+visasetreadterm
+visasetreadtermenable
+visasetserialendin
+end
 subgraph ScanController_IO.ipf
 openhdffile
 closehdffile
@@ -133,7 +148,6 @@ savewavestohdf
 addmetafiles
 sc_createsweeplogs
 sc_instrumentlogs
-getrawsavenames
 createwavescopyigor
 savescanwaves
 savesinglewavetohdf
@@ -156,21 +170,13 @@ getindent
 prettyjsonfmt
 escapequotes
 end
-subgraph ScanController_INSTR.ipf
-visaerrormsg
-writeinstr
-readinstr
-visasetreadterm
-visasetreadtermenable
-visasetserialendin
-end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

@@ -79,6 +79,15 @@ fd_rampoutputfdac --> scfw_updatefdacvalstr;
 scfw_update_all_fdac --> getfdacoutput;
 scfw_update_all_fdac --> scfw_updatefdacvalstr;
 scfw_update_all_fdac --> sc_openinstrconnections;
+subgraph fastdac.ipf
+openfastdacconnection
+getfdacoutput
+rampmultiplefdac
+fd_rampoutputfdac
+fdloadfromhdf
+fd_get_fastdacs_from_hdf
+fd_loadaskuser
+end
 subgraph ScanController.ipf
 scu_assertseparatortype
 scu_getchannelnumbers
@@ -95,24 +104,6 @@ scf_addfdinfos
 scfw_resetfdacwindow
 scfw_updatefdacvalstr
 scfw_update_all_fdac
-end
-subgraph fastdac.ipf
-openfastdacconnection
-getfdacoutput
-rampmultiplefdac
-fd_rampoutputfdac
-fdloadfromhdf
-fd_get_fastdacs_from_hdf
-fd_loadaskuser
-end
-subgraph ScanController_IO.ipf
-get_sweeplogs
-getjsonxid
-getjsonxid_fromkey
-getjsonvalue
-getjsonindices
-getjsonkeyoffset
-removetrailingwhitespace
 end
 subgraph ScanController_INSTR.ipf
 getresourceaddress
@@ -135,13 +126,22 @@ visasetstopbits
 visasetserialendin
 visasetparity
 end
+subgraph ScanController_IO.ipf
+get_sweeplogs
+getjsonxid
+getjsonxid_fromkey
+getjsonvalue
+getjsonindices
+getjsonkeyoffset
+removetrailingwhitespace
+end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

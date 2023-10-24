@@ -58,6 +58,8 @@ scc_checkrampstartfd --> getfdacoutput;
 scc_checkrampstartfd --> sc_sleep;
 sc_sleep --> scs_checksweepstate;
 scs_checksweepstate --> endscan;
+endscan --> scfd_checkrawsave;
+scfd_checkrawsave --> scf_getrecordedfadcinfo;
 endscan --> scv_setlastscanvars;
 endscan --> scv_getlastscanvars;
 endscan --> savetohdf;
@@ -75,6 +77,7 @@ scw_createconfig --> num2bool;
 addmetafiles --> sc_createsweeplogs;
 sc_createsweeplogs --> addjsonkeyval;
 sc_createsweeplogs --> num2numstr;
+sc_createsweeplogs --> scf_getrecordedfadcinfo;
 sc_createsweeplogs --> sc_instrumentlogs;
 sc_instrumentlogs --> sc_openinstrconnections;
 sc_instrumentlogs --> sc_createsweeplogs;
@@ -100,7 +103,6 @@ savetohdf --> sci_get1dwavenames;
 sci_get1dwavenames --> scf_getrecordedfadcinfo;
 savetohdf --> sci_get2dwavenames;
 sci_get2dwavenames --> sci_get1dwavenames;
-savetohdf --> getrawsavenames;
 savetohdf --> scu_assertseparatortype;
 savetohdf --> createwavescopyigor;
 savetohdf --> savewavestohdf;
@@ -116,6 +118,15 @@ sc_copysinglefile --> getexppath;
 sc_copysinglefile --> executemaccmd;
 sc_copynewfiles --> getexppath;
 endscan --> sce_scanvarstojson;
+subgraph fastdac.ipf
+getfdacoutput
+rampmultiplefdac
+fd_rampoutputfdac
+fd_getawgwave
+fd_initglobalawg
+fd_setglobalawg
+fd_getglobalawg
+end
 subgraph ScanController.ipf
 scu_assertseparatortype
 scu_unixtime
@@ -142,19 +153,24 @@ scf_getfdinfofromdevicenum
 scf_getfdinfofromid
 scf_getrecordedfadcinfo
 scf_getchannelstartnum
+scfd_checkrawsave
 scf_checkfdresponse
 scfd_postfilternumpts
 scfw_resetfdacwindow
 scfw_updatefdacvalstr
 end
-subgraph fastdac.ipf
-getfdacoutput
-rampmultiplefdac
-fd_rampoutputfdac
-fd_getawgwave
-fd_initglobalawg
-fd_setglobalawg
-fd_getglobalawg
+subgraph ScanController_INSTR.ipf
+getresourceaddress
+visaerrormsg
+writeinstr
+readinstr
+queryinstr
+queryinstrprogress
+sc_striptermination
+sc_progressbardelay
+visasetreadterm
+visasetreadtermenable
+visasetserialendin
 end
 subgraph ScanController_IO.ipf
 openhdffile
@@ -163,7 +179,6 @@ savewavestohdf
 addmetafiles
 sc_createsweeplogs
 sc_instrumentlogs
-getrawsavenames
 createwavescopyigor
 savescanwaves
 savesinglewavetohdf
@@ -187,26 +202,13 @@ prettyjsonfmt
 removetrailingwhitespace
 escapequotes
 end
-subgraph ScanController_INSTR.ipf
-getresourceaddress
-visaerrormsg
-writeinstr
-readinstr
-queryinstr
-queryinstrprogress
-sc_striptermination
-sc_progressbardelay
-visasetreadterm
-visasetreadtermenable
-visasetserialendin
-end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

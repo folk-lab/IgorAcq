@@ -12,19 +12,23 @@
     graph TB;
 fd_start_sweep --> scu_assertseparatortype;
 fd_start_sweep --> scu_getdevicechannels;
-scu_getdevicechannels --> scf_getchannelstartnum;
-scf_getchannelstartnum --> scf_getnumfds;
-scf_getchannelstartnum --> scf_getfdnumber;
+scu_getdevicechannels --> scf_getfdinfofromid;
+scf_getfdinfofromid --> scf_getfdnumber;
 scf_getfdnumber --> scf_getnumfds;
 scf_getfdnumber --> getresourceaddress;
 scf_getfdnumber --> scf_getfdvisaaddress;
 scf_getfdvisaaddress --> scf_getnumfds;
-scf_getchannelstartnum --> scf_getfdinfofromid;
-scf_getfdinfofromid --> scf_getfdnumber;
 scf_getfdinfofromid --> scf_getfdinfofromdevicenum;
 scf_getfdinfofromdevicenum --> scf_getnumfds;
+scu_getdevicechannels --> scf_getchannelstartnum;
+scf_getchannelstartnum --> scf_getnumfds;
+scf_getchannelstartnum --> scf_getfdnumber;
+scf_getchannelstartnum --> scf_getfdinfofromid;
 fd_start_sweep --> writeinstr;
 writeinstr --> visaerrormsg;
+subgraph fastdac.ipf
+fd_start_sweep
+end
 subgraph ScanController.ipf
 scu_assertseparatortype
 scu_getdevicechannels
@@ -35,9 +39,6 @@ scf_getfdinfofromdevicenum
 scf_getfdinfofromid
 scf_getchannelstartnum
 end
-subgraph fastdac.ipf
-fd_start_sweep
-end
 subgraph ScanController_INSTR.ipf
 getresourceaddress
 visaerrormsg
@@ -45,11 +46,11 @@ writeinstr
 end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },
