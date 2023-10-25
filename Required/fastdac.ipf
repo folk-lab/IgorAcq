@@ -2023,14 +2023,18 @@ function/s fd_start_sweep(S, [AWG_list])
 			adcs = replacestring(";",adcs,"")
 			S.adcLists = replacestringbykey(fdIDname, S.adcLists, adcs)
 			
+			///// WARNING THIS SETUP OF AWG MAY NOT WORK IN ALL CASES I JUTS WANTED TO GET A SCAN GOING ////./
 			// this is all for AWG //////////////////////////////////////////////////////////////////////////////////////////////////////////
-			if(!paramisDefault(AWG_list) && AWG_List.use_AWG == 1 && AWG_List.lims_checked == 1)
+			if(!paramisDefault(AWG_list) && AWG_List.use_AWG == 1 && AWG_List.lims_checked == 1 && ((stringmatch(fdIDname, stringFromList(0,  AWG_list.channelIDs)) == 1) || (stringmatch(fdIDname, stringFromList(1,  AWG_list.channelIDs)) == 1)))
 				int numWaves  // this numwaves must be one or two. If two, the command to the fastDAC assumes both AW0 and AW1 are being used.
 				
 				// we first figure out all the AW dacs corresponding to the current fdID
-				string AW0_dacs = replacestring(",",scu_getDeviceChannels(fdID, AWG_list.channels_AW0), "")
-				string AW1_dacs = replacestring(",",scu_getDeviceChannels(fdID, AWG_list.channels_AW1), "")
-				
+				if (stringmatch(fdIDname, stringFromList(0,  AWG_list.channelIDs)) == 1)
+					string AW0_dacs = replacestring(",",scu_getDeviceChannels(fdID, AWG_list.channels_AW0), "")
+				endif
+				if (stringmatch(fdIDname, stringFromList(1,  AWG_list.channelIDs)) == 1)
+					string AW1_dacs = replacestring(",",scu_getDeviceChannels(fdID, AWG_list.channels_AW1), "")
+				endif
 				// we need to run through some tests to see which one of AW0, AW1 is populated
 				// if both are unpopulated and we are using AWG then a fake squarewave will be implemented on a channel
 				
