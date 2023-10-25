@@ -471,7 +471,7 @@ function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate,
 	RampStartFD(S, ignore_lims=1)
 
 	// Let gates settle 
-	sc_sleep(S.delayy)
+	sc_sleep(1)
 
 	// Make Waves and Display etc
 	InitializeScan(S)
@@ -487,6 +487,7 @@ function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate,
 		sc_sleep(S.delayy)
 		i = 0
 		do
+		
 			rampToNextSetpoint(S, i, fastdac=1, ignore_lims=1)  // Ramp x to next setpoint
 			sc_sleep(S.delayx)
 			if (s.is2d)
@@ -900,8 +901,8 @@ end
 
 
 
-function Scank2400(instrID, startx, finx, channelsx, numptsx, delayx, rampratex, [y_label, comments, nosave]) //Units: mV
-	variable instrID, startx, finx, numptsx, delayx, rampratex,  nosave
+function Scank2400(instrID, startx, finx, channelsx, numptsx, delayx, rampratex, [y_label, comments, nosave, ramp]) //Units: mV
+	variable instrID, startx, finx, numptsx, delayx, rampratex,  nosave, ramp
 	string channelsx, y_label, comments
 	//abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"
 	
@@ -921,10 +922,10 @@ function Scank2400(instrID, startx, finx, channelsx, numptsx, delayx, rampratex,
 	// PreScanChecksKeithley(S)  
 	
 	// Ramp to start without checks because checked above
-	rampK2400Voltage(S.instrIDx, startx)
+	rampK2400Voltage(S.instrIDx, startx, ramprate = rampratex)
 	
 	// Let gates settle 
-	sc_sleep(S.delayy*20)
+	sc_sleep(2)
 	
 	// Make waves and graphs etc
 	initializeScan(S)
@@ -933,8 +934,11 @@ function Scank2400(instrID, startx, finx, channelsx, numptsx, delayx, rampratex,
 	variable i=0, setpointx
 	do
 		setpointx = S.startx + (i*(S.finx-S.startx)/(S.numptsx-1))
-//		rampK2400Voltage(S.instrIDx, setpointx, ramprate=S.rampratex)
-		setK2400Voltage(S.instrIDx, setpointx)
+		if (ramp ==1)
+			rampK2400Voltage(S.instrIDx, setpointx, ramprate=S.rampratex)
+		else
+		   setK2400Voltage(S.instrIDx, setpointx)
+		endif
 		sc_sleep(S.delayx)
 		RecordValues(S, i, i)
 		i+=1
@@ -971,11 +975,11 @@ function Scank24002D(instrIDx, startx, finx, numptsx, delayx, rampratex, instrID
 	// PreScanChecksKeithley(S)  
 	
 	// Ramp to start without checks because checked above
-	rampK2400Voltage(S.instrIDx, startx)
-	rampK2400Voltage(S.instrIDy, starty)
+	rampK2400Voltage(S.instrIDx, startx, ramprate = rampratex)
+	rampK2400Voltage(S.instrIDy, starty, ramprate = rampratey)
 	
 	// Let gates settle 
-	sc_sleep(S.delayy*5)
+	sc_sleep(2)
 	
 	// Make waves and graphs etc
 	initializeScan(S)
@@ -987,7 +991,6 @@ function Scank24002D(instrIDx, startx, finx, numptsx, delayx, rampratex, instrID
 		setpointy = S.starty + (i*(S.finy-S.starty)/(S.numptsy-1))
 		rampK2400Voltage(S.instrIDy, setpointy, ramprate=S.rampratey)
 		rampK2400Voltage(S.instrIDx, setpointx, ramprate=S.rampratex)
-
 		sc_sleep(S.delayy)
 		j=0
 		do
@@ -1371,10 +1374,10 @@ function ScanLS625Magnet(instrID, startx, finx, numptsx, delayx, [y_label, comme
 		setpointx = S.startx + (i*(S.finx-S.startx)/(S.numptsx-1))
 		if(fast==1)
 			setlS625field(S.instrIDx, setpointx) 
-			sc_sleep(max(S.delayx, (0.05+60*abs(finx-startx)/numptsx/ramprate)))
+			sc_sleep(max(S.delayx, (S.delayx+60*abs(finx-startx)/numptsx/ramprate)))
 		else
 			setlS625fieldwait(S.instrIDx, setpointx) 
-			sc_sleep(S.delayx)
+//			sc_sleep(S.delayx)
 		endif
 		RecordValues(S, i, i)
 		i+=1
@@ -1387,7 +1390,6 @@ function ScanLS625Magnet(instrID, startx, finx, numptsx, delayx, [y_label, comme
 		 dowindow /k SweepControl
 	endif
 end
-
 
 function ScanBabyDACLS625Magnet2D(bdID, startx, finx, channelsx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, rampratey, [startxs, finxs, y_label, comments, nosave]) //Units: mV
 	// Sweeps BabyDAC on x-axis and Keithley on y-axis
@@ -1531,6 +1533,7 @@ function ScanFastDacSlowLS625Magnet2D(instrIDx, startx, finx, channelsx, numptsx
 	// Set defaults
 	comments = selectstring(paramisdefault(comments), comments, "")
 	y_label = selectstring(paramisdefault(y_label), y_label, "")
+	
 	// Initialize ScanVars
 	struct ScanVars S  
 		  
@@ -1551,7 +1554,7 @@ function ScanFastDacSlowLS625Magnet2D(instrIDx, startx, finx, channelsx, numptsx
 	setlS625fieldWait(S.instrIDy, starty )
 	
 	// Let gates settle 
-	asleep(S.delayy*10)
+	asleep(S.delayy)
 
 	// Make Waves and Display etc
 	InitializeScan(S)
@@ -1562,15 +1565,17 @@ function ScanFastDacSlowLS625Magnet2D(instrIDx, startx, finx, channelsx, numptsx
 	do
 		setpointx = S.startx
 		setpointy = S.starty + (i*(S.finy-S.starty)/(S.numptsy-1))
-		setlS625field(S.instrIDy, setpointy)
-		rampMultipleFDAC(S.instrIDx,channelsx,setpointx,ramprate=S.rampratex, ignore_lims=1)
-		setlS625fieldwait(S.instrIDy, setpointy, short_wait = 1)
+		rampMultipleFDAC(S.instrIDx,channelsx, setpointx, ramprate=S.rampratex, ignore_lims=1)
+		setlS625fieldwait(S.instrIDy, setpointy)
 		sc_sleep(S.delayy)
 		j=0
 		do
 			setpointx = S.startx + (j*(S.finx-S.startx)/(S.numptsx-1))
 			rampMultipleFDAC(S.instrIDx,channelsx,setpointx,ramprate=S.rampratex, ignore_lims=1)
 			sc_sleep(S.delayx)
+//          if (mod(j, 100) == 0)
+//               sc_sleep(S.delayx)
+//          endif 
 			RecordValues(S, i, j)
 			j+=1
 		while (j<S.numptsx)
@@ -1626,15 +1631,14 @@ function ScanK2400LS625Magnet2D(keithleyID, startx, finx, numptsx, delayx, rampr
 	do
 		setpointx = S.startx
 		setpointy = S.starty + (i*(S.finy-S.starty)/(S.numptsy-1))
-		setlS625fieldWait(S.instrIDy, setpointy)
+		setlS625field(S.instrIDy, setpointy)
 		rampK2400Voltage(S.instrIDx, setpointx, ramprate=S.rampratex)
-//		setK2400Voltage(S.instrIDy, setpointy)
-
+      setlS625fieldWait(S.instrIDy, setpointy, short_wait = 1)
 		sc_sleep(S.delayy)
 		j=0
 		do
 			setpointx = S.startx + (j*(S.finx-S.startx)/(S.numptsx-1))
-			rampK2400Voltage(S.instrIDx, setpointx, ramprate=S.rampratex)
+			setK2400Voltage(S.instrIDx, setpointx)
 			sc_sleep(S.delayx)
 			RecordValues(S, i, j)
 			j+=1
@@ -1669,7 +1673,7 @@ function ScanSRSFrequency(instrID, startx, finx, numptsx, delayx, nosave)
 	SetSRSFrequency(S.instrIDx,startx)
 
 	// Let gates settle
-	sc_sleep(S.delayy*10)
+	sc_sleep(2)
 
 	// Make waves and graphs etc
 	initializeScan(S)

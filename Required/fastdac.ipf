@@ -139,7 +139,7 @@ function getFADCvalue(fdid, channel, [len_avg])
 	// Note: Min read time is ~60ms because of having to check SamplingFreq a couple of times -- Could potentially be optimized further if necessary
 	variable fdid, channel, len_avg
 	
-	len_avg = paramisdefault(len_avg) ? 0.05 : len_avg
+	len_avg = paramisdefault(len_avg) ? 0.02 : len_avg
 
 	variable/g scfd_val_mv = getFADCchannel(fdid, channel, len_avg=len_avg)  // Must be global so can use execute
 	variable/g scfd_val_real
@@ -1765,8 +1765,6 @@ end
 ////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////// FastDAC Sweeps /////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////
-
-
 
 function/s fd_start_sweep(S, [AWG_list])
 	// Starts one of:
