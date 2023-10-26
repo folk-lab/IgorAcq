@@ -23,8 +23,8 @@ function master_fit_multiple(dat_min_max, refit, dotcondcentering, kenner_out, [
 	repeats_on = paramisdefault(repeats_on) ? 1 : repeats_on // repeats_on ON is default
 	N = paramisdefault(N) ? 3 : N // averaging ON is default
 	
-	variable dat_start = str2num(StringFromList(0, dat_min_max, ","))
-	variable dat_end = str2num(StringFromList(1, dat_min_max, ",")) 
+	variable dat_start = str2num(StringFromList(0, dat_min_max, ";"))
+	variable dat_end = str2num(StringFromList(1, dat_min_max, ";")) 
 	string wave_name
 	
 	make_scanvar_table_from_dats(dat_min_max, ignore_field=0)
@@ -82,8 +82,8 @@ function master_fit_multiple(dat_min_max, refit, dotcondcentering, kenner_out, [
 	duplicate /R=[][scanvar_table_column_offset + 5] /o scanvar_table quad_wave
 	
 	string xaxis_name
-//	duplicate /R=[][0] /o scanvar_table xaxis;  xaxis_name = "Datnum"
-	duplicate /R=[][1] /o scanvar_table xaxis;  xaxis_name = "Temperature (mK)"
+	duplicate /R=[][0] /o scanvar_table xaxis;  xaxis_name = "Datnum"
+//	duplicate /R=[][1] /o scanvar_table xaxis;  xaxis_name = "Temperature (mK)"
 //	duplicate /R=[][2] /o scanvar_table xaxis;  xaxis_name = "Magnetic Field (mT)"
 
 	int marker_mode = 3
@@ -254,6 +254,7 @@ function master_ct_clean_average(wav, refit, dotcondcentering, kenner_out, [cond
 
 	if(average==1)
 //		replace_nans_with_avg($cleaned_wave_name, overwrite=0) // remove any row with > 25% NaNs in the row
+		zap_NaN_rows($cleaned_wave_name, overwrite=1, percentage_cutoff_inf=0.2)
 		avg_wav($cleaned_wave_name) // quick average plot
 		
 		wavetransform/o zapnans $avg_wave_name // this is not always the best idea as it can shift the data
@@ -533,12 +534,18 @@ function /wave fit_transition(wave_to_fit, minx, maxx, [fit_width])
 		maxx = x2pnt(wave_to_fit, endx)
 	endif
 	
-	
+//	display wave_to_fit[][0]
 //	string hold_string = "000001"; W_coef[5] = 0 // holding quadterm 0
 	string hold_string = "000000"; // not holding any terms fixed
-	
-	FuncFit/q /H=(hold_string) /TBOX=768 ct_fit_function W_coef wave_to_fit[minx,maxx][0] /D
+	//Make/O/T/N=12 T_Constraints
+  //T_Constraints[0]= {"K0 > 0","K0 < 0.1","K1 > 0.8","K1 < 1.5","K2 > 3","K2 < 30","K3 > -50","K3 < 50","K4 > -1e-4","K4 < 1e-4","K5 > -1e-7","K5 < 1e-7"}
+//    W_coef[0]= {0.0412854,1.14834,9.31696,-12.5946,6.7156e-05,3.60289e-08}
+	FuncFit/q /H=(hold_string) /TBOX=768 ct_fit_function W_coef wave_to_fit[minx,maxx][0] /D 
+	///C=T_Constraints 
+//	print W_coef
+	doupdate
 end
+
 
 
 
@@ -814,5 +821,30 @@ Function ct_fit_function(w,ys,xs) : FitFunc
 	// w[4] = Linear
 	// w[5] = Quad
 
-	ys= w[0] * tanh((xs - w[3])/(-2 * w[2])) + w[4]*xs + w[1] + w(5)*xs^2
+	ys= w[0] * tanh((xs - w[3])/(-2 * w[2])) + w[4]*xs + w[1] + w[5]*xs^2
 End
+
+
+
+//Function Chargetransition(w,x) : FitFunc
+//	Wave w
+//	Variable x
+//
+//	//CurveFitDialog/ These comments were created by the Curve Fitting dialog. Altering them will
+//	//CurveFitDialog/ make the function less convenient to work with in the Curve Fitting dialog.
+//	//CurveFitDialog/ Equation:
+//	//CurveFitDialog/ f(x) = Amp*tanh((x - Mid)/(2*Theta)) + Linear*x + Const+0*padder
+//	//CurveFitDialog/ End of Equation
+//	//CurveFitDialog/ Independent Variables 1
+//	//CurveFitDialog/ x
+//	//CurveFitDialog/ Coefficients 6
+//	//CurveFitDialog/ w[0] = Amp
+//	//CurveFitDialog/ w[1] = Const
+//	//CurveFitDialog/ w[2] = Theta
+//	//CurveFitDialog/ w[3] = Mid
+//	//CurveFitDialog/ w[4] = Linear
+//	//CurveFitDialog/ w[5] = Quad
+//
+//	return  w[0] * tanh((x - w[3])/(-2 * w[2])) + w[4]*x + w[1] + w[5]*x^2
+//
+//End
