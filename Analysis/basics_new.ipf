@@ -379,7 +379,7 @@ function spectrum_analyzer(wave data, variable samp_freq)
 
 	variable i=0
 	rowslice(spectrum,i)
-		DSPPeriodogram/R=[1,(new_numptsx)] /PARS/NODC=2/DEST=W_Periodogram slice
+	DSPPeriodogram/R=[1,(new_numptsx)] /PARS/NODC=2/DEST=W_Periodogram slice
 	duplicate/o w_Periodogram, powerspec
 	i=1
 	do
@@ -388,7 +388,9 @@ function spectrum_analyzer(wave data, variable samp_freq)
 		powerspec=powerspec+W_periodogram
 		i=i+1
 	while(i<dimsize(spectrum,1))
+	
 //	powerspec[0]=nan
+	powerspec[0, x2pnt(powerspec, 10)] = 0
 
 	duplicate /o powerspec powerspec_int
 	wave powerspec_int
@@ -1065,3 +1067,17 @@ function create_x_wave(wave_2d)
 	duplicate /o /RMD=[][0] $wave_2d_name x_wave
 	x_wave = x
 end
+
+
+
+Function GetFreeMemory()
+    variable freeMem
+
+#if defined(IGOR64)
+    freeMem = NumberByKey("PHYSMEM", IgorInfo(0)) - NumberByKey("USEDPHYSMEM", IgorInfo(0))
+#else
+    freeMem = NumberByKey("FREEMEM", IgorInfo(0))
+#endif
+
+    return freeMem / 1024 / 1024 / 1024
+End
