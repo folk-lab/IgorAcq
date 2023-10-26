@@ -39,8 +39,8 @@ function openIPS120connection(instrVarName, visa_address, amps_per_tesla, max_fi
 
 	string comm = ""
 	sprintf comm, "name=IPS120,instrID=%s,visa_address=%s" instrVarName, visa_address
-	string options = "baudrate=9600,databits=8,stopbits=2"
-	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
+
+	openVISAinstr(comm, localRM=localRM, verbose=verbose)
 	nvar localID = $(instrVarName)
 
 	svar/z ips120_names

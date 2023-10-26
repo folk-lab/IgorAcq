@@ -2464,12 +2464,21 @@ function InitScanController([configFile])
 			// instrument wave
 			make /t/o/N=(sc_instrLimit,3) sc_Instr
 
-			sc_Instr[0][0] = "openMultipleFDACs(\"3,4\", verbose=1)"
-			sc_Instr[1][0] = "openK2400connection(\"k2400\", \"GPIB0::4::INSTR\", verbose=1)"
-			sc_Instr[2][0] = "opensrsconnection(\"srs\",\"GPIB::1::INSTR\",verbose=1)"
+			sc_Instr[0][0] = "openMultipleFDACs(\"13,7,4\", verbose=1)"
+			sc_Instr[1][0] = "openLS370connection(\"ls\", \"http://lksh370-xld.qdev-b111.lab:49300/api/v1/\", \"bfbig\", verbose=1)"
+			sc_Instr[2][0] = "openIPS120connection(\"ips1\",\"GPIB::25::INSTR\", 9.569, 9000, 182, verbose=0, hold = 1)"
 			sc_Instr[0][2] = "getFDstatus(\"fd1\")"
-			sc_Instr[1][2] = "getFDstatus(\"fd2\")"
-			sc_Instr[2][2] = "GetSRSStatus(srs)"
+			sc_Instr[1][2] = "getls370Status(\"ls\")"
+			sc_Instr[2][2] = "getipsstatus(ips1)"
+			sc_Instr[3][2] = "getFDstatus(\"fd2\")"
+			sc_Instr[4][2] = "getFDstatus(\"fd3\")"
+
+
+			
+			
+//		openMultipleFDACs("13,7,4", verbose=0)
+•//openLS370connection("ls", "http://lksh370-xld.qdev-b111.lab:49300/api/v1/", "bfbig", verbose=0)
+•//openIPS120connection("ips1", "GPIB0::25::INSTR", 9.569, 9000, 182, verbose=0, hold = 1)
 
 			nvar/z filenum
 			if(!nvar_exists(filenum))
