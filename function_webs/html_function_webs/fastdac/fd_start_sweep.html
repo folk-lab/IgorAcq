@@ -11,45 +11,144 @@
     <pre class="mermaid">
     graph TB;
 fd_start_sweep --> scu_assertseparatortype;
+fd_start_sweep --> queryinstr;
+queryinstr --> writeinstr;
+writeinstr --> visaerrormsg;
+queryinstr --> readinstr;
+readinstr --> visasetreadterm;
+readinstr --> visasetreadtermenable;
+visasetreadtermenable --> visasetreadterm;
+readinstr --> visasetserialendin;
+readinstr --> visaerrormsg;
 fd_start_sweep --> scu_getdevicechannels;
-scu_getdevicechannels --> scf_getchannelstartnum;
-scf_getchannelstartnum --> scf_getnumfds;
-scf_getchannelstartnum --> scf_getfdnumber;
+scu_getdevicechannels --> scf_getfdinfofromid;
+scf_getfdinfofromid --> scf_getfdnumber;
 scf_getfdnumber --> scf_getnumfds;
 scf_getfdnumber --> getresourceaddress;
 scf_getfdnumber --> scf_getfdvisaaddress;
 scf_getfdvisaaddress --> scf_getnumfds;
-scf_getchannelstartnum --> scf_getfdinfofromid;
-scf_getfdinfofromid --> scf_getfdnumber;
 scf_getfdinfofromid --> scf_getfdinfofromdevicenum;
 scf_getfdinfofromdevicenum --> scf_getnumfds;
+scu_getdevicechannels --> scf_getchannelstartnum;
+scf_getchannelstartnum --> scf_getnumfds;
+scf_getchannelstartnum --> scf_getfdnumber;
+scf_getchannelstartnum --> scf_getfdinfofromid;
+fd_start_sweep --> removeseperator;
+fd_start_sweep --> getfdacoutput;
+getfdacoutput --> scf_getchannelstartnum;
+getfdacoutput --> queryinstr;
+getfdacoutput --> sc_striptermination;
+getfdacoutput --> scf_checkfdresponse;
+fd_start_sweep --> setupfakesquarewave;
+setupfakesquarewave --> setfdacawgsquarewave;
+setfdacawgsquarewave --> fd_getglobalawg;
+fd_getglobalawg --> fd_initglobalawg;
+fd_initglobalawg --> fd_setglobalawg;
+setfdacawgsquarewave --> scf_getnumrecordedadcs;
+scf_getnumrecordedadcs --> scf_getrecordedfadcinfo;
+scf_getnumrecordedadcs --> scu_getdevicechannels;
+setfdacawgsquarewave --> scf_getmaxrecordedadcs;
+scf_getmaxrecordedadcs --> scf_getnumrecordedadcs;
+setfdacawgsquarewave --> fd_setglobalawg;
+setfdacawgsquarewave --> getfadcspeed;
+getfadcspeed --> queryinstr;
+getfadcspeed --> sc_striptermination;
+getfadcspeed --> scf_checkfdresponse;
+getfadcspeed --> scf_getfdnumber;
+getfadcspeed --> scf_getfdinfofromid;
+setfdacawgsquarewave --> fd_clearawgwave;
+fd_clearawgwave --> queryinstr;
+fd_clearawgwave --> sc_striptermination;
+fd_clearawgwave --> scf_checkfdresponse;
+fd_clearawgwave --> fd_getawgwave;
+setfdacawgsquarewave --> fd_addawgwave;
+fd_addawgwave --> queryinstr;
+fd_addawgwave --> sc_striptermination;
+fd_addawgwave --> fd_getawgwave;
+fd_addawgwave --> scf_checkfdresponse;
+fd_start_sweep --> setupawg;
+setupawg --> fd_getglobalawg;
+setupawg --> scu_getchannelnumbers;
+scu_getchannelnumbers --> scu_assertseparatortype;
+scu_getchannelnumbers --> removetrailingwhitespace;
+setupawg --> scf_getmaxrecordedadcs;
+setupawg --> scf_getnumrecordedadcs;
+setupawg --> scc_getdeviceids;
+scc_getdeviceids --> scf_getnumfds;
+setupawg --> textwavetolist;
+setupawg --> scv_setfreq;
+scv_setfreq --> getfadcspeed;
+scv_setfreq --> scf_getnumrecordedadcs;
+setupawg --> scv_setfreq2;
+scv_setfreq2 --> scv_setfreq;
+scv_setfreq2 --> getfadcspeed;
+setupawg --> fd_getawgwave;
+setupawg --> fd_checkaw;
+setupawg --> fd_setglobalawg;
+fd_start_sweep --> scw_setupawg;
+scw_setupawg --> setupawg;
+scw_setupawg --> scu_getchannelnumbers;
+scw_setupawg --> ask_user;
+scw_setupawg --> setfdacawgsquarewave;
 fd_start_sweep --> writeinstr;
-writeinstr --> visaerrormsg;
+subgraph fastdac.ipf
+getfadcspeed
+getfdacoutput
+setfdacawgsquarewave
+setupawg
+fd_checkaw
+fd_addawgwave
+fd_getawgwave
+fd_clearawgwave
+fd_start_sweep
+fd_initglobalawg
+fd_setglobalawg
+fd_getglobalawg
+end
 subgraph ScanController.ipf
 scu_assertseparatortype
+ask_user
+scu_getchannelnumbers
 scu_getdevicechannels
+scv_setfreq
+scv_setfreq2
+setupfakesquarewave
+scw_setupawg
+scc_getdeviceids
 scf_getfdnumber
 scf_getnumfds
 scf_getfdvisaaddress
 scf_getfdinfofromdevicenum
 scf_getfdinfofromid
+scf_getrecordedfadcinfo
+scf_getnumrecordedadcs
+scf_getmaxrecordedadcs
 scf_getchannelstartnum
-end
-subgraph fastdac.ipf
-fd_start_sweep
+scf_checkfdresponse
 end
 subgraph ScanController_INSTR.ipf
 getresourceaddress
 visaerrormsg
 writeinstr
+readinstr
+queryinstr
+sc_striptermination
+visasetreadterm
+visasetreadtermenable
+visasetserialendin
+end
+subgraph ScanController_IO.ipf
+textwavetolist
+removeseperator
+removetrailingwhitespace
 end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

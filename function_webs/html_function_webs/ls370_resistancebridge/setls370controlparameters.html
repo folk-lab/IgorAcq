@@ -20,30 +20,30 @@ getjsonvalue --> getjsonindices;
 sendls370 --> puthttp;
 puthttp --> getjsonvalue;
 sendls370 --> getjsonvalue;
-subgraph ls370_resistancebridge.ipf
-setls370controlparameters
-sendls370
-end
 subgraph babydac.ipf
 bd_channellookup
 end
-subgraph ScanController_IO.ipf
-getjsonvalue
-getjsonindices
-getjsonkeyoffset
+subgraph ls370_resistancebridge.ipf
+setls370controlparameters
+sendls370
 end
 subgraph ScanController_INSTR.ipf
 posthttp
 puthttp
 gethttp
 end
+subgraph ScanController_IO.ipf
+getjsonvalue
+getjsonindices
+getjsonkeyoffset
+end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

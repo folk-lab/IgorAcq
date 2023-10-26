@@ -18,8 +18,12 @@ initscancontroller --> sc_checkbackup;
 sc_checkbackup --> getexppath;
 initscancontroller --> sc_checksqldriver;
 initscancontroller --> getexppath;
-initscancontroller --> readsrsx;
-readsrsx --> queryinstr;
+initscancontroller --> getfadcvalue;
+getfadcvalue --> getfadcchannel;
+getfadcchannel --> scc_getdeviceids;
+scc_getdeviceids --> scf_getnumfds;
+getfadcchannel --> getfadcspeed;
+getfadcspeed --> queryinstr;
 queryinstr --> writeinstr;
 writeinstr --> visaerrormsg;
 queryinstr --> readinstr;
@@ -28,13 +32,340 @@ readinstr --> visasetreadtermenable;
 visasetreadtermenable --> visasetreadterm;
 readinstr --> visasetserialendin;
 readinstr --> visaerrormsg;
+getfadcspeed --> sc_striptermination;
+getfadcspeed --> scf_checkfdresponse;
+getfadcspeed --> scf_getfdnumber;
+scf_getfdnumber --> scf_getnumfds;
+scf_getfdnumber --> getresourceaddress;
+scf_getfdnumber --> scf_getfdvisaaddress;
+scf_getfdvisaaddress --> scf_getnumfds;
+getfadcspeed --> scf_getfdinfofromid;
+scf_getfdinfofromid --> scf_getfdnumber;
+scf_getfdinfofromid --> scf_getfdinfofromdevicenum;
+scf_getfdinfofromdevicenum --> scf_getnumfds;
+getfadcchannel --> fd_readchunk;
+fd_readchunk --> getfadcspeed;
+fd_readchunk --> recordvalues;
+recordvalues --> readvstime;
+readvstime --> initscanvars;
+readvstime --> initscanvarsbd;
+initscanvarsbd --> initscanvars;
+initscanvarsbd --> scv_setsetpoints;
+scv_setsetpoints --> scv_formatsetpoints;
+scv_setsetpoints --> scv_sanitizesetpoints;
+scv_sanitizesetpoints --> scu_assertseparatortype;
+initscanvarsbd --> scu_getdaclabel;
+scu_getdaclabel --> scu_assertseparatortype;
+readvstime --> initializescan;
+initializescan --> sci_initializewaves;
+sci_initializewaves --> fd_getglobalawg;
+fd_getglobalawg --> fd_initglobalawg;
+fd_initglobalawg --> fd_setglobalawg;
+sci_initializewaves --> sci_get1dwavenames;
+sci_get1dwavenames --> scf_getrecordedfadcinfo;
+sci_initializewaves --> sci_sanitycheckwavenames;
+sci_initializewaves --> scfd_postfilternumpts;
+sci_initializewaves --> sci_init1dwave;
+sci_initializewaves --> sci_init2dwave;
+sci_initializewaves --> sc_findasyncmeasurements;
+sc_findasyncmeasurements --> sc_checkasyncscript;
+initializescan --> scg_initializegraphs;
+scg_initializegraphs --> sci_get1dwavenames;
+scg_initializegraphs --> scg_initializegraphsforwavenames;
+scg_initializegraphsforwavenames --> scg_graphexistsforwavename;
+scg_graphexistsforwavename --> scg_getopengraphtitles;
+scg_graphexistsforwavename --> scg_getopengraphids;
+scg_initializegraphsforwavenames --> scg_setupgraph1d;
+scg_initializegraphsforwavenames --> scg_open1dgraph;
+scg_open1dgraph --> scg_setupgraph1d;
+scg_initializegraphsforwavenames --> scfd_spectrum_analyzer;
+scg_initializegraphsforwavenames --> scg_twosubplot;
+scg_initializegraphsforwavenames --> scg_setupgraph2d;
+scg_initializegraphsforwavenames --> scg_open2dgraph;
+scg_open2dgraph --> scg_setupgraph2d;
+initializescan --> scg_arrangewindows;
+initializescan --> scg_openabortwindow;
+initializescan --> scv_setlastscanvars;
+readvstime --> asleep;
+asleep --> sc_sleep;
+sc_sleep --> scs_checksweepstate;
+scs_checksweepstate --> endscan;
+endscan --> scfd_checkrawsave;
+scfd_checkrawsave --> scf_getrecordedfadcinfo;
+endscan --> set_indep;
+set_indep --> clearfdacbuffer;
+clearfdacbuffer --> writeinstr;
+set_indep --> queryinstr;
+endscan --> scv_setlastscanvars;
+endscan --> scv_getlastscanvars;
+endscan --> savetohdf;
+savetohdf --> openhdffile;
+openhdffile --> endscan;
+savetohdf --> addmetafiles;
+addmetafiles --> scw_createconfig;
+scw_createconfig --> addjsonkeyval;
+addjsonkeyval --> escapequotes;
+scw_createconfig --> textwave2strarray;
+textwave2strarray --> escapequotes;
+scw_createconfig --> wave2boolarray;
+wave2boolarray --> num2bool;
+scw_createconfig --> num2bool;
+addmetafiles --> sc_createsweeplogs;
+sc_createsweeplogs --> addjsonkeyval;
+sc_createsweeplogs --> num2numstr;
+sc_createsweeplogs --> scf_getrecordedfadcinfo;
+sc_createsweeplogs --> sc_instrumentlogs;
+sc_instrumentlogs --> sc_openinstrconnections;
+sc_instrumentlogs --> sc_createsweeplogs;
+sc_instrumentlogs --> addjsonkeyval;
+addmetafiles --> prettyjsonfmt;
+prettyjsonfmt --> getindent;
+addmetafiles --> sce_scanvarstojson;
+sce_scanvarstojson --> addjsonkeyval;
+sce_scanvarstojson --> prettyjsonfmt;
+addmetafiles --> sc_confirm_json;
+addmetafiles --> scw_saveconfig;
+scw_saveconfig --> scu_unixtime;
+scw_saveconfig --> writetofile;
+savetohdf --> savefastdacinfowaves;
+savefastdacinfowaves --> fd_getglobalawg;
+savefastdacinfowaves --> fd_getawgwave;
+savefastdacinfowaves --> savesinglewavetohdf;
+savetohdf --> savescanwaves;
+savescanwaves --> scfd_postfilternumpts;
+savetohdf --> sci_get1dwavenames;
+savetohdf --> sci_get2dwavenames;
+sci_get2dwavenames --> sci_get1dwavenames;
+savetohdf --> scu_assertseparatortype;
+savetohdf --> createwavescopyigor;
+savetohdf --> savewavestohdf;
+savewavestohdf --> savesinglewavetohdf;
+savetohdf --> closehdffile;
+endscan --> saveexp;
+saveexp --> savefrompxp;
+endscan --> sc_checkbackup;
+endscan --> sc_copynewfiles;
+sc_copynewfiles --> sc_copysinglefile;
+sc_copysinglefile --> getexppath;
+sc_copysinglefile --> executemaccmd;
+sc_copynewfiles --> getexppath;
+endscan --> sce_scanvarstojson;
+readvstime --> recordvalues;
+readvstime --> endscan;
+recordvalues --> sc_managethreads;
+sc_managethreads --> readvstime;
+sc_managethreads --> sc_worker;
+sc_worker --> sc_funcasync;
+recordvalues --> sc_killthreads;
+recordvalues --> scv_setlastscanvars;
+recordvalues --> scs_checksweepstate;
+recordvalues --> scg_updatefrequentgraphs;
+fd_readchunk --> scfd_recordvalues;
+scfd_recordvalues --> recordvalues;
+scfd_recordvalues --> rampstartfd;
+rampstartfd --> scu_assertseparatortype;
+rampstartfd --> rampmultiplefdac;
+rampmultiplefdac --> scu_assertseparatortype;
+rampmultiplefdac --> scu_getchannelnumbers;
+scu_getchannelnumbers --> scu_assertseparatortype;
+scu_getchannelnumbers --> removetrailingwhitespace;
+rampmultiplefdac --> scf_getdacinfo;
+scf_getdacinfo --> scu_getchannelnumbers;
+rampmultiplefdac --> fd_rampoutputfdac;
+fd_rampoutputfdac --> getresourceaddress;
+fd_rampoutputfdac --> scfw_resetfdacwindow;
+fd_rampoutputfdac --> getfdacoutput;
+getfdacoutput --> scf_getchannelstartnum;
+scf_getchannelstartnum --> scf_getnumfds;
+scf_getchannelstartnum --> scf_getfdnumber;
+scf_getchannelstartnum --> scf_getfdinfofromid;
+getfdacoutput --> queryinstr;
+getfdacoutput --> sc_striptermination;
+getfdacoutput --> scf_checkfdresponse;
+fd_rampoutputfdac --> queryinstr;
+fd_rampoutputfdac --> queryinstrprogress;
+queryinstrprogress --> writeinstr;
+queryinstrprogress --> sc_progressbardelay;
+queryinstrprogress --> readinstr;
+fd_rampoutputfdac --> sc_striptermination;
+fd_rampoutputfdac --> scf_checkfdresponse;
+fd_rampoutputfdac --> scfw_updatefdacvalstr;
+scfd_recordvalues --> scc_checkrampstartfd;
+scc_checkrampstartfd --> rampstartfd;
+scc_checkrampstartfd --> scu_assertseparatortype;
+scc_checkrampstartfd --> getfdacoutput;
+scc_checkrampstartfd --> sc_sleep;
+scfd_recordvalues --> scfd_sendcommandandread;
+scfd_sendcommandandread --> fd_start_sweep;
+fd_start_sweep --> scu_assertseparatortype;
+fd_start_sweep --> queryinstr;
+fd_start_sweep --> scu_getdevicechannels;
+scu_getdevicechannels --> scf_getfdinfofromid;
+scu_getdevicechannels --> scf_getchannelstartnum;
+fd_start_sweep --> removeseperator;
+fd_start_sweep --> getfdacoutput;
+fd_start_sweep --> setupfakesquarewave;
+setupfakesquarewave --> setfdacawgsquarewave;
+setfdacawgsquarewave --> fd_getglobalawg;
+setfdacawgsquarewave --> scf_getnumrecordedadcs;
+scf_getnumrecordedadcs --> scf_getrecordedfadcinfo;
+scf_getnumrecordedadcs --> scu_getdevicechannels;
+setfdacawgsquarewave --> scf_getmaxrecordedadcs;
+scf_getmaxrecordedadcs --> scf_getnumrecordedadcs;
+setfdacawgsquarewave --> fd_setglobalawg;
+setfdacawgsquarewave --> getfadcspeed;
+setfdacawgsquarewave --> fd_clearawgwave;
+fd_clearawgwave --> queryinstr;
+fd_clearawgwave --> sc_striptermination;
+fd_clearawgwave --> scf_checkfdresponse;
+fd_clearawgwave --> fd_getawgwave;
+setfdacawgsquarewave --> fd_addawgwave;
+fd_addawgwave --> queryinstr;
+fd_addawgwave --> sc_striptermination;
+fd_addawgwave --> fd_getawgwave;
+fd_addawgwave --> scf_checkfdresponse;
+fd_start_sweep --> setupawg;
+setupawg --> fd_getglobalawg;
+setupawg --> scu_getchannelnumbers;
+setupawg --> scf_getmaxrecordedadcs;
+setupawg --> scf_getnumrecordedadcs;
+setupawg --> scc_getdeviceids;
+setupawg --> textwavetolist;
+setupawg --> scv_setfreq;
+scv_setfreq --> getfadcspeed;
+scv_setfreq --> scf_getnumrecordedadcs;
+setupawg --> scv_setfreq2;
+scv_setfreq2 --> scv_setfreq;
+scv_setfreq2 --> getfadcspeed;
+setupawg --> fd_getawgwave;
+setupawg --> fd_checkaw;
+setupawg --> fd_setglobalawg;
+fd_start_sweep --> scw_setupawg;
+scw_setupawg --> setupawg;
+scw_setupawg --> scu_getchannelnumbers;
+scw_setupawg --> ask_user;
+scw_setupawg --> setfdacawgsquarewave;
+fd_start_sweep --> writeinstr;
+scfd_sendcommandandread --> scfd_recordbuffer;
+scfd_recordbuffer --> roundnum;
+scfd_recordbuffer --> scfd_getreadchunksize;
+scfd_recordbuffer --> scfd_readchunk;
+scfd_readchunk --> readinstr;
+scfd_readchunk --> fd_stopfdacsweep;
+fd_stopfdacsweep --> clearfdacbuffer;
+scfd_recordbuffer --> scfd_distributedata1;
+scfd_distributedata1 --> scfd_distributedata2;
+scfd_distributedata2 --> scu_assertseparatortype;
+scfd_distributedata2 --> fd_char2num;
+scfd_distributedata2 --> scu_getdevicechannels;
+scfd_recordbuffer --> scfd_checksweepstate;
+scfd_checksweepstate --> scs_checksweepstate;
+scfd_checksweepstate --> fd_stopfdacsweep;
+scfd_recordbuffer --> scfd_expectedbytesinbuffer;
+scfd_recordbuffer --> scfd_raw2calcquickdistribute;
+scfd_raw2calcquickdistribute --> sci_get1dwavenames;
+scfd_raw2calcquickdistribute --> scf_getrecordedfadcinfo;
+scfd_recordbuffer --> scg_updatefrequentgraphs;
+scfd_sendcommandandread --> fd_stopfdacsweep;
+scfd_sendcommandandread --> readinstr;
+scfd_sendcommandandread --> sc_striptermination;
+scfd_sendcommandandread --> scf_checkfdresponse;
+scfd_sendcommandandread --> scfd_updatewindow;
+scfd_updatewindow --> scu_assertseparatortype;
+scfd_updatewindow --> scf_getchannelnumsonfd;
+scf_getchannelnumsonfd --> scu_assertseparatortype;
+scf_getchannelnumsonfd --> scf_getnumfds;
+scf_getchannelnumsonfd --> scf_getfdinfofromdevicenum;
+scfd_updatewindow --> scf_getfdvisaaddress;
+scfd_updatewindow --> getresourceaddress;
+scfd_updatewindow --> getfdacoutput;
+scfd_updatewindow --> scfw_updatefdacvalstr;
+scfd_updatewindow --> getfadcchannel;
+scfd_sendcommandandread --> scu_getdevicechannels;
+scfd_sendcommandandread --> removeseperator;
+scfd_sendcommandandread --> rampmultiplefdac;
+scfd_recordvalues --> scfd_processanddistribute;
+scfd_processanddistribute --> sci_get1dwavenames;
+scfd_processanddistribute --> scf_getrecordedfadcinfo;
+scfd_processanddistribute --> scfd_notch_filters;
+scfd_processanddistribute --> scfd_sqw_analysis;
+scfd_processanddistribute --> scfd_demodulate;
+scfd_processanddistribute --> scfd_resamplewaves;
+scfd_processanddistribute --> scfd_spectrum_analyzer;
+initscancontroller --> getk2400current;
+getk2400current --> writeinstr;
+getk2400current --> queryinstr;
+initscancontroller --> readsrsx;
+readsrsx --> queryinstr;
 initscancontroller --> readsrsy;
 readsrsy --> queryinstr;
+initscancontroller --> openmultiplefdacs;
+openmultiplefdacs --> removewhitespace;
+removewhitespace --> removetrailingwhitespace;
+openmultiplefdacs --> openfastdacconnection;
+openfastdacconnection --> visaerrormsg;
+openfastdacconnection --> openvisainstr;
+openvisainstr --> closevisainstr;
+closevisainstr --> visaerrormsg;
+openvisainstr --> visaerrormsg;
+openvisainstr --> setvisaoptions;
+setvisaoptions --> visasetbaudrate;
+setvisaoptions --> visasetstopbits;
+setvisaoptions --> visasetdatabits;
+setvisaoptions --> visasetparity;
+setvisaoptions --> visasettimeout;
+setvisaoptions --> visaerrormsg;
+openvisainstr --> queryinstr;
+openfastdacconnection --> scf_addfdinfos;
+initscancontroller --> openls370connection;
+openls370connection --> openhttpinstr;
+openls370connection --> setls370system;
+setls370system --> bd_channellookup;
+openls370connection --> ls370creategobals;
+initscancontroller --> getfdstatus;
+getfdstatus --> getresourceaddress;
+getfdstatus --> addjsonkeyval;
+getfdstatus --> getfadcspeed;
+getfdstatus --> getfadcmeasurefreq;
+getfadcmeasurefreq --> scf_getnumrecordedadcs;
+getfadcmeasurefreq --> getfadcspeed;
+getfdstatus --> scf_getfdnumber;
+getfdstatus --> scf_getchannelstartnum;
+getfdstatus --> scf_getfdinfofromid;
+getfdstatus --> num2numstr;
+getfdstatus --> getfadcchannel;
+initscancontroller --> getls370status;
+getls370status --> readtxtfile;
+getls370status --> getjsonvalue;
+getjsonvalue --> getjsonkeyoffset;
+getjsonvalue --> getjsonindices;
+getls370status --> sc_sqltimestamp;
+sc_sqltimestamp --> sc_sqldatabasetime;
+sc_sqldatabasetime --> requestsqlvalue;
+requestsqlvalue --> sc_opensqlconnection;
+sc_opensqlconnection --> sc_readsqlconnectionparameters;
+sc_readsqlconnectionparameters --> readtxtfile;
+sc_readsqlconnectionparameters --> getjsonvalue;
+requestsqlvalue --> sc_fetchsqlsingle;
+sc_fetchsqlsingle --> sc_closesqlconnection;
+requestsqlvalue --> sc_closesqlconnection;
+sc_sqltimestamp --> timestamp2secs;
+getls370status --> requestsqlvalue;
+getls370status --> getls370temp;
+getls370temp --> bd_channellookup;
+getls370temp --> getls370channellabel;
+getls370channellabel --> bd_channellookup;
+getls370temp --> sendls370;
+sendls370 --> gethttp;
+sendls370 --> posthttp;
+posthttp --> getjsonvalue;
+sendls370 --> puthttp;
+puthttp --> getjsonvalue;
+sendls370 --> getjsonvalue;
+getls370status --> addjsonkeyval;
 initscancontroller --> scw_loadconfig;
 scw_loadconfig --> readtxtfile;
 scw_loadconfig --> getjsonvalue;
-getjsonvalue --> getjsonkeyoffset;
-getjsonvalue --> getjsonindices;
 scw_loadconfig --> loadstrarray2textwave;
 loadstrarray2textwave --> getstrarrayshape;
 loadstrarray2textwave --> escapequotes;
@@ -49,25 +380,193 @@ scw_loadconfig --> loadnum2var;
 scw_loadconfig --> scw_rebuildwindow;
 initscancontroller --> killvisa;
 initscancontroller --> scw_rebuildwindow;
+subgraph babydac.ipf
+bd_channellookup
+end
+subgraph fastdac.ipf
+openfastdacconnection
+openmultiplefdacs
+set_indep
+getfadcmeasurefreq
+getfadcspeed
+getfadcchannel
+getfadcvalue
+getfdacoutput
+getfdstatus
+rampmultiplefdac
+fd_rampoutputfdac
+clearfdacbuffer
+fd_stopfdacsweep
+fd_char2num
+setfdacawgsquarewave
+setupawg
+fd_checkaw
+fd_addawgwave
+fd_getawgwave
+fd_clearawgwave
+fd_start_sweep
+fd_readchunk
+fd_initglobalawg
+fd_setglobalawg
+fd_getglobalawg
+end
+subgraph keithley2400.ipf
+getk2400current
+end
+subgraph ls370_resistancebridge.ipf
+openls370connection
+setls370system
+getls370channellabel
+getls370temp
+ls370creategobals
+sendls370
+getls370status
+end
 subgraph ScanController.ipf
+scu_assertseparatortype
+scu_unixtime
+roundnum
+ask_user
+scu_getdaclabel
+scu_getchannelnumbers
+scu_getdevicechannels
+sc_sleep
+asleep
+scv_setlastscanvars
+scv_getlastscanvars
+initscanvars
+initscanvarsbd
+scv_setfreq
+scv_setfreq2
+scv_setsetpoints
+scv_sanitizesetpoints
+scv_formatsetpoints
+initializescan
+sci_initializewaves
+sci_init1dwave
+sci_init2dwave
+sci_get1dwavenames
+sci_get2dwavenames
+sci_sanitycheckwavenames
+scg_initializegraphs
+scg_initializegraphsforwavenames
+scg_arrangewindows
+scg_twosubplot
+scg_graphexistsforwavename
+scg_open1dgraph
+scg_open2dgraph
+scg_setupgraph1d
+scg_setupgraph2d
+scg_getopengraphtitles
+scg_getopengraphids
+scg_openabortwindow
+scg_updatefrequentgraphs
+sc_openinstrconnections
 sc_checkbackup
+scs_checksweepstate
+sc_managethreads
+sc_worker
+sc_funcasync
+sc_killthreads
+sc_checkasyncscript
+sc_findasyncmeasurements
+endscan
+sce_scanvarstojson
 initscancontroller
 scw_rebuildwindow
+setupfakesquarewave
+scw_setupawg
+scw_createconfig
+scw_saveconfig
 scw_loadconfig
+recordvalues
+rampstartfd
+scc_checkrampstartfd
+scc_getdeviceids
+scf_getdacinfo
+scf_getfdnumber
+scf_getnumfds
+scf_getfdvisaaddress
+scf_getfdinfofromdevicenum
+scf_getfdinfofromid
+scf_getrecordedfadcinfo
+scf_getnumrecordedadcs
+scf_getmaxrecordedadcs
+scf_getchannelnumsonfd
+scf_getchannelstartnum
+scfd_checkrawsave
+scf_checkfdresponse
+scf_addfdinfos
+scfd_postfilternumpts
+scfd_resamplewaves
+scfd_notch_filters
+scfd_sqw_analysis
+scfd_demodulate
+scfd_spectrum_analyzer
+scfd_recordvalues
+scfd_sendcommandandread
+scfd_processanddistribute
+scfd_recordbuffer
+scfd_expectedbytesinbuffer
+scfd_getreadchunksize
+scfd_raw2calcquickdistribute
+scfd_checksweepstate
+scfd_readchunk
+scfd_distributedata1
+scfd_updatewindow
+scfd_distributedata2
+scfw_resetfdacwindow
+scfw_updatefdacvalstr
 end
-subgraph ScanController_SQL.ipf
-sc_checksqldriver
-end
-subgraph srs830.ipf
-readsrsx
-readsrsy
+subgraph ScanController_INSTR.ipf
+killvisa
+getresourceaddress
+visaerrormsg
+openvisainstr
+closevisainstr
+openhttpinstr
+writeinstr
+readinstr
+queryinstr
+queryinstrprogress
+posthttp
+puthttp
+gethttp
+sc_striptermination
+sc_progressbardelay
+setvisaoptions
+visasetreadterm
+visasetreadtermenable
+visasettimeout
+visasetbaudrate
+visasetdatabits
+visasetstopbits
+visasetserialendin
+visasetparity
 end
 subgraph ScanController_IO.ipf
+openhdffile
+closehdffile
+savewavestohdf
+addmetafiles
+sc_createsweeplogs
+sc_instrumentlogs
+createwavescopyigor
+savescanwaves
+savesinglewavetohdf
+savetohdf
+savefastdacinfowaves
+saveexp
+savefrompxp
+sc_copysinglefile
+sc_copynewfiles
 gethostname
 executewincmd
 executemaccmd
 getexppath
+writetofile
 readtxtfile
+sc_confirm_json
 getjsonvalue
 getjsonindices
 getjsonkeyoffset
@@ -78,26 +577,45 @@ loadboolarray2wave
 loadbool2var
 loadnum2var
 bool2num
+num2numstr
+num2bool
+wave2boolarray
+textwave2strarray
+textwavetolist
+addjsonkeyval
+getindent
+prettyjsonfmt
+removeseperator
+removetrailingwhitespace
+removewhitespace
 escapequotes
 unescapequotes
 end
-subgraph ScanController_INSTR.ipf
-killvisa
-visaerrormsg
-writeinstr
-readinstr
-queryinstr
-visasetreadterm
-visasetreadtermenable
-visasetserialendin
+subgraph ScanController_SQL.ipf
+requestsqlvalue
+sc_opensqlconnection
+sc_fetchsqlsingle
+sc_closesqlconnection
+sc_readsqlconnectionparameters
+sc_checksqldriver
+timestamp2secs
+sc_sqldatabasetime
+sc_sqltimestamp
+end
+subgraph Scans.ipf
+readvstime
+end
+subgraph srs830.ipf
+readsrsx
+readsrsy
 end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

@@ -17,15 +17,18 @@ scg_initializegraphsforwavenames --> scg_graphexistsforwavename;
 scg_graphexistsforwavename --> scg_getopengraphtitles;
 scg_graphexistsforwavename --> scg_getopengraphids;
 scg_initializegraphsforwavenames --> scg_setupgraph1d;
-scg_initializegraphsforwavenames --> scg_setupgraph2d;
 scg_initializegraphsforwavenames --> scg_open1dgraph;
 scg_open1dgraph --> scg_setupgraph1d;
+scg_initializegraphsforwavenames --> scfd_spectrum_analyzer;
+scg_initializegraphsforwavenames --> scg_twosubplot;
+scg_initializegraphsforwavenames --> scg_setupgraph2d;
 scg_initializegraphsforwavenames --> scg_open2dgraph;
 scg_open2dgraph --> scg_setupgraph2d;
 subgraph ScanController.ipf
 sci_get1dwavenames
 scg_initializegraphs
 scg_initializegraphsforwavenames
+scg_twosubplot
 scg_graphexistsforwavename
 scg_open1dgraph
 scg_open2dgraph
@@ -34,14 +37,15 @@ scg_setupgraph2d
 scg_getopengraphtitles
 scg_getopengraphids
 scf_getrecordedfadcinfo
+scfd_spectrum_analyzer
 end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

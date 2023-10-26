@@ -33,7 +33,17 @@ scf_getfdinfofromid --> scf_getfdinfofromdevicenum;
 scf_getfdinfofromdevicenum --> scf_getnumfds;
 scv_setfreq --> scf_getnumrecordedadcs;
 scf_getnumrecordedadcs --> scf_getrecordedfadcinfo;
+scf_getnumrecordedadcs --> scu_getdevicechannels;
+scu_getdevicechannels --> scf_getfdinfofromid;
+scu_getdevicechannels --> scf_getchannelstartnum;
+scf_getchannelstartnum --> scf_getnumfds;
+scf_getchannelstartnum --> scf_getfdnumber;
+scf_getchannelstartnum --> scf_getfdinfofromid;
+subgraph fastdac.ipf
+getfadcspeed
+end
 subgraph ScanController.ipf
+scu_getdevicechannels
 scv_setfreq
 scf_getfdnumber
 scf_getnumfds
@@ -42,10 +52,8 @@ scf_getfdinfofromdevicenum
 scf_getfdinfofromid
 scf_getrecordedfadcinfo
 scf_getnumrecordedadcs
+scf_getchannelstartnum
 scf_checkfdresponse
-end
-subgraph fastdac.ipf
-getfadcspeed
 end
 subgraph ScanController_INSTR.ipf
 getresourceaddress
@@ -60,11 +68,11 @@ visasetserialendin
 end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

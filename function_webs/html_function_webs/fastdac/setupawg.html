@@ -16,9 +16,28 @@ fd_initglobalawg --> fd_setglobalawg;
 setupawg --> scu_getchannelnumbers;
 scu_getchannelnumbers --> scu_assertseparatortype;
 scu_getchannelnumbers --> removetrailingwhitespace;
-setupawg --> scf_getnumrecordedadcs;
+setupawg --> scf_getmaxrecordedadcs;
+scf_getmaxrecordedadcs --> scf_getnumrecordedadcs;
 scf_getnumrecordedadcs --> scf_getrecordedfadcinfo;
-setupawg --> getfadcspeed;
+scf_getnumrecordedadcs --> scu_getdevicechannels;
+scu_getdevicechannels --> scf_getfdinfofromid;
+scf_getfdinfofromid --> scf_getfdnumber;
+scf_getfdnumber --> scf_getnumfds;
+scf_getfdnumber --> getresourceaddress;
+scf_getfdnumber --> scf_getfdvisaaddress;
+scf_getfdvisaaddress --> scf_getnumfds;
+scf_getfdinfofromid --> scf_getfdinfofromdevicenum;
+scf_getfdinfofromdevicenum --> scf_getnumfds;
+scu_getdevicechannels --> scf_getchannelstartnum;
+scf_getchannelstartnum --> scf_getnumfds;
+scf_getchannelstartnum --> scf_getfdnumber;
+scf_getchannelstartnum --> scf_getfdinfofromid;
+setupawg --> scf_getnumrecordedadcs;
+setupawg --> scc_getdeviceids;
+scc_getdeviceids --> scf_getnumfds;
+setupawg --> textwavetolist;
+setupawg --> scv_setfreq;
+scv_setfreq --> getfadcspeed;
 getfadcspeed --> queryinstr;
 queryinstr --> writeinstr;
 writeinstr --> visaerrormsg;
@@ -31,29 +50,14 @@ readinstr --> visaerrormsg;
 getfadcspeed --> sc_striptermination;
 getfadcspeed --> scf_checkfdresponse;
 getfadcspeed --> scf_getfdnumber;
-scf_getfdnumber --> scf_getnumfds;
-scf_getfdnumber --> getresourceaddress;
-scf_getfdnumber --> scf_getfdvisaaddress;
-scf_getfdvisaaddress --> scf_getnumfds;
 getfadcspeed --> scf_getfdinfofromid;
-scf_getfdinfofromid --> scf_getfdnumber;
-scf_getfdinfofromid --> scf_getfdinfofromdevicenum;
-scf_getfdinfofromdevicenum --> scf_getnumfds;
+scv_setfreq --> scf_getnumrecordedadcs;
+setupawg --> scv_setfreq2;
+scv_setfreq2 --> scv_setfreq;
+scv_setfreq2 --> getfadcspeed;
 setupawg --> fd_getawgwave;
 setupawg --> fd_checkaw;
 setupawg --> fd_setglobalawg;
-subgraph ScanController.ipf
-scu_assertseparatortype
-scu_getchannelnumbers
-scf_getfdnumber
-scf_getnumfds
-scf_getfdvisaaddress
-scf_getfdinfofromdevicenum
-scf_getfdinfofromid
-scf_getrecordedfadcinfo
-scf_getnumrecordedadcs
-scf_checkfdresponse
-end
 subgraph fastdac.ipf
 getfadcspeed
 setupawg
@@ -63,8 +67,23 @@ fd_initglobalawg
 fd_setglobalawg
 fd_getglobalawg
 end
-subgraph ScanController_IO.ipf
-removetrailingwhitespace
+subgraph ScanController.ipf
+scu_assertseparatortype
+scu_getchannelnumbers
+scu_getdevicechannels
+scv_setfreq
+scv_setfreq2
+scc_getdeviceids
+scf_getfdnumber
+scf_getnumfds
+scf_getfdvisaaddress
+scf_getfdinfofromdevicenum
+scf_getfdinfofromid
+scf_getrecordedfadcinfo
+scf_getnumrecordedadcs
+scf_getmaxrecordedadcs
+scf_getchannelstartnum
+scf_checkfdresponse
 end
 subgraph ScanController_INSTR.ipf
 getresourceaddress
@@ -77,13 +96,17 @@ visasetreadterm
 visasetreadtermenable
 visasetserialendin
 end
+subgraph ScanController_IO.ipf
+textwavetolist
+removetrailingwhitespace
+end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

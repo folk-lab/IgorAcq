@@ -11,29 +11,9 @@
     <pre class="mermaid">
     graph TB;
 scfw_update_fdac --> scfw_update_all_fdac;
-scfw_update_all_fdac --> openfastdacconnection;
-openfastdacconnection --> visaerrormsg;
-openfastdacconnection --> openvisainstr;
-openvisainstr --> closevisainstr;
-closevisainstr --> visaerrormsg;
-openvisainstr --> visaerrormsg;
-openvisainstr --> setvisaoptions;
-setvisaoptions --> visasetbaudrate;
-setvisaoptions --> visasetstopbits;
-setvisaoptions --> visasetdatabits;
-setvisaoptions --> visasetparity;
-setvisaoptions --> visasettimeout;
-setvisaoptions --> visaerrormsg;
-openvisainstr --> queryinstr;
-queryinstr --> writeinstr;
-writeinstr --> visaerrormsg;
-queryinstr --> readinstr;
-readinstr --> visasetreadterm;
-readinstr --> visasetreadtermenable;
-visasetreadtermenable --> visasetreadterm;
-readinstr --> visasetserialendin;
-readinstr --> visaerrormsg;
-openfastdacconnection --> scf_addfdinfos;
+scfw_update_all_fdac --> sc_openinstrconnections;
+scfw_update_all_fdac --> scf_getfdinfofromdevicenum;
+scf_getfdinfofromdevicenum --> scf_getnumfds;
 scfw_update_all_fdac --> rampmultiplefdac;
 rampmultiplefdac --> scu_assertseparatortype;
 rampmultiplefdac --> scu_getchannelnumbers;
@@ -55,8 +35,15 @@ scf_getfdvisaaddress --> scf_getnumfds;
 scf_getchannelstartnum --> scf_getfdinfofromid;
 scf_getfdinfofromid --> scf_getfdnumber;
 scf_getfdinfofromid --> scf_getfdinfofromdevicenum;
-scf_getfdinfofromdevicenum --> scf_getnumfds;
 getfdacoutput --> queryinstr;
+queryinstr --> writeinstr;
+writeinstr --> visaerrormsg;
+queryinstr --> readinstr;
+readinstr --> visasetreadterm;
+readinstr --> visasetreadtermenable;
+visasetreadtermenable --> visasetreadterm;
+readinstr --> visasetserialendin;
+readinstr --> visaerrormsg;
 getfdacoutput --> sc_striptermination;
 getfdacoutput --> scf_checkfdresponse;
 fd_rampoutputfdac --> queryinstr;
@@ -69,8 +56,12 @@ fd_rampoutputfdac --> scf_checkfdresponse;
 fd_rampoutputfdac --> scfw_updatefdacvalstr;
 scfw_update_all_fdac --> getfdacoutput;
 scfw_update_all_fdac --> scfw_updatefdacvalstr;
-scfw_update_all_fdac --> sc_openinstrconnections;
 scfw_update_fdac --> sc_openinstrconnections;
+subgraph fastdac.ipf
+getfdacoutput
+rampmultiplefdac
+fd_rampoutputfdac
+end
 subgraph ScanController.ipf
 scu_assertseparatortype
 scu_getchannelnumbers
@@ -83,49 +74,34 @@ scf_getfdinfofromdevicenum
 scf_getfdinfofromid
 scf_getchannelstartnum
 scf_checkfdresponse
-scf_addfdinfos
 scfw_resetfdacwindow
 scfw_updatefdacvalstr
 scfw_update_all_fdac
 scfw_update_fdac
 end
-subgraph fastdac.ipf
-openfastdacconnection
-getfdacoutput
-rampmultiplefdac
-fd_rampoutputfdac
-end
-subgraph ScanController_IO.ipf
-removetrailingwhitespace
-end
 subgraph ScanController_INSTR.ipf
 getresourceaddress
 visaerrormsg
-openvisainstr
-closevisainstr
 writeinstr
 readinstr
 queryinstr
 queryinstrprogress
 sc_striptermination
 sc_progressbardelay
-setvisaoptions
 visasetreadterm
 visasetreadtermenable
-visasettimeout
-visasetbaudrate
-visasetdatabits
-visasetstopbits
 visasetserialendin
-visasetparity
+end
+subgraph ScanController_IO.ipf
+removetrailingwhitespace
 end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

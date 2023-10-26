@@ -39,6 +39,28 @@ puthttp --> getjsonvalue;
 sendls370 --> getjsonvalue;
 getls370status --> addjsonkeyval;
 addjsonkeyval --> escapequotes;
+subgraph babydac.ipf
+bd_channellookup
+end
+subgraph ls370_resistancebridge.ipf
+getls370channellabel
+getls370temp
+sendls370
+getls370status
+end
+subgraph ScanController_INSTR.ipf
+posthttp
+puthttp
+gethttp
+end
+subgraph ScanController_IO.ipf
+readtxtfile
+getjsonvalue
+getjsonindices
+getjsonkeyoffset
+addjsonkeyval
+escapequotes
+end
 subgraph ScanController_SQL.ipf
 requestsqlvalue
 sc_opensqlconnection
@@ -49,35 +71,13 @@ timestamp2secs
 sc_sqldatabasetime
 sc_sqltimestamp
 end
-subgraph ls370_resistancebridge.ipf
-getls370channellabel
-getls370temp
-sendls370
-getls370status
-end
-subgraph babydac.ipf
-bd_channellookup
-end
-subgraph ScanController_IO.ipf
-readtxtfile
-getjsonvalue
-getjsonindices
-getjsonkeyoffset
-addjsonkeyval
-escapequotes
-end
-subgraph ScanController_INSTR.ipf
-posthttp
-puthttp
-gethttp
-end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

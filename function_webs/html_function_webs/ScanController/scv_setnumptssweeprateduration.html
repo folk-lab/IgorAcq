@@ -12,20 +12,20 @@
     graph TB;
 scv_setnumptssweeprateduration --> fd_get_sweeprate_from_numpts;
 scv_setnumptssweeprateduration --> fd_get_numpts_from_sweeprate;
-subgraph ScanController.ipf
-scv_setnumptssweeprateduration
-end
 subgraph fastdac.ipf
 fd_get_numpts_from_sweeprate
 fd_get_sweeprate_from_numpts
 end
+subgraph ScanController.ipf
+scv_setnumptssweeprateduration
+end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

@@ -63,7 +63,6 @@ fd_updatefadccalibration --> scf_checkfdresponse;
 setfadcspeed --> calibratefadc;
 calibratefadc --> initfastdac;
 calibratefadc --> getresourceaddress;
-calibratefadc --> roundnum;
 calibratefadc --> getfadcspeed;
 getfadcspeed --> queryinstr;
 getfadcspeed --> sc_striptermination;
@@ -75,20 +74,20 @@ scf_getfdnumber --> scf_getfdvisaaddress;
 getfadcspeed --> scf_getfdinfofromid;
 scf_getfdinfofromid --> scf_getfdnumber;
 scf_getfdinfofromid --> scf_getfdinfofromdevicenum;
+calibratefadc --> roundnum;
 calibratefadc --> ask_user;
 calibratefadc --> queryinstr;
 calibratefadc --> sc_striptermination;
 calibratefadc --> readinstr;
 calibratefadc --> scf_checkfdresponse;
-calibratefadc --> scf_getchannelstartnum;
-scf_getchannelstartnum --> scf_getnumfds;
-scf_getchannelstartnum --> scf_getfdnumber;
-scf_getchannelstartnum --> scf_getfdinfofromid;
 calibratefadc --> fd_rampoutputfdac;
 fd_rampoutputfdac --> getresourceaddress;
 fd_rampoutputfdac --> scfw_resetfdacwindow;
 fd_rampoutputfdac --> getfdacoutput;
 getfdacoutput --> scf_getchannelstartnum;
+scf_getchannelstartnum --> scf_getnumfds;
+scf_getchannelstartnum --> scf_getfdnumber;
+scf_getchannelstartnum --> scf_getfdinfofromid;
 getfdacoutput --> queryinstr;
 getfdacoutput --> sc_striptermination;
 getfdacoutput --> scf_checkfdresponse;
@@ -100,6 +99,7 @@ queryinstrprogress --> readinstr;
 fd_rampoutputfdac --> sc_striptermination;
 fd_rampoutputfdac --> scf_checkfdresponse;
 fd_rampoutputfdac --> scfw_updatefdacvalstr;
+calibratefadc --> scf_getchannelstartnum;
 calibratefadc --> fd_savefadccalibration;
 fd_savefadccalibration --> addjsonkeyval;
 addjsonkeyval --> escapequotes;
@@ -121,8 +121,8 @@ calibratefdac --> fd_resetfdaccalibration;
 fd_resetfdaccalibration --> queryinstr;
 fd_resetfdaccalibration --> sc_striptermination;
 fd_resetfdaccalibration --> scf_checkfdresponse;
-calibratefdac --> scf_getchannelstartnum;
 calibratefdac --> fd_rampoutputfdac;
+calibratefdac --> scf_getchannelstartnum;
 calibratefdac --> prompt_user;
 calibratefdac --> fd_setfdaccalibrationoffset;
 fd_setfdaccalibrationoffset --> queryinstr;
@@ -139,6 +139,27 @@ fd_savefdaccalibration --> addjsonkeyval;
 fd_savefdaccalibration --> scu_unixtime;
 fd_savefdaccalibration --> writetofile;
 fd_savefdaccalibration --> prettyjsonfmt;
+subgraph fastdac.ipf
+openfastdacconnection
+getfadcspeed
+getfdacoutput
+setfadcspeed
+fd_rampoutputfdac
+fd_loadfadccalibration
+calibratefdac
+calibratefadc
+fd_savefadccalibration
+fd_savefdaccalibration
+fd_resetfdaccalibration
+fd_setfdaccalibrationoffset
+fd_setfdaccalibrationgain
+fd_updatefadccalibration
+fd_setawguninitialized
+fd_initglobalawg
+fd_setglobalawg
+setawg
+fd_getglobalawg
+end
 subgraph ScanController.ipf
 scu_unixtime
 roundnum
@@ -161,38 +182,6 @@ scfw_fdacaskuser
 scfw_createcontrolwaves
 scfw_setguiinteraction
 end
-subgraph fastdac.ipf
-openfastdacconnection
-getfadcspeed
-getfdacoutput
-setfadcspeed
-fd_rampoutputfdac
-fd_loadfadccalibration
-calibratefdac
-calibratefadc
-fd_savefadccalibration
-fd_savefdaccalibration
-fd_resetfdaccalibration
-fd_setfdaccalibrationoffset
-fd_setfdaccalibrationgain
-fd_updatefadccalibration
-fd_setawguninitialized
-fd_initglobalawg
-fd_setglobalawg
-setawg
-fd_getglobalawg
-end
-subgraph ScanController_IO.ipf
-writetofile
-readtxtfile
-getjsonvalue
-getjsonindices
-getjsonkeyoffset
-addjsonkeyval
-getindent
-prettyjsonfmt
-escapequotes
-end
 subgraph ScanController_INSTR.ipf
 getresourceaddress
 visaerrormsg
@@ -214,13 +203,24 @@ visasetstopbits
 visasetserialendin
 visasetparity
 end
+subgraph ScanController_IO.ipf
+writetofile
+readtxtfile
+getjsonvalue
+getjsonindices
+getjsonkeyoffset
+addjsonkeyval
+getindent
+prettyjsonfmt
+escapequotes
+end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

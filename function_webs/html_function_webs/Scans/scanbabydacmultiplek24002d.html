@@ -91,6 +91,12 @@ bd_rampoutputbd --> bd_setoutputbd;
 bd_rampoutputbd --> sc_sleep;
 sc_sleep --> scs_checksweepstate;
 scs_checksweepstate --> endscan;
+endscan --> scfd_checkrawsave;
+scfd_checkrawsave --> scf_getrecordedfadcinfo;
+endscan --> set_indep;
+set_indep --> clearfdacbuffer;
+clearfdacbuffer --> writeinstr;
+set_indep --> queryinstr;
 endscan --> scv_setlastscanvars;
 endscan --> scv_getlastscanvars;
 endscan --> savetohdf;
@@ -108,6 +114,7 @@ scw_createconfig --> num2bool;
 addmetafiles --> sc_createsweeplogs;
 sc_createsweeplogs --> addjsonkeyval;
 sc_createsweeplogs --> num2numstr;
+sc_createsweeplogs --> scf_getrecordedfadcinfo;
 sc_createsweeplogs --> sc_instrumentlogs;
 sc_instrumentlogs --> sc_openinstrconnections;
 sc_instrumentlogs --> sc_createsweeplogs;
@@ -133,7 +140,6 @@ savetohdf --> sci_get1dwavenames;
 sci_get1dwavenames --> scf_getrecordedfadcinfo;
 savetohdf --> sci_get2dwavenames;
 sci_get2dwavenames --> sci_get1dwavenames;
-savetohdf --> getrawsavenames;
 savetohdf --> scu_assertseparatortype;
 savetohdf --> createwavescopyigor;
 savetohdf --> savewavestohdf;
@@ -152,9 +158,8 @@ endscan --> sce_scanvarstojson;
 rampmultiplebd --> bd_calccustomvalues;
 scanbabydac --> sc_sleep;
 scanbabydac --> initializescan;
-initializescan --> killvisa;
-initializescan --> sc_openinstrconnections;
 initializescan --> sci_initializewaves;
+sci_initializewaves --> fd_getglobalawg;
 sci_initializewaves --> sci_get1dwavenames;
 sci_initializewaves --> sci_sanitycheckwavenames;
 sci_initializewaves --> scfd_postfilternumpts;
@@ -169,9 +174,11 @@ scg_initializegraphsforwavenames --> scg_graphexistsforwavename;
 scg_graphexistsforwavename --> scg_getopengraphtitles;
 scg_graphexistsforwavename --> scg_getopengraphids;
 scg_initializegraphsforwavenames --> scg_setupgraph1d;
-scg_initializegraphsforwavenames --> scg_setupgraph2d;
 scg_initializegraphsforwavenames --> scg_open1dgraph;
 scg_open1dgraph --> scg_setupgraph1d;
+scg_initializegraphsforwavenames --> scfd_spectrum_analyzer;
+scg_initializegraphsforwavenames --> scg_twosubplot;
+scg_initializegraphsforwavenames --> scg_setupgraph2d;
 scg_initializegraphsforwavenames --> scg_open2dgraph;
 scg_open2dgraph --> scg_setupgraph2d;
 initializescan --> scg_arrangewindows;
@@ -194,6 +201,7 @@ sc_worker --> sc_funcasync;
 recordvalues --> sc_killthreads;
 recordvalues --> scv_setlastscanvars;
 recordvalues --> scs_checksweepstate;
+recordvalues --> scg_updatefrequentgraphs;
 scanbabydac --> endscan;
 scanbabydacmultiplek24002d --> sc_openinstrconnections;
 scanbabydacmultiplek24002d --> initscanvars;
@@ -213,6 +221,38 @@ scanbabydacmultiplek24002d --> sc_sleep;
 scanbabydacmultiplek24002d --> initializescan;
 scanbabydacmultiplek24002d --> recordvalues;
 scanbabydacmultiplek24002d --> endscan;
+subgraph babydac.ipf
+bd_calccustomvalues
+bd_getboard
+bd_getboardchannel
+bd_writebytesbd
+bd_readsinglebytebd
+bd_readbytesbd
+bd_getsetpointbd
+bd_setoutputbd
+bd_rampoutputbd
+bd_updatemultiplebd
+rampmultiplebd
+bd_channellookup
+bd_updatecustom
+end
+subgraph fastdac.ipf
+set_indep
+getfdacoutput
+rampmultiplefdac
+fd_rampoutputfdac
+clearfdacbuffer
+fd_getawgwave
+fd_initglobalawg
+fd_setglobalawg
+fd_getglobalawg
+end
+subgraph keithley2400.ipf
+setk2400voltage
+getk2400voltage
+rampmultiplek2400s
+rampk2400voltage
+end
 subgraph ScanController.ipf
 scu_assertseparatortype
 scu_unixtime
@@ -238,6 +278,7 @@ sci_sanitycheckwavenames
 scg_initializegraphs
 scg_initializegraphsforwavenames
 scg_arrangewindows
+scg_twosubplot
 scg_graphexistsforwavename
 scg_open1dgraph
 scg_open2dgraph
@@ -246,6 +287,7 @@ scg_setupgraph2d
 scg_getopengraphtitles
 scg_getopengraphids
 scg_openabortwindow
+scg_updatefrequentgraphs
 sc_openinstrconnections
 sc_checkbackup
 scs_checksweepstate
@@ -273,45 +315,25 @@ scf_getfdinfofromdevicenum
 scf_getfdinfofromid
 scf_getrecordedfadcinfo
 scf_getchannelstartnum
+scfd_checkrawsave
 scf_checkfdresponse
 scfd_postfilternumpts
+scfd_spectrum_analyzer
 scfw_resetfdacwindow
 scfw_updatefdacvalstr
 end
-subgraph keithley2400.ipf
-setk2400voltage
-getk2400voltage
-rampmultiplek2400s
-rampk2400voltage
-end
-subgraph babydac.ipf
-bd_calccustomvalues
-bd_getboard
-bd_getboardchannel
-bd_writebytesbd
-bd_readsinglebytebd
-bd_readbytesbd
-bd_getsetpointbd
-bd_setoutputbd
-bd_rampoutputbd
-bd_updatemultiplebd
-rampmultiplebd
-bd_channellookup
-bd_updatecustom
-end
-subgraph fastdac.ipf
-getfdacoutput
-rampmultiplefdac
-fd_rampoutputfdac
-fd_getawgwave
-fd_initglobalawg
-fd_setglobalawg
-fd_getglobalawg
-end
-subgraph Scans.ipf
-readvstime
-scanbabydac
-scanbabydacmultiplek24002d
+subgraph ScanController_INSTR.ipf
+getresourceaddress
+visaerrormsg
+writeinstr
+readinstr
+queryinstr
+queryinstrprogress
+sc_striptermination
+sc_progressbardelay
+visasetreadterm
+visasetreadtermenable
+visasetserialendin
 end
 subgraph ScanController_IO.ipf
 openhdffile
@@ -320,7 +342,6 @@ savewavestohdf
 addmetafiles
 sc_createsweeplogs
 sc_instrumentlogs
-getrawsavenames
 createwavescopyigor
 savescanwaves
 savesinglewavetohdf
@@ -344,27 +365,18 @@ prettyjsonfmt
 removetrailingwhitespace
 escapequotes
 end
-subgraph ScanController_INSTR.ipf
-killvisa
-getresourceaddress
-visaerrormsg
-writeinstr
-readinstr
-queryinstr
-queryinstrprogress
-sc_striptermination
-sc_progressbardelay
-visasetreadterm
-visasetreadtermenable
-visasetserialendin
+subgraph Scans.ipf
+readvstime
+scanbabydac
+scanbabydacmultiplek24002d
 end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

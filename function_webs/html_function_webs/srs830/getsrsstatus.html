@@ -13,6 +13,7 @@
 getsrsstatus --> getaddressgpib;
 getsrsstatus --> addjsonkeyval;
 addjsonkeyval --> escapequotes;
+getsrsstatus --> num2numstr;
 getsrsstatus --> getsrsamplitude;
 getsrsamplitude --> queryinstr;
 queryinstr --> writeinstr;
@@ -23,7 +24,6 @@ readinstr --> visasetreadtermenable;
 visasetreadtermenable --> visasetreadterm;
 readinstr --> visasetserialendin;
 readinstr --> visaerrormsg;
-getsrsstatus --> num2numstr;
 getsrsstatus --> getsrstimeconst;
 getsrstimeconst --> queryinstr;
 getsrsstatus --> getsrsfrequency;
@@ -36,21 +36,6 @@ getsrsstatus --> getsrsharmonic;
 getsrsharmonic --> queryinstr;
 getsrsstatus --> getsrsreadout;
 getsrsreadout --> queryinstr;
-subgraph srs830.ipf
-getsrsharmonic
-getsrstimeconst
-getsrsphase
-getsrsamplitude
-getsrsfrequency
-getsrsreadout
-getsrssensitivity
-getsrsstatus
-end
-subgraph ScanController_IO.ipf
-num2numstr
-addjsonkeyval
-escapequotes
-end
 subgraph ScanController_INSTR.ipf
 visaerrormsg
 writeinstr
@@ -61,13 +46,28 @@ visasetreadterm
 visasetreadtermenable
 visasetserialendin
 end
+subgraph ScanController_IO.ipf
+num2numstr
+addjsonkeyval
+escapequotes
+end
+subgraph srs830.ipf
+getsrsharmonic
+getsrstimeconst
+getsrsphase
+getsrsamplitude
+getsrsfrequency
+getsrsreadout
+getsrssensitivity
+getsrsstatus
+end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },

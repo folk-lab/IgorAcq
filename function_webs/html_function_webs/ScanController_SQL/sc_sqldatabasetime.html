@@ -20,6 +20,12 @@ getjsonvalue --> getjsonindices;
 requestsqlvalue --> sc_fetchsqlsingle;
 sc_fetchsqlsingle --> sc_closesqlconnection;
 requestsqlvalue --> sc_closesqlconnection;
+subgraph ScanController_IO.ipf
+readtxtfile
+getjsonvalue
+getjsonindices
+getjsonkeyoffset
+end
 subgraph ScanController_SQL.ipf
 requestsqlvalue
 sc_opensqlconnection
@@ -28,19 +34,13 @@ sc_closesqlconnection
 sc_readsqlconnectionparameters
 sc_sqldatabasetime
 end
-subgraph ScanController_IO.ipf
-readtxtfile
-getjsonvalue
-getjsonindices
-getjsonkeyoffset
-end
     </pre>
     <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
     mermaid.initialize({
         startOnLoad: true,
         flowchart: {
-                useMaxWidth: true, // Disable maximum width for better zooming
+                useMaxWidth: false, // Disable maximum width for better zooming
                 htmlLabels: true, // Enable HTML-based labels for better styling
                 defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
             },
