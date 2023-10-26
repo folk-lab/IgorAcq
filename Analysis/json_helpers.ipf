@@ -384,15 +384,18 @@ end
 
 function fd_getfield(datnum)
 	// Function to get old h5 values for Lakeshore temperatures
+	// 2023-10-01: Function completely fails in the try-catch-endtry. I am not sure if I am using it wrong. 
+	// Sometimes getJSONXid(sl_id, "LS625 Magnet Supply") will return error and the function will error out. 
 	variable datnum
 	
 	variable sl_id, fd_id  //JSON ids
 	variable field
 
+	sl_id = get_sweeplogs(datnum)  // Get Sweep_logs JSON;
 	try
-		sl_id = get_sweeplogs(datnum)  // Get Sweep_logs JSON;
-		fd_id = getJSONXid(sl_id, "LS625 Magnet Supply") // Get FastDAC JSON from Sweeplogs
-	
+//		fd_id = getJSONXid(sl_id, "LS625 Magnet Supply") // Get FastDAC JSON from Sweeplogs LS625
+		fd_id = getJSONXid(sl_id, "IPS") // Get FastDAC JSON from Sweeplogs IPS20
+		
 		JSONXOP_GetValue/V fd_id, "field mT"
 		field = V_value
 	
@@ -465,10 +468,11 @@ end
 
 
 
-function make_scanvar_table_from_dats(dat_min_max)
+function make_scanvar_table_from_dats(dat_min_max, [ignore_field])
 	// create a table from the input string dat_min_max
 	// so far it is hard coded to add only the datnum, field and temperature
 	string dat_min_max
+	int ignore_field
 	
 	variable dat_start = str2num(StringFromList(0, dat_min_max, ","))
 	variable dat_end = str2num(StringFromList(1, dat_min_max, ","))  
@@ -489,12 +493,17 @@ function make_scanvar_table_from_dats(dat_min_max)
 			scanvar_variable = fd_gettemperature(datnum, which_plate = "MC K")
 			scanvar_table_slice[1] = scanvar_variable * 1000
 			
-			scanvar_variable = fd_getfield(datnum)
+			if (ignore_field == 1) // terrible workaround if fd_getfield() fails to find field. I manually ignore it. :(
+				scanvar_variable = 0
+			else
+				scanvar_variable = fd_getfield(datnum)
+			endif
 			scanvar_table_slice[2] = scanvar_variable
 			
-			wave dac_vals = fd_getfd_keys_vals(datnum, number_of_fastdac = 3)
-			scanvar_table_slice[3, 3+8*3] = dac_vals[p - 3]
-			
+			///// ADDING DAC VALUES /////
+//			wave dac_vals = fd_getfd_keys_vals(datnum, number_of_fastdac = 3)
+//			scanvar_table_slice[3, 3+8*3] = dac_vals[p - 3]
+//			
 			scanvar_table[scanvar_row][] = scanvar_table_slice[q]
 
 			scanvar_row += 1
