@@ -138,7 +138,7 @@ function SetupEntropySquareWaves([freq, cycles,hqpc_zero, hqpc_plus, hqpc_minus,
 	channel_ratio = paramisdefault(channel_ratio) ? -1.478 : channel_ratio  //Using OHC, OHV
 	ramplen = paramisdefault(ramplen) ? 0 : ramplen
 	hqpc_zero = paramisdefault(hqpc_zero) ? 0 : hqpc_zero
-	nvar fd
+	nvar fd1
 
 	variable splus = hqpc_plus*hqpc_bias_multiplier, sminus=hqpc_minus*hqpc_bias_multiplier
 	variable cplus=splus*channel_ratio * balance_multiplier, cminus=sminus*channel_ratio * balance_multiplier
@@ -146,12 +146,12 @@ function SetupEntropySquareWaves([freq, cycles,hqpc_zero, hqpc_plus, hqpc_minus,
 	variable spt
 	// Make square wave 0
 	spt = 1/(4*freq)  // Convert from freq to setpoint time /s  (4 because 4 setpoints per wave)
-	makeSquareWaveAWG(fd, hqpc_zero, splus, sminus, spt, spt, spt, 0, ramplen=ramplen)
+	makeSquareWaveAWG(fd1, hqpc_zero, splus, sminus, spt, spt, spt, 0, ramplen=ramplen)
 	// Make square wave 1
-	makeSquareWaveAWG(fd, hqpc_zero, cplus, cminus, spt, spt, spt, 1, ramplen=ramplen)
+	makeSquareWaveAWG(fd1, hqpc_zero, cplus, cminus, spt, spt, spt, 1, ramplen=ramplen)
 
 	// Setup AWG
-	setupAWG(channels_AW0= "OHC(10M)", channels_AW1 = "OHV*9950", numCycles=cycles, verbose=1)
+	setupAWG(channels_AW0= "OHC(10M)", channels_AW1 = "OHV*9960", numCycles=cycles, verbose=1)
 end
 
 
@@ -578,8 +578,10 @@ function/s wave2str(w)
 end
 
 
-function make_virtual_entropy_corners(x_start, y_start, x_len, y_len, fast_sweep_y_over_x, slow_sweep_y_over_x, [datnum])
-	variable x_start, y_start, x_len, y_len, fast_sweep_y_over_x, slow_sweep_y_over_x, datnum
+function make_virtual_entropy_corners(x_start, y_start, x_len, y_len, fast_sweep_y_over_x, slow_sweep_y_over_x, [datnum, virtual_csq])
+	variable x_start, y_start, x_len, y_len, fast_sweep_y_over_x, slow_sweep_y_over_x, datnum, virtual_csq
+	// printed out 
+	// bottom left, bottom right, top left, top right
 	
 	string xs, ys
 	variable c
@@ -600,7 +602,11 @@ function make_virtual_entropy_corners(x_start, y_start, x_len, y_len, fast_sweep
 	
 	///// calculate xs /////
 	c = y0 - slow_sweep_y_over_x*x0
-	x2 = (y2 - c) / slow_sweep_y_over_x
+	if (slow_sweep_y_over_x != 0)
+		x2 = (y2 - c) / slow_sweep_y_over_x
+	else
+		x2 = x0
+	endif
 	x3 = x2 + x_len
 	xs = num2str(x0) + "," + num2str(x1) + ","	 + num2str(x2) + "," + num2str(x3) + ";"
 	print xs
@@ -611,6 +617,8 @@ function make_virtual_entropy_corners(x_start, y_start, x_len, y_len, fast_sweep
 	y3 = fast_sweep_y_over_x*x3 + c
 	ys = num2str(y0) + "," + num2str(y1) + ","	 + num2str(y2) + "," + num2str(y3) + ";"
 	print ys
+	
+	print  num2str(x0*virtual_csq) + "," + num2str(x1*virtual_csq) + ","	 + num2str(x2*virtual_csq) + "," + num2str(x3*virtual_csq) + ";"
 	
 	
 	if (ParamIsDefault(datnum) == 0)
