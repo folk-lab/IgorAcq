@@ -117,7 +117,6 @@ end
 function getFADCchannel(fdid, channel, [len_avg])
 	// Instead of just grabbing one single datapoint which is susceptible to high f noise, this averages data over len_avg and returns a single value
 	variable fdid, channel, len_avg
-	
 	len_avg = paramisdefault(len_avg) ? 0.05 : len_avg
 	
 	variable numpts = ceil(getFADCspeed(fdid)*len_avg)
@@ -228,16 +227,16 @@ function/s getFDstatus(instrID)
 		sprintf key, "DAC%d{%s}", CHstart+i, fdacvalstr[CHstart+i][3]
 		buffer = addJSONkeyval(buffer, key, num2numstr(getfdacOutput(instrID,CHstart+i))) // getfdacOutput is PER instrument
 	endfor
-
+	 
 	// ADC values
 	CHstart = scf_getChannelStartNum(instrID, adc=1)
 	for(i=0;i<scf_getFDInfoFromID(instrID, "numADC");i+=1)
 		buffer = addJSONkeyval(buffer, "ADC"+num2istr(CHstart+i), num2numstr(getfadcChannel(instrID,CHstart+i)))
 	endfor
 	
+	
 	// AWG info
 	buffer = addJSONkeyval(buffer, "AWG", getFDAWGstatus())  //NOTE: AW saved in getFDAWGstatus()
-	
 	return addJSONkeyval("", "FastDAC "+num2istr(device), buffer)
 end
 
@@ -1845,8 +1844,8 @@ function fd_readChunk(fdid, adc_channels, numpts)
 	S.samplingFreq = getFADCspeed(S.instrIDx)
 	S.raw_wave_names = wavenames  	// Override the waves the rawdata gets saved to
 	S.never_save = 1
-
-	scfd_RecordValues(S, 0, skip_data_distribution=1)
+	
+	scfd_RecordValues(S, 0, skip_data_distribution=1, skip_raw2calc=1)
 end
 
 
