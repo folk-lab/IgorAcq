@@ -418,20 +418,20 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 end
 
 
-function ScanFastDacSlow(start, fin, channels, numpts, delay, ramprate, [starts, fins, y_label, repeats, alternate, delayy, until_checkwave, until_stop_val, until_operator, comments, nosave]) //Units: mV
+function ScanFastDacSlow(start, fin, channels, numpts, delay, ramprate, [starts, fins, y_label, repeats, alternate, delayy, until_checkwave, until_stop_val, until_operator, comments, nosave, pid]) //Units: mV
 	// sweep one or more FastDAC channels but in the ScanController way (not ScanControllerFastdac). I.e. ramp, measure, ramp, measure...
 	// channels should be a comma-separated string ex: "0, 4, 5"
 	
 	
 	// not tested but should likely work - master/slave updated. - can be tested
 	
-	variable start, fin, numpts, delay, ramprate, nosave, until_stop_val, repeats, alternate, delayy
+	variable start, fin, numpts, delay, ramprate, nosave, until_stop_val, repeats, alternate, delayy, pid
 	string channels, y_label, comments, until_operator, until_checkwave
 	string starts, fins // For different start/finish points for each channel (must match length of channels if used)
-
+	if (paramIsDefault(pid))
 	// Reconnect instruments
 	sc_openinstrconnections(0)
-	
+	endif 
 	//check if rawdata needs to be saved
 	
 	// Set defaults
@@ -520,6 +520,11 @@ function ScanFastDacSlow(start, fin, channels, numpts, delay, ramprate, [starts,
 		endif
 		
 	endfor
+	nvar fd2
+	if (pid)
+		stoppid(fd2)
+		clearfdacBuffer(fd2)
+	endif
 	
 	// Save by default
 	if (nosave == 0)
@@ -1516,6 +1521,158 @@ function ScanFastDacSlowLS625Magnet2D(instrIDx, startx, finx, channelsx, numptsx
 		dowindow /k SweepControl
 	endif
 end
+
+
+function ScanFastDACIPS120Magnet2D(fdID, startx, finx, channelsx, magnetID, starty, finy, numptsy, [numpts, sweeprate, rampratex, delayy, startxs, finxs, y_label, comments, nosave, use_AWG])
+
+	// not tested but should likely work - master/slave updated.
+	
+	// 2D Scan with Fastdac on x-axis and magnet on y-axis
+	// Note: Must provide numptsx OR sweeprate in optional parameters instead
+	// Note: channels should be a comma-separated string ex: "0,4,5"
+	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, magnetID, rampratex, delayy, nosave, use_AWG
+	string channelsx, y_label, comments, startxs, finxs
+	//abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
+
+	// Set defaults
+	delayy = ParamIsDefault(delayy) ? 0.01 : delayy
+	comments = selectstring(paramisdefault(comments), comments, "")
+	startxs = selectstring(paramisdefault(startxs), startxs, "")
+	finxs = selectstring(paramisdefault(finxs), finxs, "")
+	
+	// Reconnect instruments
+	sc_openinstrconnections(0)
+	
+	//check if rawdata needs to be saved
+	
+	// Put info into scanVars struct (to more easily pass around later)
+ 	struct ScanVars S
+	// Init FastDAC part like usual, then manually set the rest
+	initScanVarsFD2(S, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
+							startxs=startxs, finxs=finxs, comments=comments)
+	S.instrIDy = magnetID
+	s.is2d = 1
+	S.starty = starty
+	S.finy = finy
+	S.y_label = selectString(paramIsDefault(y_label), y_label, "Magnet mT")
+      
+   // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
+	PreScanChecksFD(S, same_device = 0)
+	// PreScanChecksMagnet(S, y_only=1)
+	
+	// sets fastdacs to master slave if necessary, otherwise are kept independent
+	set_master_slave(S)
+   	
+   // Ramp to start without checks
+	RampStartFD(S, x_only=1, ignore_lims=1)
+	setIPS120fieldWait(S.instrIDy, S.starty)  // Ramprate should be set beforehand for magnets
+   	
+   	// Let gates settle
+	sc_sleep(S.delayy*5)
+
+	// Initialize waves and graphs
+	initializeScan(S)
+
+	// Main measurement loop
+	variable setpointy, sy, fy
+	
+	//
+	sy = starty
+	//
+	
+	variable i=0, j=0
+	string chy
+	for(i=0; i<S.numptsy; i++)
+		// Ramp slow axis
+		setpointy = sy + (i*(S.finy-S.starty)/(S.numptsy-1))	
+		setIPS120fieldWait(S.instrIDy, setpointy)  // Ramprate should be set beforehand for magnets
+
+		// Ramp to start of fast axis
+		RampStartFD(S, ignore_lims=1, x_only=1)
+		sc_sleep(S.delayy)
+		
+		// Record fast axis
+		scfd_RecordValues(S, i)
+	endfor
+	
+	// Save by default
+	if (nosave == 0)
+		EndScan(S=S)
+  	else
+  		dowindow /k SweepControl
+	endif
+end
+
+function ScanFastDacSlowIPS120Magnet2D(instrIDx, startx, finx, channelsx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, [rampratey, y_label, comments, nosave])
+	// sweep one or more FastDAC channels but in the ScanController way (not ScanControllerFastdac). I.e. ramp, measure, ramp, measure...
+	// channels should be a comma-separated string ex: "0, 4, 5"
+	
+	
+	// not tested - should be tested - master/slave updated.
+	variable instrIDx, startx, finx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, nosave, rampratey
+	string channelsx, comments, y_label
+	
+	//check if rawdata needs to be saved
+	
+	// Reconnect instruments
+	sc_openinstrconnections(0)
+	
+	// Set defaults
+	comments = selectstring(paramisdefault(comments), comments, "")
+	y_label = selectstring(paramisdefault(y_label), y_label, "")
+	
+	// Initialize ScanVars
+	struct ScanVars S
+	initScanVarsFD2(S, startx, finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, starty=starty, finy=finy, delayy=delayy,\
+	 					rampratey=rampratey, numptsy=numptsy, y_label=y_label, comments=comments)
+	
+	S.instrIDy = magnetID 
+	
+	
+	
+	// Check limits (not as much to check when using FastDAC slow)
+	scc_checkLimsFD(S)
+	S.lims_checked = 1
+
+	//set_master_slave(S): we do not need master-slave for slow scans
+	
+	// Ramp to start without checks since checked above
+	RampStartFD(S, ignore_lims = 1)
+	// no need to check the ramprate for the magnet, assume that it's slow enough
+	setIPS120fieldWait(S.instrIDy, starty)
+	
+	// Let gates settle 
+	asleep(S.delayy*10)
+
+	// Make Waves and Display etc
+	InitializeScan(S)
+	
+	// Main measurement loop
+	variable i=0, j=0, setpointx, setpointy
+	do
+		setpointy = S.starty + (i*(S.finy-S.starty)/(S.numptsy-1))
+		setIPS120field(S.instrIDy, setpointy)
+		RampStartFD(S, ignore_lims=1, x_only=1)
+		setIPS120fieldWait(S.instrIDy, setpointy)
+		sc_sleep(S.delayy)
+		j=0
+		do
+			rampToNextSetpoint(S, j, fastdac=1, ignore_lims=1)  // Ramp x to next setpoint
+			sc_sleep(S.delayx)
+			RecordValues(S, i, j)
+			j++
+		while (j<S.numptsx)
+	i++
+	while (i<S.numptsy)
+
+	// Save by default
+	if (nosave == 0)
+		EndScan(S=S)
+	else
+		dowindow /k SweepControl
+	endif
+end
+
 
 function ScanK2400LS625Magnet2D(keithleyID, startx, finx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, [rampratey, y_label, comments, nosave]) //Units: mV
 	variable keithleyID, startx, finx, numptsx, delayx, rampratex, magnetID, starty, finy, numptsy, delayy, rampratey, nosave

@@ -1069,10 +1069,14 @@ function Scan_field_n_2D(keithleyIDtop,keithleyIDbtm,fixedD,startn, finn, numpts
 	endif
 end
 
-function ScanIPSMagnet(instrID, startx, finx, numptsx, delayx, [y_label, comments, nosave]) 
-	variable instrID, startx, finx, numptsx, delayx,  nosave
+function ScanIPSMagnet(instrID, startx, finx, numptsx, delayx, [y_label, comments, nosave, fast]) 
+	variable instrID, startx, finx, numptsx, delayx,  nosave, fast
 	string y_label, comments
-	//abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
+	variable ramprate
+	
+	if(paramisdefault(fast))
+		fast=0
+	endif
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -1086,6 +1090,7 @@ function ScanIPSMagnet(instrID, startx, finx, numptsx, delayx, [y_label, comment
 	initScanVars(S, instrIDx=instrID, startx=startx, finx=finx, numptsx=numptsx, delayx=delayx, \
 	 						y_label=y_label, x_label = "Field /mT", comments=comments)
 							
+	ramprate = getips120rate(instrID)
 	
 	// Ramp to start without checks because checked above
 	setIPS120fieldWait(instrID, S.startx )
@@ -1100,8 +1105,14 @@ function ScanIPSMagnet(instrID, startx, finx, numptsx, delayx, [y_label, comment
 	variable i=0, setpointx
 	do
 		setpointx = S.startx + (i*(S.finx-S.startx)/(S.numptsx-1))
-		setIPS120fieldWait(instrID, setpointx) // Mr Ray changed this on August 04 
-		sc_sleep(S.delayx)
+		
+		if (fast==1)
+			setIPS120field(instrID, setpointx)
+			sc_sleep(max(S.delayx, (S.delayx+60*abs(finx-startx)/numptsx/ramprate)))
+		else 
+			setIPS120fieldWait(instrID, setpointx) // Mr Ray changed this on August 04 
+			sc_sleep(S.delayx)
+		endif
 		RecordValues(S, i, i)
 		i+=1
 	while (i<S.numptsx)
@@ -1113,7 +1124,6 @@ function ScanIPSMagnet(instrID, startx, finx, numptsx, delayx, [y_label, comment
 		 dowindow /k SweepControl
 	endif
 end
-
 
 function Scan_ips_D_2D(keithleyIDtop,keithleyIDbtm,fixedn,startD, finD, numptsD, delayD, ramprateD, magnetID, starty, finy, numptsy, delayy, [rampratey, y_label, comments, nosave]) //Units: mV
 
