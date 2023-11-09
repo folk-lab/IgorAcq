@@ -1566,7 +1566,7 @@ function sc_checkBackup()
 	svar sc_hostname
 
 	GetFileFolderInfo/Z/Q/P=server  // Check if data path is definded
-	if(v_flag != 0 || v_isfolder != 1)
+	if(v_flag != 0 || v_isfolder !=1)
 		print "WARNING[sc_checkBackup]: Only saving local copies of data. Set a server path with \"NewPath server\" (only to folder which contains \"local-measurement-data\")"
 		return 0
 	else
@@ -3912,6 +3912,7 @@ function scfd_resampleWaves2(w, measureFreq, targetFreq)
 	killwaves wcopy
 	
 	
+	
 	// TODO: Need to test N more (simple testing suggests we may need >200 in some cases!)
 	// TODO: Need to decide what to do with end effect. Possibly /E=2 (set edges to 0) and then turn those zeros to NaNs? 
 	// TODO: Or maybe /E=3 is safest (repeat edges). The default /E=0 (bounce) is awful.
@@ -3925,12 +3926,13 @@ function scfd_resampleWaves(w, measureFreq, targetFreq)
 	variable measureFreq, targetFreq
 
 	RatioFromNumber (targetFreq / measureFreq)
+//	print "Num and den are",v_numerator, v_denominator
 	if (V_numerator > V_denominator)
 		string cmd
 		printf cmd "WARNING[scfd_resampleWaves]: Resampling will increase number of datapoints, not decrease! (ratio = %d/%d)\r", V_numerator, V_denominator
 	endif
 	resample /UP=(V_numerator) /DOWN=(V_denominator) /N=201 /E=3 w
-	// TODO: Need to test N more (simple testing suggests we may need >200 in some cases!)
+	// TODO: Need to test N more (simple testing suggests we may need >200 in some cases!) [Vahid: I'm not sure why only N=201 is a good choice.]
 	// TODO: Need to decide what to do with end effect. Possibly /E=2 (set edges to 0) and then turn those zeros to NaNs? 
 	// TODO: Or maybe /E=3 is safest (repeat edges). The default /E=0 (bounce) is awful.
 end
@@ -4111,12 +4113,16 @@ function /s scfd_spectrum_analyzer(wave data, variable samp_freq, string wn)
 end
 
 
-function scfd_RecordValues(S, rowNum, [AWG_list, linestart, skip_data_distribution])  // TODO: Rename to fd_record_values
+function scfd_RecordValues(S, rowNum, [AWG_list, linestart, skip_data_distribution, skip_raw2calc])  // TODO: Rename to fd_record_values
 	struct ScanVars &S
 	variable rowNum, linestart
-	variable skip_data_distribution // For recording data without doing any calculation or distribution of data
+	variable skip_data_distribution, skip_raw2calc // For recording data without doing any calculation or distribution of data
 	struct AWGVars &AWG_list
 	
+	if(paramisdefault(skip_raw2calc))  // If skip_raw2calc not passed set it to 0
+		skip_raw2calc=0
+	endif 
+
 		
 	// If passed AWG_list with AWG_list.lims_checked == 1 then it will run with the Arbitrary Wave Generator on
 	// Note: Only works for 1 FastDAC! Not sure what implementation will look like for multiple yet
@@ -4142,24 +4148,32 @@ function scfd_RecordValues(S, rowNum, [AWG_list, linestart, skip_data_distributi
 	if (rowNum == 0 && (S.start_time == 0 || numtype(S.start_time) != 0))  
 		S.start_time = datetime 
 	endif
-
+	
 	// Send command and read values
-	scfd_SendCommandAndRead(S, AWG, rowNum) 
+	scfd_SendCommandAndRead(S, AWG, rowNum, skip_raw2calc=skip_raw2calc) 
 	S.end_time = datetime  
 	
 	// Process 1D read and distribute
 	if (!skip_data_distribution)
+	
 		scfd_ProcessAndDistribute(S, AWG, rowNum) 
+		
 	endif
 end
 
-function scfd_SendCommandAndRead(S, AWG_list, rowNum)
+function scfd_SendCommandAndRead(S, AWG_list, rowNum, [skip_raw2calc])
 	// Send 1D Sweep command to fastdac and record the raw data it returns ONLY
+	
 	struct ScanVars &S
 	struct AWGVars &AWG_list
 	variable rowNum
+	variable skip_raw2calc // if set to 1 it will skip the reassignment of the calc waves based on raw waves
 	string cmd_sent = ""
 	variable totalByteReturn
+	
+	if (paramisdefault(skip_raw2calc))
+		skip_raw2calc=0
+	endif
 
 	// Check some minimum requirements
 	if (S.samplingFreq == 0 || S.numADCs == 0 || S.numptsx == 0)
@@ -4170,9 +4184,9 @@ function scfd_SendCommandAndRead(S, AWG_list, rowNum)
 	
 	totalByteReturn = S.numADCs*2*S.numptsx
 	variable entered_panic_mode = 0
-	try
-   		entered_panic_mode = scfd_RecordBuffer(S, rowNum, totalByteReturn)
-   	catch  // One chance to do the sweep again if it failed for some reason (likely from a buffer overflow)
+		try
+   		entered_panic_mode = scfd_RecordBuffer(S, rowNum, totalByteReturn, skip_raw2calc=skip_raw2calc)
+   catch  // One chance to do the sweep again if it failed for some reason (likely from a buffer overflow)
 		variable errCode = GetRTError(1)  // Clear the error
 		if (v_AbortCode != 10)  // 10 is returned when user clicks abort button mid sweep
 			printf "WARNING[scfd_SendCommandAndRead]: Error during sweep at row %d. Attempting once more without updating graphs.\r" rowNum
@@ -4184,18 +4198,26 @@ function scfd_SendCommandAndRead(S, AWG_list, rowNum)
 			abortonvalue 1,10  // Continue to raise the code which specifies user clicked abort button mid sweep
 		endif
 	endtry	
+	
 
 	string endstr
 	endstr = readInstr(S.instrIDx)
+
 	endstr = sc_stripTermination(endstr,"\r\n")	
+
 	if (S.readVsTime)
 		scf_checkFDResponse(endstr,cmd_sent,isString=1,expectedResponse="READ_FINISHED")
 		// No need to update DACs
 	else
 		scf_checkFDResponse(endstr,cmd_sent,isString=1,expectedResponse="RAMP_FINISHED")
+
 	   // update DAC values in window (request values from FastDAC directly in case ramp failed)
+
 		scfd_updateWindow(S, S.numADCs) 
+
 	endif
+	
+
 	
 	if(AWG_list.use_awg == 1)  // Reset AWs back to zero (no reason to leave at end of AW)
 		string AW_DACs = AWG_list.AW_DACs, channels = ""
@@ -4345,38 +4367,58 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 	
 end
 
-function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only])
+function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only, skip_raw2calc])
 	// Returns whether recording entered into panic_mode during sweep
    struct ScanVars &S
    variable rowNum, totalByteReturn
    variable record_only // If set, then graphs will not be updated until all data has been read (defaults to 0)
+   variable skip_raw2calc // If set to 1 then there calc waves will not be reassigned based on raw
 
    // hold incoming data chunks in string and distribute to data waves
    string buffer = ""
    variable bytes_read = 0, totaldump = 0 
    variable saveBuffer = 1000 // Allow getting up to 1000 bytes behind. (Note: Buffer size is 4096 bytes and cannot be changed in Igor)
-   variable bufferDumpStart = stopMSTimer(-2)
+   variable bufferDumpStart = stopMSTimer(-2) //
 
    variable bytesSec = roundNum(2*S.samplingFreq,0)
    variable read_chunk = scfd_getReadChunkSize(S.numADCs, S.numptsx, bytesSec, totalByteReturn)
    variable panic_mode = record_only  // If Igor gets behind on reading at any point, it will go into panic mode and focus all efforts on clearing buffer.
    variable expected_bytes_in_buffer = 0 // For storing how many bytes are expected to be waiting in buffer
 
+
 	// 2023-09 -- NOTE FROM TIM TO JOHANN -- If you see a merge commit error around here, it's because I had a merge error around here when fixing the plotting stuff. I had to select the old version of this code again, but you'll want your newer version (that loops through all fastdacs rather than just the one with S.instrIDx)
+
+   
+	if(paramisdefault(skip_raw2calc))  // If skip_raw2calc not passed, set it to 0
+		skip_raw2calc = 0
+	endif
+   
+
    do
       scfd_readChunk(S.instrIDx, read_chunk, buffer)  // puts data into buffer
       scfd_distributeData1(buffer, S, bytes_read, totalByteReturn, read_chunk, rowNum)
       scfd_checkSweepstate(S.instrIDx)
 
       bytes_read += read_chunk      
-      expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)      
+      expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read) 
+      
+  
       if(!panic_mode && expected_bytes_in_buffer < saveBuffer)  // if we aren't too far behind then update Raw 1D graphs
-      	  scfd_raw2CalcQuickDistribute()
-         scg_updateFrequentGraphs() 
-	      expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)  // Basically checking how long graph updates took
+
+			// scfd_raw2CalcQuickDistribute()
+			scg_updateFrequentGraphs() 
+
+      		if (!skip_raw2calc)
+				scfd_raw2CalcQuickDistribute()
+			endif
+         // scg_updateRawGraphs() 
+         
+
+			expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)  // Basically checking how long graph updates took
+			print expected_bytes_in_buffer
 			if (expected_bytes_in_buffer > 4096)
-         		printf "ERROR[scfd_RecordBuffer]: After updating graphs, buffer is expected to overflow... Expected buffer size = %d (max = 4096). Bytes read so far = %d\r" expected_bytes_in_buffer, bytes_read
-         elseif (expected_bytes_in_buffer > 2500)
+				printf "ERROR[scfd_RecordBuffer]: After updating graphs, buffer is expected to overflow... Expected buffer size = %d (max = 4096). Bytes read so far = %d\r" expected_bytes_in_buffer, bytes_read
+         	elseif (expected_bytes_in_buffer > 2500)
 //				printf "WARNING[scfd_RecordBuffer]: Last graph update resulted in buffer becoming close to full (%d of 4096 bytes). Entering panic_mode (no more graph updates)\r", expected_bytes_in_buffer
 				panic_mode = 1         
          	endif
@@ -4407,9 +4449,10 @@ end
 
 function scfd_ExpectedBytesInBuffer(start_time, bytes_per_sec, total_bytes_read)
 	// Calculates how many bytes are expected to be in the buffer right now
-	variable start_time  // Time at which command was sent to Fastdac
-	variable bytes_per_sec  // How many bytes is fastdac returning per second (2*sampling rate)
+	variable start_time  // Time at which command was sent to Fastdac in microseconds
+	variable bytes_per_sec  // How many bytes is fastdac returning per second (2*sampling rate) (Vahid: why it's multiplied by 2?)
 	variable total_bytes_read  // How many bytes have been read so far
+	
 	
 	return round(bytes_per_sec*(stopmstimer(-2)-start_time)*1e-6 - total_bytes_read)
 end
@@ -4452,11 +4495,11 @@ function scfd_raw2CalcQuickDistribute()
         rwn = StringFromList(i, RawWaveNames1D)  // Get the current raw wave name
         cwn = StringFromList(i, CalcWaveNames1D)  // Get the current calc wave name
         calc_string = StringFromList(i, CalcStrings)  // Get the current calc function
-
         duplicate/o $rwn sc_tempwave  // Duplicate the raw wave to a temporary wave
 
         string ADCnum = rwn[3,INF]  // Extract the ADC number from the raw wave name
 
+        //calc_string = ReplaceString(rwn, calc_string, "sc_tempwave")  // Replace the raw wave name with the temporary wave name in the calc function
         calc_string = ReplaceString(rwn, calc_string, "sc_tempwave")  // Replace the raw wave name with the temporary wave name in the calc function
         execute("sc_tempwave = "+calc_string)  // Execute the calc function
 

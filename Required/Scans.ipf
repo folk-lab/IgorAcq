@@ -389,7 +389,7 @@ function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, 
 			if (use_awg)
 				Set_AWG_state(S, AWG, mod(j, S.interlaced_num_setpoints))
 			endif
-			Ramp_interlaced_channels(S, mod(j, S.interlaced_num_setpoints))
+				Ramp_interlaced_channels(S, mod(j, S.interlaced_num_setpoints))
 		endif
 
 		// Ramp to start of fast axis
