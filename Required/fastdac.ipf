@@ -334,16 +334,16 @@ function/s getFDstatus(fdIDname)
 		sprintf key, "DAC%d{%s}", CHstart+i, fdacvalstr[CHstart+i][3]
 		buffer = addJSONkeyval(buffer, key, num2numstr(getfdacOutput(instrID,CHstart+i))) // getfdacOutput is PER instrument
 	endfor
-
+	 
 	// ADC values
 	CHstart = scf_getChannelStartNum(instrID, adc=1)
 	for(i=0;i<scf_getFDInfoFromID(instrID, "numADC");i+=1)
 		buffer = addJSONkeyval(buffer, "ADC"+num2istr(CHstart+i), num2numstr(getfadcChannel(CHstart+i)))
 	endfor
 	
+	
 	// AWG info
 	buffer = addJSONkeyval(buffer, "AWG", getFDAWGstatus())  //NOTE: AW saved in getFDAWGstatus()
-	
 	return addJSONkeyval("", "FastDAC "+num2istr(device), buffer)
 end
 
@@ -2107,7 +2107,7 @@ function fd_readChunk(adc_channels, numpts, fdIDname)
 	S.never_save = 1
 	S.instrIDs = fdIDname
 	
-	scfd_RecordValues(S, 0, skip_data_distribution=1)
+	scfd_RecordValues(S, 0, skip_data_distribution=1, skip_raw2calc=1)
 end
 
 

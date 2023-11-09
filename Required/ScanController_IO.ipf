@@ -195,7 +195,7 @@ function sc_instrumentLogs(jstr)
 	// Note: all log strings must be valid JSON objects 
     string &jstr
     
-	sc_openInstrConnections(0) // Reopen connections before asking for status in case it has been a long time since the beginning of the scan
+	sc_openInstrConnections(0)  // Reopen connections before asking for status in case it has been a long time (?)[Vahid: how long would be a long time??] since the beginning of the scan
 	wave /t sc_Instr
 	variable i=0, j=0, addQuotes=0
 	string command="", val=""
