@@ -948,6 +948,54 @@ function Scank2400(instrID, startx, finx, channelsx, numptsx, delayx, rampratex,
 	endif
 end
 
+function Scank2400_current(instrID, startx, finx, channelsx, numptsx, delayx, rampratex, [y_label, comments, nosave]) //Units: nA
+	variable instrID, startx, finx, numptsx, delayx, rampratex,  nosave
+	string channelsx, y_label, comments
+	//abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"
+	
+	// Reconnect instruments
+	sc_openinstrconnections(0)
+	
+	// Set defaults
+	comments = selectstring(paramisdefault(comments), comments, "")
+	y_label = selectstring(paramisdefault(y_label), y_label, "")
+	
+	// Initialize ScanVars
+	struct ScanVars S
+	initScanVars(S, instrIDx=instrID, startx=startx, finx=finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex, \
+	 						y_label=y_label, x_label = "k2400", comments=comments)
+
+	// Check software limits and ramprate limits
+	// PreScanChecksKeithley(S)  
+	
+	// Ramp to start without checks because checked above
+	rampK2400current(S.instrIDx, startx,ramprate=1000)
+	
+	// Let gates settle 
+	//sc_sleep(S.delayx)
+	
+	// Make waves and graphs etc
+	initializeScan(S)
+
+	// Main measurement loop
+	variable i=0, setpointx
+	do
+		setpointx = S.startx + (i*(S.finx-S.startx)/(S.numptsx-1))
+//		rampK2400Voltage(S.instrIDx, setpointx, ramprate=S.rampratex)
+		setK2400current(S.instrIDx, setpointx)
+		//sc_sleep(S.delayx)
+		RecordValues(S, i, i)
+		i+=1
+	while (i<S.numptsx)
+	
+	// Save by default
+	if (nosave == 0)
+		EndScan(S=S)
+	else
+		 dowindow /k SweepControl
+	endif
+end
+
 function Scank24002D(instrIDx, startx, finx, numptsx, delayx, rampratex, instrIDy, starty, finy, numptsy, delayy, rampratey, [y_label, comments, nosave]) //Units: mV
 	variable instrIDx, startx, finx, numptsx, delayx, rampratex, instrIDy, starty, finy, numptsy, delayy, rampratey, nosave
 	string y_label, comments

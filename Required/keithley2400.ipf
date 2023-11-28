@@ -14,7 +14,7 @@ function openK2400connection(instrID, visa_address, [verbose])
 	// works for GPIB -- may need to add some more 'option' paramters if using serial
 	//                -- does not hurt to send extra parameters when using GPIB, they are ignored
 	// instrID is the name of the global variable that will be used for communication
-	// visa_address is the VISA address string, i.e. GPIB0::23::INSTR
+	// visa_address is the VISA address string, i.e. +
 	
 	string instrID, visa_address
 	variable verbose
@@ -168,7 +168,7 @@ function rampK2400current(instrID, output,[ramprate]) // Units: nA
 	do
 		new_output += step*sgn
 		setK2400current(instrID,new_output)
-		sc_sleep(sleeptime)
+		//sc_sleep(sleeptime)
 	while(sgn*new_output < sgn*output-step)
 	setK2400current(instrID,output) // Set final value
 end
