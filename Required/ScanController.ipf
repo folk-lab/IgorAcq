@@ -1388,7 +1388,7 @@ function scg_open1Dgraph(wn, x_label, [y_label, append_wn])
     
     if (cmpstr(append_wn, ""))
     	appendtograph /r $append_wn
-    	makecolorful()
+    	//makecolorful()
     	legend
     endif
     
@@ -4415,7 +4415,7 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only, skip_raw2ca
          
 
 			expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)  // Basically checking how long graph updates took
-			print expected_bytes_in_buffer
+			//print expected_bytes_in_buffer
 			if (expected_bytes_in_buffer > 4096)
 				printf "ERROR[scfd_RecordBuffer]: After updating graphs, buffer is expected to overflow... Expected buffer size = %d (max = 4096). Bytes read so far = %d\r" expected_bytes_in_buffer, bytes_read
          	elseif (expected_bytes_in_buffer > 2500)
