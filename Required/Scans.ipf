@@ -340,7 +340,7 @@ function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, 
 
 	// Set defaults
 	delay = ParamIsDefault(delay) ? 0.01 : delay
-	y_label = selectstring(paramisdefault(y_label), y_label, "nA")
+	y_label = selectstring(paramisdefault(y_label), y_label, "mV")
 	x_label = selectstring(paramisdefault(x_label), x_label, "")
 	comments = selectstring(paramisdefault(comments), comments, "")
 	starts = selectstring(paramisdefault(starts), starts, "")
@@ -695,11 +695,12 @@ end
 
 
 
-function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, numptsy, [numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave, use_AWG, interlaced_channels, interlaced_setpoints, y_label])
+function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, numptsy, [numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave, use_AWG,alternate, interlaced_channels, interlaced_setpoints, y_label])
 	// 2D Scan for FastDAC only OR FastDAC on fast axis and BabyDAC on slow axis
 	// Note: Must provide numptsx OR sweeprate in optional parameters instead
 	// Note: To ramp with babyDAC on slow axis provide the BabyDAC variable in bdID
 	// Note: channels should be a comma-separated string ex: "0,4,5"
+	// add alternate 
 	
    // Example :: Interlaced parameters 
 	// Interlaced period of 3 rows where ohmic1 and ohmic2 change on each row.
@@ -707,7 +708,7 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 	// interlace_values = "500,10,0;10,10,10"
 	// ohmic1 will change between 500,10,0 each row
 	
-	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, nosave, use_AWG 
+	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, nosave, use_AWG , alternate
 	string channelsx, channelsy, comments, startxs, finxs, startys, finys, interlaced_channels, interlaced_setpoints, y_label 
 
 	// Set defaults
@@ -732,12 +733,13 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
  	if (use_bd == 0 && use_second_fd == 0)
 
 	 	initScanVarsFD(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
-		   						 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments)
+		   						 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments,alternate=alternate)
 	
 	
 	else  				// Using second instrument for y-axis
 		initScanVarsFD(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
-		   						rampratey=rampratey, startxs=startxs, finxs=finxs, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments)
+		   						rampratey=rampratey, startxs=startxs, finxs=finxs, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments,alternate=alternate)
+		   						
 		s.is2d = 1		   						
 		S.starty = starty
 		S.finy = finy		
@@ -788,11 +790,12 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 	initializeScan(S, y_label = y_label)
 
 	// Main measurement loop
-	variable i=0, j=0
+	int i=0, j=0, d=1
 	variable setpointy, sy, fy
 	string chy
 	variable k = 0
 	for(i=0; i<S.numptsy; i++)
+		S.direction=d //will determine direction of scan inf fd_Record_Values
 
 		///// LOOP FOR INTERLACE SCANS ///// 
 		if (S.interlaced_y_flag)
@@ -807,18 +810,22 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 
 		endif
 		
-//		if (mod(i, 50) == 0)
-			DoUpdate // update graphs every 50 rows in y
-//		endif
+			DoUpdate 
+		
 		
 		// Ramp fast axis to start
-		rampToNextSetpoint(S, 0, fastdac=1, ignore_lims=1)
+		//rampToNextSetpoint(S, 0, fastdac=1, ignore_lims=1)
 		
 		// Let gates settle
 		sc_sleep(S.delayy)
 		
 		// Record fast axis
 		scfd_RecordValues(S, i, AWG_list=AWG)
+		
+		if (alternate!=0)
+		d=d*-1		// if we want to alternate scan direction (up & down vs up or down only)
+		endif
+		
 		
 	endfor
 

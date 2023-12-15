@@ -434,7 +434,7 @@ function /s avg_wav(wave wav) // /WAVE lets your return a wave
 	nc = dimsize($wn, 1) //number of columns (repeats)
 	
 	ReduceMatrixSize(wav, 0, -1, nr, 0, -1, 1, 1, avg_name)
-	
+	CopyScales/P wav, $avg_name 
 	redimension/n = -1 $avg_name
 	
 	return avg_name
