@@ -340,7 +340,7 @@ function ScanFastDAC(instrID, start, fin, channels, [numptsx, sweeprate, delay, 
 
 	// Set defaults
 	delay = ParamIsDefault(delay) ? 0.01 : delay
-	y_label = selectstring(paramisdefault(y_label), y_label, "mV")
+	y_label = selectstring(paramisdefault(y_label), y_label, "uA")
 	x_label = selectstring(paramisdefault(x_label), x_label, "")
 	comments = selectstring(paramisdefault(comments), comments, "")
 	starts = selectstring(paramisdefault(starts), starts, "")
@@ -695,12 +695,13 @@ end
 
 
 
-function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, numptsy, [numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave, use_AWG,alternate, interlaced_channels, interlaced_setpoints, y_label])
+function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, numptsy, [numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy,repeats, startxs, finxs, startys, finys, comments, nosave, use_AWG,alternate, interlaced_channels, interlaced_setpoints, y_label])
 	// 2D Scan for FastDAC only OR FastDAC on fast axis and BabyDAC on slow axis
 	// Note: Must provide numptsx OR sweeprate in optional parameters instead
 	// Note: To ramp with babyDAC on slow axis provide the BabyDAC variable in bdID
 	// Note: channels should be a comma-separated string ex: "0,4,5"
-	// add alternate 
+	// added alternate 
+	// added repeats for repeating slow scan N times
 	
    // Example :: Interlaced parameters 
 	// Interlaced period of 3 rows where ohmic1 and ohmic2 change on each row.
@@ -708,7 +709,7 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 	// interlace_values = "500,10,0;10,10,10"
 	// ohmic1 will change between 500,10,0 each row
 	
-	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, nosave, use_AWG , alternate
+	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy,repeats, nosave, use_AWG , alternate
 	string channelsx, channelsy, comments, startxs, finxs, startys, finys, interlaced_channels, interlaced_setpoints, y_label 
 
 	// Set defaults
@@ -719,12 +720,19 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 	finxs = selectstring(paramisdefault(finxs), finxs, "")
 	startys = selectstring(paramisdefault(startys), startys, "")
 	finys = selectstring(paramisdefault(finys), finys, "")
+	if (paramisdefault(repeats))
+	repeats=1
+	endif
+	
+	 print repeats
+
 	interlaced_channels = selectString(paramisdefault(interlaced_channels), interlaced_channels, "")
 	interlaced_setpoints = selectString(paramisdefault(interlaced_setpoints), interlaced_setpoints, "")
 	variable use_bd = paramisdefault(bdid) ? 0 : 1 			// Whether using both FD and BD or just FD
 	variable use_second_fd = paramisdefault(fdyID) ? 0 : 1  // Whether using a second FD for the y axis gates
 
-	
+	variable new_numptsy=numptsy*repeats
+
 	// Reconnect instruments
 	sc_openinstrconnections(0)
 
@@ -732,12 +740,12 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
  	struct ScanVars S
  	if (use_bd == 0 && use_second_fd == 0)
 
-	 	initScanVarsFD(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
+	 	initScanVarsFD(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=new_numptsy,repeats=repeats, delayy=delayy, \
 		   						 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments,alternate=alternate)
 	
 	
 	else  				// Using second instrument for y-axis
-		initScanVarsFD(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
+		initScanVarsFD(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=new_numptsy,repeats=repeats, delayy=delayy, \
 		   						rampratey=rampratey, startxs=startxs, finxs=finxs, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments,alternate=alternate)
 		   						
 		s.is2d = 1		   						
@@ -755,7 +763,7 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 			scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, starty, finy, S.startxs, S.finxs, startys, finys)
 		endif
 	endif
-	S.prevent_2d_graph_updates = 0 ////////////// SET TO 1 TO STOP 2D GRAPHS UPDATING ////////////////
+	S.prevent_2d_graph_updates = 1 ////////////// SET TO 1 TO STOP 2D GRAPHS UPDATING ////////////////
       
    // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
 
@@ -788,7 +796,7 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 
 	// Initialize waves and graphs
 	initializeScan(S, y_label = y_label)
-
+tic()
 	// Main measurement loop
 	int i=0, j=0, d=1
 	variable setpointy, sy, fy
@@ -805,12 +813,20 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 				rampToNextSetpoint(S, 0, outer_index=i, y_only=1, fastdac=!use_bd, ignore_lims=1)
 			endif
 		else
-			// Ramp slow axis
-			rampToNextSetpoint(S, 0, outer_index=i, y_only=1, fastdac=!use_bd, ignore_lims=1)
-
+			// Ramp slow axis and check for repeats too
+		if (S.repeats>1)
+			if (mod(i, S.repeats) == 0) // Ramp slow axis only for first of interlaced setpoints
+			toc()
+				rampToNextSetpoint(S, 0, outer_index=i, y_only=1, fastdac=!use_bd, ignore_lims=1); tic()
+			endif
+		endif
 		endif
 		
-			DoUpdate 
+		
+
+
+		
+			//DoUpdate 
 		
 		
 		// Ramp fast axis to start
@@ -826,7 +842,7 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 		d=d*-1		// if we want to alternate scan direction (up & down vs up or down only)
 		endif
 		
-		
+	
 	endfor
 
 	// Save by default
@@ -835,7 +851,7 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
   	else
   		dowindow /k SweepControl
 	endif
-
+toc()
 end
 
 

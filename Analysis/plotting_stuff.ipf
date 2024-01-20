@@ -121,31 +121,22 @@ function displayplot(start, endnum,whichdat,[delta,shiftx, shifty])
 	while (i<=endnum)
 	makecolorful()
 	legend
-	Legend/C/N=text0/J/A=RC/E
+	Legend/C/N=text0/J/A=RC/E=0
 
 end
 
 function linebyline(wave wav, variable delta)
 
-string wavenm=nameofwave(wav)
-		
+	string wavenm=nameofwave(wav)
+
 	variable i=0, totoffx=0, totoffy=0
 	variable endnum=dimsize(wav,1)
-	string st
-	//udh5()
-	//Display /W=(729.75,87.5,1355.25,395)
 	i=0
 	do
-		st="appendtograph "+wavenm+"[]["+num2str(i)+"]"
-		execute(st)
-//		ModifyGraph offset($st)={totoffx,totoffy}
-//		totoffx=totoffx+shiftx
-//		totoffy=totoffy+shifty
+		appendtograph wav[][i]
+
 		i+=delta
 	while (i<=endnum)
-	makecolorful()
-//	legend
-//	Legend/C/N=text0/J/A=RC/E
 
 end
 

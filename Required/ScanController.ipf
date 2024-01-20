@@ -379,6 +379,9 @@ structure ScanVars
      variable direction   // For keeping track of scan direction when using alternating scan
 	 variable never_save   // Set to 1 to make sure these ScanVars are never saved (e.g. if using to get throw away values for getting an ADC reading)
 	 variable filenum 		// Filled when getting saved
+	 
+	 // for repeats in slow axis
+	 variable repeats //how many times is the same slow axis point scanned?
 
 endstructure
 
@@ -570,7 +573,7 @@ function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, ra
 end
 
 
-function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate, duration, rampratex, delayx, starty, finy, channelsy, numptsy, rampratey, delayy, startxs, finxs, startys, finys, x_label, y_label, alternate,  interlaced_channels, interlaced_setpoints, comments])
+function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate, duration, rampratex, delayx, starty, finy, channelsy, numptsy,repeats, rampratey, delayy, startxs, finxs, startys, finys, x_label, y_label, alternate,  interlaced_channels, interlaced_setpoints, comments])
     // Function to make setting up scanVars struct easier for FastDAC scans
     // PARAMETERS:
     // startx, finx, starty, finy -- Single start/fin point for all channelsx/channelsy
@@ -579,7 +582,7 @@ function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
     struct ScanVars &S
     variable instrID
     variable startx, finx, numptsx, delayx, rampratex
-    variable starty, finy, numptsy, delayy, rampratey
+    variable starty, finy, numptsy,repeats, delayy, rampratey
 	variable sweeprate  // If start != fin numpts will be calculated based on sweeprate
 	variable duration   // numpts will be caluculated to achieve duration
     variable alternate
@@ -617,6 +620,7 @@ function initScanVarsFD(S, instrID, startx, finx, [channelsx, numptsx, sweeprate
 	S.duration = duration
     S.adcList = scf_getRecordedFADCinfo("channels")
     S.using_fastdac = 1
+    S.repeats=repeats;
 
    	// Sets channelsx, channelsy to be lists of channel numbers instead of labels
     scv_setChannels(S, channelsx, channelsy, fastdac=1)
@@ -3015,7 +3019,7 @@ function scc_checkRampStartFD(S)
    endfor
 
    if(require_ramp == 1)
-      print "WARNING[scc_checkRampStartFD]: At least one DAC was not at start point, it has been ramped and slept for delayx, but this should be done in top level scan function!"
+      //print "WARNING[scc_checkRampStartFD]: At least one DAC was not at start point, it has been ramped and slept for delayx, but this should be done in top level scan function!"
       RampStartFD(S, ignore_lims = 1, x_only=1)
       sc_sleep(S.delayy) // Settle time for 2D sweeps
    endif
@@ -3367,7 +3371,7 @@ function rampToNextSetpoint(S, inner_index, [outer_index, y_only, ignore_lims, f
 	variable y_only  	  // Set to 1 to only sweep the Y channels
 	variable ignore_lims  // Whether to ignore BabyDAC and FastDAC limits (makes sense if already checked previously)
 	variable fastdac  	  // 0 for BabyDAC, 1 for FastDAC
-
+	variable numptsy=S.numptsy/S.repeats;
 
 	variable k
 	if (!y_only)
@@ -3395,7 +3399,7 @@ function rampToNextSetpoint(S, inner_index, [outer_index, y_only, ignore_lims, f
 			sy = str2num(stringfromList(k, S.startys, ","))
 			fy = str2num(stringfromList(k, S.finys, ","))
 			chy = stringfromList(k, S.channelsy, ",")
-			setpointy = sy + (outer_index*(fy-sy)/(S.numptsy-1))	
+			setpointy = sy + (outer_index*(fy-sy)/(numptsy-1)/S.repeats); //print setpointy
 			if (fastdac)
 				RampMultipleFDAC(S.instrIDy, chy, setpointy, ramprate=S.rampratey, ignore_lims=ignore_lims)
 			else

@@ -7,6 +7,8 @@
 #include <WMBatchCurveFitIM>
 #include <Decimation>
 #include <Wave Arithmetic Panel>
+#include <Reduce Matrix Size>
+
 
 
 
@@ -53,24 +55,19 @@ function lock_in_test(data)
 end
 
 
-
-function demodulate(datnum, harmonic, wave_kenner, [append2hdf, demod_wavename])
-	///// if demod_wavename is use this name for demod wave. Otherwise default is "demod"
+function demodulate(datnum, harmonic, wave_kenner, [append2hdf, dat_kenner])
 	variable datnum, harmonic
 	string wave_kenner
 	variable append2hdf
-	string demod_wavename
-	demod_wavename = selectString(paramisdefault(demod_wavename), demod_wavename, "demod")
+	string dat_kenner
+	dat_kenner = selectString(paramisdefault(dat_kenner), dat_kenner, "")
 	variable nofcycles, period, cols, rows
 	string wn="dat" + num2str(datnum) + wave_kenner;
 	wave wav=$wn
 	struct AWGVars AWGLI
 	fd_getoldAWG(AWGLI, datnum)
-
-//	print AWGLI
-
-	cols=dimsize(wav,0); print cols
-	rows=dimsize(wav,1); print rows
+	cols=dimsize(wav,0); //print cols
+	rows=dimsize(wav,1); //print rows
 	nofcycles=AWGLI.numCycles;
 	period=AWGLI.waveLen;
 	print "AWG num cycles  = " + num2str(nofcycles)
@@ -86,78 +83,16 @@ function demodulate(datnum, harmonic, wave_kenner, [append2hdf, demod_wavename])
 	temp=temp*pi/2;
 	
 	
-	
-	///// display steps of demod /////
-//	display
-//	appendimage temp
-//
-//	display
-//	appendimage sinewave
-//
-	Duplicate /o sine1d, wave0x
-	wave0x = x
 
-//	display wav vs wave0x
-//	appendtoGraph sine1d
 	
 	print "cols = " + num2str(cols)
 	print "rows = " + num2str(rows)
 	print "(cols/period/nofcycles) = " + num2str(cols/period/nofcycles)
-	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1, demod_wavename)
-	
-	KillWindow /Z demod_window
-	Display
-	DoWindow/C demod_window
-	Appendimage /W=demod_window $demod_wavename
-	ModifyImage /W=demod_window $demod_wavename ctab = {*, *, RedWhiteGreen, 0}
+	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1, "demod")
 	
 
-	///// append to hdf /////
-//wn="demod"
-//	if (append2hdf)
-//		variable fileid
-//		fileid=get_hdfid(datnum) //opens the file
-//		HDF5SaveData/o /IGOR=-1 /TRAN=1 /WRIT=1 /Z $wn, fileid
-//		HDF5CloseFile/a fileid
-//	endif
 
 end
-
-
-
-//string window_name
-//	Display 
-//	DoWindow/C conductance_vs_sweep 
-//	
-//	Display 
-//	window_name = WinName(0,1)
-//	DoWindow/C transition_vs_sweep
-//	
-//	string cond_avg, trans_avg
-//	variable i, datnum
-//	for (i=0;i<num_dats;i+=1)
-//		datnum = str2num(stringfromlist(i, datnums))
-//		
-//		try
-//			run_single_clean_average_procedure(datnum, plot=1, notch_on=notch_on)
-//		catch
-//			print "FAILED CLEAN AND AVERAGE :: DAT " + num2str(datnum)
-//		endtry 
-//		
-//		cond_avg = "dat" + num2str(datnum) + "_dot_cleaned_avg"
-//		trans_avg = "dat" + num2str(datnum) + "_cs_cleaned_avg"
-//		
-//		closeallGraphs(no_close_graphs = "conductance_vs_sweep;transition_vs_sweep")
-//		
-//		// append to graphs 
-//		AppendToGraph /W=conductance_vs_sweep $cond_avg;
-//		AppendToGraph /W=transition_vs_sweep $trans_avg;
-//		
-		
-		
-		
-		
-		
 
 function center_dSdN(int wavenum, string kenner)
 //wav is input wave, for example demod
@@ -219,92 +154,144 @@ end
 
 
 
-function resampleWave(wav, targetFreq)
-	// finds measure freq from scan vars and calls scfd_resampleWaves
-	wave wav 
-	variable targetFreq 
-	
-	string wn = nameOfWave(wav)
-	int wavenum = getfirstnum(wn)
-	
-	struct AWGVars S
-	fd_getoldAWG(S, wavenum)
 
-	variable measureFreq = S.measureFreq
+function demodulate2(datnum,harmonic,kenner,[append2hdf, axis])
+//if axis=0: demodulation in r
+//if axis=1: demodulation in x
+//if axis=2: demodulation in y
+	variable datnum,harmonic
+	string kenner
+	variable append2hdf, axis
+	axis = paramisdefault(axis) ? axis : 0
+	variable nofcycles, period, cols, rows
+	string wn="dat"+num2str(datnum)+kenner;
+	string wn_x="temp_x"
+	string wn_y="temp_y"
+	wave wav=$wn
+	wave wav_x=$wn_x
+	wave wav_y=$wn_y
+	struct AWGVars AWGLI
+	fd_getoldAWG(AWGLI,datnum)
+	make /o demod2
 	
-	scfd_resampleWaves(wav, measureFreq, targetFreq)
 	
-end
-
-
-function notch_filter(wave wav, variable Hz, [variable Q, string notch_name, variable overwrite_wave])
-	// wav is the wave to be notch filtered, which must have the accompanying json specifying measurement frequency
-	// Hz ithe frequency to notch filter, with quality factor Q
-	// notch_name is the name of the wave to be after notch filtering.  If not specified the new wave will be the name of wav plus _nf
-	// if notch_name already exists it will be overwritten
-	// overwrite_wave is a flag that can be set to 1 to tell the function to overwrite wav, that is, to make notch_name the same as
-	// the original wave.  If notch_name is specified AND overwrite_wave is set to 1, it defaults to making the output wave notch_wave
-
-	Q = paramisdefault(Q) ? 50 : Q // set Q factor to 50 if not specified
-	overwrite_wave = paramisdefault(overwrite_wave) ? 0 : overwrite_wave	
-	String wav_name = nameOfWave(wav)
+	print AWGLI
 	
-	if (paramisdefault(notch_name))
-		if (overwrite_wave == 1)
-			notch_name=wav_name
-		else
-			notch_name = wav_name + "_nf"
-//			duplicate/o wav $notch_name
-		endif
+	//Demodulate in x?
+	if ((axis==0)||(axis==1))
+	duplicate /o wav, wav_xx
+	cols=dimsize(wav,0); print cols
+	rows=dimsize(wav,1); print rows
+	nofcycles=AWGLI.numCycles;
+	period=AWGLI.waveLen;
+	//Original Measurement Wave
+	make /o/n=(cols) sine1d
+	sine1d=sin(2*pi*(harmonic*p/period))
+	matrixop /o sinewave=colrepeat(sine1d,rows)
+	matrixop /o temp=wav_xx*sinewave
+	copyscales wav_xx, temp
+	temp=temp*pi/2;
+	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,"demod_x")
+	wn_x="demod_x"
+	wave wav_x=$wn_x
 	endif
 	
-	//Creating main wave copy and wave to display transform
-	int wavenum = getfirstnum(wav_name)
-	variable freq = 1 / (fd_getmeasfreq(wavenum) * dimdelta(wav, 0) / Hz)
-
-
-	// Creating wave variables
-	variable num_rows = dimsize(wav, 0)
-	variable padnum = 2^ceil(log(num_rows) / log(2)); 
-	duplicate /o wav tempwav
-	variable avg = mean(wav)
-	tempwav -= avg
+	//Demodulate in y?
+	if ((axis==0)||(axis==2))
+	duplicate /o wav, wav_yy
+	cols=dimsize(wav,0); print cols
+	rows=dimsize(wav,1); print rows
+	nofcycles=AWGLI.numCycles;
+	period=AWGLI.waveLen;
+	//Original Measurement Wave
+	make /o/n=(cols) sine1d
+	sine1d=cos(2*pi*(harmonic*p/period))
+	matrixop /o sinewave=colrepeat(sine1d,rows)
+	matrixop /o temp=wav_yy*sinewave
+	copyscales wav_yy, temp
+	temp=temp*pi/2;
+	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,"demod_y")
+	wn_y="demod_y"
+	wave wav_y=$wn_y
+	endif
 	
-	//Transform
-	FFT/pad=(padnum)/OUT=1/DEST=temp_fft tempwav
-//	FFT/OUT=1/DEST=temp_fft tempwav
-
-	wave /c temp_fft
+	//Given wav_x and wav_y now refer to their respective demodulations, 
+	//associate the correct set with the output based on r/x/y 
 	
-	//Create gaussian, multiply it
-	duplicate/c/o temp_fft fftfactor
-	fftfactor = 1 - exp(-(x - freq)^2 / (freq / Q)^2)
-	temp_fft *= fftfactor
-
-	//Inverse transform
-	IFFT/DEST=temp_ifft  temp_fft;DelayUpdate
-	wave temp_ifft
+	//wn="demod"
 	
-	temp_ifft += avg
-
-	redimension/N=(num_rows, -1) temp_ifft
-
-	copyscales wav, temp_ifft
-		
-	duplicate /o temp_ifft $notch_name
+	if (axis==0)
+	demod2 =( (wav_x)^2 + (wav_y)^2 ) ^ (0.5)  //problematic line - operating on null wave?
+	endif
 	
-//	if (overwrite_wave == 1)
-//		duplicate/o wave_copy, wav
-//	endif
+	if (axis==1)
+	demod2 = wav_x
+	endif
+	
+	if (axis==1)
+	demod2 = wav_y
+	endif
+	
+	//Store demodulated wave w.r.t. correct axis
+	//if (append2hdf)
+	//	variable fileid
+	//	fileid=get_hdfid(datnum) //opens the file
+	//	HDF5SaveData/o /IGOR=-1 /TRAN=1 /WRIT=1 /Z $wn, fileid
+	//	HDF5CloseFile/a fileid
+	//endif
+
+end  
+
+function rescalex(wave wav, variable factor)
+variable low=indextoScale(wav,0,0)*factor;
+variable high=indextoScale(wav,inf,0)*factor;
+SetScale/I x low,high,"", wav
+end
+
+function rescaley(wave wav, variable factor)
+variable low=indextoScale(wav,0,1)*factor;
+variable high=indextoScale(wav,inf,1)*factor;
+SetScale/I y low,high,"", wav
 end
 
 
+
+function/wave resampleWave(wave wav,variable targetFreq,variable measureFreq )
+	// resamples wave w from measureFreq
+	// to targetFreq (which should be lower than measureFreq)
+	string wn=nameOfWave(wav)
+	int wavenum=getfirstnum(wn)
+
+//	variable measureFreq
+//		struct ScanVars S
+//		fd_getScanVars(S,wavenum)
+//	struct AWGVars S
+//	fd_getoldAWG(S,wavenum)
+
+//	measureFreq=fd_getmeasfreq(wavenum); print measurefreq
+	variable N=measureFreq/targetFreq
+//	wave temp_wave
+//	duplicate/o wav, temp_wave
+
+
+	RatioFromNumber (targetFreq / measureFreq)
+	if (V_numerator > V_denominator)
+		string cmd
+		printf cmd "WARNING[scfd_resampleWaves]: Resampling will increase number of datapoints, not decrease! (ratio = %d/%d)\r", V_numerator, V_denominator
+	endif
+	resample/UP=(V_numerator)/DOWN=(V_denominator)/N=201/E=3 wav
+
+
+	// TODO: Need to test N more (simple testing suggests we may need >200 in some cases!)
+	// TODO: Need to decide what to do with end effect. Possibly /E=2 (set edges to 0) and then turn those zeros to NaNs?
+	// TODO: Or maybe /E=3 is safest (repeat edges). The default /E=0 (bounce) is awful.
+end
 
 
 function notch_filters(wave wav, [string Hzs, string Qs, string notch_name])
 	// wav is the wave to be filtered.  notch_name, if specified, is the name of the wave after notch filtering.
-	// If not specified the filtered wave will have the original name plus '_nf' 
-	// This function is used Hzto apply the notch filter for a choice of frequencies and Q factors
+	// If not specified the filtered wave will have the original name plus _nf
+	// This function is used to apply the notch filter for a choice of frequencies and Q factors
 	// if the length of Hzs and Qs do not match then Q is chosen as the first Q is the list
 	// It is expected that wav will have an associated JSON file to convert measurement times to points, via fd_getmeasfreq below
 	// EXAMPLE usage: notch_filters(dat6430cscurrent_2d, Hzs="60;180;300", Qs="50;150;250")
@@ -340,7 +327,7 @@ function notch_filters(wave wav, [string Hzs, string Qs, string notch_name])
 //	fftfactor = 1 - exp(-(x - freq)^2 / (freq / Q)^2)
 	
 	// Accessing freq conversion for wav
-	int wavenum = getfirstnum(wav_name)
+	int wavenum = getfirstnum(wav_name); print wavenum
 	variable freqfactor = 1/(fd_getmeasfreq(wavenum) * dimdelta(wav, 0)) // freq in wav = Hz in real seconds * freqfactor
 //	variable freq = 1 / (fd_getmeasfreq(wavenum) * dimdelta(wav, 0) / Hz)
 
@@ -358,9 +345,9 @@ function notch_filters(wave wav, [string Hzs, string Qs, string notch_name])
 	wave temp_ifft
 	
 	temp_ifft += offset
-
-	redimension/N=(num_rows, -1) temp_ifft
+Redimension/N=(num_rows,-1) temp_ifft
 	copyscales wav, temp_ifft
+	
 	duplicate /o temp_ifft $notch_name
 
 	
@@ -368,79 +355,98 @@ end
 
 
 
-function spectrum_analyzer(wave data, variable samp_freq)
-	// Built in powerspectrum function
-	duplicate/o data spectrum
-	SetScale/P x 0,1/samp_freq,"", spectrum
-	variable numptsx = dimsize(spectrum,0);  // number of points in x-direction
-	variable new_numptsx = 2^(floor(log(numptsx)/log(2))); // max factor of 2 less than total num points
-	wave slice;
-	wave w_Periodogram
 
-	variable i=0
-	rowslice(spectrum,i)
-		DSPPeriodogram/R=[1,(new_numptsx)] /PARS/NODC=2/DEST=W_Periodogram slice
-	duplicate/o w_Periodogram, powerspec
-	i=1
-	do
-		rowslice(spectrum,i)
-		DSPPeriodogram/R=[1,(new_numptsx)]/PARS/NODC=2/DEST=W_Periodogram slice
-		powerspec=powerspec+W_periodogram
-		i=i+1
-	while(i<dimsize(spectrum,1))
-//	powerspec[0]=nan
 
-	duplicate /o powerspec powerspec_int
-	wave powerspec_int
-	integrate powerspec_int
-	
-	display powerspec; // SetAxis bottom 0,500
-	appendtoGraph /r=l2 powerspec_int
-	ModifyGraph freePos(l2)={inf,bottom}
-	ModifyGraph rgb(powerspec_int)=(0,0,0)
-	ModifyGraph log(left)=1
-	
-	Label left "nA^2/Hz"
-	Label l2 "integrated nA^2/Hz"
-	
 
+
+
+
+function notch_filter(wave wav, variable Hz, [variable Q, string notch_name, variable overwrite_wave])
+	// wav is the wave to be notch filtered, which must have the accompanying json specifying measurement frequency
+	// Hz ithe frequency to notch filter, with quality factor Q
+	// notch_name is the name of the wave to be after notch filtering.  If not specified the new wave will be the name of wav plus _nf
+	// if notch_name already exists it will be overwritten
+	// overwrite_wave is a flag that can be set to 1 to tell the function to overwrite wav, that is, to make notch_name the same as
+	// the original wave.  If notch_name is specified AND overwrite_wave is set to 1, it defaults to making the output wave notch_wave
+
+	Q = paramisdefault(Q) ? 50 : Q // set Q factor to 50 if not specified
+	overwrite_wave = paramisdefault(overwrite_wave) ? 0 : overwrite_wave	
+	String wav_name = nameOfWave(wav)
+	
+	if (paramisdefault(notch_name))
+		if (overwrite_wave==1)
+			notch_name=wav_name
+		else
+			notch_name=wav_name+"_nf"
+//			duplicate/o wav $notch_name
+		endif
+	endif
+		
+
+	
+	
+	//Creating main wave copy and wave to display transform
+	int wavenum = getfirstnum(wav_name)
+	variable freq = 1 / (fd_getmeasfreq(wavenum) * dimdelta(wav, 0) / Hz)
+	print fd_getmeasfreq(wavenum)
+
+
+	// Creating wave variables
+	variable num_rows = dimsize(wav, 0)
+	variable padnum = 2^ceil(log(num_rows) / log(2)); 
+	duplicate /o wav tempwav
+	variable avg = mean(wav)
+	tempwav -= avg
+	
+	//Transform
+	FFT/pad=(padnum)/OUT=1/DEST=temp_fft tempwav
+//	FFT/OUT=1/DEST=temp_fft tempwav
+
+	wave /c temp_fft
+	
+	//Create gaussian, multiply it
+	duplicate/c/o temp_fft fftfactor
+	fftfactor = 1 - exp(-(x - freq)^2 / (freq / Q)^2)
+	temp_fft *= fftfactor
+
+	//Inverse transform
+	IFFT/DEST=temp_ifft  temp_fft;DelayUpdate
+	wave temp_ifft
+	
+	temp_ifft += avg
+Redimension/N=(num_rows,-1) temp_ifft
+	copyscales wav, temp_ifft
+	
+	duplicate /o temp_ifft $notch_name
+	
+//	if (overwrite_wave == 1)
+//		duplicate/o wave_copy, wav
+//	endif
 end
-
-
-
-
-
-Window Noise_check() : Graph
-	PauseUpdate; Silent 1		// building window...
-	Display /W=(35,53,1478,1119) slice1,slice2,slice3,slice4,slice5,slice6
-	ModifyGraph rgb(slice1)=(13107,13107,13107),rgb(slice2)=(65535,62414,0),rgb(slice3)=(13107,13107,13107)
-	ModifyGraph rgb(slice4)=(0,65535,47661),rgb(slice5)=(13107,13107,13107),rgb(slice6)=(32767,0,65535)
-	ModifyGraph offset(slice3)={400,0},offset(slice4)={400,0},offset(slice5)={-400,0}
-	ModifyGraph offset(slice6)={-400,0}
-	Legend/C/N=text0/J "\\s(slice1) slice1\r\\s(slice2) slice2\r\\s(slice3) slice3\r\\s(slice4) slice4\r\\s(slice5) slice5\r\\s(slice6) slice6"
-EndMacro
-
 
 
 function /s avg_wav(wave wav) // /WAVE lets your return a wave
-	// averaging any wave over columns (in y direction)
+
+	//  averaging any wave over columns (in y direction)
 	// wave returned is avg_name
-	string wn = nameofwave(wav)
-	string avg_name = wn + "_avg";
+	string wn=nameofwave(wav)
+	string avg_name=wn+"_avg";
 	int nc
 	int nr
 
-	nr = dimsize($wn, 0) //number of rows (sweep length)
-	nc = dimsize($wn, 1) //number of columns (repeats)
-	
-	ReduceMatrixSize(wav, 0, -1, nr, 0, -1, 1, 1, avg_name)
-	CopyScales/P wav, $avg_name 
-	redimension/n = -1 $avg_name
-	
+//	wn="dat"+num2str(wavenum)+dataset //current 2d array
+
+	nr = dimsize($wn,0) //number of rows (sweep length)
+	nc = dimsize($wn,1) //number of columns (repeats)
+
+	ReduceMatrixSize(wav, 0, -1, nr, 0,-1, 1,1, avg_name)
+	redimension/n=-1 $avg_name
+	variable new_nr = dimsize($avg_name,0) //number of rows (sweep length)
+	variable s=round((nr-new_nr)/2)
+	wavetransform/o/p={s,nan} shift $avg_name
+
 	return avg_name
 end
-
-
 
 function /s avg_wav_N(wave wav, int N) // /WAVE lets your return a wave
 
@@ -455,80 +461,18 @@ function /s avg_wav_N(wave wav, int N) // /WAVE lets your return a wave
 
 	nr = dimsize($wn,0) //number of rows (sweep length)
 	nc = dimsize($wn,1) //number of columns (repeats)
-	ReduceMatrixSize(wav, 0, -1, nr, 0,-1, N, 1, avg_name)
+
+	ReduceMatrixSize(wav, 0, -1, N, 0,-1, 1,1, avg_name)
 	redimension/n=-1 $avg_name
+	variable new_nr = dimsize($avg_name,0) //number of rows (sweep length)
+	variable s=round((nr-new_nr)/2)
+	wavetransform/o/p={s,nan} shift $avg_name
+
 	return avg_name
 end
 
 
 
-function average_every_n_rows(wave wav, int n)
-	// takes a 2d wave and averages every n rows (IGOR columns)
-	// creates a wave with _avg appended to the end
-	// assumes the wav has a multiple of n points
-	
-	string wave_name = nameOfWave(wav)
-	string wave_name_averaged = wave_name + "_avg"
-	
-	variable num_rows = dimsize(wav, 1) // (repeats)
-	variable num_columns = dimsize(wav, 0) // (sweep length)
-	
-	int num_rows_post_average = round(num_rows/n)
-	
-	ReduceMatrixSize(wav, 0, -1, num_columns, 0,-1, num_rows_post_average, 1, wave_name_averaged)
-
-end
-
-
-function crop_wave(wave wav, variable x_mid, variable y_mid, variable x_width, variable y_width)
-	// takes a 2d wave and creates a new cropped wave with name "_crop" appended
-	// cropped mask is determined by the centre and lengths (in gate dimensions) of the x and y
-	
-	string wave_name = nameOfWave(wav)
-	string wave_name_averaged = wave_name + "_crop"
-	
-	variable num_columns = dimsize(wav, 0) // (sweep length)
-	variable num_rows = dimsize(wav, 1) // (repeats)
-	
-	int x_coord_start, x_coord_end, y_coord_start, y_coord_end
-	
-	// setting x coordinates (with checks for bounds)
-	if (x_width == INF)
-		x_coord_start = 0
-		x_coord_end = num_columns - 1
-	else
-		x_coord_start = scaletoindex(wav, x_mid - x_width, 0)
-		x_coord_end = scaletoindex(wav, x_mid + x_width, 0)
-	endif
-
-	if (x_coord_start < 0)
-		x_coord_start = 0
-	endif	
-	if (x_coord_end > num_columns - 1)
-		x_coord_end = num_columns - 1
-	endif
-	
-	// setting y coordinates (with checks for bounds)
-	if (y_width == INF)
-		y_coord_start = 0
-		y_coord_end = num_rows - 1
-	else
-		y_coord_start = scaletoindex(wav, y_mid - y_width, 1)
-		y_coord_end = scaletoindex(wav, y_mid + y_width, 1)
-	endif
-	
-	if (y_coord_start < 0)
-		y_coord_start = 0
-	endif
-	if (y_coord_end > num_rows - 1)
-		y_coord_end = num_rows - 1
-	endif
-	
-	int num_crop_columns = (x_coord_end - x_coord_start) + 1
-	int num_crop_rows = (y_coord_end - y_coord_start) + 1
-	
-	ReduceMatrixSize(wav, x_coord_start, x_coord_end, num_crop_columns, y_coord_start, y_coord_end, num_crop_rows, 1, wave_name_averaged)
-end
 
 
 function stopalltimers()
@@ -540,81 +484,179 @@ i=i+1
 while(i<9)
 end
 
+function dat2num(string datname)
+	variable datnum
 	
+	sscanf datname,"dat%d", datnum
+	return datnum
+end
+
+function udh5([file_name,range,noraw])
+	// Loads HDF files back into Igor
+	string file_name
+	string range //Optional semicolon-separated list of start and end points. If range="startnum;endnum", only dat files between startnum and endnum inclusive will be loaded
+	variable noraw //set noraw=1 if you don't want raw datasets to be loaded
 	
-function udh5([dat_num, dat_list, dat_min_max])
-	// Loads HDF files back into Igor, if no optional paramters specified loads all dat in file path into IGOR
-	// NOTE: Assumes 'data' has been specified
-	string dat_num,dat_list, dat_min_max
-	dat_num = selectString(paramisdefault(dat_num), dat_num, "") // e.g. "302"
-	dat_list = selectString(paramisdefault(dat_list), dat_list, "") // e.g. "302,303,304,305,401"
-	dat_min_max = selectString(paramisdefault(dat_min_max), dat_min_max, "") // e.g. "302,310"
+	variable startnum, endnum, exclude
+	if (!(paramisDefault(range)))
+		startnum = str2num(stringfromlist(0,range))
+		endnum = str2num(stringfromlist(1,range))
+	endif
+	if (paramisDefault(noraw))
+		noraw=0
+	endif
+
+
 	
+	file_name = selectString(paramisdefault(file_name), file_name, "")
+	variable refnum=startmstimer
+
 	string infile = wavelist("*",";","") // get wave list
 	string hdflist = indexedfile(data,-1,".h5") // get list of .h5 files
+
 	string currentHDF="", currentWav="", datasets="", currentDS
-	
-	
-	////////////////////////////////////////////////////
-	///// Overwriting hdflist if dat_num specified /////
-	////////////////////////////////////////////////////
-	if (!stringmatch(dat_num, ""))
-		hdflist = "dat" + dat_num + ".h5"
+	if (!stringmatch(file_name, ""))
+		hdflist = file_name + ".h5"
 	endif
 	
-	/////////////////////////////////////////////////////
-	///// Overwriting hdflist if dat_list specified /////
-	/////////////////////////////////////////////////////
-	variable i
-	if (!stringmatch(dat_list, ""))
-		hdflist = ""
-		for(i=0; i<ItemsInList(dat_list, ","); i+=1)
-			hdflist = hdflist + "dat" + StringFromList(i, dat_list, ",") + ".h5;"
-		endfor
-	endif
-	
-	////////////////////////////////////////////////////////
-	///// Overwriting hdflist if dat_min_max specified /////
-	////////////////////////////////////////////////////////
-	variable dat_start = str2num(StringFromList(0, dat_min_max, ","))
-	variable dat_end = str2num(StringFromList(1, dat_min_max, ","))
-	
-	if (!stringmatch(dat_min_max, ""))
-		hdflist = ""
-		for(i=dat_start; i<dat_end+1; i+=1)
-			hdflist = hdflist + "dat" + num2str(i) + ".h5;"
-		endfor
-	endif
-	
-	print(hdflist)
-	
-	variable numHDF = itemsinlist(hdflist, ";"), fileid = 0, numWN = 0, wnExists = 0
-	variable j = 0, numloaded = 0
+	variable numHDF = itemsinlist(hdflist), fileid=0, numWN = 0, wnExists=0
+	variable i=0, j=0, numloaded=0
 
 
-	for(i = 0; i < numHDF; i += 1) // loop over h5 filelist
+	for(i=0; i<numHDF; i+=1) // loop over h5 filelist
 
-		currentHDF = StringFromList(i, hdflist, ";")
-
+	   currentHDF = StringFromList(i,hdflist)
+	   	//if (!stringmatch(currentHDF, "!*_RAW"))
+	   	
+	   	exclude = 0
+	   	if (stringmatch(currentHDF, "*_RAW*") && noraw)
+	   		exclude=1
+	   	endif
+	   	if (!(paramisDefault(range)))
+	   		if ((dat2num(currenthdf)<startnum)||(dat2num(currenthdf)>endnum))
+	   			exclude=1
+	   		endif
+	   	endif
+	   	
+	   	if (!(exclude))
 		HDF5OpenFile/P=data /R fileID as currentHDF
 		HDF5ListGroup /TYPE=2 /R=1 fileID, "/" // list datasets in root group
 		datasets = S_HDF5ListGroup
-		numWN = itemsinlist(datasets)  // number of waves in .h5
-		currentHDF = currentHDF[0, (strlen(currentHDF) - 4)]
-		for(j = 0; j < numWN; j += 1) // loop over datasets within h5 file
-	    	currentDS = StringFromList(j, datasets)
-			currentWav = currentHDF + currentDS
-		    wnExists = FindListItem(currentWav, infile,  ";")
-		    if (wnExists == -1)
-		   		// load wave from hdf
-		   		HDF5LoadData /Q /IGOR=-1 /N=$currentWav/TRAN=1 fileID, currentDS
-		   		numloaded+=1
-		    endif
+		numWN = itemsinlist(datasets)
+		currentHDF = currentHDF[0,(strlen(currentHDF)-4)]
+		for(j=0; j<numWN; j+=1) // loop over datasets within h5 file
+			currentDS = StringFromList(j,datasets)
+			currentWav = currentHDF+currentDS
+		   wnExists = FindListItem(currentWav, infile,  ";")
+		   if (wnExists==-1)
+		   	// load wave from hdf
+		   	HDF5LoadData /Q /IGOR=-1 /N=$currentWav/TRAN=1 fileID, currentDS
+		   	numloaded+=1
+		   endif
 		endfor
 		HDF5CloseFile fileID
+		endif
+		//endif
 	endfor
-	print numloaded, "waves uploaded"
+	
+
+   print numloaded, "waves uploaded"
+   
+   	variable	ms=stopmstimer(refnum)
+	print ms/1e6
 end
+
+
+function /s  loadh5(int filenum,int raw, [string kenner2])
+	// Loads HDF files back into Igor
+	
+//	variable refnum=startmstimer
+
+	string infile = wavelist("*",";","") // get wave list
+	string kenner
+	kenner = selectstring(raw,"","_RAW")
+//	string hdflist = indexedfile(data,-1,".h5") // get list of .h5 files in data path
+	
+	string currentHDF="dat"+num2str(filenum)+kenner+".h5", currentWav="", datasets="", currentDS, loadedwaves=""
+	
+	variable fileid=0, numWN = 0, wnExists=0
+	variable i=0, j=0, numloaded=0
+	int loadthiswave
+
+	HDF5OpenFile/P=data /R fileID as currentHDF
+	HDF5ListGroup /TYPE=2 /R=1 fileID, "/" // list datasets in root group
+	datasets = S_HDF5ListGroup
+	numWN = itemsinlist(datasets)
+	currentHDF = currentHDF[0,(strlen(currentHDF)-4)] // separate dat#### from .h5 
+	for(j=0; j<numWN; j+=1) // loop over datasets within h5 file
+			currentDS = StringFromList(j,datasets)
+			currentWav = currentHDF+currentDS
+		   wnExists = FindListItem(currentWav, infile,  ";")
+		   loadthiswave = (wnExists==-1) && (paramisdefault(kenner2) || (stringmatch(currentDS,kenner2)))
+		   // print currentDS,loadthiswave
+		   if (loadthiswave)
+		   	// load wave from hdf
+		   	HDF5LoadData /Q /IGOR=-1 /N=$currentWav/TRAN=1 fileID, currentDS
+		   	loadedwaves = addlistitem(currentwav,loadedwaves)
+		   	numloaded+=1
+		   endif
+	endfor
+	HDF5CloseFile fileID
+	
+
+//    variable	ms=stopmstimer(refnum)
+//	print ms/1e6
+	return loadedwaves
+end
+
+
+//function udh5([file_name])
+//	// Loads HDF files back into Igor
+//	string file_name
+//	file_name = selectString(paramisdefault(file_name), file_name, "")
+//		variable refnum=startmstimer
+//
+//	string infile = wavelist("*",";","") // get wave list
+//	string hdflist = indexedfile(data,-1,".h5") // get list of .h5 files
+//
+//	string currentHDF="", currentWav="", datasets="", currentDS
+//	if (!stringmatch(file_name, ""))
+//		hdflist = file_name + ".h5"
+//	endif
+//	
+//	variable numHDF = itemsinlist(hdflist), fileid=0, numWN = 0, wnExists=0
+//	variable i=0, j=0, numloaded=0
+//
+//
+//	for(i=0; i<numHDF; i+=1) // loop over h5 filelist
+//
+//	   currentHDF = StringFromList(i,hdflist)
+//	   	//if (!stringmatch(currentHDF, "!*_RAW"))
+//
+//		HDF5OpenFile/P=data /R fileID as currentHDF
+//		HDF5ListGroup /TYPE=2 /R=1 fileID, "/" // list datasets in root group
+//		datasets = S_HDF5ListGroup
+//		numWN = itemsinlist(datasets)
+//		currentHDF = currentHDF[0,(strlen(currentHDF)-4)]
+//		for(j=0; j<numWN; j+=1) // loop over datasets within h5 file
+//			currentDS = StringFromList(j,datasets)
+//			currentWav = currentHDF+currentDS
+//		   wnExists = FindListItem(currentWav, infile,  ";")
+//		   if (wnExists==-1)
+//		   	// load wave from hdf
+//		   	HDF5LoadData /Q /IGOR=-1 /N=$currentWav/TRAN=1 fileID, currentDS
+//		   	numloaded+=1
+//		   endif
+//		endfor
+//		HDF5CloseFile fileID
+//		//endif
+//	endfor
+//
+//   print numloaded, "waves uploaded"
+//   
+//   	variable	ms=stopmstimer(refnum)
+//	print ms/1e6
+//end
 
 
 
@@ -624,7 +666,8 @@ function ud()
 	string infolder =  indexedfile(data,-1,".ibw")
 	string current, current1
 	variable numstrings = itemsinlist(infolder), i, curplace, numloaded=0
-	
+	variable refnum=startmstimer
+
 	for(i=0; i<numstrings; i+=1)
 		current1 = StringFromList(i,infolder)
 		current = current1[0,(strlen(current1)-5)]
@@ -635,6 +678,7 @@ function ud()
 		endif
 	endfor
 	print numloaded, "waves uploaded"
+
 end
 
 macro plot2d(num,dataset,disp)
@@ -672,10 +716,12 @@ ModifyGraph width=0,height=0
 	
 	
 	variable inc
-	inc=(V_max-V_min)/20
-	Button autoscale,pos={52.00,9.00},size={103.00,21.00},proc=ButtonProc_2,title="high contrast"
-	Button use_lookup,pos={49.00,35.00},size={105.00,23.00},proc=ButtonProc_5,title="use lookup"
-	Button linear,pos={163.00,9.00},size={50.00,20.00},proc=ButtonProc_6,title="linear"
+	inc=(V_max-V_min)/30
+	
+//	decommentize below for peaks like CB
+//	ModifyImage $wvname ctab= {inc,V_max-inc,ColdWarm,0};ModifyImage $wvname log=1
+
+ModifyImage $wvname ctabAutoscale=3
 	
 end
 end
@@ -721,7 +767,6 @@ function centerwave(wavenm)
 	display data
 end 
 	
-	
 function subtract_bg(rs, bias, current,[identifier])
 variable rs, bias
 variable identifier
@@ -745,25 +790,21 @@ cond=1/temp *aspectrat // cond * geometry of sample =conductivity
 end	
 
 macro setparams_wide()
-ModifyGraph fSize=24
-ModifyGraph gFont="Gill Sans Light"
-ModifyGraph width={Aspect,1},height=400
+ModifyGraph fSize=14
+ModifyGraph gFont="arial"
 ModifyGraph grid=0
-ModifyGraph width=500,height=380
-ModifyGraph width=0,height=0
+ModifyGraph width=500,height=300
 endmacro
 
-macro setparams_square()
 
-Label bottom ""
-Label left ""
-	ModifyGraph fSize=24
-ModifyGraph gFont="Gill Sans Light"
-//ModifyGraph width=283.465,height={Aspect,1.62}
-ModifyGraph grid=2
-ModifyGraph width={Aspect,1},height=400
 
-endmacro
+
+
+
+
+
+
+	
 
 
 
@@ -812,6 +853,10 @@ End
 
 
 
+
+
+
+
 Function save_specwave(waveno)
 	variable waveno
 	
@@ -837,8 +882,6 @@ Function save_specwave(waveno)
 	
 End
 
-
-
 function save_waves(Anfang,Ende)
 	variable Anfang, Ende
 	variable index=Anfang
@@ -847,6 +890,14 @@ function save_waves(Anfang,Ende)
 		index += 1
 	while(index<Ende)
 end
+
+
+
+
+
+
+
+
 
 
 
@@ -865,6 +916,14 @@ Function renamewave(oldprefix,newprefix)
    endfor
    return 0
 end
+
+
+
+
+
+
+
+
 
 
 
@@ -902,12 +961,9 @@ function int_PSD(tim)
 end
 
 macro testLI()
-closeallGraphs()
-sc_openInstrConnections(0)
-setFdacAWGSquareWave(fd, 100, -100, 0.001, 0.001, 0)
+setFdacAWGSquareWave(fd, 100, -100, 0.01, 0.01, 0)
 setupAWG(fd, AWs="0", DACs="0", numCycles=1, verbose=1);
-ScanFastDAC(fd, 0, 1, "3", sweeprate=1,  use_awg=1,nosave=1, repeats = 1)
-
+ScanFastDAC(fd, -1, 1, "3", sweeprate=0.5,  repeats=1,  use_awg=1,nosave=0)
 //lock_in_main_2d(wave0_2d,1)
 //demodulate(filenum,1,"wa,[append2hdf])
 //display average
@@ -1024,23 +1080,88 @@ end
 
 
 
-function/wave rowslice(wave wav, int rownumb)
-	duplicate /o/rmd=[][rownumb,rownumb] wav, slice
-	redimension /n=(dimsize(slice, 0)) slice
-	return slice
+function/wave rowslice(wave wav,int rownumb)
+duplicate /o/rmd=[][rownumb,rownumb] wav, slice
+redimension/n=(dimsize(slice,0)) slice
+return slice
 end
 
 
 
 
-function centering(wave waved, string centered_wavename, wave mids)
-	duplicate/o waved $centered_wavename
-	wave new2dwave = $centered_wavename
+function centering(wave waved,string centered, wave mids)
+	duplicate/o waved $centered
+//	display; appendimage waved
+	wave new2dwave=$centered
 	copyscales waved new2dwave
-	wavestats /q mids
-	new2dwave = interp2d(waved, (x + mids[q] - V_avg), (y)) // mids is the shift in x
+	//new2dwave=interp2d(waved,(x+fit_params[q][3]),(y)) // column 3 is the center fit parameter
+	new2dwave=interp2d(waved,(x+mids[q]),(y)) // mids is the shift in x
+//		display; appendimage $centered
+
 end
 
+function center_xscale(wave waved)
+duplicate/o waved tempx
+tempx=x; wavestats/q tempx
+	variable shift, delta
+	shift= dimoffset(waved,0)-V_avg
+	delta=dimdelta(waved,0)
+	SetScale/P x shift,delta,"", waved
+end
+
+//function cst_centering(wave waved,string kenner_out)
+//	string w2d=nameofwave(waved)
+//	int wavenum=getfirstnum(w2d)
+//	string centered=kenner_out+num2str(wavenum)+"centered"
+//	string fit_params_name = kenner_out+num2str(wavenum)+"fit_params"
+//	wave fit_params = $fit_params_name
+//	
+//	//	duplicate /o /r = [][0] waved wavex;redimension/N=(nr) wavex; wavex = x
+//	duplicate/o waved $centered
+//	wave new2dwave=$centered
+//	copyscales waved new2dwave
+//	new2dwave=interp2d(waved,(x+fit_params[q][3]),(y)) // column 3 is the center fit parameter
+//end
+
+function/WAVE calculate_spectrum(time_series, [scan_duration, linear])
+	// Takes time series data and returns power spectrum
+	wave time_series  // Time series (in correct units -- i.e. check that it's in nA first)
+	variable scan_duration // If passing a wave which does not have Time as x-axis, this will be used to rescale
+	variable linear // Whether to return with linear scale (or log scale)
+	
+	linear = paramisDefault(linear) ? 1 : linear
+
+	duplicate/free time_series tseries
+	if (scan_duration)
+		setscale/i x, 0, scan_duration, tseries
+	else
+		scan_duration = DimDelta(time_series, 0) * DimSize(time_series, 0)
+	endif
+
+	variable last_val = dimSize(time_series,0)-1
+	if (mod(dimsize(time_series, 0), 2) != 0)  // ODD number of points, must be EVEN to do powerspec
+		last_val = last_val - 1
+	endif
+		
+	
+	// Built in powerspectrum function
+
+	if (!linear)  // Use log scale
+		DSPPeriodogram/PARS/DBR=1/NODC=2/R=[0,(last_val)] tseries  
+		wave w_Periodogram
+		duplicate/free w_Periodogram, powerspec
+		powerspec = powerspec+10*log(scan_duration)  // This is so that the powerspec is independent of scan_duration
+	else  // Use linear scale
+		DSPPeriodogram/PARS/NODC=2/R=[0, (last_val)] tseries
+		wave w_Periodogram
+		duplicate/o w_Periodogram, powerspec
+		// TODO: I'm not sure this is correct, but I don't know what should be done to fix it -- TIM
+		powerspec = powerspec*scan_duration  // This is supposed to be so that the powerspec is independent of scan_duration
+	endif
+//	powerspec[0] = NaN
+	return powerspec
+	
+end
 
 function create_y_wave(wave_2d)
 	// create global "y_wave" given a 2d array
@@ -1063,3 +1184,4 @@ function create_x_wave(wave_2d)
 	duplicate /o /RMD=[][0] $wave_2d_name x_wave
 	x_wave = x
 end
+

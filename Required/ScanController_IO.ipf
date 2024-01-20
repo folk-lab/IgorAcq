@@ -729,6 +729,7 @@ function sc_copyNewFiles(datnum, [save_experiment, verbose] )
 		if(V_flag==0)
 			abort "[ERROR] A path is missing. Data not backed up to server."
 		endif
+		
 	endfor
 	
 	// add experiment/history/procedure files
