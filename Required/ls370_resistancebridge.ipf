@@ -64,7 +64,8 @@ function setLS370system(system)
 			string/g bfbd_ChannelLookUp = "mc;still;magnet;4K;50K;ch6;ch5;ch3;ch2;ch1;6;5;3;2;1"  
 			string/g bfheaterlookup = "mc;still;sc_mc;ao2"							 		//sc_mc only used internally, still label refers to API 	
 //			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,290,1201,1800,10000}} 
-			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,510,1201,1800,10000}} 
+//			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,95,510,1201,1800,10000}} 
+			make/o mcheatertemp_lookup = {{31.6e-3,100e-3,316e-3,1.0,3.16,10,31.6,100},{0,10,30,70,250,1201,1800,10000}} 
 			break
 		default:
 			abort "[ERROR] Please choose a supported LS370 system: [bfsmall, bfbig]"
@@ -930,6 +931,7 @@ end
 function/s getLS370Status(instrID)
 	// instrID is passed to getLS370temp if needed
 	string instrID
+	print instrID
 
 	svar ls_system
 	string channelLabel="", stillLabel="", ch_idx="", file_name = ""
@@ -1014,7 +1016,7 @@ function/s getLS370Status(instrID)
 //
 //	string buffer = addJSONkeyval(tempBuffer,"Heaters",heatBuffer)
 	string buffer = tempBuffer
-	
+	print buffer
 	return addJSONkeyval("","Lakeshore",buffer)
 
 //	string buffer

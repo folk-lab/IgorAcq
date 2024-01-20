@@ -141,47 +141,47 @@ function plot_multiple_line_paths(wave_2d, y_wave, x_wave, [width_y, width_x, of
 	Display2DWaterfall(line_path_2d_z, offset = offset, plot_every_n = 1, plot_contour = plot_contour)
 end
 
-
-
-function get_multiple_line_paths_int(wave_2d, y_wave, x_wave, [width_y, width_x, num_traces])
-	wave wave_2d, y_wave, x_wave
-	variable width_y, width_x
-	int num_traces
-	
-	width_y = paramisdefault(width_y) ? 10 : width_y
-	width_x = paramisdefault(width_y) ? 0 : width_x
-	num_traces = paramisdefault(width_y) ? 10 : num_traces
-	
-	string wave_name = nameofwave(wave_2d)
-	
-	get_multiple_line_paths(wave_2d, y_wave, x_wave, width_y = width_y, width_x = width_x, num_traces = num_traces)
-	
-	wave line_path_2d_z, line_path_2d_y, line_path_2d_x
-	
-	///// display original 2d image with each trace
-	string window_name = "line_path_traces"
-	dowindow/k $window_name
-	display/N=$window_name
-	appendimage /W=$window_name wave_2d
-	ModifyImage /W=$window_name $wave_name ctab= {-0.005, 0.005, RedWhiteGreen, 0}
-	variable num_columns = dimsize(line_path_2d_y, 1)
-	variable i
-	for (i = 0; i < num_columns; i++)
-		appendtograph /W=$window_name line_path_2d_y[][i] vs line_path_2d_x[][i]
-	endfor
-	
-	///// integrate line paths and remove y offset
-	Integrate line_path_2d_z /D = line_path_2d_z_int
-	
-	offset_2d_traces(line_path_2d_z_int)
-	
-	// display integrated line traces
-	window_name = "line_path_traces_z_int"
-	dowindow/k $window_name
-	display/N=$window_name
-	appendimage /W=$window_name line_path_2d_z_int
-	ModifyImage /W=$window_name line_path_2d_z_int ctab= {*,*,RedWhiteGreen,0}	
-end
+//
+//
+//function get_multiple_line_paths_int(wave_2d, y_wave, x_wave, [width_y, width_x, num_traces])
+//	wave wave_2d, y_wave, x_wave
+//	variable width_y, width_x
+//	int num_traces
+//	
+//	width_y = paramisdefault(width_y) ? 10 : width_y
+//	width_x = paramisdefault(width_y) ? 0 : width_x
+//	num_traces = paramisdefault(width_y) ? 10 : num_traces
+//	
+//	string wave_name = nameofwave(wave_2d)
+//	
+//	get_multiple_line_paths(wave_2d, y_wave, x_wave, width_y = width_y, width_x = width_x, num_traces = num_traces)
+//	
+//	wave line_path_2d_z, line_path_2d_y, line_path_2d_x
+//	
+//	///// display original 2d image with each trace
+//	string window_name = "line_path_traces"
+//	dowindow/k $window_name
+//	display/N=$window_name
+//	appendimage /W=$window_name wave_2d
+//	ModifyImage /W=$window_name $wave_name ctab= {-0.005, 0.005, RedWhiteGreen, 0}
+//	variable num_columns = dimsize(line_path_2d_y, 1)
+//	variable i
+//	for (i = 0; i < num_columns; i++)
+//		appendtograph /W=$window_name line_path_2d_y[][i] vs line_path_2d_x[][i]
+//	endfor
+//	
+//	///// integrate line paths and remove y offset
+//	Integrate line_path_2d_z /D = line_path_2d_z_int
+//	
+//	offset_2d_traces(line_path_2d_z_int)
+//	
+//	// display integrated line traces
+//	window_name = "line_path_traces_z_int"
+//	dowindow/k $window_name
+//	display/N=$window_name
+//	appendimage /W=$window_name line_path_2d_z_int
+//	ModifyImage /W=$window_name line_path_2d_z_int ctab= {*,*,RedWhiteGreen,0}	
+//end
 
 
 
