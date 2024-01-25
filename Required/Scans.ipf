@@ -826,7 +826,7 @@ tic()
 
 
 		
-			//DoUpdate 
+			DoUpdate 
 		
 		
 		// Ramp fast axis to start

@@ -705,8 +705,8 @@ if (disp==1)
 //Label bottom xlabel
 //Label left ylabel
 
-ModifyGraph fSize=24
-ModifyGraph gFont="Gill Sans Light"
+ModifyGraph fSize=18
+ModifyGraph gFont="Arial"
 ModifyGraph grid=0
 ModifyGraph width={Aspect,1.62},height=300
 ModifyGraph width=0,height=0
