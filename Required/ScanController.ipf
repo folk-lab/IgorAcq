@@ -34,6 +34,28 @@ ipf#pragma rtGlobals=3		// Use modern global access method and strict wave acces
 ///////// utility functions //// (scu_...)
 ////////////////////////////////
 
+macro initparams()
+//some parameters need to be initialized first
+	fd_initGlobalAWG()
+	variable /g sc_abortsweep, sc_abortnosave, sc_pause
+endmacro
+
+function testvisa()
+			variable retcnt
+//			viWrite(1, "*IDN?\r", 6, retcnt);		
+			string response= readInstr(1, read_term="\n", read_bytes=10)
+			print response
+end
+
+Function VISAGetAttrBaud()
+	Variable bufsize			// Output
+
+	Variable status
+	status = viGetAttribute(1, VI_ATTR_RD_BUF_SIZE, bufsize)
+	print bufsize
+End
+
+
 function scu_assertSeparatorType(list_string, assert_separator)
 	// If the list_string does not include <assert_separator> but does include the other common separator between "," and ";" then 
 	// an error is raised
@@ -4382,7 +4404,7 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only, skip_raw2ca
    // hold incoming data chunks in string and distribute to data waves
    string buffer = ""
    variable bytes_read = 0, totaldump = 0 
-   variable saveBuffer = 1000 // Allow getting up to 1000 bytes behind. (Note: Buffer size is 4096 bytes and cannot be changed in Igor)
+   variable saveBuffer = 10000 // Allow getting up to 1000 bytes behind. (Note: Buffer size is 4096 bytes and cannot be changed in Igor)
    variable bufferDumpStart = stopMSTimer(-2) //
 
    variable bytesSec = roundNum(2*S.samplingFreq,0)
@@ -4391,7 +4413,6 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only, skip_raw2ca
    variable expected_bytes_in_buffer = 0 // For storing how many bytes are expected to be waiting in buffer
 
 
-	// 2023-09 -- NOTE FROM TIM TO JOHANN -- If you see a merge commit error around here, it's because I had a merge error around here when fixing the plotting stuff. I had to select the old version of this code again, but you'll want your newer version (that loops through all fastdacs rather than just the one with S.instrIDx)
 
    
 	if(paramisdefault(skip_raw2calc))  // If skip_raw2calc not passed, set it to 0
