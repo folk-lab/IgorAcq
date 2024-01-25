@@ -356,6 +356,23 @@ end
 
 
 
+//<<<<<<< Updated upstream
+//=======
+//	variable i=0
+//	rowslice(spectrum,i)
+//	DSPPeriodogram/R=[1,(new_numptsx)] /PARS/NODC=2/DEST=W_Periodogram slice
+//	duplicate/o w_Periodogram, powerspec
+//	i=1
+//	do
+//		rowslice(spectrum,i)
+//		DSPPeriodogram/R=[1,(new_numptsx)]/PARS/NODC=2/DEST=W_Periodogram slice
+//		powerspec=powerspec+W_periodogram
+//		i=i+1
+//	while(i<dimsize(spectrum,1))
+//	
+////	powerspec[0]=nan
+//	powerspec[0, x2pnt(powerspec, 10)] = 0
+//>>>>>>> Stashed changes
 
 
 
@@ -433,9 +450,6 @@ function /s avg_wav(wave wav) // /WAVE lets your return a wave
 	string avg_name=wn+"_avg";
 	int nc
 	int nr
-
-//	wn="dat"+num2str(wavenum)+dataset //current 2d array
-
 	nr = dimsize($wn,0) //number of rows (sweep length)
 	nc = dimsize($wn,1) //number of columns (repeats)
 
@@ -1185,3 +1199,29 @@ function create_x_wave(wave_2d)
 	x_wave = x
 end
 
+
+
+
+Function GetFreeMemory()
+    variable freeMem
+
+#if defined(IGOR64)
+    freeMem = NumberByKey("PHYSMEM", IgorInfo(0)) - NumberByKey("USEDPHYSMEM", IgorInfo(0))
+#else
+    freeMem = NumberByKey("FREEMEM", IgorInfo(0))
+#endif
+
+    return freeMem / 1024 / 1024 / 1024
+End
+//function rescalex(wave wav, variable factor)
+//variable low=indextoScale(wav,0,0)*factor;
+//variable high=indextoScale(wav,inf,0)*factor;
+//SetScale/I x low,high,"", wav
+//end
+//
+//function rescaley(wave wav, variable factor)
+//variable low=indextoScale(wav,0,1)*factor;
+//variable high=indextoScale(wav,inf,1)*factor;
+//SetScale/I y low,high,"", wav
+//end
+//
