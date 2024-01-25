@@ -4927,7 +4927,7 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only, skip_raw2ca
 	int i
 	string fdIDname
 	nvar sc_plotraw
-	//print "total bytes expected:"+num2str(totalByteReturn)
+	print "total bytes expected:"+num2str(totalByteReturn)
 	if (totalByteReturn >2e5)
 	panic_mode=1
 	endif
@@ -4939,16 +4939,16 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only, skip_raw2ca
 
 
 			expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)
-			//print "expected_bytes_in_buffer:"+num2str(expected_bytes_in_buffer)
+			print "expected_bytes_in_buffer:"+num2str(expected_bytes_in_buffer)
 
 			scfd_readChunk(fdID, read_chunk, buffer)	// puts data into buffer
 			scfd_distributeData1(buffer, S, bytes_read, totalByteReturn, read_chunk, rowNum, fdIDname = fdIDname)
 			scfd_checkSweepstate(fdID)
-			//print "read chunk:"+num2str(read_chunk)
+			print "read chunk:"+num2str(read_chunk)
 
 
 			bytes_read += read_chunk
-			//print "bytes_read:"+num2str(bytes_read)
+			print "bytes_read:"+num2str(bytes_read)
 
 			if(!panic_mode && expected_bytes_in_buffer < saveBuffer)// if we aren't too far behind then update Raw 1D graphs
 
@@ -4999,17 +4999,17 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only, skip_raw2ca
 			scfd_checkSweepstate(fdID)
 		endfor
 		read_chunk=strlen(buffer)
-		//print "read chunk:"+num2str(read_chunk)
+		print "read chunk:"+num2str(read_chunk)
 
 
 		bytes_read += read_chunk
-	//	print "bytes_read:"+num2str(bytes_read)
+		print "bytes_read:"+num2str(bytes_read)
 
-		//   variable st = stopMSTimer(-2)
+		   variable st = stopMSTimer(-2)
 
 		scg_updateFrequentGraphs()
 
-		//   printf "scg_updateFrequentGraphs took %.2f ms\r", (stopMSTimer(-2) - st)/1000
+		   printf "scg_updateFrequentGraphs took %.2f ms\r", (stopMSTimer(-2) - st)/1000
 
 
 		return panic_mode
@@ -5030,7 +5030,7 @@ function scfd_getReadChunkSize(numADCs, numpts, bytesSec, totalByteReturn)
 	// Returns the size of chunks that should be read at a time
 	variable numADCs, numpts, bytesSec, totalByteReturn
 
-	variable read_duration = 1  // Make readchunk s.t. it nominally take this time to fill
+	variable read_duration = 0.2  // Make readchunk s.t. it nominally take this time to fill
 	variable chunksize = (round(bytesSec*read_duration) - mod(round(bytesSec*read_duration),numADCs*2))
 
 	variable read_chunk=0
