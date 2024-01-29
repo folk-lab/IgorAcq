@@ -4916,13 +4916,13 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only, skip_raw2ca
 	variable bytes_read = 0, totaldump = 0
 	variable saveBuffer = 10000 // Allow getting up to 1000 bytes behind. (Note: Buffer size is 4096 (looks more like 5000) bytes and cannot be changed in Igor)
 	// on a Mac the buffer is ~17800; that is determined by running a scan with 8900points (at 12.5K speed) and pause for 2s before reading the buffer) successfully.
-//	On the other hand the same test with 9000pts gives error
-	  //readInstr() -- viRead error (ffffffffbfff0015): Timeout expired before operation completed.
-	  //which indicates that there are not as many bits in the buffer as viRead is expecting. 
-	  //BUT a Visa timeout of 3000ms is needed for read_chunks larger than 4000pts. The default VISA TO is 2000ms it can bechanged by
-	  	//visaSetTimeout(instrID, 3000) but there is no reason to do that, so better to leave the chunks smallish. This was all tested with sampling freq of 12.5K
+	//	On the other hand the same test with 9000pts gives error
+	//readInstr() -- viRead error (ffffffffbfff0015): Timeout expired before operation completed.
+	//which indicates that there are not as many bits in the buffer as viRead is expecting.
+	//BUT a Visa timeout of 3000ms is needed for read_chunks larger than 4000pts. The default VISA TO is 2000ms it can bechanged by
+	//visaSetTimeout(instrID, 3000) but there is no reason to do that, so better to leave the chunks smallish. This was all tested with sampling freq of 12.5K
 
-	  
+
 
 	variable bufferDumpStart = stopMSTimer(-2)
 	variable bytesSec = roundNum(2*S.samplingFreq,0)
@@ -4931,9 +4931,9 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only, skip_raw2ca
 	variable expected_bytes_in_buffer = 0 // For storing how many bytes are expected to be waiting in buffer
 
 	int i
-//	this is stuff to see if the buffer emptying is slowing down over time
+	//	this is stuff to see if the buffer emptying is slowing down over time
 	variable counter=0
-	variable le=floor(totalByteReturn/read_chunk);
+	variable le=floor(totalByteReturn/read_chunk)-1;
 	make/o/N=(le) howslow
 
 	string fdIDname
@@ -4943,18 +4943,19 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only, skip_raw2ca
 	print "bytesSec:",bytesSec
 
 	if (totalByteReturn >2e5)
-	panic_mode=1
+		panic_mode=1
 	endif
 	do
 		for(i=0; i<itemsinlist(S.instrIDs); i++)
 			fdIDname = stringfromlist(i,S.instrIDs)
 			nvar fdID = $fdIDname
 
-
-//			expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)
-//			howslow[counter]=expected_bytes_in_buffer
-//			doupdate
-//			counter=counter+1
+			if (i>0)
+				expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)
+				howslow[counter]=expected_bytes_in_buffer
+				doupdate
+				counter=counter+1
+			endif
 			//print "expected_bytes_in_buffer:"+num2str(expected_bytes_in_buffer)
 
 			scfd_readChunk(fdID, read_chunk, buffer)	// puts data into buffer
@@ -4965,31 +4966,28 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only, skip_raw2ca
 
 			bytes_read += read_chunk
 			//print "bytes_read:"+num2str(bytes_read)
-			
-						expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)
-			howslow[counter]=expected_bytes_in_buffer
-			doupdate
-			counter=counter+1
-			
+
+
+
 
 			if(!panic_mode && expected_bytes_in_buffer < saveBuffer)// if we aren't too far behind then update Raw 1D graphs
 
 				if(!sc_plotRaw)
 					scfd_raw2CalcQuickDistribute()
 				endif
-       		if (!skip_raw2calc)							// Vahid's change which is quite similar to Tim's change commentated above.
+				if (!skip_raw2calc)							// Vahid's change which is quite similar to Tim's change commentated above.
 					scfd_raw2CalcQuickDistribute()
 				endif
 
-	scg_updateFrequentGraphs()
-     			expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)// Basically checking how long graph updates took
+				scg_updateFrequentGraphs()
+				expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)// Basically checking how long graph updates took
 
 				if(expected_bytes_in_buffer > 17000)
-       			printf "ERROR[scfd_RecordBuffer]: After updating graphs, buffer is expected to overflow... Expected buffer size = %d (max = 4096). Bytes read so far = %d\r" expected_bytes_in_buffer, bytes_read
-       		elseif (expected_bytes_in_buffer > 13000)
+					printf "ERROR[scfd_RecordBuffer]: After updating graphs, buffer is expected to overflow... Expected buffer size = %d (max = 4096). Bytes read so far = %d\r" expected_bytes_in_buffer, bytes_read
+				elseif (expected_bytes_in_buffer > 13000)
 					printf "WARNING[scfd_RecordBuffer]: Last graph update resulted in buffer becoming close to full (%d of 4096 bytes). Entering panic_mode (no more graph updates)\r", expected_bytes_in_buffer
 					panic_mode = 1
-       		endif
+				endif
 			else
 				if (expected_bytes_in_buffer > 14000)
 					printf "DEBUGGING: getting behind: Expecting %d bytes in buffer (max 4096)\r" expected_bytes_in_buffer
@@ -5006,35 +5004,35 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only, skip_raw2ca
 			endif
 
 
-			endfor
-		while(totalByteReturn-bytes_read > read_chunk)
-
-		// do one last read if any data left to read
-		variable bytes_left = totalByteReturn-bytes_read
-		for(i=0; i<itemsinlist(S.instrIDs); i++)
-			fdIDname = stringfromlist(i,S.instrIDs)
-			nvar fdID = $fdIDname
-			if(bytes_left > 0)
-				scfd_readChunk(fdID, bytes_left, buffer)  // puts data into buffer
-				scfd_distributeData1(buffer, S, bytes_read, totalByteReturn, bytes_left, rowNum, fdIDname = fdIDname)
-			endif
-			scfd_checkSweepstate(fdID)
 		endfor
-		read_chunk=strlen(buffer)
-		print "read chunk:"+num2str(read_chunk)
+	while(totalByteReturn-bytes_read > read_chunk)
+
+	// do one last read if any data left to read
+	variable bytes_left = totalByteReturn-bytes_read
+	for(i=0; i<itemsinlist(S.instrIDs); i++)
+		fdIDname = stringfromlist(i,S.instrIDs)
+		nvar fdID = $fdIDname
+		if(bytes_left > 0)
+			scfd_readChunk(fdID, bytes_left, buffer)  // puts data into buffer
+			scfd_distributeData1(buffer, S, bytes_read, totalByteReturn, bytes_left, rowNum, fdIDname = fdIDname)
+		endif
+		scfd_checkSweepstate(fdID)
+	endfor
+	read_chunk=strlen(buffer)
+	print "read chunk:"+num2str(read_chunk)
 
 
-		bytes_read += read_chunk
-		print "bytes_read:"+num2str(bytes_read)
+	bytes_read += read_chunk
+	print "bytes_read:"+num2str(bytes_read)
 
-		   variable st = stopMSTimer(-2)
+	variable st = stopMSTimer(-2)
 
-		scg_updateFrequentGraphs()
+	scg_updateFrequentGraphs()
 
-		   printf "scg_updateFrequentGraphs took %.2f ms\r", (stopMSTimer(-2) - st)/1000
+	printf "scg_updateFrequentGraphs took %.2f ms\r", (stopMSTimer(-2) - st)/1000
 
 
-		return panic_mode
+	return panic_mode
 
 end
 
