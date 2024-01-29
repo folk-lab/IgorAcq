@@ -332,6 +332,9 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 	
 	variable start, fin, repeats, numptsx, sweeprate, delay, ramprate, alternate, nosave, use_awg
 	string channels, x_label, y_label, comments, starts, fins, interlaced_channels, interlaced_setpoints
+	make/o/N=(repeats) speedtrend
+	variable V_avg
+	wave howslow
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -401,6 +404,8 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 
 		// Record values for 1D sweep
 		scfd_RecordValues(S, j, AWG_List = AWG)
+		wavestats/q howslow
+		speedtrend[j]=V_avg
 
 		if (alternate!=0) // If want to alternate scan scandirection for next row
 			d = d*-1

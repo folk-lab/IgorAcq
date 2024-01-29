@@ -4951,10 +4951,10 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only, skip_raw2ca
 			nvar fdID = $fdIDname
 
 
-			expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)
-			howslow[counter]=expected_bytes_in_buffer
-			doupdate
-			counter=counter+1
+//			expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)
+//			howslow[counter]=expected_bytes_in_buffer
+//			doupdate
+//			counter=counter+1
 			//print "expected_bytes_in_buffer:"+num2str(expected_bytes_in_buffer)
 
 			scfd_readChunk(fdID, read_chunk, buffer)	// puts data into buffer
@@ -4965,6 +4965,12 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only, skip_raw2ca
 
 			bytes_read += read_chunk
 			//print "bytes_read:"+num2str(bytes_read)
+			
+						expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)
+			howslow[counter]=expected_bytes_in_buffer
+			doupdate
+			counter=counter+1
+			
 
 			if(!panic_mode && expected_bytes_in_buffer < saveBuffer)// if we aren't too far behind then update Raw 1D graphs
 
