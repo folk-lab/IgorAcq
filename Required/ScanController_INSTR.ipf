@@ -247,6 +247,7 @@ threadsafe function/s readInstr(instrID, [read_term, read_bytes, binary])
         // read termination character read_term
         visaSetReadTerm(instrID, read_term)
         visaSetReadTermEnable(instrID, 1)
+//print "read_term:", read_term,"!"
 
     else
         // in this case it will read until some END signal
@@ -255,7 +256,11 @@ threadsafe function/s readInstr(instrID, [read_term, read_bytes, binary])
     endif
     
     if(!paramIsDefault(binary))
-    	 visaSetSerialEndIn(instrID, 0)
+    	 //visaSetSerialEndIn(instrID, 0)
+    	 viSetAttribute(instrID, VI_ATTR_TERMCHAR_EN, 0)	// Disable terminator character detection
+		viSetAttribute(instrID, VI_ATTR_ASRL_END_IN, 0)	// Disable terminator character detection for serial ports
+
+//print "binary:", binary
    	 else
    	    binary = 0
    	 	 visaSetSerialEndIn(instrID, 2)
@@ -265,6 +270,8 @@ threadsafe function/s readInstr(instrID, [read_term, read_bytes, binary])
         read_bytes = 1024
     endif
 
+
+//print "read_bytes:", read_bytes
     string buffer, err
     variable return_count
     variable status = viRead(instrID, buffer, read_bytes, return_count)
@@ -279,6 +286,8 @@ threadsafe function/s readInstr(instrID, [read_term, read_bytes, binary])
 	 		return "Nan"
 	 	endif
 	 endif
+	 //print "return_count:", return_count
+
 	 return buffer
 end
 

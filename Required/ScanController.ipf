@@ -4914,24 +4914,37 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only, skip_raw2ca
 	// hold incoming data chunks in string and distribute to data waves
 	string buffer = ""
 	variable bytes_read = 0, totaldump = 0
-	variable saveBuffer = 1000 // Allow getting up to 1000 bytes behind. (Note: Buffer size is 4096 (looks more like 5000) bytes and cannot be changed in Igor)
+	variable saveBuffer = 10000 // Allow getting up to 1000 bytes behind. (Note: Buffer size is 4096 (looks more like 5000) bytes and cannot be changed in Igor)
+	// on a Mac the buffer is ~17800; that is determined by running a scan with 8900points (at 12.5K speed) and pause for 2s before reading the buffer) successfully.
+//	On the other hand the same test with 9000pts gives error
+	  //readInstr() -- viRead error (ffffffffbfff0015): Timeout expired before operation completed.
+	  //which indicates that there are not as many bits in the buffer as viRead is expecting. 
+	  //BUT a Visa timeout of 3000ms is needed for read_chunks larger than 4000pts. The default VISA TO is 2000ms it can bechanged by
+	  	//visaSetTimeout(instrID, 3000) but there is no reason to do that, so better to leave the chunks smallish. This was all tested with sampling freq of 12.5K
+
+	  
+
 	variable bufferDumpStart = stopMSTimer(-2)
-
 	variable bytesSec = roundNum(2*S.samplingFreq,0)
-
 	variable read_chunk = scfd_getReadChunkSize(S.maxADCs, S.numptsx, bytesSec, totalByteReturn) //numADCs is probably wrong, it should be maxADC count I belive
-
 	variable panic_mode = record_only  // If Igor gets behind on reading at any point, it will go into panic mode and focus all efforts on clearing buffer.
 	variable expected_bytes_in_buffer = 0 // For storing how many bytes are expected to be waiting in buffer
 
 	int i
+//	this is stuff to see if the buffer emptying is slowing down over time
+	variable counter=0
+	variable le=floor(totalByteReturn/read_chunk);
+	make/o/N=(le) howslow
+
 	string fdIDname
 	nvar sc_plotraw
 	print "total bytes expected:"+num2str(totalByteReturn)
+	print "read chunk:"+num2str(read_chunk)
+	print "bytesSec:",bytesSec
+
 	if (totalByteReturn >2e5)
 	panic_mode=1
 	endif
-
 	do
 		for(i=0; i<itemsinlist(S.instrIDs); i++)
 			fdIDname = stringfromlist(i,S.instrIDs)
@@ -4939,16 +4952,19 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only, skip_raw2ca
 
 
 			expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)
-			print "expected_bytes_in_buffer:"+num2str(expected_bytes_in_buffer)
+			howslow[counter]=expected_bytes_in_buffer
+			doupdate
+			counter=counter+1
+			//print "expected_bytes_in_buffer:"+num2str(expected_bytes_in_buffer)
 
 			scfd_readChunk(fdID, read_chunk, buffer)	// puts data into buffer
 			scfd_distributeData1(buffer, S, bytes_read, totalByteReturn, read_chunk, rowNum, fdIDname = fdIDname)
 			scfd_checkSweepstate(fdID)
-			print "read chunk:"+num2str(read_chunk)
+			//print "read chunk:"+num2str(read_chunk)
 
 
 			bytes_read += read_chunk
-			print "bytes_read:"+num2str(bytes_read)
+			//print "bytes_read:"+num2str(bytes_read)
 
 			if(!panic_mode && expected_bytes_in_buffer < saveBuffer)// if we aren't too far behind then update Raw 1D graphs
 
@@ -4962,14 +4978,14 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only, skip_raw2ca
 	scg_updateFrequentGraphs()
      			expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)// Basically checking how long graph updates took
 
-				if(expected_bytes_in_buffer > 4096)
+				if(expected_bytes_in_buffer > 17000)
        			printf "ERROR[scfd_RecordBuffer]: After updating graphs, buffer is expected to overflow... Expected buffer size = %d (max = 4096). Bytes read so far = %d\r" expected_bytes_in_buffer, bytes_read
-       		elseif (expected_bytes_in_buffer > 3000)
+       		elseif (expected_bytes_in_buffer > 13000)
 					printf "WARNING[scfd_RecordBuffer]: Last graph update resulted in buffer becoming close to full (%d of 4096 bytes). Entering panic_mode (no more graph updates)\r", expected_bytes_in_buffer
 					panic_mode = 1
        		endif
 			else
-				if (expected_bytes_in_buffer > 3500)
+				if (expected_bytes_in_buffer > 14000)
 					printf "DEBUGGING: getting behind: Expecting %d bytes in buffer (max 4096)\r" expected_bytes_in_buffer
 					if (panic_mode == 0)
 						panic_mode = 1
@@ -5030,7 +5046,7 @@ function scfd_getReadChunkSize(numADCs, numpts, bytesSec, totalByteReturn)
 	// Returns the size of chunks that should be read at a time
 	variable numADCs, numpts, bytesSec, totalByteReturn
 
-	variable read_duration = 0.2  // Make readchunk s.t. it nominally take this time to fill
+	variable read_duration = 0.25  // Make readchunk s.t. it nominally take this time to fill
 	variable chunksize = (round(bytesSec*read_duration) - mod(round(bytesSec*read_duration),numADCs*2))
 
 	variable read_chunk=0
@@ -5978,3 +5994,4 @@ function scfw_SetGUIinteraction(numDevices)
 			endif
 	endswitch
 end
+
