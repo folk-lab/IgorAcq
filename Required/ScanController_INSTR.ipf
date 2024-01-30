@@ -274,8 +274,9 @@ threadsafe function/s readInstr(instrID, [read_term, read_bytes, binary])
 //print "read_bytes:", read_bytes
     string buffer, err
     variable return_count
-    variable status = viRead(instrID, buffer, read_bytes, return_count)
+    variable status = viRead(instrID, buffer, read_bytes, return_count); print status
     if(status != 0 && status != 0x3fff0006 && status != 0x3fff0005) // 0x3fff0006 means read_bytes = return_count (NOT AN ERROR).
+    
         VISAerrormsg("readInstr() -- viRead", instrID, status)
     	return "NaN" // abort not supported in threads (v7)
 	 endif
@@ -287,6 +288,7 @@ threadsafe function/s readInstr(instrID, [read_term, read_bytes, binary])
 	 	endif
 	 endif
 	 //print "return_count:", return_count
+
 
 	 return buffer
 end
