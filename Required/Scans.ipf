@@ -814,7 +814,7 @@ tic()
 			endif
 		else
 			// Ramp slow axis and check for repeats too
-		if (S.repeats>1)
+		if (S.repeats>=1)
 			if (mod(i, S.repeats) == 0) // Ramp slow axis only for first of interlaced setpoints
 			toc()
 				rampToNextSetpoint(S, 0, outer_index=i, y_only=1, fastdac=!use_bd, ignore_lims=1); tic()
