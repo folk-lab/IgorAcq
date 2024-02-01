@@ -2040,7 +2040,9 @@ function/s fd_start_sweep(S, [AWG_list])
 				
 				// if only AW1 is populated, it is remapped to AW0 because the command AWG_RAMP only knows how many waves to use. So if we say
 				// numWaves = 1, it will always assume AW0
-				
+				if (numtype(strlen(AW1_dacs)) == 2)
+					AW1_dacs = ""
+				endif
 				if(!cmpstr(AW0_dacs,"") && !cmpstr(AW1_dacs,""))
 					for(j=0 ; j<8 ; j++)
 						if(strsearch(num2str(j),dacs,0) == -1)
@@ -2233,5 +2235,6 @@ function fd_getGlobalAWG(S)
 	S.numCycles = v[8]
 	S.numSteps = v[9]
 	S.maxADCs = v[10]
+	
 end
 

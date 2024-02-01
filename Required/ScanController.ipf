@@ -276,6 +276,12 @@ function/s scu_getDeviceChannels(instrID, channels, [adc_flag, reversal])
 	if (strlen(new_channels) > 0 && cmpstr(channels[strlen(channels)-1], sep) != 0) // remove trailing ; or , if it WASN'T present initially
 		new_channels = new_channels[0,strlen(new_channels)-2] 
 	endif
+	
+	// if NaN
+	if (stringmatch(new_channels, "NaN") == 1)
+		new_channels = ""
+	endif
+	
 	return new_channels
 end
 
@@ -4922,7 +4928,7 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only, skip_raw2ca
    
    variable panic_mode = record_only  // If Igor gets behind on reading at any point, it will go into panic mode and focus all efforts on clearing buffer.
    variable expected_bytes_in_buffer = 0 // For storing how many bytes are expected to be waiting in buffer
-
+//print read_chunk
 	int i
 	string fdIDname
 	nvar sc_plotraw
