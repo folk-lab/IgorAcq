@@ -796,7 +796,7 @@ function ScanFastDAC2D(fdID, startx, finx, channelsx, starty, finy, channelsy, n
 
 	// Initialize waves and graphs
 	initializeScan(S, y_label = y_label)
-tic()
+
 	// Main measurement loop
 	int i=0, j=0, d=1
 	variable setpointy, sy, fy
@@ -816,8 +816,8 @@ tic()
 			// Ramp slow axis and check for repeats too
 		if (S.repeats>=1)
 			if (mod(i, S.repeats) == 0) // Ramp slow axis only for first of interlaced setpoints
-			toc()
-				rampToNextSetpoint(S, 0, outer_index=i, y_only=1, fastdac=!use_bd, ignore_lims=1); tic()
+			
+				rampToNextSetpoint(S, 0, outer_index=i, y_only=1, fastdac=!use_bd, ignore_lims=1); 
 			endif
 		endif
 		endif
@@ -851,7 +851,7 @@ tic()
   	else
   		dowindow /k SweepControl
 	endif
-toc()
+
 end
 
 

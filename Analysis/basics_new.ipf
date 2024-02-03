@@ -489,14 +489,7 @@ end
 
 
 
-function stopalltimers()
-variable i
-i=0
-do
-print stopMSTimer(i)
-i=i+1
-while(i<9)
-end
+
 
 function dat2num(string datname)
 	variable datnum
