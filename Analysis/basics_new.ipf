@@ -533,14 +533,6 @@ function crop_wave(wave wav, variable x_mid, variable y_mid, variable x_width, v
 end
 
 
-function stopalltimers()
-variable i
-i=0
-do
-print stopMSTimer(i)
-i=i+1
-while(i<9)
-end
 
 	
 	
@@ -1081,3 +1073,14 @@ Function GetFreeMemory()
 
     return freeMem / 1024 / 1024 / 1024
 End
+
+
+function stopalltimers()
+	wave timers
+	
+	int i = 0
+	do
+		timers[i] = stopMSTimer(i)
+		i += 1
+	while(i < 9)
+end
