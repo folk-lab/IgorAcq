@@ -413,8 +413,8 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 		// SaveWaves(msg=comments, fastdac=1)
 	else
 		dowindow /k SweepControl
+		set_indep()
 	endif
-	
 end
 
 

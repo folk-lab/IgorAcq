@@ -1697,9 +1697,16 @@ function scg_open2Dgraph(wn, x_label, y_label, [heat_label])
 end
 
 
-function scg_setupGraph1D(graphID, x_label, [y_label])
+function scg_setupGraph1D(graphID, x_label, [y_label, datnum])
     // Sets up the axis labels, and datnum for a 1D graph
     string graphID, x_label, y_label
+    variable datnum
+    
+    // this seems like a change from back in the day when alternate bias was getting used
+    // not sure why this is necessary. But I will comment it out for now.
+    // As the 1d and 2d display datnums do not agree. 2024-02-12: Johann
+//    datnum = paramisdefault(datnum) ? 0 : datnum // alternate_bias OFF is default
+
     
     // Handle Defaults
     y_label = selectString(paramIsDefault(y_label), y_label, "")
@@ -1712,8 +1719,13 @@ function scg_setupGraph1D(graphID, x_label, [y_label])
     Label /W=$graphID left, y_label
 
 	nvar filenum
+	datnum = filenum
 	
-    TextBox /W=$graphID/C/N=datnum/A=LT/X=1.0/Y=1.0/E=2 "Dat"+num2str(filenum)
+//	if (datnum == 0)
+//		datnum = filenum - 1
+//	endif
+	
+    TextBox /W=$graphID/C/N=datnum/A=LT/X=1.0/Y=1.0/E=2 "Dat"+num2str(datnum)
 end
 
 
@@ -4925,10 +4937,9 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only, skip_raw2ca
    variable bytesSec = roundNum(2*S.samplingFreq,0)
    
    variable read_chunk = scfd_getReadChunkSize(S.maxADCs, S.numptsx, bytesSec, totalByteReturn) //numADCs is probably wrong, it should be maxADC count I belive
-   
    variable panic_mode = record_only  // If Igor gets behind on reading at any point, it will go into panic mode and focus all efforts on clearing buffer.
    variable expected_bytes_in_buffer = 0 // For storing how many bytes are expected to be waiting in buffer
-//print read_chunk
+ 	//read_chunk=1000
 	int i
 	string fdIDname
 	nvar sc_plotraw
@@ -4942,36 +4953,47 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only, skip_raw2ca
     		scfd_checkSweepstate(fdID)
  	      
     		bytes_read += read_chunk      
-    		expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)      
-    		if(!panic_mode && expected_bytes_in_buffer < saveBuffer)  // if we aren't too far behind then update Raw 1D graphs
-    		
-//       		if(!sc_plotRaw)
-//       			scfd_raw2CalcQuickDistribute()
+////    		expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)   
+//
+//       		
+//	   		if (!skip_raw2calc) // Vahid's change which is quite similar to Tim's change commentated above. 
+//				scfd_raw2CalcQuickDistribute()
+//			endif
+//   		
+//   			scg_updateFrequentGraphs() 
+// 			expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)  // Basically checking how long graph updates took
+//	 			
+//
+// 
+//    		if(!panic_mode && expected_bytes_in_buffer < saveBuffer)  // if we aren't too far behind then update Raw 1D graphs
+//    		
+////       		if(!sc_plotRaw)
+////       			scfd_raw2CalcQuickDistribute()
+////       		endif
+//       		
+//       		if (!skip_raw2calc) // Vahid's change which is quite similar to Tim's change commentated above. 
+//					scfd_raw2CalcQuickDistribute()
+//				endif
+//       		
+//       		scg_updateFrequentGraphs() 
+//     			expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)  // Basically checking how long graph updates took
+//     			
+//				if(expected_bytes_in_buffer > 4096)
+//       			printf "ERROR[scfd_RecordBuffer]: After updating graphs, buffer is expected to overflow... Expected buffer size = %d (max = 4096). Bytes read so far = %d\r" expected_bytes_in_buffer, bytes_read
+//       		elseif (expected_bytes_in_buffer > 3000)
+//					printf "WARNING[scfd_RecordBuffer]: Last graph update resulted in buffer becoming close to full (%d of 4096 bytes). Entering panic_mode (no more graph updates)\r", expected_bytes_in_buffer
+//					panic_mode = 1         
 //       		endif
-       		
-       		if (!skip_raw2calc) // Vahid's change which is quite similar to Tim's change commentated above. 
-					scfd_raw2CalcQuickDistribute()
-				endif
-       		
-       		scg_updateFrequentGraphs() 
-     			expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)  // Basically checking how long graph updates took
-     			
-				if(expected_bytes_in_buffer > 4096)
-       			printf "ERROR[scfd_RecordBuffer]: After updating graphs, buffer is expected to overflow... Expected buffer size = %d (max = 4096). Bytes read so far = %d\r" expected_bytes_in_buffer, bytes_read
-       		elseif (expected_bytes_in_buffer > 3000)
-					printf "WARNING[scfd_RecordBuffer]: Last graph update resulted in buffer becoming close to full (%d of 4096 bytes). Entering panic_mode (no more graph updates)\r", expected_bytes_in_buffer
-					panic_mode = 1         
-       		endif
-			else
-				if (expected_bytes_in_buffer > 3500)
-					printf "DEBUGGING: getting behind: Expecting %d bytes in buffer (max 4096)\r" expected_bytes_in_buffer		
-					if (panic_mode == 0)
-						panic_mode = 1
-						printf "WARNING[scfd_RecordBuffer]: Getting behind on reading buffer, entering panic mode (no more graph updates until end of sweep)Expecting %d bytes in buffer (max 4096)\r"  expected_bytes_in_buffer				
-					endif			
-				endif
-
-			endif
+//			else
+//				if (expected_bytes_in_buffer > 3500)
+//					printf "DEBUGGING: getting behind: Expecting %d bytes in buffer (max 4096)\r" expected_bytes_in_buffer		
+//					if (panic_mode == 0)
+//						panic_mode = 1
+//						printf "WARNING[scfd_RecordBuffer]: Getting behind on reading buffer, entering panic mode (no more graph updates until end of sweep)Expecting %d bytes in buffer (max 4096)\r"  expected_bytes_in_buffer				
+//					endif			
+//				endif
+//
+//			endif
 			
 			if(i != itemsinlist(S.instrIDs)-1)
 				bytes_read -= read_chunk
@@ -5017,7 +5039,8 @@ function scfd_getReadChunkSize(numADCs, numpts, bytesSec, totalByteReturn)
   // Returns the size of chunks that should be read at a time
   variable numADCs, numpts, bytesSec, totalByteReturn
 
-  variable read_duration = 0.05  // Make readchunk s.t. it nominally take this time to fill
+//  variable read_duration = 0.05  // Make readchunk s.t. it nominally take this time to fill
+   variable read_duration = 0.05
   variable chunksize = (round(bytesSec*read_duration) - mod(round(bytesSec*read_duration),numADCs*2))  
 
   variable read_chunk=0
@@ -5059,7 +5082,8 @@ function scfd_raw2CalcQuickDistribute()
         calc_string = ReplaceString(rwn, calc_string, "sc_tempwave")  // Replace the raw wave name with the temporary wave name in the calc function
         execute("sc_tempwave = "+calc_string)  // Execute the calc function
 
-        duplicate /o sc_tempwave $cwn  // Duplicate the temporary wave to the calc wave
+        //duplicate /o sc_tempwave $cwn  // Duplicate the temporary wave to the calc wave
+        FDecimateXPosStd(sc_tempwave,cwn,30,2,1)
     endfor
 end
 
@@ -5086,6 +5110,7 @@ function scfd_readChunk(instrID, read_chunk, buffer)
   variable instrID, read_chunk
   string &buffer
   buffer = readInstr(instrID, read_bytes=read_chunk, binary=1)
+  //print strlen(buffer)
   // If failed, abort
   if (cmpstr(buffer, "NaN") == 0)
     fd_stopFDACsweep(instrID)
