@@ -425,20 +425,43 @@ end
 
 
 ///////////////////////////////// Display/Analysis Functions ////////////////
-function plot_waterfall(w, x_label, y_label, [y_spacing])
+function plot_waterfall(w, x_label, y_label, [y_spacing, offset, datnum])
 	wave w
 	string x_label, y_label
-	variable y_spacing
+	variable y_spacing, offset, datnum
+	
+	datnum = paramisdefault(datnum) ? 0 : datnum // alternate_bias OFF is default
+
+	variable offset_val
+	string legend_text = ""
+	string legend_check = ""
 	
 	display
 	setWindow kwTopWin, graphicsTech=0		
 	duplicate/o w tempwave
+	int num_rows = dimsize(tempwave, 0)
+	
 	variable i
 	for (i=0; i<dimsize(w, 1); i++)
-		tempwave[][i] = tempwave[p][i]+y_spacing*i
+		if (offset != 0)
+			offset_val = tempwave[round(num_rows/2)][i]
+			tempwave[][i] -= offset_val
+			if (i==0)
+				legend_check = ""
+			else
+				legend_check = "#" + num2str(i)
+			endif
+			legend_text =  legend_text + "\s(tempwave" + legend_check + ") Current = " +  num2str(offset_val) + " nA\r"
+		endif
+		tempwave[][i] = tempwave[p][i] + y_spacing*i
 		AppendToGraph tempwave[][i]
 	endfor
-	scg_setupGraph1D(WinName(0,1), x_label, y_label=y_label)
+	scg_setupGraph1D(WinName(0,1), x_label, y_label=y_label, datnum=datnum)
+	
+	if (offset != 0)
+		legend/C/N=text0/J/B=1 legend_text
+		makecolorful()
+	endif
 end
 
 function DisplayDiff(w, [x_label, y_label, filenum, numpts])
