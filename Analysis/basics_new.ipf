@@ -219,22 +219,36 @@ end
 
 
 
-function resampleWave(wav, targetFreq)
+function resampleWave(wav, targetFreq, [measureFreq])
 	// finds measure freq from scan vars and calls scfd_resampleWaves
 	wave wav 
 	variable targetFreq 
+	variable measureFreq
+	
+	measureFreq = paramisdefault(measureFreq) ? 0 : measureFreq // default is to find measure freq from scanvars unless specified
 	
 	string wn = nameOfWave(wav)
 	int wavenum = getfirstnum(wn)
 	
-	struct AWGVars S
-	fd_getoldAWG(S, wavenum)
-
-	variable measureFreq = S.measureFreq
+	
+	if (measureFreq == 0)
+		struct AWGVars S
+		fd_getoldAWG(S, wavenum)
+		measureFreq = S.measureFreq
+	endif
 	
 	scfd_resampleWaves(wav, measureFreq, targetFreq)
 	
 end
+
+
+//function quadratic(w, pw)
+//	Wave w
+//	Variable x
+//	// assumes pw is in the form of the output wave from a poly2d with polynomial 2 fit.
+//	
+//	return pw[1]
+//end
 
 
 function notch_filter(wave wav, variable Hz, [variable Q, string notch_name, variable overwrite_wave])
