@@ -217,7 +217,83 @@ wave condfit_params = $condfit_params_name
 	
 end
 
+function zap_NaNs(wave_1d, [overwrite])
+	// removes any datapoints with NaNs :: only removes NaNs from the end of the wave. Assumes NaNs are only at start and end and not within wave
+	// wave_1d: 2d wave to remove rows from
+	// overwrite: Default is overwrite = 1. overwrite = 0 will create new wave with "_zap" appended to the end
+	// percentage_cutoff_inf: Default is percentage_cutoff_inf = 0.15 :: 15%
+	wave wave_1d
+	int overwrite
+	
+	overwrite = paramisdefault(overwrite) ? 1 : overwrite
+	
+	// Duplicating 1d wave
+	if (overwrite == 0)
+		string wave_1d_name = nameofwave(wave_1d)
+		string wave_1d_name_new = wave_1d_name + "_zap"
+		duplicate /o wave_1d $wave_1d_name_new
+		wave wave_1d_new = $wave_1d_name_new 
+	endif
+	
+	
+	create_x_wave(wave_1d)
+	wave x_wave
+	
+	
+	variable num_rows = dimsize(wave_1d, 0)
+	int first_num_from_left = 0
+	int first_num_from_right = num_rows
+		
+		
+	///// find first number index on the left /////
+	int i 
+	for (i = 0; i < num_rows; i++)
+	
+		if (numtype(wave_1d[i]) == 0)
+			first_num_from_left = i
+			break
+		endif
+		
+	endfor
+	
+	
+	///// find first number index on the right /////
+	for (i = num_rows - 1; i >= 0; i--)
+	
+		if (numtype(wave_1d[i]) == 0)
+			first_num_from_right = i
+			break
+		endif
+		
+	endfor
+	
+	
+	variable start_point = pnt2x(wave_1d, first_num_from_left) // point of first non-NaN
+	variable end_point = pnt2x(wave_1d, first_num_from_right) // point of first non-NaN
+	
+	// delete NaNs from the left
+	if (overwrite == 1)
+		deletePoints /M=0 0, first_num_from_left, wave_1d
+	else 
+		deletePoints /M=0 0, first_num_from_left, wave_1d_new
+	endif
 
+	
+	// delete NaNs from the right
+	if (overwrite == 1)
+		deletePoints /M=0 first_num_from_right-first_num_from_left+1, num_rows-first_num_from_right-1, wave_1d
+	else
+		deletePoints /M=0 first_num_from_right-first_num_from_left+1, num_rows-first_num_from_right-1, wave_1d_new
+	endif
+
+	
+	// set correct scaling using start and end point
+	if (overwrite == 1)
+		setscale /I x, start_point, end_point, wave_1d
+	else
+		setscale /I x, start_point, end_point, wave_1d_new
+	endif
+end
 
 function resampleWave(wav, targetFreq, [measureFreq])
 	// finds measure freq from scan vars and calls scfd_resampleWaves
@@ -478,13 +554,19 @@ end
 
 
 
-function average_every_n_rows(wave wav, int n)
+function average_every_n_rows(wav, n, [overwrite])
 	// takes a 2d wave and averages every n rows (IGOR columns)
 	// creates a wave with _avg appended to the end
 	// assumes the wav has a multiple of n points
+	wave wav 
+	int n, overwrite
+	
+	overwrite = paramisdefault(overwrite) ? 0 : overwrite // default not resample the data
+
 	
 	string wave_name = nameOfWave(wav)
 	string wave_name_averaged = wave_name + "_avg"
+
 	
 	variable num_rows = dimsize(wav, 1) // (repeats)
 	variable num_columns = dimsize(wav, 0) // (sweep length)
@@ -493,7 +575,12 @@ function average_every_n_rows(wave wav, int n)
 	
 	ReduceMatrixSize(wav, 0, -1, num_columns, 0,-1, num_rows_post_average, 1, wave_name_averaged)
 
+	if (overwrite == 1)
+		duplicate /o $wave_name_averaged $wave_name
+	endif
 end
+
+
 
 
 function crop_wave(wave wav, variable x_mid, variable y_mid, variable x_width, variable y_width)
