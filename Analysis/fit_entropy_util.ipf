@@ -111,6 +111,30 @@ function master_entropy_clean_average(filenum, delay, wavelen, [centre_repeats, 
 		centering(demod_entropy, "demod_entropy_centered", mids)
 		wave demod_entropy_centered
 		zap_NaN_rows(demod_entropy_centered, overwrite = 1, percentage_cutoff_inf = 0.15)
+		
+		// centre cold diff and hot diff
+		centering(cold_diff, "cold_diff_centered", mids)
+		wave cold_diff_centered
+		zap_NaN_rows(cold_diff_centered, overwrite = 1, percentage_cutoff_inf = 0.15)
+		duplicate /o cold_diff_centered cold_diff
+		
+		centering(hot_diff, "hot_diff_centered", mids)
+		wave hot_diff_centered
+		zap_NaN_rows(hot_diff_centered, overwrite = 1, percentage_cutoff_inf = 0.15)
+		duplicate /o hot_diff_centered hot_diff
+		
+		// centre plus diff and minus diff
+		wave plus_diff
+		centering(plus_diff, "plus_diff_centered", mids)
+		wave plus_diff_centered
+		zap_NaN_rows(plus_diff_centered, overwrite = 1, percentage_cutoff_inf = 0.15)
+		duplicate /o plus_diff_centered plus_diff
+		
+		wave minus_diff
+		centering(minus_diff, "minus_diff_centered", mids)
+		wave minus_diff_centered
+		zap_NaN_rows(minus_diff_centered, overwrite = 1, percentage_cutoff_inf = 0.15)
+		duplicate /o minus_diff_centered minus_diff
 	endif
 	
 	
