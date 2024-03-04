@@ -135,17 +135,18 @@ function/S scu_getDacLabel(channels, [fastdac])
 
 	variable i=0
 	string channel, buffer, xlabelfriendly = ""
-	wave/t dacvalstr
-	wave/t fdacvalstr
+
 	for(i=0;i<ItemsInList(channels, ",");i+=1)
 		channel = StringFromList(i, channels, ",")
 
 		if (fastdac == 0)
+			wave/t dacvalstr
 			buffer = dacvalstr[str2num(channel)][3] // Grab name from dacvalstr
 			if (cmpstr(buffer, "") == 0)
 				buffer = "BD"+channel
 			endif
 		elseif (fastdac == 1)
+	wave/t fdacvalstr
 			buffer = fdacvalstr[str2num(channel)][3] // Grab name from fdacvalstr
 			if (cmpstr(buffer, "") == 0)
 				buffer = "FD"+channel
@@ -4708,7 +4709,14 @@ function initFastDAC()
 	sprintf cmd, "FastDACWindow(%f,%f,%f,%f)", v_left, v_right, v_top, v_bottom
 	execute(cmd)
 	scfw_SetGUIinteraction(numDevices)
+	execute("initparams()")
 end
+
+macro initparams()
+	fd_initGlobalAWG()
+	variable /g sc_abortsweep, sc_abortnosave, sc_pause
+endmacro
+
 
 function scfw_fdacCheckForOldInit(numDACCh,numADCCh)
 	variable numDACCh, numADCCh
