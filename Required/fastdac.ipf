@@ -169,7 +169,7 @@ function getFADCChannelSingle(instrID,channel) // Units: mV
 
 	// query ADC
 	string cmd = ""
-	sprintf cmd, "GET_ADC,%d", devchannel
+	sprintf cmd, "GET_ADC,%s", devchannel
 	string response
 	response = queryInstr(instrID, cmd+"\r", read_term="\n")
 	response = sc_stripTermination(response,"\r\n")

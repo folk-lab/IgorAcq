@@ -4413,50 +4413,52 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only, skip_raw2ca
    variable expected_bytes_in_buffer = 0 // For storing how many bytes are expected to be waiting in buffer
 
 
-
-   
-	if(paramisdefault(skip_raw2calc))  // If skip_raw2calc not passed, set it to 0
-		skip_raw2calc = 0
-	endif
+//
+//   
+//	if(paramisdefault(skip_raw2calc))  // If skip_raw2calc not passed, set it to 0
+//		skip_raw2calc = 0
+//	endif
    
 
    do
+   
       scfd_readChunk(S.instrIDx, read_chunk, buffer)  // puts data into buffer
       scfd_distributeData1(buffer, S, bytes_read, totalByteReturn, read_chunk, rowNum)
       scfd_checkSweepstate(S.instrIDx)
 
       bytes_read += read_chunk      
-      expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read) 
-      
-  
-      if(!panic_mode && expected_bytes_in_buffer < saveBuffer)  // if we aren't too far behind then update Raw 1D graphs
-
-			// scfd_raw2CalcQuickDistribute()
-			scg_updateFrequentGraphs() 
-
-      		if (!skip_raw2calc)
-				scfd_raw2CalcQuickDistribute()
-			endif
-         // scg_updateRawGraphs() 
-         
-
-			expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)  // Basically checking how long graph updates took
-			//print expected_bytes_in_buffer
-			if (expected_bytes_in_buffer > 4096)
-				printf "ERROR[scfd_RecordBuffer]: After updating graphs, buffer is expected to overflow... Expected buffer size = %d (max = 4096). Bytes read so far = %d\r" expected_bytes_in_buffer, bytes_read
-         	elseif (expected_bytes_in_buffer > 2500)
-//				printf "WARNING[scfd_RecordBuffer]: Last graph update resulted in buffer becoming close to full (%d of 4096 bytes). Entering panic_mode (no more graph updates)\r", expected_bytes_in_buffer
-				panic_mode = 1         
-         	endif
-		else
-			if (expected_bytes_in_buffer > 1000)
-//				printf "DEBUGGING: getting behind: Expecting %d bytes in buffer (max 4096)\r" expected_bytes_in_buffer		
-				if (panic_mode == 0)
-					panic_mode = 1
-					//printf "WARNING[scfd_RecordBuffer]: Getting behind on reading buffer, entering panic mode (no more graph updates until end of sweep)\r"				
-				endif			
-			endif
-		endif
+//      expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read) 
+//      
+//  
+//      if(!panic_mode && expected_bytes_in_buffer < saveBuffer)  // if we aren't too far behind then update Raw 1D graphs
+//
+//			// scfd_raw2CalcQuickDistribute()
+//			scg_updateFrequentGraphs() 
+//
+//      		if (!skip_raw2calc)
+			scfd_raw2CalcQuickDistribute()
+//			endif
+// scg_updateRawGraphs() 
+doupdate
+//         
+//
+//			expected_bytes_in_buffer = scfd_ExpectedBytesInBuffer(bufferDumpStart, bytesSec, bytes_read)  // Basically checking how long graph updates took
+//			//print expected_bytes_in_buffer
+//			if (expected_bytes_in_buffer > 4096)
+//				printf "ERROR[scfd_RecordBuffer]: After updating graphs, buffer is expected to overflow... Expected buffer size = %d (max = 4096). Bytes read so far = %d\r" expected_bytes_in_buffer, bytes_read
+//         	elseif (expected_bytes_in_buffer > 2500)
+////				printf "WARNING[scfd_RecordBuffer]: Last graph update resulted in buffer becoming close to full (%d of 4096 bytes). Entering panic_mode (no more graph updates)\r", expected_bytes_in_buffer
+//				panic_mode = 1         
+//         	endif
+//		else
+//			if (expected_bytes_in_buffer > 1000)
+////				printf "DEBUGGING: getting behind: Expecting %d bytes in buffer (max 4096)\r" expected_bytes_in_buffer		
+//				if (panic_mode == 0)
+//					panic_mode = 1
+//					//printf "WARNING[scfd_RecordBuffer]: Getting behind on reading buffer, entering panic mode (no more graph updates until end of sweep)\r"				
+//				endif			
+//			endif
+//		endif
    while(totalByteReturn-bytes_read > read_chunk)
 
    // do one last read if any data left to read
@@ -4468,7 +4470,7 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only, skip_raw2ca
    
    scfd_checkSweepstate(S.instrIDx)
 //   variable st = stopMSTimer(-2)
-   scg_updateFrequentGraphs() 
+doupdate
 //   printf "scg_updateRawGraphs took %.2f ms\r", (stopMSTimer(-2) - st)/1000
    return panic_mode
 end
@@ -5219,7 +5221,8 @@ function scfw_update_fadc(action) : ButtonControl
 			nvar tempname = $tempnamestr
 			try
 				for(j=0;j<numADCCh;j+=1)
-					getfadcChannel(tempname,startCh+j)
+					//getfadcChannel(tempname,startCh+j)
+					getFADCChannelSingle(tempname,startCh+j)
 				endfor
 			catch
 				// reset error
