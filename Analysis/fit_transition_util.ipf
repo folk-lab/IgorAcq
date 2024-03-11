@@ -339,7 +339,7 @@ function /wave get_initial_params(sweep, [update_amp_only, update_theta_only, up
 	variable const = mean(sweep)
 	
 	///// guess of theta term /////
-	variable theta = 10
+	variable theta = 40
 
 	///// guess of mid term ////
 	duplicate /o sweep sweepsmooth
@@ -536,7 +536,8 @@ function /wave fit_transition(wave_to_fit, minx, maxx, [fit_width])
 	
 //	display wave_to_fit[][0]
 //	string hold_string = "000001"; W_coef[5] = 0 // holding quadterm 0
-	string hold_string = "000000"; // not holding any terms fixed
+	W_coef[5] = 0
+	string hold_string = "000001"; // not holding any terms fixed
 	//Make/O/T/N=12 T_Constraints
   //T_Constraints[0]= {"K0 > 0","K0 < 0.1","K1 > 0.8","K1 < 1.5","K2 > 3","K2 < 30","K3 > -50","K3 < 50","K4 > -1e-4","K4 < 1e-4","K5 > -1e-7","K5 < 1e-7"}
 //    W_coef[0]= {0.0412854,1.14834,9.31696,-12.5946,6.7156e-05,3.60289e-08}
