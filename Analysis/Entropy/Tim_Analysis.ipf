@@ -425,17 +425,19 @@ end
 
 
 ///////////////////////////////// Display/Analysis Functions ////////////////
-function plot_waterfall(w, x_label, y_label, [y_spacing, offset, datnum, subtract_line, current_min_max, diff, diff_smooth])
+function plot_waterfall(w, x_label, y_label, [y_spacing, offset, datnum, subtract_line, current_min_max, diff, diff_smooth, plot_every_n])
 	wave w
 	string x_label, y_label, current_min_max
-	variable y_spacing, offset, datnum, subtract_line, diff, diff_smooth
+	variable y_spacing, offset, datnum, subtract_line, diff, diff_smooth, plot_every_n
 	
 	datnum = paramisdefault(datnum) ? 0 : datnum // alternate_bias OFF is default
 	subtract_line = paramisdefault(subtract_line) ? 0 : subtract_line // subtract_line OFF is default
 	current_min_max = selectstring(paramisdefault(current_min_max), current_min_max, "0;0")
 	diff = paramisdefault(diff) ? 0 : diff // diff OFF is default
 	diff_smooth = paramisdefault(diff_smooth) ? 0 : diff_smooth // diff OFF is default
-	
+	plot_every_n = paramisdefault(plot_every_n) ? 1 : plot_every_n // plot every trace is default
+
+
 	variable offset_val
 	string legend_text = ""
 	string legend_check = ""
@@ -454,7 +456,7 @@ function plot_waterfall(w, x_label, y_label, [y_spacing, offset, datnum, subtrac
 	
 	int num_rows = dimsize(tempwave, 0)
 	
-	variable i
+	variable i, count
 	for (i=0; i<dimsize(w, 1); i++)
 		slice[] = tempwave[p][i]
 		
@@ -482,13 +484,6 @@ function plot_waterfall(w, x_label, y_label, [y_spacing, offset, datnum, subtrac
 			tempwave[][i] -= offset_val
 		endif
 		
-		if (i==0)
-			legend_check = ""
-		else
-			legend_check = "#" + num2str(i)
-		endif
-		legend_text =  legend_text + "\s(tempwave" + legend_check + ") Current = " +  num2str(offset_val) + " nA\r"
-		
 		if (diff == 0)
 			tempwave[][i] = tempwave[p][i] + y_spacing*i
 		else
@@ -498,7 +493,19 @@ function plot_waterfall(w, x_label, y_label, [y_spacing, offset, datnum, subtrac
 			endif
 			tempwave[][i] = slice[p] + y_spacing*i
 		endif
-		AppendToGraph tempwave[][i]
+		
+		
+		if (mod(i, plot_every_n) == 0)
+			if (i==0)
+				legend_check = ""
+			else
+				legend_check = "#" + num2str(count)
+			endif
+			legend_text =  legend_text + "\s(tempwave" + legend_check + ") Current = " +  num2str(offset_val) + " nA\r"
+			AppendToGraph tempwave[][i]
+			count += 1
+		endif
+		
 	endfor
 	scg_setupGraph1D(WinName(0,1), x_label, y_label=y_label, datnum=datnum)
 	
