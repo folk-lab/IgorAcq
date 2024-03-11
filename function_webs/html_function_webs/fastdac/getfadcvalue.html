@@ -253,10 +253,6 @@ scfd_distributedata2 --> scu_getdevicechannels;
 scfd_recordbuffer --> scfd_checksweepstate;
 scfd_checksweepstate --> scs_checksweepstate;
 scfd_checksweepstate --> fd_stopfdacsweep;
-scfd_recordbuffer --> scfd_expectedbytesinbuffer;
-scfd_recordbuffer --> scfd_raw2calcquickdistribute;
-scfd_raw2calcquickdistribute --> sci_get1dwavenames;
-scfd_raw2calcquickdistribute --> scf_getrecordedfadcinfo;
 scfd_recordbuffer --> scg_updatefrequentgraphs;
 scfd_sendcommandandread --> fd_stopfdacsweep;
 scfd_sendcommandandread --> readinstr;
@@ -388,9 +384,7 @@ scfd_recordvalues
 scfd_sendcommandandread
 scfd_processanddistribute
 scfd_recordbuffer
-scfd_expectedbytesinbuffer
 scfd_getreadchunksize
-scfd_raw2calcquickdistribute
 scfd_checksweepstate
 scfd_readchunk
 scfd_distributedata1

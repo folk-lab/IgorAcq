@@ -10,46 +10,30 @@
     </style>
     <pre class="mermaid">
     graph TB;
-scfd_recordbuffer --> roundnum;
-scfd_recordbuffer --> scfd_getreadchunksize;
-scfd_recordbuffer --> scfd_readchunk;
-scfd_readchunk --> readinstr;
+setips120fieldwait --> setips120field;
+setips120field --> ips120_lookupvarname;
+setips120field --> roundnum;
+setips120field --> writeipscheck;
+writeipscheck --> queryinstr;
+queryinstr --> writeinstr;
+writeinstr --> visaerrormsg;
+queryinstr --> readinstr;
 readinstr --> visasetreadterm;
 readinstr --> visasetreadtermenable;
 visasetreadtermenable --> visasetreadterm;
 readinstr --> visasetserialendin;
 readinstr --> visaerrormsg;
-scfd_readchunk --> fd_stopfdacsweep;
-fd_stopfdacsweep --> clearfdacbuffer;
-clearfdacbuffer --> writeinstr;
-writeinstr --> visaerrormsg;
-scfd_recordbuffer --> scfd_distributedata1;
-scfd_distributedata1 --> scfd_distributedata2;
-scfd_distributedata2 --> scu_assertseparatortype;
-scfd_distributedata2 --> fd_char2num;
-scfd_distributedata2 --> scu_getdevicechannels;
-scu_getdevicechannels --> scf_getfdinfofromid;
-scf_getfdinfofromid --> scf_getfdnumber;
-scf_getfdnumber --> scf_getnumfds;
-scf_getfdnumber --> getresourceaddress;
-scf_getfdnumber --> scf_getfdvisaaddress;
-scf_getfdvisaaddress --> scf_getnumfds;
-scf_getfdinfofromid --> scf_getfdinfofromdevicenum;
-scf_getfdinfofromdevicenum --> scf_getnumfds;
-scu_getdevicechannels --> scf_getchannelstartnum;
-scf_getchannelstartnum --> scf_getnumfds;
-scf_getchannelstartnum --> scf_getfdnumber;
-scf_getchannelstartnum --> scf_getfdinfofromid;
-scfd_recordbuffer --> scfd_checksweepstate;
-scfd_checksweepstate --> scs_checksweepstate;
+setips120field --> writeinstr;
+setips120fieldwait --> asleep;
+asleep --> sc_sleep;
+sc_sleep --> scs_checksweepstate;
 scs_checksweepstate --> endscan;
 endscan --> scfd_checkrawsave;
 scfd_checkrawsave --> scf_getrecordedfadcinfo;
 endscan --> set_indep;
 set_indep --> clearfdacbuffer;
+clearfdacbuffer --> writeinstr;
 set_indep --> queryinstr;
-queryinstr --> writeinstr;
-queryinstr --> readinstr;
 endscan --> scv_setlastscanvars;
 endscan --> scv_getlastscanvars;
 endscan --> savetohdf;
@@ -108,28 +92,31 @@ sc_copysinglefile --> getexppath;
 sc_copysinglefile --> executemaccmd;
 sc_copynewfiles --> getexppath;
 endscan --> sce_scanvarstojson;
-scfd_checksweepstate --> fd_stopfdacsweep;
-scfd_recordbuffer --> scg_updatefrequentgraphs;
+setips120fieldwait --> queryinstr;
 subgraph fastdac.ipf
 set_indep
 clearfdacbuffer
-fd_stopfdacsweep
-fd_char2num
 fd_getawgwave
 fd_initglobalawg
 fd_setglobalawg
 fd_getglobalawg
 end
+subgraph ips120_single_supply.ipf
+ips120_lookupvarname
+writeipscheck
+setips120field
+setips120fieldwait
+end
 subgraph ScanController.ipf
 scu_assertseparatortype
 scu_unixtime
 roundnum
-scu_getdevicechannels
+sc_sleep
+asleep
 scv_setlastscanvars
 scv_getlastscanvars
 sci_get1dwavenames
 sci_get2dwavenames
-scg_updatefrequentgraphs
 sc_openinstrconnections
 sc_checkbackup
 scs_checksweepstate
@@ -137,24 +124,11 @@ endscan
 sce_scanvarstojson
 scw_createconfig
 scw_saveconfig
-scf_getfdnumber
-scf_getnumfds
-scf_getfdvisaaddress
-scf_getfdinfofromdevicenum
-scf_getfdinfofromid
 scf_getrecordedfadcinfo
-scf_getchannelstartnum
 scfd_checkrawsave
 scfd_postfilternumpts
-scfd_recordbuffer
-scfd_getreadchunksize
-scfd_checksweepstate
-scfd_readchunk
-scfd_distributedata1
-scfd_distributedata2
 end
 subgraph ScanController_INSTR.ipf
-getresourceaddress
 visaerrormsg
 writeinstr
 readinstr

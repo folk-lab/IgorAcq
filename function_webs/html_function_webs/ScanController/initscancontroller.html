@@ -261,10 +261,6 @@ scfd_distributedata2 --> scu_getdevicechannels;
 scfd_recordbuffer --> scfd_checksweepstate;
 scfd_checksweepstate --> scs_checksweepstate;
 scfd_checksweepstate --> fd_stopfdacsweep;
-scfd_recordbuffer --> scfd_expectedbytesinbuffer;
-scfd_recordbuffer --> scfd_raw2calcquickdistribute;
-scfd_raw2calcquickdistribute --> sci_get1dwavenames;
-scfd_raw2calcquickdistribute --> scf_getrecordedfadcinfo;
 scfd_recordbuffer --> scg_updatefrequentgraphs;
 scfd_sendcommandandread --> fd_stopfdacsweep;
 scfd_sendcommandandread --> readinstr;
@@ -322,6 +318,13 @@ openls370connection --> openhttpinstr;
 openls370connection --> setls370system;
 setls370system --> bd_channellookup;
 openls370connection --> ls370creategobals;
+initscancontroller --> openips120connection;
+openips120connection --> visaerrormsg;
+openips120connection --> openvisainstr;
+openips120connection --> writeipscheck;
+writeipscheck --> queryinstr;
+openips120connection --> sc_sleep;
+openips120connection --> writeinstr;
 initscancontroller --> getfdstatus;
 getfdstatus --> getresourceaddress;
 getfdstatus --> addjsonkeyval;
@@ -363,6 +366,17 @@ sendls370 --> puthttp;
 puthttp --> getjsonvalue;
 sendls370 --> getjsonvalue;
 getls370status --> addjsonkeyval;
+initscancontroller --> getipsstatus;
+getipsstatus --> getips120field;
+getips120field --> ips120_lookupvarname;
+getips120field --> queryinstr;
+getips120field --> roundnum;
+getipsstatus --> addjsonkeyval;
+getipsstatus --> getips120rate;
+getips120rate --> ips120_lookupvarname;
+getips120rate --> queryinstr;
+getips120rate --> roundnum;
+getipsstatus --> getresourceaddress;
 initscancontroller --> scw_loadconfig;
 scw_loadconfig --> readtxtfile;
 scw_loadconfig --> getjsonvalue;
@@ -409,6 +423,14 @@ fd_readchunk
 fd_initglobalawg
 fd_setglobalawg
 fd_getglobalawg
+end
+subgraph ips120_single_supply.ipf
+openips120connection
+ips120_lookupvarname
+writeipscheck
+getips120field
+getips120rate
+getipsstatus
 end
 subgraph keithley2400.ipf
 getk2400current
@@ -507,9 +529,7 @@ scfd_recordvalues
 scfd_sendcommandandread
 scfd_processanddistribute
 scfd_recordbuffer
-scfd_expectedbytesinbuffer
 scfd_getreadchunksize
-scfd_raw2calcquickdistribute
 scfd_checksweepstate
 scfd_readchunk
 scfd_distributedata1

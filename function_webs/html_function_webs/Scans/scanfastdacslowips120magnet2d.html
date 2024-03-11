@@ -10,7 +10,20 @@
     </style>
     <pre class="mermaid">
     graph TB;
-fd_readchunk --> getfadcspeed;
+scanfastdacslowips120magnet2d --> scanfastdac;
+scanfastdac --> sc_openinstrconnections;
+scanfastdac --> initscanvars;
+scanfastdac --> initscanvarsfd;
+initscanvarsfd --> initscanvars;
+initscanvarsfd --> scf_getrecordedfadcinfo;
+initscanvarsfd --> scu_getdaclabel;
+scu_getdaclabel --> scu_assertseparatortype;
+initscanvarsfd --> scv_setsetpoints;
+scv_setsetpoints --> scv_formatsetpoints;
+scv_setsetpoints --> scv_sanitizesetpoints;
+scv_sanitizesetpoints --> scu_assertseparatortype;
+initscanvarsfd --> scv_setfreq;
+scv_setfreq --> getfadcspeed;
 getfadcspeed --> queryinstr;
 queryinstr --> writeinstr;
 writeinstr --> visaerrormsg;
@@ -31,22 +44,59 @@ getfadcspeed --> scf_getfdinfofromid;
 scf_getfdinfofromid --> scf_getfdnumber;
 scf_getfdinfofromid --> scf_getfdinfofromdevicenum;
 scf_getfdinfofromdevicenum --> scf_getnumfds;
-fd_readchunk --> recordvalues;
+scv_setfreq --> scf_getnumrecordedadcs;
+scf_getnumrecordedadcs --> scf_getrecordedfadcinfo;
+scf_getnumrecordedadcs --> scu_getdevicechannels;
+scu_getdevicechannels --> scf_getfdinfofromid;
+scu_getdevicechannels --> scf_getchannelstartnum;
+scf_getchannelstartnum --> scf_getnumfds;
+scf_getchannelstartnum --> scf_getfdnumber;
+scf_getchannelstartnum --> scf_getfdinfofromid;
+initscanvarsfd --> scv_setnumptssweeprateduration;
+scv_setnumptssweeprateduration --> fd_get_sweeprate_from_numpts;
+scv_setnumptssweeprateduration --> fd_get_numpts_from_sweeprate;
+scanfastdac --> initscanvarsfd2;
+initscanvarsfd2 --> initscanvars;
+initscanvarsfd2 --> initscanvarsfd;
+initscanvarsfd2 --> scf_getrecordedfadcinfo;
+initscanvarsfd2 --> scu_getdaclabel;
+initscanvarsfd2 --> scc_getdeviceids;
+scc_getdeviceids --> scf_getnumfds;
+initscanvarsfd2 --> fd_getglobalawg;
+fd_getglobalawg --> fd_initglobalawg;
+fd_initglobalawg --> fd_setglobalawg;
+initscanvarsfd2 --> textwavetolist;
+initscanvarsfd2 --> get_values;
+initscanvarsfd2 --> scf_getmaxrecordedadcs;
+scf_getmaxrecordedadcs --> scf_getnumrecordedadcs;
+initscanvarsfd2 --> scv_setsetpoints;
+initscanvarsfd2 --> scv_setfreq;
+initscanvarsfd2 --> scv_setfreq2;
+scv_setfreq2 --> scv_setfreq;
+scv_setfreq2 --> getfadcspeed;
+initscanvarsfd2 --> scv_setnumptssweeprateduration;
+initscanvarsfd2 --> scu_getchannelnumbers;
+scu_getchannelnumbers --> scu_assertseparatortype;
+scu_getchannelnumbers --> removetrailingwhitespace;
+scanfastdac --> prescanchecksfd;
+prescanchecksfd --> scc_checksamedevicefd;
+scc_checksamedevicefd --> scf_getchannelnumsonfd;
+scf_getchannelnumsonfd --> scu_assertseparatortype;
+scf_getchannelnumsonfd --> scf_getnumfds;
+scf_getchannelnumsonfd --> scf_getfdinfofromdevicenum;
+prescanchecksfd --> scc_checkrampratesfd;
+scc_checkrampratesfd --> scu_assertseparatortype;
+scc_checkrampratesfd --> ask_user;
+scc_checkrampratesfd --> recordvalues;
 recordvalues --> readvstime;
 readvstime --> initscanvars;
 readvstime --> initscanvarsbd;
 initscanvarsbd --> initscanvars;
 initscanvarsbd --> scv_setsetpoints;
-scv_setsetpoints --> scv_formatsetpoints;
-scv_setsetpoints --> scv_sanitizesetpoints;
-scv_sanitizesetpoints --> scu_assertseparatortype;
 initscanvarsbd --> scu_getdaclabel;
-scu_getdaclabel --> scu_assertseparatortype;
 readvstime --> initializescan;
 initializescan --> sci_initializewaves;
 sci_initializewaves --> fd_getglobalawg;
-fd_getglobalawg --> fd_initglobalawg;
-fd_initglobalawg --> fd_setglobalawg;
 sci_initializewaves --> sci_get1dwavenames;
 sci_get1dwavenames --> scf_getrecordedfadcinfo;
 sci_initializewaves --> sci_sanitycheckwavenames;
@@ -147,15 +197,30 @@ recordvalues --> sc_killthreads;
 recordvalues --> scv_setlastscanvars;
 recordvalues --> scs_checksweepstate;
 recordvalues --> scg_updatefrequentgraphs;
-fd_readchunk --> scfd_recordvalues;
-scfd_recordvalues --> recordvalues;
-scfd_recordvalues --> rampstartfd;
+prescanchecksfd --> scc_checklimsfd;
+scc_checklimsfd --> scc_checklimssinglefd;
+scc_checklimssinglefd --> scu_getchannelnumbers;
+scc_checklimssinglefd --> ask_user;
+scc_checklimssinglefd --> recordvalues;
+scanfastdac --> fd_getglobalawg;
+scanfastdac --> checkawg;
+checkawg --> scc_checkawg;
+scc_checkawg --> checkawg;
+scc_checkawg --> scu_assertseparatortype;
+scc_checkawg --> scf_getnumrecordedadcs;
+scc_checkawg --> fd_getawgwave;
+scc_checkawg --> scanfastdac;
+scc_checkawg --> ask_user;
+scanfastdac --> setawg;
+setawg --> fd_getglobalawg;
+setawg --> fd_setglobalawg;
+scanfastdac --> set_master_slave;
+set_master_slave --> queryinstr;
+scanfastdac --> rampstartfd;
 rampstartfd --> scu_assertseparatortype;
 rampstartfd --> rampmultiplefdac;
 rampmultiplefdac --> scu_assertseparatortype;
 rampmultiplefdac --> scu_getchannelnumbers;
-scu_getchannelnumbers --> scu_assertseparatortype;
-scu_getchannelnumbers --> removetrailingwhitespace;
 rampmultiplefdac --> scf_getdacinfo;
 scf_getdacinfo --> scu_getchannelnumbers;
 rampmultiplefdac --> fd_rampoutputfdac;
@@ -163,9 +228,6 @@ fd_rampoutputfdac --> getresourceaddress;
 fd_rampoutputfdac --> scfw_resetfdacwindow;
 fd_rampoutputfdac --> getfdacoutput;
 getfdacoutput --> scf_getchannelstartnum;
-scf_getchannelstartnum --> scf_getnumfds;
-scf_getchannelstartnum --> scf_getfdnumber;
-scf_getchannelstartnum --> scf_getfdinfofromid;
 getfdacoutput --> queryinstr;
 getfdacoutput --> sc_striptermination;
 getfdacoutput --> scf_checkfdresponse;
@@ -177,6 +239,32 @@ queryinstrprogress --> readinstr;
 fd_rampoutputfdac --> sc_striptermination;
 fd_rampoutputfdac --> scf_checkfdresponse;
 fd_rampoutputfdac --> scfw_updatefdacvalstr;
+scanfastdac --> sc_sleep;
+scanfastdac --> initializescan;
+scanfastdac --> set_awg_state;
+scanfastdac --> ramp_interlaced_channels;
+ramp_interlaced_channels --> scu_getchannelnumbers;
+ramp_interlaced_channels --> scf_getchannelnumsonfd;
+ramp_interlaced_channels --> openfastdacconnection;
+openfastdacconnection --> visaerrormsg;
+openfastdacconnection --> openvisainstr;
+openvisainstr --> closevisainstr;
+closevisainstr --> visaerrormsg;
+openvisainstr --> visaerrormsg;
+openvisainstr --> setvisaoptions;
+setvisaoptions --> visasetbaudrate;
+setvisaoptions --> visasetstopbits;
+setvisaoptions --> visasetdatabits;
+setvisaoptions --> visasetparity;
+setvisaoptions --> visasettimeout;
+setvisaoptions --> visaerrormsg;
+openvisainstr --> queryinstr;
+openfastdacconnection --> scf_addfdinfos;
+ramp_interlaced_channels --> rampmultiplefdac;
+scanfastdac --> recordvalues;
+scanfastdac --> scfd_recordvalues;
+scfd_recordvalues --> recordvalues;
+scfd_recordvalues --> rampstartfd;
 scfd_recordvalues --> scc_checkrampstartfd;
 scc_checkrampstartfd --> rampstartfd;
 scc_checkrampstartfd --> scu_assertseparatortype;
@@ -187,18 +275,13 @@ scfd_sendcommandandread --> fd_start_sweep;
 fd_start_sweep --> scu_assertseparatortype;
 fd_start_sweep --> queryinstr;
 fd_start_sweep --> scu_getdevicechannels;
-scu_getdevicechannels --> scf_getfdinfofromid;
-scu_getdevicechannels --> scf_getchannelstartnum;
 fd_start_sweep --> removeseperator;
 fd_start_sweep --> getfdacoutput;
 fd_start_sweep --> setupfakesquarewave;
 setupfakesquarewave --> setfdacawgsquarewave;
 setfdacawgsquarewave --> fd_getglobalawg;
 setfdacawgsquarewave --> scf_getnumrecordedadcs;
-scf_getnumrecordedadcs --> scf_getrecordedfadcinfo;
-scf_getnumrecordedadcs --> scu_getdevicechannels;
 setfdacawgsquarewave --> scf_getmaxrecordedadcs;
-scf_getmaxrecordedadcs --> scf_getnumrecordedadcs;
 setfdacawgsquarewave --> fd_setglobalawg;
 setfdacawgsquarewave --> getfadcspeed;
 setfdacawgsquarewave --> fd_clearawgwave;
@@ -217,14 +300,9 @@ setupawg --> scu_getchannelnumbers;
 setupawg --> scf_getmaxrecordedadcs;
 setupawg --> scf_getnumrecordedadcs;
 setupawg --> scc_getdeviceids;
-scc_getdeviceids --> scf_getnumfds;
 setupawg --> textwavetolist;
 setupawg --> scv_setfreq;
-scv_setfreq --> getfadcspeed;
-scv_setfreq --> scf_getnumrecordedadcs;
 setupawg --> scv_setfreq2;
-scv_setfreq2 --> scv_setfreq;
-scv_setfreq2 --> getfadcspeed;
 setupawg --> fd_getawgwave;
 setupawg --> fd_checkaw;
 setupawg --> fd_setglobalawg;
@@ -257,9 +335,6 @@ scfd_sendcommandandread --> scf_checkfdresponse;
 scfd_sendcommandandread --> scfd_updatewindow;
 scfd_updatewindow --> scu_assertseparatortype;
 scfd_updatewindow --> scf_getchannelnumsonfd;
-scf_getchannelnumsonfd --> scu_assertseparatortype;
-scf_getchannelnumsonfd --> scf_getnumfds;
-scf_getchannelnumsonfd --> scf_getfdinfofromdevicenum;
 scfd_updatewindow --> scf_getfdvisaaddress;
 scfd_updatewindow --> getresourceaddress;
 scfd_updatewindow --> getfdacoutput;
@@ -268,6 +343,9 @@ scfd_updatewindow --> getfadcchannel;
 getfadcchannel --> scc_getdeviceids;
 getfadcchannel --> getfadcspeed;
 getfadcchannel --> fd_readchunk;
+fd_readchunk --> getfadcspeed;
+fd_readchunk --> recordvalues;
+fd_readchunk --> scfd_recordvalues;
 scfd_sendcommandandread --> scu_getdevicechannels;
 scfd_sendcommandandread --> removeseperator;
 scfd_sendcommandandread --> rampmultiplefdac;
@@ -279,13 +357,95 @@ scfd_processanddistribute --> scfd_sqw_analysis;
 scfd_processanddistribute --> scfd_demodulate;
 scfd_processanddistribute --> scfd_resamplewaves;
 scfd_processanddistribute --> scfd_spectrum_analyzer;
+scanfastdac --> endscan;
+scanfastdac --> set_indep;
+scanfastdacslowips120magnet2d --> scanfastdacslow;
+scanfastdacslow --> scanfastdac;
+scanfastdacslow --> sc_openinstrconnections;
+scanfastdacslow --> initscanvars;
+scanfastdacslow --> initscanvarsfd;
+scanfastdacslow --> initscanvarsfd2;
+scanfastdacslow --> scc_checklimsfd;
+scanfastdacslow --> rampstartfd;
+scanfastdacslow --> sc_sleep;
+scanfastdacslow --> initializescan;
+scanfastdacslow --> ramptonextsetpoint;
+ramptonextsetpoint --> checkstartsfinschannels;
+checkstartsfinschannels --> scu_assertseparatortype;
+ramptonextsetpoint --> rampmultiplefdac;
+ramptonextsetpoint --> rampmultiplebd;
+rampmultiplebd --> scu_getchannelnumbers;
+rampmultiplebd --> bd_channellookup;
+rampmultiplebd --> bd_updatecustom;
+rampmultiplebd --> bd_updatemultiplebd;
+bd_updatemultiplebd --> bd_setoutputbd;
+bd_setoutputbd --> bd_getboard;
+bd_setoutputbd --> bd_getboardchannel;
+bd_getboardchannel --> bd_getboard;
+bd_setoutputbd --> bd_getsetpointbd;
+bd_setoutputbd --> bd_writebytesbd;
+bd_writebytesbd --> visaerrormsg;
+bd_setoutputbd --> bd_readbytesbd;
+bd_readbytesbd --> bd_readsinglebytebd;
+bd_readsinglebytebd --> visaerrormsg;
+bd_updatemultiplebd --> bd_rampoutputbd;
+bd_rampoutputbd --> bd_setoutputbd;
+bd_rampoutputbd --> sc_sleep;
+rampmultiplebd --> bd_calccustomvalues;
+scanfastdacslow --> recordvalues;
+scanfastdacslow --> stoppid;
+stoppid --> writeinstr;
+scanfastdacslow --> clearfdacbuffer;
+scanfastdacslow --> endscan;
+scanfastdacslowips120magnet2d --> sc_openinstrconnections;
+scanfastdacslowips120magnet2d --> initscanvars;
+scanfastdacslowips120magnet2d --> initscanvarsfd;
+scanfastdacslowips120magnet2d --> initscanvarsfd2;
+scanfastdacslowips120magnet2d --> scc_checklimsfd;
+scanfastdacslowips120magnet2d --> rampstartfd;
+scanfastdacslowips120magnet2d --> setips120field;
+setips120field --> ips120_lookupvarname;
+setips120field --> roundnum;
+setips120field --> writeipscheck;
+writeipscheck --> queryinstr;
+setips120field --> writeinstr;
+scanfastdacslowips120magnet2d --> setips120fieldwait;
+setips120fieldwait --> setips120field;
+setips120fieldwait --> asleep;
+setips120fieldwait --> queryinstr;
+scanfastdacslowips120magnet2d --> asleep;
+scanfastdacslowips120magnet2d --> initializescan;
+scanfastdacslowips120magnet2d --> sc_sleep;
+scanfastdacslowips120magnet2d --> ramptonextsetpoint;
+scanfastdacslowips120magnet2d --> recordvalues;
+scanfastdacslowips120magnet2d --> endscan;
+subgraph babydac.ipf
+bd_calccustomvalues
+bd_getboard
+bd_getboardchannel
+bd_writebytesbd
+bd_readsinglebytebd
+bd_readbytesbd
+bd_getsetpointbd
+bd_setoutputbd
+bd_rampoutputbd
+bd_updatemultiplebd
+rampmultiplebd
+bd_channellookup
+bd_updatecustom
+end
 subgraph fastdac.ipf
+openfastdacconnection
+set_master_slave
 set_indep
 getfadcspeed
 getfadcchannel
 getfdacoutput
 rampmultiplefdac
 fd_rampoutputfdac
+stoppid
+fd_get_numpts_from_sweeprate
+fd_get_sweeprate_from_numpts
 clearfdacbuffer
 fd_stopfdacsweep
 fd_char2num
@@ -299,7 +459,14 @@ fd_start_sweep
 fd_readchunk
 fd_initglobalawg
 fd_setglobalawg
+setawg
 fd_getglobalawg
+end
+subgraph ips120_single_supply.ipf
+ips120_lookupvarname
+writeipscheck
+setips120field
+setips120fieldwait
 end
 subgraph ScanController.ipf
 scu_assertseparatortype
@@ -314,7 +481,10 @@ asleep
 scv_setlastscanvars
 scv_getlastscanvars
 initscanvars
+initscanvarsfd
+initscanvarsfd2
 initscanvarsbd
+scv_setnumptssweeprateduration
 scv_setfreq
 scv_setfreq2
 scv_setsetpoints
@@ -356,9 +526,18 @@ scw_setupawg
 scw_createconfig
 scw_saveconfig
 recordvalues
+prescanchecksfd
+checkawg
+checkstartsfinschannels
 rampstartfd
 scc_checkrampstartfd
+scc_checkrampratesfd
+scc_checklimsfd
+scc_checklimssinglefd
+scc_checksamedevicefd
 scc_getdeviceids
+scc_checkawg
+ramptonextsetpoint
 scf_getdacinfo
 scf_getfdnumber
 scf_getnumfds
@@ -372,6 +551,7 @@ scf_getchannelnumsonfd
 scf_getchannelstartnum
 scfd_checkrawsave
 scf_checkfdresponse
+scf_addfdinfos
 scfd_postfilternumpts
 scfd_resamplewaves
 scfd_notch_filters
@@ -394,15 +574,23 @@ end
 subgraph ScanController_INSTR.ipf
 getresourceaddress
 visaerrormsg
+openvisainstr
+closevisainstr
 writeinstr
 readinstr
 queryinstr
 queryinstrprogress
 sc_striptermination
 sc_progressbardelay
+setvisaoptions
 visasetreadterm
 visasetreadtermenable
+visasettimeout
+visasetbaudrate
+visasetdatabits
+visasetstopbits
 visasetserialendin
+visasetparity
 end
 subgraph ScanController_IO.ipf
 openhdffile
@@ -428,6 +616,7 @@ num2numstr
 num2bool
 wave2boolarray
 textwave2strarray
+get_values
 textwavetolist
 addjsonkeyval
 getindent
@@ -438,6 +627,11 @@ escapequotes
 end
 subgraph Scans.ipf
 readvstime
+scanfastdac
+scanfastdacslow
+set_awg_state
+ramp_interlaced_channels
+scanfastdacslowips120magnet2d
 end
     </pre>
     <script type="module">
