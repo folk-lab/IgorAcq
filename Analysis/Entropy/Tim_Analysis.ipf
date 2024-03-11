@@ -425,44 +425,89 @@ end
 
 
 ///////////////////////////////// Display/Analysis Functions ////////////////
-function plot_waterfall(w, x_label, y_label, [y_spacing, offset, datnum])
+function plot_waterfall(w, x_label, y_label, [y_spacing, offset, datnum, subtract_line, current_min_max, diff, diff_smooth])
 	wave w
-	string x_label, y_label
-	variable y_spacing, offset, datnum
+	string x_label, y_label, current_min_max
+	variable y_spacing, offset, datnum, subtract_line, diff, diff_smooth
 	
 	datnum = paramisdefault(datnum) ? 0 : datnum // alternate_bias OFF is default
-
+	subtract_line = paramisdefault(subtract_line) ? 0 : subtract_line // subtract_line OFF is default
+	current_min_max = selectstring(paramisdefault(current_min_max), current_min_max, "0;0")
+	diff = paramisdefault(diff) ? 0 : diff // diff OFF is default
+	diff_smooth = paramisdefault(diff_smooth) ? 0 : diff_smooth // diff OFF is default
+	
 	variable offset_val
 	string legend_text = ""
 	string legend_check = ""
 	
+	variable current_min = str2num(stringFromList(0, current_min_max))
+	variable current_max = str2num(stringFromList(1, current_min_max))
+	variable y1, y2, x1, x2, m, c
+	
 	display
 	setWindow kwTopWin, graphicsTech=0		
 	duplicate/o w tempwave
+	duplicate /o /RMD=[][1] tempwave slice
+	wave slice
+	create_x_wave(tempwave)
+	wave x_wave
+	
 	int num_rows = dimsize(tempwave, 0)
 	
 	variable i
 	for (i=0; i<dimsize(w, 1); i++)
-		if (offset != 0)
-			offset_val = tempwave[round(num_rows/2)][i]
-			tempwave[][i] -= offset_val
-			if (i==0)
-				legend_check = ""
+		slice[] = tempwave[p][i]
+		
+		if (subtract_line != 0)
+			if (current_min == current_max)
+				y1 = tempwave[0][i]
+				y2 = tempwave[inf][i]
+				x1 = x_wave[0]
+				x2 = x_wave[inf]
 			else
-				legend_check = "#" + num2str(i)
+				y1 = current_min
+				y2 = current_max
+				findlevel /q slice, y1; x1 = x2pnt(slice, V_LevelX)
+				findlevel /q slice, y2; x2 = x2pnt(slice, V_LevelX)
 			endif
-			legend_text =  legend_text + "\s(tempwave" + legend_check + ") Current = " +  num2str(offset_val) + " nA\r"
+			
+			m = (y2-y1)/(x2-x1)
+			c = y2 - m*x2
+			
+			tempwave[][i] -= (m*x_wave[p] + c)
 		endif
-		tempwave[][i] = tempwave[p][i] + y_spacing*i
+		
+		offset_val = tempwave[round(num_rows/2)][i]
+		if (offset != 0)
+			tempwave[][i] -= offset_val
+		endif
+		
+		if (i==0)
+			legend_check = ""
+		else
+			legend_check = "#" + num2str(i)
+		endif
+		legend_text =  legend_text + "\s(tempwave" + legend_check + ") Current = " +  num2str(offset_val) + " nA\r"
+		
+		if (diff == 0)
+			tempwave[][i] = tempwave[p][i] + y_spacing*i
+		else
+			differentiate slice
+			if (diff_smooth != 0)
+				smooth diff_smooth, slice
+			endif
+			tempwave[][i] = slice[p] + y_spacing*i
+		endif
 		AppendToGraph tempwave[][i]
 	endfor
 	scg_setupGraph1D(WinName(0,1), x_label, y_label=y_label, datnum=datnum)
 	
-	if (offset != 0)
-		legend/C/N=text0/J/B=1 legend_text
-		makecolorful()
-	endif
+	legend/C/N=text0/J/B=1 legend_text
+	makecolorful()
 end
+
+
+
 
 function DisplayDiff(w, [x_label, y_label, filenum, numpts])
 	wave w
