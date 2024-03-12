@@ -262,10 +262,7 @@ function CorrectChargeSensor([fdchannelstr, fadcchannel, i, check, natarget, dir
 	variable cdac, cfdac, current, new_current, nextdac, j
 	wave/T dacvalstr
 	wave/T fdacvalstr
-	
-	
-//	rampmultipleFDAC(fd, "CSQ2*1000", 0) // ensure virtual CSQ*1000 is zero.
-	
+		
 	natarget = paramisdefault(natarget) ? 1.1 : natarget // 0.22
 	direction = paramisdefault(direction) ? 1 : direction
 	zero_tol = paramisdefault(zero_tol) ? 0.5 : zero_tol  // How close to zero before it starts to get more averaged measurements

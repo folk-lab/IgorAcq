@@ -474,8 +474,8 @@ function make_scanvar_table_from_dats(dat_min_max, [ignore_field])
 	string dat_min_max
 	int ignore_field
 	
-	variable dat_start = str2num(StringFromList(0, dat_min_max, ","))
-	variable dat_end = str2num(StringFromList(1, dat_min_max, ","))  
+	variable dat_start = str2num(StringFromList(0, dat_min_max, ";"))
+	variable dat_end = str2num(StringFromList(1, dat_min_max, ";"))  
 	
 	make /o /n=((dat_end - dat_start + 1), 3+8*3) scanvar_table 
 	variable datnum, scanvar_variable 

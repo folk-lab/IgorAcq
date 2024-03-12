@@ -27,7 +27,7 @@ function master_fit_multiple(dat_min_max, refit, dotcondcentering, kenner_out, [
 	variable dat_end = str2num(StringFromList(1, dat_min_max, ";")) 
 	string wave_name
 	
-	make_scanvar_table_from_dats(dat_min_max, ignore_field=0)
+	make_scanvar_table_from_dats(dat_min_max, ignore_field=1)
 	wave scanvar_table
 	variable scanvar_table_column_offset = 11
 	insertpoints /M=1 scanvar_table_column_offset, 6, scanvar_table
@@ -37,10 +37,16 @@ function master_fit_multiple(dat_min_max, refit, dotcondcentering, kenner_out, [
 	for(i=dat_start; i<dat_end+1; i+=1)
 		closeallGraphs()
 		wave_name = "dat" + num2str(i) + "cscurrent_2d"
-		resampleWave($wave_name, 600)
+		wave temp_wave = $wave_name
+		ReduceMatrixSize(temp_wave, 0, -1, dimsize(temp_wave, 0)/100, 0, -1, dimsize(temp_wave, 1), 1, "reduced_name")
+		wave reduced_name
+//		redimension/n=-1 reduced_name 
+
+
+//		resampleWave($wave_name, 600)
 		
 		try
-			master_ct_clean_average($wave_name, refit, dotcondcentering, kenner_out, condfit_prefix = condfit_prefix, minx = minx, maxx = maxx, average = average, fit_width = fit_width, theta_cutoff = theta_cutoff, N = N, repeats_on = repeats_on)
+			master_ct_clean_average(reduced_name, refit, dotcondcentering, kenner_out, condfit_prefix = condfit_prefix, minx = minx, maxx = maxx, average = average, fit_width = fit_width, theta_cutoff = theta_cutoff, N = N, repeats_on = repeats_on)
 			
 			wave W_coef
 			
