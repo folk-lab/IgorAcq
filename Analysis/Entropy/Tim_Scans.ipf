@@ -295,13 +295,15 @@ function DotTuneAroundVirtual(x_str, y_str, width_x_str, width_y_str, channelx_s
 	// First go to middle of scan and get charges sensor roughly right (might want to remove this later)
 	variable i
 	
-	for (i=0; i<ItemsInList(channelx_str, ",");i++)
-		rampmultipleFDAC(fd, StringFromList(i, channelx_str, ","), str2num(StringFromList(i, x_str, ",")))
-	endfor
-	
-	for (i=0; i<ItemsInList(channely_str, ",");i++)
-		rampmultipleFDAC(fd, StringFromList(i, channely_str, ","), str2num(StringFromList(i, y_str, ",")))
-	endfor
+//	for (i=0; i<ItemsInList(channelx_str, ",");i++)
+//		rampmultipleFDAC(fd, StringFromList(i, channelx_str, ","), str2num(StringFromList(i, x_str, ",")))
+//	endfor
+//	
+//	for (i=0; i<ItemsInList(channely_str, ",");i++)
+//		rampmultipleFDAC(fd, StringFromList(i, channely_str, ","), str2num(StringFromList(i, y_str, ",")))
+//	endfor
+	RampMultipleChannels(channelx_str, x_str)
+	RampMultipleChannels(channely_str, y_str)
 
 	CorrectChargeSensor(fdchannelstr=csname,fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15)
 
@@ -311,11 +313,11 @@ function DotTuneAroundVirtual(x_str, y_str, width_x_str, width_y_str, channelx_s
   ///// START GOING TO DIFFERENT CORNERS IN SCAN /////
   ///// BOTTOM LEFT OF SCAN /////
   for (i=0; i<ItemsInList(channelx_str, ",");i++)
-		rampmultipleFDAC(fd, StringFromList(i, channelx_str, ","), str2num(StringFromList(i, x_str, ",")) - str2num(StringFromList(i, width_x_str, ",")))
+		RampMultipleChannels(StringFromList(i, channelx_str, ","), num2str(str2num(StringFromList(i, x_str, ",")) - str2num(StringFromList(i, width_x_str, ","))))
   endfor
 	
   for (i=0; i<ItemsInList(channely_str, ",");i++)
-		rampmultipleFDAC(fd, StringFromList(i, channely_str, ","), str2num(StringFromList(i, y_str, ",")) - str2num(StringFromList(i, width_y_str, ",")))
+		RampMultipleChannels(StringFromList(i, channely_str, ","), num2str(str2num(StringFromList(i, y_str, ",")) - str2num(StringFromList(i, width_y_str, ","))))
   endfor
   
   CorrectChargeSensor(fdchannelstr=csname,fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15) //added cutoff time so we don't have to wait while de-bugging
@@ -325,11 +327,11 @@ function DotTuneAroundVirtual(x_str, y_str, width_x_str, width_y_str, channelx_s
   
   ///// BOTTOM RIGHT OF SCAN /////
   for (i=0; i<ItemsInList(channelx_str, ",");i++)
-		rampmultipleFDAC(fd, StringFromList(i, channelx_str, ","), str2num(StringFromList(i, x_str, ",")) + str2num(StringFromList(i, width_x_str, ",")))
+		RampMultipleChannels(StringFromList(i, channelx_str, ","), num2str(str2num(StringFromList(i, x_str, ",")) + str2num(StringFromList(i, width_x_str, ","))))
   endfor
 	
   for (i=0; i<ItemsInList(channely_str, ",");i++)
-		rampmultipleFDAC(fd, StringFromList(i, channely_str, ","), str2num(StringFromList(i, y_str, ",")) - str2num(StringFromList(i, width_y_str, ",")))
+		RampMultipleChannels(StringFromList(i, channely_str, ","), num2str(str2num(StringFromList(i, y_str, ",")) - str2num(StringFromList(i, width_y_str, ","))))
   endfor
   
   CorrectChargeSensor(fdchannelstr=csname, fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15) //added cutoff time so we don't have to wait while de-bugging
@@ -339,11 +341,11 @@ function DotTuneAroundVirtual(x_str, y_str, width_x_str, width_y_str, channelx_s
   
   ///// TOP LEFT OF SCAN /////
   for (i=0; i<ItemsInList(channelx_str, ",");i++)
-		rampmultipleFDAC(fd, StringFromList(i, channelx_str, ","), str2num(StringFromList(i, x_str, ",")) - str2num(StringFromList(i, width_x_str, ",")))
+		RampMultipleChannels(StringFromList(i, channelx_str, ","), num2str(str2num(StringFromList(i, x_str, ",")) - str2num(StringFromList(i, width_x_str, ","))))
   endfor
 	
   for (i=0; i<ItemsInList(channely_str, ",");i++)
-		rampmultipleFDAC(fd, StringFromList(i, channely_str, ","), str2num(StringFromList(i, y_str, ",")) + str2num(StringFromList(i, width_y_str, ",")))
+		RampMultipleChannels(StringFromList(i, channely_str, ","), num2str(str2num(StringFromList(i, y_str, ",")) + str2num(StringFromList(i, width_y_str, ","))))
   endfor
   
   CorrectChargeSensor(fdchannelstr=csname, fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15) //added cutoff time so we don't have to wait while de-bugging
@@ -353,11 +355,11 @@ function DotTuneAroundVirtual(x_str, y_str, width_x_str, width_y_str, channelx_s
   
   ///// TOP RIGHT OF SCAN /////
   for (i=0; i<ItemsInList(channelx_str, ",");i++)
-		rampmultipleFDAC(fd, StringFromList(i, channelx_str, ","), str2num(StringFromList(i, x_str, ",")) + str2num(StringFromList(i, width_x_str, ",")))
+		RampMultipleChannels(StringFromList(i, channelx_str, ","), num2str(str2num(StringFromList(i, x_str, ",")) + str2num(StringFromList(i, width_x_str, ","))))
   endfor
 	
   for (i=0; i<ItemsInList(channely_str, ",");i++)
-		rampmultipleFDAC(fd, StringFromList(i, channely_str, ","), str2num(StringFromList(i, y_str, ",")) + str2num(StringFromList(i, width_y_str, ",")))
+		RampMultipleChannels(StringFromList(i, channely_str, ","), num2str(str2num(StringFromList(i, y_str, ",")) + str2num(StringFromList(i, width_y_str, ","))))
   endfor
   
   CorrectChargeSensor(fdchannelstr=csname, fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15) //added cutoff time so we don't have to wait while de-bugging
