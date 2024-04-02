@@ -2157,6 +2157,10 @@ Structure AWGVars
 endstructure
 
 
+//////////////////////////////////////
+///////////// AWG stuff ////////////////
+//////////////////////////////////////
+
 function fd_initGlobalAWG()
 	Struct AWGVars S
 	// Set empty strings instead of null

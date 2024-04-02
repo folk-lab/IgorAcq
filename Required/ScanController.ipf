@@ -833,7 +833,7 @@ function initScanVarsFD2(S, startx, finx, [channelsx, numptsx, sweeprate, durati
 		S.y_label = scu_getDacLabel(S.channelsy, fastdac=1)						// setting the y_label
 		S.dacListIDs_y = scc_getDeviceIDs(S=S, check_y = 1)				// getting the fdIDs for each DAC channel
    endif
-                                                            
+         print S                                                   
 end
 
 
@@ -1081,8 +1081,11 @@ function scv_setSetpoints(S, itemsx, startx, finx, itemsy, starty, finy, startxs
         	// Adjust the single finy
         	original_finy = S.finy
         	original_starty = S.starty
-        	spacing = (original_finy-original_starty)/(num_dac_steps-1)/num_setpoints
-        	new_finy = original_finy + spacing*(num_setpoints-1)
+//        	spacing = (original_finy-original_starty)/(num_dac_steps-1)/num_setpoints
+//        	new_finy = original_finy + spacing*(num_setpoints-1)
+
+        	spacing = (original_finy-original_starty)/num_dac_steps
+	       new_finy = original_starty + spacing*(num_dac_steps)
         	S.finy = new_finy
 			
 			// Adjust the finys
@@ -1091,8 +1094,10 @@ function scv_setSetpoints(S, itemsx, startx, finx, itemsy, starty, finy, startxs
 			for (i=0;i<itemsinList(S.finys, ",");i++)
 	        	original_finy = str2num(stringfromList(i, S.finys, ","))
 	        	original_starty = str2num(stringfromList(i, S.startys, ","))
-	        	spacing = (original_finy-original_starty)/(num_dac_steps-1)/num_setpoints
-	        	new_finy = original_finy + spacing*(num_setpoints-1)
+//	        	spacing = (original_finy-original_starty)/(num_dac_steps-1)/num_setpoints
+//	        	new_finy = original_finy + spacing*(num_setpoints-1)
+				spacing = (original_finy-original_starty)/num_dac_steps
+	        	new_finy = original_starty + spacing*(num_dac_steps)
 	        	new_finys = AddListItem(num2str(new_finy), new_finys, ",", INF)
 			endfor
 			scv_sanitizeSetpoints(S.startys, new_finys, itemsy, starts, fins)
@@ -4968,7 +4973,10 @@ function scfd_RecordBuffer(S, rowNum, totalByteReturn, [record_only, skip_raw2ca
 //    		if(!panic_mode && expected_bytes_in_buffer < saveBuffer)  // if we aren't too far behind then update Raw 1D graphs
 //    		
 ////       		if(!sc_plotRaw)
-////       			scfd_raw2CalcQuickDistribute()
+
+//  			scfd_raw2CalcQuickDistribute()
+//  			doupdate
+  			
 ////       		endif
 //       		
 //       		if (!skip_raw2calc) // Vahid's change which is quite similar to Tim's change commentated above. 
@@ -5404,7 +5412,7 @@ end
 
 window scfw_fdacInitWindow() : Panel
 	PauseUpdate; Silent 1 // building window
-	NewPanel /W=(100,100,400,630) // window size
+	NewPanel /W=(100,100,420,650) // window size
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv fsize= 25,fstyle= 1
