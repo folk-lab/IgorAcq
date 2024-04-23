@@ -1,7 +1,42 @@
-pragma rtGlobals=1		// Use modern global access method.
+#pragma TextEncoding = "UTF-8"
+#pragma rtGlobals=1			// Use modern global access method and strict wave access
+#pragma DefaultTab={3,20,4}		// Set default tab width in Igor Pro 9 and later
 
 /// this procedure contains all of the functions that
 /// scan controller needs for file I/O and custom formatted string handling
+
+
+Function StringToListWave(string strList)
+    // Takes a string of numbers delimited by either commas or semicolons and converts it to a numeric wave.
+    
+    Variable numItems, i
+    String numStr, separator
+    
+    // Determine the separator used in the string
+    If (StrSearch(strList, ";", 0) >= 0)
+        separator = ";"
+    ElseIf (StrSearch(strList, ",", 0) >= 0)
+        separator = ","
+    Else
+        // If no separator is found, assume the string is invalid or empty and abort
+        Print "No valid separator found or string is empty."
+        return 0
+    EndIf
+    
+    // Count the number of items in the list
+    numItems = ItemsInList(strList, separator)
+    
+    // Make a new wave with the number of items found in the string
+    Make/O/N=(numItems) numericWave
+    
+    // Loop through the string, convert each item to a number, and assign it to the wave
+    For (i = 0; i < numItems; i += 1)
+        numStr = StringFromList(i, strList, separator)  // Extract number string from list using the detected separator
+        numericWave[i] = Str2Num(numStr)  // Convert to number and assign to wave
+    EndFor
+    
+    // Optionally, give the wave a meaningful name or handle it externally
+End
 
 //////////////////////////////
 /// SAVING EXPERIMENT DATA ///
@@ -80,6 +115,7 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 	
 	if (!logs_only)
 		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(sc_createSweepLogs(S=S))
+		make /free /T /N=1 instr_logs=prettyJSONfmt(sc_instrumentLogs()) // Modifies the jstr to add Instrumt Status (from ScanController Window)
 		make /FREE /T /N=1 scan_vars_json = sce_ScanVarsToJson(S, getrtstackinfo(3), save_to_file = 0)
 	else
 		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(sc_createSweepLogs(comments = comments))
@@ -110,6 +146,13 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 		if (V_flag != 0)
 				Print "HDF5SaveData Failed: ", "sweep_logs"
 		endif
+		
+		HDF5SaveData/z /A="instr_logs" instr_logs, hdf5_id, "metadata"
+		if (V_flag != 0)
+				Print "HDF5SaveData Failed: ", "instr_logs"
+		endif
+
+
 
 		if (!logs_only)
 			HDF5SaveData/z /A="ScanVars" scan_vars_json, hdf5_id, "metadata"
@@ -129,7 +172,7 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 		endif
 
 		// may as well save this config file, since we already have it
-		scw_saveConfig(cconfig[0])	
+		scw_saveConfig()	
 		
 	endfor
 end
@@ -185,21 +228,22 @@ function /s sc_createSweepLogs([S, comments])  // TODO: Rename
    	     endif
     endif
 
-    sc_instrumentLogs(jstr)  // Modifies the jstr to add Instrumt Status (from ScanController Window)
+//    sc_instrumentLogs(jstr)  // Modifies the jstr to add Instrumt Status (from ScanController Window)
 	return jstr
 end
 
 
-function sc_instrumentLogs(jstr)
+function/s sc_instrumentLogs()
 	// Runs all getinstrStatus() functions, and adds results to json string (to be stored in sweeplogs)
 	// Note: all log strings must be valid JSON objects 
-    string &jstr
+    string jstr=""
     
-	sc_openInstrConnections(0)  // Reopen connections before asking for status in case it has been a long time (?)[Vahid: how long would be a long time??] since the beginning of the scan
+	//sc_openInstrConnections(0)  // Reopen connections before asking for status in case it has been a long time (?)[Vahid: how long would be a long time??] since the beginning of the scan
 	wave /t sc_Instr
 	variable i=0, j=0, addQuotes=0
 	string command="", val=""
 	string /G sc_log_buffer=""
+
 	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
 		sc_log_buffer=""
 		command = TrimString(sc_Instr[i][2])
@@ -209,29 +253,30 @@ function sc_instrumentLogs(jstr)
 				print "[ERROR] in sc_createSweepLogs: "+GetErrMessage(V_Flag,2)
 			endif
 			if(strlen(sc_log_buffer)!=0)
-				// need to get first key and value from sc_log_buffer
-				JSONSimple sc_log_buffer
-				wave/t t_tokentext
-				wave w_tokentype, w_tokensize, w_tokenparent
-	
-				for(j=1;j<numpnts(t_tokentext)-1;j+=1)
-					if ( w_tokentype[j]==3 && w_tokensize[j]>0 )
-						if( w_tokenparent[j]==0 )
-							if( w_tokentype[j+1]==3 )
-								val = "\"" + t_tokentext[j+1] + "\""
-							else
-								val = t_tokentext[j+1]
-							endif
-							jstr = addJSONkeyval(jstr, t_tokentext[j], val)
-							break
-						endif
-					endif
-				endfor
+			jstr=sc_log_buffer
+//				// need to get first key and value from sc_log_buffer
+//				JSONSimple sc_log_buffer
+//				wave/t t_tokentext
+//				wave w_tokentype, w_tokensize, w_tokenparent
+//				for(j=1;j<numpnts(t_tokentext)-1;j+=1)
+//					if ( w_tokentype[j]==3 && w_tokensize[j]>0 )
+//						if( w_tokenparent[j]==0 )
+//							if( w_tokentype[j+1]==3 )
+//								val = "\"" + t_tokentext[j+1] + "\""
+//							else
+//								val = t_tokentext[j+1]
+//							endif
+//							jstr = addJSONkeyval(jstr, t_tokentext[j], val)
+//							break
+//						endif
+//					endif
+//				endfor
 			else
 				print "[WARNING] command failed to log anything: "+command+"\r"
 			endif
 		endif
 	endfor
+	return jstr
 end
 
 
@@ -350,13 +395,13 @@ function SaveToHDF(S, [additional_wavenames])
 
 	// Save ScanWaves (e.g. x_array, y_array etc)
 	if(S.using_fastdac)
-		nvar sc_resampleFreqCheckFadc
-		saveScanWaves(calc_hdf5_id, S, sc_resampleFreqCheckFadc)  // Needs a different x_array size if filtered
-		if (Sc_saveRawFadc == 1)
-			saveScanWaves(raw_hdf5_id, S, 0)
-		endif
-	else
-		saveScanWaves(calc_hdf5_id, S, 0)
+		saveScanWaves(calc_hdf5_id, S, 1)  // Needs a different x_array size if filtered
+//		going forward we never save rawdata 
+//		if (Sc_saveRawFadc == 1)
+//			saveScanWaves(raw_hdf5_id, S, 0)
+//		endif
+//	else
+		//saveScanWaves(calc_hdf5_id, S, 0)
 	endif
 	
 	// Get waveList to save
@@ -502,7 +547,7 @@ function saveFastdacInfoWaves(hdfids, S)
 			variable j
 			for(j=0;j<AWG.numWaves;j++)
 				// Get IGOR AW
-				wn = fd_getAWGwave(str2num(stringfromlist(j, AWG.AW_waves, ",")))
+				//*wn = fd_getAWGwave(str2num(stringfromlist(j, AWG.AW_waves, ",")))
 				SaveSingleWaveToHDF(wn, hdfid)
 			endfor
 		endif
@@ -1696,6 +1741,7 @@ function/s TextWavetolist(w)
 
 	for (i=0; i<n; i++)
 		list += w[i] + ";"
+
 	endfor
 	list = list[0,strlen(list)-2] // remove last semicolon
 	return list
@@ -1716,6 +1762,18 @@ function /s numWavetolist(w)
 	list = list[0,strlen(list)-2] // remove last semicolon
 	return list
 end
+
+Function ConvertNumWvToTxtWv(W)
+Wave W
+Make /T /O /N=(numpnts(W)) TxtConvert
+TxtConvert[] = num2str(W[p])
+End
+ 
+Function ConvertTxtWvToNumWv(W)
+Wave /T W
+Make /O /N=(numpnts(W)) NumConvert
+NumConvert[] = str2num(W[p])
+End
 
 function/s addJSONkeyval(JSONstr,key,value,[addquotes])
 	// returns a valid JSON string with a new key,value pair added.
@@ -1766,6 +1824,82 @@ function/s addJSONkeyval(JSONstr,key,value,[addquotes])
 	endif
 
 end
+
+//function /S escapeQuotes(str)
+//	string str
+//
+//	variable i=0, escaped=0
+//	string output = ""
+//	do
+//
+//		if(i>strlen(str)-1)
+//			break
+//		endif
+//
+//		// check if the current character is escaped
+//		if(i!=0)
+//			if( CmpStr(str[i-1], "\\") == 0)
+//				escaped = 1
+//			else
+//				escaped = 0
+//			endif
+//		endif
+//
+//		// escape quotes
+//		if( CmpStr(str[i], "\"" ) == 0 && escaped == 0)
+//			// this is an unescaped quote
+//			str = str[0,i-1] + "\\" + str[i,inf]
+//		endif
+//		i+=1
+//
+//	while(1)
+//	return str
+//end
+
+
+//Function/S addJSONkeyval(JSONstr, key, value, [addquotes])
+//    String JSONstr, key, value
+//    Variable addquotes
+//    
+//    // Check if key is null
+//    if(strlen(key) == 0)
+//        printf "Error: Key is null or empty.\n"
+//        return JSONstr  // Optionally, return the unmodified JSON string or handle the error differently
+//    endif
+//
+//	// Escape quotes in key since it's always treated as a string
+//	key = escapeQuotes(key)
+//
+//	// Check if the value is to be added as a string
+//	if(!ParamIsDefault(addquotes) && addquotes == 1)
+//		// Escape quotes in value and wrap value in outer quotes
+//		value = "\"" + escapeQuotes(value) + "\""
+//	ElseIf(strlen(value) == 0)  // If value is an empty string, treat it as null
+//		value = "null"
+//		// No else case needed here; if addquotes is 0 or not provided, value is treated as numeric or boolean
+//
+//		if(strlen(JSONstr) != 0)
+//			// Existing JSON object; prepare to append
+//			// Trim leading '{' and trailing '}' to prepare for appending
+//			JSONstr = ReplaceString("{", JSONstr, "")
+//			JSONstr = ReplaceString("}", JSONstr, "")
+//			JSONstr = TrimString(JSONstr) // Trim both leading and trailing whitespace
+//
+//			// Append new key-value pair
+//			return "{" + JSONstr + ", \"" + key + "\":" + value + "}"
+//		else
+//			// New JSON object
+//			return "{\"" + key + "\":" + value + "}"
+//		endif
+//		endif
+//End
+//
+Function/S escapeQuotes(str)
+    // Helper function to escape quotes within a string
+    String str
+    return ReplaceString("\"", str, "\\\"")
+End
+
 
 function/s getIndent(level)
 	// returning whitespace for formatting strings
@@ -1877,6 +2011,39 @@ function/S removeSeperator(str, sep)
 
 end 
 
+Function/S FormatListItems(listString)
+    String listString
+    Variable i, numItems
+    String result, currentItem
+
+
+    // Split and process each item
+    numItems = ItemsInList(listString, ";")
+    result = ""  // Initialize the result string
+
+    for(i = 0; i < numItems; i += 1)
+        currentItem = StringFromList(i, listString)
+        //print currentItem
+        if(strlen(currentItem) > 0)
+            if(strlen(result) > 0)
+                result += ","  // Add comma before adding the next item
+            endif
+            result += "\"" + TrimString(currentItem) + "\""  // Add quotes and handle any space trimming
+        endif
+    endfor
+
+    return result
+End
+
+
+//Function/S TrimString(str)
+//    String str
+//    // Trim leading and trailing white spaces
+//    return RemoveEnding(str, " ")
+//End
+
+
+
 function/S removeTrailingWhitespace(str)
     String str
 
@@ -1927,37 +2094,6 @@ function countQuotes(str)
 
 	endfor
 	return quoteCount
-end
-
-function /S escapeQuotes(str)
-	string str
-
-	variable i=0, escaped=0
-	string output = ""
-	do
-
-		if(i>strlen(str)-1)
-			break
-		endif
-
-		// check if the current character is escaped
-		if(i!=0)
-			if( CmpStr(str[i-1], "\\") == 0)
-				escaped = 1
-			else
-				escaped = 0
-			endif
-		endif
-
-		// escape quotes
-		if( CmpStr(str[i], "\"" ) == 0 && escaped == 0)
-			// this is an unescaped quote
-			str = str[0,i-1] + "\\" + str[i,inf]
-		endif
-		i+=1
-
-	while(1)
-	return str
 end
 
 function /S unescapeQuotes(str)
@@ -2062,3 +2198,4 @@ function/s searchFullString(string_to_search,substring)
 
 	return index_list
 end
+

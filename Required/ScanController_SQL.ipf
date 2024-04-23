@@ -508,6 +508,8 @@ function/s sc_checkSQLDriver([printToCommandLine])
 	// svar sqldriver
 	// if printToCommandLine=1 the global parameters
 	// won't be set. Intended for diagnostics.
+	//"DRIVER=/opt/homebrew/Library/Taps/microsoft/homebrew-mssql-release/Formula/mssql-tools18.rb;"
+
 
 	variable printToCommandLine
 
@@ -701,3 +703,6 @@ function timeSQLStatements()
 	sprintf mess, "Statement #1: %f s, statement #2: %f s, statement #3: %f s", totaltime1, totaltime2, totaltime3
 	print mess
 end
+
+
+

@@ -371,11 +371,12 @@ function/s getHTTP(instrID,cmd,headers)
 	string instrID, cmd, headers
 	string response, error
 
-//	print instrID+cmd
+	//print instrID+cmd
 	URLRequest /TIME=25.0 url=instrID+cmd, method=get, headers=headers
 
 	if (V_flag == 0)    // No error
 		response = S_serverResponse // response is a JSON string
+		//print response
 		if (V_responseCode != 200)  // 200 is the HTTP OK code
 			print "[ERROR] HTTP response code " + num2str(V_responseCode)
 		   return ""
