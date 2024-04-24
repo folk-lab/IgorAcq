@@ -18,7 +18,6 @@ function openFastDAC(portnum,[verbose])
 
 	// verbose=0 will not print any information about the connection
 
-
 	string portnum
 	variable verbose
 	string IDname="fd"
@@ -26,8 +25,6 @@ function openFastDAC(portnum,[verbose])
 
 	string http_address = "http://lcmi-docs.qdev-h101.lab:"+portnum+"/api/v1/"
 	http_address="http://127.0.0.1:"+portnum+"/api/v1/"
-
-
 
 	if(paramisdefault(verbose))
 		verbose=1
@@ -41,14 +38,41 @@ function openFastDAC(portnum,[verbose])
 
 	openHTTPinstr(comm, verbose=verbose)  // creates global variable fd=http_address
 
-	if (verbose==1)
-	response=get_proxy_info()
-	print response
-	get_idn(getjsonvalue(response,"label"))
-	// to do: currently this will only give the IDN of the first FD in the get_proxy_info response, becasue getjsonvalue can not handle the 
-	//response properly
+	response = get_proxy_info()
 	
+	string proxies_info = getjsonvalue(response, "proxies_info")
+	string fastdac_labels = get_fastdac_labels()
+	
+	if (verbose==1)
+		print response
+		print proxies_info
+		print fastdac_labels
 	endif
+end
+
+
+
+function /t get_fastdac_labels()
+	// assumes openFastDAC(portnum,[verbose]) has already been run so connections are open
+	
+	string response = ""
+	response = get_proxy_info()
+	
+	string proxies_info, fastdac_label, fastdac_labels = "", temp_parse
+	
+	proxies_info = getjsonvalue(response, "proxies_info")
+	
+	variable num_fastdacs = ItemsInList(proxies_info,  "label") - 1
+	
+	int i
+	for (i = 1; i <= num_fastdacs; i++)
+		temp_parse = stringFromList(i, proxies_info, "label")
+		fastdac_label = stringFromList(0, stringFromList(1, temp_parse, ":"), ",")
+		fastdac_label = fastdac_label[1, strlen(fastdac_label) - 2]
+		fastdac_labels +=  fastdac_label + ";"
+	endfor
+	
+	return fastdac_labels
 end
 
 
@@ -149,17 +173,17 @@ end
 
 
 function initFastDAC()
-// usage: init_dac_and_adc("1;2;4;6")
-//Edit/K=0 root:adc_table;Edit/K=0 root:dac_table
-wave/t adc_table, dac_table
-wave/t fdacvalstr
-make/o/t/n=(dimsize(ADC_table,0)) ADC_channel
-make/o/t/n=(dimsize(DAC_table,0)) DAC_channel
-ADC_channel=adc_table[p][0]
-DAC_channel=dac_table[p][0]
-
-nvar filenum
-getFDIDs()
+	// usage: init_dac_and_adc("1;2;4;6")
+	//Edit/K=0 root:adc_table;Edit/K=0 root:dac_table
+	wave/t adc_table, dac_table
+	wave/t fdacvalstr
+	make/o/t/n=(dimsize(ADC_table,0)) ADC_channel
+	make/o/t/n=(dimsize(DAC_table,0)) DAC_channel
+	ADC_channel=adc_table[p][0]
+	DAC_channel=dac_table[p][0]
+	
+	nvar filenum
+	getFDIDs()
 
 	// hardware limit (mV)
 	variable i=0, numDevices = dimsize(ADC_channel,0)/4
@@ -180,15 +204,16 @@ getFDIDs()
 	setadc_speed()
 end
 
+
 function setADC_speed()
-svar fd
-wave/t ADC_channel
-variable i=0
-do 
-set_one_fadcSpeed(i,82)
-//print get_one_fadcSpeed(i)
-i=i+1
-while(i<dimsize(ADC_channel,0))
+	svar fd
+	wave/t ADC_channel
+	variable i=0
+	do 
+		set_one_fadcSpeed(i,82)
+		//print get_one_fadcSpeed(i)
+		i=i+1
+	while(i<dimsize(ADC_channel,0))
 end
 
 
@@ -915,7 +940,7 @@ curl -X 'GET' \
   'http://lcmi-docs.qdev-h101.lab:xxx/api/v1/get-idn/1' \
   -H 'accept: application/json'
 
-function set_one_fadcSpeed(int adcValue,variable speed)
+function set_one_fadcSpeed(int adcValue, variable speed)
 	svar fd
 	wave/t ADC_channel
 	String cmd = "set-adc-sampling-time"
@@ -931,15 +956,16 @@ end
 
 
 function/s get_proxy_info()
+	// assumes openFastDAC("51011", verbose=0) has been run so that 'fd' has been created
 	svar fd
 	string	response=getHTTP(fd,"get-proxies-info","");
 	return response
-	
 end
+
 
 function get_idn(string fd_id)
 	svar fd
-	string	response=getHTTP(fd,"get-idn/"+fd_id,"");
+	string	response=getHTTP(fd, "get-idn/" + fd_id, "");
 	print response
 end
 
