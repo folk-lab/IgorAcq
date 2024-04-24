@@ -79,7 +79,7 @@ end
 
 function init_dac_and_adc(fastdac_string)
 	// creates two waves 'dac_table' and 'adc_table' which are used to create fastDAC window
-//	example: init_dac_and_adc("5;3;6;8")
+	//	example: init_dac_and_adc("5;3;6;8")
 	string fastdac_string // expecting e.g. "17;2;34"
 	
 	// if dac and adc ever change these values need updating
@@ -90,9 +90,7 @@ function init_dac_and_adc(fastdac_string)
 	int fastdac_count = 0
 	string temp_string
 	
-	////////////////////////////
 	///// create DAC table /////
-	////////////////////////////
 	int dac_count = 0
 	make /o /T /n=(num_fastdac * num_dac, 5) dac_table
 	wave /t dac_table
@@ -129,9 +127,7 @@ function init_dac_and_adc(fastdac_string)
 	endfor
 	
 	
-	////////////////////////////
 	///// create ADC table /////
-	////////////////////////////
 	int adc_count = 0
 	fastdac_count = 0
 	make /o /T /n=(num_fastdac * num_adc, 8) adc_table
@@ -171,49 +167,99 @@ function init_dac_and_adc(fastdac_string)
 end
 
 
+function /wave get_dac_channels(wave sc_dac_vals)
+	// provide fdacvalstr
+	// assumes the channels are in the zeroeth column
+	// To use this in command line:
+	//		make/o/n=num tempwave
+	// 		tempwave = linspace(start, fin, num)[p]
+	//
+	// To use in a function:
+	//		wave tempwave = linspace(start, fin, num)  //Can be done ONCE (each linspace overwrites itself!)
+	//	or
+	//		make/n=num tempwave = linspace(start, fin, num)[p]  //Can be done MANY times
+	//
+	// To combine linspaces:
+	//		make/free/o/n=num1 w1 = linspace(start1, fin1, num1)[p]
+	//		make/free/o/n=num2 w2 = linspace(start2, fin2, num2)[p]
+	//		concatenate/np/o {w1, w2}, tempwave
+	//
+	duplicate /o /RMD=[][0] sc_dac_vals temp_dac_vals
+	return temp_dac_vals
+
+end
+
+
+function /wave get_adc_channels(wave sc_adc_vals)
+	// provide fadcvalstr
+	// assumes the channels are in the zeroeth column
+	// To use this in command line:
+	//		make/o/n=num tempwave
+	// 		tempwave = linspace(start, fin, num)[p]
+	//
+	// To use in a function:
+	//		wave tempwave = linspace(start, fin, num)  //Can be done ONCE (each linspace overwrites itself!)
+	//	or
+	//		make/n=num tempwave = linspace(start, fin, num)[p]  //Can be done MANY times
+	//
+	// To combine linspaces:
+	//		make/free/o/n=num1 w1 = linspace(start1, fin1, num1)[p]
+	//		make/free/o/n=num2 w2 = linspace(start2, fin2, num2)[p]
+	//		concatenate/np/o {w1, w2}, tempwave
+	//
+	duplicate /o /RMD=[][0] sc_adc_vals temp_adc_vals
+	return temp_adc_vals
+
+end
+
+
+
 
 function initFastDAC()
 	// usage: init_dac_and_adc("1;2;4;6")
 	//Edit/K=0 root:adc_table;Edit/K=0 root:dac_table
 	wave/t adc_table, dac_table
-	wave/t fdacvalstr
-	make/o/t/n=(dimsize(ADC_table,0)) ADC_channel
-	make/o/t/n=(dimsize(DAC_table,0)) DAC_channel
-	ADC_channel=adc_table[p][0]
-	DAC_channel=dac_table[p][0]
+	wave/t fdacvalstr, fadcvalstr
+	wave/t DAC_channel = get_dac_channels(fdacvalstr)
+	wave/t ADC_channel = get_adc_channels(fadcvalstr)
+
+//	make/o/t/n=(dimsize(ADC_table,0)) ADC_channel
+//	make/o/t/n=(dimsize(DAC_table,0)) DAC_channel
+//	ADC_channel=adc_table[p][0]
+//	DAC_channel=dac_table[p][0]
 	
 	nvar filenum
-	getFDIDs()
+	getFDIDs() // create global wave of FD_IDS... (probably better wave of doing this, not sure a global wave is necessary)
 
 	// hardware limit (mV)
-	variable i=0, numDevices = dimsize(ADC_channel,0)/4
-	variable numDACCh=dimsize(DAC_channel,0), numADCCh=numDACch/2;
+	variable i = 0
+	variable numDACCh = dimsize(DAC_channel, 0)
+	variable numADCCh = dimsize(ADC_channel, 0)
 	
 	// create waves to hold control info
-	variable oldinit = scfw_fdacCheckForOldInit(numDACCh,numADCCh)
+	variable oldinit = scfw_fdacCheckForOldInit(numDACCh, numADCCh)
 
 	// create GUI window
 	string cmd = ""
-	//variable winsize_l,winsize_r,winsize_t,winsize_b
 	getwindow/z ScanControllerFastDAC wsizeRM
 	killwindow/z ScanControllerFastDAC
-	//sprintf cmd, "FastDACWindow(%f,%f,%f,%f)", v_left, v_right, v_top, v_bottom
-	//execute(cmd)
 	killwindow/z after1
 	execute("after1()")	
+	
 	setadc_speed()
 end
 
 
 function setADC_speed()
 	svar fd
-	wave/t ADC_channel
-	variable i=0
+	wave/t fadcvalstr
+	wave/t ADC_channel = get_adc_channels(fadcvalstr)
+	
+	variable i = 0
 	do 
 		set_one_fadcSpeed(i,82)
-		//print get_one_fadcSpeed(i)
-		i=i+1
-	while(i<dimsize(ADC_channel,0))
+		i = i + 1
+	while(i < dimsize(ADC_channel, 0))
 end
 
 
@@ -942,13 +988,18 @@ curl -X 'GET' \
 
 function set_one_fadcSpeed(int adcValue, variable speed)
 	svar fd
-	wave/t ADC_channel
+	wave/t fadcvalstr
+	wave/t ADC_channel = get_adc_channels(fadcvalstr)
+	
 	String cmd = "set-adc-sampling-time"
+	
 	// Convert variables to strings and construct the JSON payload dynamically
 	String payload
 	payload = "{\"access_token\": \"string\", \"fqpn\": \"" + ADC_channel(adcValue) + "\", \"sampling_time_us\": " + num2str(speed) + "}"
+	
 	//print payload
 	String headers = "accept: application/json\nContent-Type: application/json"
+	
 	// Perform the HTTP PUT request
 	String response = postHTTP(fd, cmd, payload, headers)
 end
@@ -1227,6 +1278,7 @@ function fd_get_sweeprate_from_numpts(start, fin, numpts, measureFreq)
 	return sweeprate
 end
 
+
 function fd_getmaxADCs(S)
 	struct ScanVars &S
 	variable maxADCs
@@ -1240,13 +1292,16 @@ function fd_getmaxADCs(S)
 	return maxADCs
 end
 
+
 function getFDIDs()
-	//ADC_channel has to exist for this to work
-	//creates string wave FDIDs and sting list FDIDs_list
-	wave/t ADC_channel
+	// fadcvalstr has to exist for this to work
+	// creates string wave FDIDs and string list FDIDs_list
+	wave/t fadcvalstr
+	wave/t ADC_channel = get_adc_channels(fadcvalstr)
+	
 	ConvertTxtWvToNumWv(ADC_channel); /// creates numerical wave out of ADC_channel
 	wave numconvert
-	matrixop/o rounded=round(numconvert)
+	matrixop/o rounded = round(numconvert)
 	FDecimate(rounded, "FDIDs", 4)	
 end
 
