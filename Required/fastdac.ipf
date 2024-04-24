@@ -23,6 +23,7 @@ function openFastDAC(portnum,[verbose])
 	variable verbose
 	string IDname="fd"
 
+
 	string http_address = "http://lcmi-docs.qdev-h101.lab:"+portnum+"/api/v1/"
 	http_address="http://127.0.0.1:"+portnum+"/api/v1/"
 
@@ -38,16 +39,19 @@ function openFastDAC(portnum,[verbose])
 	sprintf comm, "instrID=%s,url=%s" IDname, http_address
 	string response = ""
 
-	openHTTPinstr(comm, verbose=verbose)  // Sets svar (instrID) = url
+	openHTTPinstr(comm, verbose=verbose)  // creates global variable fd=http_address
 
 	if (verbose==1)
-		response=getHTTP(http_address,"idn","");
-		print getjsonvalue(response,"idn")
+	response=get_proxy_info()
+	print response
+	get_idn(getjsonvalue(response,"label"))
+	// to do: currently this will only give the IDN of the first FD in the get_proxy_info response, becasue getjsonvalue can not handle the 
+	//response properly
+	
 	endif
 end
 
 
-```
 
 function init_dac_and_adc(fastdac_string)
 	// creates two waves 'dac_table' and 'adc_table' which are used to create fastDAC window
@@ -924,14 +928,19 @@ function set_one_fadcSpeed(int adcValue,variable speed)
 	String response = postHTTP(fd, cmd, payload, headers)
 end
 
-function get_one_IDN()
+
+
+function/s get_proxy_info()
 	svar fd
-	wave/t ADC_channel
-	//string	response=getHTTP(fd,"get-idn/"+ADC_channel(),"");
-	string value
-	//value=getjsonvalue(response,"sampling_time_us")
-	//variable speed = roundNum(1.0/str2num(value)*1.0e6,0)
-	//return speed
+	string	response=getHTTP(fd,"get-proxies-info","");
+	return response
+	
+end
+
+function get_idn(string fd_id)
+	svar fd
+	string	response=getHTTP(fd,"get-idn/"+fd_id,"");
+	print response
 end
 
 function get_one_fadcSpeed(int adcValue)
@@ -1215,27 +1224,6 @@ function getFDIDs()
 	FDecimate(rounded, "FDIDs", 4)	
 end
 
-
-Step 1: Initialize the array
-- Let `active_dacs[]` and `active_adcs[]` be arrays of size 4 (for 4 boxes), initialized to zero.
-- Let `total_reads_per_box[]` be an array of size 4, initialized to zero.
-
-Step 2: Mark active DACs and ADCs
-- For each DAC in `dac_locations`, increment `active_dacs[dac_location]`.
-- For each ADC in `adc_locations`, increment `active_adcs[adc_location]`.
-
-Step 3: Calculate reads required to balance the load
-- Calculate `total_active_boxes` by counting non-zero entries in `active_dacs[]` and `active_adcs[]` combined.
-- For each box, calculate `max_reads` which is the maximum of any individual count in `active_adcs[]`.
-
-Step 4: Assign ADC reads
-- For each box i from 1 to 4:
-  - If `active_dacs[i] > 0 OR active_adcs[i] > 0` then:
-    - `needed_adcs = max(max_reads - active_adcs[i], 0)`
-    - `reads_per_box[i] = active_adcs[i] + needed_adcs`
-
-Step 5: Output the number of reads per box
-- The result is stored in `reads_per_box[]`, where each entry indicates the total ADC reads (real and fake) for each box.
 
 
 

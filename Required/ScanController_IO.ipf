@@ -1278,6 +1278,9 @@ function/s getJSONvalue(jstr, key)
 	endif
 end
 
+
+
+
 function/s getJSONindices(keys)
 	// returns string list with indices of parsed keys
 	string keys
