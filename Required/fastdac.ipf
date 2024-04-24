@@ -24,7 +24,7 @@ function openFastDAC(portnum,[verbose])
 	string IDname="fd"
 
 	string http_address = "http://lcmi-docs.qdev-h101.lab:"+portnum+"/api/v1/"
-	//http_address="master.qdev-h101.lab:xxx"
+	http_address="http://127.0.0.1:"+portnum+"/api/v1/"
 
 
 
@@ -173,7 +173,7 @@ getFDIDs()
 	//execute(cmd)
 	killwindow/z after1
 	execute("after1()")	
-	//setadc_speed()
+	setadc_speed()
 end
 
 function setADC_speed()
@@ -978,7 +978,7 @@ end
 function sample_ADC(string adclist, variable nr_samples)
 	svar fd
 	variable chunksize=2500
-	String cmd = "run-samples-acquisition"
+	String cmd = "start-samples-acquisition"
 	String payload=""
 	payload+= "{\"adc_list\": ["
 	payload+=adclist
@@ -986,7 +986,7 @@ function sample_ADC(string adclist, variable nr_samples)
     payload+= "\"chunk_max_samples\": \"" + num2str(chunksize) + "\", "
     payload+= "\"adc_sampling_time_us\": \"" + num2str(82) + "\", "
     payload+= "\"chunk_file_name_template\": \"temp_{{.ChunkIndex}}.dat\", "
-   	payload+=  "\"nr_samples\": \"" + num2str(nr_samples) + "\"}"
+   	payload+=  "\"nr_samples\": \"" + num2istr(nr_samples) + "\"}"
 
 //print payload
 	String headers = "accept: application/json\nContent-Type: application/json"
@@ -1009,7 +1009,7 @@ Function linear_ramp(S)
     payload += "\"chunk_max_samples\": \"" + num2str(chunkSize) + "\", "
     payload += "\"adc_sampling_time_us\":" + num2str(82) + ", "
     payload += "\"chunk_file_name_template\": \"temp_{{.ChunkIndex}}.dat\", "
-    payload += "\"nr_steps\": \"" + num2str(nr_samples) + "\","
+    payload += "\"nr_steps\": \"" + num2istr(nr_samples) + "\","
     payload += "\"dac_range_map\": {"
 
     for (i = 0; i < ItemsInList(S.daclistIDs,","); i += 1)

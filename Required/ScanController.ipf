@@ -2204,7 +2204,7 @@ Function loadFiles(S, numPntsRead)
 	Variable numAdcs = ItemsInList(adcNames) // Number of ADC columns to read in
 	Variable i, initPts, addPts, totPts
 	Variable adc, lastfile
-
+	
 	do
 		lastfile=1 // assumes that the most recent file has already been read in until proven otherwise
 
@@ -2232,6 +2232,7 @@ Function loadFiles(S, numPntsRead)
 				lastfile=0 // we just read in a new file so perhaps the most recent file has not been read in
 
 				DeleteFile/P=fdTest/Z=1 currentFile // Delete the file after processing
+				
 				S.lastRead = lastRead // Update the lastRead index in the structure
 				numPntsRead += DimSize($"tempWave0", 0) // Update the total number of points read
 				//print numPntsRead
