@@ -167,7 +167,7 @@ function init_dac_and_adc(fastdac_string)
 end
 
 
-function /wave get_dac_channels(wave sc_dac_vals)
+function /wave get_dac_channels(wave sc_dac_vals, [int use_fdacvalstr])
 	// provide fdacvalstr
 	// assumes the channels are in the zeroeth column
 	// To use this in command line:
@@ -184,13 +184,22 @@ function /wave get_dac_channels(wave sc_dac_vals)
 	//		make/free/o/n=num2 w2 = linspace(start2, fin2, num2)[p]
 	//		concatenate/np/o {w1, w2}, tempwave
 	//
-	duplicate /o /RMD=[][0] sc_dac_vals temp_dac_vals
-	return temp_dac_vals
+	
+	use_fdacvalstr = paramisdefault(use_fdacvalstr) ? 1 : use_fdacvalstr // if use_fdacvalstr == 1 use fdacvalstr else  use adc_table 
+
+	if (use_fdacvalstr == 1)
+		duplicate /o /RMD=[][0] sc_dac_vals temp_dac_vals
+		return temp_dac_vals
+	else
+		wave /t dac_table
+		duplicate /o /RMD=[][0] dac_table temp_dac_vals
+		return temp_dac_vals
+	endif
 
 end
 
 
-function /wave get_adc_channels(wave sc_adc_vals)
+function /wave get_adc_channels(wave sc_adc_vals, [int use_fadcvalstr])
 	// provide fadcvalstr
 	// assumes the channels are in the zeroeth column
 	// To use this in command line:
@@ -207,34 +216,42 @@ function /wave get_adc_channels(wave sc_adc_vals)
 	//		make/free/o/n=num2 w2 = linspace(start2, fin2, num2)[p]
 	//		concatenate/np/o {w1, w2}, tempwave
 	//
-	duplicate /o /RMD=[][0] sc_adc_vals temp_adc_vals
-	return temp_adc_vals
+	use_fadcvalstr = paramisdefault(use_fadcvalstr) ? 1 : use_fadcvalstr // if use_fadcvalstr == 1 use fadcvalstr else  use adc_table 
+
+	if (use_fadcvalstr == 1)
+		duplicate /o /RMD=[][0] sc_adc_vals temp_adc_vals
+		return temp_adc_vals
+	else
+		wave /t adc_table
+		duplicate /o /RMD=[][0] adc_table temp_adc_vals
+		return temp_adc_vals
+	endif
 
 end
 
 
+function get_number_of_fastdacs()
+	// get number of FastDACS
+	string fastdac_labels = get_fastdac_labels()
+	init_dac_and_adc(fastdac_labels)
+	variable num_fastdac = ItemsInList(fastdac_labels,  ";")
+
+	return num_fastdac
+end
 
 
 function initFastDAC()
-	// usage: init_dac_and_adc("1;2;4;6")
-	//Edit/K=0 root:adc_table;Edit/K=0 root:dac_table
-	wave/t adc_table, dac_table
-	wave/t fdacvalstr, fadcvalstr
-	wave/t DAC_channel = get_dac_channels(fdacvalstr)
-	wave/t ADC_channel = get_adc_channels(fadcvalstr)
-
-//	make/o/t/n=(dimsize(ADC_table,0)) ADC_channel
-//	make/o/t/n=(dimsize(DAC_table,0)) DAC_channel
-//	ADC_channel=adc_table[p][0]
-//	DAC_channel=dac_table[p][0]
+	// assumes something like 'openFastDAC("XXX", verbose=0)' has been run
 	
+	variable num_fastdac = get_number_of_fastdacs()
+	 
 	nvar filenum
 	getFDIDs() // create global wave of FD_IDS... (probably better wave of doing this, not sure a global wave is necessary)
 
 	// hardware limit (mV)
 	variable i = 0
-	variable numDACCh = dimsize(DAC_channel, 0)
-	variable numADCCh = dimsize(ADC_channel, 0)
+	variable numDACCh = num_fastdac * 8
+	variable numADCCh = num_fastdac * 4
 	
 	// create waves to hold control info
 	variable oldinit = scfw_fdacCheckForOldInit(numDACCh, numADCCh)
@@ -1297,12 +1314,15 @@ function getFDIDs()
 	// fadcvalstr has to exist for this to work
 	// creates string wave FDIDs and string list FDIDs_list
 	wave/t fadcvalstr
-	wave/t ADC_channel = get_adc_channels(fadcvalstr)
+	wave/t ADC_channel = get_adc_channels(fadcvalstr, use_fadcvalstr = 0)
 	
 	ConvertTxtWvToNumWv(ADC_channel); /// creates numerical wave out of ADC_channel
 	wave numconvert
 	matrixop/o rounded = round(numconvert)
-	FDecimate(rounded, "FDIDs", 4)	
+	FDecimate(rounded, "FDIDs", 4)
+	
+	killwaves /Z numconvert
+	killwaves /Z rounded
 end
 
 
