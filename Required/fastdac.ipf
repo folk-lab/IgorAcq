@@ -1022,7 +1022,6 @@ function set_one_fadcSpeed(int adcValue, variable speed)
 end
 
 
-
 function/s get_proxy_info()
 	// assumes openFastDAC("51011", verbose=0) has been run so that 'fd' has been created
 	svar fd
@@ -1047,6 +1046,7 @@ function get_one_fadcSpeed(int adcValue)
 	return speed
 end
 
+
 function get_one_FADCChannel(int channel) // Units: mV
 	svar fd
 	wave/t ADC_channel	 
@@ -1056,6 +1056,7 @@ function get_one_FADCChannel(int channel) // Units: mV
 	return str2num(adc)
 end
 
+
 function get_one_FDACChannel(int channel) // Units: mV
 	svar fd
 	wave/t DAC_channel
@@ -1064,6 +1065,7 @@ function get_one_FDACChannel(int channel) // Units: mV
 	adc=getjsonvalue(response,"value")
 	return str2num(adc)
 end
+
 
 function set_one_FDACChannel(int channel, variable setpoint, variable ramprate)
 	wave/t DAC_channel
@@ -1077,6 +1079,7 @@ function set_one_FDACChannel(int channel, variable setpoint, variable ramprate)
 	print response
 	
 end
+
 
 function sample_ADC(string adclist, variable nr_samples)
 	svar fd
@@ -1096,8 +1099,6 @@ function sample_ADC(string adclist, variable nr_samples)
 	String response = postHTTP(fd, cmd, payload, headers)
 	//print response
 end
-
-
 
 
 Function linear_ramp(S)
@@ -1130,6 +1131,7 @@ Function linear_ramp(S)
     print response
 End
 
+
 Function/S CreatePayload(S, idx)
     Struct ScanVars &S
     Int idx
@@ -1144,14 +1146,6 @@ Function/S CreatePayload(S, idx)
     payload += "}"
     return payload
 End
-
-
-
-
-
-
-
-
 
 
 function fd_stopFDACsweep()
@@ -1169,8 +1163,6 @@ end
 
 
 
-
-
 //function get_one_FADCChannel(int channel) // Units: mV
 //variable speed=gnoise(1)
 //return speed
@@ -1185,6 +1177,8 @@ end
 //variable speed=gnoise(1)
 //return speed
 //end
+
+
 
 ///////////////////////
 //// PID functions ////
@@ -1210,6 +1204,7 @@ function stopPID(instrID)
 	writeInstr(instrID, cmd+"\r")
 end
 
+
 function setPIDTune(instrID, kp, ki, kd)
 	// sets the PID tuning parameters
 	variable instrID, kp, ki, kd
@@ -1220,6 +1215,7 @@ function setPIDTune(instrID, kp, ki, kd)
 
 	writeInstr(instrID, cmd+"\r")
 end
+
 
 function setPIDSetp(instrID, setp)
 	// sets the PID set point, in mV
@@ -1242,6 +1238,7 @@ function setPIDLims(instrID, lower,upper) //mV, mV
    	writeInstr(instrID, cmd+"\r")
 end
 
+
 function setPIDDir(instrID, direct) // 0 is reverse, 1 is forward
 	// sets the direction of PID control
 	// The default direction is forward 
@@ -1253,6 +1250,7 @@ function setPIDDir(instrID, direct) // 0 is reverse, 1 is forward
 	sprintf cmd, "SET_PID_DIR,%d",direct
    	writeInstr(instrID, cmd+"\r")
 end
+
 
 function setPIDSlew(instrID, [slew]) // maximum slewrate in mV per second
 	// the slew rate is proportional how fast the controller output is allowed to ramp
@@ -1269,9 +1267,6 @@ function setPIDSlew(instrID, [slew]) // maximum slewrate in mV per second
 end
 
 
-
-
-
 ///////////////////
 //// Utilities ////
 ///////////////////
@@ -1284,6 +1279,7 @@ function fd_get_numpts_from_sweeprate(start, fin, sweeprate, measureFreq)
 	variable numpts = round(abs(fin-start)*measureFreq/sweeprate)   // distance * steps per second / sweeprate
 	return numpts
 end
+
 
 function fd_get_sweeprate_from_numpts(start, fin, numpts, measureFreq)
 	// Convert numpts into sweeprate in mV/s
@@ -1324,7 +1320,3 @@ function getFDIDs()
 	killwaves /Z numconvert
 	killwaves /Z rounded
 end
-
-
-
-

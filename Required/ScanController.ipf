@@ -407,6 +407,7 @@ Function scu_assertSeparatorType(string list_string, string assert_separator)
     EndIf
 End
 
+
 Function/S scu_getChannelNumbers(string channels)
     // This function converts a string of channel identifiers (either names or numbers)
     // into a comma-separated list of channel numbers for FastDAC.
