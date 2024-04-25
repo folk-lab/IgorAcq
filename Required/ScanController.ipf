@@ -60,13 +60,12 @@ end
 
 
 function scfw_CreateControlWaves()
-	// creates all waves and strings necessary for initfastDAC()
-	// builds fdacvalstr from fdacvalstr vice-versa for adc
+//creates all waves and strings necessary for initfastDAC()
 	wave fdacvalstr, dac_table
 	wave fadcvalstr, adc_table
 	
-	variable numdacch = dimsize(dac_table, 0)
-	variable numadcch = dimsize(adc_table, 0)
+	variable numdacch=dimsize(dac_table,0)
+	variable numadcch=dimsize(adc_table,0)
 	
 	variable i
 	
@@ -76,12 +75,12 @@ function scfw_CreateControlWaves()
 	duplicate/o dac_table, old_fdacvalstr
 	make/o/n=(numDACCh) fdacattr0 = 0
 	make/o/n=(numDACCh) fdacattr1 = 2
-	concatenate/o {fdacattr0, fdacattr1, fdacattr1, fdacattr1, fdacattr1}, fdacattr
+	concatenate/o {fdacattr0,fdacattr1,fdacattr1,fdacattr1,fdacattr1}, fdacattr
 
 	make/o/n=(numADCCh) fadcattr0 = 0
 	make/o/n=(numADCCh) fadcattr1 = 2
 	make/o/n=(numADCCh) fadcattr2 = 32
-	concatenate/o {fadcattr0, fadcattr0, fadcattr2, fadcattr1, fadcattr1, fadcattr2, fadcattr2, fadcattr1, fadcattr2}, fadcattr /// removed 8 since resampling is now done by default
+	concatenate/o {fadcattr0,fadcattr0,fadcattr2,fadcattr1,fadcattr1, fadcattr2, fadcattr2, fadcattr1, fadcattr2}, fadcattr /// removed 8 since resampling is now done by default
 
 
 	
@@ -171,12 +170,10 @@ function scfw_CreateControlWaves()
 	killwaves fadcattr0,fadcattr1,fadcattr2
 end
 
-
 function scw_OpenInstrButton(action) : Buttoncontrol
 	string action
 	sc_openInstrConnections(1)
 end
-
 
 function scfw_update_fadc(action) : ButtonControl
 	string action
@@ -227,10 +224,7 @@ function scfw_update_all_fdac([option])
 	string option // {"fdacramp": ramp all fastdacs to values currently in fdacvalstr, "fdacrampzero": ramp all to zero, "updatefdac": update fdacvalstr from what the dacs are currently at}
 	wave/t fdacvalstr
 	wave/t old_fdacvalstr
-	
-	wave/t fdacvalstr
-	wave/t DAC_channel = get_dac_channels(fdacvalstr, use_fdacvalstr = 0)
-	
+	wave/t DAC_channel
 	variable ramprate
 
 	if (paramisdefault(option))
@@ -610,10 +604,7 @@ function get_dacListIDs(S)
 	// working out DACLIstIDs for x channels
 	new_channels=scu_getChannelNumbers(S.channelsx) /// this returns a string with x DAC channels
 	wave numericwave
-	
-	wave/t fdacvalstr
-	wave/t DAC_channel = get_dac_channels(fdacvalstr, use_fdacvalstr = 0)
-	
+	wave/t dac_channel
 	variable i
 	S.daclistids=S.channelsx
 	StringToListWave(S.daclistids)
@@ -652,9 +643,7 @@ function/S scf_getRecordedFADCinfo(info_name, [column])
 	variable column
 	variable i
 	wave fadcattr
-	
-	wave/t fadcvalstr
-	wave/t ADC_channel = get_adc_channels(fadcvalstr)
+	wave/t adc_channel
 
 	string return_list = ""
 	wave/t fadcvalstr
