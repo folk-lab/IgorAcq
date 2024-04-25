@@ -10,8 +10,12 @@
 #include <Wave Arithmetic Panel>
 
 
-function scfw_fdacCheckForOldInit(numDACCh,numADCCh)
-	variable numDACCh, numADCCh
+function scfw_fdacCheckForOldInit()
+	wave  dac_table
+	wave  adc_table
+	
+	variable numdacch=dimsize(dac_table,0)
+	
 
 	variable response
 	wave/z fdacvalstr
@@ -611,10 +615,10 @@ function get_dacListIDs(S)
 	StringToListWave(S.daclistids)
 	string returnlist=""
 
-	for (i = 0; i<dimsize(numericwave, 0); i=i+1)
-		returnlist=returnlist+dac_channel[numericwave[i]]+","
-	endfor
-	S.dacListIDs=returnlist;
+//	for (i = 0; i<dimsize(numericwave, 0); i=i+1)
+//		returnlist=returnlist+dac_channel[numericwave[i]]+","
+//	endfor
+//	S.dacListIDs=returnlist;
 
 	// working out DACLIstIDs for y channels
 	new_channels=scu_getChannelNumbers(S.channelsy) /// this returns a string with x DAC channels
