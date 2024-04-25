@@ -1033,13 +1033,13 @@ Function linear_ramp(S)
 End
 
 
-Function/S CreatePayload(S, idx)
-    Struct ScanVars &S
-    Int idx
-    String dacChannel = StringFromList(idx, S.daclistIDs, ",")
-    String minValue = StringFromList(idx, S.startXs, ",")
-    String maxValue = StringFromList(idx, S.finXs, ",")
 //Function/S CreatePayload(S, idx)
+//    Struct ScanVars &S
+//    Int idx
+//    String dacChannel = StringFromList(idx, S.daclistIDs, ",")
+//    String minValue = StringFromList(idx, S.startXs, ",")
+//    String maxValue = StringFromList(idx, S.finXs, ",")
+////Function/S CreatePayload(S, idx)
 //    Struct ScanVars &S
 //    Int idx
 //    String dacChannel = StringFromList(idx, S.daclistIDs, ",")
