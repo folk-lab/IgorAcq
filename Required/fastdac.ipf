@@ -54,6 +54,30 @@ function openFastDAC(portnum,[verbose])
 end
 
 
+function /t get_fastdac_labels()
+	// assumes openFastDAC(portnum,[verbose]) has already been run so connections are open
+	
+	string response = ""
+	response = get_proxy_info()
+	
+	string proxies_info, fastdac_label, fastdac_labels = "", temp_parse
+	
+	proxies_info = getjsonvalue(response, "proxies_info")
+	
+	variable num_fastdacs = ItemsInList(proxies_info,  "label") - 1
+	
+	int i
+	for (i = 1; i <= num_fastdacs; i++)
+		temp_parse = stringFromList(i, proxies_info, "label")
+		fastdac_label = stringFromList(0, stringFromList(1, temp_parse, ":"), ",")
+		fastdac_label = fastdac_label[1, strlen(fastdac_label) - 2]
+		fastdac_labels +=  fastdac_label + ";"
+	endfor
+	
+	return fastdac_labels
+end
+
+
 
 function init_dac_and_adc(fastdac_string)
 	// creates two waves 'dac_table' and 'adc_table' which are used to create fastDAC window
