@@ -54,29 +54,6 @@ function openFastDAC(portnum,[verbose])
 end
 
 
-function /t get_fastdac_labels()
-	// assumes openFastDAC(portnum,[verbose]) has already been run so connections are open
-	
-	string response = ""
-	response = get_proxy_info()
-	
-	string proxies_info, fastdac_label, fastdac_labels = "", temp_parse
-	
-	proxies_info = getjsonvalue(response, "proxies_info")
-	
-	variable num_fastdacs = ItemsInList(proxies_info,  "label") - 1
-	
-	int i
-	for (i = 1; i <= num_fastdacs; i++)
-		temp_parse = stringFromList(i, proxies_info, "label")
-		fastdac_label = stringFromList(0, stringFromList(1, temp_parse, ":"), ",")
-		fastdac_label = fastdac_label[1, strlen(fastdac_label) - 2]
-		fastdac_labels +=  fastdac_label + ";"
-	endfor
-	
-	return fastdac_labels
-end
-
 
 
 function init_dac_and_adc(fastdac_string)
@@ -230,15 +207,6 @@ function make_adc_channels(wave sc_adc_vals, [int use_fadcvalstr])
 
 end
 
-
-
-function get_number_of_fastdacs()
-	// get number of FastDACS
-	string fastdac_labels = get_fastdac_labels()
-	variable num_fastdac = ItemsInList(fastdac_labels,  ";")
-
-	return num_fastdac
-end
 
 
 
@@ -1035,6 +1003,67 @@ svar fd
 //	buffer = addJSONkeyval(buffer, "AWG", getFDAWGstatus())  //NOTE: AW saved in getFDAWGstatus()
 return buffer
 end
+
+
+
+function /t get_fastdac_labels()
+	// assumes openFastDAC(portnum,[verbose]) has already been run so connections are open
+	
+	string response = ""
+	response = get_proxy_info()
+	
+	string proxies_info, fastdac_label, fastdac_labels = "", temp_parse
+	
+	proxies_info = getjsonvalue(response, "proxies_info")
+	
+	variable num_fastdacs = ItemsInList(proxies_info,  "label") - 1
+	
+	int i
+	for (i = 1; i <= num_fastdacs; i++)
+		temp_parse = stringFromList(i, proxies_info, "label")
+		fastdac_label = stringFromList(0, stringFromList(1, temp_parse, ":"), ",")
+		fastdac_label = fastdac_label[1, strlen(fastdac_label) - 2]
+		fastdac_labels +=  fastdac_label + ";"
+	endfor
+	
+	return fastdac_labels
+end
+
+
+
+function get_number_of_fastdacs()
+	// get number of FastDACS
+	string fastdac_labels = get_fastdac_labels()
+	variable num_fastdac = ItemsInList(fastdac_labels,  ";")
+
+	return num_fastdac
+end
+
+
+
+function [variable fd_num, variable fd_ch] get_fastdac_num_ch_variable(variable fd_num_ch)
+	// get_fastdac_num_ch_variable(6.1) returns variable [6, 1]
+	// USE :: 
+	// variable fd_num, fd_ch
+	// [fd_num, fd_ch] = get_fastdac_num_ch_variable(6.1)
+	fd_num = floor(fd_num_ch)
+	fd_ch = (fd_num_ch - fd_num) * 10
+
+	return [fd_num, fd_ch]
+end
+
+
+function [variable fd_num, variable fd_ch] get_fastdac_num_ch_string(string fd_num_ch)
+	// get_fastdac_num_ch_variable("6.1") returns variable [6, 1]
+	// USE :: 
+	// variable fd_num, fd_ch
+	// [fd_num, fd_ch] = get_fastdac_num_ch_variable("6.1")
+	fd_num = str2num(stringFromList(0, fd_num_ch, "."))
+	fd_ch = str2num(stringFromList(1, fd_num_ch, "."))
+
+	return [fd_num, fd_ch]
+end
+
 
 ///////////////////////
 //// API functions ////
