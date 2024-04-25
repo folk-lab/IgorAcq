@@ -289,6 +289,33 @@ function scfw_updateFdacValStr(channel, value, [update_oldValStr])
 	endif
 end
 
+function scw_setupLockIn(action) : Buttoncontrol
+	string action
+	wave /t LIvalstr, LIvalstr0,awgvalstr0
+	int i; svar sc_freqAW0,sc_fdackeys
+	
+	make /free /n=2 amps      = str2num(LIvalstr[0][1])
+	sc_freqAW0				   	= LIvalstr[1][1]
+	make /free /n=2 times     = 1/str2num(sc_freqAW0)/2
+	string channels           = LIvalstr[2][1]
+	variable Cycles           = str2num(LIvalstr[3][1])
+	amps[1] *= -1
+	 
+	int numDevices = str2num(stringbyKey("numDevices", sc_fdackeys, ":", ","))
+	for(i=0; i<numDevices; i++)
+		nvar fdID = $(stringbyKey("name"+num2str(i+1), sc_fdackeys, ":", ","))
+		//setFdacAWGSquareWave(fdID, amps, times, 0, verbose = 0)
+	endfor
+	//setupAWG(channels_AW0 = channels, numCycles=Cycles, verbose=1)
+	
+	LIvalstr0[1,2][0] = num2str(amps[p-1])
+	LIvalstr0[1,2][1] = num2str(times[p-1] * 1000)
+	awgvalstr0[1,2][0] = num2str(amps[p-1])
+	awgvalstr0[1,2][1] = num2str(times[p-1] * 1000)
+	awgvalstr0[3,9][] = ""
+end
+
+
 
 
 
