@@ -601,6 +601,7 @@ function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, ra
 	S.filenum = filenum
 end
 
+
 function get_dacListIDs(S)
 
 	struct ScanVars &S
@@ -614,26 +615,27 @@ function get_dacListIDs(S)
 	S.daclistids=S.channelsx
 	StringToListWave(S.daclistids)
 	string returnlist=""
-
-//	for (i = 0; i<dimsize(numericwave, 0); i=i+1)
-//		returnlist=returnlist+dac_channel[numericwave[i]]+","
-//	endfor
 //	S.dacListIDs=returnlist;
+	
+	variable fastdac_index
+	for (i = 0; i < dimsize(numericwave, 0); i = i + 1)
+		fastdac_index = get_fastdac_index(num2str(numericwave[i]), return_adc_index = 0)
+		returnlist = returnlist + dac_channel[fastdac_index] + ","
+	endfor
 
 	// working out DACLIstIDs for y channels
 	new_channels=scu_getChannelNumbers(S.channelsy) /// this returns a string with x DAC channels
 	S.dacListIDs_y=S.channelsy
 	returnlist=""
-	if((S.is2d==1)&& (strlen(S.dacListIDs_y)>1))
+	if((S.is2d == 1) && (strlen(S.dacListIDs_y) > 1))
 		StringToListWave(S.dacListIDs_y)
 
-		for (i = 0; i<dimsize(numericwave, 0); i=i+1)
-			returnlist=returnlist+dac_channel[numericwave[i]]+","
+		for (i = 0; i < dimsize(numericwave, 0); i = i + 1)
+			fastdac_index = get_fastdac_index(num2str(numericwave[i]), return_adc_index = 0)
+			returnlist = returnlist + dac_channel[fastdac_index] + ","
 		endfor
 		S.dacListIDs_y=returnlist;
 	endif
-
-
 
 end
 
@@ -738,6 +740,7 @@ function/S scu_getDacLabel(channels, [fastdac])
 	variable fastdac
 	
 	scu_assertSeparatorType(channels, ",")
+	variable fastdac_index
 
 	variable i=0
 	string channel, buffer, xlabelfriendly = ""
@@ -746,8 +749,8 @@ function/S scu_getDacLabel(channels, [fastdac])
 	for(i=0;i<ItemsInList(channels, ",");i+=1)
 		channel = StringFromList(i, channels, ",")
 
-	
-			buffer = fdacvalstr[str2num(channel)][3] // Grab name from fdacvalstr
+			fastdac_index = get_fastdac_index(channel, return_adc_index = 0)
+			buffer = fdacvalstr[fastdac_index][3] // Grab name from fdacvalstr
 			if (cmpstr(buffer, "") == 0)
 				buffer = "FD"+channel
 			endif
@@ -803,8 +806,8 @@ function scv_setSetpoints(S, itemsx, startx, finx, itemsy, starty, finy, startxs
 
 		// Repeat assignment for multiple setpoints
 		For (i = 0; i < ItemsInList(S.daclistIDs); i += 1)
-			S.IDstartxs = ReplaceStringByKey(StringFromList(i, S.daclistIDs), S.IDstartxs, StringBykey(StringFromList(i, S.daclistIDs), S.IDstartxs) + "," + StringFromList(i, starts, ","))
-			S.IDfinxs = ReplaceStringByKey(StringFromList(i, S.daclistIDs), S.IDfinxs, StringBykey(StringFromList(i, S.daclistIDs), S.IDfinxs) + "," + StringFromList(i, fins, ","))
+			S.IDstartxs = ReplaceStringByKey(StringFromList(i, S.daclistIDs, ","), S.IDstartxs, StringBykey(StringFromList(i, S.daclistIDs, ","), S.IDstartxs) + "," + StringFromList(i, starts, ","))
+			S.IDfinxs = ReplaceStringByKey(StringFromList(i, S.daclistIDs, ","), S.IDfinxs, StringBykey(StringFromList(i, S.daclistIDs, ","), S.IDfinxs) + "," + StringFromList(i, fins, ","))
 		EndFor
 
 		S.startxs = starts
