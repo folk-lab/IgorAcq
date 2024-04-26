@@ -927,6 +927,7 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
    	//get_dacListIDs(S)
 
 	scv_setLastScanVars(S)
+	print S
 end
 
 
@@ -982,7 +983,7 @@ function /t get_fastdac_labels()
 	string proxies_info, fastdac_label, fastdac_labels = "", temp_parse
 	
 	proxies_info = getjsonvalue(response, "proxies_info")
-	
+	print proxies_info
 	variable num_fastdacs = ItemsInList(proxies_info,  "label") - 1
 	
 	int i
@@ -1074,10 +1075,8 @@ function set_one_fadcSpeed(int adcValue)
 	wave/t ADC_channel
 	String cmd = "set-adc-sampling-time"
 	// Convert variables to strings and construct the JSON payload dynamically
-	print ADC_channel[0]
 	String payload=""
 	payload = "{\"access_token\": \"string\", \"fqpn\": \""  +ADC_channel[2]+ "\", \"sampling_time_us\": " + num2str(82) + "}"
-	print payload
 	String headers = "accept: application/json\nContent-Type: application/json"
 	// Perform the HTTP PUT request
 	String response = postHTTP(fd, cmd, payload, headers)
@@ -1112,7 +1111,7 @@ end
 function get_one_FADCChannel(int channel) // Units: mV
 	svar fd
 	wave/t ADC_channel	 
-	string	response=getHTTP(fd,"get-adc-voltage/"+ADC_channel(channel),"");print response
+	string	response=getHTTP(fd,"get-adc-voltage/"+ADC_channel(channel),"");//print response
 	string adc
 	adc=getjsonvalue(response,"value")
 	return str2num(adc)
@@ -1137,8 +1136,8 @@ function set_one_FDACChannel(int channel, variable setpoint, variable ramprate)
 	payload = "{\"fqpn\": \"" + Dac_channel(channel) + "\", \"ramp_rate_mv_per_s\": " + num2str(ramprate) + ", \"target\": {\"unit\": \"mV\", \"value\": " + num2str(setpoint) + "}}"
 	String headers = "accept: application/json\nContent-Type: application/json"
 	String response = postHTTP(fd, cmd, payload, headers)
-	print headers
-	print response
+	//print headers
+	//print response
 	
 end
 

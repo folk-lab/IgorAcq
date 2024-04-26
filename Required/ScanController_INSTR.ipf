@@ -323,7 +323,7 @@ function/s postHTTP(instrID,cmd,payload,headers)
 	string instrID, cmd, payload, headers
 	string response=""
 
-	print instrID+cmd, payload
+//	print instrID+cmd, payload
 	URLRequest /TIME=15.0 /DSTR=payload url=instrID+cmd, method=post, headers=headers
 
 	if (V_flag == 0)    // No error
@@ -376,7 +376,7 @@ function/s getHTTP(instrID,cmd,headers)
 	string instrID, cmd, headers
 	string response, error
 
-	print instrID+cmd
+//	print instrID+cmd
 	URLRequest /TIME=25.0 url=instrID+cmd, method=get, headers=headers
 
 	if (V_flag == 0)    // No error
