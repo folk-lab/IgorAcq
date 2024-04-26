@@ -240,9 +240,6 @@ function initFastDAC()
 	execute("after1()")	
 	
 	setadc_speed()
-	
-	
-	
 end
 
 
@@ -1064,6 +1061,38 @@ function [variable fd_num, variable fd_ch] get_fastdac_num_ch_string(string fd_n
 	return [fd_num, fd_ch]
 end
 
+
+function get_fastdac_index(fd_num_ch, [return_adc_index])
+	// assumes DAC_channel and ADC_channel have been created
+	// checks the index based on string value of fd_num_ch
+	// USE :: index = get_fastdac_index("7.3", return_adc_index=1)
+	string fd_num_ch
+	variable return_adc_index
+	
+	return_adc_index = paramisdefault(return_adc_index) ? 0 : return_adc_index  // default is to return DAC index, return_adc_index = 1 to return adc index
+
+
+	variable index
+	if (return_adc_index == 0)
+		wave /t get_fastdac_index_wave = DAC_channel
+	else
+		wave /t get_fastdac_index_wave = ADC_channel
+	endif
+	
+	int wave_len = dimsize(get_fastdac_index_wave, 0)
+	
+	// loop through wave
+	int i = 0, count = 0
+	for (i = 0; i < wave_len; i++)
+		if (cmpstr(fd_num_ch, get_fastdac_index_wave[i]) == 0)
+			index = i
+			break
+		endif
+	endfor
+	
+
+	return index
+end
 
 ///////////////////////
 //// API functions ////
