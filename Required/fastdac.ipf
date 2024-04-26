@@ -267,9 +267,9 @@ function fd_getmaxADCs(S)
 	wave numericwave
 	string adcList = scf_getRecordedFADCinfo("channels")
 	StringToListWave(adclist)
-	numericwave=floor(numericwave/4)
-	maxADCs=FindMaxRepeats(numericwave)
-	S.numADCs=dimsize(numericwave,0)
+	numericwave = floor(numericwave)
+	maxADCs = FindMaxRepeats(numericwave)
+	S.numADCs = dimsize(numericwave, 0)
 	return maxADCs
 end
 
@@ -913,24 +913,24 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
 	string temp
 	S.sweeprate = sweeprate
 	S.duration = duration
-   S.adcList = scf_getRecordedFADCinfo("channels")
-   S.using_fastdac = 1
-   temp=scf_getRecordedFADCinfo("adcListIDs"); // this returns a ; separated string with an empty space at the end
-   temp=removeending(temp) // remove the empty space
-   S.adcListIDs=FormatListItems(temp) /// make coma separated array of strings
-   S.adcLists=scf_getRecordedFADCinfo("raw_names")
-   S.fakerecords="0"
-   S.lastread=-1
+	S.adcList = scf_getRecordedFADCinfo("channels")
+	S.using_fastdac = 1
+	temp = scf_getRecordedFADCinfo("adcListIDs"); // this returns a ; separated string with an empty space at the end
+	temp = removeending(temp) // remove the empty space
+	S.adcListIDs = FormatListItems(temp) /// make coma separated array of strings
+	S.adcLists = scf_getRecordedFADCinfo("raw_names")
+	S.fakerecords = "0"
+	S.lastread = -1
   
    
-   S.raw_wave_names=scf_getRecordedFADCinfo("raw_names")
-   svar fd
-   S.instrIDs=fd
+	S.raw_wave_names=scf_getRecordedFADCinfo("raw_names")
+	svar fd
+	S.instrIDs=fd
 
    
 
 //   	// Sets channelsx, channelsy to be lists of channel numbers instead of labels
-   scv_setChannels(S, channelsx, channelsy, fastdac=1)  
+	scv_setChannels(S, channelsx, channelsy, fastdac=1)  
      
    	// Get Labels for graphs
    	S.x_label = selectString(strlen(x_label) > 0, scu_getDacLabel(S.channelsx, fastdac=1), x_label)  // Uses channels as list of numbers, and only if x_label not passed in
@@ -943,7 +943,7 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
    	// Sets starts/fins (either using starts/fins given or from single startx/finx given)
    // scv_setSetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys) had to move this
 	
-	   	get_dacListIDs(S)
+	get_dacListIDs(S)
 
 	scv_setSetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
 	
@@ -959,7 +959,7 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
    endif
    	//get_dacListIDs(S)
 
-scv_setLastScanVars(S)
+	scv_setLastScanVars(S)
 end
 
 

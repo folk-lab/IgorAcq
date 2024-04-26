@@ -877,12 +877,13 @@ function scv_setFreq([S,A])
 	
 	Struct ScanVars &S
 	Struct AWGvars &A
-	int i; //string instrIDs
-	S.samplingFreq=1/82*1e6;
-	variable maxADCs=fd_getmaxADCs(S)
-	S.maxADCs=maxADCs;
-	S.measureFreq = S.samplingFreq/S.maxADCs
 	
+	S.samplingFreq = 1 / 82 * 1e6;
+	
+	variable maxADCs = fd_getmaxADCs(S)
+	S.maxADCs = maxADCs;
+	
+	S.measureFreq = S.samplingFreq / S.maxADCs	
 end
 
 
