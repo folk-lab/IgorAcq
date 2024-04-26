@@ -47,8 +47,6 @@ function openFastDAC(portnum,[verbose])
 	string fastdac_labels = get_fastdac_labels()
 	
 	if (verbose==1)
-		print response
-		print proxies_info
 		print fastdac_labels
 	endif
 end
@@ -146,35 +144,6 @@ function init_dac_and_adc(fastdac_string)
 	endfor
 	
 	
-
-end
-
-
-function make_dac_channels(wave sc_dac_vals, [int use_fdacvalstr])
-	// provide fdacvalstr
-	// assumes the channels are in the zeroeth column
-	// To use this in command line:
-	//		make/o/n=num tempwave
-	// 		tempwave = linspace(start, fin, num)[p]
-	//
-	// To use in a function:
-	//		wave tempwave = linspace(start, fin, num)  //Can be done ONCE (each linspace overwrites itself!)
-	//	or
-	//		make/n=num tempwave = linspace(start, fin, num)[p]  //Can be done MANY times
-	//
-	// To combine linspaces:
-	//		make/free/o/n=num1 w1 = linspace(start1, fin1, num1)[p]
-	//		make/free/o/n=num2 w2 = linspace(start2, fin2, num2)[p]
-	//		concatenate/np/o {w1, w2}, tempwave
-	//
-	use_fdacvalstr = paramisdefault(use_fdacvalstr) ? 1 : use_fdacvalstr // if use_fdacvalstr == 1 use fdacvalstr else  use adc_table 
-
-	if (use_fdacvalstr == 1)
-		duplicate /o /RMD=[][0] sc_dac_vals DAC_channel
-	else
-		wave /t dac_table
-		duplicate /o /RMD=[][0] dac_table DAC_channel
-	endif
 
 end
 
