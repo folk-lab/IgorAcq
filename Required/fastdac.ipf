@@ -810,8 +810,8 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
     struct ScanVars &S
     variable x_only, startx, finx, numptsx, delayx, rampratex
     variable starty, finy, numptsy, delayy, rampratey
-	 variable sweeprate  // If start != fin numpts will be calculated based on sweeprate
-	 variable duration   // numpts will be caluculated to achieve duration
+	variable sweeprate  // If start != fin numpts will be calculated based on sweeprate
+	variable duration   // numpts will be caluculated to achieve duration
     variable alternate, use_awg
     string channelsx, channelsy
     string startxs, finxs, startys, finys
@@ -865,7 +865,7 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
 
    
 
-//   	// Sets channelsx, channelsy to be lists of channel numbers instead of labels
+	// Sets channelsx, channelsy to be lists of channel numbers instead of labels
 	scv_setChannels(S, channelsx, channelsy, fastdac=1)  
      
    	// Get Labels for graphs
@@ -875,13 +875,17 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
    	else
    		S.y_label = y_label
    	endif  		
-
-   	// Sets starts/fins (either using starts/fins given or from single startx/finx given)
-   // scv_setSetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys) had to move this
 	
 	get_dacListIDs(S)
 
 	scv_setSetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
+	
+	// Fix ramprate if zero
+	if (rampratex == 0)
+		variable fastdac_index = get_fastdac_index(stringfromList(0, S.dacListIDs, ","), return_adc_index = 0)
+		wave /t fdacvalstr
+		S.rampratex = str2num(fdacvalstr[fastdac_index][4])
+	endif
 	
 	// Set variables with some calculation
     scv_setFreq(S=S) 		// Sets S.samplingFreq/measureFreq/numADCs	

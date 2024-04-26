@@ -510,10 +510,10 @@ function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, ra
     string channelsx
     string channelsy
     string x_label, y_label
-	 string startxs, finxs, startys, finys
-	 string interlaced_channels, interlaced_setpoints
+	string startxs, finxs, startys, finys
+	string interlaced_channels, interlaced_setpoints
     string comments
-        nvar filenum
+    nvar filenum
 
     
 	// Handle Optional Strings
