@@ -376,7 +376,7 @@ function/s getHTTP(instrID,cmd,headers)
 	string instrID, cmd, headers
 	string response, error
 
-	//print instrID+cmd
+	print instrID+cmd
 	URLRequest /TIME=25.0 url=instrID+cmd, method=get, headers=headers
 
 	if (V_flag == 0)    // No error
