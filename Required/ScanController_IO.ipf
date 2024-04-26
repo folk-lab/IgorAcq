@@ -1979,12 +1979,30 @@ end
 /////////////////////////////////
 /// text formatting utilities ///
 /////////////////////////////////
+Function/S removeTrailingDelimiter(str)
+	// if final character is ; or , then remove
+	// USE ::
+	// removeTrailingDelimiter("test") returns "test"
+	// removeTrailingDelimiter("test;") returns "test"
+    String str
+    
+    variable str_len = strlen(str)
+    string str_final_val = str[str_len - 1, str_len - 1]
+    
+	if ((cmpstr(str_final_val, ",") == 0) || (cmpstr(str_final_val, ";") == 0))
+		str= str[0, str_len - 2]
+	endif 
+
+    return str
+End
+
 
 Function isWhiteSpace(char)
     String char
 
     return GrepString(char, "\\s")
 End
+
 
 Function/S removeLeadingWhitespace(str)
     String str

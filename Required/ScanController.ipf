@@ -615,13 +615,13 @@ function get_dacListIDs(S)
 	S.daclistids=S.channelsx
 	StringToListWave(S.daclistids)
 	string returnlist=""
-//	S.dacListIDs=returnlist;
 	
 	variable fastdac_index
 	for (i = 0; i < dimsize(numericwave, 0); i = i + 1)
 		fastdac_index = get_fastdac_index(num2str(numericwave[i]), return_adc_index = 0)
 		returnlist = returnlist + dac_channel[fastdac_index] + ","
 	endfor
+	S.dacListIDs = removeTrailingDelimiter(returnlist);
 
 	// working out DACLIstIDs for y channels
 	new_channels=scu_getChannelNumbers(S.channelsy) /// this returns a string with x DAC channels
@@ -634,7 +634,7 @@ function get_dacListIDs(S)
 			fastdac_index = get_fastdac_index(num2str(numericwave[i]), return_adc_index = 0)
 			returnlist = returnlist + dac_channel[fastdac_index] + ","
 		endfor
-		S.dacListIDs_y=returnlist;
+		S.dacListIDs_y = removeTrailingDelimiter(returnlist); 
 	endif
 
 end
