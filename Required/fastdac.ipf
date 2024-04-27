@@ -851,9 +851,7 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
 	S.duration = duration
 	S.adcList = scf_getRecordedFADCinfo("channels")
 	S.using_fastdac = 1
-	temp = scf_getRecordedFADCinfo("adcListIDs"); // this returns a ; separated string with an empty space at the end
-	temp = removeending(temp) // remove the empty space
-	S.adcListIDs = FormatListItems(temp) /// make coma separated array of strings
+	S.adcListIDs = scf_getRecordedFADCinfo("adcListIDs");  //removed formatliststring
 	S.adcLists = scf_getRecordedFADCinfo("raw_names")
 	S.fakerecords = "0"
 	S.lastread = -1
@@ -1169,72 +1167,55 @@ end
 
 
 Function linear_ramp(S)
-    Struct ScanVars &S
-    String adcList = S.adcListIDs 
-    Variable nr_samples = S.numptsx
-    Variable i
-    SVar fd
-    Variable chunkSize = 1200
-    String cmd = "start-linear-ramps"
-    String payload = "{\"adc_list\": [" + adcList + "], "
-    payload += "\"adc_sampling_time_us\":" + num2str(82) + ", "
-    payload += "\"chunk_file_name_template\": \"temp_{{.ChunkIndex}}.dat\", "
-    payload += "\"chunk_max_samples\": \"" + num2str(chunkSize) + "\", "
-    payload += "\"dac_range_map\": "
-	payload += CreatePayload(S.daclistids,S.startxs,S.finxs)
-	payload+= "},"
-    payload += "\"nr_steps\": \"" + num2istr(nr_samples) + "\""
+	Struct ScanVars &S
+	String adcList
+	Variable nr_samples = S.numptsx
+	variable chunksize=2500
+	SVar fd
+	variable level1, level2, level3
+	variable i
+	wave adc_list
+	scu_tic()
+	print S.adclistids
+	stringlist2wave(S.adcListIDs,"adc_list")
+	jsonxop_release/a
+	JSONXOP_New; level1=V_value
+	JSONXOP_New; level2=V_value
 
-    payload += "}"
-    print payload
+	JSONXOP_AddValue/I=(82) level1, "/adc_sampling_time_us"
+	JSONXOP_AddValue/T=(num2str(chunksize)) level1, "/chunk_max_samples"
+	JSONXOP_AddValue/T="temp_{{.ChunkIndex}}.dat" level1, "/chunk_file_name_template"
+	JSONXOP_AddValue/wave=adc_list level1, "/adc_list"
+	JSONXOP_AddValue/I=(S.numptsx) level1, "/nr_steps"
+	string dacChannel, minvalue, maxvalue
 
-    String headers = "accept: application/json\nContent-Type: application/json"
-    String response = postHTTP(fd, cmd, payload, headers)
-    print payload
+
+	for (i = 0; i < ItemsInList(S.daclistIDs, ","); i += 1)
+		JSONXOP_New; level3=V_value
+		dacChannel = StringFromList(i, S.daclistIDs, ",")
+		minValue = StringFromList(i, S.startxs, ",")
+		maxValue = StringFromList(i, S.finxs, ",")
+		JSONXOP_AddTree/T=0 level3, "max"
+		JSONXOP_AddTree/T=0 level3, "min"
+		JSONXOP_Addvalue/V=(str2num(maxvalue)) level3, "/max/value"
+		JSONXOP_Addvalue/V=(str2num(minvalue)) level3, "/min/value"
+		JSONXOP_Addvalue/T="mV" level3, "max/unit"
+		JSONXOP_Addvalue/T="mV" level3, "min/unit"
+		JSONXOP_AddValue/JOIN=(level3) level2, dacChannel
+		JSONXOP_Release level3
+	endfor
+
+	JSONXOP_AddValue/JOIN=(level2) level1, "/dac_range_map"
+	jsonxop_dump/ind=2 level1
+	//print "Full textual representation:\r", S_value
+	scu_toc()
+	string cmd="start-linear-ramps"
+	String headers = "accept: application/json\nContent-Type: application/json"
+	String response = postHTTP(fd, cmd, S_value, headers)
+
 End
 
 
-//Function/S CreatePayload(S, idx)
-//    Struct ScanVars &S
-//    Int idx
-//    String dacChannel = StringFromList(idx, S.daclistIDs, ",")
-//    String minValue = StringFromList(idx, S.startXs, ",")
-//    String maxValue = StringFromList(idx, S.finXs, ",")
-////Function/S CreatePayload(S, idx)
-//    Struct ScanVars &S
-//    Int idx
-//    String dacChannel = StringFromList(idx, S.daclistIDs, ",")
-//    String minValue = StringFromList(idx, S.startXs, ",")
-//    String maxValue = StringFromList(idx, S.finXs, ",")
-//
-//    // Construct the payload for one DAC entry
-//    String payload = "\"" + dacChannel + "\": {"
-//    payload += "\"max\": {\"unit\": \"mV\", \"value\": " + maxValue + "}, "
-//    payload += "\"min\": {\"unit\": \"mV\", \"value\": " + minValue + "}"
-//    payload += "}"
-//    return payload
-//End
-
-Function/S CreatePayload(string daclistIDs, string startxs, string finxs)
-    Variable i
-    String payload = "{"
-    for (i = 0; i < ItemsInList(daclistIDs, ","); i += 1)
-        if (i > 0)
-            payload += ", "
-        endif
-        String dacChannel = StringFromList(i, daclistIDs, ",")
-        String minValue = StringFromList(i, startxs, ",")
-        String maxValue = StringFromList(i, finxs, ",")
-
-        // Construct the payload for one DAC entry
-        payload += "\"" + dacChannel + "\": {"
-        payload += "\"max\": {\"unit\": \"mV\", \"value\": " + maxValue + "}, "
-        payload += "\"min\": {\"unit\": \"mV\", \"value\": " + minValue + "}"
-        payload += "}"
-    endfor
-  
-    return payload
-End
 
 Function/S CreateAWGJsonString(awgID, linearRampSteps, patternsPerLinearRampStep, linramp_chan, maxValues, minValues, output_dacs, adcSamples, awg_value)
     String awgID
@@ -1273,35 +1254,35 @@ Function/S CreateAWGJsonString(awgID, linearRampSteps, patternsPerLinearRampStep
 End
 
 
-Function awg_ramp()
-    String cmd = "start-awg"
-    String adcList = "\"1.0\", \"11.0\""
-    Variable nr_samples = 13000
-    Variable chunkSize = 5000
-    svar fd
-   
-    String payload = "{\"adcs_to_acquire\": [" + adcList + "], "
-    payload += "\"chunk_max_samples\": \"" + num2str(chunkSize) + "\", "
-    payload += "\"adc_sampling_time_us\":" + num2str(82) + ", "
-    payload += "\"chunk_file_name_template\": \"temp_{{.ChunkIndex}}.dat\", "
-   // payload += "\"nr_steps\":" + num2istr(nr_samples) + ", "
-    payload += "\"awgs\": {"
-   
-    payload += CreateAWGJsonString("1", 100, 3, "1,2", "1000,2000", "-1000,-2000", "0,3", "50", "100")
-    payload += CreateAWGJsonString("11", 100, 3, "1,2", "1000,2000", "-1000,-2000", "0,3", "50", "100")
-    payload = RemoveEnding(payload, ",")  // Remove last comma from AWG entries if needed
-
-    payload += "}, \"independent_linear_ramps\":"
-    payload += CreatePayload("1.0,1.3,11.0,11.3", "0,0,0,0", "1000,1300,1100,1130")
-    payload += "}"
-    
-    print payload
-    String headers = "accept: application/json\nContent-Type: application/json"
-    String response = postHTTP(fd, cmd, payload, headers)
-    print response
-End
-
-
+//Function awg_ramp()
+//    String cmd = "start-awg"
+//    String adcList = "\"1.0\", \"11.0\""
+//    Variable nr_samples = 13000
+//    Variable chunkSize = 5000
+//    svar fd
+//   
+//    String payload = "{\"adcs_to_acquire\": [" + adcList + "], "
+//    payload += "\"chunk_max_samples\": \"" + num2str(chunkSize) + "\", "
+//    payload += "\"adc_sampling_time_us\":" + num2str(82) + ", "
+//    payload += "\"chunk_file_name_template\": \"temp_{{.ChunkIndex}}.dat\", "
+//   // payload += "\"nr_steps\":" + num2istr(nr_samples) + ", "
+//    payload += "\"awgs\": {"
+//   
+//    payload += CreateAWGJsonString("1", 100, 3, "1,2", "1000,2000", "-1000,-2000", "0,3", "50", "100")
+//    payload += CreateAWGJsonString("11", 100, 3, "1,2", "1000,2000", "-1000,-2000", "0,3", "50", "100")
+//    payload = RemoveEnding(payload, ",")  // Remove last comma from AWG entries if needed
+//
+//    payload += "}, \"independent_linear_ramps\":"
+//    payload += CreatePayload("1.0,1.3,11.0,11.3", "0,0,0,0", "1000,1300,1100,1130")
+//    payload += "}"
+//    
+//    print payload
+//    String headers = "accept: application/json\nContent-Type: application/json"
+//    String response = postHTTP(fd, cmd, payload, headers)
+//    print response
+//End
+//
+//
 
 
 

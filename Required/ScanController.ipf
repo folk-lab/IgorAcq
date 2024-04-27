@@ -1928,11 +1928,9 @@ function scfd_resampleWaves(w, measureFreq, targetFreq)
 	Wave w
 	variable measureFreq, targetFreq
 	variable numpntsx
-	duplicate/o w w_before
-
 
 	RatioFromNumber (targetFreq / measureFreq)
-//	print "Num and den are",v_numerator, v_denominator
+	//	print "Num and den are",v_numerator, v_denominator
 	if (V_numerator < V_denominator)
 		string cmd
 		//print "Resampling would increase number of datapoints, not decrease, therefore resampling is skipped"
@@ -1941,7 +1939,7 @@ function scfd_resampleWaves(w, measureFreq, targetFreq)
 
 	endif
 	// TODO: Need to test N more (simple testing suggests we may need >200 in some cases!) [Vahid: I'm not sure why only N=201 is a good choice.]
-	// TODO: Need to decide what to do with end effect. Possibly /E=2 (set edges to 0) and then turn those zeros to NaNs? 
+	// TODO: Need to decide what to do with end effect. Possibly /E=2 (set edges to 0) and then turn those zeros to NaNs?
 	// TODO: Or maybe /E=1 is safest, this was tested with random noise around 0 and around a finite value
 	numpntsx=dimsize(w,0)
 	return numpntsx

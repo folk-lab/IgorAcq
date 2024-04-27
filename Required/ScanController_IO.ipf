@@ -1373,6 +1373,17 @@ function /S getStrArrayShape(array)
 
 end
 
+function stringlist2wave(string text_string, string dest_wave)
+variable numItems = ItemsInList(text_string, ";")  /// needs to be modified to allow for , and ;
+Make/o/T/N=(numItems) text_wave
+variable i
+for(i = 0; i < numItems; i += 1)
+    text_wave[i] = StringFromList(i, text_string, ";")
+endfor
+Duplicate/o text_wave $dest_wave
+end
+
+
 function loadStrArray2textWave(array,destwave)
 	// supports 1 and 2d arrays
 	string array,destwave
