@@ -789,25 +789,31 @@ function scv_setSetpoints(S, itemsx, startx, finx, itemsy, starty, finy, startxs
 	If (Strlen(startxs) == 0 && Strlen(finxs) == 0)   // Single start/end for all itemsx
 		S.startx = startx
 		S.finx = finx
+		starts = num2str(startx); fins = num2str(finx)
 		scv_formatSetpoints(startx, finx, itemsx, starts, fins)  // Format single start/ends into lists
 
 		// Assign formatted starts and ends to each channel
-		For (i = 0; i < ItemsInList(S.channelsx); i += 1)
-			S.IDstartxs = ReplaceStringByKey(StringFromList(i, S.channelsx), S.IDstartxs, StringBykey(StringFromList(i, S.channelsx), S.IDstartxs) + "," + StringFromList(i, starts, ","))
-			S.IDfinxs = ReplaceStringByKey(StringFromList(i, S.channelsx), S.IDfinxs, StringBykey(StringFromList(i, S.channelsx), S.IDfinxs) + "," + StringFromList(i, fins, ","))
+		For (i = 0; i < ItemsInList(S.channelsx, ","); i += 1)
+			print StringFromList(i, S.channelsx), S.IDstartxs, StringBykey(StringFromList(i, S.channelsx), S.IDstartxs) + "" + StringFromList(i, starts, ",")
+			S.IDstartxs = ReplaceStringByKey(StringFromList(i, S.channelsx), S.IDstartxs, StringBykey(StringFromList(i, S.channelsx), S.IDstartxs) + "" + StringFromList(i, starts, ","))
+			S.IDfinxs = ReplaceStringByKey(StringFromList(i, S.channelsx), S.IDfinxs, StringBykey(StringFromList(i, S.channelsx), S.IDfinxs) + "" + StringFromList(i, fins, ","))
 		EndFor
 
 		S.startxs = starts
 		S.finxs = fins
 	ElseIf (Strlen(startxs) > 0 && Strlen(finxs) > 0)   // Multiple start/end points provided
+		starts = startxs; fins = finxs
 		scv_sanitizeSetpoints(startxs, finxs, itemsx, starts, fins)  // Clean and format provided start/ends
 		S.startx = Str2Num(StringFromList(0, starts, ","))
 		S.finx = Str2Num(StringFromList(0, fins, ","))
 
 		// Repeat assignment for multiple setpoints
-		For (i = 0; i < ItemsInList(S.daclistIDs); i += 1)
-			S.IDstartxs = ReplaceStringByKey(StringFromList(i, S.daclistIDs, ","), S.IDstartxs, StringBykey(StringFromList(i, S.daclistIDs, ","), S.IDstartxs) + "," + StringFromList(i, starts, ","))
-			S.IDfinxs = ReplaceStringByKey(StringFromList(i, S.daclistIDs, ","), S.IDfinxs, StringBykey(StringFromList(i, S.daclistIDs, ","), S.IDfinxs) + "," + StringFromList(i, fins, ","))
+		For (i = 0; i < ItemsInList(S.daclistIDs, ","); i += 1)
+			print StringFromList(i, S.daclistIDs, ",")
+			print S.IDstartxs
+			print StringBykey(StringFromList(i, S.daclistIDs, ","), S.IDstartxs) + "" + StringFromList(i, starts, ",")
+			S.IDstartxs = ReplaceStringByKey(StringFromList(i, S.daclistIDs, ","), S.IDstartxs, StringBykey(StringFromList(i, S.daclistIDs, ","), S.IDstartxs) + "" + StringFromList(i, starts, ","))
+			S.IDfinxs = ReplaceStringByKey(StringFromList(i, S.daclistIDs, ","), S.IDfinxs, StringBykey(StringFromList(i, S.daclistIDs, ","), S.IDfinxs) + "" + StringFromList(i, fins, ","))
 		EndFor
 
 		S.startxs = starts
@@ -822,10 +828,12 @@ function scv_setSetpoints(S, itemsx, startx, finx, itemsy, starty, finy, startxs
 		if (strlen(startys) == 0 && strlen(finys) == 0)  // Single start/end for Y
 			s.starty = starty
 			s.finy = finy
+			starts = num2str(starty); fins = num2str(finy)
 			scv_formatSetpoints(starty, finy, itemsy, starts, fins)
 			s.startys = starts
 			s.finys = fins
 		elseif (!(numtype(strlen(startys)) != 0 || strlen(startys) == 0) && !(numtype(strlen(finys)) != 0 || strlen(finys) == 0)) // Multiple start/end for Ys
+			starts = startys; fins = finys
 			scv_sanitizeSetpoints(startys, finys, itemsy, starts, fins)
 			s.starty = str2num(StringFromList(0, starts, ","))
 			s.finy = str2num(StringFromList(0, fins, ","))
