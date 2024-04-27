@@ -130,8 +130,8 @@ function ScanFastDAC2D(startx, finx, channelsx, starty, finy, channelsy, numptsy
 	// Set defaults
 	y_label = selectstring(paramisdefault(y_label), y_label, "nA")
 	delayy = ParamIsDefault(delayy) ? 0.01 : delayy
-	rampratey = ParamIsDefault(rampratey) ? 1000 : rampratey
-	rampratex = ParamIsDefault(rampratex) ? 1000 : rampratex
+//	rampratey = ParamIsDefault(rampratey) ? 1000 : rampratey
+//	rampratex = ParamIsDefault(rampratex) ? 1000 : rampratex
 
 
 	comments = selectstring(paramisdefault(comments), comments, "")

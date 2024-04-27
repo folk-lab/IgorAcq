@@ -806,7 +806,6 @@ function scv_setSetpoints(S, itemsx, startx, finx, itemsy, starty, finy, startxs
 
 		// Assign formatted starts and ends to each channel
 		For (i = 0; i < ItemsInList(S.channelsx, ","); i += 1)
-			print StringFromList(i, S.channelsx), S.IDstartxs, StringBykey(StringFromList(i, S.channelsx), S.IDstartxs) + "" + StringFromList(i, starts, ",")
 			S.IDstartxs = ReplaceStringByKey(StringFromList(i, S.channelsx), S.IDstartxs, StringBykey(StringFromList(i, S.channelsx), S.IDstartxs) + "" + StringFromList(i, starts, ","))
 			S.IDfinxs = ReplaceStringByKey(StringFromList(i, S.channelsx), S.IDfinxs, StringBykey(StringFromList(i, S.channelsx), S.IDfinxs) + "" + StringFromList(i, fins, ","))
 		EndFor
@@ -821,9 +820,6 @@ function scv_setSetpoints(S, itemsx, startx, finx, itemsy, starty, finy, startxs
 
 		// Repeat assignment for multiple setpoints
 		For (i = 0; i < ItemsInList(S.daclistIDs, ","); i += 1)
-			print StringFromList(i, S.daclistIDs, ",")
-			print S.IDstartxs
-			print StringBykey(StringFromList(i, S.daclistIDs, ","), S.IDstartxs) + "" + StringFromList(i, starts, ",")
 			S.IDstartxs = ReplaceStringByKey(StringFromList(i, S.daclistIDs, ","), S.IDstartxs, StringBykey(StringFromList(i, S.daclistIDs, ","), S.IDstartxs) + "" + StringFromList(i, starts, ","))
 			S.IDfinxs = ReplaceStringByKey(StringFromList(i, S.daclistIDs, ","), S.IDfinxs, StringBykey(StringFromList(i, S.daclistIDs, ","), S.IDfinxs) + "" + StringFromList(i, fins, ","))
 		EndFor
@@ -2140,13 +2136,19 @@ function scfd_RecordValues(S, rowNum, [AWG_list, linestart, skip_data_distributi
 
 	// If beginning of scan, record start time
 	if (rowNum == 0 && (S.start_time == 0 || numtype(S.start_time) != 0))  
-		S.start_time = datetime-date2secs(2024,04,22) 
+//		S.start_time = datetime - Date2Secs(-1,-1,-1) //date2secs(2024,04,22) 
+		S.start_time = datetime //date2secs(2024,04,22)
 	endif
 	
 	// Send command and read values
 	//print "sending command and reading"
 	scfd_SendCommandAndRead(S, AWG, rowNum, skip_raw2calc=skip_raw2calc) 
-	S.end_time = datetime-date2secs(2024,04,22) // this did not work on a MAC but I am not going to change it until I confirm it also does not work on a PC
+	
+	if (rowNum == (S.numptsy - 1))  
+		S.end_time = datetime - S.start_time
+		S.start_time = 0
+	endif
+//	S.end_time = datetime-date2secs(2024,04,22) // this did not work on a MAC but I am not going to change it until I confirm it also does not work on a PC
 	
 	// Process 1D read and distribute
 	if (!skip_data_distribution)
@@ -2757,11 +2759,11 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	scv_getLastScanVars(S_)
 
 	if (aborting)
-		S_.end_time = datetime-date2secs(2024,04,22) 
+//		S_.end_time = datetime-date2secs(2024,04,22) 
 		S_.comments = "aborted, " + S_.comments
 	endif
 	if (S_.end_time == 0 || numtype(S_.end_time) != 0) // Should have already been set, but if not, this is likely a good guess and prevents a stupid number being saved
-		S_.end_time = datetime-date2secs(2024,04,22) 
+//		S_.end_time = datetime-date2secs(2024,04,22) 
 		S_.comments = "end_time guessed, "+S_.comments
 	endif
 	
@@ -2769,7 +2771,8 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	S_.filenum = filenum
 
 	dowindow/k SweepControl // kill scan control window
-	printf "Time elapsed: %.2f s \r", (S_.end_time-S_.start_time)
+	print S_.end_time; print S_.start_time
+	printf "Time elapsed: %.02f s \r", (S_.end_time - S_.start_time)
 	HDF5CloseFile/A 0 //Make sure any previously opened HDFs are closed (may be left open if Igor crashes)
 	
 	if(S_.using_fastdac == 0)
@@ -2778,10 +2781,11 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	SaveToHDF(S_, additional_wavenames=additional_wavenames)
 
 	nvar sc_save_time
-	if(save_experiment==1 && (datetime-date2secs(2024,04,22) -sc_save_time)>180.0)
+	if(save_experiment==1 && (datetime - sc_save_time) > 180.0)
 		// save if save_exp=1 and if more than 3 minutes has elapsed since previous saveExp
 		saveExp()
-		sc_save_time = datetime-date2secs(2024,04,22) 
+//		sc_save_time = datetime-date2secs(2024,04,22)
+		sc_save_time = datetime
 	endif
 
 //	if(sc_checkBackup())  	// check if a path is defined to backup data
@@ -3240,7 +3244,7 @@ function RecordValues(S, i, j, [fillnan])
 
 	// Set Scan start_time on first measurement if not already set
 	if (i == 0 && j == 0 && (S.start_time == 0 || numtype(S.start_time) != 0))
-		S.start_time = datetime-date2secs(2024,04,22) 
+		S.start_time = datetime - date2secs(2024,04,22) 
 	endif
 
 	// Figure out which way to index waves
