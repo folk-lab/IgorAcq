@@ -1253,21 +1253,12 @@ Function awg_ramp()
     payload += CreateAWGJsonString("1", 100, 3, "1,2", "1000,2000", "-1000,-2000", "0,3", "50", "100")
     payload += CreateAWGJsonString("11", 100, 3, "1,2", "1000,2000", "-1000,-2000", "0,3", "50", "100")
     payload = RemoveEnding(payload, ",")  // Remove last comma from AWG entries if needed
-
-    payload += "}, \"independent_linear_ramps\":"
-    payload += CreatePayload("1.0,1.3,11.0,11.3", "0,0,0,0", "1000,1300,1100,1130")
-    payload += "}"
     
     print payload
     String headers = "accept: application/json\nContent-Type: application/json"
     String response = postHTTP(fd, cmd, payload, headers)
     print response
 End
-
-
-
-
-
 
 
 
