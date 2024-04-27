@@ -2771,7 +2771,6 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	S_.filenum = filenum
 
 	dowindow/k SweepControl // kill scan control window
-	print S_.end_time; print S_.start_time
 	printf "Time elapsed: %.02f s \r", (S_.end_time - S_.start_time)
 	HDF5CloseFile/A 0 //Make sure any previously opened HDFs are closed (may be left open if Igor crashes)
 	

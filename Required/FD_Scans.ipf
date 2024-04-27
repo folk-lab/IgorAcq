@@ -39,7 +39,7 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 	struct ScanVars S
 	initScanVarsFD(S, start, fin, channelsx=channels, numptsx=numptsx, rampratex=ramprate, starty=1, finy=repeats, delayy=delay, sweeprate=sweeprate,  \
 					numptsy=repeats, startxs=starts, finxs=fins, x_label=x_label, y_label=y_label, alternate=alternate, interlaced_channels=interlaced_channels, \
-					interlaced_setpoints=interlaced_setpoints, comments=comments, use_awg = use_awg)
+					interlaced_setpoints=interlaced_setpoints, comments=comments, use_awg=use_awg)
 
    
 	// Check software limits and ramprate limits
@@ -73,7 +73,7 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 
 	// Main measurement loop
 	int j, d = 1
-	for (j=0; j<S.numptsy; j++)
+	for (j = 0; j < S.numptsy; j++)
 		S.direction = d  // Will determine direction of scan in fd_Record_Values
 		// Interlaced Scan Stuff
 		if (S.interlaced_y_flag)
@@ -84,7 +84,7 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 		endif
 
 		// Ramp to start of fast axis // this would need to ramp all the DACs being used to their starting position (do we need synchronization)
-		RampStartFD(S, ignore_lims=1, x_only=1) // This uses ramp smart, Which does not account for synchronization. the important thing would be
+		RampStartFD(S, ignore_lims = 1, x_only = 1) // This uses ramp smart, Which does not account for synchronization. the important thing would be
 		// to have all the dacs return to their respective starting positions
 		sc_sleep(S.delayy)
 
@@ -93,15 +93,14 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 		scfd_RecordValues(S, j)
 
 
-		if (alternate!=0) // If want to alternate scan scandirection for next row
-			d = d*-1
+		if (alternate != 0) // If want to alternate scan scandirection for next row
+			d = d * -1
 		endif
 	endfor
 
 	// Save by default
 	if (nosave == 0)
-
-		EndScan(S=S)
+		EndScan(S = S)
 		// SaveWaves(msg=comments, fastdac=1)
 	endif
 	doWindow/k/z SweepControl  // Attempt to close previously open window just in case
@@ -154,7 +153,7 @@ function ScanFastDAC2D(startx, finx, channelsx, starty, finy, channelsy, numptsy
 	scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, starty, finy, S.startxs, S.finxs, startys, finys)
 	// Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
 	PreScanChecksFD(S)
-	if (fake==1)
+	if (fake == 1)
 		abort
 	endif
    	
@@ -166,8 +165,8 @@ function ScanFastDAC2D(startx, finx, channelsx, starty, finy, channelsy, numptsy
 //	endif
 //	SetAWG(AWG, use_AWG)
    
-      // Ramp to start without checks
-   	   RampStartFD(S, ignore_lims=1)
+	// Ramp to start without checks
+	RampStartFD(S, ignore_lims = 1)
 //   	
 //   	// Let gates settle
 	sc_sleep(S.delayy)
@@ -191,7 +190,7 @@ function ScanFastDAC2D(startx, finx, channelsx, starty, finy, channelsy, numptsy
 ////			endif
 ////		else
 ////			// Ramp slow axis
-			rampToNextSetpoint(S, 0, outer_index=i, y_only=1, ignore_lims=1) //uses the same, ramp multiple fdac but this function seems to be bd specific
+		rampToNextSetpoint(S, 0, outer_index=i, y_only=1, ignore_lims=1) //uses the same, ramp multiple fdac but this function seems to be bd specific
 ////
 ////		endif
 ////		
@@ -210,33 +209,30 @@ function ScanFastDAC2D(startx, finx, channelsx, starty, finy, channelsy, numptsy
 	// Save by default
 	if (nosave == 0)
 		EndScan(S=S)
-  	
   		dowindow /k SweepControl
 	endif
-	
-	
 	
 end
 
 
 
 function/s fd_start_sweep(S, [AWG_list])
-Struct ScanVars &S
-Struct AWGVars &AWG_List
-//	int i
-//	string cmd="//*"
-//	
-print S
-	 string adcList=S.adcList;
-	 string startxs=S.startxs;
-	 string finxs=S.finxs;
-	 int numptsx=S.numptsx;
-	 if (S.readVsTime) 
-			sample_ADC(S.adclistIDs,  S.numptsx)
+	Struct ScanVars &S
+	Struct AWGVars &AWG_List
+	//	int i
+	//	string cmd="//*"
+	//	
+	print S
+	string adcList=S.adcList;
+	string startxs=S.startxs;
+	string finxs=S.finxs;
+	int numptsx=S.numptsx;
+	if (S.readVsTime) 
+		sample_ADC(S.adclistIDs,  S.numptsx)
 	endif
 	
 	if (S.readvstime==0)
-	linear_ramp(S)
+		linear_ramp(S)
 	endif
 		
 	 
@@ -258,7 +254,7 @@ function fake_ramp(string adclist, string startxs, string finxs,int numptsx)
 	nof_ADCs=dimsize(numericwave,0);
 	le=1000;
 	counter=numptsx
-do
+	do
 		//le=abs(floor(gnoise(1000)));
 		make/o/N=(le,nof_ADCs) tempwave
 		for(i=0; i<nof_ADCs; i+=1)
@@ -273,15 +269,16 @@ do
 	// one last round with the remaining pnts
 	le=counter
 	make/o/N=(le,nof_ADCs) tempwave
-		for(i=0; i<nof_ADCs; i+=1)
-			tempwave[][i]=0*sin(0.001*x*2*pi)+gnoise(1)+10
-			//setdimLabel 1,i, column, tempwave
-		endfor
-		name="test_"+num2str(j)+".dat"
-		Save/p=fdtest/J/M="\n"/O tempwave as name
-	
+	for(i=0; i<nof_ADCs; i+=1)
+		tempwave[][i]=0*sin(0.001*x*2*pi)+gnoise(1)+10
+		//setdimLabel 1,i, column, tempwave
+	endfor
+	name="test_"+num2str(j)+".dat"
+	Save/p=fdtest/J/M="\n"/O tempwave as name
 	
 end
+
+
 
 //	
 //	string fdIDname; S.adcLists = ""; S.fakeRecords = ""
