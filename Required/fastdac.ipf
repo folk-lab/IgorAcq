@@ -880,12 +880,6 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
 
 	scv_setSetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
 	
-	// Fix ramprate if zero
-	if (rampratex == 0)
-		variable fastdac_index = get_fastdac_index(stringfromList(0, S.dacListIDs, ","), return_adc_index = 0)
-		wave /t fdacvalstr
-		S.rampratex = str2num(fdacvalstr[fastdac_index][4])
-	endif
 	
 	// Set variables with some calculation
     scv_setFreq(S=S) 		// Sets S.samplingFreq/measureFreq/numADCs	
@@ -897,10 +891,22 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
    		S.channelsy = scu_getChannelNumbers(channelsy)				// converting from channel labels to numbers
 		S.y_label = scu_getDacLabel(S.channelsy)						// setting the y_label
    endif
-   	//get_dacListIDs(S)
 
-	scv_setLastScanVars(S)
+
+	// Fix ramprate if zero
+	variable fastdac_index
+	wave /t fdacvalstr
+	if (rampratex == 0)
+		fastdac_index = get_fastdac_index(stringfromList(0, S.channelsx, ","), return_adc_index = 0)
+		S.rampratex = str2num(fdacvalstr[fastdac_index][4])
+	endif
 	
+	if (rampratey == 0)
+		fastdac_index = get_fastdac_index(stringfromList(0, S.channelsy, ","), return_adc_index = 0)
+		S.rampratey = str2num(fdacvalstr[fastdac_index][4])
+	endif
+	
+	scv_setLastScanVars(S)
 	
 	
 	// removing delimiters
