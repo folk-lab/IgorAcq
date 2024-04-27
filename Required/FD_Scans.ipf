@@ -672,13 +672,13 @@ function FDSpectrumAnalyzer(scanlength,[numAverage, raw_graphs, calc_graphs, com
 	if (raw_graphs)
 		all_graphIDs += scg_initializeGraphsForWavenames(sci_get1DWaveNames(1,1), "Time /s", for_2d=0, y_label="ADC /mV")  // RAW ADC readings
 		if (S.is2d)
-			all_graphIDs += scg_initializeGraphsForWavenames(sci_get1DWaveNames(1,1), "Time /s", for_2d=1, y_label="Repeats")  // RAW ADC readings
+			all_graphIDs += scg_initializeGraphsForWavenames(sci_get1DWaveNames(1,1), "Time /s", for_2d=1, only_2d=1, y_label="Repeats")  // RAW ADC readings
 		endif
 	endif
 	if (calc_graphs)
 		all_graphIDs += scg_initializeGraphsForWavenames(sci_get1DWaveNames(0,1), "Time /s", for_2d=0, y_label="Current /nA")    // Calculated data (should be in nA)
 		if (S.is2d)
-			all_graphIDs += scg_initializeGraphsForWavenames(sci_get1DWaveNames(1,1), "Time /s", for_2d=1, y_label="Repeats")  // RAW ADC readings
+			all_graphIDs += scg_initializeGraphsForWavenames(sci_get1DWaveNames(1,1), "Time /s", for_2d=1, only_2d=1, y_label="Repeats")  // RAW ADC readings
 		endif
 	endif
 	

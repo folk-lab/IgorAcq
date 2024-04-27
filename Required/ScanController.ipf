@@ -1364,15 +1364,16 @@ function/S scg_initializeGraphs(S , [y_label])
 end
 
 
-function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label, append_wn, spectrum, mFreq, y_label_2d])
+function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, only_2d, y_label, append_wn, spectrum, mFreq, y_label_2d])
 	// Ensures a graph is open and tiles graphs for each wave in comma separated wavenames
 	// Returns list of graphIDs of active graphs
 	// append_wavename would append a wave to every single wavename in wavenames (more useful for passing just one wavename)
 	// spectrum -- Also shows a noise spectrum of the data (useful for fastdac scans)
 	string wavenames, x_label, y_label, append_wn, y_label_2d
-	variable for_2d , spectrum, mFreq
+	variable for_2d, only_2d, spectrum, mFreq
 	
 	spectrum = paramisDefault(spectrum) ? 0 : 1
+	only_2d = paramisDefault(only_2d) ? 0 : only_2d
 	y_label = selectString(paramisDefault(y_label), y_label, "")
 	append_wn = selectString(paramisDefault(append_wn), append_wn, "")
 	y_label_2d = selectString(paramisDefault(y_label_2d), y_label_2d, "")
@@ -1393,26 +1394,30 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 		endif
 
 		// 1D graphs
-		if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-			scg_setupGraph1D(openGraphID, x_label, y_label= selectstring(cmpstr(y_label_1d, ""), wn, wn +" (" + y_label_1d + ")"))
-			wn = StringFromList(i, wavenames) 
-		else
-			wn = StringFromList(i, wavenames)
-			
-	      	if (spectrum)
-	      		scg_open1Dgraph(wn, x_label, y_label=selectstring(cmpstr(y_label_1d,""), wn, wn +" (" + y_label_1d + ")"))
-	      		openGraphID = winname(0,1)
-				string wn_powerspec = scfd_spectrum_analyzer($wn, mFreq, "pwrspec" + ADCnum)
-				scg_twosubplot(openGraphID, wn_powerspec, logy = 1, labelx = "Frequency (Hz)", labely ="pwr", append_wn = wn_powerspec + "int", append_labely = "cumul. pwr")
-			else 
-	      		scg_open1Dgraph(wn, x_label, y_label=selectstring(cmpstr(y_label_1d, ""), wn, wn + " (" + y_label_1d + ")"), append_wn = append_wn)
-	      		openGraphID = winname(0,1)			
-			endif 
-			
-	   endif
+		if (only_2d == 0)
 		
-		graphIDs = addlistItem(openGraphID, graphIDs, ";", INF) 	
-	   openGraphID = ""
+			if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
+				scg_setupGraph1D(openGraphID, x_label, y_label= selectstring(cmpstr(y_label_1d, ""), wn, wn +" (" + y_label_1d + ")"))
+				wn = StringFromList(i, wavenames) 
+			else
+				wn = StringFromList(i, wavenames)
+				
+		      	if (spectrum)
+		      		scg_open1Dgraph(wn, x_label, y_label=selectstring(cmpstr(y_label_1d,""), wn, wn +" (" + y_label_1d + ")"))
+		      		openGraphID = winname(0,1)
+					string wn_powerspec = scfd_spectrum_analyzer($wn, mFreq, "pwrspec" + ADCnum)
+					scg_twosubplot(openGraphID, wn_powerspec, logy = 1, labelx = "Frequency (Hz)", labely ="pwr", append_wn = wn_powerspec + "int", append_labely = "cumul. pwr")
+				else 
+		      		scg_open1Dgraph(wn, x_label, y_label=selectstring(cmpstr(y_label_1d, ""), wn, wn + " (" + y_label_1d + ")"), append_wn = append_wn)
+		      		openGraphID = winname(0,1)			
+				endif 
+				
+		   endif
+		   graphIDs = addlistItem(openGraphID, graphIDs, ";", INF) 
+		   
+		endif
+		
+		openGraphID = ""
 		
 		// 2D graphs
 		if (for_2d)
