@@ -900,6 +900,33 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
    	//get_dacListIDs(S)
 
 	scv_setLastScanVars(S)
+	
+	
+	
+	// removing delimiters
+	// x-channel
+	S.channelsx = removeTrailingDelimiter(S.channelsx)
+	S.startxs = removeTrailingDelimiter(S.startxs)
+	S.finxs = removeTrailingDelimiter(S.finxs)
+	S.dacListIDs = removeTrailingDelimiter(S.dacListIDs)
+	S.IDstartxs = removeTrailingDelimiter(S.IDstartxs)
+	S.IDfinxs = removeTrailingDelimiter(S.IDfinxs)
+	
+	// y-channel
+	S.channelsy = removeTrailingDelimiter(S.channelsy)
+	S.startys = removeTrailingDelimiter(S.startys)
+	S.finys = removeTrailingDelimiter(S.finys)
+	S.dacListIDs_y = removeTrailingDelimiter(S.dacListIDs_y)
+	
+	// adc
+	S.adcListIDs = removeTrailingDelimiter(S.adcListIDs)
+	S.adcList = removeTrailingDelimiter(S.adcList)
+	S.adcLists = removeTrailingDelimiter(S.adcLists)
+	
+	// wave-names
+	S.raw_wave_names = removeTrailingDelimiter(S.raw_wave_names)
+	
+	
 	print S
 end
 

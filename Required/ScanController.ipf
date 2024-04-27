@@ -599,6 +599,18 @@ function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, ra
 	S.direction = 1   // For keeping track of scan direction when using alternating scan
 	S.never_save = 0  // Set to 1 to make sure these ScanVars are never saved (e.g. if using to get throw away values for getting an ADC reading)
 	S.filenum = filenum
+	
+	
+	// removing delimiters
+	// x-channel
+	S.channelsx = removeTrailingDelimiter(S.channelsx)
+	S.startxs = removeTrailingDelimiter(S.startxs)
+	S.finxs = removeTrailingDelimiter(S.finxs)
+	
+	// y-channel
+	S.channelsy = removeTrailingDelimiter(S.channelsy)
+	S.startys = removeTrailingDelimiter(S.startys)
+	S.finys = removeTrailingDelimiter(S.finys)
 end
 
 
@@ -621,7 +633,7 @@ function get_dacListIDs(S)
 		fastdac_index = get_fastdac_index(num2str(numericwave[i]), return_adc_index = 0)
 		returnlist = returnlist + dac_channel[fastdac_index] + ","
 	endfor
-	S.dacListIDs = removeTrailingDelimiter(returnlist);
+//	S.dacListIDs = removeTrailingDelimiter(returnlist);
 
 	// working out DACLIstIDs for y channels
 	new_channels=scu_getChannelNumbers(S.channelsy) /// this returns a string with x DAC channels
@@ -634,7 +646,7 @@ function get_dacListIDs(S)
 			fastdac_index = get_fastdac_index(num2str(numericwave[i]), return_adc_index = 0)
 			returnlist = returnlist + dac_channel[fastdac_index] + ","
 		endfor
-		S.dacListIDs_y = removeTrailingDelimiter(returnlist); 
+//		S.dacListIDs_y = removeTrailingDelimiter(returnlist); 
 	endif
 
 end
