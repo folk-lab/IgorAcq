@@ -428,6 +428,11 @@ Function ReadVsTimeFastdac(duration, [y_label, comments, nosave]) // Units: seco
 	if (itemsinlist(channels, ",") == 0)
 		abort "[ERROR] \"ReadVsTimeFastdac\": No ADC channels selected"
 	endif
+	
+	// Turn off resampling during noise spectrum scan
+	nvar sc_ResampleFreqfadc
+	variable original_resample_state = sc_ResampleFreqfadc 
+	sc_ResampleFreqfadc = 1e6 // in this case the resampling will be skipped
 
 	Struct ScanVars S // Declare a structure to hold scanning variables
 	initScanVarsFD(S, 0, duration, duration=duration, x_label="time /s", y_label="Current /nA", comments=comments)
@@ -447,6 +452,10 @@ Function ReadVsTimeFastdac(duration, [y_label, comments, nosave]) // Units: seco
 	else
 		dowindow/k SweepControl // If nosave is true, keep the sweep control window open for further interaction
 	endif
+	
+	
+	// Return resampling state to whatever it was before
+	sc_ResampleFreqfadc = original_resample_state
 End
 
 
