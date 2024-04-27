@@ -810,8 +810,8 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
     struct ScanVars &S
     variable x_only, startx, finx, numptsx, delayx, rampratex
     variable starty, finy, numptsy, delayy, rampratey
-	 variable sweeprate  // If start != fin numpts will be calculated based on sweeprate
-	 variable duration   // numpts will be caluculated to achieve duration
+	variable sweeprate  // If start != fin numpts will be calculated based on sweeprate
+	variable duration   // numpts will be caluculated to achieve duration
     variable alternate, use_awg
     string channelsx, channelsy
     string startxs, finxs, startys, finys
@@ -865,7 +865,7 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
 
    
 
-//   	// Sets channelsx, channelsy to be lists of channel numbers instead of labels
+	// Sets channelsx, channelsy to be lists of channel numbers instead of labels
 	scv_setChannels(S, channelsx, channelsy, fastdac=1)  
      
    	// Get Labels for graphs
@@ -875,13 +875,11 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
    	else
    		S.y_label = y_label
    	endif  		
-
-   	// Sets starts/fins (either using starts/fins given or from single startx/finx given)
-   // scv_setSetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys) had to move this
 	
 	get_dacListIDs(S)
 
 	scv_setSetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
+	
 	
 	// Set variables with some calculation
     scv_setFreq(S=S) 		// Sets S.samplingFreq/measureFreq/numADCs	
@@ -893,9 +891,48 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
    		S.channelsy = scu_getChannelNumbers(channelsy)				// converting from channel labels to numbers
 		S.y_label = scu_getDacLabel(S.channelsy)						// setting the y_label
    endif
-   	//get_dacListIDs(S)
 
+
+	// Fix ramprate if zero
+	variable fastdac_index
+	wave /t fdacvalstr
+	if (rampratex == 0)
+		fastdac_index = get_fastdac_index(stringfromList(0, S.channelsx, ","), return_adc_index = 0)
+		S.rampratex = str2num(fdacvalstr[fastdac_index][4])
+	endif
+	
+	if (rampratey == 0)
+		fastdac_index = get_fastdac_index(stringfromList(0, S.channelsy, ","), return_adc_index = 0)
+		S.rampratey = str2num(fdacvalstr[fastdac_index][4])
+	endif
+	
 	scv_setLastScanVars(S)
+	
+	
+	// removing delimiters
+	// x-channel
+	S.channelsx = removeTrailingDelimiter(S.channelsx)
+	S.startxs = removeTrailingDelimiter(S.startxs)
+	S.finxs = removeTrailingDelimiter(S.finxs)
+	S.dacListIDs = removeTrailingDelimiter(S.dacListIDs)
+	S.IDstartxs = removeTrailingDelimiter(S.IDstartxs)
+	S.IDfinxs = removeTrailingDelimiter(S.IDfinxs)
+	
+	// y-channel
+	S.channelsy = removeTrailingDelimiter(S.channelsy)
+	S.startys = removeTrailingDelimiter(S.startys)
+	S.finys = removeTrailingDelimiter(S.finys)
+	S.dacListIDs_y = removeTrailingDelimiter(S.dacListIDs_y)
+	
+	// adc
+	S.adcListIDs = removeTrailingDelimiter(S.adcListIDs)
+	S.adcList = removeTrailingDelimiter(S.adcList)
+	S.adcLists = removeTrailingDelimiter(S.adcLists)
+	
+	// wave-names
+	S.raw_wave_names = removeTrailingDelimiter(S.raw_wave_names)
+	
+	
 	print S
 end
 
@@ -1253,12 +1290,21 @@ Function awg_ramp()
     payload += CreateAWGJsonString("1", 100, 3, "1,2", "1000,2000", "-1000,-2000", "0,3", "50", "100")
     payload += CreateAWGJsonString("11", 100, 3, "1,2", "1000,2000", "-1000,-2000", "0,3", "50", "100")
     payload = RemoveEnding(payload, ",")  // Remove last comma from AWG entries if needed
+
+    payload += "}, \"independent_linear_ramps\":"
+    payload += CreatePayload("1.0,1.3,11.0,11.3", "0,0,0,0", "1000,1300,1100,1130")
+    payload += "}"
     
     print payload
     String headers = "accept: application/json\nContent-Type: application/json"
     String response = postHTTP(fd, cmd, payload, headers)
     print response
 End
+
+
+
+
+
 
 
 

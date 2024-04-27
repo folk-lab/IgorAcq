@@ -360,6 +360,17 @@ function scu_unixTime()
 	return DateTime - date2secs(1970,1,1) - date2secs(-1,-1,-1)
 end
 
+function scu_tic()
+    variable/G tictoc = startMSTimer
+end
+
+function scu_toc()
+    NVAR/Z tictoc
+    variable ttTime = stopMSTimer(tictoc)
+    printf "%g seconds\r", (ttTime/1e6)
+    killvariables/Z tictoc
+end
+
 
 function roundNum(number,decimalplace) 
     // to return integers, decimalplace=0
@@ -510,10 +521,10 @@ function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, ra
     string channelsx
     string channelsy
     string x_label, y_label
-	 string startxs, finxs, startys, finys
-	 string interlaced_channels, interlaced_setpoints
+	string startxs, finxs, startys, finys
+	string interlaced_channels, interlaced_setpoints
     string comments
-        nvar filenum
+    nvar filenum
 
     
 	// Handle Optional Strings
@@ -599,6 +610,18 @@ function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, ra
 	S.direction = 1   // For keeping track of scan direction when using alternating scan
 	S.never_save = 0  // Set to 1 to make sure these ScanVars are never saved (e.g. if using to get throw away values for getting an ADC reading)
 	S.filenum = filenum
+	
+	
+	// removing delimiters
+	// x-channel
+	S.channelsx = removeTrailingDelimiter(S.channelsx)
+	S.startxs = removeTrailingDelimiter(S.startxs)
+	S.finxs = removeTrailingDelimiter(S.finxs)
+	
+	// y-channel
+	S.channelsy = removeTrailingDelimiter(S.channelsy)
+	S.startys = removeTrailingDelimiter(S.startys)
+	S.finys = removeTrailingDelimiter(S.finys)
 end
 
 
@@ -621,7 +644,7 @@ function get_dacListIDs(S)
 		fastdac_index = get_fastdac_index(num2str(numericwave[i]), return_adc_index = 0)
 		returnlist = returnlist + dac_channel[fastdac_index] + ","
 	endfor
-	S.dacListIDs = removeTrailingDelimiter(returnlist);
+//	S.dacListIDs = removeTrailingDelimiter(returnlist);
 
 	// working out DACLIstIDs for y channels
 	new_channels=scu_getChannelNumbers(S.channelsy) /// this returns a string with x DAC channels
@@ -634,7 +657,7 @@ function get_dacListIDs(S)
 			fastdac_index = get_fastdac_index(num2str(numericwave[i]), return_adc_index = 0)
 			returnlist = returnlist + dac_channel[fastdac_index] + ","
 		endfor
-		S.dacListIDs_y = removeTrailingDelimiter(returnlist); 
+//		S.dacListIDs_y = removeTrailingDelimiter(returnlist); 
 	endif
 
 end
@@ -789,25 +812,27 @@ function scv_setSetpoints(S, itemsx, startx, finx, itemsy, starty, finy, startxs
 	If (Strlen(startxs) == 0 && Strlen(finxs) == 0)   // Single start/end for all itemsx
 		S.startx = startx
 		S.finx = finx
+		starts = num2str(startx); fins = num2str(finx)
 		scv_formatSetpoints(startx, finx, itemsx, starts, fins)  // Format single start/ends into lists
 
 		// Assign formatted starts and ends to each channel
-		For (i = 0; i < ItemsInList(S.channelsx); i += 1)
-			S.IDstartxs = ReplaceStringByKey(StringFromList(i, S.channelsx), S.IDstartxs, StringBykey(StringFromList(i, S.channelsx), S.IDstartxs) + "," + StringFromList(i, starts, ","))
-			S.IDfinxs = ReplaceStringByKey(StringFromList(i, S.channelsx), S.IDfinxs, StringBykey(StringFromList(i, S.channelsx), S.IDfinxs) + "," + StringFromList(i, fins, ","))
+		For (i = 0; i < ItemsInList(S.channelsx, ","); i += 1)
+			S.IDstartxs = ReplaceStringByKey(StringFromList(i, S.channelsx), S.IDstartxs, StringBykey(StringFromList(i, S.channelsx), S.IDstartxs) + "" + StringFromList(i, starts, ","))
+			S.IDfinxs = ReplaceStringByKey(StringFromList(i, S.channelsx), S.IDfinxs, StringBykey(StringFromList(i, S.channelsx), S.IDfinxs) + "" + StringFromList(i, fins, ","))
 		EndFor
 
 		S.startxs = starts
 		S.finxs = fins
 	ElseIf (Strlen(startxs) > 0 && Strlen(finxs) > 0)   // Multiple start/end points provided
+		starts = startxs; fins = finxs
 		scv_sanitizeSetpoints(startxs, finxs, itemsx, starts, fins)  // Clean and format provided start/ends
 		S.startx = Str2Num(StringFromList(0, starts, ","))
 		S.finx = Str2Num(StringFromList(0, fins, ","))
 
 		// Repeat assignment for multiple setpoints
-		For (i = 0; i < ItemsInList(S.daclistIDs); i += 1)
-			S.IDstartxs = ReplaceStringByKey(StringFromList(i, S.daclistIDs, ","), S.IDstartxs, StringBykey(StringFromList(i, S.daclistIDs, ","), S.IDstartxs) + "," + StringFromList(i, starts, ","))
-			S.IDfinxs = ReplaceStringByKey(StringFromList(i, S.daclistIDs, ","), S.IDfinxs, StringBykey(StringFromList(i, S.daclistIDs, ","), S.IDfinxs) + "," + StringFromList(i, fins, ","))
+		For (i = 0; i < ItemsInList(S.daclistIDs, ","); i += 1)
+			S.IDstartxs = ReplaceStringByKey(StringFromList(i, S.daclistIDs, ","), S.IDstartxs, StringBykey(StringFromList(i, S.daclistIDs, ","), S.IDstartxs) + "" + StringFromList(i, starts, ","))
+			S.IDfinxs = ReplaceStringByKey(StringFromList(i, S.daclistIDs, ","), S.IDfinxs, StringBykey(StringFromList(i, S.daclistIDs, ","), S.IDfinxs) + "" + StringFromList(i, fins, ","))
 		EndFor
 
 		S.startxs = starts
@@ -822,10 +847,12 @@ function scv_setSetpoints(S, itemsx, startx, finx, itemsy, starty, finy, startxs
 		if (strlen(startys) == 0 && strlen(finys) == 0)  // Single start/end for Y
 			s.starty = starty
 			s.finy = finy
+			starts = num2str(starty); fins = num2str(finy)
 			scv_formatSetpoints(starty, finy, itemsy, starts, fins)
 			s.startys = starts
 			s.finys = fins
 		elseif (!(numtype(strlen(startys)) != 0 || strlen(startys) == 0) && !(numtype(strlen(finys)) != 0 || strlen(finys) == 0)) // Multiple start/end for Ys
+			starts = startys; fins = finys
 			scv_sanitizeSetpoints(startys, finys, itemsy, starts, fins)
 			s.starty = str2num(StringFromList(0, starts, ","))
 			s.finy = str2num(StringFromList(0, fins, ","))
@@ -1364,15 +1391,16 @@ function/S scg_initializeGraphs(S , [y_label])
 end
 
 
-function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label, append_wn, spectrum, mFreq, y_label_2d])
+function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, only_2d, y_label, append_wn, spectrum, mFreq, y_label_2d])
 	// Ensures a graph is open and tiles graphs for each wave in comma separated wavenames
 	// Returns list of graphIDs of active graphs
 	// append_wavename would append a wave to every single wavename in wavenames (more useful for passing just one wavename)
 	// spectrum -- Also shows a noise spectrum of the data (useful for fastdac scans)
 	string wavenames, x_label, y_label, append_wn, y_label_2d
-	variable for_2d , spectrum, mFreq
+	variable for_2d, only_2d, spectrum, mFreq
 	
 	spectrum = paramisDefault(spectrum) ? 0 : 1
+	only_2d = paramisDefault(only_2d) ? 0 : only_2d
 	y_label = selectString(paramisDefault(y_label), y_label, "")
 	append_wn = selectString(paramisDefault(append_wn), append_wn, "")
 	y_label_2d = selectString(paramisDefault(y_label_2d), y_label_2d, "")
@@ -1393,26 +1421,30 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, y_label
 		endif
 
 		// 1D graphs
-		if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-			scg_setupGraph1D(openGraphID, x_label, y_label= selectstring(cmpstr(y_label_1d, ""), wn, wn +" (" + y_label_1d + ")"))
-			wn = StringFromList(i, wavenames) 
-		else
-			wn = StringFromList(i, wavenames)
-			
-	      	if (spectrum)
-	      		scg_open1Dgraph(wn, x_label, y_label=selectstring(cmpstr(y_label_1d,""), wn, wn +" (" + y_label_1d + ")"))
-	      		openGraphID = winname(0,1)
-				string wn_powerspec = scfd_spectrum_analyzer($wn, mFreq, "pwrspec" + ADCnum)
-				scg_twosubplot(openGraphID, wn_powerspec, logy = 1, labelx = "Frequency (Hz)", labely ="pwr", append_wn = wn_powerspec + "int", append_labely = "cumul. pwr")
-			else 
-	      		scg_open1Dgraph(wn, x_label, y_label=selectstring(cmpstr(y_label_1d, ""), wn, wn + " (" + y_label_1d + ")"), append_wn = append_wn)
-	      		openGraphID = winname(0,1)			
-			endif 
-			
-	   endif
+		if (only_2d == 0)
 		
-		graphIDs = addlistItem(openGraphID, graphIDs, ";", INF) 	
-	   openGraphID = ""
+			if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
+				scg_setupGraph1D(openGraphID, x_label, y_label= selectstring(cmpstr(y_label_1d, ""), wn, wn +" (" + y_label_1d + ")"))
+				wn = StringFromList(i, wavenames) 
+			else
+				wn = StringFromList(i, wavenames)
+				
+		      	if (spectrum)
+		      		scg_open1Dgraph(wn, x_label, y_label=selectstring(cmpstr(y_label_1d,""), wn, wn +" (" + y_label_1d + ")"))
+		      		openGraphID = winname(0,1)
+					string wn_powerspec = scfd_spectrum_analyzer($wn, mFreq, "pwrspec" + ADCnum)
+					scg_twosubplot(openGraphID, wn_powerspec, logy = 1, labelx = "Frequency (Hz)", labely ="pwr", append_wn = wn_powerspec + "int", append_labely = "cumul. pwr")
+				else 
+		      		scg_open1Dgraph(wn, x_label, y_label=selectstring(cmpstr(y_label_1d, ""), wn, wn + " (" + y_label_1d + ")"), append_wn = append_wn)
+		      		openGraphID = winname(0,1)			
+				endif 
+				
+		   endif
+		   graphIDs = addlistItem(openGraphID, graphIDs, ";", INF) 
+		   
+		endif
+		
+		openGraphID = ""
 		
 		// 2D graphs
 		if (for_2d)
@@ -1900,13 +1932,12 @@ function scfd_resampleWaves(w, measureFreq, targetFreq)
 
 
 	RatioFromNumber (targetFreq / measureFreq)
-	resample /UP=(V_numerator) /DOWN=(V_denominator) /N=201 /E=0 w
-
 //	print "Num and den are",v_numerator, v_denominator
-	if (V_numerator > V_denominator)
+	if (V_numerator < V_denominator)
 		string cmd
 		//print "Resampling would increase number of datapoints, not decrease, therefore resampling is skipped"
-		duplicate/o w_before w
+		resample /UP=(V_numerator) /DOWN=(V_denominator) /N=201 /E=0 w
+
 
 	endif
 	// TODO: Need to test N more (simple testing suggests we may need >200 in some cases!) [Vahid: I'm not sure why only N=201 is a good choice.]
@@ -2115,13 +2146,19 @@ function scfd_RecordValues(S, rowNum, [AWG_list, linestart, skip_data_distributi
 
 	// If beginning of scan, record start time
 	if (rowNum == 0 && (S.start_time == 0 || numtype(S.start_time) != 0))  
-		S.start_time = datetime-date2secs(2024,04,22) 
+//		S.start_time = datetime - Date2Secs(-1,-1,-1) //date2secs(2024,04,22) 
+		S.start_time = datetime //date2secs(2024,04,22)
 	endif
 	
 	// Send command and read values
 	//print "sending command and reading"
 	scfd_SendCommandAndRead(S, AWG, rowNum, skip_raw2calc=skip_raw2calc) 
-	S.end_time = datetime-date2secs(2024,04,22) // this did not work on a MAC but I am not going to change it until I confirm it also does not work on a PC
+	
+	if (rowNum == (S.numptsy - 1))  
+		S.end_time = datetime - S.start_time
+		S.start_time = 0
+	endif
+//	S.end_time = datetime-date2secs(2024,04,22) // this did not work on a MAC but I am not going to change it until I confirm it also does not work on a PC
 	
 	// Process 1D read and distribute
 	if (!skip_data_distribution)
@@ -2343,7 +2380,7 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			execute(cwn+"y ="+calc_str)
 			resamp=0
 		endif
-
+scu_tic()
 		// dont resample for SQW analysis or demodulation after notch filtering resample
 		if (resamp==1)
 			numpntsx=scfd_resampleWaves(sc_tempwave, ScanVars.measureFreq, sc_ResampleFreqfadc)
@@ -2352,6 +2389,7 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			sci_init2DWave(wn,numpntsx, ScanVars.startx, ScanVars.finx, ScanVars.numptsy, ScanVars.starty, ScanVars.finy)
 			endif
 		endif
+		scu_toc()
 
 
 		calc_str = ReplaceString(rwn, calc_string, "sc_tempwave")
@@ -2732,11 +2770,11 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	scv_getLastScanVars(S_)
 
 	if (aborting)
-		S_.end_time = datetime-date2secs(2024,04,22) 
+//		S_.end_time = datetime-date2secs(2024,04,22) 
 		S_.comments = "aborted, " + S_.comments
 	endif
 	if (S_.end_time == 0 || numtype(S_.end_time) != 0) // Should have already been set, but if not, this is likely a good guess and prevents a stupid number being saved
-		S_.end_time = datetime-date2secs(2024,04,22) 
+//		S_.end_time = datetime-date2secs(2024,04,22) 
 		S_.comments = "end_time guessed, "+S_.comments
 	endif
 	
@@ -2744,7 +2782,7 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	S_.filenum = filenum
 
 	dowindow/k SweepControl // kill scan control window
-	printf "Time elapsed: %.2f s \r", (S_.end_time-S_.start_time)
+	printf "Time elapsed: %.02f s \r", (S_.end_time - S_.start_time)
 	HDF5CloseFile/A 0 //Make sure any previously opened HDFs are closed (may be left open if Igor crashes)
 	
 	if(S_.using_fastdac == 0)
@@ -2753,10 +2791,11 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	SaveToHDF(S_, additional_wavenames=additional_wavenames)
 
 	nvar sc_save_time
-	if(save_experiment==1 && (datetime-date2secs(2024,04,22) -sc_save_time)>180.0)
+	if(save_experiment==1 && (datetime - sc_save_time) > 180.0)
 		// save if save_exp=1 and if more than 3 minutes has elapsed since previous saveExp
 		saveExp()
-		sc_save_time = datetime-date2secs(2024,04,22) 
+//		sc_save_time = datetime-date2secs(2024,04,22)
+		sc_save_time = datetime
 	endif
 
 //	if(sc_checkBackup())  	// check if a path is defined to backup data
@@ -3215,7 +3254,7 @@ function RecordValues(S, i, j, [fillnan])
 
 	// Set Scan start_time on first measurement if not already set
 	if (i == 0 && j == 0 && (S.start_time == 0 || numtype(S.start_time) != 0))
-		S.start_time = datetime-date2secs(2024,04,22) 
+		S.start_time = datetime - date2secs(2024,04,22) 
 	endif
 
 	// Figure out which way to index waves
