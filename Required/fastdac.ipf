@@ -419,15 +419,18 @@ end
 Function RampMultipleFDAC(string channels, variable setpoint, [variable ramprate, string setpoints_str])
     // This function ramps multiple FastDAC channels to given setpoint(s) at a specified ramp rate.
     // Parameters:
-    // channels - A comma-separated list of channels to be ramped.
+    // channels - A comma-separated list of channels to be ramped. Expects 
     // setpoint - A common setpoint to ramp all channels to (ignored if setpoints_str is provided).
     // ramprate - The ramp rate in mV/s for all channels. If not specified, uses each channel's configured ramp rate.
     // setpoints_str - An optional comma-separated list of setpoints, allowing individual setpoints for each channel.
+    // Example Use ::
+    // rampmultiplefDAC("11.3, 11.6", 0, setpoints_str ="10, -10")
 
  
     
     // If ramprate is not specified or not a number, default to 1000 (this is mostly safe)
-    ramprate = numtype(ramprate) == 0 ? ramprate : 1000
+	ramprate = paramisdefault(ramprate) ? 0 : ramprate  // default is to return DAC index, return_adc_index = 1 to return adc index
+
 
     // Convert channel identifiers to numbers, supporting both numerical IDs and named channels
     channels = scu_getChannelNumbers(channels)
@@ -438,8 +441,11 @@ Function RampMultipleFDAC(string channels, variable setpoint, [variable ramprate
     endif
     
     // Initialize variables for the loop
-    Variable i = 0, channel, nChannels = ItemsInList(channels, ",")
+    Variable i = 0, nChannels = ItemsInList(channels, ",")
+    string channel
     Variable channel_ramp  // Not used, consider removing if unnecessary
+    variable fastdac_index
+    Wave/T fdacvalstr
     
     // Loop through each channel to apply the ramp
     for (i = 0; i < nChannels; i += 1)
@@ -449,15 +455,18 @@ Function RampMultipleFDAC(string channels, variable setpoint, [variable ramprate
         endif
         
         // Extract the channel number from the list and ramp to the setpoint
-        channel = str2num(StringFromList(i, channels, ","))
-        fd_rampOutputFDAC(channel, setpoint, ramprate)  // Ramp the channel to the setpoint at the specified rate
+        channel = StringFromList(i, channels, ",")
+        
+        fastdac_index = get_fastdac_index(channel, return_adc_index = 0)
+        ramprate = str2num(fdacvalstr[fastdac_index][4])
+        fd_rampOutputFDAC(fastdac_index, setpoint, ramprate)  // Ramp the channel to the setpoint at the specified rate
     endfor
 End
 
 
 
 
-Function fd_rampOutputFDAC(int channel, variable setpoint, variable ramprate) // Units: mV, mV/s
+Function fd_rampOutputFDAC(variable channel, variable setpoint, variable ramprate) // Units: mV, mV/s
     // This function ramps one FD DAC channel to a specified setpoint at a given ramprate.
     // It checks that both the setpoint and ramprate are within their respective limits before proceeding.
 

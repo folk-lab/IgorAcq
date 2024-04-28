@@ -202,7 +202,7 @@ function scfw_update_fdac(action) : ButtonControl
 	wave/t fdacvalstr
 	wave/t old_fdacvalstr
 	variable numDACCh
-	numDACCh=scfw_update_all_fdac(option=action)
+	numDACCh = scfw_update_all_fdac(option=action)
 	return numDACCh
 end
 
@@ -236,33 +236,33 @@ function scfw_update_all_fdac([option])
 	endif
 	
 	// Either ramp fastdacs or update fdacvalstr
-	variable i=0,j=0,output = 0, startCh = 0, numDACCh
-	numDACCh = dimsize(DAC_channel,0)
+	variable i = 0, j = 0, output = 0, startCh = 0, numDACCh
+	numDACCh = dimsize(DAC_channel, 0)
 	
 
 			try
 				strswitch(option)
 					case "fdacramp":
-						for(j=0;j<numDACCh;j+=1)
+						for(j = 0; j < numDACCh; j += 1)
 							output = str2num(fdacvalstr[j][1])
 							if(output != str2num(old_fdacvalstr[j]))
-							ramprate=str2num(fdacvalstr[j][4])
-								rampmultipleFDAC(num2str(j), output,ramprate=ramprate)
+								ramprate = str2num(fdacvalstr[j][4])
+								rampmultipleFDAC(DAC_channel[j], output, ramprate = ramprate)
 							endif
 						endfor
 						break
 					case "fdacrampzero":
-						for(j=0;j<numDACCh;j+=1)
-						ramprate=str2num(fdacvalstr[j][4])
-							rampmultipleFDAC(num2str(j), 0,ramprate=ramprate)
+						for(j = 0; j < numDACCh; j += 1)
+							ramprate = str2num(fdacvalstr[j][4])
+							rampmultipleFDAC(DAC_channel[j], 0, ramprate = ramprate)
 						endfor
 					break
 
 					case "updatefdac":
 						variable value
-						for(j=0;j<numDACCh;j+=1)
-							value=get_one_FDACChannel(j)
-							scfw_updateFdacValStr(j, value, update_oldValStr=1)
+						for(j = 0; j < numDACCh; j += 1)
+							value = get_one_FDACChannel(j)
+							scfw_updateFdacValStr(j, value, update_oldValStr = 1)
 						endfor
 						break
 				endswitch
@@ -270,7 +270,7 @@ function scfw_update_all_fdac([option])
 			
 				
 				// silent abort
-				abortonvalue 1,10
+				abortonvalue 1, 10
 			endtry
 			
 			return numDACCh
@@ -581,7 +581,8 @@ function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, ra
 		S.interlaced_num_setpoints = ItemsInList(StringFromList(0, interlaced_setpoints, ";"), ",")
 		S.numptsy = numptsy * S.interlaced_num_setpoints
 		printf "NOTE: Interlace scan, numptsy will increase from %d to %d\r" ,non_interlaced_numptsy, S.numptsy
-
+	else
+		S.interlaced_num_setpoints = 0 // may be useful to set this to 1 for ease of checking numptsy / interlaced_num_setpoints = repeats or numptsy
 	endif
 	
 	

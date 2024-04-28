@@ -80,7 +80,7 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 			if (use_awg)
 				//*Set_AWG_state(S, AWG, mod(j, S.interlaced_num_setpoints))
 			endif
-			//*Ramp_interlaced_channels(S, mod(j, S.interlaced_num_setpoints))
+			//Ramp_interlaced_channels(S, mod(j, S.interlaced_num_setpoints))
 		endif
 
 		// Ramp to start of fast axis // this would need to ramp all the DACs being used to their starting position (do we need synchronization)
@@ -773,6 +773,11 @@ function/WAVE fd_calculate_spectrum(time_series, [scan_duration, linear])
 //	powerspec[0] = NaN
 	return powerspec
 end
+
+
+
+
+
 //
 //function plotPowerSpectrum(w, [scan_duration, linear, powerspec_name])
 //	wave w
@@ -795,4 +800,54 @@ end
 //end
 //
 
+
+
+
+function Ramp_interlaced_channels(S, i)
+	// TODO: Should this live in Scans.ipf? If so, is there a better location for it?
+	struct ScanVars &S
+	variable i
+	
+	string interlace_channel, interlaced_setpoints_for_channel
+	
+	/////// Additions to determine instrID from channel name ////////////
+	string channel_num // I.e. not label
+	variable device
+	variable viRM
+	svar sc_fdackeys
+	variable err
+	wave/t fdacvalstr
+	wave/t fdacnames
+	//////////////
+	
+	variable interlace_value
+	variable k
+		for (k=0; k<ItemsInList(S.interlaced_channels, ","); k++)
+		interlace_channel = StringFromList(k, S.interlaced_channels, ",")  // return one of the channels in interlaced_channels
+		interlaced_setpoints_for_channel = StringFromList(k, S.interlaced_setpoints, ";") // return string of values to interlace between for one of the channels in interlaced_channels
+		interlace_value = str2num(StringFromList(mod(i, ItemsInList(interlaced_setpoints_for_channel, ",")), interlaced_setpoints_for_channel, ",")) // return the interlace value for specific channel, changes per 1d sweep
+		
+		//////////////////////// Additions to determine instrID from channel name //////////////
+		// Check if channel actually exists on a FastDAC, if not skip
+		if(numtype(str2num(interlace_channel)) != 0) // If possible channel is a name (not a number)
+			duplicate/o/free/t/r=[][3] fdacvalstr fdacnames
+			findvalue/RMD=[][3]/TEXT=interlace_channel/TXOP=5 fdacnames
+			if(V_Value == -1)  // If channel not found, skip this "channel"
+				continue 
+			endif
+		endif
+		// Figure out which FastDAC the channel belongs to
+//		channel_num = scu_getChannelNumbers(interlace_channel)
+//		scf_getChannelNumsOnFD(channel_num, device) // Sets device to device num
+//		string deviceAddress = stringbykey("visa"+num2istr(device), sc_fdacKeys, ":", ",")
+		// Open connection to that FastDAC and ramp
+//		viRM = openFastDACconnection("fdac_window_resource", deviceAddress, verbose=0, fill = 0)
+//		nvar tempinstrID = $"fdac_window_resource"
+		rampmultiplefDAC(S.interlaced_channels, 0, setpoints_str = S.interlaced_setpoints)
+//		viClose(tempinstrID) // Don't know if it's important to close both, or even correct to do so... Just copying what I (or Christian) did before...
+//		viClose(viRM)
+		///////////
+	endfor
+
+end
 
