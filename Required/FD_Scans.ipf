@@ -75,12 +75,13 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 	int j, d = 1
 	for (j = 0; j < S.numptsy; j++)
 		S.direction = d  // Will determine direction of scan in fd_Record_Values
+		
 		// Interlaced Scan Stuff
 		if (S.interlaced_y_flag)
 			if (use_awg)
 				//*Set_AWG_state(S, AWG, mod(j, S.interlaced_num_setpoints))
 			endif
-			//Ramp_interlaced_channels(S, mod(j, S.interlaced_num_setpoints))
+			Ramp_interlaced_channels(S, mod(j, S.interlaced_num_setpoints))
 		endif
 
 		// Ramp to start of fast axis // this would need to ramp all the DACs being used to their starting position (do we need synchronization)
@@ -809,20 +810,13 @@ function Ramp_interlaced_channels(S, i)
 	variable i
 	
 	string interlace_channel, interlaced_setpoints_for_channel
-	
-	/////// Additions to determine instrID from channel name ////////////
-	string channel_num // I.e. not label
-	variable device
-	variable viRM
-	svar sc_fdackeys
-	variable err
 	wave/t fdacvalstr
 	wave/t fdacnames
-	//////////////
+
 	
 	variable interlace_value
 	variable k
-		for (k=0; k<ItemsInList(S.interlaced_channels, ","); k++)
+	for (k = 0; k < ItemsInList(S.interlaced_channels, ","); k++)
 		interlace_channel = StringFromList(k, S.interlaced_channels, ",")  // return one of the channels in interlaced_channels
 		interlaced_setpoints_for_channel = StringFromList(k, S.interlaced_setpoints, ";") // return string of values to interlace between for one of the channels in interlaced_channels
 		interlace_value = str2num(StringFromList(mod(i, ItemsInList(interlaced_setpoints_for_channel, ",")), interlaced_setpoints_for_channel, ",")) // return the interlace value for specific channel, changes per 1d sweep
@@ -836,17 +830,9 @@ function Ramp_interlaced_channels(S, i)
 				continue 
 			endif
 		endif
+		
 		// Figure out which FastDAC the channel belongs to
-//		channel_num = scu_getChannelNumbers(interlace_channel)
-//		scf_getChannelNumsOnFD(channel_num, device) // Sets device to device num
-//		string deviceAddress = stringbykey("visa"+num2istr(device), sc_fdacKeys, ":", ",")
-		// Open connection to that FastDAC and ramp
-//		viRM = openFastDACconnection("fdac_window_resource", deviceAddress, verbose=0, fill = 0)
-//		nvar tempinstrID = $"fdac_window_resource"
-		rampmultiplefDAC(S.interlaced_channels, 0, setpoints_str = S.interlaced_setpoints)
-//		viClose(tempinstrID) // Don't know if it's important to close both, or even correct to do so... Just copying what I (or Christian) did before...
-//		viClose(viRM)
-		///////////
+		rampmultiplefDAC(interlace_channel, interlace_value)
 	endfor
 
 end

@@ -1137,9 +1137,9 @@ function get_one_FDACChannel(int channel) // Units: mV
 	svar fd
 	wave/t DAC_channel
 	string	response=getHTTP(fd,"get-dac-voltage/"+DAC_channel(channel),"");
-	string adc
-	adc=getjsonvalue(response,"value")
-	return str2num(adc)
+	string dac
+	dac = getjsonvalue(response,"value")
+	return str2num(dac)
 end
 
 
