@@ -127,31 +127,32 @@ function ScanFastDAC2D(startx, finx, channelsx, starty, finy, channelsy, numptsy
 	variable startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, fdyID, rampratex, rampratey, delayy, nosave, use_AWG
 	string channelsx, channelsy, comments, startxs, finxs, startys, finys, interlaced_channels, interlaced_setpoints, y_label
 	int fake
+	
 	// Set defaults
-	y_label = selectstring(paramisdefault(y_label), y_label, "nA")
 	delayy = ParamIsDefault(delayy) ? 0.01 : delayy
-//	rampratey = ParamIsDefault(rampratey) ? 1000 : rampratey
-//	rampratex = ParamIsDefault(rampratex) ? 1000 : rampratex
 
-
+	y_label = selectstring(paramisdefault(y_label), y_label, "nA")
 	comments = selectstring(paramisdefault(comments), comments, "")
 	startxs = selectstring(paramisdefault(startxs), startxs, "")
 	finxs = selectstring(paramisdefault(finxs), finxs, "")
 	startys = selectstring(paramisdefault(startys), startys, "")
 	finys = selectstring(paramisdefault(finys), finys, "")
-
 	interlaced_channels = selectString(paramisdefault(interlaced_channels), interlaced_channels, "")
 	interlaced_setpoints = selectString(paramisdefault(interlaced_setpoints), interlaced_setpoints, "")
+	
+	
 	variable scan2d = 1
 	// Put info into scanVars struct (to more easily pass around later)
 	struct ScanVars S
 	initScanVarsFD(S, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy,\
 	starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys,\
 	interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments, x_only = 0)
+	
 	s.is2d = 1
 	S.starty = starty
 	S.finy = finy
 	scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, starty, finy, S.startxs, S.finxs, startys, finys)
+	
 	// Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
 	PreScanChecksFD(S)
 	if (fake == 1)
@@ -168,45 +169,42 @@ function ScanFastDAC2D(startx, finx, channelsx, starty, finy, channelsy, numptsy
    
 	// Ramp to start without checks
 	RampStartFD(S, ignore_lims = 1)
-//   	
-//   	// Let gates settle
+  	
+	// Let gates settle
 	sc_sleep(S.delayy)
-//
-//	// Initialize waves and graphs
+
+	// Initialize waves and graphs
 	initializeScan(S, y_label = y_label)
-//
-//	// Main measurement loop
-	variable i=0, j=0
+
+	// Main measurement loop
 	variable setpointy, sy, fy
 	string chy
-	variable k = 0
-	for(i=0; i<S.numptsy; i++)
-//
-//		///// LOOP FOR INTERLACE SCANS ///// 
-////		//*if (S.interlaced_y_flag)
-////			Ramp_interlaced_channels(S, mod(i, S.interlaced_num_setpoints))
-////			Set_AWG_state(S, AWG, mod(i, S.interlaced_num_setpoints))
-////			if (mod(i, S.interlaced_num_setpoints) == 0) // Ramp slow axis only for first of interlaced setpoints
-////				rampToNextSetpoint(S, 0, outer_index=i, y_only=1, fastdac=!use_bd, ignore_lims=1)
-////			endif
-////		else
-////			// Ramp slow axis
-		rampToNextSetpoint(S, 0, outer_index=i, y_only=1, ignore_lims=1) //uses the same, ramp multiple fdac but this function seems to be bd specific
-////
-////		endif
-////		
-//
-//		// Ramp fast axis to start
+	variable i = 0, j = 0, k = 0
+	for(i = 0; i < S.numptsy; i++)
+	
+		///// LOOP FOR INTERLACE SCANS ///// 
+		if (S.interlaced_y_flag)
+			Ramp_interlaced_channels(S, mod(i, S.interlaced_num_setpoints))
+//			Set_AWG_state(S, AWG, mod(i, S.interlaced_num_setpoints))
+			if (mod(i, S.interlaced_num_setpoints) == 0) // Ramp slow axis only for first of interlaced setpoints
+				rampToNextSetpoint(S, 0, outer_index = i, y_only=1, ignore_lims = 1)
+			endif
+		else
+			// Ramp slow axis
+			rampToNextSetpoint(S, 0, outer_index = i, y_only = 1, ignore_lims = 1) //uses the same, ramp multiple fdac but this function seems to be bd specific
+		endif
+	
+		// Ramp fast axis to start
 		rampToNextSetpoint(S, 0, ignore_lims=1)
-//		
-//		// Let gates settle
+	
+		// Let gates settle
 		sc_sleep(S.delayy)
-//		
-//		// Record fast axis
+		
+		// Record fast axis
 		scfd_RecordValues(S, i)//*, AWG_list=AWG)
-//		
+		
 	endfor
-//	
+	
 	// Save by default
 	if (nosave == 0)
 		EndScan(S=S)
