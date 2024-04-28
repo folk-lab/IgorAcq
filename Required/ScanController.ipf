@@ -360,6 +360,17 @@ function scu_unixTime()
 	return DateTime - date2secs(1970,1,1) - date2secs(-1,-1,-1)
 end
 
+function scu_tic()
+    variable/G tictoc = startMSTimer
+end
+
+function scu_toc()
+    NVAR/Z tictoc
+    variable ttTime = stopMSTimer(tictoc)
+    printf "%g seconds\r", (ttTime/1e6)
+    killvariables/Z tictoc
+end
+
 
 function roundNum(number,decimalplace) 
     // to return integers, decimalplace=0
@@ -1921,13 +1932,12 @@ function scfd_resampleWaves(w, measureFreq, targetFreq)
 
 
 	RatioFromNumber (targetFreq / measureFreq)
-	resample /UP=(V_numerator) /DOWN=(V_denominator) /N=201 /E=0 w
-
 //	print "Num and den are",v_numerator, v_denominator
-	if (V_numerator > V_denominator)
+	if (V_numerator < V_denominator)
 		string cmd
 		//print "Resampling would increase number of datapoints, not decrease, therefore resampling is skipped"
-		duplicate/o w_before w
+		resample /UP=(V_numerator) /DOWN=(V_denominator) /N=201 /E=0 w
+
 
 	endif
 	// TODO: Need to test N more (simple testing suggests we may need >200 in some cases!) [Vahid: I'm not sure why only N=201 is a good choice.]
@@ -2370,7 +2380,7 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			execute(cwn+"y ="+calc_str)
 			resamp=0
 		endif
-
+scu_tic()
 		// dont resample for SQW analysis or demodulation after notch filtering resample
 		if (resamp==1)
 			numpntsx=scfd_resampleWaves(sc_tempwave, ScanVars.measureFreq, sc_ResampleFreqfadc)
@@ -2379,6 +2389,7 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 			sci_init2DWave(wn,numpntsx, ScanVars.startx, ScanVars.finx, ScanVars.numptsy, ScanVars.starty, ScanVars.finy)
 			endif
 		endif
+		scu_toc()
 
 
 		calc_str = ReplaceString(rwn, calc_string, "sc_tempwave")
