@@ -125,6 +125,39 @@ function displayplot(start, endnum,whichdat,[delta,shiftx, shifty])
 
 end
 
+
+function create_colour_wave()
+	// assumes 'newpath colour_data' points to path holding colour waves. 
+	// colour palletes downloaded from here: https://www.kennethmoreland.com/color-advice
+	// can then be used i.e. ModifyImage wave0 ctab= {*,*,colour_fast,0}
+	
+	string colour_names
+	colour_names = "bent_CW;black_body;ext_kindlmann;fast;inferno;kindlmann;plasma;smooth_CW;viridis"
+	
+	int number_of_colour = itemsinList(colour_names, ";")
+	string csv_name, wave_name, colour_name
+	
+	int i
+	for (i = 0; i < number_of_colour; i++)
+		
+		colour_name = stringFromList(i, colour_names, ";")
+		
+		csv_name = colour_name + ".csv"
+		wave_name = "colour_" + colour_name
+		
+		
+		loadwave /Q/J/K=1/M/N/P=colour_data csv_name
+		wave wave0
+		duplicate /o/RMD=[1,][1,3] wave0 $wave_name
+		
+		wave colour_wave = $wave_name
+		colour_wave *= 65535
+	endfor
+
+end
+
+
+
 function makecolorful([rev, nlines])
 	variable rev, nlines
 	variable num=0, index=0,colorindex

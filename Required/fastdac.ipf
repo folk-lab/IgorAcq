@@ -144,7 +144,45 @@ function init_dac_and_adc(fastdac_string)
 	endfor
 	
 	
+	//*** TODO create colour table and sel wave to couo,our fore aand background of scancontreoller (listbox)
+	///////////////////////////////////////
+	///// create colour and sel table /////
+	///////////////////////////////////////
+	//ListBox fdaclist colorWave=colour_bent_cw, selWave= sc_sel_table;SetDimLabel 2,1,backColors,sc_sel_table	// TO COLOUR THE SCANCONTROLLER ADD THIS APPROPRIATELY
+	wave colour_val = colour_fast
+	
+	duplicate /o colour_val sc_colour_table
+	make /o /n=(num_fastdac * num_dac, 5, 2) sc_sel_table
+	wave sc_colour_table
+	wave sc_sel_table
+	
+	variable colour_index, num_colours
+	num_colours = dimsize(colour_val, 0)
+	insertpoints /M=1 /V=(65535/2) inf, 1, sc_colour_table
 
+	variable start_index = round(num_colours*0.2)
+	variable end_index = round(num_colours*0.8)
+	num_colours = end_index - start_index
+	
+	fastdac_count = 0
+	
+	for  (i=0; i < num_fastdac * num_dac; i++)
+		
+		fastdac_count = floor(i/8)
+		colour_index = fastdac_count * (num_colours/(num_fastdac-1)) + start_index
+		colour_index += 10
+	
+		// sel_table
+		sc_sel_table[][][0] = 0
+		
+		sc_sel_table[i][0][1] = colour_index
+		sc_sel_table[i][1][1] = colour_index
+		sc_sel_table[i][2][1] = colour_index
+		sc_sel_table[i][3][1] = colour_index
+		sc_sel_table[i][4][1] = colour_index
+		
+	endfor
+	
 end
 
 
