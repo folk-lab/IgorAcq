@@ -149,11 +149,22 @@ end
 
 
 
-function initFastDAC()
+function initFastDAC([fastdac_order])
 	// usage: init_dac_and_adc("1;2;4;6")
 	//Edit/K=0 root:adc_table;Edit/K=0 root:dac_table
+	// default is to initialise the FastDacs in ascending order. But can specify the order with the parameter fastdac_order
+	// i.e. fastdac_order = "12;3;6;1;17"
+	string fastdac_order
+	fastdac_order = selectString(paramIsDefault(fastdac_order), fastdac_order, "")
+	
 
-	string fastdac_labels = get_fastdac_labels()
+	string fastdac_labels
+	if (paramIsDefault(fastdac_order) == 0)
+		fastdac_labels = get_fastdac_labels(sort_fastdacs = 0, fastdac_order = fastdac_order)	// default is to return sorted fastdac channels
+	else
+		fastdac_labels = get_fastdac_labels(sort_fastdacs = 1)	// default is to return sorted fastdac channels
+	endif
+	
 	init_dac_and_adc(fastdac_labels)
 	wave/t adc_table, dac_table
 
@@ -988,9 +999,16 @@ end
 
 
 
-function /t get_fastdac_labels()
+function /t get_fastdac_labels([sort_fastdacs, fastdac_order])
 	// assumes openFastDAC(portnum,[verbose]) has already been run so connections are open
+	// default is to sort the fastdac_labels in ascending order
+	// if sort_fastdacs == 0. Then fastdac_labels is returned instead.
+	variable sort_fastdacs
+	string fastdac_order
 	
+	sort_fastdacs = paramisdefault(sort_fastdacs) ? 1 : sort_fastdacs  // default is to sort the fastdac labels
+	fastdac_order = selectString(paramIsDefault(fastdac_order), fastdac_order, "")
+
 	string response = ""
 	response = get_proxy_info()
 	
@@ -1008,9 +1026,15 @@ function /t get_fastdac_labels()
 		fastdac_labels +=  fastdac_label + ";"
 	endfor
 	
-	return fastdac_labels
-end
+	
+	if (sort_fastdacs == 1)
+		fastdac_labels = sort_text_wave(fastdac_labels, numeric_values = 1)
+		return fastdac_labels
+	else
+		return fastdac_order
+	endif
 
+end
 
 
 function get_number_of_fastdacs()

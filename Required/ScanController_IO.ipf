@@ -1397,14 +1397,68 @@ function /S getStrArrayShape(array)
 
 end
 
+
 function stringlist2wave(string text_string, string dest_wave)
-variable numItems = ItemsInList(text_string, ";")  /// needs to be modified to allow for , and ;
-Make/o/T/N=(numItems) text_wave
-variable i
-for(i = 0; i < numItems; i += 1)
-    text_wave[i] = StringFromList(i, text_string, ";")
-endfor
-Duplicate/o text_wave $dest_wave
+	variable numItems = ItemsInList(text_string, ";")  /// needs to be modified to allow for , and ;
+	Make/o/T/N=(numItems) text_wave
+	variable i
+	for(i = 0; i < numItems; i += 1)
+	    text_wave[i] = StringFromList(i, text_string, ";")
+	endfor
+	Duplicate/o text_wave $dest_wave
+end
+
+
+function /t sort_text_wave(input_string, [numeric_values])
+	// Take a string as an input and applies the 'sort' function in IGOR returning a string.
+	// If vales are numbers set numeric_values = 1 to handle them properly
+	// USE ::
+	// print sort_text_wave("12;3;6;1;17", numeric_values=1)
+	string input_string
+	variable numeric_values
+	numeric_values = paramisdefault(numeric_values) ? 1 : numeric_values  // default is to assume values are numbers (will append 0 if a single value)
+
+
+	variable num_strings = itemsInList(input_string, ";")
+	string textval
+	
+	
+	stringlist2wave(input_string, "string_wave")
+	wave /t string_wave
+	
+	
+	// format the string wave so that single channel numbers will have "0" appended before this keeps the intented ordering when using `sort`
+	int i
+	for (i = 0; i < num_strings; i++)
+		textval = string_wave[i]
+		
+		if ((strlen(textval) == 1) && (numeric_values == 1))
+			string_wave[i] = "0" + string_wave[i]
+		endif
+
+	endfor
+
+
+	// sort the string wave
+	Sort string_wave, string_wave
+
+
+	// build a string from the sorted wave and remove the extra zero
+	string return_string = ""	
+	for (i = 0; i < num_strings; i++)
+		textval = string_wave[i]
+		
+		if ((cmpstr(textval[0,1], "0") == 1) && (numeric_values == 1))
+			return_string += num2str(str2num(textval)) + ";" // funny trick to get rid of leading 0
+		else
+			return_string += textval
+		endif
+
+	endfor
+	
+	return_string = removeTrailingDelimiter(return_string)
+	
+	return return_string
 end
 
 
