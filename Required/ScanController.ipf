@@ -525,6 +525,8 @@ function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, ra
 	string interlaced_channels, interlaced_setpoints
     string comments
     nvar filenum
+    
+    jsonxop_release/a
 
     
 	// Handle Optional Strings
@@ -630,6 +632,9 @@ function get_dacListIDs(S)
 
 	struct ScanVars &S
 	string  new_channels
+	
+	//*** I don't think this function is still necessary now that channels are only referred to in XX.xx format and we don't care about chan_no anymore.
+//	This is now the same as S.channelsx. But there is an issue with the dacListIDs_y so that needs to be figured out
 
 	// working out DACLIstIDs for x channels
 	new_channels=scu_getChannelNumbers(S.channelsx) /// this returns a string with x DAC channels
@@ -1929,11 +1934,9 @@ function scfd_resampleWaves(w, measureFreq, targetFreq)
 	Wave w
 	variable measureFreq, targetFreq
 	variable numpntsx
-	duplicate/o w w_before
-
 
 	RatioFromNumber (targetFreq / measureFreq)
-//	print "Num and den are",v_numerator, v_denominator
+	//	print "Num and den are",v_numerator, v_denominator
 	if (V_numerator < V_denominator)
 		string cmd
 		//print "Resampling would increase number of datapoints, not decrease, therefore resampling is skipped"
@@ -1942,7 +1945,7 @@ function scfd_resampleWaves(w, measureFreq, targetFreq)
 
 	endif
 	// TODO: Need to test N more (simple testing suggests we may need >200 in some cases!) [Vahid: I'm not sure why only N=201 is a good choice.]
-	// TODO: Need to decide what to do with end effect. Possibly /E=2 (set edges to 0) and then turn those zeros to NaNs? 
+	// TODO: Need to decide what to do with end effect. Possibly /E=2 (set edges to 0) and then turn those zeros to NaNs?
 	// TODO: Or maybe /E=1 is safest, this was tested with random noise around 0 and around a finite value
 	numpntsx=dimsize(w,0)
 	return numpntsx
@@ -2211,22 +2214,22 @@ Function scfd_SendCommandAndRead(S,AWG_list,rowNum, [ skip_raw2calc])
 	S.lastread = -1  // Reset the last read index
 
 	//need to reinitialize the raw ADC waves otherwise loadfiles will be confused. If this is not a desired way to handle this,
-	//we will need to add a counter to loadfiles to keep track on how many pnts have already been read
-	scfd_resetraw_waves()
-	// Loop to read data until the expected number of points is reached
-	Do
-		////                sleep/s 0.1// Short pause to allow for data acquisition
-
-		numpnts_read = loadfiles(S,numpnts_read)  // Load data from files
-		scfd_raw2CalcQuickDistribute(0)  // 0 or 1 for if data should be displayed decimated or not during the scan
-		scfd_checkSweepstate()
-		doupdate
-
-	While (numpnts_read<S.numptsx)  // Continue if not all points are read
-
-	// Update FastDAC and ADC GUI elements
-	scfw_update_all_fdac(option="updatefdac")
-	scfw_update_fadc("")  // Update FADC display with no additional specification
+//	//we will need to add a counter to loadfiles to keep track on how many pnts have already been read
+//	scfd_resetraw_waves()
+//	// Loop to read data until the expected number of points is reached
+//	Do
+//		               sleep/s 0.41// Short pause to allow for data acquisition
+//
+//		numpnts_read = loadfiles(S,numpnts_read)  // Load data from files
+//		scfd_raw2CalcQuickDistribute(0)  // 0 or 1 for if data should be displayed decimated or not during the scan
+//		scfd_checkSweepstate()
+//		doupdate
+//
+//	While (numpnts_read<S.numptsx)  // Continue if not all points are read
+//
+//	// Update FastDAC and ADC GUI elements
+//	scfw_update_all_fdac(option="updatefdac")
+//	scfw_update_fadc("")  // Update FADC display with no additional specification
 
 
 
@@ -3384,8 +3387,64 @@ function RecordValues(S, i, j, [fillnan])
 	endif
 end
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////AWG functions ///////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+function scw_setupsquarewave()
+
+	wave /t LIvalstr0, awgvalstr, awgvalstr0, awgvalstr1
+	svar sc_freqAW0, sc_freqAW1, sc_fdackeys
+	nvar sc_wnumawg
+	
+	int i, j=0, num_amps = dimsize(awgvalstr,0) - 1
+	make /free /n=(num_amps) amps = 0
+	make /free /n=(num_amps) times = 0
+	 
+	for(i=1; i <= num_amps; i++)
+		
+		//checks for empty str or invalid inputs in scancontroller window
+		variable amp      = str2num(awgvalstr[i][0])
+		variable amp_time = str2num(awgvalstr[i][1])
+		
+		if(numtype(amp) == 0 && numtype(amp_time) == 0)	
+		   if(amp_time != 0)
+		   		amps[j]  = amp
+         		times[j] = amp_time
+         		j++
+         	endif
+		endif		
+	
+	endfor
+	
+	//removing zero valued rows and changing times to seconds
+	deletepoints j, num_amps-j, amps
+	deletepoints j, num_amps-j, times
+	
+	times /= 1000
+	
+	if (sc_wnumawg == 0)
+		awgvalstr0[1,j][0] = num2str(amps[p-1])
+		awgvalstr0[1,j][1] = num2str(times[p-1] * 1000)
+		awgvalstr0[j+1,INF][] = ""
+		LIvalstr0[1,2][] = ""
+		sc_freqAW0 = num2str(1/sum(times))
+	
+	elseif(sc_wnumawg == 1)
+		awgvalstr1[1,j][0] = num2str(amps[p-1])
+		awgvalstr1[1,j][1] = num2str(times[p-1] * 1000)
+		awgvalstr0[j+1,INF][] = ""
+		sc_freqAW1 = num2str(1/sum(times))
+	endif
+end
+
+
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////// ASYNC handling ///////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // Note: Slow ScanContoller ONLY
 
 //function sc_ManageThreads(innerIndex, outerIndex, readvstime, is2d, start_time)

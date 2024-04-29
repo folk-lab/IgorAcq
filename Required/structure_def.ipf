@@ -110,6 +110,8 @@
 	string adcLists      	// adclist by id -> attempting to use stringbykey
 	string IDstartxs, IDfinxs  // If sweeping from different start/end points for each channel or instrument / This one is a stringkey with fdIDs
 	string dacListIDs_y     // Ids for channely (for now, not sure ill change this yet)
+	variable use_AWG 		// Is AWG going to be on during the scan; redundant but then AWG will not have to be passed if not needed
+
 
 	endstructure
 
@@ -187,6 +189,8 @@ Function scv_getLastScanVars(S)
 		S.filenum = sc_lastScanVarsVariables[30]
 		S.sync = sc_lastScanVarsVariables[31]
 		S.maxADCs = sc_lastScanVarsVariables[32]
+		S.use_AWG= 	sc_lastScanVarsVariables[33]	// Is AWG going to be on during the scan
+
 
 		// Ensure this list matches the actual global storage structure and contents
 	Else
@@ -205,7 +209,7 @@ Function scv_setLastScanVars(S)
 
 	// Ensure global waves for storing string and numeric values exist
 	Make/o/T/N=(21) sc_lastScanVarsStrings // Adjust size for the number of string fields
-	Make/o/N=(33) sc_lastScanVarsVariables // Adjust size for the number of numeric fields
+	Make/o/N=(34) sc_lastScanVarsVariables // Adjust size for the number of numeric fields
 
 	// Storing string fields to sc_lastScanVarsStrings wave
 	sc_lastScanVarsStrings[0] = S.channelsx  //FD xchannel numbers
@@ -264,6 +268,8 @@ Function scv_setLastScanVars(S)
 	sc_lastScanVarsVariables[30] = S.filenum
 	sc_lastScanVarsVariables[31] = S.sync
 	sc_lastScanVarsVariables[32] = S.maxADCs
+	sc_lastScanVarsVariables[33] = S.use_AWG
+
 End
 
 
