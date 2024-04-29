@@ -860,6 +860,7 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
 	S.raw_wave_names=scf_getRecordedFADCinfo("raw_names")
 	svar fd
 	S.instrIDs=fd
+	S.use_awg=use_awg
 
    
 
@@ -1018,6 +1019,7 @@ function [variable fd_num, variable fd_ch] get_fastdac_num_ch_variable(variable 
 	// USE :: 
 	// variable fd_num, fd_ch
 	// [fd_num, fd_ch] = get_fastdac_num_ch_variable(6.1)
+	// but it can not be run from the command line, only inside functions
 	fd_num = floor(fd_num_ch)
 	fd_ch = (fd_num_ch - fd_num) * 10
 
@@ -1030,6 +1032,8 @@ function [variable fd_num, variable fd_ch] get_fastdac_num_ch_string(string fd_n
 	// USE :: 
 	// variable fd_num, fd_ch
 	// [fd_num, fd_ch] = get_fastdac_num_ch_variable("6.1")
+	// but it can not be run from the command line, only inside functions
+
 	fd_num = str2num(stringFromList(0, fd_num_ch, "."))
 	fd_ch = str2num(stringFromList(1, fd_num_ch, "."))
 
@@ -1140,29 +1144,28 @@ function set_one_FDACChannel(int channel, variable setpoint, variable ramprate)
 	payload = "{\"fqpn\": \"" + Dac_channel(channel) + "\", \"ramp_rate_mv_per_s\": " + num2str(ramprate) + ", \"target\": {\"unit\": \"mV\", \"value\": " + num2str(setpoint) + "}}"
 	String headers = "accept: application/json\nContent-Type: application/json"
 	String response = postHTTP(fd, cmd, payload, headers)
-	//print headers
-	//print response
 	
 end
 
 
 function sample_ADC(string adclist, variable nr_samples)
 	svar fd
-	variable chunksize=2500
+	variable chunksize=5000
+	variable level1
 	String cmd = "start-samples-acquisition"
-	String payload=""
-	payload+= "{\"adc_list\": ["
-	payload+=adclist
-	payload+=  "], "
-    payload+= "\"chunk_max_samples\": \"" + num2str(chunksize) + "\", "
-    payload+= "\"adc_sampling_time_us\": \"" + num2str(82) + "\", "
-    payload+= "\"chunk_file_name_template\": \"temp_{{.ChunkIndex}}.dat\", "
-   	payload+=  "\"nr_samples\": \"" + num2istr(nr_samples) + "\"}"
+	wave adc_list
+	
+	stringlist2wave(adclist,"adc_list")
+	JSONXOP_New; level1=V_value
+	JSONXOP_AddValue/I=(82) level1, "/adc_sampling_time_us"
+	JSONXOP_AddValue/T=(num2str(chunksize)) level1, "/chunk_max_samples"
+	JSONXOP_AddValue/T="temp_{{.ChunkIndex}}.dat" level1, "/chunk_file_name_template"
+	JSONXOP_AddValue/wave=adc_list level1, "/adc_list"
+	JSONXOP_AddValue/I=(nr_samples) level1, "/nr_samples"
+	jsonxop_dump/ind=2 level1 ///--->>> S_value
 
-//print payload
 	String headers = "accept: application/json\nContent-Type: application/json"
-	String response = postHTTP(fd, cmd, payload, headers)
-	//print response
+	String response = postHTTP(fd, cmd, S_value, headers)
 end
 
 
@@ -1174,14 +1177,11 @@ Function linear_ramp(S)
 	SVar fd
 	variable level1, level2, level3
 	variable i
-	wave adc_list
-	scu_tic()
-	print S.adclistids
 	stringlist2wave(S.adcListIDs,"adc_list")
-	jsonxop_release/a
+		wave adc_list
+
 	JSONXOP_New; level1=V_value
 	JSONXOP_New; level2=V_value
-
 	JSONXOP_AddValue/I=(82) level1, "/adc_sampling_time_us"
 	JSONXOP_AddValue/T=(num2str(chunksize)) level1, "/chunk_max_samples"
 	JSONXOP_AddValue/T="temp_{{.ChunkIndex}}.dat" level1, "/chunk_file_name_template"
@@ -1208,50 +1208,134 @@ Function linear_ramp(S)
 	JSONXOP_AddValue/JOIN=(level2) level1, "/dac_range_map"
 	jsonxop_dump/ind=2 level1
 	//print "Full textual representation:\r", S_value
-	scu_toc()
 	string cmd="start-linear-ramps"
 	String headers = "accept: application/json\nContent-Type: application/json"
 	String response = postHTTP(fd, cmd, S_value, headers)
 
 End
 
+Function awg_ramp(S,AWG)
+	Struct ScanVars &S
+	Struct AWGVars &AWG
+
+	String adcList
+	Variable nr_samples = S.numptsx
+	variable chunksize=5000
+	SVar fd
+	variable level1, level2, level3,level4,level5
+	variable i,j
+	wave adc_list
+	jsonxop_release/a
+AWG.numCycles=1
+
+	stringlist2wave(S.adcListIDs,"adc_list")
+	JSONXOP_New; level1=V_value
+	JSONXOP_New; level2=V_value
 
 
-Function/S CreateAWGJsonString(awgID, linearRampSteps, patternsPerLinearRampStep, linramp_chan, maxValues, minValues, output_dacs, adcSamples, awg_value)
-    String awgID
-    Variable linearRampSteps, patternsPerLinearRampStep
-    String linramp_chan, maxValues, minValues,output_dacs
-    string adcSamples, awg_value
-    Variable i, j
-    string  dacID, maxValue, minValue
-    
-    String jsonStr = "\"" + awgID + "\": {"
-    jsonStr += "\"linear_ramp_steps\": " + num2str(linearRampSteps) + ","
-    jsonStr += "\"linear_ramps\": {"
-    
-    // Split the DACs and their respective max and min values
-    // these are the channel numbers on the AWG FD box
-    for(i = 0; i < ItemsInList(linramp_chan,","); i += 1)
-         dacID = StringFromList(i, linramp_chan,",")
-         maxValue = StringFromList(i, maxValues,",")
-         minValue = StringFromList(i, minValues,",")
-        jsonStr += "\"" + dacID + "\": {"
-        jsonStr += "\"max\": {\"unit\": \"mV\", \"value\": " + maxValue + "},"
-        jsonStr += "\"min\": {\"unit\": \"mV\", \"value\": " + minValue + "}},"
-    endfor
-    jsonStr = RemoveEnding(jsonStr, ",")
+	JSONXOP_AddValue/I=(82) level1, "/adc_sampling_time_us"
+	JSONXOP_AddValue/wave=adc_list level1, "/adcs_to_acquire"
+	JSONXOP_AddValue/T=(num2str(chunksize)) level1, "/chunk_max_samples"
+	JSONXOP_AddValue/T="temp_{{.ChunkIndex}}.dat" level1, "/chunk_file_name_template"
 
-    jsonStr += "},"
-    jsonStr += "\"patterns_per_linear_ramp_step\": " + num2str(patternsPerLinearRampStep) + ","
-    jsonStr += "\"wave_patterns\": ["
+	string dacChannel, minvalue, maxvalue
+	get_boxnum_dacnum(S.dacListIDS)
+	wave boxnum,dacnum,unique_boxnum
 
-        jsonStr += "{\"output_dacs\": [" + output_dacs + "],"
-        jsonStr += "\"dac_set_points\": [{"
-        jsonStr += "\"adc_samples\": " + adcSamples + ","
-        jsonStr += "\"voltage\": {\"unit\": \"mV\", \"value\": " + awg_value + "}}]}],"
-    
-    return jsonStr
+	j = 0
+	for (i = 0; i < dimsize(unique_boxnum, 0); i += 1)
+		JSONXOP_New; level3=V_value
+		JSONXOP_New; level4=V_value
+
+
+		do
+			if (boxnum[j] == unique_boxnum[i])
+
+				minValue = StringFromList(j, S.startxs, ",")
+				maxValue = StringFromList(j, S.finxs, ",")
+				level5=linear_ramps_json(maxValue, minValue) // Assuming this function correctly handles JSON object creation
+				JSONXOP_AddValue/JOIN=(level5) level4, num2str(dacnum[j])
+				jsonxop_release level5
+				jsonxop_dump/ind=2 level4
+
+				j += 1
+			elseif (boxnum[j] != unique_boxnum[i])
+				break
+			endif
+			
+		while (j < dimsize(boxnum, 0))
+		
+	JSONXOP_AddValue/JOIN=(level4) level3, "linear_ramps"
+	jsonxop_dump/ind=2 level3
+
+	level5=wave_pattern()
+	JSONXOP_AddValue/JOIN=(level5) level3, "wave_patterns"
+
+	JSONXOP_AddValue/I=(Awg.numCycles) level3, "/patterns_per_linear_ramp_step"
+	JSONXOP_AddValue/I=(S.numptsx) level3, "/linear_ramp_steps"
+
+	JSONXOP_AddValue/JOIN=(level3) level2, num2str(unique_boxnum[i])
+
+	jsonxop_dump/ind=2 level3
+	jsonxop_release level3
+	endfor
+
+	JSONXOP_AddValue/JOIN=(level2) level1, "/awgs"
+	jsonxop_dump/ind=2 level1
+	print "Full textual representation:\r", S_value
+	
+		string cmd="start-awg"
+		String headers = "accept: application/json\nContent-Type: application/json"
+		command_save(S_value)
+		String response = postHTTP(fd, cmd, S_value, headers)
 End
+
+function wave_pattern()
+variable jsonId
+wave setpoint, samples, daclist
+variable N=dimsize(setpoint,0)
+
+    JSONXOP_New
+    jsonId = V_value
+     JSONXOP_AddValue/wave=daclist jsonid, "output_dacs"
+
+    JSONXOP_AddTree/T=1 jsonId, "/dac_set_points"
+    JSONXOP_AddValue/OBJ=(N) jsonId, "/dac_set_points"
+
+variable i=0
+for (i=0;i<N;i=i+1)
+    JSONXOP_AddTree/T=0 jsonId, "/dac_set_points/"+num2str(i)+"/voltage"
+    JSONXOP_AddTree/T=0 jsonId, "/dac_set_points/"+num2str(i)+"/voltage"
+
+    JSONXOP_AddValue/t="mV" jsonId, "/dac_set_points/"+num2str(i)+"/voltage/unit"
+    JSONXOP_AddValue/v=(setpoint[i]) jsonId, "/dac_set_points/"+num2str(i)+"/voltage/value"
+    JSONXOP_AddValue/v=(samples[i]) jsonId, "/dac_set_points/"+num2str(i)+"/adc_samples"
+    endfor
+
+//    JSONXOP_Dump/IND=2 jsonId
+//    print "Full textual representation:\r", S_value
+//    JSONXOP_Release jsonId
+return jsonId
+End
+
+
+
+function linear_ramps_json(string maxvalue,string minvalue)
+
+	variable level5
+	JSONXOP_New; level5=V_value
+	JSONXOP_AddTree/T=0 level5, "max"
+	JSONXOP_AddTree/T=0 level5, "min"
+	JSONXOP_Addvalue/V=(str2num(maxvalue)) level5, "/max/value"
+	JSONXOP_Addvalue/V=(str2num(minvalue)) level5, "/min/value"
+	JSONXOP_Addvalue/T="mV" level5, "max/unit"
+	JSONXOP_Addvalue/T="mV" level5, "min/unit"
+	return level5
+
+end
+
+
+
 
 
 //Function awg_ramp()
@@ -1301,24 +1385,6 @@ function fd_stopFDACsweep()
 	print "stopped FD Ramp"
 
 end
-
-
-
-//function get_one_FADCChannel(int channel) // Units: mV
-//variable speed=gnoise(1)
-//return speed
-//end
-
-//function get_one_FDACChannel(int channel) // Units: mV
-//variable speed=channel+gnoise(1)
-//return speed
-//end
-
-//function set_one_FDACChannel(int channel, variable setpoint, variable ramprate)
-//variable speed=gnoise(1)
-//return speed
-//end
-
 
 
 ///////////////////////

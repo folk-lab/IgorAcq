@@ -919,6 +919,30 @@ function fileappend(string toappend)
     
 end
 
+function command_save(string cmd)
+	String filename = "check.json"
+	DeleteFile/P=data/Z=1 filename // Delete the file after processing
+
+	Variable fileID
+
+	// Open the file "filename" at path "data" in append mode.
+	// Here logfile is the actual path name.  If you want to make it a string variable you have to say $logfile
+	Open /A/Z /P=data fileID as filename
+	variable err = V_flag
+	
+	// Confirm that opening went OK
+	if (err != 0)
+		DoAlert 0, "Error in DemoOpen"
+		return err
+	endif
+	
+   // Append the input string "toappend" to the file
+   	fprintf fileID, "%s\n", cmd
+    
+    Close fileID
+    
+end
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////  System Functions /////////////////////////////////////////////////////////////////////////////
