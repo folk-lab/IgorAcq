@@ -13,12 +13,12 @@
 getbddacvalue --> scu_getchannelnumbers;
 scu_getchannelnumbers --> scu_assertseparatortype;
 scu_getchannelnumbers --> removetrailingwhitespace;
-subgraph babydac.ipf
-getbddacvalue
-end
-subgraph ScanController.ipf
+subgraph ScanController_old.ipf
 scu_assertseparatortype
 scu_getchannelnumbers
+end
+subgraph babydac.ipf
+getbddacvalue
 end
 subgraph ScanController_IO.ipf
 removetrailingwhitespace

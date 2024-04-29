@@ -11,13 +11,11 @@
     <pre class="mermaid">
     graph TB;
 getbdstatus --> addjsonkeyval;
-addjsonkeyval --> escapequotes;
 subgraph babydac.ipf
 getbdstatus
 end
 subgraph ScanController_IO.ipf
 addjsonkeyval
-escapequotes
 end
     </pre>
     <script type="module">

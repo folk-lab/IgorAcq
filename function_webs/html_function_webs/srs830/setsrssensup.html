@@ -21,6 +21,10 @@ visasetreadtermenable --> visasetreadterm;
 readinstr --> visasetserialendin;
 readinstr --> visaerrormsg;
 setsrssensup --> writeinstr;
+subgraph srs830.ipf
+getsrssensitivity
+setsrssensup
+end
 subgraph ScanController_INSTR.ipf
 visaerrormsg
 writeinstr
@@ -29,10 +33,6 @@ queryinstr
 visasetreadterm
 visasetreadtermenable
 visasetserialendin
-end
-subgraph srs830.ipf
-getsrssensitivity
-setsrssensup
 end
     </pre>
     <script type="module">

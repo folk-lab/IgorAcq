@@ -1,0 +1,261 @@
+    <html>
+    <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/zoomooz/1.4.1/zoomooz.min.js"></script>
+    <style>
+        .mermaid {
+            height: 600px; /* Adjust the height as needed */
+            margin-bottom: 20px; /* Adjust the bottom margin as needed */
+        }
+    </style>
+    <pre class="mermaid">
+    graph TB;
+setfadcspeed --> scf_getnumfds;
+setfadcspeed --> getresourceaddress;
+setfadcspeed --> scf_getfdvisaaddress;
+scf_getfdvisaaddress --> scf_getnumfds;
+setfadcspeed --> scf_getfdinfofromdevicenum;
+scf_getfdinfofromdevicenum --> scf_getnumfds;
+setfadcspeed --> queryinstr;
+queryinstr --> writeinstr;
+writeinstr --> visaerrormsg;
+queryinstr --> readinstr;
+readinstr --> visasetreadterm;
+readinstr --> visasetreadtermenable;
+visasetreadtermenable --> visasetreadterm;
+readinstr --> visasetserialendin;
+readinstr --> visaerrormsg;
+setfadcspeed --> sc_striptermination;
+setfadcspeed --> scf_checkfdresponse;
+setfadcspeed --> roundnum;
+setfadcspeed --> fd_loadfadccalibration;
+fd_loadfadccalibration --> getresourceaddress;
+fd_loadfadccalibration --> readtxtfile;
+fd_loadfadccalibration --> getjsonvalue;
+getjsonvalue --> getjsonkeyoffset;
+getjsonvalue --> getjsonindices;
+fd_loadfadccalibration --> fd_updatefadccalibration;
+fd_updatefadccalibration --> queryinstr;
+fd_updatefadccalibration --> sc_striptermination;
+fd_updatefadccalibration --> scf_checkfdresponse;
+setfadcspeed --> calibratefadc;
+calibratefadc --> initfastdac;
+initfastdac --> get_fastdac_labels;
+get_fastdac_labels --> get_proxy_info;
+get_proxy_info --> gethttp;
+gethttp --> fileappend;
+get_fastdac_labels --> getjsonvalue;
+get_fastdac_labels --> sort_text_wave;
+sort_text_wave --> stringlist2wave;
+initfastdac --> init_dac_and_adc;
+initfastdac --> get_number_of_fastdacs;
+get_number_of_fastdacs --> get_fastdac_labels;
+initfastdac --> getfdids;
+initfastdac --> scfw_fdaccheckforoldinit;
+scfw_fdaccheckforoldinit --> scfw_fdacaskuser;
+scfw_fdaccheckforoldinit --> scfw_createcontrolwaves;
+scfw_createcontrolwaves --> openfastdac;
+openfastdac --> openhttpinstr;
+openfastdac --> get_proxy_info;
+openfastdac --> getjsonvalue;
+openfastdac --> get_fastdac_labels;
+scfw_createcontrolwaves --> getfdstatus;
+getfdstatus --> scv_getlastscanvars;
+getfdstatus --> textwavetolist;
+getfdstatus --> addjsonkeyval;
+getfdstatus --> scfw_update_fdac;
+scfw_update_fdac --> scfw_update_all_fdac;
+scfw_update_all_fdac --> rampmultiplefdac;
+rampmultiplefdac --> scu_assertseparatortype;
+rampmultiplefdac --> scu_getchannelnumbers;
+scu_getchannelnumbers --> scu_assertseparatortype;
+scu_getchannelnumbers --> removetrailingwhitespace;
+rampmultiplefdac --> scf_getdacinfo;
+scf_getdacinfo --> scu_getchannelnumbers;
+rampmultiplefdac --> fd_rampoutputfdac;
+fd_rampoutputfdac --> getresourceaddress;
+fd_rampoutputfdac --> scfw_resetfdacwindow;
+fd_rampoutputfdac --> getfdacoutput;
+getfdacoutput --> scf_getchannelstartnum;
+scf_getchannelstartnum --> scf_getnumfds;
+scf_getchannelstartnum --> scf_getfdnumber;
+scf_getfdnumber --> scf_getnumfds;
+scf_getfdnumber --> getresourceaddress;
+scf_getfdnumber --> scf_getfdvisaaddress;
+scf_getchannelstartnum --> scf_getfdinfofromid;
+scf_getfdinfofromid --> scf_getfdnumber;
+scf_getfdinfofromid --> scf_getfdinfofromdevicenum;
+getfdacoutput --> queryinstr;
+getfdacoutput --> sc_striptermination;
+getfdacoutput --> scf_checkfdresponse;
+fd_rampoutputfdac --> queryinstr;
+fd_rampoutputfdac --> queryinstrprogress;
+queryinstrprogress --> writeinstr;
+queryinstrprogress --> sc_progressbardelay;
+queryinstrprogress --> readinstr;
+fd_rampoutputfdac --> sc_striptermination;
+fd_rampoutputfdac --> scf_checkfdresponse;
+fd_rampoutputfdac --> scfw_updatefdacvalstr;
+scfw_update_all_fdac --> get_one_fdacchannel;
+get_one_fdacchannel --> gethttp;
+get_one_fdacchannel --> getjsonvalue;
+scfw_update_all_fdac --> scfw_updatefdacvalstr;
+getfdstatus --> scfw_update_fadc;
+scfw_update_fadc --> get_one_fadcchannel;
+get_one_fadcchannel --> gethttp;
+get_one_fadcchannel --> getjsonvalue;
+initfastdac --> setadc_speed;
+setadc_speed --> set_one_fadcspeed;
+set_one_fadcspeed --> posthttp;
+posthttp --> fileappend;
+posthttp --> getjsonvalue;
+calibratefadc --> getresourceaddress;
+calibratefadc --> roundnum;
+calibratefadc --> getfadcspeed;
+getfadcspeed --> queryinstr;
+getfadcspeed --> sc_striptermination;
+getfadcspeed --> scf_checkfdresponse;
+getfadcspeed --> scf_getfdnumber;
+getfadcspeed --> scf_getfdinfofromid;
+calibratefadc --> ask_user;
+calibratefadc --> queryinstr;
+calibratefadc --> sc_striptermination;
+calibratefadc --> readinstr;
+calibratefadc --> scf_checkfdresponse;
+calibratefadc --> scf_getchannelstartnum;
+calibratefadc --> fd_rampoutputfdac;
+calibratefadc --> fd_savefadccalibration;
+fd_savefadccalibration --> addjsonkeyval;
+fd_savefadccalibration --> writetofile;
+fd_savefadccalibration --> prettyjsonfmt;
+prettyjsonfmt --> getindent;
+setfadcspeed --> fd_setawguninitialized;
+fd_setawguninitialized --> setawg;
+setawg --> fd_getglobalawg;
+fd_getglobalawg --> fd_initglobalawg;
+fd_initglobalawg --> fd_setglobalawg;
+setawg --> fd_setglobalawg;
+fd_setawguninitialized --> fd_getglobalawg;
+fd_setawguninitialized --> fd_setglobalawg;
+setfadcspeed --> setawg;
+subgraph ScanController_old.ipf
+scu_assertseparatortype
+roundnum
+ask_user
+scu_getchannelnumbers
+scv_getlastscanvars
+scf_getdacinfo
+scf_getfdnumber
+scf_getnumfds
+scf_getfdvisaaddress
+scf_getfdinfofromdevicenum
+scf_getfdinfofromid
+scf_getchannelstartnum
+scf_checkfdresponse
+scfw_resetfdacwindow
+scfw_updatefdacvalstr
+initfastdac
+scfw_fdaccheckforoldinit
+scfw_fdacaskuser
+scfw_update_all_fdac
+scfw_update_fdac
+scfw_update_fadc
+scfw_createcontrolwaves
+end
+subgraph ScanController.ipf
+scfw_fdaccheckforoldinit
+scfw_fdacaskuser
+scfw_createcontrolwaves
+scfw_update_fadc
+scfw_update_fdac
+scfw_update_all_fdac
+scfw_updatefdacvalstr
+roundnum
+ask_user
+end
+subgraph fastdac_old.ipf
+getfadcspeed
+getfdacoutput
+getfdstatus
+setfadcspeed
+rampmultiplefdac
+fd_rampoutputfdac
+fd_loadfadccalibration
+calibratefadc
+fd_savefadccalibration
+fd_updatefadccalibration
+fd_setawguninitialized
+fd_initglobalawg
+fd_setglobalawg
+setawg
+fd_getglobalawg
+end
+subgraph formatting_http.ipf
+openhttpinstr
+posthttp
+gethttp
+end
+subgraph fastdac.ipf
+openfastdac
+init_dac_and_adc
+initfastdac
+setadc_speed
+getfdids
+getfdstatus
+get_fastdac_labels
+get_number_of_fastdacs
+set_one_fadcspeed
+get_proxy_info
+get_one_fadcchannel
+get_one_fdacchannel
+end
+subgraph ScanController_IO.ipf
+fileappend
+writetofile
+readtxtfile
+getjsonvalue
+getjsonindices
+getjsonkeyoffset
+stringlist2wave
+sort_text_wave
+textwavetolist
+addjsonkeyval
+getindent
+prettyjsonfmt
+removetrailingwhitespace
+end
+subgraph ScanController_INSTR.ipf
+getresourceaddress
+visaerrormsg
+openhttpinstr
+writeinstr
+readinstr
+queryinstr
+queryinstrprogress
+posthttp
+gethttp
+sc_striptermination
+sc_progressbardelay
+visasetreadterm
+visasetreadtermenable
+visasetserialendin
+end
+    </pre>
+    <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+        startOnLoad: true,
+        flowchart: {
+                useMaxWidth: false, // Disable maximum width for better zooming
+                htmlLabels: true, // Enable HTML-based labels for better styling
+                defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
+            },
+        });
+    $(document).ready(function() {
+            // Apply Zoomooz to the Mermaid diagram container
+            $('.mermaid').zoomTarget();
+        });
+    </script>
+    </body>
+    </html>
+    

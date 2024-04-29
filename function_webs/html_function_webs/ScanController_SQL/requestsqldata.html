@@ -20,12 +20,6 @@ requestsqldata --> sc_fetchsqldata;
 sc_fetchsqldata --> sc_closesqlconnection;
 sc_fetchsqldata --> sc_mapsqltypetowavetype;
 requestsqldata --> sc_closesqlconnection;
-subgraph ScanController_IO.ipf
-readtxtfile
-getjsonvalue
-getjsonindices
-getjsonkeyoffset
-end
 subgraph ScanController_SQL.ipf
 requestsqldata
 sc_opensqlconnection
@@ -33,6 +27,12 @@ sc_fetchsqldata
 sc_closesqlconnection
 sc_readsqlconnectionparameters
 sc_mapsqltypetowavetype
+end
+subgraph ScanController_IO.ipf
+readtxtfile
+getjsonvalue
+getjsonindices
+getjsonkeyoffset
 end
     </pre>
     <script type="module">

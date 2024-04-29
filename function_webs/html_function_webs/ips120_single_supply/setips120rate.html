@@ -22,10 +22,8 @@ readinstr --> visasetreadtermenable;
 visasetreadtermenable --> visasetreadterm;
 readinstr --> visasetserialendin;
 readinstr --> visaerrormsg;
-subgraph ips120_single_supply.ipf
-ips120_lookupvarname
-writeipscheck
-setips120rate
+subgraph ScanController_old.ipf
+roundnum
 end
 subgraph ScanController.ipf
 roundnum
@@ -38,6 +36,11 @@ queryinstr
 visasetreadterm
 visasetreadtermenable
 visasetserialendin
+end
+subgraph ips120_single_supply.ipf
+ips120_lookupvarname
+writeipscheck
+setips120rate
 end
     </pre>
     <script type="module">

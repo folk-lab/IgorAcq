@@ -21,12 +21,15 @@ visasetreadtermenable --> visasetreadterm;
 readinstr --> visasetserialendin;
 readinstr --> visaerrormsg;
 getls625rate --> roundnum;
-subgraph ls625_single_supply.ipf
-ls625_lookupvarname
-getls625rate
+subgraph ScanController_old.ipf
+roundnum
 end
 subgraph ScanController.ipf
 roundnum
+end
+subgraph ls625_single_supply.ipf
+ls625_lookupvarname
+getls625rate
 end
 subgraph ScanController_INSTR.ipf
 visaerrormsg

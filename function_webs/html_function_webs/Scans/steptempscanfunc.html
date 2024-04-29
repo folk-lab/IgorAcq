@@ -21,14 +21,8 @@ steptempscanfunc --> setls625fieldwait;
 setls625fieldwait --> setls625field;
 setls625fieldwait --> asleep;
 asleep --> sc_sleep;
-sc_sleep --> scs_checksweepstate;
-scs_checksweepstate --> endscan;
-endscan --> scfd_checkrawsave;
-scfd_checkrawsave --> scf_getrecordedfadcinfo;
-endscan --> set_indep;
-set_indep --> clearfdacbuffer;
-clearfdacbuffer --> writeinstr;
-set_indep --> queryinstr;
+setls625fieldwait --> getls625rampstatus;
+getls625rampstatus --> queryinstr;
 queryinstr --> writeinstr;
 queryinstr --> readinstr;
 readinstr --> visasetreadterm;
@@ -36,66 +30,6 @@ readinstr --> visasetreadtermenable;
 visasetreadtermenable --> visasetreadterm;
 readinstr --> visasetserialendin;
 readinstr --> visaerrormsg;
-endscan --> scv_setlastscanvars;
-endscan --> scv_getlastscanvars;
-endscan --> savetohdf;
-savetohdf --> openhdffile;
-openhdffile --> endscan;
-savetohdf --> addmetafiles;
-addmetafiles --> scw_createconfig;
-scw_createconfig --> addjsonkeyval;
-addjsonkeyval --> escapequotes;
-scw_createconfig --> textwave2strarray;
-textwave2strarray --> escapequotes;
-scw_createconfig --> wave2boolarray;
-wave2boolarray --> num2bool;
-scw_createconfig --> num2bool;
-addmetafiles --> sc_createsweeplogs;
-sc_createsweeplogs --> addjsonkeyval;
-sc_createsweeplogs --> num2numstr;
-sc_createsweeplogs --> scf_getrecordedfadcinfo;
-sc_createsweeplogs --> sc_instrumentlogs;
-sc_instrumentlogs --> sc_openinstrconnections;
-sc_instrumentlogs --> sc_createsweeplogs;
-sc_instrumentlogs --> addjsonkeyval;
-addmetafiles --> prettyjsonfmt;
-prettyjsonfmt --> getindent;
-addmetafiles --> sce_scanvarstojson;
-sce_scanvarstojson --> addjsonkeyval;
-sce_scanvarstojson --> prettyjsonfmt;
-addmetafiles --> sc_confirm_json;
-addmetafiles --> scw_saveconfig;
-scw_saveconfig --> scu_unixtime;
-scw_saveconfig --> writetofile;
-savetohdf --> savefastdacinfowaves;
-savefastdacinfowaves --> fd_getglobalawg;
-fd_getglobalawg --> fd_initglobalawg;
-fd_initglobalawg --> fd_setglobalawg;
-savefastdacinfowaves --> fd_getawgwave;
-savefastdacinfowaves --> savesinglewavetohdf;
-savetohdf --> savescanwaves;
-savescanwaves --> scfd_postfilternumpts;
-savetohdf --> sci_get1dwavenames;
-sci_get1dwavenames --> scf_getrecordedfadcinfo;
-savetohdf --> sci_get2dwavenames;
-sci_get2dwavenames --> sci_get1dwavenames;
-savetohdf --> scu_assertseparatortype;
-savetohdf --> createwavescopyigor;
-savetohdf --> savewavestohdf;
-savewavestohdf --> savesinglewavetohdf;
-savetohdf --> closehdffile;
-endscan --> saveexp;
-saveexp --> savefrompxp;
-endscan --> sc_checkbackup;
-sc_checkbackup --> getexppath;
-endscan --> sc_copynewfiles;
-sc_copynewfiles --> sc_copysinglefile;
-sc_copysinglefile --> getexppath;
-sc_copysinglefile --> executemaccmd;
-sc_copynewfiles --> getexppath;
-endscan --> sce_scanvarstojson;
-setls625fieldwait --> getls625rampstatus;
-getls625rampstatus --> queryinstr;
 steptempscanfunc --> asleep;
 steptempscanfunc --> getls370temp;
 getls370temp --> bd_channellookup;
@@ -103,11 +37,14 @@ getls370temp --> getls370channellabel;
 getls370channellabel --> bd_channellookup;
 getls370temp --> sendls370;
 sendls370 --> gethttp;
+gethttp --> fileappend;
 sendls370 --> posthttp;
+posthttp --> fileappend;
 posthttp --> getjsonvalue;
 getjsonvalue --> getjsonkeyoffset;
 getjsonvalue --> getjsonindices;
 sendls370 --> puthttp;
+puthttp --> fileappend;
 puthttp --> getjsonvalue;
 sendls370 --> getjsonvalue;
 steptempscanfunc --> setls370exclusivereader;
@@ -137,16 +74,20 @@ setls370heateroff --> sendls370;
 steptempscanfunc --> resetls370exclusivereader;
 resetls370exclusivereader --> setls370exclusivereader;
 resetls370exclusivereader --> setls370loggersschedule;
-subgraph babydac.ipf
-bd_channellookup
+subgraph ScanController_old.ipf
+roundnum
+sc_sleep
+asleep
 end
-subgraph fastdac.ipf
-set_indep
-clearfdacbuffer
-fd_getawgwave
-fd_initglobalawg
-fd_setglobalawg
-fd_getglobalawg
+subgraph ScanController.ipf
+roundnum
+sc_sleep
+asleep
+end
+subgraph formatting_http.ipf
+posthttp
+puthttp
+gethttp
 end
 subgraph ls370_resistancebridge.ipf
 getls370channellabel
@@ -165,6 +106,12 @@ ls370_mode_to_str
 ls370_estimateheaterrange
 sendls370
 end
+subgraph babydac.ipf
+bd_channellookup
+end
+subgraph Scans.ipf
+steptempscanfunc
+end
 subgraph ls625_single_supply.ipf
 ls625_lookupvarname
 getls625rampstatus
@@ -172,26 +119,14 @@ setls625current
 setls625field
 setls625fieldwait
 end
-subgraph ScanController.ipf
-scu_assertseparatortype
-scu_unixtime
-roundnum
-sc_sleep
-asleep
-scv_setlastscanvars
-scv_getlastscanvars
-sci_get1dwavenames
-sci_get2dwavenames
-sc_openinstrconnections
-sc_checkbackup
-scs_checksweepstate
-endscan
-sce_scanvarstojson
-scw_createconfig
-scw_saveconfig
-scf_getrecordedfadcinfo
-scfd_checkrawsave
-scfd_postfilternumpts
+subgraph ScanController_IO.ipf
+fileappend
+readtxtfile
+getjsonxid
+getjsonxid_fromkey
+getjsonvalue
+getjsonindices
+getjsonkeyoffset
 end
 subgraph ScanController_INSTR.ipf
 visaerrormsg
@@ -204,44 +139,6 @@ gethttp
 visasetreadterm
 visasetreadtermenable
 visasetserialendin
-end
-subgraph ScanController_IO.ipf
-openhdffile
-closehdffile
-savewavestohdf
-addmetafiles
-sc_createsweeplogs
-sc_instrumentlogs
-createwavescopyigor
-savescanwaves
-savesinglewavetohdf
-savetohdf
-savefastdacinfowaves
-saveexp
-savefrompxp
-sc_copysinglefile
-sc_copynewfiles
-executemaccmd
-getexppath
-writetofile
-readtxtfile
-getjsonxid
-getjsonxid_fromkey
-sc_confirm_json
-getjsonvalue
-getjsonindices
-getjsonkeyoffset
-num2numstr
-num2bool
-wave2boolarray
-textwave2strarray
-addjsonkeyval
-getindent
-prettyjsonfmt
-escapequotes
-end
-subgraph Scans.ipf
-steptempscanfunc
 end
     </pre>
     <script type="module">

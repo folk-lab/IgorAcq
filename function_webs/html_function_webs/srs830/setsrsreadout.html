@@ -12,12 +12,12 @@
     graph TB;
 setsrsreadout --> writeinstr;
 writeinstr --> visaerrormsg;
+subgraph srs830.ipf
+setsrsreadout
+end
 subgraph ScanController_INSTR.ipf
 visaerrormsg
 writeinstr
-end
-subgraph srs830.ipf
-setsrsreadout
 end
     </pre>
     <script type="module">

@@ -20,28 +20,37 @@ getjsonvalue --> getjsonkeyoffset;
 getjsonvalue --> getjsonindices;
 setls370loggersschedule --> sendls370;
 sendls370 --> gethttp;
+gethttp --> fileappend;
 sendls370 --> posthttp;
+posthttp --> fileappend;
 posthttp --> getjsonvalue;
 sendls370 --> puthttp;
+puthttp --> fileappend;
 puthttp --> getjsonvalue;
 sendls370 --> getjsonvalue;
+subgraph formatting_http.ipf
+posthttp
+puthttp
+gethttp
+end
 subgraph ls370_resistancebridge.ipf
 setls370loggersschedule
 ls370getloggingschedulefromconfig
 sendls370
 end
-subgraph ScanController_INSTR.ipf
-posthttp
-puthttp
-gethttp
-end
 subgraph ScanController_IO.ipf
+fileappend
 readtxtfile
 getjsonxid
 getjsonxid_fromkey
 getjsonvalue
 getjsonindices
 getjsonkeyoffset
+end
+subgraph ScanController_INSTR.ipf
+posthttp
+puthttp
+gethttp
 end
     </pre>
     <script type="module">

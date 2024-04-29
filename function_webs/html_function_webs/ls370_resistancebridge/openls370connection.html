@@ -14,13 +14,16 @@ openls370connection --> openhttpinstr;
 openls370connection --> setls370system;
 setls370system --> bd_channellookup;
 openls370connection --> ls370creategobals;
-subgraph babydac.ipf
-bd_channellookup
+subgraph formatting_http.ipf
+openhttpinstr
 end
 subgraph ls370_resistancebridge.ipf
 openls370connection
 setls370system
 ls370creategobals
+end
+subgraph babydac.ipf
+bd_channellookup
 end
 subgraph ScanController_INSTR.ipf
 openhttpinstr

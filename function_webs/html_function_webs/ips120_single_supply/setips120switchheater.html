@@ -24,12 +24,6 @@ setips120switchheater --> writeipscheck;
 writeipscheck --> queryinstr;
 queryinstr --> writeinstr;
 queryinstr --> readinstr;
-subgraph ips120_single_supply.ipf
-writeipscheck
-getips120status
-getips120heaterstatus
-setips120switchheater
-end
 subgraph ScanController_INSTR.ipf
 visaerrormsg
 writeinstr
@@ -38,6 +32,12 @@ queryinstr
 visasetreadterm
 visasetreadtermenable
 visasetserialendin
+end
+subgraph ips120_single_supply.ipf
+writeipscheck
+getips120status
+getips120heaterstatus
+setips120switchheater
 end
     </pre>
     <script type="module">

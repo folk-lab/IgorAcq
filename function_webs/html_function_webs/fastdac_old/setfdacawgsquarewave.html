@@ -1,0 +1,113 @@
+    <html>
+    <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/zoomooz/1.4.1/zoomooz.min.js"></script>
+    <style>
+        .mermaid {
+            height: 600px; /* Adjust the height as needed */
+            margin-bottom: 20px; /* Adjust the bottom margin as needed */
+        }
+    </style>
+    <pre class="mermaid">
+    graph TB;
+setfdacawgsquarewave --> fd_getglobalawg;
+fd_getglobalawg --> fd_initglobalawg;
+fd_initglobalawg --> fd_setglobalawg;
+setfdacawgsquarewave --> scf_getnumrecordedadcs;
+scf_getnumrecordedadcs --> scf_getrecordedfadcinfo;
+scf_getnumrecordedadcs --> scu_getdevicechannels;
+scu_getdevicechannels --> scf_getfdinfofromid;
+scf_getfdinfofromid --> scf_getfdnumber;
+scf_getfdnumber --> scf_getnumfds;
+scf_getfdnumber --> getresourceaddress;
+scf_getfdnumber --> scf_getfdvisaaddress;
+scf_getfdvisaaddress --> scf_getnumfds;
+scf_getfdinfofromid --> scf_getfdinfofromdevicenum;
+scf_getfdinfofromdevicenum --> scf_getnumfds;
+scu_getdevicechannels --> scf_getchannelstartnum;
+scf_getchannelstartnum --> scf_getnumfds;
+scf_getchannelstartnum --> scf_getfdnumber;
+scf_getchannelstartnum --> scf_getfdinfofromid;
+setfdacawgsquarewave --> scf_getmaxrecordedadcs;
+scf_getmaxrecordedadcs --> scf_getnumrecordedadcs;
+setfdacawgsquarewave --> fd_setglobalawg;
+setfdacawgsquarewave --> getfadcspeed;
+getfadcspeed --> queryinstr;
+queryinstr --> writeinstr;
+writeinstr --> visaerrormsg;
+queryinstr --> readinstr;
+readinstr --> visasetreadterm;
+readinstr --> visasetreadtermenable;
+visasetreadtermenable --> visasetreadterm;
+readinstr --> visasetserialendin;
+readinstr --> visaerrormsg;
+getfadcspeed --> sc_striptermination;
+getfadcspeed --> scf_checkfdresponse;
+getfadcspeed --> scf_getfdnumber;
+getfadcspeed --> scf_getfdinfofromid;
+setfdacawgsquarewave --> fd_clearawgwave;
+fd_clearawgwave --> queryinstr;
+fd_clearawgwave --> sc_striptermination;
+fd_clearawgwave --> scf_checkfdresponse;
+fd_clearawgwave --> fd_getawgwave;
+setfdacawgsquarewave --> fd_addawgwave;
+fd_addawgwave --> queryinstr;
+fd_addawgwave --> sc_striptermination;
+fd_addawgwave --> fd_getawgwave;
+fd_addawgwave --> scf_checkfdresponse;
+subgraph ScanController_old.ipf
+scu_getdevicechannels
+scf_getfdnumber
+scf_getnumfds
+scf_getfdvisaaddress
+scf_getfdinfofromdevicenum
+scf_getfdinfofromid
+scf_getrecordedfadcinfo
+scf_getnumrecordedadcs
+scf_getmaxrecordedadcs
+scf_getchannelstartnum
+scf_checkfdresponse
+end
+subgraph ScanController.ipf
+scf_getrecordedfadcinfo
+end
+subgraph fastdac_old.ipf
+getfadcspeed
+setfdacawgsquarewave
+fd_addawgwave
+fd_getawgwave
+fd_clearawgwave
+fd_initglobalawg
+fd_setglobalawg
+fd_getglobalawg
+end
+subgraph ScanController_INSTR.ipf
+getresourceaddress
+visaerrormsg
+writeinstr
+readinstr
+queryinstr
+sc_striptermination
+visasetreadterm
+visasetreadtermenable
+visasetserialendin
+end
+    </pre>
+    <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+        startOnLoad: true,
+        flowchart: {
+                useMaxWidth: false, // Disable maximum width for better zooming
+                htmlLabels: true, // Enable HTML-based labels for better styling
+                defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
+            },
+        });
+    $(document).ready(function() {
+            // Apply Zoomooz to the Mermaid diagram container
+            $('.mermaid').zoomTarget();
+        });
+    </script>
+    </body>
+    </html>
+    

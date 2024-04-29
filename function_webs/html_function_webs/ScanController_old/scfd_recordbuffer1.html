@@ -1,0 +1,187 @@
+    <html>
+    <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/zoomooz/1.4.1/zoomooz.min.js"></script>
+    <style>
+        .mermaid {
+            height: 600px; /* Adjust the height as needed */
+            margin-bottom: 20px; /* Adjust the bottom margin as needed */
+        }
+    </style>
+    <pre class="mermaid">
+    graph TB;
+scfd_recordbuffer1 --> roundnum;
+scfd_recordbuffer1 --> scfd_getreadchunksize;
+scfd_recordbuffer1 --> scfd_readchunk;
+scfd_readchunk --> readinstr;
+readinstr --> visasetreadterm;
+readinstr --> visasetreadtermenable;
+visasetreadtermenable --> visasetreadterm;
+readinstr --> visasetserialendin;
+readinstr --> visaerrormsg;
+scfd_readchunk --> fd_stopfdacsweep;
+scfd_recordbuffer1 --> scfd_distributedata1;
+scfd_distributedata1 --> scfd_distributedata2;
+scfd_distributedata2 --> scu_assertseparatortype;
+scfd_distributedata2 --> fd_char2num;
+scfd_distributedata2 --> scu_getdevicechannels;
+scu_getdevicechannels --> scf_getfdinfofromid;
+scf_getfdinfofromid --> scf_getfdnumber;
+scf_getfdnumber --> scf_getnumfds;
+scf_getfdnumber --> getresourceaddress;
+scf_getfdnumber --> scf_getfdvisaaddress;
+scf_getfdvisaaddress --> scf_getnumfds;
+scf_getfdinfofromid --> scf_getfdinfofromdevicenum;
+scf_getfdinfofromdevicenum --> scf_getnumfds;
+scu_getdevicechannels --> scf_getchannelstartnum;
+scf_getchannelstartnum --> scf_getnumfds;
+scf_getchannelstartnum --> scf_getfdnumber;
+scf_getchannelstartnum --> scf_getfdinfofromid;
+scfd_recordbuffer1 --> scfd_checksweepstate;
+scfd_checksweepstate --> scs_checksweepstate;
+scs_checksweepstate --> endscan;
+endscan --> scv_setlastscanvars;
+endscan --> scv_getlastscanvars;
+endscan --> savetohdf;
+savetohdf --> openhdffile;
+openhdffile --> endscan;
+savetohdf --> addmetafiles;
+addmetafiles --> scw_createconfig;
+scw_createconfig --> addjsonkeyval;
+addmetafiles --> sc_createsweeplogs;
+sc_createsweeplogs --> addjsonkeyval;
+sc_createsweeplogs --> num2numstr;
+sc_createsweeplogs --> scf_getrecordedfadcinfo;
+addmetafiles --> prettyjsonfmt;
+prettyjsonfmt --> getindent;
+addmetafiles --> sc_instrumentlogs;
+sc_instrumentlogs --> sc_createsweeplogs;
+addmetafiles --> sce_scanvarstojson;
+sce_scanvarstojson --> addjsonkeyval;
+sce_scanvarstojson --> prettyjsonfmt;
+addmetafiles --> sc_confirm_json;
+addmetafiles --> scw_saveconfig;
+scw_saveconfig --> scu_unixtime;
+savetohdf --> savefastdacinfowaves;
+savetohdf --> savescanwaves;
+savescanwaves --> scfd_postfilternumpts;
+savetohdf --> sci_get1dwavenames;
+sci_get1dwavenames --> scf_getrecordedfadcinfo;
+savetohdf --> sci_get2dwavenames;
+sci_get2dwavenames --> sci_get1dwavenames;
+savetohdf --> scu_assertseparatortype;
+savetohdf --> createwavescopyigor;
+savetohdf --> savewavestohdf;
+savewavestohdf --> savesinglewavetohdf;
+savetohdf --> closehdffile;
+endscan --> saveexp;
+saveexp --> savefrompxp;
+endscan --> sce_scanvarstojson;
+scfd_checksweepstate --> fd_stopfdacsweep;
+scfd_recordbuffer1 --> scfd_expectedbytesinbuffer;
+scfd_recordbuffer1 --> scfd_raw2calcquickdistribute;
+scfd_raw2calcquickdistribute --> sci_get1dwavenames;
+scfd_raw2calcquickdistribute --> scf_getrecordedfadcinfo;
+scfd_recordbuffer1 --> scg_updatefrequentgraphs;
+subgraph ScanController_old.ipf
+scu_assertseparatortype
+scu_unixtime
+roundnum
+scu_getdevicechannels
+scv_setlastscanvars
+scv_getlastscanvars
+sci_get1dwavenames
+sci_get2dwavenames
+scg_updatefrequentgraphs
+scs_checksweepstate
+endscan
+sce_scanvarstojson
+scw_createconfig
+scw_saveconfig
+scf_getfdnumber
+scf_getnumfds
+scf_getfdvisaaddress
+scf_getfdinfofromdevicenum
+scf_getfdinfofromid
+scf_getrecordedfadcinfo
+scf_getchannelstartnum
+scfd_postfilternumpts
+scfd_recordbuffer1
+scfd_expectedbytesinbuffer
+scfd_getreadchunksize
+scfd_raw2calcquickdistribute
+scfd_checksweepstate
+scfd_readchunk
+scfd_distributedata1
+scfd_distributedata2
+end
+subgraph ScanController.ipf
+scu_unixtime
+roundnum
+scf_getrecordedfadcinfo
+sci_get1dwavenames
+sci_get2dwavenames
+scg_updatefrequentgraphs
+scs_checksweepstate
+scfd_postfilternumpts
+scfd_raw2calcquickdistribute
+scfd_checksweepstate
+scw_createconfig
+scw_saveconfig
+endscan
+sce_scanvarstojson
+end
+subgraph fastdac_old.ipf
+fd_stopfdacsweep
+fd_char2num
+end
+subgraph fastdac.ipf
+fd_stopfdacsweep
+end
+subgraph ScanController_IO.ipf
+openhdffile
+closehdffile
+savewavestohdf
+addmetafiles
+sc_createsweeplogs
+sc_instrumentlogs
+createwavescopyigor
+savescanwaves
+savesinglewavetohdf
+savetohdf
+savefastdacinfowaves
+saveexp
+savefrompxp
+sc_confirm_json
+num2numstr
+addjsonkeyval
+getindent
+prettyjsonfmt
+end
+subgraph ScanController_INSTR.ipf
+getresourceaddress
+visaerrormsg
+readinstr
+visasetreadterm
+visasetreadtermenable
+visasetserialendin
+end
+    </pre>
+    <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+        startOnLoad: true,
+        flowchart: {
+                useMaxWidth: false, // Disable maximum width for better zooming
+                htmlLabels: true, // Enable HTML-based labels for better styling
+                defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
+            },
+        });
+    $(document).ready(function() {
+            // Apply Zoomooz to the Mermaid diagram container
+            $('.mermaid').zoomTarget();
+        });
+    </script>
+    </body>
+    </html>
+    

@@ -16,13 +16,16 @@ setls625field --> setls625current;
 setls625current --> ls625_lookupvarname;
 setls625current --> writeinstr;
 writeinstr --> visaerrormsg;
+subgraph ScanController_old.ipf
+roundnum
+end
+subgraph ScanController.ipf
+roundnum
+end
 subgraph ls625_single_supply.ipf
 ls625_lookupvarname
 setls625current
 setls625field
-end
-subgraph ScanController.ipf
-roundnum
 end
 subgraph ScanController_INSTR.ipf
 visaerrormsg

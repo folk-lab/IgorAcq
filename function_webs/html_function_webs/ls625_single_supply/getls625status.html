@@ -12,7 +12,6 @@
     graph TB;
 getls625status --> ls625_lookupvarname;
 getls625status --> addjsonkeyval;
-addjsonkeyval --> escapequotes;
 getls625status --> getls625field;
 getls625field --> ls625_lookupvarname;
 getls625field --> getls625current;
@@ -30,6 +29,12 @@ getls625status --> getls625rate;
 getls625rate --> ls625_lookupvarname;
 getls625rate --> queryinstr;
 getls625rate --> roundnum;
+subgraph ScanController_old.ipf
+roundnum
+end
+subgraph ScanController.ipf
+roundnum
+end
 subgraph ls625_single_supply.ipf
 ls625_lookupvarname
 getls625current
@@ -37,8 +42,8 @@ getls625field
 getls625rate
 getls625status
 end
-subgraph ScanController.ipf
-roundnum
+subgraph ScanController_IO.ipf
+addjsonkeyval
 end
 subgraph ScanController_INSTR.ipf
 visaerrormsg
@@ -48,10 +53,6 @@ queryinstr
 visasetreadterm
 visasetreadtermenable
 visasetserialendin
-end
-subgraph ScanController_IO.ipf
-addjsonkeyval
-escapequotes
 end
     </pre>
     <script type="module">

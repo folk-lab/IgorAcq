@@ -12,12 +12,12 @@
     graph TB;
 setsrstimeconst --> writeinstr;
 writeinstr --> visaerrormsg;
+subgraph srs830.ipf
+setsrstimeconst
+end
 subgraph ScanController_INSTR.ipf
 visaerrormsg
 writeinstr
-end
-subgraph srs830.ipf
-setsrstimeconst
 end
     </pre>
     <script type="module">

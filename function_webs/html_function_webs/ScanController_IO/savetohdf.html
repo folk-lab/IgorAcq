@@ -12,65 +12,30 @@
     graph TB;
 savetohdf --> openhdffile;
 openhdffile --> endscan;
-endscan --> scfd_checkrawsave;
-scfd_checkrawsave --> scf_getrecordedfadcinfo;
-endscan --> set_indep;
-set_indep --> clearfdacbuffer;
-clearfdacbuffer --> writeinstr;
-writeinstr --> visaerrormsg;
-set_indep --> queryinstr;
-queryinstr --> writeinstr;
-queryinstr --> readinstr;
-readinstr --> visasetreadterm;
-readinstr --> visasetreadtermenable;
-visasetreadtermenable --> visasetreadterm;
-readinstr --> visasetserialendin;
-readinstr --> visaerrormsg;
 endscan --> scv_setlastscanvars;
 endscan --> scv_getlastscanvars;
 endscan --> savetohdf;
 endscan --> saveexp;
 saveexp --> savefrompxp;
-endscan --> sc_checkbackup;
-sc_checkbackup --> getexppath;
-endscan --> sc_copynewfiles;
-sc_copynewfiles --> sc_copysinglefile;
-sc_copysinglefile --> getexppath;
-sc_copysinglefile --> executemaccmd;
-sc_copynewfiles --> getexppath;
 endscan --> sce_scanvarstojson;
 sce_scanvarstojson --> addjsonkeyval;
-addjsonkeyval --> escapequotes;
 sce_scanvarstojson --> prettyjsonfmt;
 prettyjsonfmt --> getindent;
 savetohdf --> addmetafiles;
 addmetafiles --> scw_createconfig;
 scw_createconfig --> addjsonkeyval;
-scw_createconfig --> textwave2strarray;
-textwave2strarray --> escapequotes;
-scw_createconfig --> wave2boolarray;
-wave2boolarray --> num2bool;
-scw_createconfig --> num2bool;
 addmetafiles --> sc_createsweeplogs;
 sc_createsweeplogs --> addjsonkeyval;
 sc_createsweeplogs --> num2numstr;
 sc_createsweeplogs --> scf_getrecordedfadcinfo;
-sc_createsweeplogs --> sc_instrumentlogs;
-sc_instrumentlogs --> sc_openinstrconnections;
-sc_instrumentlogs --> sc_createsweeplogs;
-sc_instrumentlogs --> addjsonkeyval;
 addmetafiles --> prettyjsonfmt;
+addmetafiles --> sc_instrumentlogs;
+sc_instrumentlogs --> sc_createsweeplogs;
 addmetafiles --> sce_scanvarstojson;
 addmetafiles --> sc_confirm_json;
 addmetafiles --> scw_saveconfig;
 scw_saveconfig --> scu_unixtime;
-scw_saveconfig --> writetofile;
 savetohdf --> savefastdacinfowaves;
-savefastdacinfowaves --> fd_getglobalawg;
-fd_getglobalawg --> fd_initglobalawg;
-fd_initglobalawg --> fd_setglobalawg;
-savefastdacinfowaves --> fd_getawgwave;
-savefastdacinfowaves --> savesinglewavetohdf;
 savetohdf --> savescanwaves;
 savescanwaves --> scfd_postfilternumpts;
 savetohdf --> sci_get1dwavenames;
@@ -82,39 +47,30 @@ savetohdf --> createwavescopyigor;
 savetohdf --> savewavestohdf;
 savewavestohdf --> savesinglewavetohdf;
 savetohdf --> closehdffile;
-subgraph fastdac.ipf
-set_indep
-clearfdacbuffer
-fd_getawgwave
-fd_initglobalawg
-fd_setglobalawg
-fd_getglobalawg
-end
-subgraph ScanController.ipf
+subgraph ScanController_old.ipf
 scu_assertseparatortype
 scu_unixtime
 scv_setlastscanvars
 scv_getlastscanvars
 sci_get1dwavenames
 sci_get2dwavenames
-sc_openinstrconnections
-sc_checkbackup
 endscan
 sce_scanvarstojson
 scw_createconfig
 scw_saveconfig
 scf_getrecordedfadcinfo
-scfd_checkrawsave
 scfd_postfilternumpts
 end
-subgraph ScanController_INSTR.ipf
-visaerrormsg
-writeinstr
-readinstr
-queryinstr
-visasetreadterm
-visasetreadtermenable
-visasetserialendin
+subgraph ScanController.ipf
+scu_unixtime
+scf_getrecordedfadcinfo
+sci_get1dwavenames
+sci_get2dwavenames
+scfd_postfilternumpts
+scw_createconfig
+scw_saveconfig
+endscan
+sce_scanvarstojson
 end
 subgraph ScanController_IO.ipf
 openhdffile
@@ -130,20 +86,11 @@ savetohdf
 savefastdacinfowaves
 saveexp
 savefrompxp
-sc_copysinglefile
-sc_copynewfiles
-executemaccmd
-getexppath
-writetofile
 sc_confirm_json
 num2numstr
-num2bool
-wave2boolarray
-textwave2strarray
 addjsonkeyval
 getindent
 prettyjsonfmt
-escapequotes
 end
     </pre>
     <script type="module">

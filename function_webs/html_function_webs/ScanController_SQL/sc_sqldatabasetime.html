@@ -20,12 +20,6 @@ getjsonvalue --> getjsonindices;
 requestsqlvalue --> sc_fetchsqlsingle;
 sc_fetchsqlsingle --> sc_closesqlconnection;
 requestsqlvalue --> sc_closesqlconnection;
-subgraph ScanController_IO.ipf
-readtxtfile
-getjsonvalue
-getjsonindices
-getjsonkeyoffset
-end
 subgraph ScanController_SQL.ipf
 requestsqlvalue
 sc_opensqlconnection
@@ -33,6 +27,12 @@ sc_fetchsqlsingle
 sc_closesqlconnection
 sc_readsqlconnectionparameters
 sc_sqldatabasetime
+end
+subgraph ScanController_IO.ipf
+readtxtfile
+getjsonvalue
+getjsonindices
+getjsonkeyoffset
 end
     </pre>
     <script type="module">

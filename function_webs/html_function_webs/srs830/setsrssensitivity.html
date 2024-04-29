@@ -12,12 +12,12 @@
     graph TB;
 setsrssensitivity --> writeinstr;
 writeinstr --> visaerrormsg;
+subgraph srs830.ipf
+setsrssensitivity
+end
 subgraph ScanController_INSTR.ipf
 visaerrormsg
 writeinstr
-end
-subgraph srs830.ipf
-setsrssensitivity
 end
     </pre>
     <script type="module">

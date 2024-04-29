@@ -11,6 +11,9 @@
     <pre class="mermaid">
     graph TB;
 savescanwaves --> scfd_postfilternumpts;
+subgraph ScanController_old.ipf
+scfd_postfilternumpts
+end
 subgraph ScanController.ipf
 scfd_postfilternumpts
 end

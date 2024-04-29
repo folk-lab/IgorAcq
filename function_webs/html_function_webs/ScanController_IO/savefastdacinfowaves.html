@@ -10,19 +10,7 @@
     </style>
     <pre class="mermaid">
     graph TB;
-savefastdacinfowaves --> fd_getglobalawg;
-fd_getglobalawg --> fd_initglobalawg;
-fd_initglobalawg --> fd_setglobalawg;
-savefastdacinfowaves --> fd_getawgwave;
-savefastdacinfowaves --> savesinglewavetohdf;
-subgraph fastdac.ipf
-fd_getawgwave
-fd_initglobalawg
-fd_setglobalawg
-fd_getglobalawg
-end
 subgraph ScanController_IO.ipf
-savesinglewavetohdf
 savefastdacinfowaves
 end
     </pre>

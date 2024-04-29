@@ -19,9 +19,6 @@ readinstr --> visasetreadtermenable;
 visasetreadtermenable --> visasetreadterm;
 readinstr --> visasetserialendin;
 readinstr --> visaerrormsg;
-subgraph ips120_single_supply.ipf
-getips120volts
-end
 subgraph ScanController_INSTR.ipf
 visaerrormsg
 writeinstr
@@ -30,6 +27,9 @@ queryinstr
 visasetreadterm
 visasetreadtermenable
 visasetserialendin
+end
+subgraph ips120_single_supply.ipf
+getips120volts
 end
     </pre>
     <script type="module">

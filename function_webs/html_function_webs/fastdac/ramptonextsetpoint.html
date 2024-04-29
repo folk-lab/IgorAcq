@@ -1,0 +1,118 @@
+    <html>
+    <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/zoomooz/1.4.1/zoomooz.min.js"></script>
+    <style>
+        .mermaid {
+            height: 600px; /* Adjust the height as needed */
+            margin-bottom: 20px; /* Adjust the bottom margin as needed */
+        }
+    </style>
+    <pre class="mermaid">
+    graph TB;
+ramptonextsetpoint --> checkstartsfinschannels;
+checkstartsfinschannels --> scu_assertseparatortype;
+ramptonextsetpoint --> rampmultiplefdac;
+rampmultiplefdac --> scu_assertseparatortype;
+rampmultiplefdac --> scu_getchannelnumbers;
+scu_getchannelnumbers --> scu_assertseparatortype;
+scu_getchannelnumbers --> removetrailingwhitespace;
+rampmultiplefdac --> scf_getdacinfo;
+scf_getdacinfo --> scu_getchannelnumbers;
+rampmultiplefdac --> fd_rampoutputfdac;
+fd_rampoutputfdac --> getresourceaddress;
+fd_rampoutputfdac --> scfw_resetfdacwindow;
+fd_rampoutputfdac --> getfdacoutput;
+getfdacoutput --> scf_getchannelstartnum;
+scf_getchannelstartnum --> scf_getnumfds;
+scf_getchannelstartnum --> scf_getfdnumber;
+scf_getfdnumber --> scf_getnumfds;
+scf_getfdnumber --> getresourceaddress;
+scf_getfdnumber --> scf_getfdvisaaddress;
+scf_getfdvisaaddress --> scf_getnumfds;
+scf_getchannelstartnum --> scf_getfdinfofromid;
+scf_getfdinfofromid --> scf_getfdnumber;
+scf_getfdinfofromid --> scf_getfdinfofromdevicenum;
+scf_getfdinfofromdevicenum --> scf_getnumfds;
+getfdacoutput --> queryinstr;
+queryinstr --> writeinstr;
+writeinstr --> visaerrormsg;
+queryinstr --> readinstr;
+readinstr --> visasetreadterm;
+readinstr --> visasetreadtermenable;
+visasetreadtermenable --> visasetreadterm;
+readinstr --> visasetserialendin;
+readinstr --> visaerrormsg;
+getfdacoutput --> sc_striptermination;
+getfdacoutput --> scf_checkfdresponse;
+fd_rampoutputfdac --> queryinstr;
+fd_rampoutputfdac --> queryinstrprogress;
+queryinstrprogress --> writeinstr;
+queryinstrprogress --> sc_progressbardelay;
+queryinstrprogress --> readinstr;
+fd_rampoutputfdac --> sc_striptermination;
+fd_rampoutputfdac --> scf_checkfdresponse;
+fd_rampoutputfdac --> scfw_updatefdacvalstr;
+subgraph ScanController_old.ipf
+scu_assertseparatortype
+scu_getchannelnumbers
+checkstartsfinschannels
+ramptonextsetpoint
+scf_getdacinfo
+scf_getfdnumber
+scf_getnumfds
+scf_getfdvisaaddress
+scf_getfdinfofromdevicenum
+scf_getfdinfofromid
+scf_getchannelstartnum
+scf_checkfdresponse
+scfw_resetfdacwindow
+scfw_updatefdacvalstr
+end
+subgraph ScanController.ipf
+scfw_updatefdacvalstr
+end
+subgraph fastdac_old.ipf
+getfdacoutput
+rampmultiplefdac
+fd_rampoutputfdac
+end
+subgraph fastdac.ipf
+checkstartsfinschannels
+ramptonextsetpoint
+end
+subgraph ScanController_IO.ipf
+removetrailingwhitespace
+end
+subgraph ScanController_INSTR.ipf
+getresourceaddress
+visaerrormsg
+writeinstr
+readinstr
+queryinstr
+queryinstrprogress
+sc_striptermination
+sc_progressbardelay
+visasetreadterm
+visasetreadtermenable
+visasetserialendin
+end
+    </pre>
+    <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+        startOnLoad: true,
+        flowchart: {
+                useMaxWidth: false, // Disable maximum width for better zooming
+                htmlLabels: true, // Enable HTML-based labels for better styling
+                defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
+            },
+        });
+    $(document).ready(function() {
+            // Apply Zoomooz to the Mermaid diagram container
+            $('.mermaid').zoomTarget();
+        });
+    </script>
+    </body>
+    </html>
+    

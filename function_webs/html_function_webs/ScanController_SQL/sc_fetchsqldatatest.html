@@ -18,18 +18,18 @@ sc_readsqlconnectionparameters --> readtxtfile;
 sc_readsqlconnectionparameters --> getjsonvalue;
 getjsonvalue --> getjsonkeyoffset;
 getjsonvalue --> getjsonindices;
-subgraph ScanController_IO.ipf
-readtxtfile
-getjsonvalue
-getjsonindices
-getjsonkeyoffset
-end
 subgraph ScanController_SQL.ipf
 sc_fetchsqldata
 sc_closesqlconnection
 sc_readsqlconnectionparameters
 sc_mapsqltypetowavetype
 sc_fetchsqldatatest
+end
+subgraph ScanController_IO.ipf
+readtxtfile
+getjsonvalue
+getjsonindices
+getjsonkeyoffset
 end
     </pre>
     <script type="module">

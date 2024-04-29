@@ -12,7 +12,6 @@
     graph TB;
 get34401astatus --> getaddressgpib;
 get34401astatus --> addjsonkeyval;
-addjsonkeyval --> escapequotes;
 get34401astatus --> check34401aconfig;
 check34401aconfig --> queryinstr;
 queryinstr --> writeinstr;
@@ -27,6 +26,9 @@ subgraph hp34401A.ipf
 check34401aconfig
 get34401astatus
 end
+subgraph ScanController_IO.ipf
+addjsonkeyval
+end
 subgraph ScanController_INSTR.ipf
 visaerrormsg
 writeinstr
@@ -36,10 +38,6 @@ getaddressgpib
 visasetreadterm
 visasetreadtermenable
 visasetserialendin
-end
-subgraph ScanController_IO.ipf
-addjsonkeyval
-escapequotes
 end
     </pre>
     <script type="module">

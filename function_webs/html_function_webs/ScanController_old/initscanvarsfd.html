@@ -1,0 +1,93 @@
+    <html>
+    <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/zoomooz/1.4.1/zoomooz.min.js"></script>
+    <style>
+        .mermaid {
+            height: 600px; /* Adjust the height as needed */
+            margin-bottom: 20px; /* Adjust the bottom margin as needed */
+        }
+    </style>
+    <pre class="mermaid">
+    graph TB;
+initscanvarsfd --> initscanvars;
+initscanvarsfd --> scf_getrecordedfadcinfo;
+initscanvarsfd --> scu_getdaclabel;
+scu_getdaclabel --> scu_assertseparatortype;
+scu_getdaclabel --> get_fastdac_index;
+initscanvarsfd --> get_daclistids;
+get_daclistids --> get_fastdac_index;
+initscanvarsfd --> scv_setsetpoints;
+scv_setsetpoints --> scv_formatsetpoints;
+scv_setsetpoints --> scv_sanitizesetpoints;
+scv_sanitizesetpoints --> scu_assertseparatortype;
+initscanvarsfd --> scv_setfreq;
+scv_setfreq --> fd_getmaxadcs;
+fd_getmaxadcs --> scf_getrecordedfadcinfo;
+initscanvarsfd --> scv_setnumptssweeprateduration;
+scv_setnumptssweeprateduration --> fd_get_sweeprate_from_numpts;
+scv_setnumptssweeprateduration --> fd_get_numpts_from_sweeprate;
+initscanvarsfd --> scu_getchannelnumbers;
+scu_getchannelnumbers --> scu_assertseparatortype;
+scu_getchannelnumbers --> removetrailingwhitespace;
+initscanvarsfd --> get_fastdac_index;
+initscanvarsfd --> scv_setlastscanvars;
+initscanvarsfd --> remove_fd_files;
+subgraph ScanController_old.ipf
+scu_assertseparatortype
+scu_getdaclabel
+scu_getchannelnumbers
+scv_setlastscanvars
+initscanvars
+initscanvarsfd
+scv_setnumptssweeprateduration
+scv_setfreq
+scv_setsetpoints
+scv_sanitizesetpoints
+scv_formatsetpoints
+scf_getrecordedfadcinfo
+end
+subgraph ScanController.ipf
+initscanvars
+get_daclistids
+scf_getrecordedfadcinfo
+scu_getdaclabel
+scv_setsetpoints
+scv_setfreq
+scv_setnumptssweeprateduration
+scv_sanitizesetpoints
+end
+subgraph fastdac_old.ipf
+fd_get_numpts_from_sweeprate
+fd_get_sweeprate_from_numpts
+end
+subgraph fastdac.ipf
+fd_getmaxadcs
+initscanvarsfd
+get_fastdac_index
+remove_fd_files
+fd_get_numpts_from_sweeprate
+fd_get_sweeprate_from_numpts
+end
+subgraph ScanController_IO.ipf
+removetrailingwhitespace
+end
+    </pre>
+    <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.1/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+        startOnLoad: true,
+        flowchart: {
+                useMaxWidth: false, // Disable maximum width for better zooming
+                htmlLabels: true, // Enable HTML-based labels for better styling
+                defaultRenderer: "elk", // Makes connections linear, ugly but good for large graphs
+            },
+        });
+    $(document).ready(function() {
+            // Apply Zoomooz to the Mermaid diagram container
+            $('.mermaid').zoomTarget();
+        });
+    </script>
+    </body>
+    </html>
+    

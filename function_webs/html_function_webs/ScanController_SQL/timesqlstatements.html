@@ -26,12 +26,6 @@ requestsqlvalue --> sc_opensqlconnection;
 requestsqlvalue --> sc_fetchsqlsingle;
 sc_fetchsqlsingle --> sc_closesqlconnection;
 requestsqlvalue --> sc_closesqlconnection;
-subgraph ScanController_IO.ipf
-readtxtfile
-getjsonvalue
-getjsonindices
-getjsonkeyoffset
-end
 subgraph ScanController_SQL.ipf
 requestsqldata
 requestsqlvalue
@@ -42,6 +36,12 @@ sc_closesqlconnection
 sc_readsqlconnectionparameters
 sc_mapsqltypetowavetype
 timesqlstatements
+end
+subgraph ScanController_IO.ipf
+readtxtfile
+getjsonvalue
+getjsonindices
+getjsonkeyoffset
 end
     </pre>
     <script type="module">

@@ -10,16 +10,14 @@
     </style>
     <pre class="mermaid">
     graph TB;
-sc_instrumentlogs --> sc_openinstrconnections;
 sc_instrumentlogs --> sc_createsweeplogs;
 sc_createsweeplogs --> addjsonkeyval;
-addjsonkeyval --> escapequotes;
 sc_createsweeplogs --> num2numstr;
 sc_createsweeplogs --> scf_getrecordedfadcinfo;
-sc_createsweeplogs --> sc_instrumentlogs;
-sc_instrumentlogs --> addjsonkeyval;
+subgraph ScanController_old.ipf
+scf_getrecordedfadcinfo
+end
 subgraph ScanController.ipf
-sc_openinstrconnections
 scf_getrecordedfadcinfo
 end
 subgraph ScanController_IO.ipf
@@ -27,7 +25,6 @@ sc_createsweeplogs
 sc_instrumentlogs
 num2numstr
 addjsonkeyval
-escapequotes
 end
     </pre>
     <script type="module">

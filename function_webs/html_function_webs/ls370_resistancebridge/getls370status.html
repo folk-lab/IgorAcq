@@ -32,35 +32,15 @@ getls370temp --> getls370channellabel;
 getls370channellabel --> bd_channellookup;
 getls370temp --> sendls370;
 sendls370 --> gethttp;
+gethttp --> fileappend;
 sendls370 --> posthttp;
+posthttp --> fileappend;
 posthttp --> getjsonvalue;
 sendls370 --> puthttp;
+puthttp --> fileappend;
 puthttp --> getjsonvalue;
 sendls370 --> getjsonvalue;
 getls370status --> addjsonkeyval;
-addjsonkeyval --> escapequotes;
-subgraph babydac.ipf
-bd_channellookup
-end
-subgraph ls370_resistancebridge.ipf
-getls370channellabel
-getls370temp
-sendls370
-getls370status
-end
-subgraph ScanController_INSTR.ipf
-posthttp
-puthttp
-gethttp
-end
-subgraph ScanController_IO.ipf
-readtxtfile
-getjsonvalue
-getjsonindices
-getjsonkeyoffset
-addjsonkeyval
-escapequotes
-end
 subgraph ScanController_SQL.ipf
 requestsqlvalue
 sc_opensqlconnection
@@ -70,6 +50,33 @@ sc_readsqlconnectionparameters
 timestamp2secs
 sc_sqldatabasetime
 sc_sqltimestamp
+end
+subgraph formatting_http.ipf
+posthttp
+puthttp
+gethttp
+end
+subgraph ls370_resistancebridge.ipf
+getls370channellabel
+getls370temp
+sendls370
+getls370status
+end
+subgraph babydac.ipf
+bd_channellookup
+end
+subgraph ScanController_IO.ipf
+fileappend
+readtxtfile
+getjsonvalue
+getjsonindices
+getjsonkeyoffset
+addjsonkeyval
+end
+subgraph ScanController_INSTR.ipf
+posthttp
+puthttp
+gethttp
 end
     </pre>
     <script type="module">

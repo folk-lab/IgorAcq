@@ -11,13 +11,10 @@
     <pre class="mermaid">
     graph TB;
 loadstrarray2textwave --> getstrarrayshape;
-loadstrarray2textwave --> escapequotes;
 loadstrarray2textwave --> unescapequotes;
-unescapequotes --> escapequotes;
 subgraph ScanController_IO.ipf
 getstrarrayshape
 loadstrarray2textwave
-escapequotes
 unescapequotes
 end
     </pre>

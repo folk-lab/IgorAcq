@@ -12,12 +12,12 @@
     graph TB;
 setsrsfrequency --> writeinstr;
 writeinstr --> visaerrormsg;
+subgraph srs830.ipf
+setsrsfrequency
+end
 subgraph ScanController_INSTR.ipf
 visaerrormsg
 writeinstr
-end
-subgraph srs830.ipf
-setsrsfrequency
 end
     </pre>
     <script type="module">

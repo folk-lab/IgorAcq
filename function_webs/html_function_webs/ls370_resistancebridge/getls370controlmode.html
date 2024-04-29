@@ -12,28 +12,37 @@
     graph TB;
 getls370controlmode --> sendls370;
 sendls370 --> gethttp;
+gethttp --> fileappend;
 sendls370 --> posthttp;
+posthttp --> fileappend;
 posthttp --> getjsonvalue;
 getjsonvalue --> getjsonkeyoffset;
 getjsonvalue --> getjsonindices;
 sendls370 --> puthttp;
+puthttp --> fileappend;
 puthttp --> getjsonvalue;
 sendls370 --> getjsonvalue;
 getls370controlmode --> ls370_mode_str_to_mode;
+subgraph formatting_http.ipf
+posthttp
+puthttp
+gethttp
+end
 subgraph ls370_resistancebridge.ipf
 getls370controlmode
 ls370_mode_str_to_mode
 sendls370
 end
+subgraph ScanController_IO.ipf
+fileappend
+getjsonvalue
+getjsonindices
+getjsonkeyoffset
+end
 subgraph ScanController_INSTR.ipf
 posthttp
 puthttp
 gethttp
-end
-subgraph ScanController_IO.ipf
-getjsonvalue
-getjsonindices
-getjsonkeyoffset
 end
     </pre>
     <script type="module">

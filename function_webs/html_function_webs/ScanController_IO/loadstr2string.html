@@ -11,12 +11,9 @@
     <pre class="mermaid">
     graph TB;
 loadstr2string --> removeliteralquotes;
-loadstr2string --> escapequotes;
 loadstr2string --> unescapequotes;
-unescapequotes --> escapequotes;
 subgraph ScanController_IO.ipf
 loadstr2string
-escapequotes
 unescapequotes
 removeliteralquotes
 end

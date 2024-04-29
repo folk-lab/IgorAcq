@@ -31,6 +31,9 @@ readinstr --> visasetreadtermenable;
 visasetreadtermenable --> visasetreadterm;
 readinstr --> visasetserialendin;
 readinstr --> visaerrormsg;
+subgraph srs830.ipf
+opensrsconnection
+end
 subgraph ScanController_INSTR.ipf
 visaerrormsg
 openvisainstr
@@ -47,9 +50,6 @@ visasetdatabits
 visasetstopbits
 visasetserialendin
 visasetparity
-end
-subgraph srs830.ipf
-opensrsconnection
 end
     </pre>
     <script type="module">

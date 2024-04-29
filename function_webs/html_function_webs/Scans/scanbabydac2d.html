@@ -21,6 +21,7 @@ scv_setsetpoints --> scv_sanitizesetpoints;
 scv_sanitizesetpoints --> scu_assertseparatortype;
 initscanvarsbd --> scu_getdaclabel;
 scu_getdaclabel --> scu_assertseparatortype;
+scu_getdaclabel --> get_fastdac_index;
 scanbabydac --> prescanchecksbd;
 prescanchecksbd --> scc_checklimsbd;
 scc_checklimsbd --> scu_assertseparatortype;
@@ -71,102 +72,15 @@ queryinstrprogress --> readinstr;
 fd_rampoutputfdac --> sc_striptermination;
 fd_rampoutputfdac --> scf_checkfdresponse;
 fd_rampoutputfdac --> scfw_updatefdacvalstr;
-ramptonextsetpoint --> rampmultiplebd;
-rampmultiplebd --> scu_getchannelnumbers;
-rampmultiplebd --> bd_channellookup;
-rampmultiplebd --> bd_updatecustom;
-rampmultiplebd --> bd_updatemultiplebd;
-bd_updatemultiplebd --> bd_setoutputbd;
-bd_setoutputbd --> bd_getboard;
-bd_setoutputbd --> bd_getboardchannel;
-bd_getboardchannel --> bd_getboard;
-bd_setoutputbd --> bd_getsetpointbd;
-bd_setoutputbd --> bd_writebytesbd;
-bd_writebytesbd --> visaerrormsg;
-bd_setoutputbd --> bd_readbytesbd;
-bd_readbytesbd --> bd_readsinglebytebd;
-bd_readsinglebytebd --> visaerrormsg;
-bd_updatemultiplebd --> bd_rampoutputbd;
-bd_rampoutputbd --> bd_setoutputbd;
-bd_rampoutputbd --> sc_sleep;
-sc_sleep --> scs_checksweepstate;
-scs_checksweepstate --> endscan;
-endscan --> scfd_checkrawsave;
-scfd_checkrawsave --> scf_getrecordedfadcinfo;
-endscan --> set_indep;
-set_indep --> clearfdacbuffer;
-clearfdacbuffer --> writeinstr;
-set_indep --> queryinstr;
-endscan --> scv_setlastscanvars;
-endscan --> scv_getlastscanvars;
-endscan --> savetohdf;
-savetohdf --> openhdffile;
-openhdffile --> endscan;
-savetohdf --> addmetafiles;
-addmetafiles --> scw_createconfig;
-scw_createconfig --> addjsonkeyval;
-addjsonkeyval --> escapequotes;
-scw_createconfig --> textwave2strarray;
-textwave2strarray --> escapequotes;
-scw_createconfig --> wave2boolarray;
-wave2boolarray --> num2bool;
-scw_createconfig --> num2bool;
-addmetafiles --> sc_createsweeplogs;
-sc_createsweeplogs --> addjsonkeyval;
-sc_createsweeplogs --> num2numstr;
-sc_createsweeplogs --> scf_getrecordedfadcinfo;
-sc_createsweeplogs --> sc_instrumentlogs;
-sc_instrumentlogs --> sc_openinstrconnections;
-sc_instrumentlogs --> sc_createsweeplogs;
-sc_instrumentlogs --> addjsonkeyval;
-addmetafiles --> prettyjsonfmt;
-prettyjsonfmt --> getindent;
-addmetafiles --> sce_scanvarstojson;
-sce_scanvarstojson --> addjsonkeyval;
-sce_scanvarstojson --> prettyjsonfmt;
-addmetafiles --> sc_confirm_json;
-addmetafiles --> scw_saveconfig;
-scw_saveconfig --> scu_unixtime;
-scw_saveconfig --> writetofile;
-savetohdf --> savefastdacinfowaves;
-savefastdacinfowaves --> fd_getglobalawg;
-fd_getglobalawg --> fd_initglobalawg;
-fd_initglobalawg --> fd_setglobalawg;
-savefastdacinfowaves --> fd_getawgwave;
-savefastdacinfowaves --> savesinglewavetohdf;
-savetohdf --> savescanwaves;
-savescanwaves --> scfd_postfilternumpts;
-savetohdf --> sci_get1dwavenames;
-sci_get1dwavenames --> scf_getrecordedfadcinfo;
-savetohdf --> sci_get2dwavenames;
-sci_get2dwavenames --> sci_get1dwavenames;
-savetohdf --> scu_assertseparatortype;
-savetohdf --> createwavescopyigor;
-savetohdf --> savewavestohdf;
-savewavestohdf --> savesinglewavetohdf;
-savetohdf --> closehdffile;
-endscan --> saveexp;
-saveexp --> savefrompxp;
-endscan --> sc_checkbackup;
-sc_checkbackup --> getexppath;
-endscan --> sc_copynewfiles;
-sc_copynewfiles --> sc_copysinglefile;
-sc_copysinglefile --> getexppath;
-sc_copysinglefile --> executemaccmd;
-sc_copynewfiles --> getexppath;
-endscan --> sce_scanvarstojson;
-rampmultiplebd --> bd_calccustomvalues;
 scanbabydac --> sc_sleep;
 scanbabydac --> initializescan;
 initializescan --> sci_initializewaves;
-sci_initializewaves --> fd_getglobalawg;
 sci_initializewaves --> sci_get1dwavenames;
+sci_get1dwavenames --> scf_getrecordedfadcinfo;
 sci_initializewaves --> sci_sanitycheckwavenames;
 sci_initializewaves --> scfd_postfilternumpts;
 sci_initializewaves --> sci_init1dwave;
 sci_initializewaves --> sci_init2dwave;
-sci_initializewaves --> sc_findasyncmeasurements;
-sc_findasyncmeasurements --> sc_checkasyncscript;
 initializescan --> scg_initializegraphs;
 scg_initializegraphs --> sci_get1dwavenames;
 scg_initializegraphs --> scg_initializegraphsforwavenames;
@@ -194,13 +108,45 @@ readvstime --> asleep;
 asleep --> sc_sleep;
 readvstime --> recordvalues;
 readvstime --> endscan;
-recordvalues --> sc_managethreads;
-sc_managethreads --> readvstime;
-sc_managethreads --> sc_worker;
-sc_worker --> sc_funcasync;
-recordvalues --> sc_killthreads;
+endscan --> scv_setlastscanvars;
+endscan --> scv_getlastscanvars;
+endscan --> savetohdf;
+savetohdf --> openhdffile;
+openhdffile --> endscan;
+savetohdf --> addmetafiles;
+addmetafiles --> scw_createconfig;
+scw_createconfig --> addjsonkeyval;
+addmetafiles --> sc_createsweeplogs;
+sc_createsweeplogs --> addjsonkeyval;
+sc_createsweeplogs --> num2numstr;
+sc_createsweeplogs --> scf_getrecordedfadcinfo;
+addmetafiles --> prettyjsonfmt;
+prettyjsonfmt --> getindent;
+addmetafiles --> sc_instrumentlogs;
+sc_instrumentlogs --> sc_createsweeplogs;
+addmetafiles --> sce_scanvarstojson;
+sce_scanvarstojson --> addjsonkeyval;
+sce_scanvarstojson --> prettyjsonfmt;
+addmetafiles --> sc_confirm_json;
+addmetafiles --> scw_saveconfig;
+scw_saveconfig --> scu_unixtime;
+savetohdf --> savefastdacinfowaves;
+savetohdf --> savescanwaves;
+savescanwaves --> scfd_postfilternumpts;
+savetohdf --> sci_get1dwavenames;
+savetohdf --> sci_get2dwavenames;
+sci_get2dwavenames --> sci_get1dwavenames;
+savetohdf --> scu_assertseparatortype;
+savetohdf --> createwavescopyigor;
+savetohdf --> savewavestohdf;
+savewavestohdf --> savesinglewavetohdf;
+savetohdf --> closehdffile;
+endscan --> saveexp;
+saveexp --> savefrompxp;
+endscan --> sce_scanvarstojson;
 recordvalues --> scv_setlastscanvars;
 recordvalues --> scs_checksweepstate;
+scs_checksweepstate --> endscan;
 recordvalues --> scg_updatefrequentgraphs;
 scanbabydac --> endscan;
 scanbabydac2d --> sc_openinstrconnections;
@@ -213,33 +159,7 @@ scanbabydac2d --> initializescan;
 scanbabydac2d --> ramptonextsetpoint;
 scanbabydac2d --> recordvalues;
 scanbabydac2d --> endscan;
-subgraph babydac.ipf
-bd_calccustomvalues
-bd_getboard
-bd_getboardchannel
-bd_writebytesbd
-bd_readsinglebytebd
-bd_readbytesbd
-bd_getsetpointbd
-bd_setoutputbd
-bd_rampoutputbd
-bd_updatemultiplebd
-rampmultiplebd
-bd_channellookup
-bd_updatecustom
-end
-subgraph fastdac.ipf
-set_indep
-getfdacoutput
-rampmultiplefdac
-fd_rampoutputfdac
-clearfdacbuffer
-fd_getawgwave
-fd_initglobalawg
-fd_setglobalawg
-fd_getglobalawg
-end
-subgraph ScanController.ipf
+subgraph ScanController_old.ipf
 scu_assertseparatortype
 scu_unixtime
 ask_user
@@ -275,14 +195,7 @@ scg_getopengraphids
 scg_openabortwindow
 scg_updatefrequentgraphs
 sc_openinstrconnections
-sc_checkbackup
 scs_checksweepstate
-sc_managethreads
-sc_worker
-sc_funcasync
-sc_killthreads
-sc_checkasyncscript
-sc_findasyncmeasurements
 endscan
 sce_scanvarstojson
 scw_createconfig
@@ -301,25 +214,70 @@ scf_getfdinfofromdevicenum
 scf_getfdinfofromid
 scf_getrecordedfadcinfo
 scf_getchannelstartnum
-scfd_checkrawsave
 scf_checkfdresponse
 scfd_postfilternumpts
 scfd_spectrum_analyzer
 scfw_resetfdacwindow
 scfw_updatefdacvalstr
 end
-subgraph ScanController_INSTR.ipf
-getresourceaddress
-visaerrormsg
-writeinstr
-readinstr
-queryinstr
-queryinstrprogress
-sc_striptermination
-sc_progressbardelay
-visasetreadterm
-visasetreadtermenable
-visasetserialendin
+subgraph ScanController.ipf
+scfw_updatefdacvalstr
+sc_openinstrconnections
+scu_unixtime
+initscanvars
+scf_getrecordedfadcinfo
+scu_getdaclabel
+scv_setsetpoints
+scv_sanitizesetpoints
+initializescan
+sci_initializewaves
+sci_init1dwave
+sci_init2dwave
+sci_get1dwavenames
+sci_get2dwavenames
+sci_sanitycheckwavenames
+scg_initializegraphs
+scg_initializegraphsforwavenames
+scg_arrangewindows
+scg_twosubplot
+scg_graphexistsforwavename
+scg_open1dgraph
+scg_open2dgraph
+scg_setupgraph1d
+scg_setupgraph2d
+scg_getopengraphtitles
+scg_getopengraphids
+scg_openabortwindow
+scg_updatefrequentgraphs
+sc_sleep
+asleep
+scs_checksweepstate
+scfd_postfilternumpts
+scfd_spectrum_analyzer
+scw_createconfig
+scw_saveconfig
+endscan
+sce_scanvarstojson
+ask_user
+recordvalues
+end
+subgraph fastdac_old.ipf
+getfdacoutput
+rampmultiplefdac
+fd_rampoutputfdac
+end
+subgraph babydac.ipf
+bd_getboard
+end
+subgraph fastdac.ipf
+checkstartsfinschannels
+ramptonextsetpoint
+get_fastdac_index
+end
+subgraph Scans.ipf
+readvstime
+scanbabydac
+scanbabydac2d
 end
 subgraph ScanController_IO.ipf
 openhdffile
@@ -335,26 +293,25 @@ savetohdf
 savefastdacinfowaves
 saveexp
 savefrompxp
-sc_copysinglefile
-sc_copynewfiles
-executemaccmd
-getexppath
-writetofile
 sc_confirm_json
 num2numstr
-num2bool
-wave2boolarray
-textwave2strarray
 addjsonkeyval
 getindent
 prettyjsonfmt
 removetrailingwhitespace
-escapequotes
 end
-subgraph Scans.ipf
-readvstime
-scanbabydac
-scanbabydac2d
+subgraph ScanController_INSTR.ipf
+getresourceaddress
+visaerrormsg
+writeinstr
+readinstr
+queryinstr
+queryinstrprogress
+sc_striptermination
+sc_progressbardelay
+visasetreadterm
+visasetreadtermenable
+visasetserialendin
 end
     </pre>
     <script type="module">

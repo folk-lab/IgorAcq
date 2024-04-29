@@ -12,12 +12,12 @@
     graph TB;
 setsrsphase --> writeinstr;
 writeinstr --> visaerrormsg;
+subgraph srs830.ipf
+setsrsphase
+end
 subgraph ScanController_INSTR.ipf
 visaerrormsg
 writeinstr
-end
-subgraph srs830.ipf
-setsrsphase
 end
     </pre>
     <script type="module">

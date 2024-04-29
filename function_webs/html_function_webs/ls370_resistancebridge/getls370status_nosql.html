@@ -16,17 +16,21 @@ getls370temp --> getls370channellabel;
 getls370channellabel --> bd_channellookup;
 getls370temp --> sendls370;
 sendls370 --> gethttp;
+gethttp --> fileappend;
 sendls370 --> posthttp;
+posthttp --> fileappend;
 posthttp --> getjsonvalue;
 getjsonvalue --> getjsonkeyoffset;
 getjsonvalue --> getjsonindices;
 sendls370 --> puthttp;
+puthttp --> fileappend;
 puthttp --> getjsonvalue;
 sendls370 --> getjsonvalue;
 getls370status_nosql --> addjsonkeyval;
-addjsonkeyval --> escapequotes;
-subgraph babydac.ipf
-bd_channellookup
+subgraph formatting_http.ipf
+posthttp
+puthttp
+gethttp
 end
 subgraph ls370_resistancebridge.ipf
 getls370channellabel
@@ -34,17 +38,20 @@ getls370temp
 sendls370
 getls370status_nosql
 end
-subgraph ScanController_INSTR.ipf
-posthttp
-puthttp
-gethttp
+subgraph babydac.ipf
+bd_channellookup
 end
 subgraph ScanController_IO.ipf
+fileappend
 getjsonvalue
 getjsonindices
 getjsonkeyoffset
 addjsonkeyval
-escapequotes
+end
+subgraph ScanController_INSTR.ipf
+posthttp
+puthttp
+gethttp
 end
     </pre>
     <script type="module">

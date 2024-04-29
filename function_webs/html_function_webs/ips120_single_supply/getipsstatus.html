@@ -10,6 +10,7 @@
     </style>
     <pre class="mermaid">
     graph TB;
+getipsstatus --> addjsonkeyval;
 getipsstatus --> getips120field;
 getips120field --> ips120_lookupvarname;
 getips120field --> queryinstr;
@@ -22,21 +23,19 @@ visasetreadtermenable --> visasetreadterm;
 readinstr --> visasetserialendin;
 readinstr --> visaerrormsg;
 getips120field --> roundnum;
-getipsstatus --> addjsonkeyval;
-addjsonkeyval --> escapequotes;
 getipsstatus --> getips120rate;
 getips120rate --> ips120_lookupvarname;
 getips120rate --> queryinstr;
 getips120rate --> roundnum;
 getipsstatus --> getresourceaddress;
-subgraph ips120_single_supply.ipf
-ips120_lookupvarname
-getips120field
-getips120rate
-getipsstatus
+subgraph ScanController_old.ipf
+roundnum
 end
 subgraph ScanController.ipf
 roundnum
+end
+subgraph ScanController_IO.ipf
+addjsonkeyval
 end
 subgraph ScanController_INSTR.ipf
 getresourceaddress
@@ -48,9 +47,11 @@ visasetreadterm
 visasetreadtermenable
 visasetserialendin
 end
-subgraph ScanController_IO.ipf
-addjsonkeyval
-escapequotes
+subgraph ips120_single_supply.ipf
+ips120_lookupvarname
+getips120field
+getips120rate
+getipsstatus
 end
     </pre>
     <script type="module">

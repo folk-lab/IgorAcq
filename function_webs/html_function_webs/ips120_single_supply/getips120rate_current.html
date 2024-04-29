@@ -25,10 +25,8 @@ getips120rate --> roundnum;
 getips120rate_current --> ips120_lookupvarname;
 getips120rate_current --> queryinstr;
 getips120rate_current --> roundnum;
-subgraph ips120_single_supply.ipf
-ips120_lookupvarname
-getips120rate
-getips120rate_current
+subgraph ScanController_old.ipf
+roundnum
 end
 subgraph ScanController.ipf
 roundnum
@@ -41,6 +39,11 @@ queryinstr
 visasetreadterm
 visasetreadtermenable
 visasetserialendin
+end
+subgraph ips120_single_supply.ipf
+ips120_lookupvarname
+getips120rate
+getips120rate_current
 end
     </pre>
     <script type="module">

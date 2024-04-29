@@ -19,6 +19,9 @@ readinstr --> visasetreadtermenable;
 visasetreadtermenable --> visasetreadterm;
 readinstr --> visasetserialendin;
 readinstr --> visaerrormsg;
+subgraph srs830.ipf
+getsrsharmonic
+end
 subgraph ScanController_INSTR.ipf
 visaerrormsg
 writeinstr
@@ -27,9 +30,6 @@ queryinstr
 visasetreadterm
 visasetreadtermenable
 visasetserialendin
-end
-subgraph srs830.ipf
-getsrsharmonic
 end
     </pre>
     <script type="module">

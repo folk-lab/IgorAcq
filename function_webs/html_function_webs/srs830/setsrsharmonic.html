@@ -12,12 +12,12 @@
     graph TB;
 setsrsharmonic --> writeinstr;
 writeinstr --> visaerrormsg;
+subgraph srs830.ipf
+setsrsharmonic
+end
 subgraph ScanController_INSTR.ipf
 visaerrormsg
 writeinstr
-end
-subgraph srs830.ipf
-setsrsharmonic
 end
     </pre>
     <script type="module">

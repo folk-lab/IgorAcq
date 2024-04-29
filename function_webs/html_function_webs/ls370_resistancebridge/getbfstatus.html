@@ -27,18 +27,6 @@ requestsqlvalue --> sc_closesqlconnection;
 sc_sqltimestamp --> timestamp2secs;
 getbfstatus --> requestsqlvalue;
 getbfstatus --> addjsonkeyval;
-addjsonkeyval --> escapequotes;
-subgraph ls370_resistancebridge.ipf
-getbfstatus
-end
-subgraph ScanController_IO.ipf
-readtxtfile
-getjsonvalue
-getjsonindices
-getjsonkeyoffset
-addjsonkeyval
-escapequotes
-end
 subgraph ScanController_SQL.ipf
 requestsqlvalue
 sc_opensqlconnection
@@ -48,6 +36,16 @@ sc_readsqlconnectionparameters
 timestamp2secs
 sc_sqldatabasetime
 sc_sqltimestamp
+end
+subgraph ls370_resistancebridge.ipf
+getbfstatus
+end
+subgraph ScanController_IO.ipf
+readtxtfile
+getjsonvalue
+getjsonindices
+getjsonkeyoffset
+addjsonkeyval
 end
     </pre>
     <script type="module">
