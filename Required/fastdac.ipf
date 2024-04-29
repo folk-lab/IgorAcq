@@ -1013,7 +1013,10 @@ function get_number_of_fastdacs()
 end
 
 function get_boxnum_dacnum(string daclist)
-
+// after running this function three global waves are created/modified:
+//boxnum: just the number of the fd box for all channels used in the scan
+//unique_boxnum: which fd boxes are used in the scan?
+//dacnum: what is the DAC number for the specific box in that scan?
 int N=ItemsInList(daclist, ",");
 	make/o/n=(N) boxnum
 	make/o/n=(N) dacnum
