@@ -1101,6 +1101,8 @@ function sci_initializeWaves(S)  // TODO: rename
     struct ScanVars &S
     struct AWGVars AWG
     fd_getGlobalAWG(AWG)
+    AWG.wavelen=404
+    AWG.numCycles=1
     
     variable numpts  //Numpts to initialize wave with, note: for Filtered data, this number is reduced
     string wavenames, wn, rawwavenames, rwn
@@ -1123,7 +1125,7 @@ function sci_initializeWaves(S)  // TODO: rename
 			if (S.using_fastdac && fadcattr[str2num(wavenum)][8] == 48) // Checkbox checked
 				numpts = (raw) ? S.numptsx : scfd_postFilterNumpts(S.numptsx, S.measureFreq)
 			else
-				numpts = S.numptsx
+				numpts = S.numptsx*AWG.wavelen*AWG.numCycles
 			endif
 
 			sci_init1DWave(wn, numpts, S.startx, S.finx)
@@ -2197,6 +2199,7 @@ Function scfd_SendCommandAndRead(S,AWG_list,rowNum, [ skip_raw2calc])
 	Variable skip_raw2calc  // Optional flag to skip processing of raw data
 	String cmd_sent  // Command sent to FastDAC (currently not used but initialized)
 	Variable numpnts_read=0  // Number of points read in the current operation
+	variable pnts2read  // wavelen of the 1d wave to be filled
 
 	// Default skip_raw2calc to 0 if not provided
 	If (ParamIsDefault(skip_raw2calc))
@@ -2207,30 +2210,35 @@ Function scfd_SendCommandAndRead(S,AWG_list,rowNum, [ skip_raw2calc])
 	If (S.samplingFreq == 0 || S.numADCs == 0 || S.numptsx == 0)
 		Abort "ERROR[scfd_SendCommandAndRead]: Not enough info in ScanVars to run scan"
 	EndIf
+	
+//	also where is the best place to perform this step?
+
 
 	// Start the sweep
 	fd_start_sweep(S, AWG_list = AWG_list)
 	S.lastread = -1  // Reset the last read index
 
+
 	//need to reinitialize the raw ADC waves otherwise loadfiles will be confused. If this is not a desired way to handle this,
-//	//we will need to add a counter to loadfiles to keep track on how many pnts have already been read
-//	scfd_resetraw_waves()
-//	// Loop to read data until the expected number of points is reached
-//	Do
-//		               sleep/s 0.41// Short pause to allow for data acquisition
-//
-//		numpnts_read = loadfiles(S,numpnts_read)  // Load data from files
-//		scfd_raw2CalcQuickDistribute(0)  // 0 or 1 for if data should be displayed decimated or not during the scan
-//		scfd_checkSweepstate()
-//		doupdate
-//
-//	While (numpnts_read<S.numptsx)  // Continue if not all points are read
-//
-//	// Update FastDAC and ADC GUI elements
-//	scfw_update_all_fdac(option="updatefdac")
-//	scfw_update_fadc("")  // Update FADC display with no additional specification
+	//we will need to add a counter to loadfiles to keep track on how many pnts have already been read
+	scfd_resetraw_waves()
+	// Loop to read data until the expected number of points is reached
+	Do
+		              sleep/s 0.41// Short pause to allow for data acquisition
+
+		numpnts_read = loadfiles(S,numpnts_read)  // Load data from files
+		pnts2read=scfd_raw2CalcQuickDistribute(0)  // 0 or 1 for if data should be displayed decimated or not during the scan
+		scfd_checkSweepstate()
+		doupdate
+
+	While (numpnts_read<pnts2read)  // Continue if not all points are read
+	
+	// Update FastDAC and ADC GUI elements
+	scfw_update_all_fdac(option="updatefdac")
+	scfw_update_fadc("")  // Update FADC display with no additional specification
 
 
+//*** this has to be implemented too:
 
 	//	if(AWG_list.use_awg == 1)  // Reset AWs back to zero (no reason to leave at end of AW)
 	//		for(i=0;i<itemsinlist(S.instrIDs);i++)
@@ -2245,24 +2253,6 @@ Function scfd_SendCommandAndRead(S,AWG_list,rowNum, [ skip_raw2calc])
 	//	endif
 end
 
-//Function TestTask(s)		// This is the function that will be called periodically
-//	STRUCT WMBackgroundStruct &s
-//	
-//	Printf "Task %s called, ticks=%d\r", s.name, s.curRunTicks
-//	loadfiles("adc1;adc3")
-//	return 0	// Continue background task
-//End
-//
-//Function StartTestTask()
-//	Variable numTicks = 2 * 60		// Run every two seconds (120 ticks)
-//	CtrlNamedBackground Test, period=numTicks, proc=TestTask
-//	CtrlNamedBackground Test, start
-//End
-//
-//Function StopTestTask()
-//	CtrlNamedBackground Test, stop
-//End
-
 
 Function loadFiles(S, numPntsRead)
 	struct ScanVars &S
@@ -2271,7 +2261,6 @@ Function loadFiles(S, numPntsRead)
 	// - 'adcNames' contains a semicolon-separated list of wave names for loading data.
 	// - The folder path 'fdTest' must contain files to be loaded.
 	// - 'lastRead' variable must hold the index of the last file that was loaded.
-
 	String adcNames = S.adcLists
 	String fileList = IndexedFile(fdTest, -1, ".dat") // List all .dat files in fdTest
 	String currentFile, testString
@@ -2523,6 +2512,8 @@ function scfd_raw2CalcQuickDistribute(int decim)
 		endif
 
 	endfor
+	variable pnts2read=dimsize(sc_tempwave,0)
+	return pnts2read
 end
 
 function scfd_checkSweepstate()

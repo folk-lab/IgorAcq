@@ -931,7 +931,7 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
 	// wave-names
 	S.raw_wave_names = removeTrailingDelimiter(S.raw_wave_names)
 	
-	
+	remove_fd_files()/// delete all files in fdTest directory
 	print S
 end
 
@@ -1167,7 +1167,7 @@ end
 
 function sample_ADC(string adclist, variable nr_samples)
 	svar fd
-	variable chunksize=5000
+	variable chunksize=1000
 	variable level1
 	String cmd = "start-samples-acquisition"
 	wave adc_list
@@ -1190,7 +1190,7 @@ Function linear_ramp(S)
 	Struct ScanVars &S
 	String adcList
 	Variable nr_samples = S.numptsx
-	variable chunksize=2500
+	variable chunksize=5000
 	SVar fd
 	variable level1, level2, level3
 	variable i
@@ -1231,10 +1231,10 @@ Function linear_ramp(S)
 
 End
 
-Function awg_ramp(S,AWG)
+Function awg_ramp(S)
 	Struct ScanVars &S
-	Struct AWGVars &AWG
-
+	struct AWGVars AWG
+	fd_getGlobalAWG(AWG)
 	String adcList
 	Variable nr_samples = S.numptsx
 	variable chunksize=5000
@@ -1242,17 +1242,15 @@ Function awg_ramp(S,AWG)
 	variable level1, level2, level3,level4,level5
 	variable i,j
 	wave adc_list
-	jsonxop_release/a
-AWG.numCycles=1
+	AWG.numCycles=1//***
 
+	jsonxop_release/a
 	stringlist2wave(S.adcListIDs,"adc_list")
 	JSONXOP_New; level1=V_value
 	JSONXOP_New; level2=V_value
-
-
-	JSONXOP_AddValue/I=(82) level1, "/adc_sampling_time_us"
 	JSONXOP_AddValue/wave=adc_list level1, "/adcs_to_acquire"
 	JSONXOP_AddValue/T=(num2str(chunksize)) level1, "/chunk_max_samples"
+	JSONXOP_AddValue/I=(82) level1, "/adc_sampling_time_us"
 	JSONXOP_AddValue/T="temp_{{.ChunkIndex}}.dat" level1, "/chunk_file_name_template"
 
 	string dacChannel, minvalue, maxvalue
@@ -1279,60 +1277,58 @@ AWG.numCycles=1
 			elseif (boxnum[j] != unique_boxnum[i])
 				break
 			endif
-			
+
 		while (j < dimsize(boxnum, 0))
-		
-	JSONXOP_AddValue/JOIN=(level4) level3, "linear_ramps"
-	jsonxop_dump/ind=2 level3
 
-	level5=wave_pattern()
-	JSONXOP_AddValue/JOIN=(level5) level3, "wave_patterns"
+		JSONXOP_AddValue/I=(S.numptsx) level3, "/linear_ramp_steps"
+		JSONXOP_AddValue/JOIN=(level4) level3, "linear_ramps"
 
-	JSONXOP_AddValue/I=(Awg.numCycles) level3, "/patterns_per_linear_ramp_step"
-	JSONXOP_AddValue/I=(S.numptsx) level3, "/linear_ramp_steps"
+		JSONXOP_AddValue/I=(AWG.numCycles) level3, "/patterns_per_linear_ramp_step"
+		level5=wave_pattern()
+		JSONXOP_Addtree/T=1 level3, "wave_patterns"
+		JSONXOP_AddValue/JOIN=(level5) level3, "wave_patterns"
+		JSONXOP_AddValue/JOIN=(level3) level2, num2str(unique_boxnum[i])
 
-	JSONXOP_AddValue/JOIN=(level3) level2, num2str(unique_boxnum[i])
-
-	jsonxop_dump/ind=2 level3
-	jsonxop_release level3
+		jsonxop_dump/ind=2 level3
+		jsonxop_release level3
 	endfor
 
+
+	//JSONXOP_Addtree/T=1 level1, "/awgs"
 	JSONXOP_AddValue/JOIN=(level2) level1, "/awgs"
 	jsonxop_dump/ind=2 level1
 	print "Full textual representation:\r", S_value
-	
-		string cmd="start-awg"
-		String headers = "accept: application/json\nContent-Type: application/json"
-		command_save(S_value)
-		String response = postHTTP(fd, cmd, S_value, headers)
+
+	string cmd="start-awg"
+	String headers = "accept: application/json\nContent-Type: application/json"
+	command_save(S_value)
+	String response = postHTTP(fd, cmd, S_value, headers)
 End
 
 function wave_pattern()
-variable jsonId
-wave setpoint, samples, daclist
-variable N=dimsize(setpoint,0)
+//creates AWG wave for dacs
+	variable jsonId
+	wave setpoint, samples, daclist
+	variable N=dimsize(setpoint,0)
 
-    JSONXOP_New
-    jsonId = V_value
-     JSONXOP_AddValue/wave=daclist jsonid, "output_dacs"
+	JSONXOP_New
+	jsonId = V_value
+	JSONXOP_AddValue/wave=daclist jsonid, "output_dacs"
 
-    JSONXOP_AddTree/T=1 jsonId, "/dac_set_points"
-    JSONXOP_AddValue/OBJ=(N) jsonId, "/dac_set_points"
+	JSONXOP_AddTree/T=1 jsonId, "/dac_set_points"
+	JSONXOP_AddValue/OBJ=(N) jsonId, "/dac_set_points"
 
-variable i=0
-for (i=0;i<N;i=i+1)
-    JSONXOP_AddTree/T=0 jsonId, "/dac_set_points/"+num2str(i)+"/voltage"
-    JSONXOP_AddTree/T=0 jsonId, "/dac_set_points/"+num2str(i)+"/voltage"
+	variable i=0
+	for (i=0;i<N;i=i+1)
+		JSONXOP_AddTree/T=0 jsonId, "/dac_set_points/"+num2str(i)+"/voltage"
+		JSONXOP_AddTree/T=0 jsonId, "/dac_set_points/"+num2str(i)+"/voltage"
 
-    JSONXOP_AddValue/t="mV" jsonId, "/dac_set_points/"+num2str(i)+"/voltage/unit"
-    JSONXOP_AddValue/v=(setpoint[i]) jsonId, "/dac_set_points/"+num2str(i)+"/voltage/value"
-    JSONXOP_AddValue/v=(samples[i]) jsonId, "/dac_set_points/"+num2str(i)+"/adc_samples"
-    endfor
+		JSONXOP_AddValue/t="mV" jsonId, "/dac_set_points/"+num2str(i)+"/voltage/unit"
+		JSONXOP_AddValue/v=(setpoint[i]) jsonId, "/dac_set_points/"+num2str(i)+"/voltage/value"
+		JSONXOP_AddValue/v=(samples[i]) jsonId, "/dac_set_points/"+num2str(i)+"/adc_samples"
+	endfor
 
-//    JSONXOP_Dump/IND=2 jsonId
-//    print "Full textual representation:\r", S_value
-//    JSONXOP_Release jsonId
-return jsonId
+	return jsonId
 End
 
 
@@ -1387,6 +1383,17 @@ end
 
 
 
+function remove_fd_files()
+variable i
+string currentfile
+	String fileList = IndexedFile(fdTest, -1, ".dat") // List all .dat files in fdTest
+	Variable numFiles = ItemsInList(fileList)
+	for (i = 0; i < numFiles; i += 1)
+				currentFile = StringFromList(i, fileList)
+
+		DeleteFile/P=fdTest/Z=1 currentFile // Delete the file after processing
+	endfor
+end
 
 
 
