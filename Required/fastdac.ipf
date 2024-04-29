@@ -189,6 +189,9 @@ function setADC_speed()
 	wave/t ADC_channel
 	variable i = 0
 	do 
+		if (mod(i,4)==0)
+		reset_adc(i)
+		endif
 		set_one_fadcSpeed(i)
 		i = i + 1
 	while(i<dimsize(ADC_channel, 0))
@@ -1096,6 +1099,7 @@ end
 
 
 function set_one_fadcSpeed(int adcValue)
+// this is done in initfastDAC()
 	svar fd
 	wave/t ADC_channel
 	String cmd = "set-adc-sampling-time"
@@ -1103,6 +1107,21 @@ function set_one_fadcSpeed(int adcValue)
 	String payload=""
 	payload = "{\"access_token\": \"string\", \"fqpn\": \""  +ADC_channel[2]+ "\", \"sampling_time_us\": " + num2str(82) + "}"
 	String headers = "accept: application/json\nContent-Type: application/json"
+	// Perform the HTTP PUT request
+	String response = postHTTP(fd, cmd, payload, headers)
+end
+
+function reset_adc(int adcValue)
+/// this command resets all ADC in a box
+/// this command is called in initFastDAC()
+	svar fd
+	wave/t ADC_channel
+	variable fd_num
+	fd_num=floor(str2num(ADC_channel[adcValue]))
+	String cmd = "reset-adcs/"
+	String payload=""
+	payload = num2str(fd_num)
+	String headers = "accept: application/json"
 	// Perform the HTTP PUT request
 	String response = postHTTP(fd, cmd, payload, headers)
 end
@@ -1346,41 +1365,6 @@ function linear_ramps_json(string maxvalue,string minvalue)
 	return level5
 
 end
-
-
-
-
-
-//Function awg_ramp()
-//    String cmd = "start-awg"
-//    String adcList = "\"1.0\", \"11.0\""
-//    Variable nr_samples = 13000
-//    Variable chunkSize = 5000
-//    svar fd
-//   
-//    String payload = "{\"adcs_to_acquire\": [" + adcList + "], "
-//    payload += "\"chunk_max_samples\": \"" + num2str(chunkSize) + "\", "
-//    payload += "\"adc_sampling_time_us\":" + num2str(82) + ", "
-//    payload += "\"chunk_file_name_template\": \"temp_{{.ChunkIndex}}.dat\", "
-//   // payload += "\"nr_steps\":" + num2istr(nr_samples) + ", "
-//    payload += "\"awgs\": {"
-//   
-//    payload += CreateAWGJsonString("1", 100, 3, "1,2", "1000,2000", "-1000,-2000", "0,3", "50", "100")
-//    payload += CreateAWGJsonString("11", 100, 3, "1,2", "1000,2000", "-1000,-2000", "0,3", "50", "100")
-//    payload = RemoveEnding(payload, ",")  // Remove last comma from AWG entries if needed
-//
-//    payload += "}, \"independent_linear_ramps\":"
-//    payload += CreatePayload("1.0,1.3,11.0,11.3", "0,0,0,0", "1000,1300,1100,1130")
-//    payload += "}"
-//    
-//    print payload
-//    String headers = "accept: application/json\nContent-Type: application/json"
-//    String response = postHTTP(fd, cmd, payload, headers)
-//    print response
-//End
-//
-//
-
 
 
 function remove_fd_files()
