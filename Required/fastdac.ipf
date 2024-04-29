@@ -1012,7 +1012,21 @@ function get_number_of_fastdacs()
 	return num_fastdac
 end
 
+function get_boxnum_dacnum(string daclist)
 
+int N=ItemsInList(daclist, ",");
+	make/o/n=(N) boxnum
+	make/o/n=(N) dacnum
+	variable fd_num
+	variable fd_ch
+	variable i
+	for (i = 0; i < ItemsInList(daclist, ","); i += 1)
+		[fd_num, fd_ch] = get_fastdac_num_ch_string(stringfromlist(i,daclist,","))
+		boxnum[i]=fd_num
+		dacnum[i]=fd_ch
+	endfor
+	FindDuplicates/INDX=indexWave/RN=unique_boxnum boxnum
+end
 
 function [variable fd_num, variable fd_ch] get_fastdac_num_ch_variable(variable fd_num_ch)
 	// get_fastdac_num_ch_variable(6.1) returns variable [6, 1]
