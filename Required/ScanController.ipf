@@ -454,40 +454,37 @@ Function/S scu_getChannelNumbers(string channels)
     
     // Initialize variables for processing
     String new_channels = "", err_msg
-    Variable i = 0
     String ch
+    Wave/T fdacvalstr  // Assuming fdacvalstr contains FastDAC channel info
     
-    // Process for FastDAC channels
-
-        Wave/T fdacvalstr  // Assuming fdacvalstr contains FastDAC channel info
-        for(i=0;i<itemsinlist(channels, ",");i+=1)
-            // Extract and trim each channel identifier from the list
-            ch = stringfromlist(i, channels, ",")
-            ch = removeLeadingWhitespace(ch)
-            ch = removeTrailingWhiteSpace(ch)
-            
-            // Check if the channel identifier is not numeric and not empty
-            if(numtype(str2num(ch)) != 0 && cmpstr(ch,""))
-                // Search for the channel identifier in FastDAC configuration
-                duplicate/o/free/t/r=[][3] fdacvalstr fdacnames
-                findvalue/RMD=[][3]/TEXT=ch/TXOP=5 fdacnames
-                if(V_Value == -1)  // If not found, abort with error
-                    sprintf err_msg "ERROR[scu_getChannelNumbers]:No FastDAC channel found with name %s", ch
-                    abort err_msg
-                else  // If found, use the corresponding channel number
-                    ch = fdacvalstr[V_value][0]
-                endif
+    // Process for FastDAC channels 
+    int i 
+    for(i = 0; i < itemsinlist(channels, ","); i++)
+        // Extract and trim each channel identifier from the list
+        ch = stringfromlist(i, channels, ",")
+        ch = removeLeadingWhitespace(ch)
+        ch = removeTrailingWhiteSpace(ch)
+        
+        // Check if the channel identifier is not numeric and not empty
+        if(numtype(str2num(ch)) != 0 && cmpstr(ch,""))
+            // Search for the channel identifier in FastDAC configuration
+            duplicate/o/free/t/r=[][3] fdacvalstr fdacnames
+            findvalue/RMD=[][3]/TEXT=ch/TXOP=5 fdacnames
+            if(V_Value == -1)  // If not found, abort with error
+                sprintf err_msg "ERROR[scu_getChannelNumbers]:No FastDAC channel found with name %s", ch
+                abort err_msg
+            else  // If found, use the corresponding channel number
+                ch = fdacvalstr[V_value][0]
             endif
-            // Add the processed channel to the new_channels list
-            new_channels = addlistitem(ch, new_channels, ",", INF)
-        endfor
+        endif
+        // Add the processed channel to the new_channels list
+        new_channels = addlistitem(ch, new_channels, ",", INF)
+    endfor
 
     
     // Clean up: Remove the trailing comma from the new_channels string
-    if(strlen(new_channels) > 0)
-        new_channels = new_channels[0,strlen(new_channels)-1]
-    endif
-    
+	new_channels = removetrailingDelimiter(new_channels)
+
     return new_channels
 End
 
@@ -627,46 +624,6 @@ function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, ra
 	S.finys = removeTrailingDelimiter(S.finys)
 end
 
-
-function get_dacListIDs(S)
-
-	struct ScanVars &S
-	string  new_channels
-	
-	//*** I don't think this function is still necessary now that channels are only referred to in XX.xx format and we don't care about chan_no anymore.
-//	This is now the same as S.channelsx. But there is an issue with the dacListIDs_y so that needs to be figured out
-
-	// working out DACLIstIDs for x channels
-	new_channels=scu_getChannelNumbers(S.channelsx) /// this returns a string with x DAC channels
-	wave numericwave
-	wave/t dac_channel
-	variable i
-	S.daclistids=S.channelsx
-	StringToListWave(S.daclistids)
-	string returnlist=""
-	
-	variable fastdac_index
-	for (i = 0; i < dimsize(numericwave, 0); i = i + 1)
-		fastdac_index = get_fastdac_index(num2str(numericwave[i]), return_adc_index = 0)
-		returnlist = returnlist + dac_channel[fastdac_index] + ","
-	endfor
-//	S.dacListIDs = removeTrailingDelimiter(returnlist);
-
-	// working out DACLIstIDs for y channels
-	new_channels=scu_getChannelNumbers(S.channelsy) /// this returns a string with x DAC channels
-	S.dacListIDs_y=S.channelsy
-	returnlist=""
-	if((S.is2d == 1) && (strlen(S.dacListIDs_y) > 1))
-		StringToListWave(S.dacListIDs_y)
-
-		for (i = 0; i < dimsize(numericwave, 0); i = i + 1)
-			fastdac_index = get_fastdac_index(num2str(numericwave[i]), return_adc_index = 0)
-			returnlist = returnlist + dac_channel[fastdac_index] + ","
-		endfor
-//		S.dacListIDs_y = removeTrailingDelimiter(returnlist); 
-	endif
-
-end
 
 
 function/S scf_getRecordedFADCinfo(info_name, [column])
@@ -924,6 +881,7 @@ end
 
 function scv_setNumptsSweeprateDuration(S)
 	// Set all of S.numptsx, S.sweeprate, S.duration based on whichever of those is provided
+	// Note: Valid for start/fin only (uses S.startx, S.finx NOT S.startxs, S.finxs)
 	Struct ScanVars &S
 	 // If NaN then set to zero so rest of logic works
    if(numtype(S.sweeprate) == 2)
@@ -1100,8 +1058,7 @@ function sci_initializeWaves(S)  // TODO: rename
 	
     struct ScanVars &S
   
-    S.wavelen=404
-   S.numCycles=1
+
     
     variable numpts  //Numpts to initialize wave with, note: for Filtered data, this number is reduced
     string wavenames, wn, rawwavenames, rwn
@@ -2215,8 +2172,7 @@ Function scfd_SendCommandAndRead(S,rowNum, [ skip_raw2calc])
 	scfd_resetraw_waves()
 	// Loop to read data until the expected number of points is reached
 	Do
-		              sleep/s 0.41// Short pause to allow for data acquisition
-
+		sleep/s 0.1// Short pause to allow for data acquisition
 		numpnts_read = loadfiles(S,numpnts_read)  // Load data from files
 		pnts2read=scfd_raw2CalcQuickDistribute(0)  // 0 or 1 for if data should be displayed decimated or not during the scan
 		scfd_checkSweepstate()

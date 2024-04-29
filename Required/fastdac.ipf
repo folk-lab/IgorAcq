@@ -792,7 +792,7 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
     string interlaced_channels, interlaced_setpoints
     string comments
 	
-    // Defaulting optional string parameters to empty if not provided
+    ///// Defaulting optional string parameters to empty if not provided /////
 	channelsy = selectString(paramIsDefault(channelsy), channelsy, "")
 	startys = selectString(paramIsDefault(startys), startys, "")
 	finys = selectString(paramIsDefault(finys), finys, "")
@@ -811,14 +811,14 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
 	use_awg = paramisdefault(use_awg) ? 0 : use_awg  
 
 
-	// Standard initialization
+	///// Standard initialization /////
 	initScanVars(S, startx=startx, finx=finx, channelsx=channelsx, numptsx=numptsx, delayx=delayx, rampratex=rampratex,\
 	starty=starty, finy=finy, channelsy=channelsy, numptsy=numptsy, rampratey=rampratey, delayy=delayy, \
 	x_label=x_label, y_label=y_label, startxs=startxs, finxs=finxs, startys=startys, finys=finys, alternate=alternate,\
 	interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments)
 	
 	
-	// Additional intialization for fastDAC scans
+	///// Additional intialization for fastDAC scans /////
 	string temp
 	S.sweeprate = sweeprate
 	S.duration = duration
@@ -829,18 +829,22 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
 	S.fakerecords = "0"
 	S.lastread = -1
   
-   
 	S.raw_wave_names=scf_getRecordedFADCinfo("raw_names")
 	svar fd
 	S.instrIDs=fd
-	S.use_awg=use_awg
-
-   
-
-	// Sets channelsx, channelsy to be lists of channel numbers instead of labels
+	
+	
+	///// Setting up AWG /////
+	S.use_awg = use_awg
+	S.wavelen = 1  //*** fix this later
+	S.numcycles = 1
+	
+	
+	///// Sets channelsx, channelsy to be lists of channel numbers instead of labels /////
 	scv_setChannels(S, channelsx, channelsy, fastdac=1)  
      
-   	// Get Labels for graphs
+     
+   	///// Get Labels for graphs /////
    	S.x_label = selectString(strlen(x_label) > 0, scu_getDacLabel(S.channelsx, fastdac=1), x_label)  // Uses channels as list of numbers, and only if x_label not passed in
    	if (S.is2d)
    		S.y_label = selectString(strlen(y_label) > 0, scu_getDacLabel(S.channelsy, fastdac=1), y_label) 
@@ -848,24 +852,22 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
    		S.y_label = y_label
    	endif  		
 	
-	get_dacListIDs(S)
+	
+	///// Setting daclistids for x and y /////
+	S.daclistids = scu_getChannelNumbers(S.channelsx) //** Not sure if we even need daclistids in the future...
+	S.dacListIDs_y = scu_getChannelNumbers(S.channelsy)
 
+
+	///// Setting x and y setpoints /////
 	scv_setSetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
 	
 	
-	// Set variables with some calculation
+	///// Set variables with some calculation /////
     scv_setFreq(S=S) 		// Sets S.samplingFreq/measureFreq/numADCs	
     scv_setNumptsSweeprateDuration(S) 	// Checks that either numpts OR sweeprate OR duration was provided, and sets ScanVars accordingly
-                                       // Note: Valid for start/fin only (uses S.startx, S.finx NOT S.startxs, S.finxs)
+             
                                 
-   ///// for 2D scans //////////////////////////////////////////////////////////////////////////////////////////////////
-   if(!x_only)
-   		S.channelsy = scu_getChannelNumbers(channelsy)				// converting from channel labels to numbers
-		S.y_label = scu_getDacLabel(S.channelsy)						// setting the y_label
-   endif
-
-
-	// Fix ramprate if zero
+	///// Setting ramprate if zero /////
 	variable fastdac_index
 	wave /t fdacvalstr
 	if (rampratex == 0)
@@ -881,7 +883,7 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
 	scv_setLastScanVars(S)
 	
 	
-	// removing delimiters
+	///// Removing delimiters /////
 	// x-channel
 	S.channelsx = removeTrailingDelimiter(S.channelsx)
 	S.startxs = removeTrailingDelimiter(S.startxs)
@@ -904,7 +906,9 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
 	// wave-names
 	S.raw_wave_names = removeTrailingDelimiter(S.raw_wave_names)
 	
-	remove_fd_files()/// delete all files in fdTest directory
+	
+	///// Delete all files in fdTest directory /////
+	remove_fd_files()
 	print S
 end
 
@@ -1243,7 +1247,7 @@ Function awg_ramp(S)
 	variable level1, level2, level3,level4,level5
 	variable i,j
 	wave adc_list
-	S.numCycles=1//***
+//	S.numCycles=1//***
 
 	jsonxop_release/a
 	stringlist2wave(S.adcListIDs,"adc_list")
