@@ -188,10 +188,7 @@ function setADC_speed()
 	svar fd
 	wave/t ADC_channel
 	variable i = 0
-	do 
-		if (mod(i,4)==0)
-		reset_adc(i)
-		endif
+	do
 		set_one_fadcSpeed(i)
 		i = i + 1
 	while(i<dimsize(ADC_channel, 0))
@@ -525,86 +522,39 @@ end
 
 
 
-function fd_initGlobalAWG()
-	Struct AWGVars S
-	// Set empty strings instead of null
-	S.AW_waves   = ""
-	S.AW_dacs    = ""
-	S.AW_dacs2   = ""
-	S.channels_AW0   = ""
-	S.channels_AW1   = ""
-	S.channelIDs = ""
-	S.InstrIDs   = "" 
-	
-	fd_setGlobalAWG(S)
-end
+//function fd_initGlobalAWG()
+//	Struct AWGVars S
+//	// Set empty strings instead of null
+//	S.AW_waves   = ""
+//	S.AW_dacs    = ""
+//	S.AW_dacs2   = ""
+//	S.channels_AW0   = ""
+//	S.channels_AW1   = ""
+//	S.channelIDs = ""
+//	S.InstrIDs   = "" 
+//	
+//	fd_setGlobalAWG(S)
+//end
 
 
-function fd_setGlobalAWG(S)
-	// Function to store values from AWG_list to global variables/strings/waves
-	// StructPut ONLY stores VARIABLES so have to store other parts separately
-	struct AWGVars &S
-
-	// Store String parts  
-	make/o/t fd_AWGglobalStrings = {S.AW_Waves, S.AW_dacs, S.AW_dacs2, S.channels_AW0, S.channels_AW1, S.channelIDs, S.InstrIDs}
-
-	// Store variable parts
-	make/o fd_AWGglobalVars = {S.initialized, S.use_AWG, S.lims_checked, S.waveLen, S.numADCs, S.samplingFreq,\
-		S.measureFreq, S.numWaves, S.numCycles, S.numSteps, S.maxADCs}
-end
-
-
-function SetAWG(A, state)
-	// Set use_awg state to 1 or 0
-	struct AWGVars &A
-	variable state
-	
-	if (state != 0 && state != 1)
-		abort "ERROR[SetAWGuseState]: value must be 0 or 1"
-	endif
-	if (A.initialized == 0 || numtype(strlen(A.AW_Waves)) != 0 || numtype(strlen(A.AW_dacs)) != 0)
-		fd_getGlobalAWG(A)
-	endif
-	A.use_awg = state
-	fd_setGlobalAWG(A)
-end
+//function fd_setGlobalAWG(S)
+//	// Function to store values from AWG_list to global variables/strings/waves
+//	// StructPut ONLY stores VARIABLES so have to store other parts separately
+//	struct AWGVars &S
+//
+//	// Store String parts  
+//	make/o/t fd_AWGglobalStrings = {S.AW_Waves, S.AW_dacs, S.AW_dacs2, S.channels_AW0, S.channels_AW1, S.channelIDs, S.InstrIDs}
+//
+//	// Store variable parts
+//	make/o fd_AWGglobalVars = {S.initialized, S.use_AWG, S.lims_checked, S.waveLen, S.numADCs, S.samplingFreq,\
+//		S.measureFreq, S.numWaves, S.numCycles, S.numSteps, S.maxADCs}
+//end
 
 
-function fd_getGlobalAWG(S)
-	// Function to get global values for AWG_list that were stored using set_global_AWG_list()
-	// StructPut ONLY gets VARIABLES
-	struct AWGVars &S
-	// Get string parts
-	wave/T t = fd_AWGglobalStrings
-	
-		if (!WaveExists(t))
-		fd_initGlobalAWG()
-		wave/T t = fd_AWGglobalStrings
-	endif
-	
-	S.AW_waves = t[0]
-	S.AW_dacs = t[1]
-	S.AW_dacs2 = t[2]
-	S.channels_AW0 = t[3]
-	S.channels_AW1 = t[4]
-	S.channelIDs = t[5]
-	S.instrIDs = t[6]
 
-	// Get variable parts
-	wave v = fd_AWGglobalVars
-	S.initialized = v[0]
-	S.use_AWG = v[1]  
-	S.lims_checked = 0 // Always initialized to zero so that checks have to be run before using in scan (see SetCheckAWG())
-	S.waveLen = v[3]
-	S.numADCs = v[4]
-	S.samplingFreq = v[5]
-	S.measureFreq = v[6]
-	S.numWaves = v[7]
-	S.numCycles = v[8]
-	S.numSteps = v[9]
-	S.maxADCs = v[10]
-	
-end
+
+
+
 
 //////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////// End of AWG stuff//////////////////////////////////////////////
@@ -1105,15 +1055,16 @@ function set_one_fadcSpeed(int adcValue)
 	String cmd = "set-adc-sampling-time"
 	// Convert variables to strings and construct the JSON payload dynamically
 	String payload=""
-	payload = "{\"access_token\": \"string\", \"fqpn\": \""  +ADC_channel[2]+ "\", \"sampling_time_us\": " + num2str(82) + "}"
+	payload = "{\"access_token\": \"string\", \"fqpn\": \""  +ADC_channel[adcValue]+ "\", \"sampling_time_us\": " + num2str(82) + "}"
 	String headers = "accept: application/json\nContent-Type: application/json"
 	// Perform the HTTP PUT request
 	String response = postHTTP(fd, cmd, payload, headers)
+	
 end
 
 function reset_adc(int adcValue)
 /// this command resets all ADC in a box
-/// this command is called in initFastDAC()
+//not sure what this function actually does
 	svar fd
 	wave/t ADC_channel
 	variable fd_num
@@ -1252,8 +1203,6 @@ End
 
 Function awg_ramp(S)
 	Struct ScanVars &S
-	struct AWGVars AWG
-	fd_getGlobalAWG(AWG)
 	String adcList
 	Variable nr_samples = S.numptsx
 	variable chunksize=5000
@@ -1261,7 +1210,7 @@ Function awg_ramp(S)
 	variable level1, level2, level3,level4,level5
 	variable i,j
 	wave adc_list
-	AWG.numCycles=1//***
+	S.numCycles=1//***
 
 	jsonxop_release/a
 	stringlist2wave(S.adcListIDs,"adc_list")
@@ -1302,7 +1251,7 @@ Function awg_ramp(S)
 		JSONXOP_AddValue/I=(S.numptsx) level3, "/linear_ramp_steps"
 		JSONXOP_AddValue/JOIN=(level4) level3, "linear_ramps"
 
-		JSONXOP_AddValue/I=(AWG.numCycles) level3, "/patterns_per_linear_ramp_step"
+		JSONXOP_AddValue/I=(S.numCycles) level3, "/patterns_per_linear_ramp_step"
 		level5=wave_pattern()
 		JSONXOP_Addtree/T=1 level3, "wave_patterns"
 		JSONXOP_AddValue/JOIN=(level5) level3, "wave_patterns"

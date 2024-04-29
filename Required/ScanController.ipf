@@ -905,13 +905,12 @@ function scv_setSetpoints(S, itemsx, startx, finx, itemsy, starty, finy, startxs
 	endif
 end
 
-function scv_setFreq([S,A])
+function scv_setFreq([S])
 	// Set S.samplingFreq, S.numADCs, S.measureFreq
 	// measureFreq is set now based on maxADCs (numADCs per fastDAC selected for recording)
 	// for now assume all ADC are set to max speed
 	
 	Struct ScanVars &S
-	Struct AWGvars &A
 	
 	S.samplingFreq = 1 / 82 * 1e6;
 	
@@ -1099,10 +1098,9 @@ function sci_initializeWaves(S)  // TODO: rename
 	//	(This will be after calc (i.e. don't need before and after calc wave))
 	
     struct ScanVars &S
-    struct AWGVars AWG
-    fd_getGlobalAWG(AWG)
-    AWG.wavelen=404
-    AWG.numCycles=1
+  
+    S.wavelen=404
+   S.numCycles=1
     
     variable numpts  //Numpts to initialize wave with, note: for Filtered data, this number is reduced
     string wavenames, wn, rawwavenames, rwn
@@ -1125,7 +1123,7 @@ function sci_initializeWaves(S)  // TODO: rename
 			if (S.using_fastdac && fadcattr[str2num(wavenum)][8] == 48) // Checkbox checked
 				numpts = (raw) ? S.numptsx : scfd_postFilterNumpts(S.numptsx, S.measureFreq)
 			else
-				numpts = S.numptsx*AWG.wavelen*AWG.numCycles
+				numpts = S.numptsx*S.wavelen*S.numCycles
 			endif
 
 			sci_init1DWave(wn, numpts, S.startx, S.finx)
@@ -1142,23 +1140,23 @@ function sci_initializeWaves(S)  // TODO: rename
 			          	//sci_init1DWave(wn+"cold", S.numptsx/AWG.waveLen, S.startx, S.finx)
 			
 			          	if(S.is2d == 1)
-			          		sci_init2DWave(wn+"hot_2d", S.numptsx/AWG.waveLen, S.startx, S.finx, S.numptsy, S.starty, S.finy)
-			          		sci_init2DWave(wn+"cold_2d", S.numptsx/AWG.waveLen, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+			          		sci_init2DWave(wn+"hot_2d", S.numptsx/S.waveLen, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+			          		sci_init2DWave(wn+"cold_2d", S.numptsx/S.waveLen, S.startx, S.finx, S.numptsy, S.starty, S.finy)
 			          	endif
 			
 			        endif
 
 //			//initializing 1d waves for demodulation
 			if (S.using_fastdac && raw == 0 && fadcattr[str2num(wavenum)][6] == 48)
-				sci_init1DWave(wn+"x", S.numptsx/AWG.waveLen/AWG.numCycles, S.startx, S.finx)
-				sci_init1DWave(wn+"y", S.numptsx/AWG.waveLen/AWG.numCycles, S.startx, S.finx)
+				sci_init1DWave(wn+"x", S.numptsx/S.waveLen/S.numCycles, S.startx, S.finx)
+				sci_init1DWave(wn+"y", S.numptsx/S.waveLen/S.numCycles, S.startx, S.finx)
 
 				//initializing 2d waves for demodulation
 				if (s.is2d == 1)
-					sci_init2DWave(wn+"x_2d", S.numptsx/AWG.waveLen/AWG.numCycles, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+					sci_init2DWave(wn+"x_2d", S.numptsx/S.waveLen/S.numCycles, S.startx, S.finx, S.numptsy, S.starty, S.finy)
 
 					if (sc_demody == 1)
-						sci_init2DWave(wn+"y_2d", S.numptsx/AWG.waveLen/AWG.numCycles, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+						sci_init2DWave(wn+"y_2d", S.numptsx/S.waveLen/S.numCycles, S.startx, S.finx, S.numptsy, S.starty, S.finy)
 					endif
 
 				endif
@@ -2127,12 +2125,11 @@ end
 
 
 
-function scfd_RecordValues(S, rowNum, [AWG_list, linestart, skip_data_distribution, skip_raw2calc])  // TODO: Rename to fd_record_values
+function scfd_RecordValues(S, rowNum, [ linestart, skip_data_distribution, skip_raw2calc])  // TODO: Rename to fd_record_values
 	// this function is predominantly used in scanfastdac functions. It is for ramping and recording a certain axis 
 	struct ScanVars &S			// Contains all scan details such as instrIDs, xchannels, ychannels...
 	variable rowNum, linestart
 	variable skip_data_distribution, skip_raw2calc // For recording data without doing any calculation or distribution of data
-	struct AWGVars &AWG_list
 	
 	if(paramisdefault(skip_raw2calc))  // If skip_raw2calc not passed set it to 0
 		skip_raw2calc=0
@@ -2141,12 +2138,6 @@ function scfd_RecordValues(S, rowNum, [AWG_list, linestart, skip_data_distributi
 		
 	// If passed AWG_list with AWG_list.lims_checked == 1 then it will run with the Arbitrary Wave Generator on
 	// Note: Only works for 1 FastDAC! Not sure what implementation will look like for multiple yet
-
-	// Check if AWG is going to be used
-	Struct AWGVars AWG  // Note: Default has AWG.lims_checked = 0
-	if(!paramisdefault(AWG_list))  // If AWG_list passed, then overwrite default
-		AWG = AWG_list
-	endif 
 		 
 
 	// If beginning of scan, record start time
@@ -2157,7 +2148,7 @@ function scfd_RecordValues(S, rowNum, [AWG_list, linestart, skip_data_distributi
 	
 	// Send command and read values
 	//print "sending command and reading"
-	scfd_SendCommandAndRead(S, AWG, rowNum, skip_raw2calc=skip_raw2calc) 
+	scfd_SendCommandAndRead(S, rowNum, skip_raw2calc=skip_raw2calc) 
 	
 	if (rowNum == (S.numptsy - 1))  
 		S.end_time = datetime - S.start_time
@@ -2167,7 +2158,7 @@ function scfd_RecordValues(S, rowNum, [AWG_list, linestart, skip_data_distributi
 	
 	// Process 1D read and distribute
 	if (!skip_data_distribution)
-		scfd_ProcessAndDistribute(S, AWG, rowNum) 	
+		scfd_ProcessAndDistribute(S, rowNum) 	
 	endif
 end
 
@@ -2183,7 +2174,7 @@ function scfd_checkRawSave()
 	endif
 end
 
-Function scfd_SendCommandAndRead(S,AWG_list,rowNum, [ skip_raw2calc])
+Function scfd_SendCommandAndRead(S,rowNum, [ skip_raw2calc])
 	// Sends a command for a 1D sweep to FastDAC and records the raw data returned.
 	// Optionally skips processing raw data into calculated waves based on skip_raw2calc flag.
 	//
@@ -2194,7 +2185,6 @@ Function scfd_SendCommandAndRead(S,AWG_list,rowNum, [ skip_raw2calc])
 	// skip_raw2calc: Optional flag to skip the conversion of raw waves to calculated waves.
 
 	Struct ScanVars &S
-	Struct AWGVars &AWG_list
 	Variable rowNum
 	Variable skip_raw2calc  // Optional flag to skip processing of raw data
 	String cmd_sent  // Command sent to FastDAC (currently not used but initialized)
@@ -2215,7 +2205,7 @@ Function scfd_SendCommandAndRead(S,AWG_list,rowNum, [ skip_raw2calc])
 
 
 	// Start the sweep
-	fd_start_sweep(S, AWG_list = AWG_list)
+	fd_start_sweep(S)
 	S.lastread = -1  // Reset the last read index
 
 
@@ -2315,10 +2305,9 @@ End
 
 
 
-function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
+function scfd_ProcessAndDistribute(ScanVars, rowNum)
 	// Get 1D wave names, duplicate each wave then resample, notch filter and copy into calc wave (and do calc string)
 	struct ScanVars &ScanVars
-	struct AWGVars &AWGVars
 	variable rowNum
 	
 	variable i = 0
@@ -2354,13 +2343,13 @@ function scfd_ProcessAndDistribute(ScanVars, AWGVars, rowNum)
 		endif
 
 		if(sc_hotcold == 1)
-			scfd_sqw_analysis(sc_tempwave, sc_hotcolddelay, AWGVars.waveLen, cwn)
+			scfd_sqw_analysis(sc_tempwave, sc_hotcolddelay, Scanvars.waveLen, cwn)
 			resamp=0
 		endif
 
 
 		if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
-			scfd_demodulate(sc_tempwave, str2num(fadcvalstr[str2num(ADCnum)][7]), AWGVars.numCycles, AWGVars.waveLen, cwn)
+			scfd_demodulate(sc_tempwave, str2num(fadcvalstr[str2num(ADCnum)][7]), Scanvars.numCycles, Scanvars.waveLen, cwn)
 
 
 			//calc function for demod x

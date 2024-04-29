@@ -6,44 +6,6 @@
 ///////////// Structs ////////////////
 //////////////////////////////////////
 
-	Structure AWGVars
-	// strings/waves/etc //
-	// Convenience
-	string AW_Waves		// Which AWs to use e.g. "2" for AW_2 only, "1,2" for fdAW_1 and fdAW_2. (only supports 1 and 2 so far)
-
-	// Used in AWG_RAMP
-	string AW_dacs		// Dacs to use for waves
-	// Note: AW_dacs is formatted (dacs_for_wave0, dacs_for_wave1, .... e.g. '01,23' for Dacs 0,1 to output wave0, Dacs 2,3 to output wave1)
-
-	// Variables //
-	// Convenience
-	variable initialized	// Must set to 1 in order for this to be used in fd_Record_Values (this is per setup change basis)
-	variable use_AWG 		// Is AWG going to be on during the scan
-	variable lims_checked 	// Have limits been checked before scanning
-	variable waveLen			// in samples (i.e. sum of samples at each setpoint for a single wave cycle)
-
-	// Checking things don't change
-	variable numADCs  	// num ADCs selected to measure when setting up AWG
-	variable samplingFreq // SampleFreq when setting up AWG
-	variable measureFreq // MeasureFreq when setting up AWG
-
-	// Used in AWG_Ramp
-	variable numWaves	// Number of AWs being used
-	variable numCycles 	// # wave cycles per DAC step for a full 1D scan
-	variable numSteps  	// # DAC steps for a full 1D scan
-
-	//for master/slave use
-	string AW_dacs2    //stringkey with fdIDs
-	variable maxADCs   //max amount of ADCs
-	string channels_AW0
-	string channels_AW1
-	string channelIDs
-	string InstrIDs
-
-
-
-	endstructure
-
 
 	/////////////////////////////////////////////////
 	//////////////////  ScanVars /////////////////// (scv_...)
@@ -110,7 +72,16 @@
 	string adcLists      	// adclist by id -> attempting to use stringbykey
 	string IDstartxs, IDfinxs  // If sweeping from different start/end points for each channel or instrument / This one is a stringkey with fdIDs
 	string dacListIDs_y     // Ids for channely (for now, not sure ill change this yet)
+
+	//// AWG usage
 	variable use_AWG 		// Is AWG going to be on during the scan; redundant but then AWG will not have to be passed if not needed
+	variable waveLen			// in samples (i.e. sum of samples at each setpoint for a single wave cycle)
+	variable numCycles 	// # wave cycles per DAC step for a full 1D scan
+	string AWG_DACs  // DACs to use in AWGs if we have 5 AWG waves, it would look like this: "11.1,11.0"; 1.0,1.3,1.2",....
+	// so the list is a semi-coma separated string with the DACs coma-separated. ///*** maybe we will come up with a better
+	//						solution for this
+
+
 
 
 	endstructure
@@ -147,6 +118,7 @@ Function scv_getLastScanVars(S)
 		S.IDfinxs = sc_lastScanVarsStrings[18]
 		S.dacListIDs_y = sc_lastScanVarsStrings[19]
 		S.comments = sc_lastScanVarsStrings[20]
+		S.AWG_DACs=sc_lastScanVarsStrings[21]
 
 		// Ensure this list matches the actual global storage structure and contents
 	Else
@@ -190,6 +162,8 @@ Function scv_getLastScanVars(S)
 		S.sync = sc_lastScanVarsVariables[31]
 		S.maxADCs = sc_lastScanVarsVariables[32]
 		S.use_AWG= 	sc_lastScanVarsVariables[33]	// Is AWG going to be on during the scan
+		S.wavelen=sc_lastScanVarsVariables[34]
+		S.numCycles=sc_lastScanVarsVariables[35]
 
 
 		// Ensure this list matches the actual global storage structure and contents
@@ -208,8 +182,8 @@ Function scv_setLastScanVars(S)
 	Struct ScanVars &S
 
 	// Ensure global waves for storing string and numeric values exist
-	Make/o/T/N=(21) sc_lastScanVarsStrings // Adjust size for the number of string fields
-	Make/o/N=(34) sc_lastScanVarsVariables // Adjust size for the number of numeric fields
+	Make/o/T/N=(22) sc_lastScanVarsStrings // Adjust size for the number of string fields
+	Make/o/N=(36) sc_lastScanVarsVariables // Adjust size for the number of numeric fields
 
 	// Storing string fields to sc_lastScanVarsStrings wave
 	sc_lastScanVarsStrings[0] = S.channelsx  //FD xchannel numbers
@@ -269,6 +243,8 @@ Function scv_setLastScanVars(S)
 	sc_lastScanVarsVariables[31] = S.sync
 	sc_lastScanVarsVariables[32] = S.maxADCs
 	sc_lastScanVarsVariables[33] = S.use_AWG
+	sc_lastScanVarsVariables[34]=S.wavelen
+	sc_lastScanVarsVariables[35]=S.numCycles
 
 End
 
