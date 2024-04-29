@@ -215,12 +215,8 @@ end
 
 
 
-function/s fd_start_sweep(S, [AWG_list])
+function/s fd_start_sweep(S)
 	Struct ScanVars &S
-	Struct AWGVars &AWG_List
-	//	int i
-	//	string cmd="//*"
-	//	
 	print S
 	string adcList=S.adcList;
 	string startxs=S.startxs;
