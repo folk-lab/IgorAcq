@@ -541,16 +541,15 @@ function saveFastdacInfoWaves(hdfids, S)
 		
 	
 		// Add AWs used to HDF file if used
-		struct AWGVars AWG
-		fd_getGlobalAWG(AWG)
-		if (AWG.use_awg)
-			variable j
-			for(j=0;j<AWG.numWaves;j++)
-				// Get IGOR AW
-				//*wn = fd_getAWGwave(str2num(stringfromlist(j, AWG.AW_waves, ",")))
-				SaveSingleWaveToHDF(wn, hdfid)
-			endfor
-		endif
+//*** not sure if we have to use this
+//		if (S.use_awg)
+//			variable j
+//			for(j=0;j<AWG.numWaves;j++)
+//				// Get IGOR AW
+//				//*wn = fd_getAWGwave(str2num(stringfromlist(j, AWG.AW_waves, ",")))
+//				SaveSingleWaveToHDF(wn, hdfid)
+//			endfor
+//		endif
 	endfor
 end
 

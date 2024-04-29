@@ -199,7 +199,7 @@ function setADC_speed()
 	svar fd
 	wave/t ADC_channel
 	variable i = 0
-	do 
+	do
 		set_one_fadcSpeed(i)
 		i = i + 1
 	while(i<dimsize(ADC_channel, 0))
@@ -542,86 +542,39 @@ end
 
 
 
-function fd_initGlobalAWG()
-	Struct AWGVars S
-	// Set empty strings instead of null
-	S.AW_waves   = ""
-	S.AW_dacs    = ""
-	S.AW_dacs2   = ""
-	S.channels_AW0   = ""
-	S.channels_AW1   = ""
-	S.channelIDs = ""
-	S.InstrIDs   = "" 
-	
-	fd_setGlobalAWG(S)
-end
+//function fd_initGlobalAWG()
+//	Struct AWGVars S
+//	// Set empty strings instead of null
+//	S.AW_waves   = ""
+//	S.AW_dacs    = ""
+//	S.AW_dacs2   = ""
+//	S.channels_AW0   = ""
+//	S.channels_AW1   = ""
+//	S.channelIDs = ""
+//	S.InstrIDs   = "" 
+//	
+//	fd_setGlobalAWG(S)
+//end
 
 
-function fd_setGlobalAWG(S)
-	// Function to store values from AWG_list to global variables/strings/waves
-	// StructPut ONLY stores VARIABLES so have to store other parts separately
-	struct AWGVars &S
-
-	// Store String parts  
-	make/o/t fd_AWGglobalStrings = {S.AW_Waves, S.AW_dacs, S.AW_dacs2, S.channels_AW0, S.channels_AW1, S.channelIDs, S.InstrIDs}
-
-	// Store variable parts
-	make/o fd_AWGglobalVars = {S.initialized, S.use_AWG, S.lims_checked, S.waveLen, S.numADCs, S.samplingFreq,\
-		S.measureFreq, S.numWaves, S.numCycles, S.numSteps, S.maxADCs}
-end
-
-
-function SetAWG(A, state)
-	// Set use_awg state to 1 or 0
-	struct AWGVars &A
-	variable state
-	
-	if (state != 0 && state != 1)
-		abort "ERROR[SetAWGuseState]: value must be 0 or 1"
-	endif
-	if (A.initialized == 0 || numtype(strlen(A.AW_Waves)) != 0 || numtype(strlen(A.AW_dacs)) != 0)
-		fd_getGlobalAWG(A)
-	endif
-	A.use_awg = state
-	fd_setGlobalAWG(A)
-end
+//function fd_setGlobalAWG(S)
+//	// Function to store values from AWG_list to global variables/strings/waves
+//	// StructPut ONLY stores VARIABLES so have to store other parts separately
+//	struct AWGVars &S
+//
+//	// Store String parts  
+//	make/o/t fd_AWGglobalStrings = {S.AW_Waves, S.AW_dacs, S.AW_dacs2, S.channels_AW0, S.channels_AW1, S.channelIDs, S.InstrIDs}
+//
+//	// Store variable parts
+//	make/o fd_AWGglobalVars = {S.initialized, S.use_AWG, S.lims_checked, S.waveLen, S.numADCs, S.samplingFreq,\
+//		S.measureFreq, S.numWaves, S.numCycles, S.numSteps, S.maxADCs}
+//end
 
 
-function fd_getGlobalAWG(S)
-	// Function to get global values for AWG_list that were stored using set_global_AWG_list()
-	// StructPut ONLY gets VARIABLES
-	struct AWGVars &S
-	// Get string parts
-	wave/T t = fd_AWGglobalStrings
-	
-		if (!WaveExists(t))
-		fd_initGlobalAWG()
-		wave/T t = fd_AWGglobalStrings
-	endif
-	
-	S.AW_waves = t[0]
-	S.AW_dacs = t[1]
-	S.AW_dacs2 = t[2]
-	S.channels_AW0 = t[3]
-	S.channels_AW1 = t[4]
-	S.channelIDs = t[5]
-	S.instrIDs = t[6]
 
-	// Get variable parts
-	wave v = fd_AWGglobalVars
-	S.initialized = v[0]
-	S.use_AWG = v[1]  
-	S.lims_checked = 0 // Always initialized to zero so that checks have to be run before using in scan (see SetCheckAWG())
-	S.waveLen = v[3]
-	S.numADCs = v[4]
-	S.samplingFreq = v[5]
-	S.measureFreq = v[6]
-	S.numWaves = v[7]
-	S.numCycles = v[8]
-	S.numSteps = v[9]
-	S.maxADCs = v[10]
-	
-end
+
+
+
 
 //////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////// End of AWG stuff//////////////////////////////////////////////
@@ -951,7 +904,7 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
 	// wave-names
 	S.raw_wave_names = removeTrailingDelimiter(S.raw_wave_names)
 	
-	
+	remove_fd_files()/// delete all files in fdTest directory
 	print S
 end
 
@@ -1129,13 +1082,30 @@ end
 
 
 function set_one_fadcSpeed(int adcValue)
+// this is done in initfastDAC()
 	svar fd
 	wave/t ADC_channel
 	String cmd = "set-adc-sampling-time"
 	// Convert variables to strings and construct the JSON payload dynamically
 	String payload=""
-	payload = "{\"access_token\": \"string\", \"fqpn\": \""  +ADC_channel[2]+ "\", \"sampling_time_us\": " + num2str(82) + "}"
+	payload = "{\"access_token\": \"string\", \"fqpn\": \""  +ADC_channel[adcValue]+ "\", \"sampling_time_us\": " + num2str(82) + "}"
 	String headers = "accept: application/json\nContent-Type: application/json"
+	// Perform the HTTP PUT request
+	String response = postHTTP(fd, cmd, payload, headers)
+	
+end
+
+function reset_adc(int adcValue)
+/// this command resets all ADC in a box
+//not sure what this function actually does
+	svar fd
+	wave/t ADC_channel
+	variable fd_num
+	fd_num=floor(str2num(ADC_channel[adcValue]))
+	String cmd = "reset-adcs/"
+	String payload=""
+	payload = num2str(fd_num)
+	String headers = "accept: application/json"
 	// Perform the HTTP PUT request
 	String response = postHTTP(fd, cmd, payload, headers)
 end
@@ -1200,7 +1170,7 @@ end
 
 function sample_ADC(string adclist, variable nr_samples)
 	svar fd
-	variable chunksize=5000
+	variable chunksize=1000
 	variable level1
 	String cmd = "start-samples-acquisition"
 	wave adc_list
@@ -1223,7 +1193,7 @@ Function linear_ramp(S)
 	Struct ScanVars &S
 	String adcList
 	Variable nr_samples = S.numptsx
-	variable chunksize=2500
+	variable chunksize=5000
 	SVar fd
 	variable level1, level2, level3
 	variable i
@@ -1264,10 +1234,8 @@ Function linear_ramp(S)
 
 End
 
-Function awg_ramp(S,AWG)
+Function awg_ramp(S)
 	Struct ScanVars &S
-	Struct AWGVars &AWG
-
 	String adcList
 	Variable nr_samples = S.numptsx
 	variable chunksize=5000
@@ -1275,17 +1243,15 @@ Function awg_ramp(S,AWG)
 	variable level1, level2, level3,level4,level5
 	variable i,j
 	wave adc_list
-	jsonxop_release/a
-AWG.numCycles=1
+	S.numCycles=1//***
 
+	jsonxop_release/a
 	stringlist2wave(S.adcListIDs,"adc_list")
 	JSONXOP_New; level1=V_value
 	JSONXOP_New; level2=V_value
-
-
-	JSONXOP_AddValue/I=(82) level1, "/adc_sampling_time_us"
 	JSONXOP_AddValue/wave=adc_list level1, "/adcs_to_acquire"
 	JSONXOP_AddValue/T=(num2str(chunksize)) level1, "/chunk_max_samples"
+	JSONXOP_AddValue/I=(82) level1, "/adc_sampling_time_us"
 	JSONXOP_AddValue/T="temp_{{.ChunkIndex}}.dat" level1, "/chunk_file_name_template"
 
 	string dacChannel, minvalue, maxvalue
@@ -1312,60 +1278,58 @@ AWG.numCycles=1
 			elseif (boxnum[j] != unique_boxnum[i])
 				break
 			endif
-			
+
 		while (j < dimsize(boxnum, 0))
-		
-	JSONXOP_AddValue/JOIN=(level4) level3, "linear_ramps"
-	jsonxop_dump/ind=2 level3
 
-	level5=wave_pattern()
-	JSONXOP_AddValue/JOIN=(level5) level3, "wave_patterns"
+		JSONXOP_AddValue/I=(S.numptsx) level3, "/linear_ramp_steps"
+		JSONXOP_AddValue/JOIN=(level4) level3, "linear_ramps"
 
-	JSONXOP_AddValue/I=(Awg.numCycles) level3, "/patterns_per_linear_ramp_step"
-	JSONXOP_AddValue/I=(S.numptsx) level3, "/linear_ramp_steps"
+		JSONXOP_AddValue/I=(S.numCycles) level3, "/patterns_per_linear_ramp_step"
+		level5=wave_pattern()
+		JSONXOP_Addtree/T=1 level3, "wave_patterns"
+		JSONXOP_AddValue/JOIN=(level5) level3, "wave_patterns"
+		JSONXOP_AddValue/JOIN=(level3) level2, num2str(unique_boxnum[i])
 
-	JSONXOP_AddValue/JOIN=(level3) level2, num2str(unique_boxnum[i])
-
-	jsonxop_dump/ind=2 level3
-	jsonxop_release level3
+		jsonxop_dump/ind=2 level3
+		jsonxop_release level3
 	endfor
 
+
+	//JSONXOP_Addtree/T=1 level1, "/awgs"
 	JSONXOP_AddValue/JOIN=(level2) level1, "/awgs"
 	jsonxop_dump/ind=2 level1
 	print "Full textual representation:\r", S_value
-	
-		string cmd="start-awg"
-		String headers = "accept: application/json\nContent-Type: application/json"
-		command_save(S_value)
-		String response = postHTTP(fd, cmd, S_value, headers)
+
+	string cmd="start-awg"
+	String headers = "accept: application/json\nContent-Type: application/json"
+	command_save(S_value)
+	String response = postHTTP(fd, cmd, S_value, headers)
 End
 
 function wave_pattern()
-variable jsonId
-wave setpoint, samples, daclist
-variable N=dimsize(setpoint,0)
+//creates AWG wave for dacs
+	variable jsonId
+	wave setpoint, samples, daclist
+	variable N=dimsize(setpoint,0)
 
-    JSONXOP_New
-    jsonId = V_value
-     JSONXOP_AddValue/wave=daclist jsonid, "output_dacs"
+	JSONXOP_New
+	jsonId = V_value
+	JSONXOP_AddValue/wave=daclist jsonid, "output_dacs"
 
-    JSONXOP_AddTree/T=1 jsonId, "/dac_set_points"
-    JSONXOP_AddValue/OBJ=(N) jsonId, "/dac_set_points"
+	JSONXOP_AddTree/T=1 jsonId, "/dac_set_points"
+	JSONXOP_AddValue/OBJ=(N) jsonId, "/dac_set_points"
 
-variable i=0
-for (i=0;i<N;i=i+1)
-    JSONXOP_AddTree/T=0 jsonId, "/dac_set_points/"+num2str(i)+"/voltage"
-    JSONXOP_AddTree/T=0 jsonId, "/dac_set_points/"+num2str(i)+"/voltage"
+	variable i=0
+	for (i=0;i<N;i=i+1)
+		JSONXOP_AddTree/T=0 jsonId, "/dac_set_points/"+num2str(i)+"/voltage"
+		JSONXOP_AddTree/T=0 jsonId, "/dac_set_points/"+num2str(i)+"/voltage"
 
-    JSONXOP_AddValue/t="mV" jsonId, "/dac_set_points/"+num2str(i)+"/voltage/unit"
-    JSONXOP_AddValue/v=(setpoint[i]) jsonId, "/dac_set_points/"+num2str(i)+"/voltage/value"
-    JSONXOP_AddValue/v=(samples[i]) jsonId, "/dac_set_points/"+num2str(i)+"/adc_samples"
-    endfor
+		JSONXOP_AddValue/t="mV" jsonId, "/dac_set_points/"+num2str(i)+"/voltage/unit"
+		JSONXOP_AddValue/v=(setpoint[i]) jsonId, "/dac_set_points/"+num2str(i)+"/voltage/value"
+		JSONXOP_AddValue/v=(samples[i]) jsonId, "/dac_set_points/"+num2str(i)+"/adc_samples"
+	endfor
 
-//    JSONXOP_Dump/IND=2 jsonId
-//    print "Full textual representation:\r", S_value
-//    JSONXOP_Release jsonId
-return jsonId
+	return jsonId
 End
 
 
@@ -1385,41 +1349,17 @@ function linear_ramps_json(string maxvalue,string minvalue)
 end
 
 
+function remove_fd_files()
+variable i
+string currentfile
+	String fileList = IndexedFile(fdTest, -1, ".dat") // List all .dat files in fdTest
+	Variable numFiles = ItemsInList(fileList)
+	for (i = 0; i < numFiles; i += 1)
+				currentFile = StringFromList(i, fileList)
 
-
-
-//Function awg_ramp()
-//    String cmd = "start-awg"
-//    String adcList = "\"1.0\", \"11.0\""
-//    Variable nr_samples = 13000
-//    Variable chunkSize = 5000
-//    svar fd
-//   
-//    String payload = "{\"adcs_to_acquire\": [" + adcList + "], "
-//    payload += "\"chunk_max_samples\": \"" + num2str(chunkSize) + "\", "
-//    payload += "\"adc_sampling_time_us\":" + num2str(82) + ", "
-//    payload += "\"chunk_file_name_template\": \"temp_{{.ChunkIndex}}.dat\", "
-//   // payload += "\"nr_steps\":" + num2istr(nr_samples) + ", "
-//    payload += "\"awgs\": {"
-//   
-//    payload += CreateAWGJsonString("1", 100, 3, "1,2", "1000,2000", "-1000,-2000", "0,3", "50", "100")
-//    payload += CreateAWGJsonString("11", 100, 3, "1,2", "1000,2000", "-1000,-2000", "0,3", "50", "100")
-//    payload = RemoveEnding(payload, ",")  // Remove last comma from AWG entries if needed
-//
-//    payload += "}, \"independent_linear_ramps\":"
-//    payload += CreatePayload("1.0,1.3,11.0,11.3", "0,0,0,0", "1000,1300,1100,1130")
-//    payload += "}"
-//    
-//    print payload
-//    String headers = "accept: application/json\nContent-Type: application/json"
-//    String response = postHTTP(fd, cmd, payload, headers)
-//    print response
-//End
-//
-//
-
-
-
+		DeleteFile/P=fdTest/Z=1 currentFile // Delete the file after processing
+	endfor
+end
 
 
 
