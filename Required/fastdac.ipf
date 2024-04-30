@@ -1375,7 +1375,6 @@ function wave_pattern()
 End
 
 
-
 function linear_ramps_json(string maxvalue,string minvalue)
 
 	variable level5
@@ -1504,6 +1503,168 @@ function setPIDSlew(instrID, [slew]) // maximum slewrate in mV per second
 	print/D cmd
    	writeInstr(instrID, cmd+"\r")
 end
+
+
+
+/////////////
+//// AWG ////
+/////////////
+function fdawg_create(dac_channels, setpoints, wavelen, [overwrite, print_on])
+	// Adds information to global waves '' '' ''
+	// If overwrite = 1 then delete global wave
+	// If overwrite = 0 then append to gloabl wave
+	// USE ::
+	// fdawg_create("12.0,12.1", "0,1,2;10,-10,100", 10, overwrite = 1, print_on = 1)
+	// fdawg_create("7.0", "0,1,2,10,-10,100", 10, overwrite = 0, print_on = 1)
+	string dac_channels, setpoints
+	variable wavelen
+	int overwrite, print_on
+	
+	overwrite = paramisdefault(overwrite) ? 1 : overwrite  // default is to overwrite previous AWG waves
+	print_on = paramisdefault(print_on) ? 1 : print_on  // default is to print previous sc_awg_info if it exists
+
+	
+	// print the current awg_wave incase overwrite == 0 is accidentally not set
+	wave /t sc_awg_info
+	if ((waveexists(sc_awg_info) == 1) && (print_on == 1))
+		print sc_awg_info
+	endif
+	
+	// layer 0 = DAC channel
+	// layer 1 = DAC setpoints 
+	// layer 2 = wavelen
+	// layer 3 = fastdac number (boxnum)
+	
+	// each row is a new DAC channel in AWG (max 8 rows in AWG)
+	// each column is a new AWG 
+	
+	
+	// overwrite old sc_awg_info or create new wave
+	if (overwrite == 1)
+		make /o/t/n=(8,1,4) sc_awg_info
+	else
+		InsertPoints /M=1 /V=0 inf, 1, sc_awg_info
+	endif
+	
+	
+	// parameters for looping through DAC channels
+	int num_awg = dimsize(sc_awg_info, 1) - 1
+	
+	variable num_dac_channels = itemsInList(dac_channels, ",")
+	variable num_setpoints = itemsInList(setpoints, ";")
+	
+	string dac_channel, setpoint
+	variable boxnum
+	int i 
+	
+	
+	///// input DAC channels /////
+	for (i = 0; i < num_dac_channels; i++)
+		dac_channel = stringFromList(i, dac_channels, ",")
+		sc_awg_info[i][num_awg][0] = dac_channel
+	endfor
+	
+	
+	///// input DAC setpoints /////
+	for (i = 0; i < num_setpoints; i++)
+		setpoint = stringFromList(i, setpoints, ";")
+		sc_awg_info[i][num_awg][1] = setpoint
+	endfor
+	
+	
+	///// input wavelen /////
+	for (i = 0; i < num_dac_channels; i++)
+		sc_awg_info[i][num_awg][2] = num2str(wavelen)
+	endfor
+	
+	
+	///// fastdac number /////
+	boxnum = floor(str2num(stringFromList(0, dac_channels, ",")))
+	for (i = 0; i < num_dac_channels; i++)
+		if (boxnum != floor(str2num(stringFromList(i, dac_channels, ","))))
+			abort "[WARNING] AWG : Cannot create awg with gates on different fastdacs"
+		endif
+	endfor
+	sc_awg_info[0][num_awg][3] = num2str(boxnum)
+	
+	
+	
+	///// check if the AWG wave is good /////
+	// are the gates unique?
+	fdawg_check_unique_gate()
+	
+	// does dac number match setpoint number
+	if (num_dac_channels != num_setpoints)
+		abort "[WARNING] AWG : Number of DAC does not match provided setpoints"
+	endif 
+
+end
+
+
+
+
+function fdawg_check_unique_gate()
+	// assumes the wave 'sc_awg_info' has been created
+	// will abort if with warning message if there are duplicate gates.
+	wave /t sc_awg_info
+	
+	// gate values in 'sc_awg_info[X][X][0]'
+	
+	///// create DAC list first /////
+	string dac_channels = fdawg_get_dac_channels()
+	
+	int num_dac_channels = itemsinlist(dac_channels, ",")
+	
+	variable dac_channel
+	int i, j
+	for (i = 0; i < num_dac_channels - 1; i++)
+	
+		dac_channel = str2num(stringFromList(i, dac_channels, ","))
+		
+		for (j = i + 1; j < num_dac_channels; j++)
+		
+			if (dac_channel == str2num(stringFromList(j, dac_channels, ",")))
+				abort "[WARNING] AWG : Same gate on more than one AWG"
+			endif
+			
+		endfor 
+	
+	endfor 
+	
+	
+end
+
+
+
+
+
+function /t fdawg_get_dac_channels()
+	// assumes the wave 'sc_awg_info' has been created
+	// returns a list of all the dac channels using in sc_awg_info across all AWGs
+	
+	wave /t sc_awg_info
+	// gate values in 'sc_awg_info[X][X][0]'
+	
+	
+	///// create DAC list first /////
+	string dac_channels = "", dac_channel = ""
+	variable num_awg = dimsize(sc_awg_info, 1)
+	
+	int i, j
+	for (i = 0; i < num_awg; i++)
+		for (j = 0; j < 8; j++)
+			dac_channel = sc_awg_info[j][i][0]
+			
+			if (strlen(dac_channel) > 0)
+				dac_channels += dac_channel + ","
+			endif
+			
+		endfor
+	endfor
+	
+	return removetrailingDelimiter(dac_channels)
+end
+
 
 
 ///////////////////
