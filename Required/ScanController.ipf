@@ -1057,8 +1057,6 @@ function sci_initializeWaves(S)  // TODO: rename
 	//	(This will be after calc (i.e. don't need before and after calc wave))
 	
     struct ScanVars &S
-  
-
     
     variable numpts  //Numpts to initialize wave with, note: for Filtered data, this number is reduced
     string wavenames, wn, rawwavenames, rwn
@@ -1081,7 +1079,7 @@ function sci_initializeWaves(S)  // TODO: rename
 			if (S.using_fastdac && fadcattr[str2num(wavenum)][8] == 48) // Checkbox checked
 				numpts = (raw) ? S.numptsx : scfd_postFilterNumpts(S.numptsx, S.measureFreq)
 			else
-				numpts = S.numptsx*S.wavelen*S.numCycles
+				numpts = S.numptsx * S.wavelen * S.numCycles
 			endif
 
 			sci_init1DWave(wn, numpts, S.startx, S.finx)

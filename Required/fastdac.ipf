@@ -148,8 +148,10 @@ function init_dac_and_adc(fastdac_string)
 	///////////////////////////////////////
 	///// create colour and sel table /////
 	///////////////////////////////////////
-	//ListBox fdaclist colorWave=colour_bent_cw, selWave= sc_sel_table;SetDimLabel 2,1,backColors,sc_sel_table	// TO COLOUR THE SCANCONTROLLER ADD THIS APPROPRIATELY
-	wave colour_val = colour_fast
+	//ListBox fdaclist colorWave=colour_bent_cw, selWave= sc_sel_table;
+	// SetDimLabel 2,1,backColors,sc_sel_table	// TO COLOUR THE SCANCONTROLLER ADD THIS APPROPRIATELY
+	
+	wave colour_val = colour_bent_cw
 	
 	duplicate /o colour_val sc_colour_table
 	make /o /n=(num_fastdac * num_dac, 5, 2) sc_sel_table
@@ -160,8 +162,8 @@ function init_dac_and_adc(fastdac_string)
 	num_colours = dimsize(colour_val, 0)
 	insertpoints /M=1 /V=(65535/2) inf, 1, sc_colour_table
 
-	variable start_index = round(num_colours*0.2)
-	variable end_index = round(num_colours*0.8)
+	variable start_index = round(num_colours*0.4)
+	variable end_index = round(num_colours*0.6)
 	num_colours = end_index - start_index
 	
 	fastdac_count = 0
@@ -873,9 +875,17 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
 	
 	
 	///// Setting up AWG /////
+	//*** Is information from the first AWG enough?
 	S.use_awg = use_awg
-	S.wavelen = 1  //*** fix this later
-	S.numcycles = 1
+	if (use_awg == 0)
+		S.wavelen = 1 
+		S.numcycles = 1
+	else
+		wave /t sc_awg_info // ASSUME FIRST AWG HAS BEEN CREATED
+		int num_setpoints = ItemsInList(sc_awg_info[1][0], ",")
+		S.wavelen = str2num(sc_awg_info[2][0]) * num_setpoints
+		S.numcycles = str2num(sc_awg_info[4][0])
+	endif
 	
 	
 	///// Sets channelsx, channelsy to be lists of channel numbers instead of labels /////
@@ -1073,10 +1083,10 @@ end
 
 
 function [variable fd_num, variable fd_ch] get_fastdac_num_ch_string(string fd_num_ch)
-	// get_fastdac_num_ch_variable("6.1") returns variable [6, 1]
+	// get_fastdac_num_ch_string("6.1") returns variable [6, 1]
 	// USE :: 
 	// variable fd_num, fd_ch
-	// [fd_num, fd_ch] = get_fastdac_num_ch_variable("6.1")
+	// [fd_num, fd_ch] = get_fastdac_num_ch_string("6.1")
 	// but it can not be run from the command line, only inside functions
 
 	fd_num = str2num(stringFromList(0, fd_num_ch, "."))
@@ -1117,6 +1127,47 @@ function get_fastdac_index(fd_num_ch, [return_adc_index])
 
 	return index
 end
+
+
+
+function /t fd_get_unique_fastdac_from_dac(dac_channels)
+	// returns a list of unique fastdac number from dac_channels
+	// USE :: 
+	// unique_fastdac_num =  fd_get_unique_gate("1,2.0',3,2.3,5.3,4.7,6.5,4.4")
+	string dac_channels 
+	
+	string unique_fastdac_vals = ""
+	variable unique_fastdac_val, unique_fastdac_numbers
+	variable dac_channel, unique_true
+	
+	
+	int num_dac_channels = itemsinlist(dac_channels, ",")
+	int i, j, k
+	for (i = 0; i < num_dac_channels; i++)
+	
+		dac_channel = str2num(stringFromList(i, dac_channels, ","))
+		
+		// add fastdac number if unique
+		unique_fastdac_val = floor(dac_channel)
+		unique_fastdac_numbers = itemsinlist(unique_fastdac_vals, ",")
+		unique_true = 1
+		for  (k = 0; k < unique_fastdac_numbers; k++)
+			if (unique_fastdac_val == str2num(stringfromList(k, unique_fastdac_vals, ",")))
+				unique_true = 0
+			endif
+		endfor
+		
+		if (unique_true == 1)
+			unique_fastdac_vals += num2str(unique_fastdac_val) + ","
+		endif
+	
+	endfor 
+	
+	return removetrailingDelimiter(unique_fastdac_vals)
+	
+	
+end
+
 
 ///////////////////////
 //// API functions ////
@@ -1276,6 +1327,23 @@ Function linear_ramp(S)
 
 End
 
+
+function /t fd_get_unique_fastdac_number(S)
+	Struct ScanVars &S
+	// returns unique fastdac numbers from channelsx
+	// if AWG_on = 1 then includes dac channels from AWG also
+
+	string dac_channels = removetrailingDelimiter(S.channelsx) // remove delimiter just in case
+	
+	if (S.use_AWG == 1)
+		dac_channels += "," + fdawg_get_all_dac_channels()
+	endif
+	
+	return fd_get_unique_fastdac_from_dac(dac_channels)
+end
+
+
+
 Function awg_ramp(S)
 	Struct ScanVars &S
 	String adcList
@@ -1283,9 +1351,7 @@ Function awg_ramp(S)
 	variable chunksize=5000
 	SVar fd
 	variable level1, level2, level3,level4,level5
-	variable i,j
 	wave adc_list
-//	S.numCycles=1//***
 
 	jsonxop_release/a
 	stringlist2wave(S.adcListIDs,"adc_list")
@@ -1297,43 +1363,70 @@ Function awg_ramp(S)
 	JSONXOP_AddValue/T="temp_{{.ChunkIndex}}.dat" level1, "/chunk_file_name_template"
 
 	string dacChannel, minvalue, maxvalue
-	get_boxnum_dacnum(S.dacListIDS)
-	wave boxnum,dacnum,unique_boxnum
+	wave /t sc_awg_info
+	variable number_of_awgs = dimsize(sc_awg_info, 1)
+	variable awg_fastdac_num
+	
+	string linear_channels = S.channelsx
+	
+	string unique_fastdac_numbers  = fd_get_unique_fastdac_number(S)
+	variable num_unique_fastdac = itemsinList(unique_fastdac_numbers, ",")
+	
+	int dac_index, awg_index, unique_fastdac_num
+	variable fd_num, fd_ch
+	
+	
+	int i, j
+	for (i = 0; i < num_unique_fastdac; i++)
+		JSONXOP_New; level3 = V_value
+		JSONXOP_New; level4 = V_value
+		
+		unique_fastdac_num = str2num(stringfromlist(i, unique_fastdac_numbers, ","))
 
-	j = 0
-	for (i = 0; i < dimsize(unique_boxnum, 0); i += 1)
-		JSONXOP_New; level3=V_value
-		JSONXOP_New; level4=V_value
-
-
-		do
-			if (boxnum[j] == unique_boxnum[i])
+		
+		///// loop through DAC channels that are ramping ////// 
+		for (j = 0; j < itemsinlist(linear_channels, ","); j++)
+			[fd_num, fd_ch] = get_fastdac_num_ch_string(stringfromList(j, linear_channels, ","))
+			
+			///// add values from FastDACs /////
+			if (fd_num == unique_fastdac_num)
 
 				minValue = StringFromList(j, S.startxs, ",")
 				maxValue = StringFromList(j, S.finxs, ",")
-				level5=linear_ramps_json(maxValue, minValue) // Assuming this function correctly handles JSON object creation
-				JSONXOP_AddValue/JOIN=(level5) level4, num2str(dacnum[j])
+				level5 = linear_ramps_json(maxValue, minValue) // Assuming this function correctly handles JSON object creation
+				JSONXOP_AddValue/JOIN=(level5) level4, num2str(round(fd_ch))
 				jsonxop_release level5
 				jsonxop_dump/ind=2 level4
 
-				j += 1
-			elseif (boxnum[j] != unique_boxnum[i])
-				break
 			endif
 
-		while (j < dimsize(boxnum, 0))
-
+		endfor
+		
+		
 		JSONXOP_AddValue/I=(S.numptsx) level3, "/linear_ramp_steps"
 		JSONXOP_AddValue/JOIN=(level4) level3, "linear_ramps"
 
-		JSONXOP_AddValue/I=(S.numCycles) level3, "/patterns_per_linear_ramp_step"
-		level5=wave_pattern()
+		JSONXOP_AddValue/I=(S.numCycles) level3, "/patterns_per_linear_ramp_step" //**tODOD SHOULD THIS BE FROM SCANVARS?
+		
 		JSONXOP_Addtree/T=1 level3, "wave_patterns"
-		JSONXOP_AddValue/JOIN=(level5) level3, "wave_patterns"
-		JSONXOP_AddValue/JOIN=(level3) level2, num2str(unique_boxnum[i])
+		
+		
+		////// loop through AWGs /////
+		for (j = 0; j < number_of_awgs; j++)
+			awg_fastdac_num = str2num(sc_awg_info[3][j])
+			
+			// add values from AWGs
+			if (awg_fastdac_num == unique_fastdac_num)
+				level5 = fdawg_wave_pattern(j)
+				JSONXOP_AddValue/JOIN=(level5) level3, "wave_patterns"
+			endif
 
+		endfor
+		
+		JSONXOP_AddValue/JOIN=(level3) level2, num2str(unique_fastdac_num)
 		jsonxop_dump/ind=2 level3
 		jsonxop_release level3
+		
 	endfor
 
 
@@ -1345,33 +1438,130 @@ Function awg_ramp(S)
 	string cmd="start-awg"
 	String headers = "accept: application/json\nContent-Type: application/json"
 	command_save(S_value)
+	print S_value
+
+//	abort
+	
 	String response = postHTTP(fd, cmd, S_value, headers)
+	
+	
+//	j = 0
+//	for (i = 0; i < dimsize(unique_boxnum, 0); i += 1)
+//		JSONXOP_New; level3=V_value
+//		JSONXOP_New; level4=V_value
+//
+//
+//		do
+//			if (boxnum[j] == unique_boxnum[i])
+//
+//				minValue = StringFromList(j, S.startxs, ",")
+//				maxValue = StringFromList(j, S.finxs, ",")
+//				level5=linear_ramps_json(maxValue, minValue) // Assuming this function correctly handles JSON object creation
+//				JSONXOP_AddValue/JOIN=(level5) level4, num2str(dacnum[j])
+//				jsonxop_release level5
+//				jsonxop_dump/ind=2 level4
+//
+//				j += 1
+//			elseif (boxnum[j] != unique_boxnum[i])
+//				break
+//			endif
+//
+//		while (j < dimsize(boxnum, 0))
+//
+//		JSONXOP_AddValue/I=(S.numptsx) level3, "/linear_ramp_steps"
+//		JSONXOP_AddValue/JOIN=(level4) level3, "linear_ramps"
+//
+//		JSONXOP_AddValue/I=(S.numCycles) level3, "/patterns_per_linear_ramp_step"
+//		level5=wave_pattern()
+//		JSONXOP_Addtree/T=1 level3, "wave_patterns"
+//		JSONXOP_AddValue/JOIN=(level5) level3, "wave_patterns"
+//		JSONXOP_AddValue/JOIN=(level3) level2, num2str(unique_boxnum[i])
+//
+//		jsonxop_dump/ind=2 level3
+//		jsonxop_release level3
+//	endfor
+//
+//
+//	//JSONXOP_Addtree/T=1 level1, "/awgs"
+//	JSONXOP_AddValue/JOIN=(level2) level1, "/awgs"
+//	jsonxop_dump/ind=2 level1
+//	print "Full textual representation:\r", S_value
+//
+//	string cmd="start-awg"
+//	String headers = "accept: application/json\nContent-Type: application/json"
+//	command_save(S_value)
+//	String response = postHTTP(fd, cmd, S_value, headers)
 End
 
-function wave_pattern()
-//creates AWG wave for dacs
-	variable jsonId
-	wave setpoint, samples, daclist
-	variable N=dimsize(setpoint,0)
 
+function fdawg_wave_pattern(AWG_index)
+	int AWG_index
+	// creates AWG wave for AWG number 'AWG_index'
+	// assumes sc_awg_info has been created
+	wave /t sc_awg_info
+	
+	variable setpoint, wavelen
+	variable jsonId
+	
+	wave/b dac_channels = fdawg_get_DAC_channels_in_AWG(AWG_index)
+//	duplicate /o/b numericwave dac_channels
+	matrixop /o dac_channels = int8(dac_channels)
+	
+	///// adding DAC channels /////
 	JSONXOP_New
 	jsonId = V_value
-	JSONXOP_AddValue/wave=daclist jsonid, "output_dacs"
+	JSONXOP_AddValue/wave=dac_channels jsonid, "output_dacs"
 
+
+	///// adding setpoints /////
+	string setpoints = fdawg_get_DAC_setpoints_in_AWG(AWG_index)
+	variable num_setpoints_per_awg = fdawg_get_number_DAC_setpoints_in_AWG(AWG_index)
 	JSONXOP_AddTree/T=1 jsonId, "/dac_set_points"
-	JSONXOP_AddValue/OBJ=(N) jsonId, "/dac_set_points"
+	JSONXOP_AddValue/OBJ=(num_setpoints_per_awg) jsonId, "/dac_set_points"
 
-	variable i=0
-	for (i=0;i<N;i=i+1)
-		JSONXOP_AddTree/T=0 jsonId, "/dac_set_points/"+num2str(i)+"/voltage"
-		JSONXOP_AddTree/T=0 jsonId, "/dac_set_points/"+num2str(i)+"/voltage"
 
-		JSONXOP_AddValue/t="mV" jsonId, "/dac_set_points/"+num2str(i)+"/voltage/unit"
-		JSONXOP_AddValue/v=(setpoint[i]) jsonId, "/dac_set_points/"+num2str(i)+"/voltage/value"
-		JSONXOP_AddValue/v=(samples[i]) jsonId, "/dac_set_points/"+num2str(i)+"/adc_samples"
+	int i
+	for (i = 0; i < num_setpoints_per_awg; i++)
+		setpoint = str2num(stringfromlist(i, setpoints, ","))
+		wavelen = str2num(sc_awg_info[2][AWG_index])
+		
+		JSONXOP_AddTree/T=0 jsonId, "/dac_set_points/" + num2str(i) + "/voltage"
+		JSONXOP_AddTree/T=0 jsonId, "/dac_set_points/" + num2str(i) + "/voltage"
+
+		JSONXOP_AddValue/t="mV" jsonId, "/dac_set_points/" + num2str(i) + "/voltage/unit"
+		JSONXOP_AddValue/v=(setpoint) jsonId, "/dac_set_points/" + num2str(i) + "/voltage/value"
+		JSONXOP_AddValue/v=(wavelen) jsonId, "/dac_set_points/" + num2str(i) + "/adc_samples"
+
 	endfor
+	
+	jsonxop_dump/ind=2 jsonid
+
 
 	return jsonId
+		
+//	variable jsonId
+//	wave setpoint, samples, daclist
+//	variable N = dimsize(setpoint, 0)
+//
+//	JSONXOP_New
+//	jsonId = V_value
+//	JSONXOP_AddValue/wave=daclist jsonid, "output_dacs"
+//
+//	JSONXOP_AddTree/T=1 jsonId, "/dac_set_points"
+//	JSONXOP_AddValue/OBJ=(N) jsonId, "/dac_set_points"
+//
+//	variable i=0
+//	for (i = 0; i < N; i++)
+//		JSONXOP_AddTree/T=0 jsonId, "/dac_set_points/"+num2str(i)+"/voltage"
+//		JSONXOP_AddTree/T=0 jsonId, "/dac_set_points/"+num2str(i)+"/voltage"
+//
+//		JSONXOP_AddValue/t="mV" jsonId, "/dac_set_points/"+num2str(i)+"/voltage/unit"
+//		JSONXOP_AddValue/v=(setpoint[i]) jsonId, "/dac_set_points/"+num2str(i)+"/voltage/value"
+//		JSONXOP_AddValue/v=(samples[i]) jsonId, "/dac_set_points/"+num2str(i)+"/adc_samples"
+//	endfor
+//
+//	return jsonId
+
 End
 
 
@@ -1509,17 +1699,18 @@ end
 /////////////
 //// AWG ////
 /////////////
-function fdawg_create(dac_channels, setpoints, wavelen, [overwrite, print_on])
+function fdawg_create(dac_channels, setpoints, wavelen, [num_cycles, overwrite, print_on])
 	// Adds information to global waves '' '' ''
 	// If overwrite = 1 then delete global wave
 	// If overwrite = 0 then append to gloabl wave
 	// USE ::
-	// fdawg_create("12.0,12.1", "0,1,2;10,-10,100", 10, overwrite = 1, print_on = 1)
-	// fdawg_create("7.0", "0,1,2,10,-10,100", 10, overwrite = 0, print_on = 1)
+	// fdawg_create("12.0,12.1", "0,1,2", "10", overwrite = 1, print_on = 1)
+	// fdawg_create("7.0", "0,1,2,10,-10,100", "10", overwrite = 0, print_on = 1)
 	string dac_channels, setpoints
-	variable wavelen
-	int overwrite, print_on
+	string wavelen
+	int num_cycles, overwrite, print_on
 	
+	num_cycles = paramisdefault(num_cycles) ? 1 : num_cycles  // default is for a single cycle
 	overwrite = paramisdefault(overwrite) ? 1 : overwrite  // default is to overwrite previous AWG waves
 	print_on = paramisdefault(print_on) ? 1 : print_on  // default is to print previous sc_awg_info if it exists
 
@@ -1530,10 +1721,11 @@ function fdawg_create(dac_channels, setpoints, wavelen, [overwrite, print_on])
 		print sc_awg_info
 	endif
 	
-	// layer 0 = DAC channel
-	// layer 1 = DAC setpoints 
-	// layer 2 = wavelen
-	// layer 3 = fastdac number (boxnum)
+	// row 0 = DAC channels
+	// row 1 = DAC setpoints 
+	// row 2 = wavelen
+	// row 3 = fastdac number (boxnum)
+	// row 4 = num cycles
 	
 	// each row is a new DAC channel in AWG (max 8 rows in AWG)
 	// each column is a new AWG 
@@ -1541,15 +1733,17 @@ function fdawg_create(dac_channels, setpoints, wavelen, [overwrite, print_on])
 	
 	// overwrite old sc_awg_info or create new wave
 	if (overwrite == 1)
-		make /o/t/n=(8,1,4) sc_awg_info
+		killwaves /Z sc_awg_info
+		make /o/t/n=(5,1) sc_awg_info
 	else
 		InsertPoints /M=1 /V=0 inf, 1, sc_awg_info
 	endif
 	
+	wave /t sc_awg_info
+	
 	
 	// parameters for looping through DAC channels
 	int num_awg = dimsize(sc_awg_info, 1) - 1
-	
 	variable num_dac_channels = itemsInList(dac_channels, ",")
 	variable num_setpoints = itemsInList(setpoints, ";")
 	
@@ -1559,24 +1753,16 @@ function fdawg_create(dac_channels, setpoints, wavelen, [overwrite, print_on])
 	
 	
 	///// input DAC channels /////
-	for (i = 0; i < num_dac_channels; i++)
-		dac_channel = stringFromList(i, dac_channels, ",")
-		sc_awg_info[i][num_awg][0] = dac_channel
-	endfor
+	sc_awg_info[0][num_awg] = dac_channels
 	
 	
 	///// input DAC setpoints /////
-	for (i = 0; i < num_setpoints; i++)
-		setpoint = stringFromList(i, setpoints, ";")
-		sc_awg_info[i][num_awg][1] = setpoint
-	endfor
-	
+	sc_awg_info[1][num_awg] = setpoints
+
 	
 	///// input wavelen /////
-	for (i = 0; i < num_dac_channels; i++)
-		sc_awg_info[i][num_awg][2] = num2str(wavelen)
-	endfor
-	
+	sc_awg_info[2][num_awg] = wavelen
+
 	
 	///// fastdac number /////
 	boxnum = floor(str2num(stringFromList(0, dac_channels, ",")))
@@ -1585,18 +1771,19 @@ function fdawg_create(dac_channels, setpoints, wavelen, [overwrite, print_on])
 			abort "[WARNING] AWG : Cannot create awg with gates on different fastdacs"
 		endif
 	endfor
-	sc_awg_info[0][num_awg][3] = num2str(boxnum)
+	sc_awg_info[3][num_awg] = num2str(boxnum)
+	
+	
+	///// input number of cycles /////
+	sc_awg_info[4][num_awg] = num2str(num_cycles)
 	
 	
 	
-	///// check if the AWG wave is good /////
+
+	///// CHECK if the AWG wave is good /////
 	// are the gates unique?
 	fdawg_check_unique_gate()
 	
-	// does dac number match setpoint number
-	if (num_dac_channels != num_setpoints)
-		abort "[WARNING] AWG : Number of DAC does not match provided setpoints"
-	endif 
 
 end
 
@@ -1611,7 +1798,7 @@ function fdawg_check_unique_gate()
 	// gate values in 'sc_awg_info[X][X][0]'
 	
 	///// create DAC list first /////
-	string dac_channels = fdawg_get_dac_channels()
+	string dac_channels = fdawg_get_all_dac_channels()
 	
 	int num_dac_channels = itemsinlist(dac_channels, ",")
 	
@@ -1636,9 +1823,7 @@ end
 
 
 
-
-
-function /t fdawg_get_dac_channels()
+function /t fdawg_get_all_dac_channels()
 	// assumes the wave 'sc_awg_info' has been created
 	// returns a list of all the dac channels using in sc_awg_info across all AWGs
 	
@@ -1652,19 +1837,108 @@ function /t fdawg_get_dac_channels()
 	
 	int i, j
 	for (i = 0; i < num_awg; i++)
-		for (j = 0; j < 8; j++)
-			dac_channel = sc_awg_info[j][i][0]
+		dac_channel = sc_awg_info[0][i]
 			
-			if (strlen(dac_channel) > 0)
-				dac_channels += dac_channel + ","
-			endif
+		if (strlen(dac_channel) > 0)
+			dac_channels += dac_channel + ","
+		endif
 			
-		endfor
 	endfor
 	
 	return removetrailingDelimiter(dac_channels)
 end
 
+
+
+function fdawg_get_number_DACs_in_AWG(AWG_index)
+	// return the number of DAC channels in the AWG wave specified by AWG_index
+	// assumes sc_awg_info has been created
+	// USE ::
+	// print fdawg_get_number_DACs_in_AWG(0)
+	int AWG_index
+	
+	wave /t sc_awg_info
+	int num_dacs = 0 
+	string dac_val = ""
+	
+	dac_val = sc_awg_info[0][AWG_index]
+	num_dacs = itemsinlist(dac_val, ",")
+	
+	return num_dacs
+
+end
+
+
+
+
+function /wave fdawg_get_DAC_channels_in_AWG(AWG_index)
+	// return the number of DAC channels in the AWG wave specified by AWG_index
+	// assumes sc_awg_info has been created
+	// USE ::
+	// print fdawg_get_number_DACs_in_AWG(0)
+	int AWG_index
+	
+	wave /t sc_awg_info
+	int num_dacs = 0 
+	string dac_val = ""
+	
+	///// create num wave of dac channels
+	dac_val = sc_awg_info[0][AWG_index]
+	killwaves /z numericWave
+	StringToListWave(dac_val + ",")
+	wave numericWave
+
+
+	///// now only pick the DAC number, not the fastdac number
+	variable num_dacs_in_awg = fdawg_get_number_DACs_in_AWG(AWG_index)
+	variable fd_num, fd_ch
+	
+	int i
+	for (i = 0; i < num_dacs_in_awg; i++)
+	
+		[fd_num, fd_ch] = get_fastdac_num_ch_variable(numericWave[i])
+		numericWave[i] = round(fd_ch)
+		
+	endfor
+	
+	return numericWave
+
+end
+
+
+
+
+function /s fdawg_get_DAC_setpoints_in_AWG(AWG_index)
+	// return the DAC setpoints as a string
+	// assumes sc_awg_info has been created
+	// USE ::
+	// print fdawg_get_number_DACs_in_AWG(0)
+	int AWG_index
+
+	wave /t sc_awg_info
+	
+	string dac_setpoints = sc_awg_info[1][AWG_index]
+	
+	return dac_setpoints
+
+end
+
+
+
+function fdawg_get_number_DAC_setpoints_in_AWG(AWG_index)
+	// return the number of DAC setpoints
+	// assumes sc_awg_info has been created
+	// USE ::
+	// print fdawg_get_number_DAC_setpoints_in_AWG(0)
+	int AWG_index
+
+	string dac_setpoints = fdawg_get_DAC_setpoints_in_AWG(AWG_index)
+	
+	variable num_setpoints = itemsinlist(dac_setpoints, ",")
+	
+	return num_setpoints
+
+end
 
 
 ///////////////////

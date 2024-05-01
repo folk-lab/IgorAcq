@@ -1397,12 +1397,19 @@ function /S getStrArrayShape(array)
 end
 
 
-function stringlist2wave(string text_string, string dest_wave)
-	variable numItems = ItemsInList(text_string, ";")  /// needs to be modified to allow for , and ;
-	Make/o/T/N=(numItems) text_wave
+function stringlist2wave(text_string, dest_wave, [delimiter])
+	// takes string and turns into text wave based on delimiter 
+	// default is delimiter ';'n :: IGOR default
+	string text_string, dest_wave
+	string delimiter
+	
+	delimiter = selectString(paramIsDefault(delimiter), delimiter, ";")
+
+	variable numItems = ItemsInList(text_string, delimiter)  /// needs to be modified to allow for , and ;
+	Make/o/T/N = (numItems) text_wave
 	variable i
 	for(i = 0; i < numItems; i += 1)
-	    text_wave[i] = StringFromList(i, text_string, ";")
+	    text_wave[i] = StringFromList(i, text_string, delimiter)
 	endfor
 	Duplicate/o text_wave $dest_wave
 end
@@ -1858,6 +1865,17 @@ function/s TextWavetolist(w)
 	return list
 end
 
+
+//
+//Function ConvertTxtWvToNumWv(W)
+//	// creates gloabl wave numconvert
+//	Wave /T W
+//	
+//	Make /O /N=(numpnts(W)) NumConvert
+//	NumConvert[] = str2num(W[p])
+//End
+
+
 function /s numWavetolist(w)
 	// returns an array and makes sure quotes and commas are parsed correctly.
 	// supports 1d and 2d arrays
@@ -1881,9 +1899,9 @@ TxtConvert[] = num2str(W[p])
 End
  
 Function ConvertTxtWvToNumWv(W)
-Wave /T W
-Make /O /N=(numpnts(W)) NumConvert
-NumConvert[] = str2num(W[p])
+	Wave /T W
+	Make /O /N=(numpnts(W)) NumConvert
+	NumConvert[] = str2num(W[p])
 End
 
 function/s addJSONkeyval(JSONstr,key,value,[addquotes])

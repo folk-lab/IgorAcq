@@ -85,7 +85,7 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 		endif
 
 		// Ramp to start of fast axis // this would need to ramp all the DACs being used to their starting position (do we need synchronization)
-		RampStartFD(S, ignore_lims = 1, x_only = 1) // This uses ramp smart, Which does not account for synchronization. the important thing would be
+		//RampStartFD(S, ignore_lims = 1, x_only = 1) // This uses ramp smart, Which does not account for synchronization. the important thing would be
 		// to have all the dacs return to their respective starting positions
 		sc_sleep(S.delayy)
 
@@ -227,7 +227,7 @@ function/s fd_start_sweep(S)
 	endif
 	
 	if (S.readvstime==0)
-		linear_ramp(S)
+		awg_ramp(S)  ///****
 	endif
 		
 	 
