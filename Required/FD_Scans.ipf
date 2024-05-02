@@ -146,7 +146,7 @@ function ScanFastDAC2D(startx, finx, channelsx, starty, finy, channelsy, numptsy
 	struct ScanVars S
 	initScanVarsFD(S, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy,\
 	starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys,\
-	interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments, x_only = 0)
+	interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments, x_only=0, use_AWG=use_AWG)
 	
 	s.is2d = 1
 	S.starty = starty

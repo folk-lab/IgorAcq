@@ -874,20 +874,6 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
 	S.instrIDs=fd
 	
 	
-	///// Setting up AWG /////
-	//*** Is information from the first AWG enough?
-	S.use_awg = use_awg
-	if (use_awg == 0)
-		S.wavelen = 1 
-		S.numcycles = 1
-	else
-		wave /t sc_awg_info // ASSUME FIRST AWG HAS BEEN CREATED
-		int num_setpoints = ItemsInList(sc_awg_info[1][0], ",")
-		S.wavelen = str2num(sc_awg_info[2][0]) * num_setpoints
-		S.numcycles = str2num(sc_awg_info[4][0])
-	endif
-	
-	
 	///// Sets channelsx, channelsy to be lists of channel numbers instead of labels /////
 	scv_setChannels(S, channelsx, channelsy, fastdac=1)  
      
@@ -953,6 +939,21 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
 	
 	// wave-names
 	S.raw_wave_names = removeTrailingDelimiter(S.raw_wave_names)
+	
+				
+	///// Setting up AWG /////
+	//*** Is information from the first AWG enough?
+	S.use_awg = use_awg
+	if (use_awg == 0)
+		S.wavelen = 1 
+		S.numcycles = 1
+	else
+		wave /t sc_awg_info // ASSUME FIRST AWG HAS BEEN CREATED
+		int num_setpoints = ItemsInList(sc_awg_info[1][0], ",")
+		S.wavelen = str2num(sc_awg_info[2][0]) * num_setpoints
+		S.numcycles = str2num(sc_awg_info[4][0])
+		fdawg_check_awg_and_sweepgates_unique(S)
+	endif
 	
 	
 	///// Delete all files in fdTest directory /////
@@ -1167,6 +1168,39 @@ function /t fd_get_unique_fastdac_from_dac(dac_channels)
 	
 	
 end
+
+
+
+function /t fd_get_ramp_dacs(S)
+	// returns a list of dac numbers from channelsx, channelsx, interlaced_channels
+	// USE :: 
+	// ramp_dacs =  fd_get_ramp_dacs(S)
+	struct ScanVars &S
+	
+	string ramp_dacs = ""
+	
+	ramp_dacs += S.channelsx + ","
+	ramp_dacs += S.channelsy + ","
+	
+	int num_interlace_channels = itemsinlist(S.interlaced_channels, ",")
+	string interlace_channel = "", interlace_channels = ""
+	
+	int i 
+	for (i = 0; i < num_interlace_channels; i++)
+		interlace_channel = stringfromList(i, S.interlaced_channels, ",")
+		
+		if (stringmatch(interlace_channel, "*awg*") == 0) // if no AWG in interlace channels
+			interlace_channels += scu_getChannelNumbers(interlace_channel) + ","
+		endif
+	endfor
+	
+	ramp_dacs = removetrailingDelimiter(ramp_dacs) + "," // assert a trailing delimiter at the end
+	ramp_dacs += removetrailingDelimiter(interlace_channels)
+	
+	return ramp_dacs
+	
+end
+
 
 
 ///////////////////////
@@ -1747,13 +1781,19 @@ function fdawg_create(dac_channels, setpoints, wavelen, [num_cycles, overwrite, 
 	variable num_dac_channels = itemsInList(dac_channels, ",")
 	variable num_setpoints = itemsInList(setpoints, ";")
 	
-	string dac_channel, setpoint
+	string normalised_dac_channels = ""
 	variable boxnum
 	int i 
 	
-	
+	////////////////////////////////////////////
+	///// ADDING INFO TO SC_AWG_INFO WAVE //////
+	////////////////////////////////////////////
 	///// input DAC channels /////
-	sc_awg_info[0][num_awg] = dac_channels
+	for (i = 0; i < num_dac_channels; i++)
+		normalised_dac_channels += scu_getChannelNumbers(stringfromlist(i, dac_channels, ",")) + ","
+	endfor
+	normalised_dac_channels = removetrailingDelimiter(normalised_dac_channels)
+	sc_awg_info[0][num_awg] = normalised_dac_channels
 	
 	
 	///// input DAC setpoints /////
@@ -1765,9 +1805,9 @@ function fdawg_create(dac_channels, setpoints, wavelen, [num_cycles, overwrite, 
 
 	
 	///// fastdac number /////
-	boxnum = floor(str2num(stringFromList(0, dac_channels, ",")))
+	boxnum = floor(str2num(stringFromList(0, normalised_dac_channels, ",")))
 	for (i = 0; i < num_dac_channels; i++)
-		if (boxnum != floor(str2num(stringFromList(i, dac_channels, ","))))
+		if (boxnum != floor(str2num(stringFromList(i, normalised_dac_channels, ","))))
 			abort "[WARNING] AWG : Cannot create awg with gates on different fastdacs"
 		endif
 	endfor
@@ -1778,15 +1818,19 @@ function fdawg_create(dac_channels, setpoints, wavelen, [num_cycles, overwrite, 
 	sc_awg_info[4][num_awg] = num2str(num_cycles)
 	
 	
-	
-
-	///// CHECK if the AWG wave is good /////
-	// are the gates unique?
+	/////////////////////////////////////////////////
+	///// CHECKING SC_AWG_INFO WAVE FOR SAFETY //////
+	/////////////////////////////////////////////////
+	///// Are the gates unique?
 	fdawg_check_unique_gate()
 	
+	///// Are the AWG lengths equal?
+	fdawg_check_awg_lengths_equal()
+	
+	///// Maximum two AWGs per FastDAC?
+	fdawg_check_maximum_numer_of_awgs()
 
 end
-
 
 
 
@@ -1818,7 +1862,112 @@ function fdawg_check_unique_gate()
 	
 	endfor 
 	
+end
+
+
+
+function fdawg_check_awg_lengths_equal()
+	// assumes the wave 'sc_awg_info' has been created
+	// will abort if with warning message if there are duplicate gates.
+	wave /t sc_awg_info
+		
+	///// create AWG lengths list first /////
+	string awg_lengths = fdawg_get_AWG_lengths()
 	
+	int num_awgs = dimsize(sc_awg_info, 1)
+		
+	variable awg_length
+	int i, j
+	for (i = 0; i < num_awgs - 1; i++)
+	
+		awg_length = str2num(stringFromList(i, awg_lengths, ","))
+		
+		for (j = i + 1; j < num_awgs; j++)
+		
+			if (awg_length != str2num(stringFromList(j, awg_lengths, ",")))
+				abort "[WARNING] AWG : AWG lengths are NOT equal i.e. (num_setpoints * wavelen * num_cycles)"
+			endif
+			
+		endfor 
+		
+	endfor 
+
+end
+
+
+function fdawg_check_maximum_numer_of_awgs()
+	// check that only two AWGs are created per fastdac
+	// assumes the wave 'sc_awg_info' has been created
+	// will abort if with warning message if there are duplicate gates.
+	wave /t sc_awg_info
+	string abort_message = ""
+	
+	int MAX_AWG_PER_FASTDAC = 2
+	
+	int num_awgs = dimsize(sc_awg_info, 1)
+	int awg_count, boxnum1, boxnum2
+	
+	variable awg_length
+	int i, j
+	for (i = 0; i < num_awgs; i++)
+		awg_count = 0
+	
+		boxnum1 = str2num(sc_awg_info[3][i])
+		
+		for (j = 0; j < num_awgs; j++)
+		
+			boxnum2 = str2num(sc_awg_info[3][j])
+		
+			if (boxnum1 == boxnum2)
+				awg_count += 1
+			endif
+			
+			if (awg_count > MAX_AWG_PER_FASTDAC)
+				abort_message = "[WARNING] " + num2str(awg_count) + " AWGs set on FastDAC " + num2str(boxnum1) + " : the Arduino will explode..."
+				abort abort_message 
+			endif
+		
+			
+		endfor 
+		
+	endfor
+	
+end
+
+
+
+function fdawg_check_awg_and_sweepgates_unique(S)
+	// added in initscanvars to ensure the AWG DACs and Ramping DACs are unique
+	// assumes the wave 'sc_awg_info' has been created
+	// will abort if with warning message if there are duplicate gates.
+	struct ScanVars &S
+	wave /t sc_awg_info
+	string abort_message
+		
+	///// create AWG lengths list first /////
+	string sweep_dac_channels = fd_get_ramp_dacs(S)
+	string awg_dac_channels = fdawg_get_all_dac_channels()
+	
+	string dac_channels = sweep_dac_channels + "," + awg_dac_channels
+	int num_dacs = itemsinlist(dac_channels, ",")
+		
+	variable dac_channel
+	int i, j
+	for (i = 0; i < num_dacs - 1; i++)
+	
+		dac_channel = str2num(stringFromList(i, dac_channels, ","))
+		
+		for (j = i + 1; j < num_dacs; j++)
+		
+			if (dac_channel == str2num(stringFromList(j, dac_channels, ",")))
+				abort_message = "[WARNING] Channel " + num2str(dac_channel) + " on both AWG and Sweepgates. Unpredicatable Behaviour"
+				abort abort_message
+			endif
+			
+		endfor 
+		
+	endfor 
+
 end
 
 
@@ -1827,9 +1976,7 @@ function /t fdawg_get_all_dac_channels()
 	// assumes the wave 'sc_awg_info' has been created
 	// returns a list of all the dac channels using in sc_awg_info across all AWGs
 	
-	wave /t sc_awg_info
-	// gate values in 'sc_awg_info[X][X][0]'
-	
+	wave /t sc_awg_info	
 	
 	///// create DAC list first /////
 	string dac_channels = "", dac_channel = ""
@@ -1846,6 +1993,39 @@ function /t fdawg_get_all_dac_channels()
 	endfor
 	
 	return removetrailingDelimiter(dac_channels)
+end
+
+
+
+function /t fdawg_get_AWG_lengths()
+	// assumes the wave 'sc_awg_info' has been created
+	// returns a comma separated list aWG lengths using formula
+	// awg_num_setpoints * awg_wavelen * awg_num_cycles
+	// USE ::
+	// string awg_lengths = fdawg_get_AWG_lengths()
+	
+	wave /t sc_awg_info	
+	
+	///// create DAC list first /////
+	string awg_lengths = ""
+	variable awg_length = 0
+	variable num_awg = dimsize(sc_awg_info, 1)
+	
+	variable awg_num_setpoints, awg_wavelen, awg_num_cycles
+	
+	int i, j
+	for (i = 0; i < num_awg; i++)
+	
+		awg_num_setpoints = itemsinlist(sc_awg_info[1][i], ",")
+		awg_wavelen = str2num(sc_awg_info[2][i])
+		awg_num_cycles = str2num(sc_awg_info[4][i])
+		
+		awg_length = awg_num_setpoints * awg_wavelen * awg_num_cycles
+		awg_lengths += num2str(awg_length) + ","
+			
+	endfor
+	
+	return removetrailingDelimiter(awg_lengths)
 end
 
 
@@ -1867,7 +2047,6 @@ function fdawg_get_number_DACs_in_AWG(AWG_index)
 	return num_dacs
 
 end
-
 
 
 
@@ -1939,6 +2118,7 @@ function fdawg_get_number_DAC_setpoints_in_AWG(AWG_index)
 	return num_setpoints
 
 end
+
 
 
 ///////////////////
