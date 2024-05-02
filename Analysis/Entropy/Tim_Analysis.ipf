@@ -390,7 +390,8 @@ function PlotNoiseSpectrogram(numstart, numfinish, [measureFreq, stepSize])
 	variable measureFreq, stepSize
 	nvar fd
 	
-	measureFreq = paramisdefault(measureFreq) ? getfadcspeed(fd) : measureFreq
+//	measureFreq = paramisdefault(measureFreq) ? getfadcspeed(fd) : measureFreq ***
+	measureFreq = paramisdefault(measureFreq) ? 12195 : measureFreq
 	stepSize = paramisdefault(stepSize) ? 1 : stepSize
 	
 	string start = num2str(numstart)

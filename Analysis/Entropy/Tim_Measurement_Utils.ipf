@@ -69,7 +69,8 @@ function makeSquareWaveAWG(instrID, v0, vP, vM, v0len, vPlen, vMlen, wave_num, [
 
 
     // Get current measureFreq to calculate require sampleLens to achieve durations in s
-   variable measureFreq = getFADCmeasureFreq(instrID)
+   variable measureFreq = 12195 //getFADCmeasureFreq(instrID) // ***
+   
    variable numSamples = 0
 
    // Make wave
@@ -118,11 +119,11 @@ function makeSquareWaveAWG(instrID, v0, vP, vM, v0len, vPlen, vMlen, wave_num, [
    endif
 
     // Clear current wave and then reset with new awg_sqw
-   fd_clearAWGwave(instrID, wave_num)
-   fd_addAWGwave(instrID, wave_num, awg_sqw)
+//   fd_clearAWGwave(instrID, wave_num) ***
+//   fd_addAWGwave(instrID, wave_num, awg_sqw) ***
 
    // Make sure user sets up AWG_list again after this change using fd_setupAWG()
-   fd_setAWGuninitialized()
+//   fd_setAWGuninitialized()
 end
 
 
@@ -151,7 +152,7 @@ function SetupEntropySquareWaves([freq, cycles,hqpc_zero, hqpc_plus, hqpc_minus,
 	makeSquareWaveAWG(fd1, hqpc_zero, cplus, cminus, spt, spt, spt, 1, ramplen=ramplen)
 
 	// Setup AWG
-	setupAWG(channels_AW0= "OHC(10M)", channels_AW1 = "OHV*9960", numCycles=cycles, verbose=1)
+//	setupAWG(channels_AW0= "OHC(10M)", channels_AW1 = "OHV*9960", numCycles=cycles, verbose=1)
 end
 
 
@@ -181,7 +182,7 @@ function SetupEntropySquareWaves_unequal([freq, cycles, hqpc_plus, hqpc_minus, r
 	makeSquareWaveAWG(fd, 0, cplus, cminus, spt, spt, spt, 1, ramplen=ramplen)
 
 	// Setup AWG
-	setupAWG(channels_AW0="HO1/10M", channels_AW0="HO2*1000", numCycles=cycles)
+//	setupAWG(channels_AW0="HO1/10M", channels_AW0="HO2*1000", numCycles=cycles)
 end
 
 
@@ -200,7 +201,7 @@ function GetTargetCSCurrent([oldcscurr, lower_lim, upper_lim, nosave])
 	nvar fd
 	string channelstr = "CSQ"
 
-	channelstr = scu_getChannelNumbers(channelstr, fastdac=1)
+	channelstr = scu_getChannelNumbers(channelstr)
 
 	lower_lim = paramisdefault(lower_lim) ? 1 : lower_lim
 	upper_lim = paramisdefault(upper_lim) ? 3 : upper_lim
@@ -209,7 +210,8 @@ function GetTargetCSCurrent([oldcscurr, lower_lim, upper_lim, nosave])
 	// Begin by calling CorrectChargeSensor with default things
 	if (paramisDefault(oldcscurr))
 		CorrectChargeSensor(fdchannelstr=channelstr, fadcchannel=0, check=0, direction=1)
-		oldcscurr = getFADCvalue(0, len_avg=0.3)
+//		oldcscurr = getFADCvalue(0, len_avg=0.3) ***
+		oldcscurr = get_one_FADCChannel(0)
 	else
 		CorrectChargeSensor(fdchannelstr=channelstr, fadcchannel=0, check=0, direction=1, natarget=oldcscurr)
 	endif
@@ -234,17 +236,17 @@ function GetTargetCSCurrent([oldcscurr, lower_lim, upper_lim, nosave])
 
 	// If Igor gives garbage, go back to the original center and return
 	if(newcenter > oldcenter + 30 || newcenter < oldcenter - 30)
-		rampmultiplefdac(fd, channelstr, oldcenter)
+		rampmultiplefdac(channelstr, oldcenter) //***
 		printf "WARNING [GetTargetCSCurrent]: Thought center of CS trace was at %.1fmV, centering at %.1fmV\n", newcenter, oldcenter
 		return oldcscurr
 	endif
 
-	rampmultiplefdac(fd, channelstr, newcenter)
-	variable newcscurr = getFADCvalue(0, len_avg=0.3)
+	rampmultiplefdac(channelstr, newcenter)
+	variable newcscurr = get_one_FADCChannel(0) //***
 
 	// If a strangely small or large cscurrent, ramp back to center and return
 	if(newcscurr > upper_lim || newcscurr < lower_lim)
-		rampmultiplefdac(fd, channelstr, oldcenter)
+		rampmultiplefdac(channelstr, oldcenter)
 		printf "WARNING [GetTargetCSCurrent]: Thought natarget was at %.1fmV, using %.1fmV\n", newcscurr, oldcscurr
 		return oldcscurr
 	endif
@@ -277,7 +279,7 @@ function CorrectChargeSensor([fdchannelstr, fadcchannel, i, check, natarget, dir
 	endif
 
 	if (!paramisdefault(fdchannelstr))
-		fdchannelstr = scu_getChannelNumbers(fdchannelstr, fastdac=1)
+		fdchannelstr = scu_getChannelNumbers(fdchannelstr)
 		if(itemsInList(fdchannelstr, ",") != 1)
 			abort "ERROR[CorrectChargeSensor]: Only works with 1 fdchannel"
 		else
@@ -288,8 +290,7 @@ function CorrectChargeSensor([fdchannelstr, fadcchannel, i, check, natarget, dir
 	sc_openinstrconnections(0)
 
 	//get current
-	current = getFADCvalue(fadcchannel, len_avg=0.5)
-
+	current = get_one_FADCChannel(fadcchannel) //***
 
 	variable end_condition = (naTarget == 0) ? zero_tol : 0.05*naTarget   // Either 5% or just an absolute zero_tol given
 	variable step_multiplier = 1
@@ -317,21 +318,21 @@ function CorrectChargeSensor([fdchannelstr, fadcchannel, i, check, natarget, dir
 
 			if (check==0) //no user input
 				if (-1000*gate_divider < nextdac && nextdac < 100*gate_divider) //Prevent it doing something crazy
-					rampmultipleChannels(num2str(fdchannel), num2str(nextdac))
+					RampMultipleFDAC(num2str(fdchannel), nextdac) //***
 				else
 					abort "Failed to correct charge sensor to target current"
 				endif
 			else //ask for user input
 				doAlert/T="About to change DAC" 1, "Scan wants to ramp DAC to " + num2str(nextdac) +"mV, is that OK?"
 				if (V_flag == 1)
-					rampmultipleChannels(num2str(fdchannel), num2str(nextdac))
+					RampMultipleFDAC(num2str(fdchannel), nextdac)
 				else
 					abort "Aborted"
 				endif
 			endif
 
 			//get current after dac step
-			current = getFADCvalue(fadcchannel, len_avg=avg_len)
+			current = get_one_FDACChannel(fadcchannel) //***
 
 
 			doupdate  // Update scancontroller window
@@ -405,7 +406,7 @@ function CenterOnTransition([gate, virtual_gates, width, single_only])
 	width = paramisdefault(width) ? 20 : width
 
 	string gate_num
-	gate_num = scu_getChannelNumbers(gate, fastdac=1)
+	gate_num = scu_getChannelNumbers(gate)
 
 	variable initial, mid
 	wave/t fdacvalstr
@@ -420,9 +421,9 @@ function CenterOnTransition([gate, virtual_gates, width, single_only])
 	endif
 
 	if (abs(mid-initial) < width && numtype(mid) != 2)
-		rampmultipleChannels(gate, num2str(mid))
+		rampMultipleFDAC(gate, mid)
 	else
-		rampmultipleChannels(gate, num2str(initial))
+		rampMultipleFDAC(gate, initial)
 		printf "CLOSE CALL: center on transition thought mid was at %dmV\r", mid
 		mid = initial
 	endif
@@ -437,13 +438,13 @@ end
 //////////////////////////////////////////////////////////////////////////////////////////
 
 
-function loadFromHDF(datnum, [no_check])
-	variable datnum, no_check
-
-	bdLoadFromHDF(datnum, no_check = no_check)
-	fdLoadFromHDF(datnum, no_check = no_check)
-	sc_openinstrconnections(0)  // Connections may have been messed up by the temporary connections made when setting bd/fd DACs
-end
+//function loadFromHDF(datnum, [no_check])
+//	variable datnum, no_check
+//
+//	bdLoadFromHDF(datnum, no_check = no_check)
+//	fdLoadFromHDF(datnum, no_check = no_check)
+//	sc_openinstrconnections(0)  // Connections may have been messed up by the temporary connections made when setting bd/fd DACs
+//end
 
 
 function additionalSetupAfterLoadHDF()
@@ -459,12 +460,12 @@ function additionalSetupAfterLoadHDF()
 
 //	print v1, v2, v3
 
-	rampmultiplefdac(fd, "SDP", str2num(scf_getDacInfo("SDP", "output")) + v1)
-	rampmultipleBD(bd, "SDBD", GetBDdacValue("SDBD") + v2)
-	rampmultiplefdac(fd, "CSS", str2num(scf_getDacInfo("CSS", "output")) + v3)	
-	rampmultiplefdac(fd, "ACC*2", str2num(scf_getDacInfo("ACC*2", "output")) - 0.5*v1 - 0.5*v2 - 0.5*v3)  // Somewhat corrected based on other changes	
+//	rampMultipleFDAC("SDP", str2num(scf_getDacInfo("SDP", "output")) + v1) //***
+//	rampmultipleBD(bd, "SDBD", GetBDdacValue("SDBD") + v2)
+//	rampMultipleFDAC("CSS", str2num(scf_getDacInfo("CSS", "output")) + v3) //***	
+//	rampMultipleFDAC("ACC*2", str2num(scf_getDacInfo("ACC*2", "output")) - 0.5*v1 - 0.5*v2 - 0.5*v3)  //*** // Somewhat corrected based on other changes	
 
-	rampmultiplebd(bd, "OCSB*1000", 8.7)
+//	rampmultiplebd(bd, "OCSB*1000", 8.7)
 end
 
 

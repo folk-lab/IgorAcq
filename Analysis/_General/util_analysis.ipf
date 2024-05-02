@@ -15,12 +15,12 @@ function lock_in_test(data)
 	int  xmin, xmax
 	int data_length, i
 	variable step_value, avg, res, voltage, period
-	struct AWGVars AWG
+//	struct AWGVars AWG
 	variable batches
 	batches=25;
 	variable nofcycles
-	nofcycles=AWG.numCycles;
-	period=AWG.waveLen/2;
+	nofcycles=10//***AWG.numCycles;
+	period=10//***AWG.waveLen/2;
 	
 	voltage=1E-3
 	data_length=numpnts(data)
@@ -64,15 +64,15 @@ function demodulate(datnum, harmonic, wave_kenner, [append2hdf, demod_wavename])
 	variable nofcycles, period, cols, rows
 	string wn="dat" + num2str(datnum) + wave_kenner;
 	wave wav=$wn
-	struct AWGVars AWGLI
-	fd_getoldAWG(AWGLI, datnum)
+//	struct AWGVars AWGLI
+//	fd_getoldAWG(AWGLI, datnum) //***
 
 //	print AWGLI
 
 	cols=dimsize(wav,0); print cols
 	rows=dimsize(wav,1); print rows
-	nofcycles=AWGLI.numCycles;
-	period=AWGLI.waveLen;
+	nofcycles=10//***AWGLI.numCycles;
+	period=10//**AWGLI.waveLen;
 	print "AWG num cycles  = " + num2str(nofcycles)
 	print "AWG wave len = " + num2str(period)
 	
@@ -306,12 +306,12 @@ function resampleWave(wav, targetFreq, [measureFreq])
 	string wn = nameOfWave(wav)
 	int wavenum = getfirstnum(wn)
 	
-	
-	if (measureFreq == 0)
-		struct AWGVars S
-		fd_getoldAWG(S, wavenum)
-		measureFreq = S.measureFreq
-	endif
+	///** todo
+//	if (measureFreq == 0)
+//		struct AWGVars S
+//		fd_getoldAWG(S, wavenum)
+//		measureFreq = S.measureFreq
+//	endif
 	
 	scfd_resampleWaves(wav, measureFreq, targetFreq)
 	
@@ -350,8 +350,8 @@ function notch_filter(wave wav, variable Hz, [variable Q, string notch_name, var
 	
 	//Creating main wave copy and wave to display transform
 	int wavenum = getfirstnum(wav_name)
-	variable freq = 1 / (fd_getmeasfreq(wavenum) * dimdelta(wav, 0) / Hz)
-
+//	variable freq = 1 / (fd_getmeasfreq(wavenum) * dimdelta(wav, 0) / Hz) //**todo
+	variable freq = 1 
 
 	// Creating wave variables
 	variable num_rows = dimsize(wav, 0)
@@ -431,8 +431,8 @@ function notch_filters(wave wav, [string Hzs, string Qs, string notch_name])
 	
 	// Accessing freq conversion for wav
 	int wavenum = getfirstnum(wav_name)
-	variable freqfactor = 1/(fd_getmeasfreq(wavenum) * dimdelta(wav, 0)) // freq in wav = Hz in real seconds * freqfactor
-//	variable freq = 1 / (fd_getmeasfreq(wavenum) * dimdelta(wav, 0) / Hz)
+//	variable freqfactor = 1/(fd_getmeasfreq(wavenum) * dimdelta(wav, 0)) //***// freq in wav = Hz in real seconds * freqfactor
+	variable freqfactor = 1
 
 	fftfactor=1
 	variable freq, Q, i

@@ -5,6 +5,8 @@
 Menu "Graph"
 	"Close All Graphs/9", CloseAllGraphs()
 End
+
+
 Function CloseAllGraphs()
 	String name
 	do

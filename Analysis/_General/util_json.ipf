@@ -214,7 +214,7 @@ end
 //
 function fd_getoldAWG(S,datnum,[fastdac_num, kenner])
 	// Function to get old values for AWG that is stored in hdf file with filenum
-	struct AWGVars &S
+	struct ScanVars &S //*** TODOD
 	variable datnum, fastdac_num
 	string kenner
 	kenner = selectString(paramisdefault(kenner), kenner, "")
@@ -252,20 +252,20 @@ function fd_getoldAWG(S,datnum,[fastdac_num, kenner])
 	S.measureFreq=V_value
 
 	JSONXOP_GetValue/V fd_id, "/AWG/numWaves"
-	S.numWaves=V_value
+//	S.numWaves=V_value ***
 
 	JSONXOP_GetValue/V fd_id, "/AWG/numCycles"
 	S.numCycles=V_value
 
 
 	JSONXOP_GetValue/V fd_id, "/AWG/numSteps"
-	S.numSteps=V_value
+//	S.numSteps=V_value
 
 	JSONXOP_GetValue/T fd_id, "/AWG/AW_Waves"
-	S.AW_waves=S_value
+//	S.AW_waves=S_value
 
 	JSONXOP_GetValue/T fd_id, "/AWG/AW_Dacs"
-	S.AW_dacs=S_value
+//	S.AW_dacs=S_value
 
 	JSONXOP_Release /A  //Clear all stored JSON strings
 
