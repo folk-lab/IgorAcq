@@ -255,7 +255,7 @@ function fd_getmaxADCs(S)
 	string adcList = scf_getRecordedFADCinfo("channels")
 	StringToListWave(adclist)
 	numericwave = floor(numericwave)
-	maxADCs = FindMaxRepeats(numericwave)
+	maxADCs = get_MaxRepeats_from_wave(numericwave)
 	S.numADCs = dimsize(numericwave, 0)
 	return maxADCs
 end

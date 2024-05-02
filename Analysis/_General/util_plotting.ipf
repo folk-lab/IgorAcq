@@ -19,6 +19,18 @@ Function CloseAllGraphs()
 End
 
 
+Function CloseAllTables()
+	String name
+	do
+		name = WinName(0,2) // name of the front table
+		if (strlen(name) == 0)
+			break // all done
+		endif
+		DoWindow/K $name // Close the table
+	while(1)
+End
+
+
 
 Function AddLegend(wav, param)
     wave wav        

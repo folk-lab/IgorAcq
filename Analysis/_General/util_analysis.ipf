@@ -577,49 +577,6 @@ function ud()
 	print numloaded, "waves uploaded"
 end
 
-macro plot2d(num,dataset,disp)
-variable num
-string dataset
-variable disp
-
-	string wvname
-			wvname="dat"+num2str(num)+dataset
-if (disp==1)
-	display; 
-	endif
-	appendimage $wvname
-	wavestats/q $wvname
-	//ModifyImage $wvname ctab= {0.000,*,VioletOrangeYellow,0}
-	ModifyImage $wvname ctab= {*,*,VioletOrangeYellow,0}
-	
-
-
-	ColorScale/C/N=text0/F=0/A=RC/E width=20,image=$wvname
-	
-	TextBox/C/N=text1/F=0/A=MT/E wvname
-//ModifyImage $wvname minRGB=(0,65535,0),maxRGB=(4369,4369,4369)
-//Label bottom xlabel
-//Label left ylabel
-
-ModifyGraph fSize=24
-ModifyGraph gFont="Gill Sans Light"
-ModifyGraph grid=0
-ModifyGraph width={Aspect,1.62},height=300
-ModifyGraph width=0,height=0
-
-	//Button logscale,proc=ButtonProc,title="log"//pos={647.00,11.00},size={50.00,20.00}
-	//Button lin,proc=ButtonProc_1,title="lin"//pos={647.00,45.00},size={50.00,20.00}
-	
-	
-	variable inc
-	inc=(V_max-V_min)/20
-	Button autoscale,pos={52.00,9.00},size={103.00,21.00},proc=ButtonProc_2,title="high contrast"
-	Button use_lookup,pos={49.00,35.00},size={105.00,23.00},proc=ButtonProc_5,title="use lookup"
-	Button linear,pos={163.00,9.00},size={50.00,20.00},proc=ButtonProc_6,title="linear"
-	
-end
-end
-
 
 
 
@@ -886,13 +843,3 @@ Function GetFreeMemory()
     return freeMem / 1024 / 1024 / 1024
 End
 
-
-function stopalltimers()
-	wave timers
-	
-	int i = 0
-	do
-		timers[i] = stopMSTimer(i)
-		i += 1
-	while(i < 9)
-end
