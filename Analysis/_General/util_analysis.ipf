@@ -112,110 +112,9 @@ function demodulate(datnum, harmonic, wave_kenner, [append2hdf, demod_wavename])
 	ModifyImage /W=demod_window $demod_wavename ctab = {*, *, RedWhiteGreen, 0}
 	
 
-	///// append to hdf /////
-//wn="demod"
-//	if (append2hdf)
-//		variable fileid
-//		fileid=get_hdfid(datnum) //opens the file
-//		HDF5SaveData/o /IGOR=-1 /TRAN=1 /WRIT=1 /Z $wn, fileid
-//		HDF5CloseFile/a fileid
-//	endif
-
 end
 
 
-
-//string window_name
-//	Display 
-//	DoWindow/C conductance_vs_sweep 
-//	
-//	Display 
-//	window_name = WinName(0,1)
-//	DoWindow/C transition_vs_sweep
-//	
-//	string cond_avg, trans_avg
-//	variable i, datnum
-//	for (i=0;i<num_dats;i+=1)
-//		datnum = str2num(stringfromlist(i, datnums))
-//		
-//		try
-//			run_single_clean_average_procedure(datnum, plot=1, notch_on=notch_on)
-//		catch
-//			print "FAILED CLEAN AND AVERAGE :: DAT " + num2str(datnum)
-//		endtry 
-//		
-//		cond_avg = "dat" + num2str(datnum) + "_dot_cleaned_avg"
-//		trans_avg = "dat" + num2str(datnum) + "_cs_cleaned_avg"
-//		
-//		closeallGraphs(no_close_graphs = "conductance_vs_sweep;transition_vs_sweep")
-//		
-//		// append to graphs 
-//		AppendToGraph /W=conductance_vs_sweep $cond_avg;
-//		AppendToGraph /W=transition_vs_sweep $trans_avg;
-//		
-		
-		
-		
-		
-		
-
-function center_dSdN(int wavenum, string kenner)
-//wav is input wave, for example demod
-//centered is output name
-wave demod
-string centered=kenner+num2str(wavenum)+"centered"
-string centeravg=kenner+num2str(wavenum)+"centered_avg"
-string cleaned=kenner+num2str(wavenum)+"cleaned"
-string cleaned_avg=kenner+num2str(wavenum)+"cleaned_avg"
-
-
-//duplicate/o demod centered
-wave badthetasx
-
-string condfit_prefix="cst"; //this can become an input if needed
-string condfit_params_name=condfit_prefix+num2str(wavenum)+"fit_params"
-wave condfit_params = $condfit_params_name
-
-	duplicate/o/r=[][3] condfit_params mids
-
-	centering(demod,centered,mids)
-	wave temp=$centered
-
-	duplicate/o temp $cleaned
-
-
-	// removing lines with bad thetas;
-
-	variable i, idx
-	int nc
-	int nr
-	nr = dimsize(badthetasx,0) //number of rows
-	i=0
-	if (nr>0)
-		do
-			idx=badthetasx[i]-i //when deleting, I need the -i because if deleting in the loop the indeces of center change continously as points are deleted
-			DeletePoints/M=1 idx,1, $cleaned
-			i=i+1
-		while (i<nr)
-	endif
-//		WaveTransform zapnans $cleaned_avg
-//		WaveTransform zapnans $centeravg
-
-
-	avg_wav($cleaned)
-	avg_wav($centered)
-	display $cleaned_avg, $centeravg
-	makecolorful()
-//	wave center=$centeravg
-//	Extract/o/indx center,newx, (numtype(center[p])==0)
-//	wavestats center
-//	DeletePoints 0, 43, center 
-
-	
-
-	
-	
-end
 
 function zap_NaNs(wave_1d, [overwrite])
 	// removes any datapoints with NaNs :: only removes NaNs from the end of the wave. Assumes NaNs are only at start and end and not within wave
@@ -295,6 +194,55 @@ function zap_NaNs(wave_1d, [overwrite])
 	endif
 end
 
+
+function replace_nans_with_avg(wave_2d, [overwrite])
+	// Replaces NaN values in a 2D wave with the average of the non-NaN values in each column
+    // wave_2d: The input 2D wave
+    // overwrite: Set to 1 to overwrite the input wave (Default is to create new wave with "_new" added)
+	wave wave_2d
+	int overwrite
+	
+	string wave_name = nameofwave(wave_2d)
+	
+	// Getting x-values from wave
+	string wave_name_x = wave_name + "_x"
+	duplicate /o /R=[][0] wave_2d $wave_name_x
+	wave wave_2d_x = $wave_name_x
+	wave_2d_x = x
+	
+	// Duplicating 2d wave
+	string wave_name_new = wave_name + "_new"
+	duplicate /o wave_2d $wave_name_new
+	wave wave_new = $wave_name_new 
+	
+	variable num_rows = dimsize(wave_2d, 1) // IGOR column
+	variable num_bad_rows = 0
+	variable i
+	for (i = 0; i < num_rows; i++)
+		duplicate /R=[][i] /o /free wave_2d wave_slice
+		wavestats /Q wave_slice
+		if (V_numNans/V_npnts > 0.33) // If 25% or more of data poitns are NaNs
+			DeletePoints/M=1 (i - num_bad_rows), 1, wave_new // delete row 
+			num_bad_rows += 1
+		else
+			Interpolate2 /T=1 /I=0 /Y=wave_slice wave_2d_x,  wave_slice // linear interpolation
+			wave_new[][i - num_bad_rows] = wave_slice[p]
+		endif
+	endfor
+	
+	
+	killwaves wave_2d_x
+	
+	
+	if (overwrite == 1)
+		duplicate /o wave_new $wave_name
+		killwaves wave_new
+	endif
+end
+
+
+
+
 function resampleWave(wav, targetFreq, [measureFreq])
 	// finds measure freq from scan vars and calls scfd_resampleWaves
 	wave wav 
@@ -315,77 +263,6 @@ function resampleWave(wav, targetFreq, [measureFreq])
 	
 	scfd_resampleWaves(wav, measureFreq, targetFreq)
 	
-end
-
-
-//function quadratic(w, pw)
-//	Wave w
-//	Variable x
-//	// assumes pw is in the form of the output wave from a poly2d with polynomial 2 fit.
-//	
-//	return pw[1]
-//end
-
-
-function notch_filter(wave wav, variable Hz, [variable Q, string notch_name, variable overwrite_wave])
-	// wav is the wave to be notch filtered, which must have the accompanying json specifying measurement frequency
-	// Hz ithe frequency to notch filter, with quality factor Q
-	// notch_name is the name of the wave to be after notch filtering.  If not specified the new wave will be the name of wav plus _nf
-	// if notch_name already exists it will be overwritten
-	// overwrite_wave is a flag that can be set to 1 to tell the function to overwrite wav, that is, to make notch_name the same as
-	// the original wave.  If notch_name is specified AND overwrite_wave is set to 1, it defaults to making the output wave notch_wave
-
-	Q = paramisdefault(Q) ? 50 : Q // set Q factor to 50 if not specified
-	overwrite_wave = paramisdefault(overwrite_wave) ? 0 : overwrite_wave	
-	String wav_name = nameOfWave(wav)
-	
-	if (paramisdefault(notch_name))
-		if (overwrite_wave == 1)
-			notch_name=wav_name
-		else
-			notch_name = wav_name + "_nf"
-//			duplicate/o wav $notch_name
-		endif
-	endif
-	
-	//Creating main wave copy and wave to display transform
-	int wavenum = getfirstnum(wav_name)
-//	variable freq = 1 / (fd_getmeasfreq(wavenum) * dimdelta(wav, 0) / Hz) //**todo
-	variable freq = 1 
-
-	// Creating wave variables
-	variable num_rows = dimsize(wav, 0)
-	variable padnum = 2^ceil(log(num_rows) / log(2)); 
-	duplicate /o wav tempwav
-	variable avg = mean(wav)
-	tempwav -= avg
-	
-	//Transform
-	FFT/pad=(padnum)/OUT=1/DEST=temp_fft tempwav
-//	FFT/OUT=1/DEST=temp_fft tempwav
-
-	wave /c temp_fft
-	
-	//Create gaussian, multiply it
-	duplicate/c/o temp_fft fftfactor
-	fftfactor = 1 - exp(-(x - freq)^2 / (freq / Q)^2)
-	temp_fft *= fftfactor
-
-	//Inverse transform
-	IFFT/DEST=temp_ifft  temp_fft;DelayUpdate
-	wave temp_ifft
-	
-	temp_ifft += avg
-
-	redimension/N=(num_rows, -1) temp_ifft
-
-	copyscales wav, temp_ifft
-		
-	duplicate /o temp_ifft $notch_name
-	
-//	if (overwrite_wave == 1)
-//		duplicate/o wave_copy, wav
-//	endif
 end
 
 
@@ -501,19 +378,6 @@ end
 
 
 
-
-Window Noise_check() : Graph
-	PauseUpdate; Silent 1		// building window...
-	Display /W=(35,53,1478,1119) slice1,slice2,slice3,slice4,slice5,slice6
-	ModifyGraph rgb(slice1)=(13107,13107,13107),rgb(slice2)=(65535,62414,0),rgb(slice3)=(13107,13107,13107)
-	ModifyGraph rgb(slice4)=(0,65535,47661),rgb(slice5)=(13107,13107,13107),rgb(slice6)=(32767,0,65535)
-	ModifyGraph offset(slice3)={400,0},offset(slice4)={400,0},offset(slice5)={-400,0}
-	ModifyGraph offset(slice6)={-400,0}
-	Legend/C/N=text0/J "\\s(slice1) slice1\r\\s(slice2) slice2\r\\s(slice3) slice3\r\\s(slice4) slice4\r\\s(slice5) slice5\r\\s(slice6) slice6"
-EndMacro
-
-
-
 function /s avg_wav(wave wav) // /WAVE lets your return a wave
 	// averaging any wave over columns (in y direction)
 	// wave returned is avg_name
@@ -532,25 +396,6 @@ function /s avg_wav(wave wav) // /WAVE lets your return a wave
 	return avg_name
 end
 
-
-
-function /s avg_wav_N(wave wav, int N) // /WAVE lets your return a wave
-
-	//  averaging any wave over columns (in y direction)
-	// wave returned is avg_name
-	string wn=nameofwave(wav)
-	string avg_name=wn+"_avg";
-	int nc
-	int nr
-
-//	wn="dat"+num2str(wavenum)+dataset //current 2d array
-
-	nr = dimsize($wn,0) //number of rows (sweep length)
-	nc = dimsize($wn,1) //number of columns (repeats)
-	ReduceMatrixSize(wav, 0, -1, nr, 0,-1, N, 1, avg_name)
-	redimension/n=-1 $avg_name
-	return avg_name
-end
 
 
 
@@ -777,91 +622,6 @@ end
 
 
 
-function mean_nan(wavenm)
-	wave wavenm
-	
-	variable i=0, sumwv=0, numpts=dimsize(wavenm,0), numvals=0
-	do
-		if (abs(wavenm[i])>0)
-			sumwv += wavenm[i]
-			numvals+=1
-		endif
-		i+=1
-	while(i<numpts)
-	return (sumwv/numvals)
-end
-
-
-function centerwave(wavenm)
-	string wavenm 
-	wave data
-	Duplicate/o $wavenm data
-	data=data/1.5
-
-	
-	variable centerpt, centerval
-	wave w_coef=w_coef 
-
-
-
-	variable l= dimsize(data, 0 )
-	WaveStats/Q/R=[l/2-100,l/2+100] data
-	//wavestats /q data
-	centerpt = v_maxrowloc
-	
-	
-	CurveFit/q/NTHR=0 lor  data[(centerpt-20),(centerpt+20)] 
-	centerval=w_coef[2]
-	SetScale/P x (dimoffset(data,0)-centerval),dimdelta(data,0),"", data
-	display data
-end 
-	
-	
-function subtract_bg(rs, bias, current,[identifier])
-variable rs, bias
-variable identifier
-wave current
-variable aspectrat=6.8/3.2;
-string wavenm=("cond"+num2str(identifier))
-
-	if (paramisdefault(identifier))
-		wavenm="cond"
-	endif
-    duplicate /o current  $wavenm
-    wave cond=$wavenm
-	duplicate /o current  temp
-
-temp=bias/current-rs
-cond=1/temp *aspectrat // cond * geometry of sample =conductivity
-//display; appendimage cond
-
-
-
-end	
-
-macro setparams_wide()
-ModifyGraph fSize=24
-ModifyGraph gFont="Gill Sans Light"
-ModifyGraph width={Aspect,1},height=400
-ModifyGraph grid=0
-ModifyGraph width=500,height=380
-ModifyGraph width=0,height=0
-endmacro
-
-macro setparams_square()
-
-Label bottom ""
-Label left ""
-	ModifyGraph fSize=24
-ModifyGraph gFont="Gill Sans Light"
-//ModifyGraph width=283.465,height={Aspect,1.62}
-ModifyGraph grid=2
-ModifyGraph width={Aspect,1},height=400
-
-endmacro
-
-
-
 
 Function Setmaxi(sva) : SetVariableControl
 	STRUCT WMSetVariableAction &sva
@@ -882,6 +642,7 @@ break
 
 	return maxi
 End
+
 
 Function Setmini(sva) : SetVariableControl
 	STRUCT WMSetVariableAction &sva
@@ -907,45 +668,8 @@ End
 
 
 
-Function save_specwave(waveno)
-	variable waveno
-	
-	Variable index = 0
-	do
-		Wave/Z w = WaveRefIndexedDFR(:, index)
-		if (!WaveExists(w))
-			break
-		endif
-		
-		String fileName = NameOfWave(w)
-		string compare2="dat"+num2str(waveno)
-		variable slen
-		slen= strlen(compare2)
 
-		if(stringmatch(fileName[0,slen-1], compare2))
-		Save/C/O/P=data w as fileName
-      print filename
-		endif
-		index += 1
-	while(1)
-	
-	
-End
-
-
-
-function save_waves(Anfang,Ende)
-	variable Anfang, Ende
-	variable index=Anfang
-	do
-		save_specwave(index)
-		index += 1
-	while(index<Ende)
-end
-
-
-
-Function renamewave(oldprefix,newprefix)
+Function renamewave(oldprefix, newprefix)
    string oldprefix, newprefix
  
    string theList, theOne, theName
@@ -963,50 +687,44 @@ end
 
 
 
-
-
-
-function int_PSD(tim)
-	string tim
-//	wave ref
-	string inwave="spectrum_2020-10-09_"+tim+"fftADC0"
-	string outwave="spectrum_2020-10-09_"+tim+"_int"
-	wave nw=$inwave
-	//execute("graph()")
-	wavestats/q nw
-	if (V_min<-140)
-	DeletePoints 0,1, nw
+function/wave Linspace(start, fin, num, [make_global])
+	// An Igor substitute for np.linspace() (obviously with many caveats and drawbacks since it is in Igor...)
+	//
+	// To use this in command line:
+	//		make/o/n=num tempwave
+	// 		tempwave = linspace(start, fin, num)[p]
+	//
+	// To use in a function:
+	//		wave tempwave = linspace(start, fin, num)  //Can be done ONCE (each linspace overwrites itself!)
+	//	or
+	//		make/n=num tempwave = linspace(start, fin, num)[p]  //Can be done MANY times
+	//
+	// To combine linspaces:
+	//		make/free/o/n=num1 w1 = linspace(start1, fin1, num1)[p]
+	//		make/free/o/n=num2 w2 = linspace(start2, fin2, num2)[p]
+	//		concatenate/np/o {w1, w2}, tempwave
+	//
+	variable start, fin, num
+	int make_global
+	make_global = paramisdefault(make_global) ? 0 : make_global  // default to not make global wave
+	
+	if (num == 1)
+		if (make_global == 1)
+			Make/N=1/O linspaced = {start}
+		else
+			Make/N=1/O/Free linspaced = {start}
+		endif
+	else
+		if (make_global == 1)
+			Make/N=2/O linspace_start_end = {start, fin}
+		else
+			Make/N=2/O/Free linspace_start_end = {start, fin}
+		endif
+		Interpolate2/T=1/N=(num)/Y=linspaced linspace_start_end
 	endif
-	
-	appendtoGraph/l $inwave; 
-
-	duplicate/o $inwave $outwave
-	wave nw_int=$outwave
-	duplicate/o nw temp
-	temp= 10^(nw/10);
-
-	Integrate temp/D=nw_int
-	appendtoGraph/r nw_int; 
-	makecolorful(); 
-	
-//	matrixop/o diff=ref-nw
-//	display diff
-//	SetScale/I x 0,1269,"", diff
-
-
+	return linspaced
 end
 
-macro testLI()
-closeallGraphs()
-sc_openInstrConnections(0)
-setFdacAWGSquareWave(fd, 100, -100, 0.001, 0.001, 0)
-setupAWG(fd, AWs="0", DACs="0", numCycles=1, verbose=1);
-ScanFastDAC(fd, 0, 1, "3", sweeprate=1,  use_awg=1,nosave=1, repeats = 1)
-
-//lock_in_main_2d(wave0_2d,1)
-//demodulate(filenum,1,"wa,[append2hdf])
-//display average
-endmacro
 
 
 //from:
@@ -1090,6 +808,7 @@ function MultiGraphLayout(GraphList, nCols, spacing, layoutName)
 	return 1
 end
 
+
 function getfirstnum(numstr)
     string numstr
     
@@ -1099,14 +818,6 @@ function getfirstnum(numstr)
     return number
 end
 
-function /s getprefix(numstr)
-    string numstr
-    
-    string junk
-    variable number
-    sscanf numstr, "%[^0123456789]%d", junk, number
-    return junk
-end
 
 function /s getsuffix(numstr)
     string numstr

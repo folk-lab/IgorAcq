@@ -84,6 +84,56 @@ end
 
 
 
+
+
+
+function TransitionCenterFromFit(w)
+	wave w
+	variable Vmid, smooth_width
+	// Get rough middle from differentiating
+	redimension/N=-1 w
+	duplicate/FREE w wSmooth
+	wavestats/Q/M=1 w //easy way to get num notNaNs (M=1 only calculates a few wavestats)
+	smooth_width = V_npnts/10 //width to smooth by (relative to how many datapoints taken)
+	smooth smooth_width, wSmooth	//Smooth wave so differentiate works better
+	differentiate wSmooth /D=wSmoothDiff
+	wavestats/Q/M=1 wSmoothDiff
+	Vmid = V_minloc
+	
+	// Estimate fit parameters
+	Make/D/O/N=5 W_coef
+	wavestats/Q/M=1/R=[V_minRowLoc-V_npnts/5, V_minRowLoc+V_npnts/5] w //wavestats close to the transition (in mV, not dat points)
+					//Amp,   			Const, 	Theta, 							Mid,	Linear
+	w_coef[0] = {-(v_max-v_min), v_avg, 	abs((v_maxloc-v_minloc)/3), 	Vmid, 0}
+	duplicate/O/Free w_coef w_coeftemp 
+	
+	// Fit with initial param guess
+	funcFit/Q Chargetransition W_coef w 
+	wave w_sigma
+	variable scan_width = abs(rightx(w)-leftx(w))
+	if(w_sigma[3] < scan_width/10) // Check Vmid was a good fit by seeing if uncertainty is <1/10 width of scan
+		return w_coef[3]
+	endif
+	
+	// Otherwise get a better guess of the linear component
+	make/O/N=2 cm_coef = 0
+	duplicate/O/Free/R=(leftx(w), vmid-scan_width/5) w wBeforeTransition //so hopefully just the gradient of the line leading up to the transition and not including the transition
+	curvefit/Q line kwCWave = cm_coef wBeforeTransition /D
+	
+	// Fit again with better slope estimate
+	w_coef = w_coeftemp
+	w_coef[4] = cm_coef[1] // Slope
+	funcFit/Q Chargetransition W_coef w	  //try again with new set of w_coef
+	if	(w_sigma[3] < scan_width/10)
+		return w_coef[3]
+	else
+		print "Bad Vmid = " + num2str(w_coef[3]) + " +- " + num2str(w_sigma[3]) + " near Vmid = " + num2str(Vmid)
+		return NaN
+	endif
+end
+
+
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////// Dot Tuning Stuff /////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -801,15 +851,6 @@ function ScanAlongTransition(step_gate, step_size, step_range, center_gate, swee
 
 	nvar fd, bd
 
-	if (!paramIsDefault(load_datnum))
-//		loadFromHDF(load_datnum, no_check=1) //***
-		if (additional_setup)
-			additionalSetupAfterLoadHDF()
-		endif
-		if (!paramisdefault(sweep_gate_start))
-			rampmultiplefdac(sweep_gate, sweep_gate_start)
-		endif
-	endif
 
 	wave/T fdacvalstr
 	wave/T dacvalstr
@@ -1261,7 +1302,6 @@ function DCbiasRepeats(max_current, num_steps, duration, [voltage_ratio])
 	string current_channel = "OHC(10M)"
 	string voltage_channel = "OHV*1000"
 
-	nvar fd
 	string comments
 	variable repeats
 
@@ -1302,8 +1342,9 @@ end
 
 
 
-function QPCProbe(InstrID, channels, [scan_time, max_voltage, steps, delay, repeats, comments])
-   variable InstrID
+function QPCProbe(channels, [scan_time, max_voltage, steps, delay, repeats, comments])
+	// runs a scanfastdac from 0 to X
+	// where X = max_voltage/steps * [0 - steps]
 	string channels, comments
 	variable scan_time, max_voltage, steps, delay, repeats
 	
@@ -1330,4 +1371,482 @@ end
 
 
 
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////// Measurement Utilities   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////// Setting up AWG ///////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+function makeSquareWaveAWG(instrID, v0, vP, vM, v0len, vPlen, vMlen, wave_num, [ramplen])  // TODO: move this to Tim's igor procedures
+   // Make square waves with form v0, +vP, v0, -vM (useful for Tim's Entropy)
+   // Stores copy of wave in Igor (accessible by fd_getAWGwave(wave_num))
+   // Note: Need to call, fd_setupAWG() after making new wave
+   // To make simple square wave set length of unwanted setpoints to zero.
+   variable instrID, v0, vP, vM, v0len, vPlen, vMlen, wave_num
+   variable ramplen  // lens in seconds
+   variable max_setpoints = 26
+
+
+	ramplen = paramisdefault(ramplen) ? 0.003 : ramplen
+
+	if (ramplen < 0)
+		abort "ERROR[makeSquareWaveAWG]: Cannot use a negative ramplen"
+	endif
+
+    // Open connection
+    sc_openinstrconnections(0)
+
+   // put inputs into waves to make them easier to work with
+   make/o/free sps = {v0, vP, v0, vM} // CHANGE refers to output
+   make/o/free lens = {v0len, vPlen, v0len, vMlen}
+
+   // Sanity check on period
+   // Note: limit checks happen in AWG_RAMP
+   if (sum(lens) > 1)
+      string msg
+      sprintf msg "Do you really want to make a square wave with period %.3gs?", sum(lens)
+      variable ans = ask_user(msg, type=1)
+      if (ans == 2)
+         abort "User aborted"
+      endif
+   endif
+   // Ensure that ramplen is not too long (will never reach setpoints)
+   variable i=0
+   for(i=0;i<numpnts(lens);i++)
+    if (lens[i] < ramplen && lens[1] != 0)
+      msg = "Do you really want to ramp for longer than the duration of a setpoint? You will never reach the setpoint"
+      ans = ask_user(msg, type=1)
+      if (ans == 2)
+         abort "User aborted"
+      endif
+    endif
+   endfor
+
+
+    // Get current measureFreq to calculate require sampleLens to achieve durations in s
+   variable measureFreq = 12195 //getFADCmeasureFreq(instrID) // ***
+   
+   variable numSamples = 0
+
+   // Make wave
+   variable j=0, k=0
+   variable setpoints_per_ramp = floor((max_setpoints - numpnts(sps))/numpnts(sps)) // points per section in square wave by setting points per square wave
+   variable ramp_step_size = min(setpoints_per_ramp, floor(measureFreq * ramplen)) // used points per section in square wave. Comparing setpoints_per_ramp to measured points
+   variable ramp_setpoint_duration = 0
+
+   if (ramp_step_size != 0)
+     ramp_setpoint_duration = ramplen / ramp_step_size
+   endif
+
+   // make wave to store setpoints/sample_lengths, correctly sized
+   make/o/free/n=((numpnts(sps)*ramp_step_size + numpnts(sps)), 2) awg_sqw
+
+   //Initialize prev_setpoint to the last setpoint
+   variable prev_setpoint = sps[numpnts(sps) - 1]
+   variable ramp_step = 0
+   for(i=0;i<numpnts(sps);i++)
+      if(lens[i] != 0)  // Only add to wave if duration is non-zero
+         // Ramps happen at the beginning of a setpoint and use the 'previous' wave setting to compute
+         // where to ramp from. Obviously this does not work for the first wave length, is that avoidable?
+         ramp_step = (sps[i] - prev_setpoint)/(ramp_step_size + 1)
+         for (k = 1; k < ramp_step_size+1; k++)
+          // THINK ABOUT CASE RAMPLEN 0 -> ramp_setpoint_duration = 0
+          numSamples = round(ramp_setpoint_duration * measureFreq)
+          awg_sqw[j][0] = {prev_setpoint + (ramp_step * k)}
+          awg_sqw[j][1] = {numSamples}
+          j++
+         endfor
+         numSamples = round((lens[i]-ramplen)*measureFreq)  // Convert to # samples
+         if(numSamples == 0)  // Prevent adding zero length setpoint
+            abort "ERROR[makeSquareWaveAWG]: trying to add setpoint with zero length, duration too short for sampleFreq"
+         endif
+         awg_sqw[j][0] = {sps[i]}
+         awg_sqw[j][1] = {numSamples}
+         j++ // Increment awg_sqw position for storing next setpoint/sampleLen
+         prev_setpoint = sps[i]
+      endif
+   endfor
+
+
+    // Check there is a awg_sqw to add
+   if(numpnts(awg_sqw) == 0)
+      abort "ERROR[makeSquareWaveAWG]: No setpoints added to awg_sqw"
+   endif
+
+    // Clear current wave and then reset with new awg_sqw
+//   fd_clearAWGwave(instrID, wave_num) ***
+//   fd_addAWGwave(instrID, wave_num, awg_sqw) ***
+
+   // Make sure user sets up AWG_list again after this change using fd_setupAWG()
+//   fd_setAWGuninitialized()
+end
+
+
+
+function SetupEntropySquareWaves([freq, cycles,hqpc_zero, hqpc_plus, hqpc_minus, channel_ratio, balance_multiplier, hqpc_bias_multiplier, ramplen])
+	variable freq, cycles,hqpc_zero, hqpc_plus, hqpc_minus, channel_ratio, balance_multiplier, hqpc_bias_multiplier, ramplen
+
+	balance_multiplier = paramIsDefault(balance_multiplier) ? 1 : balance_multiplier
+	hqpc_bias_multiplier = paramIsDefault(hqpc_bias_multiplier) ? 1 : hqpc_bias_multiplier
+	freq = paramisdefault(freq) ? 12.5 : freq
+	cycles = paramisdefault(cycles) ? 1 : cycles
+	hqpc_plus = paramisdefault(hqpc_plus) ? 50 : hqpc_plus
+	hqpc_minus = paramisdefault(hqpc_minus) ? -50 : hqpc_minus
+	channel_ratio = paramisdefault(channel_ratio) ? -1.478 : channel_ratio  //Using OHC, OHV
+	ramplen = paramisdefault(ramplen) ? 0 : ramplen
+	hqpc_zero = paramisdefault(hqpc_zero) ? 0 : hqpc_zero
+	nvar fd1
+
+	variable splus = hqpc_plus*hqpc_bias_multiplier, sminus=hqpc_minus*hqpc_bias_multiplier
+	variable cplus=splus*channel_ratio * balance_multiplier, cminus=sminus*channel_ratio * balance_multiplier
+
+	variable spt
+	// Make square wave 0
+	spt = 1/(4*freq)  // Convert from freq to setpoint time /s  (4 because 4 setpoints per wave)
+	makeSquareWaveAWG(fd1, hqpc_zero, splus, sminus, spt, spt, spt, 0, ramplen=ramplen)
+	// Make square wave 1
+	makeSquareWaveAWG(fd1, hqpc_zero, cplus, cminus, spt, spt, spt, 1, ramplen=ramplen)
+
+	// Setup AWG
+//	setupAWG(channels_AW0= "OHC(10M)", channels_AW1 = "OHV*9960", numCycles=cycles, verbose=1)
+end
+
+
+
+function SetupEntropySquareWaves_unequal([freq, cycles, hqpc_plus, hqpc_minus, ratio_plus, ratio_minus, balance_multiplier, hqpc_bias_multiplier, ramplen])
+	variable freq, cycles, hqpc_plus, hqpc_minus, ratio_plus, ratio_minus, balance_multiplier, hqpc_bias_multiplier, ramplen
+
+	balance_multiplier = paramIsDefault(balance_multiplier) ? 1 : balance_multiplier
+	hqpc_bias_multiplier = paramIsDefault(hqpc_bias_multiplier) ? 1 : hqpc_bias_multiplier
+	freq = paramisdefault(freq) ? 12.5 : freq
+	cycles = paramisdefault(cycles) ? 1 : cycles
+	hqpc_plus = paramisdefault(hqpc_plus) ? 50 : hqpc_plus
+	hqpc_minus = paramisdefault(hqpc_minus) ? -50 : hqpc_minus
+	ratio_plus = paramisdefault(ratio_plus) ? -1.531 : ratio_plus
+	ratio_minus = paramisdefault(ratio_minus) ? -1.531 : ratio_minus
+	ramplen = paramisdefault(ramplen) ? 0 : ramplen
+
+	nvar fd
+
+	variable splus = hqpc_plus*hqpc_bias_multiplier, sminus=hqpc_minus*hqpc_bias_multiplier
+	variable cplus=splus*ratio_plus * balance_multiplier, cminus=sminus*ratio_minus * balance_multiplier
+
+	variable spt
+	// Make square wave 0
+	spt = 1/(4*freq)  // Convert from freq to setpoint time /s  (4 because 4 setpoints per wave)
+	makeSquareWaveAWG(fd, 0, splus, sminus, spt, spt, spt, 0, ramplen=ramplen)
+	// Make square wave 1
+	makeSquareWaveAWG(fd, 0, cplus, cminus, spt, spt, spt, 1, ramplen=ramplen)
+
+	// Setup AWG
+//	setupAWG(channels_AW0="HO1/10M", channels_AW0="HO2*1000", numCycles=cycles)
+end
+
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////// Charge sensor functions ///////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////
+
+function CorrectChargeSensor([fdchannelstr, fadcchannel, i, check, natarget, direction, zero_tol, gate_divider, cutoff_time])
+//Corrects the charge sensor by ramping the CSQ in 1mV steps
+//(direction changes the direction it tries to correct in)
+	variable fadcchannel, i, check, natarget, direction, zero_tol, gate_divider, cutoff_time
+	string fdchannelstr
+	variable cdac, cfdac, current, new_current, nextdac, j
+	wave/T dacvalstr
+	wave/T fdacvalstr
+		
+	natarget = paramisdefault(natarget) ? 1.1 : natarget // 0.22
+	direction = paramisdefault(direction) ? 1 : direction
+	zero_tol = paramisdefault(zero_tol) ? 0.5 : zero_tol  // How close to zero before it starts to get more averaged measurements
+	gate_divider = paramisdefault(gate_divider) ? 20 : gate_divider
+	cutoff_time = paramisdefault(cutoff_time) ? 30 : cutoff_time
+	fadcchannel = paramisdefault(fadcchannel) ? 1 : fadcchannel
+
+	if (paramisdefault(fadcchannel))
+		abort "Must provide fdadcID if using fadc to read current"
+	elseif (paramisdefault(fdchannelstr))
+		abort "Must provide fdchannel if using fd"
+	endif
+
+	if (!paramisdefault(fdchannelstr))
+		fdchannelstr = scu_getChannelNumbers(fdchannelstr)
+		if(itemsInList(fdchannelstr, ",") != 1)
+			abort "ERROR[CorrectChargeSensor]: Only works with 1 fdchannel"
+		else
+			variable fdchannel = str2num(fdchannelstr)
+		endif
+	endif
+
+	sc_openinstrconnections(0)
+
+	//get current
+	current = get_one_FADCChannel(fadcchannel) //***
+
+	variable end_condition = (naTarget == 0) ? zero_tol : 0.05*naTarget   // Either 5% or just an absolute zero_tol given
+	variable step_multiplier = 1
+	variable avg_len = 0.001// Starting time to avg, will increase as it gets closer to ideal value
+	if (abs(current-natarget) > end_condition/2)  // If more than half the end_condition out
+		variable start_time = datetime
+		do
+			//get current dac setting
+			cdac = str2num(fdacvalstr[fdchannel][1])
+
+
+			if (abs(current-natarget) > 15*end_condition)
+				step_multiplier = 10
+			elseif (abs(current-natarget) > 10*end_condition)
+				step_multiplier = 3			
+			else
+				step_multiplier = 1
+			endif
+
+			if (current < nAtarget)  // Choose next step direction
+				nextdac = cdac+step_multiplier*(0.32*direction)*gate_divider  // 0.305... is FastDAC resolution (20000/2^16)
+			else
+				nextdac = cdac-step_multiplier*(0.32*direction)*gate_divider
+			endif
+
+			if (check==0) //no user input
+				if (-1000*gate_divider < nextdac && nextdac < 100*gate_divider) //Prevent it doing something crazy
+					RampMultipleFDAC(num2str(fdchannel), nextdac) //***
+				else
+					abort "Failed to correct charge sensor to target current"
+				endif
+			else //ask for user input
+				doAlert/T="About to change DAC" 1, "Scan wants to ramp DAC to " + num2str(nextdac) +"mV, is that OK?"
+				if (V_flag == 1)
+					RampMultipleFDAC(num2str(fdchannel), nextdac)
+				else
+					abort "Aborted"
+				endif
+			endif
+
+			//get current after dac step
+			current = get_one_FDACChannel(fadcchannel) //***
+
+
+			doupdate  // Update scancontroller window
+
+
+			if ((abs(current-nAtarget) < end_condition*3) && avg_len < 0.2)  // If close to end, start averaging for at least 0.2
+				avg_len = 0.2
+			endif
+			if (abs(current-nAtarget) < end_condition*3)  // Average longer each time when close
+				avg_len = avg_len*1.2
+			endif
+			if (avg_len > 1)  // Max average length = 1s
+				avg_len = 1
+			endif
+//			print avg_len
+			asleep(0.05)
+		while (abs(current-nAtarget) > end_condition && (datetime - start_time < cutoff_time))   // Until reaching end condition
+
+		if (!paramisDefault(i))
+			print "Ramped to " + num2str(nextdac) + "mV, at line " + num2str(i)
+		endif
+	endif
+end
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////// Centering Functions ////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////
+
+function FindTransitionMid(dat, [threshold]) //Finds mid by differentiating, returns minloc
+	wave dat
+	variable threshold
+	variable MinVal, MinLoc, w, lower, upper
+	threshold = paramisDefault(threshold) ? 2 : threshold 
+	wavestats/Q dat //easy way to get num notNaNs
+	w = V_npnts/5 //width to smooth by (relative to how many datapoints taken)
+	redimension/N=-1 dat
+	smooth w, dat	//Smooth dat so differentiate works better
+	duplicate/o/R=[w, numpnts(dat)-w] dat dattemp
+	differentiate/EP=1 dattemp /D=datdiff
+	wavestats/Q datdiff
+	MinVal = V_min  		//Will get overwritten by next wavestats otherwise
+	MinLoc = V_minLoc 	//
+	Findvalue/V=(minVal)/T=(abs(minval/100)) datdiff //find index of min peak
+	lower = V_value-w*0.75 //Region to cut from datdiff
+	upper = V_value+w*0.75 //same
+	if(lower < 1)
+		lower = 0 //make sure it doesn't exceed datdiff index range
+	endif
+	if(upper > numpnts(datdiff)-2)
+		upper = numpnts(datdiff)-1 //same
+	endif
+	datdiff[lower, upper] = NaN //Remove peak
+	wavestats/Q datdiff //calc V_adev without peak
+	if(abs(MinVal/V_adev)>threshold)
+		//print "MinVal/V_adev = " + num2str(abs(MinVal/V_adev)) + ", at " + num2str(minloc) + "mV"
+		return MinLoc
+	else
+		print "MinVal/V_adev = " + num2str(abs(MinVal/V_adev)) + ", at " + num2str(minloc) + "mV"
+		return NaN
+	endif
+end
+
+
+function CenterOnTransition([gate, virtual_gates, width, single_only])
+	string gate, virtual_gates
+	variable width, single_only
+
+	gate = selectstring(paramisdefault(gate), gate, "ACC*2")
+	width = paramisdefault(width) ? 20 : width
+
+	string gate_num
+	gate_num = scu_getChannelNumbers(gate)
+
+	variable initial, mid
+	wave/t fdacvalstr
+	initial = str2num(fdacvalstr[str2num(gate_num)][1])
+
+	ScanFastDAC(initial-width, initial+width, gate, sweeprate=width, nosave=1)
+	mid = findtransitionmid($"cscurrent", threshold=2)
+
+	if (single_only == 0 && numtype(mid) != 2)
+		ScanFastDAC(mid-width/10, mid+width/10, gate, sweeprate=width/10, nosave=1)
+		mid = findtransitionmid($"cscurrent", threshold=2)
+	endif
+
+	if (abs(mid-initial) < width && numtype(mid) != 2)
+		rampMultipleFDAC(gate, mid)
+	else
+		rampMultipleFDAC(gate, initial)
+		printf "CLOSE CALL: center on transition thought mid was at %dmV\r", mid
+		mid = initial
+	endif
+	return mid
+end
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////// Miscellaneous ////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+function/T get_virtual_scan_params(mid, width1, virtual_mids, ratios)
+	variable mid, width1
+	string virtual_mids, ratios
+
+	abort "2021/11 -- Somehow this function got lost, will need to be remade to be used again"
+end
+
+
+
+
+function calculate_virtual_starts_fins_using_ratio(sweep_mid, sweep_width, sweep_gate, virtual_gates, virtual_mids, virtual_ratios, channels, starts, fins)
+	// Given the sweepgate mid/width, and the virtual gate mids/ratios, returns the full channels, starts, fins for a virtual sweep
+	// Note: channels, starts, fins will be modified to have the return values (can't return more than 1 string in Igor)
+	string sweep_gate, virtual_gates, virtual_mids, virtual_ratios
+	string &channels, &starts, &fins // The & allows for modifying the string that was passed in
+	variable sweep_mid, sweep_width
+	
+	if ((itemsinList(virtual_gates, ",") != itemsinList(virtual_mids, ",")) || (itemsinList(virtual_gates, ",") != itemsinList(virtual_ratios, ",")))
+		abort "ERROR[calculate_virtual_starts_fins_using_ratio]: Virtual_gates, Virtual_mids, and virtual_ratios must all have the same number of items"
+	endif
+	
+	
+	starts = num2str(sweep_mid - sweep_width)
+	fins = num2str(sweep_mid + sweep_width)
+	channels = addlistitem(sweep_gate, virtual_gates, ",", 0)
+	
+	variable temp_mid, temp_ratio, temp_start, temp_fin
+	variable k
+	for (k=0; k<ItemsInList(virtual_gates, ","); k++)
+			temp_mid = str2num(StringFromList(k, virtual_mids, ","))
+			temp_ratio = str2num(StringFromList(k, virtual_ratios, ","))
+			
+			temp_start = temp_mid - temp_ratio*sweep_width
+			temp_fin = temp_mid + temp_ratio*sweep_width
+			
+			starts = addlistitem(num2str(temp_start), starts, ",", inf)
+			fins = addlistitem(num2str(temp_fin), fins, ",", inf)
+	 endfor
+	 
+end
+
+
+
+function make_virtual_entropy_corners(x_start, y_start, x_len, y_len, fast_sweep_y_over_x, slow_sweep_y_over_x, [datnum, virtual_csq])
+	variable x_start, y_start, x_len, y_len, fast_sweep_y_over_x, slow_sweep_y_over_x, datnum, virtual_csq
+	// printed out 
+	// bottom left, bottom right, top left, top right
+	
+	string xs, ys
+	variable c
+	
+	///// setup xs /////
+	variable x0, x1, x2, x3
+	x0 = x_start
+	x1 = x_start + x_len
+	
+	
+	//// setup ys /////
+	variable y0, y1, y2, y3
+	y0 = y_start
+	c = y0 - fast_sweep_y_over_x*x0
+	y1 = fast_sweep_y_over_x*x1 + c
+	y2 = y_start + y_len
+	
+	
+	///// calculate xs /////
+	c = y0 - slow_sweep_y_over_x*x0
+	if (slow_sweep_y_over_x != 0)
+		x2 = (y2 - c) / slow_sweep_y_over_x
+	else
+		x2 = x0
+	endif
+	x3 = x2 + x_len
+	xs = num2str(x0) + "," + num2str(x1) + ","	 + num2str(x2) + "," + num2str(x3) + ";"
+	print xs
+	
+	
+	///// calculate ys /////
+	c = y2 - fast_sweep_y_over_x*x2
+	y3 = fast_sweep_y_over_x*x3 + c
+	ys = num2str(y0) + "," + num2str(y1) + ","	 + num2str(y2) + "," + num2str(y3) + ";"
+	print ys
+	
+	print  num2str(x0*virtual_csq) + "," + num2str(x1*virtual_csq) + ","	 + num2str(x2*virtual_csq) + "," + num2str(x3*virtual_csq) + ";"
+	
+	
+	if (ParamIsDefault(datnum) == 0)
+		displaymultiple({datnum}, "cscurrent_2d", diff=1)
+		make /o/n=2 tempfullx_start = {x0, x1}
+		make /o/n=2 tempfully_start = {y0, y1}
+		
+		make /o/n=2 tempfullx_end = {x2, x3}
+		make /o/n=2 tempfully_end = {y2, y3}
+		
+		AppendToGraph tempfully_start vs tempfullx_start
+		AppendToGraph tempfully_end vs tempfullx_end
+		
+		ModifyGraph mode(tempfully_start)=4, mrkThick(tempfully_start)=3, rgb(tempfully_start)=(0,65535,65535), lsize=2
+		ModifyGraph mode(tempfully_end)=4, mrkThick(tempfully_end)=3, rgb(tempfully_end)=(0,65535,65535), lsize=2
+		
+		Tag/C/N=start_x_start_row/A=MC/L=2 tempfully_start, 0, "start_x_start_row"
+		Tag/C/N=end_x_start_row/A=MC/L=2 tempfully_start, 1, "end_x_start_row"
+		
+		Tag/C/N=start_x_end_row/A=MC/L=2 tempfully_end, 0, "start_x_end_row"
+		Tag/C/N=end_x_end_row/A=MC/L=2 tempfully_end, 1, "end_x_end_row"
+
+	endif
+	
+	
+end
 

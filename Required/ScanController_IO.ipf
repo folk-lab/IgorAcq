@@ -1468,7 +1468,7 @@ function /t sort_text_wave(input_string, [numeric_values])
 end
 
 
-function loadStrArray2textWave(array,destwave)
+function loadStrArray2textWave(array, destwave)
 	// supports 1 and 2d arrays
 	string array,destwave
 	string dims = getStrArrayShape(array), element=""
@@ -1517,6 +1517,7 @@ function loadStrArray2textWave(array,destwave)
 
 end
 
+
 function /S getArrayShape(array)
 	// works for integers, floats, and boolean (true/false or 1/0)
 	string array
@@ -1560,6 +1561,7 @@ function /S getArrayShape(array)
 	endif
 
 end
+
 
 function loadBoolArray2wave(array,destwave)
 	// works for int or float since igor doesn't make a distinction
@@ -1615,6 +1617,7 @@ function loadBoolArray2wave(array,destwave)
 
 end
 
+
 function loadNumArray2wave(array,destwave)
 	// works for int or float since igor doesn't make a distinction
 	string array,destwave
@@ -1669,11 +1672,13 @@ function loadNumArray2wave(array,destwave)
 
 end
 
+
 function loadBool2var(boolean,destvar)
 	string boolean,destvar
 
 	variable/g $destvar = bool2num(boolean)
 end
+
 
 function loadStr2string(str,deststring)
 	string str,deststring
@@ -1682,11 +1687,13 @@ function loadStr2string(str,deststring)
 	string/g $deststring = unescapeQuotes(str)
 end
 
+
 function loadNum2var(numasstr,destvar)
 	string numasstr,destvar
 
 	variable/g $destvar = str2num(numasstr)
 end
+
 
 function bool2Num(str)
 	string str
@@ -1701,6 +1708,7 @@ function bool2Num(str)
 	endif
 end
 
+
 /// write ///
 
 function/s num2numStr(val)
@@ -1712,6 +1720,7 @@ function/s num2numStr(val)
 	endif
 end
 
+
 function/s num2bool(val)
 	variable val
 	if(val==1)
@@ -1722,6 +1731,7 @@ function/s num2bool(val)
 		return ""
 	endif
 end
+
 
 function/s wave2BoolArray(w)
 	// returns an array
@@ -1754,6 +1764,7 @@ function/s wave2BoolArray(w)
 	return list
 end
 
+
 function/s wave2NumArray(w)
 	// returns an array
 	// supports 1d and 2d arrays
@@ -1784,6 +1795,7 @@ function/s wave2NumArray(w)
 
 	return list
 end
+
 
 function/s textWave2StrArray(w)
 	// returns an array and makes sure quotes and commas are parsed correctly.
@@ -1848,6 +1860,7 @@ function/s get_values(string kwListStr, [int keys, string keydel, string listdel
 	return keysOrVals
 end
 
+
 function/s TextWavetolist(w)
 	// returns an array and makes sure quotes and commas are parsed correctly.
 	// supports 1d and 2d arrays
@@ -1866,16 +1879,6 @@ function/s TextWavetolist(w)
 end
 
 
-//
-//Function ConvertTxtWvToNumWv(W)
-//	// creates gloabl wave numconvert
-//	Wave /T W
-//	
-//	Make /O /N=(numpnts(W)) NumConvert
-//	NumConvert[] = str2num(W[p])
-//End
-
-
 function /s numWavetolist(w)
 	// returns an array and makes sure quotes and commas are parsed correctly.
 	// supports 1d and 2d arrays
@@ -1892,17 +1895,20 @@ function /s numWavetolist(w)
 	return list
 end
 
+
 Function ConvertNumWvToTxtWv(W)
 Wave W
 Make /T /O /N=(numpnts(W)) TxtConvert
 TxtConvert[] = num2str(W[p])
 End
  
+ 
 Function ConvertTxtWvToNumWv(W)
 	Wave /T W
 	Make /O /N=(numpnts(W)) NumConvert
 	NumConvert[] = str2num(W[p])
 End
+
 
 function/s addJSONkeyval(JSONstr,key,value,[addquotes])
 	// returns a valid JSON string with a new key,value pair added.
@@ -1954,75 +1960,7 @@ function/s addJSONkeyval(JSONstr,key,value,[addquotes])
 
 end
 
-//function /S escapeQuotes(str)
-//	string str
-//
-//	variable i=0, escaped=0
-//	string output = ""
-//	do
-//
-//		if(i>strlen(str)-1)
-//			break
-//		endif
-//
-//		// check if the current character is escaped
-//		if(i!=0)
-//			if( CmpStr(str[i-1], "\\") == 0)
-//				escaped = 1
-//			else
-//				escaped = 0
-//			endif
-//		endif
-//
-//		// escape quotes
-//		if( CmpStr(str[i], "\"" ) == 0 && escaped == 0)
-//			// this is an unescaped quote
-//			str = str[0,i-1] + "\\" + str[i,inf]
-//		endif
-//		i+=1
-//
-//	while(1)
-//	return str
-//end
 
-
-//Function/S addJSONkeyval(JSONstr, key, value, [addquotes])
-//    String JSONstr, key, value
-//    Variable addquotes
-//    
-//    // Check if key is null
-//    if(strlen(key) == 0)
-//        printf "Error: Key is null or empty.\n"
-//        return JSONstr  // Optionally, return the unmodified JSON string or handle the error differently
-//    endif
-//
-//	// Escape quotes in key since it's always treated as a string
-//	key = escapeQuotes(key)
-//
-//	// Check if the value is to be added as a string
-//	if(!ParamIsDefault(addquotes) && addquotes == 1)
-//		// Escape quotes in value and wrap value in outer quotes
-//		value = "\"" + escapeQuotes(value) + "\""
-//	ElseIf(strlen(value) == 0)  // If value is an empty string, treat it as null
-//		value = "null"
-//		// No else case needed here; if addquotes is 0 or not provided, value is treated as numeric or boolean
-//
-//		if(strlen(JSONstr) != 0)
-//			// Existing JSON object; prepare to append
-//			// Trim leading '{' and trailing '}' to prepare for appending
-//			JSONstr = ReplaceString("{", JSONstr, "")
-//			JSONstr = ReplaceString("}", JSONstr, "")
-//			JSONstr = TrimString(JSONstr) // Trim both leading and trailing whitespace
-//
-//			// Append new key-value pair
-//			return "{" + JSONstr + ", \"" + key + "\":" + value + "}"
-//		else
-//			// New JSON object
-//			return "{\"" + key + "\":" + value + "}"
-//		endif
-//		endif
-//End
-//
 Function/S escapeQuotes(str)
     // Helper function to escape quotes within a string
     String str
@@ -2043,6 +1981,7 @@ function/s getIndent(level)
 
 	return output
 end
+
 
 function /s prettyJSONfmt(jstr)
 	// this could be much prettier
@@ -2081,6 +2020,7 @@ function /s prettyJSONfmt(jstr)
 
 	return output[0,strlen(output)-3]+"\n}\n"
 end
+
 
 /////////////////////////////////
 /// text formatting utilities ///
@@ -2158,6 +2098,7 @@ function/S removeSeperator(str, sep)
 
 end 
 
+
 Function/S FormatListItems(listString)
     String listString
     Variable i, numItems
@@ -2183,14 +2124,6 @@ Function/S FormatListItems(listString)
 End
 
 
-//Function/S TrimString(str)
-//    String str
-//    // Trim leading and trailing white spaces
-//    return RemoveEnding(str, " ")
-//End
-
-
-
 function/S removeTrailingWhitespace(str)
     String str
 
@@ -2209,6 +2142,7 @@ function/S removeTrailingWhitespace(str)
     return str
 End
 
+
 function/s removeWhiteSpace(str)
 	// Remove leading or trailing whitespace
 	string str
@@ -2216,6 +2150,7 @@ function/s removeWhiteSpace(str)
 	str = removeTrailingWhitespace(str)
 	return str
 end
+
 
 function countQuotes(str)
 	// count how many quotes are in the string
@@ -2242,6 +2177,7 @@ function countQuotes(str)
 	endfor
 	return quoteCount
 end
+
 
 function /S unescapeQuotes(str)
 	string str
@@ -2273,6 +2209,7 @@ function /S unescapeQuotes(str)
 	while(1==1)
 	return str
 end
+
 
 function/s removeLiteralQuotes(str)
 	// removes single outermost quotes
@@ -2316,6 +2253,7 @@ function/s removeLiteralQuotes(str)
 	return str[0,j-1]
 end
 
+
 function/t removeStringListDuplicates(theListStr)
 	// credit: http://www.igorexchange.com/node/1071
 	String theListStr
@@ -2329,6 +2267,7 @@ function/t removeStringListDuplicates(theListStr)
 	endfor
 	return retStr
 End
+
 
 function/s searchFullString(string_to_search,substring)
 	string string_to_search, substring
