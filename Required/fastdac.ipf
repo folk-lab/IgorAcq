@@ -1377,6 +1377,24 @@ function /t fd_get_unique_fastdac_number(S)
 end
 
 
+function fd_reset_start_fin_from_direction(S)
+	// swaps the start and fin if direction is -1. 
+	Struct ScanVars &S
+	
+	variable startx = S.startx;
+	variable finx = S.finx;
+	string startxs = S.startxs;
+	string finxs = S.finxs;
+	
+	if (S.direction == -1)
+		S.startx = finx
+		S.finx = startx
+		S.startxs = finxs
+		S.finxs = startxs
+	endif
+
+end
+
 
 Function awg_ramp(S)
 	Struct ScanVars &S

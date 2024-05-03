@@ -2158,30 +2158,28 @@ Function scfd_SendCommandAndRead(S,rowNum, [ skip_raw2calc])
 	EndIf
 	
 //	also where is the best place to perform this step?
-
-
+	
 	// Start the sweep
 	fd_start_sweep(S)
 	S.lastread = -1  // Reset the last read index
-
-
-	//need to reinitialize the raw ADC waves otherwise loadfiles will be confused. If this is not a desired way to handle this,
-	//we will need to add a counter to loadfiles to keep track on how many pnts have already been read
+	
+	// need to reinitialize the raw ADC waves otherwise loadfiles will be confused. If this is not a desired way to handle this,
+	// we will need to add a counter to loadfiles to keep track on how many pnts have already been read
 	scfd_resetraw_waves()
 	// Loop to read data until the expected number of points is reached
 	Do
 		sleep/s 0.1// Short pause to allow for data acquisition
 		numpnts_read = loadfiles(S,numpnts_read)  // Load data from files
-		pnts2read=scfd_raw2CalcQuickDistribute(0)  // 0 or 1 for if data should be displayed decimated or not during the scan
+		pnts2read = scfd_raw2CalcQuickDistribute(0)  // 0 or 1 for if data should be displayed decimated or not during the scan
 		scfd_checkSweepstate()
 		doupdate
 
 	While (numpnts_read<pnts2read)  // Continue if not all points are read
 	
+	
 	// Update FastDAC and ADC GUI elements
 	scfw_update_all_fdac(option="updatefdac")
 	scfw_update_fadc("")  // Update FADC display with no additional specification
-
 
 //*** this has to be implemented too:
 
@@ -2230,14 +2228,23 @@ Function loadFiles(S, numPntsRead)
 				for (adc = 0; adc < numAdcs; adc += 1)
 					Wave oneAdc = $StringFromList(adc, adcNames) // Target wave for data
 					Wave dataToAdd = $("tempWave" + num2str(adc+1)) // Source wave for data
-
+					
 					WaveStats/Q oneAdc
 					initPts = V_npnts
 					totPts = (V_npnts + V_numNans)
 					WaveStats/Q dataToAdd
 					addPts = V_npnts
 
-					oneAdc[initPts, (initPts + addPts - 1)] = dataToAdd[p - initPts] // Copy data
+					// copy data differently if alternate or not
+					if (S.alternate == 0)
+						oneAdc[initPts, (initPts + addPts - 1)] = dataToAdd[p - initPts] // fill wave from start
+					else
+						if (S.direction == 1)
+							oneAdc[initPts, (initPts + addPts - 1)] = dataToAdd[p - initPts] // fill wave from start
+						else
+							oneAdc[(totPts - initPts - addPts), (totPts - initPts - 1)] = dataToAdd[addPts - 1 - (p - (totPts - initPts - addPts))]  // fill wave from end
+						endif
+					endif
 				EndFor
 				lastfile=0 // we just read in a new file so perhaps the most recent file has not been read in
 
@@ -2265,7 +2272,6 @@ function scfd_ProcessAndDistribute(ScanVars, rowNum)
 	struct ScanVars &ScanVars
 	variable rowNum
 	
-	variable i = 0
 	string RawWaveNames1D = sci_get1DWaveNames(1, 1)
 	string CalcWaveNames1D = sci_get1DWaveNames(0, 1)
 	string CalcStrings = scf_getRecordedFADCinfo("calc_funcs")
@@ -2282,6 +2288,7 @@ function scfd_ProcessAndDistribute(ScanVars, rowNum)
 		abort "Different number of raw wave names compared to calc wave names"
 	endif
 
+	int i
 	for (i=0; i<itemsinlist(RawWaveNames1D); i++)
 		resamp=1 //assume we need to resample in the end
 
@@ -2316,7 +2323,9 @@ function scfd_ProcessAndDistribute(ScanVars, rowNum)
 			execute(cwn+"y ="+calc_str)
 			resamp=0
 		endif
-scu_tic()
+		
+		scu_tic()
+		
 		// dont resample for SQW analysis or demodulation after notch filtering resample
 		if (resamp==1)
 			numpntsx=scfd_resampleWaves(sc_tempwave, ScanVars.measureFreq, sc_ResampleFreqfadc)
@@ -2456,7 +2465,7 @@ function scfd_raw2CalcQuickDistribute(int decim)
 		endif
 
 	endfor
-	variable pnts2read=dimsize(sc_tempwave,0)
+	variable pnts2read = dimsize(sc_tempwave,0)
 	return pnts2read
 end
 

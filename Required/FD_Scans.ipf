@@ -218,18 +218,24 @@ end
 function/s fd_start_sweep(S)
 	Struct ScanVars &S
 	print S
-	string adcList=S.adcList;
-	string startxs=S.startxs;
-	string finxs=S.finxs;
-	int numptsx=S.numptsx;
+//	string adcList=S.adcList;
+
+	fd_reset_start_fin_from_direction(S)
+
+	int numptsx = S.numptsx;
 	if (S.readVsTime) 
 		sample_ADC(S.adclistIDs,  S.numptsx)
 	endif
 	
 	if (S.readvstime==0)
-		awg_ramp(S)  ///****
+		if (S.use_awg == 1)
+			awg_ramp(S)
+		else
+			linear_ramp(S)
+		endif
 	endif
-		
+	
+	fd_reset_start_fin_from_direction(S)
 	 
 //	 fake_ramp( adclist,  startxs,  finxs, numptsx)
 	 

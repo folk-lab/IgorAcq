@@ -309,6 +309,14 @@ function createWavesCopyIgor(wavesList, filenum, [saveNames])
 	endfor
 end
 
+
+function create_variable(string vn)
+	if (exists(vn)==0)
+		execute ("variable/g "+vn+"=0")
+	endif
+end
+
+
 function saveScanWaves(hdfid, S, filtered)
 	// Save x_array and y_array in HDF 
 	// Note: The x_array will have the right dimensions taking into account filtering
