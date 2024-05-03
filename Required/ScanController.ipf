@@ -2157,7 +2157,7 @@ Function scfd_SendCommandAndRead(S,rowNum, [ skip_raw2calc])
 		Abort "ERROR[scfd_SendCommandAndRead]: Not enough info in ScanVars to run scan"
 	EndIf
 	
-//	also where is the best place to perform this step?
+	//	also where is the best place to perform this step?
 	
 	// Start the sweep
 	fd_start_sweep(S)
@@ -2181,19 +2181,10 @@ Function scfd_SendCommandAndRead(S,rowNum, [ skip_raw2calc])
 	scfw_update_all_fdac(option="updatefdac")
 	scfw_update_fadc("")  // Update FADC display with no additional specification
 
-//*** this has to be implemented too:
 
-	//	if(AWG_list.use_awg == 1)  // Reset AWs back to zero (no reason to leave at end of AW)
-	//		for(i=0;i<itemsinlist(S.instrIDs);i++)
-	//			fdIDname = stringfromlist(i, S.instrIDs)
-	//			nvar fdID = $fdIDname
-	//			string AW_dacs = scu_getDeviceChannels(fdID, AWG_list.channels_AW0)
-	//			AW_dacs = addlistitem(scu_getDeviceChannels(fdID, AWG_list.channels_AW1), AW_dacs, ",", INF)
-	//			AW_dacs = removeSeperator(AW_dacs, ",")
-	//			AW_dacs = scu_getDeviceChannels(fdID, AW_dacs, reversal = 1)
-	//			rampmultiplefdac(fdID, AW_dacs, 0)
-	//		endfor
-	//	endif
+	// Ramp AWGs back to zero
+	fdawg_ramp_DACs_to_zero()
+	
 end
 
 

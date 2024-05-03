@@ -2139,6 +2139,18 @@ end
 
 
 
+function fdawg_ramp_DACs_to_zero()
+	// ramps all the AWG dac channels to zero
+	// assumes sc_awg_info has been created
+	// USE ::
+	// print fdawg_ramp_DACs_to_zero()
+	
+	string dac_channels = fdawg_get_all_dac_channels()
+	rampmultiplefdac(dac_channels, 0)
+	
+end
+
+
 ///////////////////
 //// Utilities ////
 ///////////////////
