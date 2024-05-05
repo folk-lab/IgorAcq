@@ -831,6 +831,7 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
     string  x_label, y_label
     string interlaced_channels, interlaced_setpoints
     string comments
+    nvar sc_hotcolddelay
 	
     ///// Defaulting optional string parameters to empty if not provided /////
 	channelsy = selectString(paramIsDefault(channelsy), channelsy, "")
@@ -913,9 +914,7 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
 		fastdac_index = get_fastdac_index(stringfromList(0, S.channelsy, ","), return_adc_index = 0)
 		S.rampratey = str2num(fdacvalstr[fastdac_index][4])
 	endif
-	
-	scv_setLastScanVars(S)
-	
+		
 	
 	///// Removing delimiters /////
 	// x-channel
@@ -947,17 +946,21 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
 	if (use_awg == 0)
 		S.wavelen = 1 
 		S.numcycles = 1
+		S.hotcolddelay=nan
 	else
 		wave /t sc_awg_info // ASSUME FIRST AWG HAS BEEN CREATED
 		int num_setpoints = ItemsInList(sc_awg_info[1][0], ",")
 		S.wavelen = str2num(sc_awg_info[2][0]) * num_setpoints
 		S.numcycles = str2num(sc_awg_info[4][0])
 		fdawg_check_awg_and_sweepgates_unique(S)
+		S.hotcolddelay=sc_hotcolddelay
 	endif
 	
 	
 	///// Delete all files in fdTest directory /////
 	remove_fd_files()
+	scv_setLastScanVars(S)
+
 	print S
 end
 

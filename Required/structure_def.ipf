@@ -80,6 +80,8 @@
 	string AWG_DACs  // DACs to use in AWGs if we have 5 AWG waves, it would look like this: "11.1,11.0"; 1.0,1.3,1.2",....
 	// so the list is a semi-coma separated string with the DACs coma-separated. ///*** maybe we will come up with a better
 	//						solution for this
+	
+	variable hotcolddelay
 
 
 
@@ -164,6 +166,7 @@ Function scv_getLastScanVars(S)
 		S.use_AWG= 	sc_lastScanVarsVariables[33]	// Is AWG going to be on during the scan
 		S.wavelen=sc_lastScanVarsVariables[34]
 		S.numCycles=sc_lastScanVarsVariables[35]
+		S.hotcolddelay=sc_lastScanVarsVariables[36]
 
 
 		// Ensure this list matches the actual global storage structure and contents
@@ -183,7 +186,7 @@ Function scv_setLastScanVars(S)
 
 	// Ensure global waves for storing string and numeric values exist
 	Make/o/T/N=(22) sc_lastScanVarsStrings // Adjust size for the number of string fields
-	Make/o/N=(36) sc_lastScanVarsVariables // Adjust size for the number of numeric fields
+	Make/o/N=(37) sc_lastScanVarsVariables // Adjust size for the number of numeric fields
 
 	// Storing string fields to sc_lastScanVarsStrings wave
 	sc_lastScanVarsStrings[0] = S.channelsx  //FD xchannel numbers
@@ -245,6 +248,7 @@ Function scv_setLastScanVars(S)
 	sc_lastScanVarsVariables[33] = S.use_AWG
 	sc_lastScanVarsVariables[34]=S.wavelen
 	sc_lastScanVarsVariables[35]=S.numCycles
+	sc_lastScanVarsVariables[36]=S.hotcolddelay
 
 End
 

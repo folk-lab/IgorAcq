@@ -350,7 +350,7 @@ function spectrum_analyzer(wave data, variable samp_freq)
 	duplicate/o w_Periodogram, powerspec
 	i=1
 	do
-		rowslice(spectrum,i)
+		rowslice(spectrum,i) // this will not work if spectrum is 1d
 		DSPPeriodogram/R=[1,(new_numptsx)]/PARS/NODC=2/DEST=W_Periodogram slice
 		powerspec=powerspec+W_periodogram
 		i=i+1

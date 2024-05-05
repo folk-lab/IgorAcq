@@ -1963,10 +1963,12 @@ end
 function scfd_sqw_analysis(wave wav, int delay, int wavelen, string wave_out)
 
 // this function separates hot (plus/minus) and cold(plus/minus) and returns  two waves for hot and cold //part of CT
+// it also assumes that the sc_awg_info' setpoints have this pattern: "0,100,0,-100"(cold1-hot1-cold2-hot2)  and that there are always 4 setpoints and 1 cycle of heating. this is 
+// a very entropy specific post measurement analysis 
+//*** we still need to add the option to remove the first few points in a cycle.
 
 	variable numpts = numpnts(wav)
 	duplicate /free /o wav, wav_copy
-	//variable N = numpts/(wavelen/StepsInCycle) // i believe this was not done right in silvias code
 	variable N = numpts/wavelen
 	
 	Make/o/N=(N) cold1, cold2, hot1, hot2
@@ -1975,7 +1977,6 @@ function scfd_sqw_analysis(wave wav, int delay, int wavelen, string wave_out)
 	Redimension/N=(wavelen/4,4,N) wav_copy //should be the dimension of fdAW AWG.Wavelen
 	DeletePoints/M=0 0,delay, wav_copy
 	reducematrixSize(wav_copy,0,-1,1,0,-1,4,1,"wav_new") // fdAW 
-
 	cold1 = wav_new[0][0][p] 
 	cold2 = wav_new[0][2][p] 
 	hot1 = wav_new[0][1][p]   
