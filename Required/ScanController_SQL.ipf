@@ -1,6 +1,8 @@
 ﻿#pragma TextEncoding = "UTF-8"
 #pragma rtGlobals=3		// Use modern global access method and strict wave access.
 #include <SQLConstants>
+//#include <SQLUtils>
+
 
 ////////////////////////////
 //// SQL User functions ////
@@ -555,7 +557,7 @@ function/s sc_checkSQLDriver([printToCommandLine])
 		endif
 		i+=1
 	while(1)
-
+print drivers
 	// if printToCommandLine=1 just print result and exit
 	if(printToCommandLine)
 		print "[INFO] \"sc_checkSQLDriver\": Avaliable drivers are:"
@@ -568,7 +570,8 @@ function/s sc_checkSQLDriver([printToCommandLine])
 		// check if right driver is installed
 		// looking for PostgreSQL ANSI(x64)
 		for(i=0;i<itemsinlist(drivers,",");i+=1)
-			if(cmpstr(stringfromlist(i,drivers,","),"PostgreSQL ANSI(x64)") == 0)
+//			if(cmpstr(stringfromlist(i,drivers,","),"PostgreSQL ANSI(x64)") == 0)
+			if(cmpstr(stringfromlist(i,drivers,","),"MySQL ODBC 8.4 ANSI Driver") == 0)
 				// we have the drivers we are looking for!
 				sqldriver_available = 1
 				sqldriver = stringfromlist(i,drivers,",")
@@ -652,7 +655,8 @@ end
 function sc_fetchSQLDataTest()
 
 	svar sqldriver
-	string database = "bf"
+	sqldriver="postgres"
+	string database = "ld"
 	string connParams = sc_readSQLConnectionParameters()
 	string connStr = ""
 	sprintf connStr, "DRIVER=%s;SERVER=%s;PORT=%s;DATABASE=%s;UID=%s;PWD=%s;CHARSET=UTF8;", sqldriver, stringbykey("server",connParams,":",","), stringbykey("port",connParams,":",","), stringbykey("database",connParams,":",","), stringbykey("uid",connParams,":",","), stringbykey("pwd",connParams,":",",")

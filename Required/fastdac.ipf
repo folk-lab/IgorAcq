@@ -152,7 +152,7 @@ function init_dac_and_adc(fastdac_string)
 	// SetDimLabel 2,1,backColors,sc_sel_table	// TO COLOUR THE SCANCONTROLLER ADD THIS APPROPRIATELY
 	
 	wave colour_val = colour_bent_cw
-	
+	//*** colour_val is not initialized
 	duplicate /o colour_val sc_colour_table
 	make /o /n=(num_fastdac * num_dac, 5, 2) sc_sel_table
 	wave sc_colour_table
@@ -1471,6 +1471,7 @@ Function awg_ramp(S)
 			if (awg_fastdac_num == unique_fastdac_num)
 				level5 = fdawg_wave_pattern(j)
 				JSONXOP_AddValue/JOIN=(level5) level3, "wave_patterns"
+				jsonxop_dump/ind=2 level3
 			endif
 
 		endfor
@@ -1490,59 +1491,8 @@ Function awg_ramp(S)
 	string cmd="start-awg"
 	String headers = "accept: application/json\nContent-Type: application/json"
 	command_save(S_value)
-	print S_value
-
-//	abort
 	
 	String response = postHTTP(fd, cmd, S_value, headers)
-	
-	
-//	j = 0
-//	for (i = 0; i < dimsize(unique_boxnum, 0); i += 1)
-//		JSONXOP_New; level3=V_value
-//		JSONXOP_New; level4=V_value
-//
-//
-//		do
-//			if (boxnum[j] == unique_boxnum[i])
-//
-//				minValue = StringFromList(j, S.startxs, ",")
-//				maxValue = StringFromList(j, S.finxs, ",")
-//				level5=linear_ramps_json(maxValue, minValue) // Assuming this function correctly handles JSON object creation
-//				JSONXOP_AddValue/JOIN=(level5) level4, num2str(dacnum[j])
-//				jsonxop_release level5
-//				jsonxop_dump/ind=2 level4
-//
-//				j += 1
-//			elseif (boxnum[j] != unique_boxnum[i])
-//				break
-//			endif
-//
-//		while (j < dimsize(boxnum, 0))
-//
-//		JSONXOP_AddValue/I=(S.numptsx) level3, "/linear_ramp_steps"
-//		JSONXOP_AddValue/JOIN=(level4) level3, "linear_ramps"
-//
-//		JSONXOP_AddValue/I=(S.numCycles) level3, "/patterns_per_linear_ramp_step"
-//		level5=wave_pattern()
-//		JSONXOP_Addtree/T=1 level3, "wave_patterns"
-//		JSONXOP_AddValue/JOIN=(level5) level3, "wave_patterns"
-//		JSONXOP_AddValue/JOIN=(level3) level2, num2str(unique_boxnum[i])
-//
-//		jsonxop_dump/ind=2 level3
-//		jsonxop_release level3
-//	endfor
-//
-//
-//	//JSONXOP_Addtree/T=1 level1, "/awgs"
-//	JSONXOP_AddValue/JOIN=(level2) level1, "/awgs"
-//	jsonxop_dump/ind=2 level1
-//	print "Full textual representation:\r", S_value
-//
-//	string cmd="start-awg"
-//	String headers = "accept: application/json\nContent-Type: application/json"
-//	command_save(S_value)
-//	String response = postHTTP(fd, cmd, S_value, headers)
 End
 
 

@@ -2002,6 +2002,8 @@ end
 
 
 function scfd_demodulate(wav, harmonic, nofcycles, period, wnam)//, [append2hdf])
+			//scfd_demodulate(sc_tempwave, str2num(fadcvalstr[str2num(ADCnum)][7]), Scanvars.numCycles, Scanvars.waveLen, cwn)
+
 	
 	wave wav
 	variable harmonic, nofcycles, period //, append2hdf
@@ -2023,6 +2025,8 @@ function scfd_demodulate(wav, harmonic, nofcycles, period, wnam)//, [append2hdf]
 	cols=dimsize(wav_copy,0)
 	rows=dimsize(wav_copy,1)
 	make /o/n=(cols) sine1d
+	copyscales wav, sine1d
+
 	
 	//demodulation in x
 	sine1d=sin(2*pi*(harmonic*p/period) + sc_demodphi/180*pi)
