@@ -2096,15 +2096,11 @@ function scfd_RecordValues(S, rowNum, [ linestart, skip_data_distribution, skip_
 		skip_raw2calc=0
 	endif 
 
-		
-	// If passed AWG_list with AWG_list.lims_checked == 1 then it will run with the Arbitrary Wave Generator on
-	// Note: Only works for 1 FastDAC! Not sure what implementation will look like for multiple yet
 		 
 
 	// If beginning of scan, record start time
 	if (rowNum == 0 && (S.start_time == 0 || numtype(S.start_time) != 0))  
-//		S.start_time = datetime - Date2Secs(-1,-1,-1) //date2secs(2024,04,22) 
-		S.start_time = datetime //date2secs(2024,04,22)
+		S.start_time = datetime 
 	endif
 	
 	// Send command and read values
@@ -2115,7 +2111,6 @@ function scfd_RecordValues(S, rowNum, [ linestart, skip_data_distribution, skip_
 		S.end_time = datetime - S.start_time
 		S.start_time = 0
 	endif
-//	S.end_time = datetime-date2secs(2024,04,22) // this did not work on a MAC but I am not going to change it until I confirm it also does not work on a PC
 	
 	// Process 1D read and distribute
 	if (!skip_data_distribution)
@@ -2172,6 +2167,8 @@ Function scfd_SendCommandAndRead(S,rowNum, [ skip_raw2calc])
 	// we will need to add a counter to loadfiles to keep track on how many pnts have already been read
 	scfd_resetraw_waves()
 	// Loop to read data until the expected number of points is reached
+	sleep/s 0.5// at the beginning we need to wait long enough to have the first file ready
+
 	Do
 		sleep/s 0.1// Short pause to allow for data acquisition
 		numpnts_read = loadfiles(S,numpnts_read)  // Load data from files
@@ -2735,13 +2732,11 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 
 	nvar sc_save_time
 	if(save_experiment==1 && (datetime - sc_save_time) > 180.0)
-		// save if save_exp=1 and if more than 3 minutes has elapsed since previous saveExp
 		saveExp()
-//		sc_save_time = datetime-date2secs(2024,04,22)
 		sc_save_time = datetime
 	endif
 
-//	if(sc_checkBackup())  	// check if a path is defined to backup data
+//	if(sc_checkBackup())  	//*** check if a path is defined to backup data
 //		 sc_copyNewFiles(S_.filenum, save_experiment=save_experiment)		// copy data to server mount point (nvar filenum gets incremented after HDF is opened)
 //	endif
 
@@ -2802,7 +2797,7 @@ function/T sce_ScanVarsToJson(S, traceback, [save_to_file])
 	string buffer = ""
 	
 	buffer = addJSONkeyval(buffer,"Filenum",num2istr(S.filenum))
-	buffer = addJSONkeyval(buffer,"Traceback",traceback,addquotes=1)  // TODO: Remove everything from EndScan onwards (will always be the same and gives no useful extra info)
+	buffer = addJSONkeyval(buffer,"Traceback",traceback,addquotes=1)  //*** TODO: Remove everything from EndScan onwards (will always be the same and gives no useful extra info)
 	buffer = addJSONkeyval(buffer,"x_label",S.x_label,addquotes=1)
 	buffer = addJSONkeyval(buffer,"y_label",S.y_label,addquotes=1)
 	buffer = addJSONkeyval(buffer,"startx", num2str(S.startx))

@@ -117,6 +117,8 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(sc_createSweepLogs(S=S))
 		make /free /T /N=1 instr_logs=prettyJSONfmt(sc_instrumentLogs()) // Modifies the jstr to add Instrumt Status (from ScanController Window)
 		make /FREE /T /N=1 scan_vars_json = sce_ScanVarsToJson(S, getrtstackinfo(3), save_to_file = 0)
+		make/free/T/n=1 awg_json=sc_awg_log()
+		
 	else
 		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(sc_createSweepLogs(comments = comments))
 	endif
@@ -150,6 +152,11 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 		HDF5SaveData/z /A="instr_logs" instr_logs, hdf5_id, "metadata"
 		if (V_flag != 0)
 				Print "HDF5SaveData Failed: ", "instr_logs"
+		endif
+		
+				HDF5SaveData/z /A="AWG_waves" awg_json, hdf5_id, "metadata"
+		if (V_flag != 0)
+				Print "HDF5SaveData Failed: ", "AWG_info"
 		endif
 
 
@@ -230,6 +237,46 @@ function /s sc_createSweepLogs([S, comments])  // TODO: Rename
 
 //    sc_instrumentLogs(jstr)  // Modifies the jstr to add Instrumt Status (from ScanController Window)
 	return jstr
+end
+
+function sc_awg_col(variable idx)
+wave/t	sc_awg_info
+variable jsonId
+JSONXOP_New/z; jsonId=V_value
+JSONXOP_AddValue/V=(str2num(sc_awg_info[0][idx])) jsonId, "DAC_no"
+JSONXOP_AddValue/T=(sc_awg_info[1][idx]) jsonId, "setpoints"
+JSONXOP_AddValue/I=(round(str2num(sc_awg_info[2][idx]))) jsonId, "samples"
+JSONXOP_AddValue/I=(round(str2num(sc_awg_info[3][idx]))) jsonId, "Box no"
+JSONXOP_AddValue/I=(round(str2num(sc_awg_info[4][idx]))) jsonId, "# cycles"
+JSONXOP_Dump jsonid
+return jsonid
+
+end
+
+
+function /s sc_awg_log()
+	wave/t	sc_awg_info
+	variable level1, level2
+	variable i, num_awgs
+
+	num_awgs=dimsize(sc_awg_info,1)
+
+	JSONXOP_New/z; level1=V_value
+	JSONXOP_AddTree/T=1 level1, "/wave"
+	
+	for(i=0; (i<num_awgs); i=i+1)
+
+		level2=sc_awg_col(i)
+		JSONXOP_Dump level1
+		JSONXOP_AddValue/JOIN=(level2) level1, "wave"
+		JSONXOP_Dump level1
+
+	endfor
+
+	JSONXOP_Dump level1
+	jsonxop_release/a
+	return S_value
+
 end
 
 
@@ -404,12 +451,6 @@ function SaveToHDF(S, [additional_wavenames])
 	// Save ScanWaves (e.g. x_array, y_array etc)
 	if(S.using_fastdac)
 		saveScanWaves(calc_hdf5_id, S, 1)  // Needs a different x_array size if filtered
-//		going forward we never save rawdata 
-//		if (Sc_saveRawFadc == 1)
-//			saveScanWaves(raw_hdf5_id, S, 0)
-//		endif
-//	else
-		//saveScanWaves(calc_hdf5_id, S, 0)
 	endif
 	
 	// Get waveList to save
