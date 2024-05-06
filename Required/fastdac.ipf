@@ -124,11 +124,11 @@ function init_dac_and_adc(fastdac_string)
 		adc_table[i][1] = temp_string
 		
 		// column 3
-		temp_string = "wave" + num2str(i)
+		temp_string = "ADC" + num2str(i)
 		adc_table[i][3] = temp_string
 		
 		// column 4
-		temp_string = "ADC" + num2str(i)
+		temp_string = "wave" + num2str(i)
 		adc_table[i][4] = temp_string
 		
 		// column 7
@@ -148,8 +148,9 @@ function init_dac_and_adc(fastdac_string)
 	///////////////////////////////////////
 	///// create colour and sel table /////
 	///////////////////////////////////////
-	//ListBox fdaclist colorWave=colour_bent_cw, selWave= sc_sel_table;
-	// SetDimLabel 2,1,backColors,sc_sel_table	// TO COLOUR THE SCANCONTROLLER ADD THIS APPROPRIATELY
+	wave colour_bent_cw, sc_sel_table
+	ListBox fdaclist colorWave=colour_bent_cw, selWave= sc_sel_table;
+	SetDimLabel 2,1,backColors,sc_sel_table	// TO COLOUR THE SCANCONTROLLER ADD THIS APPROPRIATELY
 	
 	wave colour_val = colour_bent_cw
 	//*** colour_val is not initialized
@@ -657,7 +658,7 @@ function scc_checkRampratesFD(S)
 	if(numtype(strlen(s.channelsx)) == 0 && strlen(s.channelsx) != 0)  // if s.Channelsx != (null or "")
 		scu_assertSeparatorType(S.channelsx, ",")
 		for(i=0;i<itemsinlist(S.channelsx,",");i+=1)
-			eff_ramprate = abs(str2num(stringfromlist(i,S.startxs,","))-str2num(stringfromlist(i,S.finxs,",")))*(S.measureFreq/S.numptsx)
+			eff_ramprate = abs(str2num(stringfromlist(i,S.startxs,","))-str2num(stringfromlist(i,S.finxs,",")))*(S.measureFreq/S.numptsx/S.wavelen/S.numCycles)
 			channel = str2num(stringfromlist(i, S.channelsx, ","))
 			if(eff_ramprate > str2num(fdacvalstr[channel][4])*1.05 || s.rampratex > str2num(fdacvalstr[channel][4])*1.05)  // Allow 5% too high for convenience
 				// we are going too fast
@@ -1216,7 +1217,7 @@ function set_one_fadcSpeed(int adcValue)
 	String cmd = "set-adc-sampling-time"
 	// Convert variables to strings and construct the JSON payload dynamically
 	String payload=""
-	payload = "{\"access_token\": \"string\", \"fqpn\": \""  +ADC_channel[adcValue]+ "\", \"sampling_time_us\": " + num2str(82) + "}"
+	payload = "{\"access_token\": \"string\", \"fqpn\": \""  +ADC_channel[adcValue]+ "\", \"sampling_time_us\": " + num2str(82*4) + "}"
 	String headers = "accept: application/json\nContent-Type: application/json"
 	// Perform the HTTP PUT request
 	String response = postHTTP(fd, cmd, payload, headers)
@@ -1330,7 +1331,7 @@ Function linear_ramp(S)
 
 	JSONXOP_New; level1=V_value
 	JSONXOP_New; level2=V_value
-	JSONXOP_AddValue/I=(82) level1, "/adc_sampling_time_us"
+	JSONXOP_AddValue/I=(332) level1, "/adc_sampling_time_us"
 	JSONXOP_AddValue/T=(num2str(chunksize)) level1, "/chunk_max_samples"
 	JSONXOP_AddValue/T="temp_{{.ChunkIndex}}.dat" level1, "/chunk_file_name_template"
 	JSONXOP_AddValue/wave=adc_list level1, "/adc_list"

@@ -1092,20 +1092,20 @@ function sci_initializeWaves(S)  // TODO: rename
 			//initializing for hot/cold waves, not sure if i need to, if we are just saving in the end?
 			        if(sc_hotcold && raw == 0)
 			
-			             //sci_init1DWave(wn+"hot", S.numptsx/AWG.waveLen, S.startx, S.finx) //dont need to initialize since im not plotting
-			          	//sci_init1DWave(wn+"cold", S.numptsx/AWG.waveLen, S.startx, S.finx)
+			             sci_init1DWave(wn+"hot", S.numptsx, S.startx, S.finx) //dont need to initialize since im not plotting
+			          	sci_init1DWave(wn+"cold", S.numptsx, S.startx, S.finx)  ///*** I don't think this will work for virtual gates
 			
 			          	if(S.is2d == 1)
-			          		sci_init2DWave(wn+"hot_2d", S.numptsx/S.waveLen, S.startx, S.finx, S.numptsy, S.starty, S.finy)
-			          		sci_init2DWave(wn+"cold_2d", S.numptsx/S.waveLen, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+			          		sci_init2DWave(wn+"hot_2d", S.numptsx, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+			          		sci_init2DWave(wn+"cold_2d", S.numptsx, S.startx, S.finx, S.numptsy, S.starty, S.finy)
 			          	endif
 			
 			        endif
 
 //			//initializing 1d waves for demodulation
 			if (S.using_fastdac && raw == 0 && fadcattr[str2num(wavenum)][6] == 48)
-				sci_init1DWave(wn+"x", S.numptsx/S.waveLen/S.numCycles, S.startx, S.finx)
-				sci_init1DWave(wn+"y", S.numptsx/S.waveLen/S.numCycles, S.startx, S.finx)
+				sci_init1DWave(wn+"x", S.numptsx, S.startx, S.finx)
+				sci_init1DWave(wn+"y", S.numptsx, S.startx, S.finx)
 
 				//initializing 2d waves for demodulation
 				if (s.is2d == 1)
@@ -1123,11 +1123,6 @@ function sci_initializeWaves(S)  // TODO: rename
 
 	endfor
 
-	// Setup Async measurements if not doing a fastdac scan (workers will look for data made here)
-//	if (!S.using_fastdac) 
-//		sc_findAsyncMeasurements()
-//	endif
-	
 end
 
 
@@ -1330,6 +1325,8 @@ function/S scg_initializeGraphs(S , [y_label])
 						endif
 					endfor
 				endif
+				
+				
 	    	endif
 	    	
       	// Specific to Regular Scancontroller
@@ -2167,10 +2164,8 @@ Function scfd_SendCommandAndRead(S,rowNum, [ skip_raw2calc])
 	// we will need to add a counter to loadfiles to keep track on how many pnts have already been read
 	scfd_resetraw_waves()
 	// Loop to read data until the expected number of points is reached
-	sleep/s 0.5// at the beginning we need to wait long enough to have the first file ready
 
 	Do
-		sleep/s 0.1// Short pause to allow for data acquisition
 		numpnts_read = loadfiles(S,numpnts_read)  // Load data from files
 		pnts2read = scfd_raw2CalcQuickDistribute(0)  // 0 or 1 for if data should be displayed decimated or not during the scan
 		scfd_checkSweepstate()
@@ -2199,6 +2194,9 @@ Function loadFiles(S, numPntsRead)
 	// - 'lastRead' variable must hold the index of the last file that was loaded.
 	String adcNames = S.adcLists
 	String fileList = IndexedFile(fdTest, -1, ".dat") // List all .dat files in fdTest
+	sleep/s 0.1// Short pause to allow for data acquisition
+
+	
 	String currentFile, testString
 	Variable lastRead = S.lastRead // Initialize with the last file index loaded from structure S
 	Variable numFiles = ItemsInList(fileList)

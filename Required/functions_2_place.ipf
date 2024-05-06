@@ -4,7 +4,7 @@
 
 /// this a where all the functions that need to still be place in the proper procedure files live
 macro initexperiment()
-NewPath/o fdtest "Macintosh HD:Users:luescher:Dropbox:work:current_meas:temp:wave_loader:"
+NewPath/o fdtest "Macintosh HD:Users:luescher:temp_files:"
 NewPath/O data "Macintosh HD:Users:luescher:Dropbox:work:current_meas:temp:"
 
 initscancontroller()
@@ -53,7 +53,7 @@ end
 
 Window after1() : Panel
 	PauseUpdate; Silent 1		// building window...
-	NewPanel /W=(36,57,1046,660)
+	NewPanel /W=(139,320,1149,923)
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv fsize= 25,fstyle= 1
@@ -82,9 +82,9 @@ Window after1() : Panel
 	SetDrawEnv fsize= 14,fstyle= 1,textrot= -60
 	DrawText 550,75,"Record"
 	SetDrawEnv fsize= 14,fstyle= 1
-	DrawText 590,70,"Wave Name"
+	DrawText 597,70,"wave name"
 	SetDrawEnv fsize= 14,fstyle= 1
-	DrawText 705,70,"Calc Function"
+	DrawText 728,70,"Calc func"
 	SetDrawEnv fsize= 14,fstyle= 1,textrot= -60
 	DrawText 878,74,"Notch"
 	SetDrawEnv fsize= 14,fstyle= 1,textrot= -60
@@ -141,8 +141,8 @@ Window after1() : Panel
 	Button connectfdac,fColor=(65535,0,0)
 	Button killaboutfdac,pos={680.00,536.00},size={60.00,40.00},proc=sc_controlwindows
 	Button killaboutfdac,title="Kill Sweep\r Controls",fSize=10,fColor=(3,52428,1)
-	Button killgraphsfdac,pos={536.00,536.00},size={60.00,40.00},proc=scw_killgraphs
-	Button killgraphsfdac,title="Close All\rGraphs",fColor=(1,12815,52428)
+	Button killgraphsfdac,pos={536.00,535.00},size={60.00,40.00},proc=scw_killgraphs
+	Button killgraphsfdac,title="Close All \rGraphs",fSize=12,fColor=(1,12815,52428)
 	Button updatebuttonfdac,pos={464.00,536.00},size={60.00,40.00},proc=scw_updatewindow
 	Button updatebuttonfdac,title="save\rconfig",fColor=(65535,16385,16385)
 	TabControl tb2,pos={44.00,420.00},size={180.00,20.00},disable=1,proc=TabProc2
