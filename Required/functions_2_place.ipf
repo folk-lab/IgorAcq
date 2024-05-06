@@ -29,20 +29,21 @@ macro initexperiment()
 	create_variable("filenum"); 
 	create_variable("lastconfig");
 	
-	lastconfig=scu_unixTime()
+	lastconfig = scu_unixTime()
 
 
 	make/o numericwave
 	//numwav2txtwav(DAC_channel);
 	//numwav2txtwav(ADC_channel);
-	 openFastDAC("51011", verbose=0)
+	 openFastDAC("51011", verbose = 0)
 
 	 init_dac_and_adc("1;11")
 	 initfastdac()
-	 openFastDAC("51011", verbose=0)
+	 openFastDAC("51011", verbose = 0)
 	 fadcattr[1][2]=48
 	 
- make/o/t/n=6 labels;labels={"DAC_no","setpoints","samples","Box no","# cycles","Do not edit"} // this will be the labels for the AWG table
+	make/o/t/n=6 sc_awg_labels
+	sc_awg_labels={"DAC Channel", "Setpoints", "Samples", "Box #", "# Cycles", "Do not edit"} // this will be the sc_awg_labels for the AWG table
 
 endmacro
 
@@ -296,8 +297,8 @@ Function Show_AWG_wave(ba) : ButtonControl
 	DoWindow/K $name // Close the table
 	
 	PauseUpdate; Silent 1		// building window...
-	Edit/N=AWG_info/W=(1070,58,1486,275) labels,sc_awg_info
-	ModifyTable alignment=0,format(Point)=1,width(labels)=78,width(sc_awg_info)=78
+	Edit/N=AWG_info/W=(1070,58,1486,275) sc_awg_labels,sc_awg_info
+	ModifyTable alignment=0,format(Point)=1,width(sc_awg_labels)=78,width(sc_awg_info)=78
 				break
 		case -1: // control being killed
 			break
@@ -346,8 +347,8 @@ End
 
 Window AWG_info() : Table
 	PauseUpdate; Silent 1		// building window...
-	Edit/W=(1070,58,1486,275) labels,sc_awg_info
-	ModifyTable alignment=0,format(Point)=1,width(labels)=90,width(sc_awg_info)=110
+	Edit/W=(1070,58,1486,275) sc_awg_labels,sc_awg_info
+	ModifyTable alignment=0,format(Point)=1,width(sc_awg_labels)=90,width(sc_awg_info)=110
 EndMacro
 
 Function minimize(ba) : ButtonControl
