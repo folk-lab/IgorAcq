@@ -2317,7 +2317,7 @@ function scfd_ProcessAndDistribute(ScanVars, rowNum)
 			resamp=0
 		endif
 		
-		scu_tic()
+	
 		
 		// dont resample for SQW analysis or demodulation after notch filtering resample
 		if (resamp==1)
@@ -2327,7 +2327,7 @@ function scfd_ProcessAndDistribute(ScanVars, rowNum)
 			sci_init2DWave(wn,numpntsx, ScanVars.startx, ScanVars.finx, ScanVars.numptsy, ScanVars.starty, ScanVars.finy)
 			endif
 		endif
-		scu_toc()
+	
 
 
 		calc_str = ReplaceString(rwn, calc_string, "sc_tempwave")

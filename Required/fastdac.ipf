@@ -960,8 +960,6 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
 	///// Delete all files in fdTest directory /////
 	remove_fd_files()
 	scv_setLastScanVars(S)
-
-	print S
 end
 
 
@@ -1451,7 +1449,7 @@ Function awg_ramp(S)
 				level5 = linear_ramps_json(maxValue, minValue) // Assuming this function correctly handles JSON object creation
 				JSONXOP_AddValue/JOIN=(level5) level4, num2str(round(fd_ch))
 				jsonxop_release level5
-				jsonxop_dump/ind=2 level4
+//				jsonxop_dump/ind=2 level4
 
 			endif
 
@@ -1474,22 +1472,19 @@ Function awg_ramp(S)
 			if (awg_fastdac_num == unique_fastdac_num)
 				level5 = fdawg_wave_pattern(j)
 				JSONXOP_AddValue/JOIN=(level5) level3, "wave_patterns"
-				jsonxop_dump/ind=2 level3
+//				jsonxop_dump/ind=2 level3
 			endif
 
 		endfor
 		
 		JSONXOP_AddValue/JOIN=(level3) level2, num2str(unique_fastdac_num)
-		jsonxop_dump/ind=2 level3
+//		jsonxop_dump/ind=2 level3
 		jsonxop_release level3
 		
 	endfor
 
-
-	//JSONXOP_Addtree/T=1 level1, "/awgs"
 	JSONXOP_AddValue/JOIN=(level2) level1, "/awgs"
 	jsonxop_dump/ind=2 level1
-	print "Full textual representation:\r", S_value
 
 	string cmd="start-awg"
 	String headers = "accept: application/json\nContent-Type: application/json"
