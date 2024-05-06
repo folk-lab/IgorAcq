@@ -217,7 +217,7 @@ end
 
 function/s fd_start_sweep(S)
 	Struct ScanVars &S
-	print S
+	//print S
 //	string adcList=S.adcList;
 
 	fd_reset_start_fin_from_direction(S)

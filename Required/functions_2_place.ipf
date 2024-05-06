@@ -4,10 +4,15 @@
 
 /// this a where all the functions that need to still be place in the proper procedure files live
 macro initexperiment()
-NewPath/o fdtest "Macintosh HD:Users:luescher:temp_files:"
-NewPath/O data "Macintosh HD:Users:luescher:Dropbox:work:current_meas:temp:"
+//NewPath/o fdtest "Macintosh HD:Users:labuser:temp_files:"
+//NewPath/O data "Macintosh HD:Users:labuser:Dropbox:work:current_meas:temp:"
+//NewPath/O data "Macintosh HD:Users:labuser:Documents:Data:Johann:2024_04_SwaggerTest:data:"
+//NewPath/O fdtest "Macintosh HD:Users:labuser:Documents:Data:Johann:2024_04_SwaggerTest:temp_files:"
 
-initscancontroller()
+	create_experiment_paths()
+
+	initscancontroller()
+	
 	create_variable("sc_abortsweep")
 	create_variable("sc_scanstarttime")
 	create_variable("sc_save_time")
@@ -23,6 +28,7 @@ initscancontroller()
 	create_variable("sc_plotRaw")
 	create_variable("filenum"); 
 	create_variable("lastconfig");
+	
 	lastconfig=scu_unixTime()
 
 
@@ -39,6 +45,32 @@ initscancontroller()
  make/o/t/n=6 labels;labels={"DAC_no","setpoints","samples","Box no","# cycles","Do not edit"} // this will be the labels for the AWG table
 
 endmacro
+
+
+
+
+function create_experiment_paths()
+	// assumes the experiment has been saved so that the filepath 'home' exists
+	//not tested on Windows computer
+	 
+	// check Mac or Windows to determine seperator
+	string separator_type
+	if (cmpstr(igorInfo(2), "Macintosh") == 0) // if mac
+		separator_type = ":"
+	elseif (cmpstr(igorInfo(2), "Windows") == 0) // if windows
+		separator_type = "\\"
+	endif
+	 
+	pathinfo home // path stored in s_path
+	string master_path = ParseFilePath(1, s_path, separator_type, 1, 0)
+	
+	string data_path = master_path + "data" + separator_type
+	string tempdata_path = master_path + "temp_data" + separator_type
+	 
+	NewPath/C data data_path
+	NewPath/C fdtest tempdata_path
+
+end
 
 
 
@@ -227,27 +259,27 @@ Menu "Windows"
 	
 End
 
-Function CloseAllGraphs()
-	String name
-	do
-		name = WinName(0,1) // name of the front graph
-		if (strlen(name) == 0)
-			break // all done
-		endif
-		DoWindow/K $name // Close the graph
-	while(1)
-End
-
-Function CloseAllTables()
-	String name
-	do
-		name = WinName(0,2) // name of the front table
-		if (strlen(name) == 0)
-			break // all done
-		endif
-		DoWindow/K $name // Close the table
-	while(1)
-End
+//Function CloseAllGraphs()
+//	String name
+//	do
+//		name = WinName(0,1) // name of the front graph
+//		if (strlen(name) == 0)
+//			break // all done
+//		endif
+//		DoWindow/K $name // Close the graph
+//	while(1)
+//End
+//
+//Function CloseAllTables()
+//	String name
+//	do
+//		name = WinName(0,2) // name of the front table
+//		if (strlen(name) == 0)
+//			break // all done
+//		endif
+//		DoWindow/K $name // Close the table
+//	while(1)
+//End
 
 
 
