@@ -2982,6 +2982,17 @@ function InitScanController([configFile])
 	make/n=0 viRM
 
 	scw_rebuildwindow()
+	
+	scw_colour_the_table()
+end
+
+
+function scw_colour_the_table()
+	// assumes sc_sel_table already exists 
+	// colour_bent_cw
+	wave colour_bent_cw, sc_sel_table
+	ListBox fdaclist win=after1, colorWave=colour_bent_cw, selWave= sc_sel_table;
+	SetDimLabel 2, 1, backColors, sc_sel_table
 end
 
 

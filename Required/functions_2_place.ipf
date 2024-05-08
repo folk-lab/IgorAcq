@@ -10,8 +10,11 @@ macro initexperiment()
 //NewPath/O fdtest "Macintosh HD:Users:labuser:Documents:Data:Johann:2024_04_SwaggerTest:temp_files:"
 
 	create_experiment_paths()
-
-	initscancontroller()
+	
+	// add custom colours
+	create_colour_wave()
+	
+//	initscancontroller()
 	
 	create_variable("sc_abortsweep")
 	create_variable("sc_scanstarttime")
@@ -30,20 +33,16 @@ macro initexperiment()
 	create_variable("lastconfig");
 	
 	lastconfig = scu_unixTime()
-
-
-	make/o numericwave
-	//numwav2txtwav(DAC_channel);
-	//numwav2txtwav(ADC_channel);
-	 openFastDAC("51011", verbose = 0)
-
-	 init_dac_and_adc("1;11")
-	 initfastdac()
-	 openFastDAC("51011", verbose = 0)
-	 fadcattr[1][2]=48
-	 
+	
+	openFastDAC("51011", verbose = 0)
+	initfastdac()
+	fadcattr[1][2]=48
+	
 	make/o/t/n=6 sc_awg_labels
 	sc_awg_labels={"DAC Channel", "Setpoints", "Samples", "Box #", "# Cycles", "Do not edit"} // this will be the sc_awg_labels for the AWG table
+	
+	
+	initscancontroller()
 
 endmacro
 
@@ -63,6 +62,10 @@ function create_experiment_paths()
 	endif
 	 
 	pathinfo home // path stored in s_path
+	
+	//////////////////////////////////////////
+	///// EXPERIMENTAL DATA MASTER PATHS /////
+	//////////////////////////////////////////
 	string master_path = ParseFilePath(1, s_path, separator_type, 1, 0)
 	
 	string data_path = master_path + "data" + separator_type
@@ -70,6 +73,22 @@ function create_experiment_paths()
 	 
 	NewPath/C data data_path
 	NewPath/C fdtest tempdata_path
+	
+	
+	////////////////////////////////////
+	///// GITHUB DATA MASTER PATHS /////
+	////////////////////////////////////
+	if (cmpstr(igorInfo(2), "Macintosh") == 0) // if mac
+		master_path = ParseFilePath(1, s_path, separator_type, 0, 4)
+		master_path += "Github:IgorAcq:data:"
+	elseif (cmpstr(igorInfo(2), "Windows") == 0) // if windows
+		print "what is github path on windows?"
+	endif
+	
+	string colour_path = master_path + "colours" + separator_type
+	
+	NewPath/C colour_data colour_path
+
 
 end
 
