@@ -2337,6 +2337,7 @@ Function loadFiles(S, numPntsRead)
 	// - 'lastRead' variable must hold the index of the last file that was loaded.
 	String adcNames = S.adcLists
 	String fileList = IndexedFile(fdTest, -1, ".dat") // List all .dat files in fdTest
+
 	sleep/s 0.1// Short pause to allow for data acquisition
 
 	
@@ -2352,6 +2353,11 @@ Function loadFiles(S, numPntsRead)
 
 		for (i = 0; i < numFiles; i += 1)
 			currentFile = StringFromList(i, fileList)
+//			GetFileFolderInfo/Q/Z/P=fdtest currentfile
+//			or 
+//			Fstatus/P=fdtest currentfile
+//			print V_logEOF
+//*** need to add a check if the file is finite size
 			testString = "*_" + num2str(lastRead + 1) + ".dat" // Pattern of the next file to read
 
 			if (StringMatch(currentFile, testString))
@@ -2554,7 +2560,7 @@ function scfd_resetraw_waves()
 	for (i=0; i<itemsinlist(RawWaveNames1D); i++)
 		rwn = StringFromList(i, RawWaveNames1D)  // Get the current raw wave name
 		wave temp=$rwn
-		temp=nan
+		temp=nan   ////****why does this suddenly give an error
 	endfor
 end
 

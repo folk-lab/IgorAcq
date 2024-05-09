@@ -4,10 +4,6 @@
 
 /// this a where all the functions that need to still be place in the proper procedure files live
 macro initexperiment()
-//NewPath/o fdtest "Macintosh HD:Users:labuser:temp_files:"
-//NewPath/O data "Macintosh HD:Users:labuser:Dropbox:work:current_meas:temp:"
-//NewPath/O data "Macintosh HD:Users:labuser:Documents:Data:Johann:2024_04_SwaggerTest:data:"
-//NewPath/O fdtest "Macintosh HD:Users:labuser:Documents:Data:Johann:2024_04_SwaggerTest:temp_files:"
 
 	create_experiment_paths()
 	
@@ -32,12 +28,13 @@ macro initexperiment()
 	create_variable("filenum"); 
 	create_variable("lastconfig");
 	create_variable("sc_meas_mode");
-
+make numericwave
 	
 	
 	lastconfig = scu_unixTime()
 	
-	openFastDAC("51011", verbose = 0)
+	openFastDAC("44001", verbose = 0)
+	//openFastDAC("51011", verbose = 0)
 	initfastdac()
 	fadcattr[1][2]=48
 	
@@ -278,7 +275,7 @@ Menu "Windows"
 End
 
 Menu "Windows"
-	"Scancontoller windows /0", Dowindow/f after1;  Dowindow/f ScanController
+	"Scancontoller windows /0", Dowindow/f after1;  //Dowindow/f ScanController
 
 
 	
