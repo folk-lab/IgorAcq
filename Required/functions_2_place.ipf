@@ -28,13 +28,14 @@ macro initexperiment()
 	create_variable("filenum"); 
 	create_variable("lastconfig");
 	create_variable("sc_meas_mode");
-make numericwave
 	
+//	make /o numericwave
 	
 	lastconfig = scu_unixTime()
 	
 	openFastDAC("44001", verbose = 0)
-	//openFastDAC("51011", verbose = 0)
+//	openFastDAC("51011", verbose = 0)
+	
 	initfastdac()
 	fadcattr[1][2]=48
 	
@@ -45,6 +46,8 @@ make numericwave
 	initscancontroller()
 
 endmacro
+
+
 
 
 

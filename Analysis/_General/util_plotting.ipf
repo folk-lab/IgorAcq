@@ -167,6 +167,9 @@ function create_colour_wave()
 		wave colour_wave = $wave_name
 		colour_wave *= 65535
 	endfor
+	
+	
+	killwaves /z wave0
 
 end
 

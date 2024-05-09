@@ -148,16 +148,14 @@ function init_dac_and_adc(fastdac_string)
 	///////////////////////////////////////
 	///// create colour and sel table /////
 	///////////////////////////////////////
-	wave colour_bent_cw, sc_sel_table
-//	ListBox fdaclist colorWave=colour_bent_cw, selWave= sc_sel_table;
-//	SetDimLabel 2, 1, backColors, sc_sel_table	// TO COLOUR THE SCANCONTROLLER ADD THIS APPROPRIATELY
-	
+	wave colour_bent_cw
 	wave colour_val = colour_bent_cw
-	//*** colour_val is not initialized
 	duplicate /o colour_val sc_colour_table
-	make /o /n=(num_fastdac * num_dac, 5, 2) sc_sel_table
+	
+	make /o /n=(num_fastdac * num_dac, 5, 2) sc_sel_table_dac
+	make /o /n=(num_fastdac * num_adc, 8, 2) sc_sel_table_adc
 	wave sc_colour_table
-	wave sc_sel_table
+	wave sc_sel_table_dac, sc_sel_table_adc
 	
 	variable colour_index, num_colours
 	num_colours = dimsize(colour_val, 0)
@@ -167,8 +165,9 @@ function init_dac_and_adc(fastdac_string)
 	variable end_index = round(num_colours*0.5)
 	num_colours = end_index - start_index
 	
-	fastdac_count = 0
 	
+	// colour the dac
+	fastdac_count = 0
 	for  (i=0; i < num_fastdac * num_dac; i++)
 		
 		fastdac_count = floor(i/8)
@@ -176,13 +175,36 @@ function init_dac_and_adc(fastdac_string)
 		colour_index += 10
 	
 		// sel_table
-		sc_sel_table[][][0] = 0
+		sc_sel_table_dac[][][0] = 0
 		
-		sc_sel_table[i][0][1] = colour_index
-		sc_sel_table[i][1][1] = colour_index
-		sc_sel_table[i][2][1] = colour_index
-		sc_sel_table[i][3][1] = colour_index
-		sc_sel_table[i][4][1] = colour_index
+		sc_sel_table_dac[i][0][1] = colour_index
+		sc_sel_table_dac[i][1][1] = colour_index
+		sc_sel_table_dac[i][2][1] = colour_index
+		sc_sel_table_dac[i][3][1] = colour_index
+		sc_sel_table_dac[i][4][1] = colour_index
+		
+	endfor
+	
+	
+	// colour the adc
+	fastdac_count = 0
+	for  (i=0; i < num_fastdac * num_adc; i++)
+		
+		fastdac_count = floor(i/4)
+		colour_index = fastdac_count * (num_colours/(num_fastdac-1)) + start_index
+		colour_index += 10
+	
+		// sel_table
+		sc_sel_table_adc[][][0] = 0
+		
+		sc_sel_table_adc[i][0][1] = colour_index
+		sc_sel_table_adc[i][1][1] = colour_index
+		sc_sel_table_adc[i][2][1] = colour_index
+		sc_sel_table_adc[i][3][1] = colour_index
+		sc_sel_table_adc[i][4][1] = colour_index
+		sc_sel_table_adc[i][5][1] = colour_index
+		sc_sel_table_adc[i][6][1] = colour_index
+		sc_sel_table_adc[i][7][1] = colour_index
 		
 	endfor
 	
