@@ -3,14 +3,21 @@
 #include <Resize Controls>
 
 /// this a where all the functions that need to still be place in the proper procedure files live
-macro initexperiment()
 
+macro initexperiment_macro()
+	initexperiment()
+endmacro
+
+
+
+function initexperiment()
+
+	// create experiment paths
 	create_experiment_paths()
 	
 	// add custom colours
 	create_colour_wave()
 	
-//	initscancontroller()
 	
 	create_variable("sc_abortsweep")
 	create_variable("sc_scanstarttime")
@@ -31,33 +38,88 @@ macro initexperiment()
 	
 //	make /o numericwave
 	
-	lastconfig = scu_unixTime()
+	variable lastconfig = scu_unixTime()
 	
-	openFastDAC("44001", verbose = 0)
+	
+	// determine the portnum
+	string home_path, separator_type
+	[home_path, separator_type] = sc_get_igor_path()
+	string master_path = ParseFilePath(1, home_path, separator_type, 1, 0)
+	string swagger_file = master_path + "start_swagger.sh"
+	string portnum = sc_get_swagger_port(swagger_file)
+	
+	// open fastdacconnection
+	openFastDAC(portnum, verbose = 0)
+//	openFastDAC("44001", verbose = 0)
 //	openFastDAC("51011", verbose = 0)
 	
+	// initialise fastdac wave
 	initfastdac()
+	
+	// initialise the scancontroller 
+	initscancontroller()
+	
+	// tick some boxes in the scancontroller
+	wave fadcattr
 	fadcattr[1][2]=48
 	
 	make/o/t/n=6 sc_awg_labels
 	sc_awg_labels={"DAC Channel", "Setpoints", "Samples", "Box #", "# Cycles", "Do not edit"} // this will be the sc_awg_labels for the AWG table
 	
-	
-	initscancontroller()
 
-endmacro
+end
 
 
 
 
+function /t sc_get_swagger_port(S_fileName)
+    String S_fileName       // full path to file to be loaded; "" for dialog
+    
+    string DataKey = "*http-addr*" // string to match
+        
+    // full path is specified, load file directly
+    variable refNum
+    Open/R refNum as S_fileName
+ 	string line
+ 	
+ 	int i = 0
+    do
+        // read file line by line
+        FReadLine refNum, line
+        
+        if(strlen(line) == 0)                       
+            break                                       
+        endif
+
+        // stop reading when DataKey is hit
+        if(StringMatch(line, DataKey))
+            break
+        endif
+        
+        i += 1
+        
+    while(1)
+    
+    Close refNum
+ 
+	// parse out the port number
+	string httpaddress = stringfromlist(1, line, ":")
+    httpaddress = httpaddress[0,4]
+    
+    
+    return httpaddress
+end
 
 
-function create_experiment_paths()
+
+function [string home_path, string separator_type] sc_get_igor_path()
 	// assumes the experiment has been saved so that the filepath 'home' exists
 	//not tested on Windows computer
+	// USE ::
+	// string home_path, separator_type
+	// [home_path, separator_type] = sc_get_igor_path()
 	 
 	// check Mac or Windows to determine seperator
-	string separator_type
 	if (cmpstr(igorInfo(2), "Macintosh") == 0) // if mac
 		separator_type = ":"
 	elseif (cmpstr(igorInfo(2), "Windows") == 0) // if windows
@@ -66,10 +128,24 @@ function create_experiment_paths()
 	 
 	pathinfo home // path stored in s_path
 	
+	home_path = s_path
+	
+	return [home_path, separator_type]
+end
+
+
+
+function create_experiment_paths()
+//	assumes the experiment has been saved so that the filepath 'home' exists
+//	not tested on Windows computer
+
+	string home_path, separator_type
+	[home_path, separator_type] = sc_get_igor_path()
+	
 	//////////////////////////////////////////
 	///// EXPERIMENTAL DATA MASTER PATHS /////
 	//////////////////////////////////////////
-	string master_path = ParseFilePath(1, s_path, separator_type, 1, 0)
+	string master_path = ParseFilePath(1, home_path, separator_type, 1, 0)
 	
 	string data_path = master_path + "data" + separator_type
 	string tempdata_path = master_path + "temp_data" + separator_type
@@ -82,7 +158,7 @@ function create_experiment_paths()
 	///// GITHUB DATA MASTER PATHS /////
 	////////////////////////////////////
 	if (cmpstr(igorInfo(2), "Macintosh") == 0) // if mac
-		master_path = ParseFilePath(1, s_path, separator_type, 0, 4)
+		master_path = ParseFilePath(1, home_path, separator_type, 0, 4)
 		master_path += "Github:IgorAcq:data:"
 	elseif (cmpstr(igorInfo(2), "Windows") == 0) // if windows
 		print "what is github path on windows?"
