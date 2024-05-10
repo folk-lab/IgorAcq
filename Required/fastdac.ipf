@@ -503,7 +503,7 @@ Function RampMultipleFDAC(string channels, variable setpoint, [variable ramprate
  
     
     // If ramprate is not specified or not a number, default to 1000 (this is mostly safe)
-	ramprate = paramisdefault(ramprate) ? 0 : ramprate  // default is to return DAC index, return_adc_index = 1 to return adc index
+	ramprate = paramisdefault(ramprate) ? 1000 : ramprate  // default is to return DAC index, return_adc_index = 1 to return adc index
 
 
     // Convert channel identifiers to numbers, supporting both numerical IDs and named channels
@@ -532,7 +532,7 @@ Function RampMultipleFDAC(string channels, variable setpoint, [variable ramprate
         channel = StringFromList(i, channels, ",")
         
         fastdac_index = get_fastdac_index(channel, return_adc_index = 0)
-        ramprate = str2num(fdacvalstr[fastdac_index][4])
+//        ramprate = str2num(fdacvalstr[fastdac_index][4])
         fd_rampOutputFDAC(fastdac_index, setpoint, ramprate)  // Ramp the channel to the setpoint at the specified rate
     endfor
 End
@@ -561,7 +561,7 @@ Function fd_rampOutputFDAC(variable channel, variable setpoint, variable ramprat
             Abort "ERROR[fd_rampOutputFDAC]: Bad ramprate in ScanController_Fastdac window for channel " + num2str(channel)
         EndIf
     EndIf
-    
+        
     // Ramp the DAC channel to the desired output with the validated ramprate
     set_one_FDACChannel(channel, output, ramprate)
     

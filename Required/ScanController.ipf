@@ -3144,9 +3144,9 @@ function scw_colour_the_table()
 	SetDimLabel 2, 1, backColors, sc_sel_table_dac
 	
 	
-	wave colour_bent_cw, sc_sel_table_adc
-	ListBox fadclist win=after1, colorWave=colour_bent_cw, selWave= sc_sel_table_adc;
-	SetDimLabel 2, 1, backColors, sc_sel_table_adc
+//	wave colour_bent_cw, sc_sel_table_adc
+//	ListBox fadclist win=after1, colorWave=colour_bent_cw, selWave= sc_sel_table_adc;
+//	SetDimLabel 2, 1, backColors, sc_sel_table_adc
 end
 
 
