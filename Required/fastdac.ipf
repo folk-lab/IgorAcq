@@ -1346,6 +1346,103 @@ function sample_ADC(string adclist, variable nr_samples)
 end
 
 
+function rampMultipleFDAC_parallel(channels, setpoints, ramprates)
+	string channels, setpoints, ramprates
+	
+	// calculate number of parameters
+	int num_channels = itemsInList(channels, ",")
+	int num_setpoints = itemsInList(setpoints, ",")
+	int num_ramprates = itemsInList(ramprates, ",")
+	
+	int single_setpoint
+	if (num_setpoints == 1)
+		single_setpoint = 1
+	elseif (num_channels == num_setpoints)
+		single_setpoint = 0
+	else
+		abort "Number of channels (" + num2str(num_channels) + ") and setpoints (" + num2str(num_setpoints) + ") does not match"
+	endif
+	
+	int single_ramprate
+	if (num_ramprates == 1)
+		single_ramprate = 1
+	elseif (num_channels == num_ramprates)
+		single_ramprate = 0
+	else
+		abort "Number of channels (" + num2str(num_channels) + ") and ramprates (" + num2str(num_ramprates) + ") does not match"
+	endif
+	
+	
+	
+	// start setting up the json
+	String adcList
+	Variable nr_samples = 1
+	variable chunksize=5000
+	SVar fd
+	variable level1, level2, level3
+//	variable i
+//	stringlist2wave(S.adcListIDs,"adc_list")
+	wave adc_list
+
+	JSONXOP_New; level1=V_value
+	JSONXOP_New; level2=V_value
+	JSONXOP_AddValue/I=(82) level1, "/adc_sampling_time_us"
+	JSONXOP_AddValue/T=(num2str(chunksize)) level1, "/chunk_max_samples"
+	JSONXOP_AddValue/T="temp_{{.ChunkIndex}}.dat" level1, "/chunk_file_name_template"
+	JSONXOP_AddValue/wave=adc_list level1, "/adc_list"
+	JSONXOP_AddValue/I=(nr_samples) level1, "/nr_steps"
+	string dacChannel, minvalue, maxvalue
+
+//
+//	for (i = 0; i < ItemsInList("alalalalala", ","); i += 1)
+//		JSONXOP_New; level3=V_value
+//		dacChannel = StringFromList(i, channels, ",")
+//		minValue = StringFromList(i, S.startxs, ",")
+//		maxValue = StringFromList(i, S.finxs, ",")
+//		JSONXOP_AddTree/T=0 level3, "max"
+//		JSONXOP_AddTree/T=0 level3, "min"
+//		JSONXOP_Addvalue/V=(str2num(maxvalue)) level3, "/max/value"
+//		JSONXOP_Addvalue/V=(str2num(minvalue)) level3, "/min/value"
+//		JSONXOP_Addvalue/T="mV" level3, "max/unit"
+//		JSONXOP_Addvalue/T="mV" level3, "min/unit"
+//		JSONXOP_AddValue/JOIN=(level3) level2, dacChannel
+//		JSONXOP_Release level3
+//	endfor
+//
+//	JSONXOP_AddValue/JOIN=(level2) level1, "/dac_range_map"
+//	jsonxop_dump/ind=2 level1
+//	//print "Full textual representation:\r", S_value
+//	string cmd="start-linear-ramps"
+//	String headers = "accept: application/json\nContent-Type: application/json"
+//	String response = postHTTP(fd, cmd, S_value, headers)
+//	
+	
+	
+	
+	// loop through DAC channels to build json
+	string channel, setpoint, ramprate
+	int i
+	for (i = 0; i < num_channels; i++)
+	
+		channel = stringfromlist(i, channels, ",")
+		if (single_ramprate == 1)
+			ramprate = ramprates
+		else
+			ramprate = stringfromlist(i, ramprates, ",")
+		endif
+		if (single_setpoint == 1)
+			setpoint = setpoints
+		else
+			setpoint = stringfromlist(i, setpoints, ",")
+		endif
+		
+	endfor
+	
+	
+end
+
+
+
 Function linear_ramp(S)
 	Struct ScanVars &S
 	String adcList
@@ -1355,7 +1452,7 @@ Function linear_ramp(S)
 	variable level1, level2, level3
 	variable i
 	stringlist2wave(S.adcListIDs,"adc_list")
-		wave adc_list
+	wave adc_list
 
 	JSONXOP_New; level1=V_value
 	JSONXOP_New; level2=V_value
