@@ -19,10 +19,9 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 	// - nosave: If set to 1, does not save the scan results.
 	// - use_awg: If set to 1, uses the AWG for the scan.
 	// - interlaced_channels, interlaced_setpoints: For interlaced scans.
-
-
 	variable start, fin, repeats, numptsx, sweeprate, delay, ramprate, alternate, nosave, use_awg,fake
 	string channels, x_label, y_label, comments, starts, fins, interlaced_channels, interlaced_setpoints
+
 
 	// Set defaults
 	delay = ParamIsDefault(delay) ? 0.01 : delay
@@ -60,6 +59,7 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 		S.y_label = "Repeats"
 	endif
 	PreScanChecksFD(S)
+
 	if (fake==1)
 		abort
 	endif
@@ -67,11 +67,13 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 	// Ramp to start
 	RampStartFD(S)  // Ramps to starting value
 
+
 	// Let gates settle
 	sc_sleep_noupdate(S.delayy)
 
 	// Initiate Scan
 	initializeScan(S, y_label = y_label)
+
 
 	// Main measurement loop
 	int j, d = 1
@@ -85,26 +87,30 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 			Ramp_interlaced_channels(S, mod(j, S.interlaced_num_setpoints))
 		endif
 
+
 		// Ramp to start of fast axis // this would need to ramp all the DACs being used to their starting position (do we need synchronization)
 		RampStartFD(S, ignore_lims = 1, x_only = 1) // This uses ramp smart, Which does not account for synchronization. the important thing would be
+
 		// to have all the dacs return to their respective starting positions
 		sc_sleep(S.delayy)
+
 
 		// Record values for 1D sweep
 		//*scfd_RecordValues(S, j, AWG_List = AWG)
 		scfd_RecordValues(S, j)
-
-
 		if (alternate != 0) // If want to alternate scan scandirection for next row
 			d = d * -1
 		endif
+
 	endfor
+
 
 	// Save by default
 	if (nosave == 0)
 		EndScan(S = S)
 		// SaveWaves(msg=comments, fastdac=1)
 	endif
+
 	doWindow/k/z SweepControl  // Attempt to close previously open window just in case
 	doWindow/k/z SweepControl  // Attempt to close previously open window just in case
 

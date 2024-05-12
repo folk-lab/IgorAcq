@@ -1940,6 +1940,7 @@ function scs_checksweepstate()
 	
 	if(NVAR_Exists(sc_abortsweep) && sc_abortsweep==1)
 		// If the Abort button is pressed during the scan, save existing data and stop the scan.
+		fd_stopFDACsweep()
 		dowindow /k SweepControl
 		sc_abortsweep=0
 		sc_abortnosave=0
@@ -1948,6 +1949,7 @@ function scs_checksweepstate()
 		abort "Measurement aborted by user. Data saved automatically."
 	elseif(NVAR_Exists(sc_abortnosave) && sc_abortnosave==1)
 		// Abort measurement without saving anything!
+		fd_stopFDACsweep()
 		dowindow /k SweepControl
 		sc_abortnosave = 0
 		sc_abortsweep = 0
@@ -2286,7 +2288,6 @@ Function scfd_SendCommandAndRead(S,rowNum, [ skip_raw2calc])
 	String cmd_sent  // Command sent to FastDAC (currently not used but initialized)
 	Variable numpnts_read=0  // Number of points read in the current operation
 	variable pnts2read  // wavelen of the 1d wave to be filled
-
 	// Default skip_raw2calc to 0 if not provided
 	If (ParamIsDefault(skip_raw2calc))
 		skip_raw2calc = 0
@@ -2301,29 +2302,31 @@ Function scfd_SendCommandAndRead(S,rowNum, [ skip_raw2calc])
 	
 	// Start the sweep
 	fd_start_sweep(S)
+
 	S.lastread = -1  // Reset the last read index
 	
 	// need to reinitialize the raw ADC waves otherwise loadfiles will be confused. If this is not a desired way to handle this,
 	// we will need to add a counter to loadfiles to keep track on how many pnts have already been read
-	scfd_resetraw_waves()
+	// it takes 0.25s to get to this point
+	
+	scfd_resetraw_waves() // this takes 0.0007s
+
 	// Loop to read data until the expected number of points is reached
-
 	Do
-		numpnts_read = loadfiles(S,numpnts_read)  // Load data from files
-		pnts2read = scfd_raw2CalcQuickDistribute(0)  // 0 or 1 for if data should be displayed decimated or not during the scan
-		scfd_checkSweepstate()
-		doupdate
-
+		numpnts_read = loadfiles(S,numpnts_read)  // Load data from files: takes 0.006s
+		pnts2read = scfd_raw2CalcQuickDistribute(1) // 0 or 1 for if data should be displayed decimated or not during the scan: this takes 0.0016
+		scfd_checkSweepstate() // takes less than 1e-5s
+		doupdate  //takes about 0.01s
 	While (numpnts_read<pnts2read)  // Continue if not all points are read
-	
-	
-	// Update FastDAC and ADC GUI elements
-	scfw_update_all_fdac(option="updatefdac")
-	scfw_update_fadc("")  // Update FADC display with no additional specification
 
-
-	// Ramp AWGs back to zero
-	fdawg_ramp_DACs_to_zero()
+//	// Update FastDAC and ADC GUI elements:
+//*** I commented this out as it slows the measurement down a lot. If we can not speed this up we should make it optional and only 
+//execute these commands at the end of any scan
+//	scfw_update_all_fdac(option="updatefdac")
+//	scfw_update_fadc("")  // Update FADC display with no additional specification
+//	// Ramp AWGs back to zero
+//	fdawg_ramp_DACs_to_zero()
+	
 	
 end
 
@@ -2338,7 +2341,7 @@ Function loadFiles(S, numPntsRead)
 	String adcNames = S.adcLists
 	String fileList = IndexedFile(fdTest, -1, ".dat") // List all .dat files in fdTest
 
-	sleep/s 0.1// Short pause to allow for data acquisition
+	//sleep/s 0.4// Short pause to allow for file writing to finish
 
 	
 	String currentFile, testString
@@ -2353,10 +2356,10 @@ Function loadFiles(S, numPntsRead)
 
 		for (i = 0; i < numFiles; i += 1)
 			currentFile = StringFromList(i, fileList)
-//			GetFileFolderInfo/Q/Z/P=fdtest currentfile
+			GetFileFolderInfo/Q/Z/P=fdtest currentfile
 //			or 
-//			Fstatus/P=fdtest currentfile
-//			print V_logEOF
+			//Fstatus/P=fdtest currentfile
+			print V_logEOF
 //*** need to add a check if the file is finite size
 			testString = "*_" + num2str(lastRead + 1) + ".dat" // Pattern of the next file to read
 

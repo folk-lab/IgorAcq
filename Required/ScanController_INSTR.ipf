@@ -322,7 +322,7 @@ end
 function/s postHTTP(instrID,cmd,payload,headers)
 	string instrID, cmd, payload, headers
 	string response=""
-
+//print headers
 	//print instrID+cmd, payload
 	URLRequest /TIME=15.0 /DSTR=payload url=instrID+cmd, method=post, headers=headers
 

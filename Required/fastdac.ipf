@@ -1267,6 +1267,20 @@ function reset_adc(int adcValue)
 	String response = postHTTP(fd, cmd, payload, headers)
 end
 
+function fd_stopFDACsweep()
+/// this command will stop any active sweep
+	svar fd
+	String cmd = "abort-active-cmd"
+	String payload=""
+	String headers ="accept: application/json\rContent-Type: application/json"
+
+	// Perform the HTTP PUT request
+	String response = postHTTP(fd, cmd, payload, headers)
+		print "stopped FD Ramp"
+
+end
+
+
 
 function/s get_proxy_info()
 	// assumes openFastDAC("51011", verbose=0) has been run so that 'fd' has been created
@@ -1311,6 +1325,7 @@ function get_one_FDACChannel(int channel) // Units: mV
 	dac = getjsonvalue(response,"value")
 	return str2num(dac)
 end
+
 
 
 function set_one_FDACChannel(int channel, variable setpoint, variable ramprate)
@@ -1719,19 +1734,6 @@ string currentfile
 end
 
 
-
-function fd_stopFDACsweep()
-//svar fd
-//	// Stops any sweeps which might be running
-//	String cmd = "stop"
-//	String payload
-//	payload = "{\"dac\": " + num2str(channel) + ", \"setpoint_mv\": " + num2str(setpoint)+ ", \"rate_mv_s\": " + num2str(ramprate) + "}"
-//	String headers = "accept: application/json\nContent-Type: application/json"
-//	String response = postHTTP(fd, cmd, payload, headers)
-//	print response
-	print "stopped FD Ramp"
-
-end
 
 
 ///////////////////////

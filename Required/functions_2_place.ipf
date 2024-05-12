@@ -13,7 +13,7 @@ endmacro
 function initexperiment()
 
 	// create experiment paths
-	create_experiment_paths()
+	//create_experiment_paths()
 	
 	// add custom colours
 	create_colour_wave()
@@ -46,12 +46,12 @@ function initexperiment()
 	[home_path, separator_type] = sc_get_igor_path()
 	string master_path = ParseFilePath(1, home_path, separator_type, 1, 0)
 	string swagger_file = master_path + "start_swagger.sh"
-	string portnum = sc_get_swagger_port(swagger_file)
+	//string portnum = sc_get_swagger_port(swagger_file)
 	
 	// open fastdacconnection
-	openFastDAC(portnum, verbose = 0)
-//	openFastDAC("44001", verbose = 0)
-//	openFastDAC("51011", verbose = 0)
+	//openFastDAC(portnum, verbose = 0)
+	openFastDAC("44001", verbose = 0)
+//openFastDAC("51011", verbose = 0)
 	
 	// initialise fastdac wave
 	initfastdac()
