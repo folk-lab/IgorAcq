@@ -83,7 +83,7 @@ end
 function getFADCspeed(instrID)
 	// Returns speed in Hz (but arduino thinks in microseconds)
 	variable instrID
-	svar fadcSpeeds
+	//svar fadcSpeeds
 
 	string response="", compare="", cmd="", command=""
 
