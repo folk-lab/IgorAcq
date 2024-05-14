@@ -49,9 +49,9 @@ function initexperiment()
 	//string portnum = sc_get_swagger_port(swagger_file)
 	
 	// open fastdacconnection
-	//openFastDAC(portnum, verbose = 0)
+	// openFastDAC(portnum, verbose = 0)
 	openFastDAC("44001", verbose = 0)
-//openFastDAC("51011", verbose = 0)
+	// openFastDAC("51011", verbose = 0)
 	
 	// initialise fastdac wave
 	initfastdac()

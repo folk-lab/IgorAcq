@@ -175,7 +175,11 @@ function init_dac_and_adc(fastdac_string)
 		colour_index += 10
 	
 		// sel_table
-		sc_sel_table_dac[][][0] = 0
+		sc_sel_table_dac[i][0][0] = 0
+		sc_sel_table_dac[i][1][0] = 1
+		sc_sel_table_dac[i][2][0] = 1
+		sc_sel_table_dac[i][3][0] = 1
+		sc_sel_table_dac[i][4][0] = 1
 		
 		sc_sel_table_dac[i][0][1] = colour_index
 		sc_sel_table_dac[i][1][1] = colour_index
@@ -195,7 +199,14 @@ function init_dac_and_adc(fastdac_string)
 		colour_index += 10
 	
 		// sel_table
-		sc_sel_table_adc[][][0] = 0
+		sc_sel_table_adc[i][0][0] = 0
+		sc_sel_table_adc[i][1][0] = 0
+		sc_sel_table_adc[i][2][0] = 1
+		sc_sel_table_adc[i][3][0] = 1
+		sc_sel_table_adc[i][4][0] = 1
+		sc_sel_table_adc[i][5][0] = 1
+		sc_sel_table_adc[i][6][0] = 1
+		sc_sel_table_adc[i][7][0] = 1
 		
 		sc_sel_table_adc[i][0][1] = colour_index
 		sc_sel_table_adc[i][1][1] = colour_index
