@@ -184,7 +184,7 @@ end
 
 Window after1() : Panel
 	PauseUpdate; Silent 1		// building window...
-	NewPanel /W=(103,53,1113,656)
+	NewPanel /W=(139,320,1149,923)
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv fsize= 25,fstyle= 1
@@ -229,8 +229,7 @@ Window after1() : Panel
 	SetDrawEnv fsize= 14,fstyle= 1
 	DrawText 822,389,"Log Status"
 	ListBox fdaclist,pos={8.00,72.00},size={356.00,428.00},fSize=14,frame=2
-	ListBox fdaclist,listWave=root:fdacvalstr,selWave=root:sc_sel_table
-	ListBox fdaclist,colorWave=root:colour_bent_CW,mode=1,selRow=12
+	ListBox fdaclist,listWave=root:fdacvalstr,selWave=root:fdacattr,mode=1,selRow=-1
 	ListBox fdaclist,widths={35,70,110,65}
 	Button updatefdac,pos={24.00,528.00},size={64.00,20.00},proc=scfw_update_fdac
 	Button updatefdac,title="Update"
@@ -247,20 +246,22 @@ Window after1() : Panel
 	CheckBox sc_plotRawBox,title="\\Z14Plot Raw",variable=sc_plotRaw,side=1
 	CheckBox sc_demodyBox,pos={580.00,272.00},size={108.00,17.00},proc=scw_CheckboxClicked
 	CheckBox sc_demodyBox,title="\\Z14Save Demod.y",variable=sc_demody,side=1
+	CheckBox sc_hotcoldBox,pos={814.00,312.00},size={78.00,17.00},proc=scw_CheckboxClicked
+	CheckBox sc_hotcoldBox,title="\\Z14 Hot/Cold",variable=sc_hotcold,side=1
 	SetVariable sc_hotcolddelayBox,pos={908.00,311.00},size={68.00,20.00}
 	SetVariable sc_hotcolddelayBox,title="\\Z14Delay",value=sc_hotcolddelay
 	SetVariable sc_FilterfadcBox,pos={824.00,264.00},size={148.00,20.00}
 	SetVariable sc_FilterfadcBox,title="\\Z14Resamp Freq "
 	SetVariable sc_FilterfadcBox,help={"Re-samples to specified frequency, 0 Hz == no re-sampling"}
-	SetVariable sc_FilterfadcBox,limits={1,12196,1},value=sc_ResampleFreqfadc
+	SetVariable sc_FilterfadcBox,value=sc_ResampleFreqfadc
 	SetVariable sc_demodphiBox,pos={704.00,268.00},size={100.00,20.00}
 	SetVariable sc_demodphiBox,title="\\Z14Demod \\$WMTEX$ \\Phi $/WMTEX$"
 	SetVariable sc_demodphiBox,value=sc_demodphi
-	SetVariable sc_nfreqBox,pos={583.00,313.00},size={148.00,20.00}
+	SetVariable sc_nfreqBox,pos={500.00,312.00},size={148.00,20.00}
 	SetVariable sc_nfreqBox,title="\\Z14 Notch Freqs"
 	SetVariable sc_nfreqBox,help={"seperate frequencies (Hz) with , "}
 	SetVariable sc_nfreqBox,value=sc_nfreq
-	SetVariable sc_nQsBox,pos={745.00,312.00},size={140.00,20.00}
+	SetVariable sc_nQsBox,pos={660.00,312.00},size={140.00,20.00}
 	SetVariable sc_nQsBox,title="\\Z14 Notch Qs",help={"seperate Qs with , "}
 	SetVariable sc_nQsBox,value=sc_nQs
 	ListBox sc_InstrFdac,pos={396.00,393.00},size={600.00,128.00},fSize=14,frame=2
@@ -316,9 +317,6 @@ Window after1() : Panel
 	Button hide,title="Hide All\r Procs",fColor=(52428,52425,1)
 	Button maxi,pos={816.00,536.00},size={60.00,40.00},proc=maximize
 	Button maxi,title="large\rwindow",fColor=(26214,26214,26214)
-	PopupMenu popup0,pos={403.00,311.00},size={122.00,20.00},proc=scw_measmode
-	PopupMenu popup0,title="Mode: ",fSize=12
-	PopupMenu popup0,mode=3,popvalue="entropy",value=#"\"Normal;Lock-in;entropy\""
 EndMacro
 
 

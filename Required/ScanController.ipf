@@ -293,26 +293,6 @@ function scfw_updateFdacValStr(channel, value, [update_oldValStr])
 	endif
 end
 
-Function scw_measmode(pa) : PopupMenuControl
-	STRUCT WMPopupAction &pa
-	nvar sc_meas_mode
-	switch( pa.eventCode )
-		case 3:
-			sc_meas_mode=pa.popNum
-			break
-		case 2:
-			sc_meas_mode=pa.popNum
-			break
-		case 1:
-			sc_meas_mode=pa.popNum
-			break
-		case -1: // control being killed
-			break
-	endswitch
-	return 0
-End
-
-
 function scw_setupLockIn(action) : Buttoncontrol
 	string action
 	wave /t LIvalstr, LIvalstr0,awgvalstr0
@@ -1050,21 +1030,9 @@ function initializeScan(S, [init_graphs, y_label])
     y_label = selectString(paramIsDefault(y_label), y_label, "")
     init_graphs = paramisdefault(init_graphs) ? 1 : init_graphs
     variable fastdac
-    nvar sc_meas_mode
 
     // Make sure waves exist to store data
-    switch( sc_meas_mode )
-		case 3:
-    sci_init_entr_waves(S)
-			break
-		case 2:
-    sci_init_LI_waves(S)
-			break
-		case 1:
     sci_initializeWaves(S)
-			break
-	endswitch
-
 
     // Set up graphs to display recorded data
     if (init_graphs)
@@ -1094,7 +1062,7 @@ function sci_initializeWaves(S)  // TODO: rename
     string wavenames, wn, rawwavenames, rwn
     variable raw, j
     wave fadcattr
-    nvar sc_demody, sc_hotcold, sc_measmode
+    nvar sc_demody, sc_hotcold
     
     rawwavenames = sci_get1DWaveNames(1, S.using_fastdac)
     
@@ -1107,53 +1075,13 @@ function sci_initializeWaves(S)  // TODO: rename
 			wn = stringFromList(j, wavenames)
 			rwn = stringFromList(j, rawwavenames)
 			string wavenum = rwn[3,strlen(rwn)]
-			if (S.using_fastdac)
 
-				if (raw==0)
-					numpts = S.numptsx * S.wavelen * S.numCycles
-					numpts = scfd_postFilterNumpts(numpts, S.measureFreq)
-				elseif (raw==1)
-					numpts = S.numptsx * S.wavelen * S.numCycles
-				endif
+			if (S.using_fastdac && fadcattr[str2num(wavenum)][8] == 48) // Checkbox checked
+				numpts = (raw) ? S.numptsx : scfd_postFilterNumpts(S.numptsx, S.measureFreq)
+			else
+				numpts = S.numptsx * S.wavelen * S.numCycles
+			endif
 
-				sci_init1DWave(wn, numpts, S.startx, S.finx)
-
-				if (S.is2d == 1)
-					sci_init2DWave(wn+"_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
-				endif
-
-			endif   //using FD
-		endfor
-	endfor
-end
-
-function sci_init_entr_waves(S)  // TODO: rename
-	// Initializes the waves necessary for an entropy scan
-	// Need 1D and 2D waves for the raw data coming from the fastdac (2D for storing, not necessarily displaying)
-	// 	Need 2D waves for either the raw data, or filtered data if a filter is set
-	// (If a filter is set, the raw waves should only ever be plotted 1D)
-	//	(This will be after calc (i.e. don't need before and after calc wave))
-
-	struct ScanVars &S
-
-	variable numpts  //Numpts to initialize wave with, note: for Filtered data, this number is reduced
-	string wavenames, wn, rawwavenames, rwn
-	variable raw, j
-	wave fadcattr
-	nvar sc_demody, sc_hotcold, sc_measmode
-
-	rawwavenames = sci_get1DWaveNames(1, S.using_fastdac)
-
-	for (raw = 0; raw<2; raw++)                                      // (raw = 0 means calc waves)
-		wavenames = sci_get1DWaveNames(raw, S.using_fastdac)
-		sci_sanityCheckWavenames(wavenames)
-
-		for (j=0; j<itemsinlist(wavenames);j++)
-
-			wn = stringFromList(j, wavenames)
-			rwn = stringFromList(j, rawwavenames)
-			string wavenum = rwn[3,strlen(rwn)]
-			numpts = S.numptsx * S.wavelen * S.numCycles
 			sci_init1DWave(wn, numpts, S.startx, S.finx)
 
 			if (S.is2d == 1)
@@ -1162,18 +1090,33 @@ function sci_init_entr_waves(S)  // TODO: rename
 
 
 			//initializing for hot/cold waves, not sure if i need to, if we are just saving in the end?
-			if(raw==0)
-				sci_init1DWave(wn+"_hot", S.numptsx, S.startx, S.finx) //dont need to initialize since im not plotting
-				sci_init1DWave(wn+"_cold", S.numptsx, S.startx, S.finx)  ///*** I don't think this will work for virtual gates
-				sci_init1DWave(wn+"_entr", S.numptsx, S.startx, S.finx)  ///*** I don't think this will work for virtual gates
+			        if(sc_hotcold && raw == 0)
+			
+			             sci_init1DWave(wn+"hot", S.numptsx, S.startx, S.finx) //dont need to initialize since im not plotting
+			          	sci_init1DWave(wn+"cold", S.numptsx, S.startx, S.finx)  ///*** I don't think this will work for virtual gates
+			
+			          	if(S.is2d == 1)
+			          		sci_init2DWave(wn+"hot_2d", S.numptsx, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+			          		sci_init2DWave(wn+"cold_2d", S.numptsx, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+			          	endif
+			
+			        endif
 
+//			//initializing 1d waves for demodulation
+			if (S.using_fastdac && raw == 0 && fadcattr[str2num(wavenum)][6] == 48)
+				sci_init1DWave(wn+"x", S.numptsx, S.startx, S.finx)
+				sci_init1DWave(wn+"y", S.numptsx, S.startx, S.finx)
 
-				if(S.is2d == 1)
-					sci_init2DWave(wn+"_hot_2d", S.numptsx, S.startx, S.finx, S.numptsy, S.starty, S.finy)
-					sci_init2DWave(wn+"_cold_2d", S.numptsx, S.startx, S.finx, S.numptsy, S.starty, S.finy)
-					sci_init2DWave(wn+"_entr_2d", S.numptsx, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+				//initializing 2d waves for demodulation
+				if (s.is2d == 1)
+					sci_init2DWave(wn+"x_2d", S.numptsx/S.waveLen/S.numCycles, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+
+					if (sc_demody == 1)
+						sci_init2DWave(wn+"y_2d", S.numptsx/S.waveLen/S.numCycles, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+					endif
 
 				endif
+
 			endif
 
 		endfor
@@ -1184,74 +1127,11 @@ end
 
 
 
-
-
-function sci_init_LI_waves(S)  // TODO: rename
-   // Initializes the waves necessary for a Lock-in scan scan
-	// Need 1D and 2D waves for the raw data coming from the fastdac (2D for storing, not necessarily displaying)
-	// 	Need 2D waves for either the raw data, or filtered data if a filter is set
-	// (If a filter is set, the raw waves should only ever be plotted 1D)
-	//	(This will be after calc (i.e. don't need before and after calc wave))
+	// Setup Async measurements if not doing a fastdac scan (workers will look for data made here)
+	if (!S.using_fastdac) 
+		sc_findAsyncMeasurements()
+	endif
 	
-    struct ScanVars &S
-    
-    variable numpts  //Numpts to initialize wave with, note: for Filtered data, this number is reduced
-    string wavenames, wn, rawwavenames, rwn
-    variable raw, j
-    wave fadcattr
-    nvar sc_demody, sc_hotcold, sc_measmode
-    
-    rawwavenames = sci_get1DWaveNames(1, S.using_fastdac)
-    
-	for (raw = 0; raw<2; raw++)                                      // (raw = 0 means calc waves)
-		wavenames = sci_get1DWaveNames(raw, S.using_fastdac)
-		sci_sanityCheckWavenames(wavenames)
-
-		for (j=0; j<itemsinlist(wavenames);j++)
-
-			wn = stringFromList(j, wavenames)
-			rwn = stringFromList(j, rawwavenames)
-			string wavenum = rwn[3,strlen(rwn)]
-
-			if (S.using_fastdac)
-
-				if (raw==0)
-				numpts = S.numptsx * S.wavelen * S.numCycles
-					numpts = S.numptsx
-				elseif (raw==1)
-					numpts = S.numptsx * S.wavelen * S.numCycles
-				endif
-
-				sci_init1DWave(wn, numpts, S.startx, S.finx)
-
-				if (S.is2d == 1)
-					sci_init2DWave(wn+"_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
-				endif
-
-
-				//initializing 1d waves for demodulation
-				if (S.using_fastdac && raw == 0 && fadcattr[str2num(wavenum)][6] == 48)
-					sci_init1DWave(wn+"x", S.numptsx, S.startx, S.finx)
-					sci_init1DWave(wn+"y", S.numptsx, S.startx, S.finx)
-
-					//initializing 2d waves for demodulation
-					if (s.is2d == 1)
-						sci_init2DWave(wn+"x_2d", S.numptsx, S.startx, S.finx, S.numptsy, S.starty, S.finy)
-
-						if (sc_demody == 1)
-							sci_init2DWave(wn+"y_2d", S.numptsx, S.startx, S.finx, S.numptsy, S.starty, S.finy)
-						endif
-
-					endif
-
-				endif
-				
-			endif   //using FD
-
-		endfor
-
-	endfor
-
 end
 
 function sci_init1DWave(wn, numpts, start, fin)
@@ -1313,7 +1193,6 @@ function/S sci_get1DWaveNames(raw, fastdac, [for_plotting])
 		else
 			wavenames = scf_getRecordedFADCinfo("calc_names")
 		endif
-		
     else  // Regular ScanController
         wave sc_RawRecord, sc_RawWaveNames, sc_RawPlot
         wave sc_CalcRecord, sc_CalcWaveNames, sc_CalcPlot
@@ -1374,119 +1253,99 @@ end
 /////////////////////////////////////////////////////////////////////////////
 
 function/S scg_initializeGraphs(S , [y_label])
-	// Initialize graphs that are going to be recorded
-	// Returns list of Graphs that data is being plotted in
-	// Sets sc_frequentGraphs (the list of graphs that should be updated through a 1D scan, where the rest should only get updated at the end of 1D scans)
-
-	// Note: For Fastdac
-	//     Raw is e.g. ADC0, ADC1. Calc is e.g. wave1, wave2 (or specified names)
-	//     Either the Raw 1D graphs or if not plot_raw, then the Calc 1D graphs should be updated
-
-
-	// Note: For Regular Scancontroller
-	//     Raw is the top half of ScanController, Calc is the middle part (with Calc scripts)
-	//     All 1D graphs should be updated
-
-	struct ScanVars &S
-	string y_label
-	y_label = selectstring(paramIsDefault(y_label), y_label, "")
-
-	string/g sc_frequentGraphs = ""  // So that fd_record_values and RecordValues know which graphs to update while reading.
-	string graphIDs = ""
-	variable i,j
-	string waveNames
-	string buffer=""
-	variable raw
-	nvar sc_plotRaw, sc_meas_mode
-	wave fadcattr
-
-	string rawwaveNames = sci_get1DWaveNames(1, S.using_fastdac, for_plotting=1)
-	for (i = 0; i<2; i++)  // i = 0, 1 for raw = 1, 0 (i.e. go through raw graphs first, then calc graphs)
-		raw = !i
-
-		// Get the wavenames (raw or calc, fast or slow) that we need to make graphs for
-		waveNames = sci_get1DWaveNames(raw, S.using_fastdac, for_plotting=1)
-		if (cmpstr(waveNames, "") == 0) // If the strings ARE equal
-			continue
-		endif
-
-
-		// Specific to Fastdac
-		if (S.using_fastdac)
-			// If plot raw not ticked, then skip making raw graphs
-			if(raw && sc_plotRaw == 0)
-				continue
-			endif
-
-			if (raw)
-				// Plot 1D ONLY for raw (even if a 2D scan), but also show noise spectrum along with the 1D raw plot
-				buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label="mV", spectrum = 1, mFreq = S.measureFreq)
-				for (j=0; j<itemsinlist(waveNames); j++)
-					// No *2 in this loop, because only plots 1D graphs
-					sc_frequentGraphs = addlistItem(stringfromlist(j, buffer, ";"), sc_frequentGraphs, ";")
-				endfor
-
-			elseif (sc_meas_mode==1)
-				// Plot 1D (and 2D if 2D scan)
-				buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label=y_label, for_2d=S.is2d, y_label_2d = S.y_label)
-				if (!sc_plotRaw)
-					for (j=0; j<itemsinlist(waveNames); j++)
-						// j*(1+S.is2d) so that only 1D graphs are collected in the sc_frequentGraphs
-						sc_frequentGraphs = addlistItem(stringfromlist(j*(1+S.is2d), buffer, ";"), sc_frequentGraphs, ";")
+    // Initialize graphs that are going to be recorded
+    // Returns list of Graphs that data is being plotted in
+    // Sets sc_frequentGraphs (the list of graphs that should be updated through a 1D scan, where the rest should only get updated at the end of 1D scans)
+    
+    // Note: For Fastdac
+    //     Raw is e.g. ADC0, ADC1. Calc is e.g. wave1, wave2 (or specified names)
+    //     Either the Raw 1D graphs or if not plot_raw, then the Calc 1D graphs should be updated
+    
+    
+    // Note: For Regular Scancontroller
+    //     Raw is the top half of ScanController, Calc is the middle part (with Calc scripts)
+    //     All 1D graphs should be updated
+    
+    struct ScanVars &S
+	 string y_label
+	 y_label = selectstring(paramIsDefault(y_label), y_label, "")
+	 
+	 string/g sc_frequentGraphs = ""  // So that fd_record_values and RecordValues know which graphs to update while reading.
+    string graphIDs = ""
+    variable i,j
+    string waveNames
+    string buffer
+    variable raw
+    nvar sc_plotRaw 
+    wave fadcattr
+    
+    string rawwaveNames = sci_get1DWaveNames(1, S.using_fastdac, for_plotting=1)
+    for (i = 0; i<2; i++)  // i = 0, 1 for raw = 1, 0 (i.e. go through raw graphs first, then calc graphs)
+      	raw = !i
+      	
+		// Get the wavenames (raw or calc, fast or slow) that we need to make graphs for 
+      	waveNames = sci_get1DWaveNames(raw, S.using_fastdac, for_plotting=1)
+      	if (cmpstr(waveNames, "") == 0) // If the strings ARE equal
+      		continue
+      	endif
+      	
+      	// Specific to Fastdac
+      	if (S.using_fastdac)
+	      	// If plot raw not ticked, then skip making raw graphs
+	    	if(raw && sc_plotRaw == 0)
+	    		continue
+	    	endif
+	    	
+	    	if (raw)
+	    		// Plot 1D ONLY for raw (even if a 2D scan), but also show noise spectrum along with the 1D raw plot
+	    		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label="mV", spectrum = 1, mFreq = S.measureFreq)
+	    		for (j=0; j<itemsinlist(waveNames); j++)
+	    			// No *2 in this loop, because only plots 1D graphs
+		    		sc_frequentGraphs = addlistItem(stringfromlist(j, buffer, ";"), sc_frequentGraphs, ";")	    		
+	    		endfor
+	    	else
+	    		// Plot 1D (and 2D if 2D scan)
+	    		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label=y_label, for_2d=S.is2d, y_label_2d = S.y_label)
+	    		if (!sc_plotRaw)
+	    			for (j=0; j<itemsinlist(waveNames); j++)
+	    				// j*(1+S.is2d) so that only 1D graphs are collected in the sc_frequentGraphs
+			    		sc_frequentGraphs = addlistItem(stringfromlist(j*(1+S.is2d), buffer, ";"), sc_frequentGraphs, ";")	    		
+		    		endfor
+		      	endif
+	      		
+	      		// Graphing specific to using demod
+	      		if (S.using_fastdac)	
+	      			for (j=0; j<itemsinlist(waveNames); j++)
+						string rwn = StringFromList(j, rawWaveNames)
+						string cwn = StringFromList(j, WaveNames)
+						string ADCnum = rwn[3,INF]
+				
+						if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
+							buffer += scg_initializeGraphsForWavenames(cwn + "x", S.x_label, for_2d=S.is2d, y_label=y_label, append_wn = cwn + "y")
+						endif
 					endfor
 				endif
+				
+				
+	    	endif
+	    	
+      	// Specific to Regular Scancontroller
+		else
+	   		// Plot 1D (and 2D if 2D scan)
+	   		
+			buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label=y_label, for_2d=S.is2d, y_label_2d = S.y_label)
+	
+			// Always add 1D graphs to plotting list
+			for (j=0; j<itemsinlist(waveNames); j++)
+				// j*(1+S.is2d) so that only 1D graphs are collected in the sc_frequentGraphs
+	    		sc_frequentGraphs = addlistItem(stringfromlist(j*(1+S.is2d), buffer, ";"), sc_frequentGraphs, ";")	    		
+    		endfor
+		endif
+	 
+       graphIDs = graphIDs + buffer
+    endfor
 
-
-
-				// Graphing specific to using demod
-			elseif (S.using_fastdac && (sc_meas_mode==2))
-				for (j=0; j<itemsinlist(waveNames); j++)
-					string rwn = StringFromList(j, rawWaveNames)
-					string cwn = StringFromList(j, WaveNames)
-					string ADCnum = rwn[3,INF]
-
-					if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
-						buffer += scg_initializeGraphsForWavenames(cwn + "x", S.x_label, for_2d=S.is2d, y_label=y_label, append_wn = cwn + "y")
-					endif
-				endfor
-
-
-
-				// Graphing specific to using entropy
-			elseif (S.using_fastdac && (sc_meas_mode==3))
-				for (j=0; j<itemsinlist(waveNames); j++)
-					//string rwn = StringFromList(j, rawWaveNames)
-					cwn = StringFromList(j, WaveNames)
-
-					buffer += scg_initializeGraphsForWavenames(cwn + "_cold", S.x_label, for_2d=S.is2d, y_label=y_label, append_wn = cwn + "_hot")
-					buffer += scg_initializeGraphsForWavenames(cwn + "_entr", S.x_label, for_2d=S.is2d, y_label=y_label)
-
-
-				endfor
-			endif
-
-
-
-
-		
-
-		// Specific to Regular Scancontroller
-	else
-		// Plot 1D (and 2D if 2D scan)
-
-		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label=y_label, for_2d=S.is2d, y_label_2d = S.y_label)
-
-		// Always add 1D graphs to plotting list
-		for (j=0; j<itemsinlist(waveNames); j++)
-			// j*(1+S.is2d) so that only 1D graphs are collected in the sc_frequentGraphs
-			sc_frequentGraphs = addlistItem(stringfromlist(j*(1+S.is2d), buffer, ";"), sc_frequentGraphs, ";")
-		endfor
-	endif
-
-	graphIDs = graphIDs + buffer
-endfor
-
-return graphIDs
+    return graphIDs
 end
 
 
@@ -1497,7 +1356,6 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, only_2d
 	// spectrum -- Also shows a noise spectrum of the data (useful for fastdac scans)
 	string wavenames, x_label, y_label, append_wn, y_label_2d
 	variable for_2d, only_2d, spectrum, mFreq
-	nvar sc_meas_mode
 	
 	spectrum = paramisDefault(spectrum) ? 0 : 1
 	only_2d = paramisDefault(only_2d) ? 0 : only_2d
@@ -1510,21 +1368,20 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, only_2d
 	string wn, openGraphID, graphIDs = ""
 	variable i
 	for (i = 0; i<ItemsInList(wavenames); i++)  // Look through wavenames that are being recorded
-	 //*** what does this line do?   wn = selectString(cmpstr(append_wn, ""), StringFromList(i, wavenames), StringFromList(i, wavenames)+";" +append_wn)
-		wn = StringFromList(i, wavenames,";")  //for now use this until I understand why it was written like that above
- 
+	    wn = selectString(cmpstr(append_wn, ""), StringFromList(i, wavenames), StringFromList(i, wavenames)+";" +append_wn)
+	    
 		if (spectrum)
 			wn = stringfromlist(0,wn)
 			string ADCnum = wn[3,INF] //would fail if this was done with calculated waves, but we dont care about it
-			openGraphID = scg_graphExistsForWavename(wn + ";pwrspec" + ADCnum +";..." ) 
+			openGraphID = scg_graphExistsForWavename(wn + ";pwrspec" + ADCnum +";..." ) // weird naming convention on igors end.
 		else
 			openGraphID = scg_graphExistsForWavename(wn)
 		endif
 
 		// 1D graphs
 		if (only_2d == 0)
+		
 			if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-			
 				scg_setupGraph1D(openGraphID, x_label, y_label= selectstring(cmpstr(y_label_1d, ""), wn, wn +" (" + y_label_1d + ")"))
 				wn = StringFromList(i, wavenames) 
 			else
@@ -3805,5 +3662,3 @@ end
 //	endif
 //
 //end
-
-
