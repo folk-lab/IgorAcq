@@ -696,7 +696,7 @@ function scc_checkRampratesFD(S)
 			if(eff_ramprate > str2num(fdacvalstr[channel][4])*1.05 || s.rampratex > str2num(fdacvalstr[channel][4])*1.05)  // Allow 5% too high for convenience
 				// we are going too fast
 				sprintf question, "DAC channel %d will be ramped at Sweeprate: %.1f mV/s and Ramprate: %.1f mV/s, software limit is set to %s mV/s. Continue?", channel, eff_ramprate, s.rampratex, fdacvalstr[channel][4]
-				answer = ask_user(question, type=1)
+				//answer = ask_user(question, type=1)
 				if(answer == 2)
 					kill_graphs = 1
 					break
@@ -712,7 +712,7 @@ function scc_checkRampratesFD(S)
 			channel = str2num(stringfromlist(i, S.channelsy, ","))
 			if(s.rampratey > str2num(fdacvalstr[channel][4]))
 				sprintf question, "DAC channel %d will be ramped at %.1f mV/s, software limit is set to %s mV/s. Continue?", channel, S.rampratey, fdacvalstr[channel][4]
-				answer = ask_user(question, type=1)
+				//answer = ask_user(question, type=1)
 				if(answer == 2)
 					kill_graphs = 1
 					break
