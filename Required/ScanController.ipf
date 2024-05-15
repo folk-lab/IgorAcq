@@ -1097,7 +1097,7 @@ function sci_initializeWaves(S)  // TODO: rename
 			rwn = stringFromList(j, rawwavenames)
 			string wavenum = rwn[3,strlen(rwn)]
 
-			if (S.using_fastdac && fadcattr[str2num(wavenum)][8] == 48) // Checkbox checked
+			if (S.using_fastdac && fadcattr[str2num(wavenum)][8] == 48) // Workout what the frequency is based on resamp freq
 				numpts = (raw) ? S.numptsx : scfd_postFilterNumpts(S.numptsx, S.measureFreq)
 			else
 				numpts = S.numptsx * S.wavelen * S.numCycles
@@ -2128,8 +2128,7 @@ function scfd_RecordValues(S, rowNum, [ linestart, skip_data_distribution, skip_
 	scfd_SendCommandAndRead(S, rowNum, skip_raw2calc=skip_raw2calc) 
 	
 	if (rowNum == (S.numptsy - 1))  
-		S.end_time = datetime - S.start_time
-		S.start_time = 0
+		S.end_time = datetime
 	endif
 	
 	// Process 1D read and distribute
@@ -2434,6 +2433,8 @@ function scfd_ProcessAndDistribute(ScanVars, rowNum)
 
 end
 
+
+
 function scfd_resetraw_waves()
 	string RawWaveNames1D = sci_get1DWaveNames(1, 1)  // Get the names of 1D raw waves
 	string rwn
@@ -2444,11 +2445,6 @@ function scfd_resetraw_waves()
 		temp=nan   ////****why does this suddenly give an error
 	endfor
 end
-
-
-
-
-
 
 
 function scfd_raw2CalcQuickDistribute(int decim)
@@ -2738,28 +2734,33 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	scv_getLastScanVars(S_)
 
 	if (aborting)
-//		S_.end_time = datetime-date2secs(2024,04,22) 
+		S_.end_time = datetime
 		S_.comments = "aborted, " + S_.comments
 	endif
-	if (S_.end_time == 0 || numtype(S_.end_time) != 0) // Should have already been set, but if not, this is likely a good guess and prevents a stupid number being saved
-//		S_.end_time = datetime-date2secs(2024,04,22) 
-		S_.comments = "end_time guessed, "+S_.comments
-	endif
+	
+//	if (S_.end_time == 0 || numtype(S_.end_time) != 0) // Should have already been set, but if not, this is likely a good guess and prevents a stupid number being saved
+////		S_.end_time = datetime-date2secs(2024,04,22) 
+//		S_.comments = "end_time guessed, "+S_.comments
+//	endif
 	
 	nvar filenum
 	S_.filenum = filenum
 
 	dowindow/k SweepControl // kill scan control window
-	printf "Time elapsed: %.02f s \r", (S_.end_time - S_.start_time)
+	
+	variable scan_time = S_.end_time - S_.start_time
+	printf "Time elapsed: %.02f s \r", (scan_time)
+	
 	HDF5CloseFile/A 0 //Make sure any previously opened HDFs are closed (may be left open if Igor crashes)
 	
 	if(S_.using_fastdac == 0)
 		KillDataFolder/z root:async // clean this up for next time
 	endif
+	
 	SaveToHDF(S_, additional_wavenames=additional_wavenames)
 
 	nvar sc_save_time
-	if(save_experiment==1 && (datetime - sc_save_time) > 180.0)
+	if(save_experiment==1 && (datetime - sc_save_time) > 60*60*24) // 24 hours
 		saveExp()
 		sc_save_time = datetime
 	endif
@@ -3044,8 +3045,11 @@ function scw_create_colour_waves()
 	insertpoints /M=1 /V=(65535/2) inf, 1, sc_colour_table
 
 	variable start_index = round(num_colours*0.3)
-	variable end_index = round(num_colours*0.5)
+	variable end_index = round(num_colours*0.45)
 	num_colours = end_index - start_index
+	
+//	variable start_false_index = round(num_colours/2) + start_index
+//	variable end_index = round(num_colours/2) + end_index
 	
 	
 	// colour the dac

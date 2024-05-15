@@ -96,6 +96,7 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 		// Record values for 1D sweep
 		//*scfd_RecordValues(S, j, AWG_List = AWG)
 		scfd_RecordValues(S, j)
+		
 		if (alternate != 0) // If want to alternate scan scandirection for next row
 			d = d * -1
 		endif

@@ -186,7 +186,7 @@ Function scv_setLastScanVars(S)
 
 	// Ensure global waves for storing string and numeric values exist
 	Make/o/T/N=(22) sc_lastScanVarsStrings // Adjust size for the number of string fields
-	Make/o/N=(37) sc_lastScanVarsVariables // Adjust size for the number of numeric fields
+	Make/o/D/N=(37) sc_lastScanVarsVariables // Adjust size for the number of numeric fields
 
 	// Storing string fields to sc_lastScanVarsStrings wave
 	sc_lastScanVarsStrings[0] = S.channelsx  //FD xchannel numbers
