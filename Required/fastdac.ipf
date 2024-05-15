@@ -144,81 +144,6 @@ function init_dac_and_adc(fastdac_string)
 	endfor
 	
 	
-	//*** TODO create colour table and sel wave to couo,our fore aand background of scancontreoller (listbox)
-	///////////////////////////////////////
-	///// create colour and sel table /////
-	///////////////////////////////////////
-	wave colour_bent_cw
-	wave colour_val = colour_bent_cw
-	duplicate /o colour_val sc_colour_table
-	
-	make /o /n=(num_fastdac * num_dac, 5, 2) sc_sel_table_dac
-	make /o /n=(num_fastdac * num_adc, 8, 2) sc_sel_table_adc
-	wave sc_colour_table
-	wave sc_sel_table_dac, sc_sel_table_adc
-	
-	variable colour_index, num_colours
-	num_colours = dimsize(colour_val, 0)
-	insertpoints /M=1 /V=(65535/2) inf, 1, sc_colour_table
-
-	variable start_index = round(num_colours*0.3)
-	variable end_index = round(num_colours*0.5)
-	num_colours = end_index - start_index
-	
-	
-	// colour the dac
-	fastdac_count = 0
-	for  (i=0; i < num_fastdac * num_dac; i++)
-		
-		fastdac_count = floor(i/8)
-		colour_index = fastdac_count * (num_colours/(num_fastdac-1)) + start_index
-		colour_index += 10
-	
-		// sel_table
-		sc_sel_table_dac[i][0][0] = 0
-		sc_sel_table_dac[i][1][0] = 1
-		sc_sel_table_dac[i][2][0] = 1
-		sc_sel_table_dac[i][3][0] = 1
-		sc_sel_table_dac[i][4][0] = 1
-		
-		sc_sel_table_dac[i][0][1] = colour_index
-		sc_sel_table_dac[i][1][1] = colour_index
-		sc_sel_table_dac[i][2][1] = colour_index
-		sc_sel_table_dac[i][3][1] = colour_index
-		sc_sel_table_dac[i][4][1] = colour_index
-		
-	endfor
-	
-	
-	// colour the adc
-	fastdac_count = 0
-	for  (i=0; i < num_fastdac * num_adc; i++)
-		
-		fastdac_count = floor(i/4)
-		colour_index = fastdac_count * (num_colours/(num_fastdac-1)) + start_index
-		colour_index += 10
-	
-		// sel_table
-		sc_sel_table_adc[i][0][0] = 0
-		sc_sel_table_adc[i][1][0] = 0
-		sc_sel_table_adc[i][2][0] = 1
-		sc_sel_table_adc[i][3][0] = 1
-		sc_sel_table_adc[i][4][0] = 1
-		sc_sel_table_adc[i][5][0] = 1
-		sc_sel_table_adc[i][6][0] = 1
-		sc_sel_table_adc[i][7][0] = 1
-		
-		sc_sel_table_adc[i][0][1] = colour_index
-		sc_sel_table_adc[i][1][1] = colour_index
-		sc_sel_table_adc[i][2][1] = colour_index
-		sc_sel_table_adc[i][3][1] = colour_index
-		sc_sel_table_adc[i][4][1] = colour_index
-		sc_sel_table_adc[i][5][1] = colour_index
-		sc_sel_table_adc[i][6][1] = colour_index
-		sc_sel_table_adc[i][7][1] = colour_index
-		
-	endfor
-	
 end
 
 
@@ -256,12 +181,16 @@ function initFastDAC([fastdac_order])
 	// create waves to hold control info
 	variable oldinit = scfw_fdacCheckForOldInit()
 
+
 	// create GUI window
 	string cmd = ""
 	getwindow/z ScanControllerFastDAC wsizeRM
 	killwindow/z ScanControllerFastDAC
 	killwindow/z after1
 	execute("after1()")
+	
+	scw_colour_the_table()
+	
 
 	setadc_speed()
 end

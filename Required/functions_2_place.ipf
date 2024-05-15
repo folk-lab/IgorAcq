@@ -53,11 +53,12 @@ function initexperiment()
 	openFastDAC("44001", verbose = 0)
 	// openFastDAC("51011", verbose = 0)
 	
+	// initialise the scancontroller 
+	initscancontroller()
+	
 	// initialise fastdac wave
 	initfastdac()
 	
-	// initialise the scancontroller 
-	initscancontroller()
 	
 	// tick some boxes in the scancontroller
 	wave fadcattr

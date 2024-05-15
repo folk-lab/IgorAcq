@@ -68,24 +68,45 @@ function scfw_CreateControlWaves()
 	wave fdacvalstr, dac_table
 	wave fadcvalstr, adc_table
 	
-	variable numdacch=dimsize(dac_table,0)
-	variable numadcch=dimsize(adc_table,0)
+	variable numDACCh = dimsize(dac_table, 0)
+	variable numadcch = dimsize(adc_table, 0)
 	
 	variable i
 	
 	duplicate/o dac_table, fdacvalstr
 	duplicate/o adc_table, fadcvalstr
 
+
 	duplicate/o dac_table, old_fdacvalstr
 	make/o/n=(numDACCh) fdacattr0 = 0
 	make/o/n=(numDACCh) fdacattr1 = 2
-	concatenate/o {fdacattr0,fdacattr1,fdacattr1,fdacattr1,fdacattr1}, fdacattr
+	
+	make /o /n=(numDACCh, 5, 2) fdacattr
+	wave fdacattr
+	fdacattr[][0] = fdacattr0[p]
+	fdacattr[][1] = fdacattr1[p]
+	fdacattr[][2] = fdacattr1[p]
+	fdacattr[][3] = fdacattr1[p]
+	fdacattr[][4] = fdacattr1[p]
 
+
+	make /o /n=(numADCCh, 8, 2) fadcattr
+	wave fadcattr
 	make/o/n=(numADCCh) fadcattr0 = 0
 	make/o/n=(numADCCh) fadcattr1 = 2
 	make/o/n=(numADCCh) fadcattr2 = 32
-	concatenate/o {fadcattr0,fadcattr0,fadcattr2,fadcattr1,fadcattr1, fadcattr2, fadcattr2, fadcattr1, fadcattr2}, fadcattr /// removed 8 since resampling is now done by default
+	fadcattr[][0] = fadcattr0[p]
+	fadcattr[][1] = fadcattr0[p]
+	fadcattr[][2] = fadcattr2[p]
+	fadcattr[][3] = fadcattr1[p]
+	fadcattr[][4] = fadcattr1[p]
+	fadcattr[][5] = fadcattr2[p]
+	fadcattr[][6] = fadcattr2[p]
+	fadcattr[][7] = fadcattr1[p]
 
+	
+	// colour fastdac sc
+	scw_create_colour_waves()
 
 	
 	// create waves for LI
@@ -2928,54 +2949,49 @@ function InitScanController([configFile])
 	if(paramisdefault(configFile))
 		// look for newest config file
 		string filelist = greplist(indexedfile(config,-1,".json"),"sc")
-	
-			// These arrays should have the same size. Their indeces correspond to each other.
-			make/t/o sc_RawWaveNames = {"g1x", "g1y","I_leak","ADC"} // Wave names to be created and saved
-			make/o sc_RawRecord = {0,0,0,0} // Whether you want to record and save the data for this wave
-			make/o sc_RawPlot = {0,0,0,0} // Whether you want to plot the data for this wave
-			make/t/o sc_RawScripts = {"get_one_FADCChannel(channel)","readSRSx(srs)", "readSRSy(srs)","getK2400current(k2400)"}
-
-			// And these waves should be the same size too
-			make/t/o sc_CalcWaveNames = {"", ""} // Calculated wave names
-			make/t/o sc_CalcScripts = {"",""} // Scripts to calculate stuff
-			make/o sc_CalcRecord = {0,0} // Include this calculated field or not
-			make/o sc_CalcPlot = {0,0} // Whether you want to plot the data for this wave
-			make /o sc_measAsync = {0,0}
-
-			// Print variables
-			variable/g sc_PrintRaw = 1,sc_PrintCalc = 1
-			
-			// Clean up volatile memory
-			variable/g sc_cleanup = 0
-
-			// instrument wave
-			make /t/o/N=(sc_instrLimit,3) sc_Instr
-			sc_Instr=""
-
-			sc_Instr[0][0] = "openFastDAC(\"xxx\", verbose=0)"
-			//sc_Instr[1][0] = "openLS370connection(\"ls\", \"http://lksh370-xld.qdev-b111.lab:49300/api/v1/\", \"bfbig\", verbose=1)"
-			//sc_Instr[2][0] = "openIPS120connection(\"ips1\",\"GPIB::25::INSTR\", 9.569, 9000, 182, verbose=0, hold = 1)"
-			sc_Instr[0][2] = "getFDstatus()"
-			//sc_Instr[1][2] = "getls370Status(\"ls\")"
-			//sc_Instr[2][2] = "getipsstatus(ips1)"
-			//sc_Instr[3][2] = "getFDstatus(\"fd2\")"
-			//sc_Instr[4][2] = "getFDstatus(\"fd3\")"
-
-
-			
-			
-//		openMultipleFDACs("13,7,4", verbose=0)
-//openLS370connection("ls", "http://lksh370-xld.qdev-b111.lab:49300/api/v1/", "bfbig", verbose=0)
-//openIPS120connection("ips1", "GPIB0::25::INSTR", 9.569, 9000, 182, verbose=0, hold = 1)
-
-			nvar/z filenum
-			if(!nvar_exists(filenum))
-				print "Initializing FileNum to 0 since it didn't exist before.\n"
-				variable /g filenum=0
-			else
-				printf "Current filenum is %d\n", filenum
-			endif
-//		endif
+		
+		// These arrays should have the same size. Their indeces correspond to each other.
+		make/t/o sc_RawWaveNames = {"g1x", "g1y","I_leak","ADC"} // Wave names to be created and saved
+		make/o sc_RawRecord = {0,0,0,0} // Whether you want to record and save the data for this wave
+		make/o sc_RawPlot = {0,0,0,0} // Whether you want to plot the data for this wave
+		make/t/o sc_RawScripts = {"get_one_FADCChannel(channel)","readSRSx(srs)", "readSRSy(srs)","getK2400current(k2400)"}
+		
+		// And these waves should be the same size too
+		make/t/o sc_CalcWaveNames = {"", ""} // Calculated wave names
+		make/t/o sc_CalcScripts = {"",""} // Scripts to calculate stuff
+		make/o sc_CalcRecord = {0,0} // Include this calculated field or not
+		make/o sc_CalcPlot = {0,0} // Whether you want to plot the data for this wave
+		make /o sc_measAsync = {0,0}
+		
+		// Print variables
+		variable/g sc_PrintRaw = 1,sc_PrintCalc = 1
+		
+		// Clean up volatile memory
+		variable/g sc_cleanup = 0
+		
+		// instrument wave
+		make /t/o/N=(sc_instrLimit,3) sc_Instr
+		sc_Instr=""
+		
+		sc_Instr[0][0] = "openFastDAC(\"xxx\", verbose=0)"
+		//sc_Instr[1][0] = "openLS370connection(\"ls\", \"http://lksh370-xld.qdev-b111.lab:49300/api/v1/\", \"bfbig\", verbose=1)"
+		//sc_Instr[2][0] = "openIPS120connection(\"ips1\",\"GPIB::25::INSTR\", 9.569, 9000, 182, verbose=0, hold = 1)"
+		sc_Instr[0][2] = "getFDstatus()"
+		//sc_Instr[1][2] = "getls370Status(\"ls\")"
+		//sc_Instr[2][2] = "getipsstatus(ips1)"
+		
+		
+		//	openMultipleFDACs("13,7,4", verbose=0)
+		//	openLS370connection("ls", "http://lksh370-xld.qdev-b111.lab:49300/api/v1/", "bfbig", verbose=0)
+		//	openIPS120connection("ips1", "GPIB0::25::INSTR", 9.569, 9000, 182, verbose=0, hold = 1)
+		
+		nvar/z filenum
+		if(!nvar_exists(filenum))
+			print "Initializing FileNum to 0 since it didn't exist before.\n"
+			variable /g filenum=0
+		else
+			printf "Current filenum is %d\n", filenum
+		endif
 	else
 		scw_loadConfig()
 	endif
@@ -2992,21 +3008,84 @@ function InitScanController([configFile])
 
 	scw_rebuildwindow()
 	
-	scw_colour_the_table()
 end
 
 
 function scw_colour_the_table()
-	// assumes sc_sel_table already exists 
-	// colour_bent_cw
-	wave colour_bent_cw, sc_sel_table_dac
-	ListBox fdaclist win=after1, colorWave=colour_bent_cw, selWave= sc_sel_table_dac;
-	SetDimLabel 2, 1, backColors, sc_sel_table_dac
+	wave colour_bent_cw, fdacattr
+	ListBox fdaclist win=after1, colorWave=colour_bent_cw, selWave= fdacattr;
+	SetDimLabel 2, 1, backColors, fdacattr
+	
+	wave colour_bent_cw, fadcattr
+	ListBox fadclist win=after1, colorWave=colour_bent_cw, selWave= fadcattr;
+	SetDimLabel 2, 1, backColors, fadcattr
+end
+
+
+function scw_create_colour_waves()
+	// assumes fdacattr and fadcattr already exists 
+	
+	///////////////////////////////////////
+	///// create colour and sel table /////
+	///////////////////////////////////////
+	wave colour_bent_cw
+	wave colour_val = colour_bent_cw
+	duplicate /o colour_val sc_colour_table
+	wave sc_colour_table
+	wave fdacattr, fadcattr
+
+	int num_dac = 8
+	int num_adc = 4
+	variable num_fastdac = dimsize(fdacattr, 0) / num_dac
+
+	
+	variable colour_index, num_colours
+	num_colours = dimsize(colour_val, 0)
+	insertpoints /M=1 /V=(65535/2) inf, 1, sc_colour_table
+
+	variable start_index = round(num_colours*0.3)
+	variable end_index = round(num_colours*0.5)
+	num_colours = end_index - start_index
 	
 	
-//	wave colour_bent_cw, sc_sel_table_adc
-//	ListBox fadclist win=after1, colorWave=colour_bent_cw, selWave= sc_sel_table_adc;
-//	SetDimLabel 2, 1, backColors, sc_sel_table_adc
+	// colour the dac
+	int fastdac_count = 0
+	int i
+	for  (i=0; i < num_fastdac * num_dac; i++)
+		
+		fastdac_count = floor(i/8)
+		colour_index = fastdac_count * (num_colours/(num_fastdac-1)) + start_index
+		colour_index += 10
+		
+		fdacattr[i][0][1] = colour_index
+		fdacattr[i][1][1] = colour_index
+		fdacattr[i][2][1] = colour_index
+		fdacattr[i][3][1] = colour_index
+		fdacattr[i][4][1] = colour_index
+		
+	endfor
+	
+	
+	// colour the adc
+	fastdac_count = 0
+	for  (i=0; i < num_fastdac * num_adc; i++)
+		
+		fastdac_count = floor(i/4)
+		colour_index = fastdac_count * (num_colours/(num_fastdac-1)) + start_index
+		colour_index += 10
+	
+		fadcattr[i][0][1] = colour_index
+		fadcattr[i][1][1] = colour_index
+		fadcattr[i][2][1] = colour_index
+		fadcattr[i][3][1] = colour_index
+		fadcattr[i][4][1] = colour_index
+		fadcattr[i][5][1] = colour_index
+		fadcattr[i][6][1] = colour_index
+		fadcattr[i][7][1] = colour_index
+		
+	endfor
+	
+
 end
 
 
