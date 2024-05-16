@@ -2,12 +2,52 @@
 #pragma rtGlobals=3				// Use modern global access method and strict wave access
 #pragma DefaultTab={3,20,4}		// Set default tab width in Igor Pro 9 and later
 #include <Reduce Matrix Size>
-#include <Waves Average>
-#include <FilterDialog> menus=0
-#include <Split Axis>
-#include <WMBatchCurveFitIM>
 #include <Decimation>
-#include <Wave Arithmetic Panel>
+
+// Scan Controller routines for 1d and 2d scans
+// Version 1.7 August 8, 2016
+// Version 1.8 XXXX X, 2017
+// Version 2.0 May, 2018
+// Version 3.0 March, 2020
+// Version 4.0 Oct, 2021 -- Tim Child, Johann Drayne
+// Version 5.0 August, 2023 -- Raveel Tejani
+
+// Authors: Mohammad Samani, Nik Hartman, Christian Olsen, Tim Child, Johann Drayne, Raveel Tejani
+
+// Updates in 2.0:
+
+//		-- All drivers now uses the VISA xop, as it is the only one supporting multiple threads.
+//			VDT and GPIB xop's should not be used anymore.
+//		-- "Request scripts" are removed from the scancontroller window. Its only use was
+//			 trying to do async communication (badly).
+//    -- Added Async checkbox in scancontroller window
+
+// Updates in 3.0:
+
+//		-- Support for Fastdacs added (most Fastdac functions can be found in ScanController_Fastdac)
+//		-- Minor: Added Dat# to graphs
+
+// Updates in 4.0:
+
+// 		-- Improved support for FastDACs (mostly works with multiple fastDACs connected now, although cannot sweep multiple at the same time)
+// 		-- Significant refactoring of functions related to a Scan (i.e. initWaves, saveWaves etc) including opening graphs etc. 
+//			All scans functions work with a ScanVars Struct which contains information about the current scan (instead of many globals)
+
+// Updates in 5.0:
+//		-- realtime analysis (notch filtering, demodulation), AWG and LI built into fastDAC window
+//            Main changes is in scfd_processAndDistribute()
+ 
+//		-- master slave for fastDAC syncs
+//				 internal functions that have been reworked for sync:
+//						scfd_RecordValues(), which implies scfd_sendCommandandRead(), fd_start_sweep(), scfd_recordbuffer() all changed
+//                  scv_setSetpoints() - creates stringkeys - stores fdIDs as keys and starts & fins as values
+// 						rampStartFd() - reworked to loop through fdIDs of channels
+// 						ramptoNextSetpoint() - reworked to loop through fdIDs
+//
+//				 new functions for sync:
+//						initScanVarsFD2() - figures out which fdIDs are being used, which ones to sync, stores other variables useful like daclistIDs
+//                  set_indep() - sets all fdacs to independent mode and clears buffer, called in EndScan. Can be used independently when having errors
+//  					set_master_slave() - sets master/slave based on the syncIDs found in initScanVarsFD2(), uses ScanVars
 
 
 function scfw_fdacCheckForOldInit()
