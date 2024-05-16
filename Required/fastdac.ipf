@@ -93,7 +93,7 @@ function init_dac_and_adc(fastdac_string)
 		dac_table[i][3] = temp_string
 		
 		// column 4: ramprate
-		temp_string = "10000"
+		temp_string = "1000000"
 		dac_table[i][4] = temp_string
 		
 		
@@ -111,7 +111,7 @@ function init_dac_and_adc(fastdac_string)
 	////////////////////////////
 	int adc_count = 0
 	fastdac_count = 0
-	make /o /T /n=(num_fastdac * num_adc, 8) adc_table
+	make /o /T /n=(num_fastdac * num_adc, 9) adc_table
 	wave /t adc_table
 	for  (i=0; i < num_fastdac * num_adc; i++)
 	
@@ -928,7 +928,7 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
 	///// Delete all files in fdTest directory /////
 	remove_fd_files()
 	scv_setLastScanVars(S)
-	print S
+//	print S
 end
 
 

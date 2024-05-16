@@ -219,19 +219,22 @@ Window after1() : Panel
 	SetDrawEnv fsize= 14,fstyle= 1
 	DrawText 728,70,"Calc func"
 	SetDrawEnv fsize= 14,fstyle= 1,textrot= -60
-	DrawText 878,74,"Notch"
+	DrawText 849,66,"Notch"
 	SetDrawEnv fsize= 14,fstyle= 1,textrot= -60
-	DrawText 923,74,"Demod"
+	DrawText 891,69,"Demod"
 	SetDrawEnv fsize= 14,fstyle= 1,textrot= -60
-	DrawText 972,76,"Harmonic"
+	DrawText 931,71,"Harmonic"
 	SetDrawEnv fsize= 14,fstyle= 1
 	DrawText 412,389,"Connect Instrument"
 	SetDrawEnv fsize= 14,fstyle= 1
 	DrawText 632,389,"Open GUI"
 	SetDrawEnv fsize= 14,fstyle= 1
 	DrawText 822,389,"Log Status"
+	SetDrawEnv fsize= 14,fstyle= 1,textrot= -60
+	DrawText 965,69,"hot/cold"
 	ListBox fdaclist,pos={8.00,72.00},size={356.00,428.00},fSize=14,frame=2
-	ListBox fdaclist,listWave=root:fdacvalstr,selWave=root:fdacattr,mode=1,selRow=-1
+	ListBox fdaclist,listWave=root:fdacvalstr,selWave=root:fdacattr
+	ListBox fdaclist,colorWave=root:colour_bent_CW,mode=1,selRow=-1
 	ListBox fdaclist,widths={35,70,110,65}
 	Button updatefdac,pos={24.00,528.00},size={64.00,20.00},proc=scfw_update_fdac
 	Button updatefdac,title="Update"
@@ -240,7 +243,8 @@ Window after1() : Panel
 	Button fdacrampzero,pos={264.00,528.00},size={80.00,20.00},proc=scfw_update_fdac
 	Button fdacrampzero,title="Ramp all 0"
 	ListBox fadclist,pos={400.00,72.00},size={600.00,180.00},fSize=14,frame=2
-	ListBox fadclist,listWave=root:fadcvalstr,selWave=root:fadcattr,mode=1,selRow=1
+	ListBox fadclist,listWave=root:fadcvalstr,selWave=root:fadcattr
+	ListBox fadclist,colorWave=root:colour_bent_CW,mode=1,selRow=1
 	ListBox fadclist,widths={30,70,30,95,100,30,30,20}
 	Button updatefadc,pos={396.00,268.00},size={88.00,20.00},proc=scfw_update_fadc
 	Button updatefadc,title="Update ADC"
@@ -248,8 +252,6 @@ Window after1() : Panel
 	CheckBox sc_plotRawBox,title="\\Z14Plot Raw",variable=sc_plotRaw,side=1
 	CheckBox sc_demodyBox,pos={580.00,272.00},size={108.00,17.00},proc=scw_CheckboxClicked
 	CheckBox sc_demodyBox,title="\\Z14Save Demod.y",variable=sc_demody,side=1
-	CheckBox sc_hotcoldBox,pos={814.00,312.00},size={78.00,17.00},proc=scw_CheckboxClicked
-	CheckBox sc_hotcoldBox,title="\\Z14 Hot/Cold",variable=sc_hotcold,side=1
 	SetVariable sc_hotcolddelayBox,pos={908.00,311.00},size={68.00,20.00}
 	SetVariable sc_hotcolddelayBox,title="\\Z14Delay",value=sc_hotcolddelay
 	SetVariable sc_FilterfadcBox,pos={824.00,264.00},size={148.00,20.00}
@@ -269,7 +271,7 @@ Window after1() : Panel
 	ListBox sc_InstrFdac,pos={396.00,393.00},size={600.00,128.00},fSize=14,frame=2
 	ListBox sc_InstrFdac,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1
 	ListBox sc_InstrFdac,selRow=0,editStyle=1
-	Button connectfdac,pos={393.00,533.00},size={60.00,40.00},proc=scw_OpenInstrButton
+	Button connectfdac,pos={395.00,535.00},size={60.00,40.00},proc=scw_OpenInstrButton
 	Button connectfdac,title="Connect\rInstr",labelBack=(65535,65535,65535)
 	Button connectfdac,fColor=(65535,0,0)
 	Button killaboutfdac,pos={680.00,536.00},size={60.00,40.00},proc=sc_controlwindows

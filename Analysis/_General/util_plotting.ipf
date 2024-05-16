@@ -1080,7 +1080,7 @@ function get_multiple_line_paths_int(wave_2d, y_wave, x_wave, [width_y, width_x,
 	///// integrate line paths and remove y offset
 	Integrate line_path_2d_z /D = line_path_2d_z_int
 	
-	offset_2d_traces(line_path_2d_z_int)
+	//offset_2d_traces(line_path_2d_z_int)
 	
 	// display integrated line traces
 	window_name = "line_path_traces_z_int"

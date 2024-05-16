@@ -40,17 +40,6 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 					numptsy=repeats, startxs=starts, finxs=fins, x_label=x_label, y_label=y_label, alternate=alternate, interlaced_channels=interlaced_channels, \
 					interlaced_setpoints=interlaced_setpoints, comments=comments, use_awg=use_awg)
 
-   
-	// Check software limits and ramprate limits
-	
-  	// If using AWG then get that now and check it
-//	struct AWGVars AWG
-//	if(use_AWG)	
-//		fd_getGlobalAWG(AWG)
-//		CheckAWG(AWG, S)  //Note: sets S.numptsx here and AWG.lims_checked = 1
-//	endif
-//	SetAWG(AWG, use_AWG)
-
 // Pre-scan setup
 	if (S.is2d)
 		S.y_label = "Repeats"
@@ -71,7 +60,7 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 	// Initiate Scan
 	initializeScan(S, y_label = y_label)
 
-
+abort
 	// Main measurement loop
 	int j, d = 1
 	for (j = 0; j < S.numptsy; j++)

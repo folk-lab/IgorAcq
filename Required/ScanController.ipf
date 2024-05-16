@@ -131,6 +131,7 @@ function scfw_CreateControlWaves()
 
 
 	make /o /n=(numADCCh, 8, 2) fadcattr
+	make /o /n=(numADCCh, 9, 2) fadcattr
 	wave fadcattr
 	make/o/n=(numADCCh) fadcattr0 = 0
 	make/o/n=(numADCCh) fadcattr1 = 2
@@ -143,6 +144,8 @@ function scfw_CreateControlWaves()
 	fadcattr[][5] = fadcattr2[p]
 	fadcattr[][6] = fadcattr2[p]
 	fadcattr[][7] = fadcattr1[p]
+	fadcattr[][8] = fadcattr2[p]
+
 
 	
 	// colour fastdac sc
@@ -284,13 +287,15 @@ end
 
 
 
-function scfw_update_all_fdac([option])
+function scfw_update_all_fdac([option,SP])
 	// Ramps or updates all FastDac outputs
 	string option // {"fdacramp": ramp all fastdacs to values currently in fdacvalstr, "fdacrampzero": ramp all to zero, "updatefdac": update fdacvalstr from what the dacs are currently at}
+	variable SP
 	wave/t fdacvalstr
 	wave/t old_fdacvalstr
 	wave/t DAC_channel
 	variable ramprate
+	
 
 	if (paramisdefault(option))
 		option = "fdacramp"
@@ -317,7 +322,7 @@ function scfw_update_all_fdac([option])
 							ramprate = str2num(fdacvalstr[j][4])
 							rampmultipleFDAC(DAC_channel[j], 0, ramprate = ramprate)
 						endfor
-					break
+						break
 
 					case "updatefdac":
 						variable value
@@ -326,6 +331,14 @@ function scfw_update_all_fdac([option])
 							scfw_updateFdacValStr(j, value, update_oldValStr = 1)
 						endfor
 						break
+				case "fdacramptoSP"://// this was to check speed of setDACs, but keep it in for now
+					for(j = 0; j < numDACCh; j += 1)
+						scu_tic()
+						ramprate = str2num(fdacvalstr[j][4])
+						rampmultipleFDAC(DAC_channel[j], SP, ramprate = ramprate)
+						scu_toc()
+					endfor
+					break
 				endswitch
 			catch
 			
@@ -333,9 +346,8 @@ function scfw_update_all_fdac([option])
 				// silent abort
 				abortonvalue 1, 10
 			endtry
-			
+
 			return numDACCh
-		
 	
 end
 
@@ -1091,30 +1103,29 @@ End
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 function initializeScan(S, [init_graphs, y_label])
-    // Opens instrument connection, initializes waves to store data, opens and tiles graphs, opens abort window.
-    // init_graphs: set to 0 if you want to handle opening graphs yourself
-    struct ScanVars &S
-    variable init_graphs
-    string y_label
-    y_label = selectString(paramIsDefault(y_label), y_label, "")
-    init_graphs = paramisdefault(init_graphs) ? 1 : init_graphs
-    variable fastdac
-
-    // Make sure waves exist to store data
-    sci_initializeWaves(S)
-
-    // Set up graphs to display recorded data
-    if (init_graphs)
-	    string activeGraphs
-//	    activeGraphs = scg_initializeGraphs(S, y_label = y_label)
-//	    scg_arrangeWindows(activeGraphs)
-	 endif
-
-    // Open Abort window
-    scg_openAbortWindow()
-
-    // Save struct to globals
-    scv_setLastScanVars(S)
+	// Opens instrument connection, initializes waves to store data, opens and tiles graphs, opens abort window.
+	// init_graphs: set to 0 if you want to handle opening graphs yourself
+	struct ScanVars &S
+	variable init_graphs
+	string y_label
+	
+	y_label = selectString(paramIsDefault(y_label), y_label, "")
+	init_graphs = paramisdefault(init_graphs) ? 1 : init_graphs
+	
+	// Open Abort window
+	scg_openAbortWindow()
+	
+	// Make sure waves exist to store data
+	sci_initializeWaves(S)  //0.00061s per wave
+	
+	// Set up graphs to display recorded data
+	if (init_graphs)
+		string activeGraphs
+		activeGraphs = scg_initializeGraphs(S, y_label = y_label)// 0.00045s per wave
+		scg_arrangeWindows(activeGraphs)// 2.2s per two graph
+	
+	// Save struct to globals
+	scv_setLastScanVars(S)
 end
 
 
@@ -1145,7 +1156,7 @@ function sci_initializeWaves(S)  // TODO: rename
 			rwn = stringFromList(j, rawwavenames)
 			string wavenum = rwn[3,strlen(rwn)]
 
-			if (S.using_fastdac && fadcattr[str2num(wavenum)][8] == 48) // Workout what the frequency is based on resamp freq
+			if (S.using_fastdac) // Workout what the frequency is based on resamp freq
 				numpts = (raw) ? S.numptsx : scfd_postFilterNumpts(S.numptsx, S.measureFreq)
 			else
 				numpts = S.numptsx * S.wavelen * S.numCycles
@@ -1221,6 +1232,7 @@ function sci_init1DWave(wn, numpts, start, fin)
     
     make/O/n=(numpts) $wn
     wave temp_wv = $wn; temp_wv[p] = NaN
+
     cmd = "setscale/I x " + num2str(start) + ", " + num2str(fin) + ", " + wn; execute(cmd)
 end
 
@@ -1230,7 +1242,6 @@ function sci_init2DWave(wn, numptsx, startx, finx, numptsy, starty, finy)
     string wn
     variable numptsx, startx, finx, numptsy, starty, finy
     string cmd
-    
     if (numtype(numptsx) != 0 || numptsx == 0)
 		sprintf cmd "ERROR[sci_init1DWave]: Invalid numptsx for wn = %s. numptsx either 0 or NaN", wn
     	abort cmd
@@ -1245,6 +1256,7 @@ function sci_init2DWave(wn, numptsx, startx, finx, numptsy, starty, finy)
 	   	abort cmd
    endif
     
+
     make/O/n=(numptsx, numptsy) $wn
     wave temp_wv = $wn; temp_wv[p][q] = NaN
     cmd = "setscale/I x " + num2str(startx) + ", " + num2str(finx) + ", " + wn; execute(cmd)
@@ -1501,12 +1513,16 @@ function scg_arrangeWindows(graphIDs)
     cmd = "TileWindows/O=1/A=(3,4) "  
     variable i
     for (i = 0; i<itemsInList(graphIDs); i++)
+    scu_tic()
         windowName = StringFromList(i, graphIDs)
         cmd += windowName+", "
         doWindow/F $windowName // Bring window to front 
+        scu_toc()
     endfor
+    scu_tic()
     execute(cmd)
     doupdate
+    scu_toc()
 end
 
 function scg_twosubplot(graphID, wave2name,[logy, logx, labelx, labely, append_wn, append_labely])
@@ -3136,6 +3152,8 @@ function scw_create_colour_waves()
 		fadcattr[i][5][1] = colour_index
 		fadcattr[i][6][1] = colour_index
 		fadcattr[i][7][1] = colour_index
+		fadcattr[i][8][1] = colour_index
+
 		
 	endfor
 	
