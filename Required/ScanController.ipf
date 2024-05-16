@@ -1106,8 +1106,8 @@ function initializeScan(S, [init_graphs, y_label])
     // Set up graphs to display recorded data
     if (init_graphs)
 	    string activeGraphs
-	    activeGraphs = scg_initializeGraphs(S, y_label = y_label)
-	    scg_arrangeWindows(activeGraphs)
+//	    activeGraphs = scg_initializeGraphs(S, y_label = y_label)
+//	    scg_arrangeWindows(activeGraphs)
 	 endif
 
     // Open Abort window
@@ -1219,7 +1219,8 @@ function sci_init1DWave(wn, numpts, start, fin)
 	   	abort cmd
    endif
     
-    make/O/n=(numpts) $wn = NaN
+    make/O/n=(numpts) $wn
+    wave temp_wv = $wn; temp_wv[p] = NaN
     cmd = "setscale/I x " + num2str(start) + ", " + num2str(fin) + ", " + wn; execute(cmd)
 end
 
@@ -1244,7 +1245,8 @@ function sci_init2DWave(wn, numptsx, startx, finx, numptsy, starty, finy)
 	   	abort cmd
    endif
     
-    make/O/n=(numptsx, numptsy) $wn = NaN  // TODO: can put in a cmd and execute if necessary
+    make/O/n=(numptsx, numptsy) $wn
+    wave temp_wv = $wn; temp_wv[p][q] = NaN
     cmd = "setscale/I x " + num2str(startx) + ", " + num2str(finx) + ", " + wn; execute(cmd)
 	cmd = "setscale/I y " + num2str(starty) + ", " + num2str(finy) + ", " + wn; execute(cmd)
 end
