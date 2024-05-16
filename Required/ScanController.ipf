@@ -425,10 +425,18 @@ function scu_tic()
     variable/G tictoc = startMSTimer
 end
 
-function scu_toc()
+function scu_toc([int print_on])
+	print_on = ParamIsDefault(print_on) ? 1 : print_on
+
     NVAR/Z tictoc
     variable ttTime = stopMSTimer(tictoc)
-    printf "%g seconds\r", (ttTime/1e6)
+    
+    if (print_on == 1)
+    	printf "%g seconds\r", (ttTime/1e6)
+    endif
+    
+    return ttTime
+    
     killvariables/Z tictoc
 end
 
@@ -1211,7 +1219,7 @@ function sci_init1DWave(wn, numpts, start, fin)
 	   	abort cmd
    endif
     
-    make/O/n=(numpts) $wn = NaN  
+    make/O/n=(numpts) $wn = NaN
     cmd = "setscale/I x " + num2str(start) + ", " + num2str(fin) + ", " + wn; execute(cmd)
 end
 
