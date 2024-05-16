@@ -130,7 +130,6 @@ function scfw_CreateControlWaves()
 	fdacattr[][4] = fdacattr1[p]
 
 
-	make /o /n=(numADCCh, 8, 2) fadcattr
 	make /o /n=(numADCCh, 9, 2) fadcattr
 	wave fadcattr
 	make/o/n=(numADCCh) fadcattr0 = 0
@@ -1123,6 +1122,7 @@ function initializeScan(S, [init_graphs, y_label])
 		string activeGraphs
 		activeGraphs = scg_initializeGraphs(S, y_label = y_label)// 0.00045s per wave
 		scg_arrangeWindows(activeGraphs)// 2.2s per two graph
+	endif
 	
 	// Save struct to globals
 	scv_setLastScanVars(S)
