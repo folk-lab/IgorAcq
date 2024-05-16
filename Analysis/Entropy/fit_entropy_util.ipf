@@ -447,29 +447,7 @@ function master_entropy_clean_average(filenum, delay, wavelen, [centre_repeats, 
 end
 
 
-function offset_2d_traces(wav, [use_average])
-	// pass in a 2d wave and offset each trace so the first value is at set_y_point
-	wave wav
-	variable use_average // use first use_average percent of data to calculate how much to average
-	
-	use_average = paramisdefault(use_average) ? 0 : use_average // set in fraction. 0.1 = first 10% of data
-	
-	variable set_y_point = 0
-	variable row_value
-	
-	variable num_rows = dimsize(wav, 1)
-	
-	variable i
-	for (i=0; i < num_rows; i++)
-		if (use_average == 0)
-			row_value = wav[0][i]
-		else
-			duplicate /o/RMD=[0][i] wav single_trace
-			row_value = mean(single_trace,  pnt2x(single_trace, 0), pnt2x(single_trace, dimsize(single_trace, 0)*use_average))
-		endif
-		wav[][i] = wav[p][i] - (row_value - set_y_point)
-	endfor
-end
+
 
 
 function/wave sqw_analysis(wave wav, int delay, int wavelen, [variable cold_awg_first])

@@ -13,7 +13,7 @@ endmacro
 function initexperiment()
 
 	// create experiment paths
-	//create_experiment_paths()
+	create_experiment_paths()
 	
 	// add custom colours
 	create_colour_wave()
@@ -115,7 +115,7 @@ end
 
 function [string home_path, string separator_type] sc_get_igor_path()
 	// assumes the experiment has been saved so that the filepath 'home' exists
-	//not tested on Windows computer
+	// Windows path looks like 'D:local_measurement_data:Will:Summer2024TLDDendiTest:'
 	// USE ::
 	// string home_path, separator_type
 	// [home_path, separator_type] = sc_get_igor_path()
@@ -124,7 +124,7 @@ function [string home_path, string separator_type] sc_get_igor_path()
 	if (cmpstr(igorInfo(2), "Macintosh") == 0) // if mac
 		separator_type = ":"
 	elseif (cmpstr(igorInfo(2), "Windows") == 0) // if windows
-		separator_type = "\\"
+		separator_type = ":"
 	endif
 	 
 	pathinfo home // path stored in s_path
@@ -146,7 +146,7 @@ function create_experiment_paths()
 	//////////////////////////////////////////
 	///// EXPERIMENTAL DATA MASTER PATHS /////
 	//////////////////////////////////////////
-	string master_path = ParseFilePath(1, home_path, separator_type, 1, 0)
+	string master_path = home_path // ParseFilePath(1, home_path, separator_type, 1, 0)
 	
 	string data_path = master_path + "data" + separator_type
 	string tempdata_path = master_path + "temp_data" + separator_type
@@ -162,7 +162,8 @@ function create_experiment_paths()
 		master_path = ParseFilePath(1, home_path, separator_type, 0, 4)
 		master_path += "Github:IgorAcq:data:"
 	elseif (cmpstr(igorInfo(2), "Windows") == 0) // if windows
-		print "what is github path on windows?"
+		master_path = ParseFilePath(1, home_path, separator_type, 0, 1)
+		master_path += "local_measurement_programs:IgorAcq:data:"
 	endif
 	
 	string colour_path = master_path + "colours" + separator_type
