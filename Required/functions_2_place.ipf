@@ -186,7 +186,7 @@ end
 
 Window after1() : Panel
 	PauseUpdate; Silent 1		// building window...
-	NewPanel /W=(139,320,1149,923)
+	NewPanel /W=(258,324,1268,927)
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv fsize= 25,fstyle= 1
@@ -232,6 +232,8 @@ Window after1() : Panel
 	DrawText 822,389,"Log Status"
 	SetDrawEnv fsize= 14,fstyle= 1,textrot= -60
 	DrawText 965,69,"hot/cold"
+	SetDrawEnv fsize= 14,fstyle= 1,textrot= -60
+	DrawText 976,59,"0 + 0 -"
 	ListBox fdaclist,pos={8.00,72.00},size={356.00,428.00},fSize=14,frame=2
 	ListBox fdaclist,listWave=root:fdacvalstr,selWave=root:fdacattr
 	ListBox fdaclist,colorWave=root:colour_bent_CW,mode=1,selRow=-1
@@ -244,7 +246,7 @@ Window after1() : Panel
 	Button fdacrampzero,title="Ramp all 0"
 	ListBox fadclist,pos={400.00,72.00},size={600.00,180.00},fSize=14,frame=2
 	ListBox fadclist,listWave=root:fadcvalstr,selWave=root:fadcattr
-	ListBox fadclist,colorWave=root:colour_bent_CW,mode=1,selRow=1
+	ListBox fadclist,colorWave=root:colour_bent_CW,mode=1,selRow=3
 	ListBox fadclist,widths={30,70,30,95,100,30,30,20}
 	Button updatefadc,pos={396.00,268.00},size={88.00,20.00},proc=scfw_update_fadc
 	Button updatefadc,title="Update ADC"
@@ -270,7 +272,7 @@ Window after1() : Panel
 	SetVariable sc_nQsBox,value=sc_nQs
 	ListBox sc_InstrFdac,pos={396.00,393.00},size={600.00,128.00},fSize=14,frame=2
 	ListBox sc_InstrFdac,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1
-	ListBox sc_InstrFdac,selRow=0,editStyle=1
+	ListBox sc_InstrFdac,selRow=4,editStyle=1
 	Button connectfdac,pos={395.00,535.00},size={60.00,40.00},proc=scw_OpenInstrButton
 	Button connectfdac,title="Connect\rInstr",labelBack=(65535,65535,65535)
 	Button connectfdac,fColor=(65535,0,0)

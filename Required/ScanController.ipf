@@ -228,8 +228,6 @@ function scfw_CreateControlWaves()
 	sc_Instr[0][2] = "getFDstatus()"
 	//sc_Instr[1][2] = "getls370Status(\"ls\")"
 	//sc_Instr[2][2] = "getipsstatus(ips1)"
-	//sc_Instr[3][2] = "getFDstatus(\"fd2\")"
-	//sc_Instr[4][2] = "getFDstatus(\"fd3\")"
 
 
 	// clean up
@@ -1172,7 +1170,7 @@ function sci_initializeWaves(S)  // TODO: rename
 			//initializing for hot/cold waves, not sure if i need to, if we are just saving in the end?
 			if (S.using_fastdac && raw == 0 && fadcattr[str2num(wavenum)][8] == 48)
 				if (fadcattr[str2num(wavenum)][6] == 48)
-					abort "ERROR: Demod and hot/cold can not be clicked at the same time!"
+					abort "ERROR: Demod and hot/cold can not be selected at the same time!"
 				endif
 
 				sci_init1DWave(wn+"hot", S.numptsx, S.startx, S.finx) //dont need to initialize since im not plotting
@@ -1360,75 +1358,86 @@ function/S scg_initializeGraphs(S , [y_label])
     string graphIDs = ""
     variable i,j
     string waveNames
-    string buffer
+    string buffer=""
     variable raw
     nvar sc_plotRaw 
     wave fadcattr
     
     string rawwaveNames = sci_get1DWaveNames(1, S.using_fastdac, for_plotting=1)
-    for (i = 0; i<2; i++)  // i = 0, 1 for raw = 1, 0 (i.e. go through raw graphs first, then calc graphs)
-      	raw = !i
-      	
-		// Get the wavenames (raw or calc, fast or slow) that we need to make graphs for 
-      	waveNames = sci_get1DWaveNames(raw, S.using_fastdac, for_plotting=1)
-      	if (cmpstr(waveNames, "") == 0) // If the strings ARE equal
-      		continue
-      	endif
-      	
-      	// Specific to Fastdac
-      	if (S.using_fastdac)
-	      	// If plot raw not ticked, then skip making raw graphs
-	    	if(raw && sc_plotRaw == 0)
-	    		continue
-	    	endif
-	    	
-	    	if (raw)
-	    		// Plot 1D ONLY for raw (even if a 2D scan), but also show noise spectrum along with the 1D raw plot
-	    		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label="mV", spectrum = 1, mFreq = S.measureFreq)
-	    		for (j=0; j<itemsinlist(waveNames); j++)
-	    			// No *2 in this loop, because only plots 1D graphs
-		    		sc_frequentGraphs = addlistItem(stringfromlist(j, buffer, ";"), sc_frequentGraphs, ";")	    		
-	    		endfor
-	    	else
-	    		// Plot 1D (and 2D if 2D scan)
-	    		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label=y_label, for_2d=S.is2d, y_label_2d = S.y_label)
-	    		if (!sc_plotRaw)
-	    			for (j=0; j<itemsinlist(waveNames); j++)
-	    				// j*(1+S.is2d) so that only 1D graphs are collected in the sc_frequentGraphs
-			    		sc_frequentGraphs = addlistItem(stringfromlist(j*(1+S.is2d), buffer, ";"), sc_frequentGraphs, ";")	    		
-		    		endfor
-		      	endif
-	      		
-	      		// Graphing specific to using demod
-	      		if (S.using_fastdac)	
-	      			for (j=0; j<itemsinlist(waveNames); j++)
-						string rwn = StringFromList(j, rawWaveNames)
-						string cwn = StringFromList(j, WaveNames)
-						string ADCnum = rwn[3,INF]
-				
-						if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
-							buffer += scg_initializeGraphsForWavenames(cwn + "x", S.x_label, for_2d=S.is2d, y_label=y_label, append_wn = cwn + "y")
-						endif
+	for (i = 0; i<2; i++)  // i = 0, 1 for raw = 1, 0 (i.e. go through raw graphs first, then calc graphs)
+		raw = !i
+
+		// Get the wavenames (raw or calc, fast or slow) that we need to make graphs for
+		waveNames = sci_get1DWaveNames(raw, S.using_fastdac, for_plotting=1)
+		if (cmpstr(waveNames, "") == 0) // If the strings ARE equal
+			continue
+		endif
+
+		// Specific to Fastdac
+		if (S.using_fastdac)
+			// If plot raw not ticked, then skip making raw graphs
+			if(raw && sc_plotRaw == 0)
+				continue
+			endif
+
+			if (raw)
+				// Plot 1D ONLY for raw (even if a 2D scan), but also show noise spectrum along with the 1D raw plot
+				buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label="mV", spectrum = 1, mFreq = S.measureFreq)
+				for (j=0; j<itemsinlist(waveNames); j++)
+					// No *2 in this loop, because only plots 1D graphs
+					sc_frequentGraphs = addlistItem(stringfromlist(j, buffer, ";"), sc_frequentGraphs, ";")
+				endfor
+			else
+				//	    		// Plot 1D (and 2D if 2D scan)//*** moved down to the loop with demod and hot/cold
+				//	    		buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label=y_label, for_2d=S.is2d, y_label_2d = S.y_label)
+				//	    		if (!sc_plotRaw)
+				//	    			for (j=0; j<itemsinlist(waveNames); j++)
+				////	    				// j*(1+S.is2d) so that only 1D graphs are collected in the sc_frequentGraphs
+				//			    		sc_frequentGraphs = addlistItem(stringfromlist(j*(1+S.is2d), buffer, ";"), sc_frequentGraphs, ";")
+				//		    		endfor
+				//		      	endif
+
+				// Graphing specific to using demod
+				for (j=0; j<itemsinlist(waveNames); j++)
+					string rwn = StringFromList(j, rawWaveNames)
+					string cwn = StringFromList(j, WaveNames)
+					string ADCnum = rwn[3,INF]
+
+					if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
+						buffer += scg_initializeGraphsForWavenames(cwn, S.x_label, y_label=y_label, for_2d=0, y_label_2d = S.y_label)
+						buffer += scg_initializeGraphsForWavenames(cwn + "x", S.x_label, for_2d=S.is2d, y_label=y_label, append_wn = cwn + "y")
+					elseif (fadcattr[str2num(ADCnum)][8] == 48) // checks which hot/cold box is checked
+						buffer += scg_initializeGraphsForWavenames(cwn, S.x_label, y_label=y_label, for_2d=0, y_label_2d = S.y_label)
+						buffer += scg_initialize_entr_graph(cwn,S.x_label,y_label=y_label)
+					else
+						buffer += scg_initializeGraphsForWavenames(cwn, S.x_label, y_label=y_label, for_2d=S.is2d, y_label_2d = S.y_label)
+					endif
+				endfor
+
+				if (!sc_plotRaw)
+					for (j=0; j<itemsinlist(waveNames); j++)
+						//	    				// j*(1+S.is2d) so that only 1D graphs are collected in the sc_frequentGraphs
+						sc_frequentGraphs = addlistItem(stringfromlist(j*(1+S.is2d), buffer, ";"), sc_frequentGraphs, ";")
 					endfor
 				endif
-				
-				
-	    	endif
-	    	
-      	// Specific to Regular Scancontroller
+
+
+			endif
+
+			// Specific to Regular Scancontroller
 		else
-	   		// Plot 1D (and 2D if 2D scan)
-	   		
+			// Plot 1D (and 2D if 2D scan)
+
 			buffer = scg_initializeGraphsForWavenames(waveNames, S.x_label, y_label=y_label, for_2d=S.is2d, y_label_2d = S.y_label)
-	
+
 			// Always add 1D graphs to plotting list
 			for (j=0; j<itemsinlist(waveNames); j++)
 				// j*(1+S.is2d) so that only 1D graphs are collected in the sc_frequentGraphs
-	    		sc_frequentGraphs = addlistItem(stringfromlist(j*(1+S.is2d), buffer, ";"), sc_frequentGraphs, ";")	    		
-    		endfor
+				sc_frequentGraphs = addlistItem(stringfromlist(j*(1+S.is2d), buffer, ";"), sc_frequentGraphs, ";")
+			endfor
 		endif
-	 
-       graphIDs = graphIDs + buffer
+
+		graphIDs = graphIDs + buffer
     endfor
 
     return graphIDs
@@ -1505,6 +1514,55 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, only_2d
 		endif
 	         
 	endfor
+	return graphIDs
+end
+
+function/S scg_initialize_entr_graph(wn, x_label, [y_label, append_wn, y_label_2d])
+	// Ensures a graph is open and tiles graphs for each wave in comma separated wavenames
+	// Returns list of graphIDs of active graphs
+	// append_wavename would append a wave to every single wavename in wavenames (more useful for passing just one wavename)
+	// spectrum -- Also shows a noise spectrum of the data (useful for fastdac scans)
+	string wn, x_label, y_label, append_wn, y_label_2d
+
+	y_label = selectString(paramisDefault(y_label), y_label, "")
+	append_wn = selectString(paramisDefault(append_wn), append_wn, "")
+	y_label_2d = selectString(paramisDefault(y_label_2d), y_label_2d, "")
+
+	string y_label_1d = y_label // Only use the y_label for 1D graphs if the scan is 1D (otherwise gets confused with y sweep gate)
+
+	string  openGraphID, graphIDs = ""
+
+	//1D entropy plot
+	string tempstr=wn+"entr;"+wn+"hot..."
+	openGraphID = scg_graphExistsForWavename(tempstr)
+
+	if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
+		scg_setupGraph1D(openGraphID, x_label, y_label= selectstring(cmpstr(y_label_1d, ""), wn, wn +" (" + y_label_1d + ")"))
+	else
+
+		scg_open1Dgraph(wn+"entr", x_label, y_label="entropy (a.u.)", append_wn = append_wn)
+		appendtoGraph/r $(wn+"hot"),$(wn+"cold"),
+		Label right, "hot/cold (a.u.)"
+
+
+		openGraphID = winname(0,1)
+	endif
+	graphIDs=openGraphID;  // save this so it can be returned
+	openGraphID = ""
+
+	// 2D graphs
+	string wn2d = wn + "entr_2d"
+	openGraphID = scg_graphExistsForWavename(wn2d)
+	if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
+		scg_setupGraph2D(openGraphID, wn2d, x_label, y_label_2d, heat_label = selectstring(cmpstr(y_label_1d,""), wn, wn +" ("+y_label_1d +")"))
+	else
+		scg_open2Dgraph(wn2d, x_label, y_label_2d, heat_label = "entropy (a.u.)")
+		openGraphID = winname(0,1)
+	endif
+
+	graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
+
+	print graphIDs
 	return graphIDs
 end
 
@@ -1655,7 +1713,6 @@ function scg_setupGraph1D(graphID, x_label, [y_label, datnum])
     // Sets axis labels, datnum etc
     setaxis/w=$graphID /a
     Label /W=$graphID bottom, x_label
-
     Label /W=$graphID left, y_label
 
 	nvar filenum
@@ -2072,6 +2129,8 @@ function scfd_sqw_analysis(wave wav, int delay, int wavelen, string wave_out)
 	
 	wave coldwave = $(wave_out + "cold")
 	wave hotwave = $(wave_out + "hot")
+	wave entrwave = $(wave_out + "entr")
+
 	
 	coldwave=(cold1+cold2)/2
 	hotwave=(hot1+hot2)/2
@@ -2081,8 +2140,9 @@ function scfd_sqw_analysis(wave wav, int delay, int wavelen, string wave_out)
 
 	CopyScales /I wav, coldwave, hotwave
 	
-	//duplicate/o hot, nument
-	//nument=cold-hot;
+	duplicate/o hotwave, entrwave
+	entrwave=coldwave-hotwave;
+
 
 end
 
@@ -2384,8 +2444,8 @@ function scfd_ProcessAndDistribute(ScanVars, rowNum)
 			scfd_notch_filters(sc_tempwave, ScanVars.measureFreq,Hzs=sc_nfreq, Qs=sc_nQs)
 		endif
 
-		if(sc_hotcold == 1)
-			scfd_sqw_analysis(sc_tempwave, sc_hotcolddelay, Scanvars.waveLen, cwn)
+		if (fadcattr[str2num(ADCnum)][8] == 48) // checks which hot/cold box is checked
+			scfd_sqw_analysis(sc_tempwave, sc_hotcolddelay, Scanvars.waveLen, cwn)  //--> f.e. wave0hot,wave0cold,wave0entr
 			resamp=0
 		endif
 
@@ -2435,18 +2495,25 @@ function scfd_ProcessAndDistribute(ScanVars, rowNum)
 
 
 			//Copy 1D hotcold into 2d
-			if (sc_hotcold == 1)
-				string cwnhot = cwn + "hot"
-				string cwn2dhot = cwnhot + "_2d"
-				wave cw2dhot = $cwn2dhot
-				wave cwhot = $cwnhot
-				cw2dhot[][rowNum] = cwhot[p]
+			if (fadcattr[str2num(ADCnum)][8] == 48)
+			//*** for now leaving population of 2d hot and cold out, may change mind about that later
+//				string cwnhot = cwn + "hot"
+//				//string cwn2dhot = cwnhot + "_2d"
+//				//wave cw2dhot = $cwn2dhot
+//				wave cwhot = $cwnhot
+//				//cw2dhot[][rowNum] = cwhot[p]
 
-				string cwncold = cwn + "cold"
-				string cwn2dcold = cwncold + "_2d"
-				wave cw2dcold = $cwn2dcold
-				wave cwcold = $cwncold
-				cw2dcold[][rowNum] = cwcold[p]
+//				string cwncold = cwn + "cold"
+//				string cwn2dcold = cwncold + "_2d"
+//				wave cw2dcold = $cwn2dcold
+//				wave cwcold = $cwncold
+//				cw2dcold[][rowNum] = cwcold[p]
+				
+				string cwnentr = cwn + "entr"
+				string cwn2dentr = cwnentr + "_2d"
+				wave cw2dentr = $cwn2dentr
+				wave cwentr = $cwnentr
+				cw2dentr[][rowNum] = cwentr[p]
 			endif
 
 

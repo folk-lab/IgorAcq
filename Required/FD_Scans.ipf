@@ -49,11 +49,8 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 	
 	// Ramp to start
 	RampStartFD(S)  // Ramps to starting value
-
-
 	// Let gates settle
 	sc_sleep_noupdate(S.delayy)
-
 	// Initiate Scan
 	initializeScan(S, y_label = y_label)
 
@@ -67,9 +64,6 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 		
 		// Interlaced Scan Stuff
 		if (S.interlaced_y_flag)
-			if (use_awg)
-				//*Set_AWG_state(S, AWG, mod(j, S.interlaced_num_setpoints))
-			endif
 			Ramp_interlaced_channels(S, mod(j, S.interlaced_num_setpoints))
 		endif
 
