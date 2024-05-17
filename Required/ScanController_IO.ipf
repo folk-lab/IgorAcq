@@ -2369,3 +2369,27 @@ function/s searchFullString(string_to_search,substring)
 	return index_list
 end
 
+
+
+Function FindMaxRepeats(waveName)
+    Wave waveName
+    Variable maxRepeats = 1  // Minimum number of repeats is 1
+    Variable currentCount = 1  // Current count of consecutive repeats
+    Variable i
+    
+    // Loop through the wave, starting from the second element
+    For (i = 1; i < DimSize(waveName, 0); i += 1)
+        // Check if the current value is the same as the previous one
+        If (waveName[i] == waveName[i-1])
+            currentCount += 1  // Increment the count for consecutive repeats
+            // Update maxRepeats if the current count is greater
+            maxRepeats = max(maxRepeats, currentCount)
+        Else
+            currentCount = 1  // Reset the count if the current value is different
+        EndIf
+    EndFor
+    
+    // Print the maximum number of consecutive repeats
+    //Print "The maximum number of consecutive repeats is: ", maxRepeats
+    return maxrepeats
+End

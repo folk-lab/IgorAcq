@@ -148,14 +148,14 @@ end
 
 
 
-function initFastDAC([fastdac_order])
+function initFastDAC([fastdac_order, portnum])
 	// usage: init_dac_and_adc("1;2;4;6")
 	//Edit/K=0 root:adc_table;Edit/K=0 root:dac_table
 	// default is to initialise the FastDacs in ascending order. But can specify the order with the parameter fastdac_order
 	// i.e. fastdac_order = "12;3;6;1;17"
-	string fastdac_order
+	string fastdac_order, portnum
 	fastdac_order = selectString(paramIsDefault(fastdac_order), fastdac_order, "")
-	
+	portnum = selectString(paramIsDefault(portnum), portnum, "XXX")
 
 	string fastdac_labels
 	if (paramIsDefault(fastdac_order) == 0)
@@ -179,7 +179,7 @@ function initFastDAC([fastdac_order])
 	getFDIDs()
 
 	// create waves to hold control info
-	variable oldinit = scfw_fdacCheckForOldInit()
+	variable oldinit = scfw_fdacCheckForOldInit(portnum = portnum)
 
 
 	// create GUI window
