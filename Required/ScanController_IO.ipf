@@ -1,6 +1,7 @@
 #pragma TextEncoding = "UTF-8"
 #pragma rtGlobals=1			// Use modern global access method and strict wave access
 #pragma DefaultTab={3,20,4}		// Set default tab width in Igor Pro 9 and later
+//#include "json_functions"
 
 /// this procedure contains all of the functions that
 /// scan controller needs for file I/O and custom formatted string handling
