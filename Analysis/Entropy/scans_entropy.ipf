@@ -1,182 +1,173 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////// Noise Measurements /////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-function standardNoiseMeasurement([instrID, comments, nosave])
-	// Run standard noise measurement (i.e. 5x 12s scans with fastdac reading 12kHz)
-	// ca_amp_setting = amplification on current amp (i.e. for 1e8 enter 8)
-	variable instrID, nosave
-	string comments
-
-	if(paramIsDefault(instrID))
-		nvar fd
-		instrID = fd
-	endif
-	comments = selectString(paramIsDefault(comments), comments, "")
-
-	variable current_freq = 12195 //getFADCspeed(instrID) ///***
-	FDSpectrumAnalyzer(12,numAverage=5,comments="noise, spectrum, "+comments, nosave=nosave)
-end
-
-
-function QpcStabilitySweeps()
-	// 30 mins of slow sweeping down to pinch off and back to depletion to check QPC is stable (taking 90s per sweep, 10 back and forth sweeps)
-	nvar fd
-	variable pinchoff = -450
-	variable depletion = -50
-
-	ScanfastDAC(depletion, pinchoff, "CSQ,CSS", repeats=20, sweeprate=abs(depletion-pinchoff)/90, alternate=1, comments="repeat, alternating, checking stability of CS gates", nosave=0)
-	rampmultipleFDAC("CSQ,CSS", 0)
-end
+//function standardNoiseMeasurement([instrID, comments, nosave])
+//	// Run standard noise measurement (i.e. 5x 12s scans with fastdac reading 12kHz)
+//	// ca_amp_setting = amplification on current amp (i.e. for 1e8 enter 8)
+//	variable instrID, nosave
+//	string comments
+//
+//	if(paramIsDefault(instrID))
+//		nvar fd
+//		instrID = fd
+//	endif
+//	comments = selectString(paramIsDefault(comments), comments, "")
+//
+//	variable current_freq = 12195 //getFADCspeed(instrID) ///***
+//	FDSpectrumAnalyzer(12,numAverage=5,comments="noise, spectrum, "+comments, nosave=nosave)
+//end
 
 
-
-function NoiseOnOffTransition([num_repeats])
-	// Assumes that it is starting close to a transition
-	// Roughly this does:
-	//		CS correction
-	// 		Quick centering (with sweepgate, and not very wide)
-	// 		1D scan of transition for on transition measurement
-	//		Careful centering by fitting and moving to center value
-	//		Noise measurement at center of transition
-	// 		Move off transition by moving 1000mV away
-	// 		Noise measurement off transition
-	// 		Move back to transition
-	variable num_repeats
-	
-	num_repeats = (num_repeats == 0) ? 1 : num_repeats
-	
-	nvar fd
-	string CSQ_gate = "CSQ"
-	string Sweepgate = "ACC*400"
-	variable sweeprate = 100
-	variable centering_width = 1000
-	string extra_info = "1e9 amplification, 1kHz cutoff, 100uV bias, "
-	
-	variable sweepgate_start_val = 10 // *** str2num(scf_getDacInfo(sweepgate, "output"))  // Get starting value of sweepgate
-	variable i, mid
-	// Measure on transition
-	for (i=0; i<num_repeats; i++)
-		CorrectChargeSensor(fdchannelstr=CSQ_gate, fadcchannel=0, check=0, direction=1)
-		mid = CenterOnTransition(gate=sweepgate, width=centering_width, single_only=1)
-		
-		// 1D scan before noise on transition
-		
-		ScanFastDAC(mid-centering_width/2, mid+centering_width/2, sweepgate, sweeprate=sweeprate, y_label="Current /nA", comments="transition, Scan before on transition measurment num="+num2istr(i), nosave=0)
-
-		// Careful centering
-		wave w = $"cscurrent"
-		mid = TransitionCenterFromFit(w)
-		if (numtype(mid) == 0)
-			rampMultipleFDAC(sweepgate, mid)			
-		endif
-		
-		// Scan on transition
-		standardNoiseMeasurement(comments="on transition, "+extra_info+num2str(i))
-
-		// Measure off transition
-		rampMultipleFDAC(sweepgate, mid-centering_width)
-		standardNoiseMeasurement(comments="off transition, "+extra_info+num2str(i))
-		
-		// Return to initial position
-		rampMultipleFDAC(sweepgate, sweepgate_start_val)
-	endfor	
-end
+//function QpcStabilitySweeps()
+//	// 30 mins of slow sweeping down to pinch off and back to depletion to check QPC is stable (taking 90s per sweep, 10 back and forth sweeps)
+//	nvar fd
+//	variable pinchoff = -450
+//	variable depletion = -50
+//
+//	ScanfastDAC(depletion, pinchoff, "CSQ,CSS", repeats=20, sweeprate=abs(depletion-pinchoff)/90, alternate=1, comments="repeat, alternating, checking stability of CS gates", nosave=0)
+//	rampmultipleFDAC("CSQ,CSS", 0)
+//end
 
 
+//
+//function NoiseOnOffTransition([num_repeats])
+//	// Assumes that it is starting close to a transition
+//	// Roughly this does:
+//	//		CS correction
+//	// 		Quick centering (with sweepgate, and not very wide)
+//	// 		1D scan of transition for on transition measurement
+//	//		Careful centering by fitting and moving to center value
+//	//		Noise measurement at center of transition
+//	// 		Move off transition by moving 1000mV away
+//	// 		Noise measurement off transition
+//	// 		Move back to transition
+//	variable num_repeats
+//	
+//	num_repeats = (num_repeats == 0) ? 1 : num_repeats
+//	
+//	nvar fd
+//	string CSQ_gate = "CSQ"
+//	string Sweepgate = "ACC*400"
+//	variable sweeprate = 100
+//	variable centering_width = 1000
+//	string extra_info = "1e9 amplification, 1kHz cutoff, 100uV bias, "
+//	
+//	variable sweepgate_start_val = 10 // *** str2num(scf_getDacInfo(sweepgate, "output"))  // Get starting value of sweepgate
+//	variable i, mid
+//	// Measure on transition
+//	for (i=0; i<num_repeats; i++)
+//		CorrectChargeSensor(fdchannelstr=CSQ_gate, fadcchannel=0, check=0, direction=1)
+//		mid = CenterOnTransition(gate=sweepgate, width=centering_width, single_only=1)
+//		
+//		// 1D scan before noise on transition
+//		
+//		ScanFastDAC(mid-centering_width/2, mid+centering_width/2, sweepgate, sweeprate=sweeprate, y_label="Current /nA", comments="transition, Scan before on transition measurment num="+num2istr(i), nosave=0)
+//
+//		// Careful centering
+//		wave w = $"cscurrent"
+//		mid = TransitionCenterFromFit(w)
+//		if (numtype(mid) == 0)
+//			rampMultipleFDAC(sweepgate, mid)			
+//		endif
+//		
+//		// Scan on transition
+//		standardNoiseMeasurement(comments="on transition, "+extra_info+num2str(i))
+//
+//		// Measure off transition
+//		rampMultipleFDAC(sweepgate, mid-centering_width)
+//		standardNoiseMeasurement(comments="off transition, "+extra_info+num2str(i))
+//		
+//		// Return to initial position
+//		rampMultipleFDAC(sweepgate, sweepgate_start_val)
+//	endfor	
+//end
 
 
 
 
-function TransitionCenterFromFit(w)
-	wave w
-	variable Vmid, smooth_width
-	// Get rough middle from differentiating
-	redimension/N=-1 w
-	duplicate/FREE w wSmooth
-	wavestats/Q/M=1 w //easy way to get num notNaNs (M=1 only calculates a few wavestats)
-	smooth_width = V_npnts/10 //width to smooth by (relative to how many datapoints taken)
-	smooth smooth_width, wSmooth	//Smooth wave so differentiate works better
-	differentiate wSmooth /D=wSmoothDiff
-	wavestats/Q/M=1 wSmoothDiff
-	Vmid = V_minloc
-	
-	// Estimate fit parameters
-	Make/D/O/N=5 W_coef
-	wavestats/Q/M=1/R=[V_minRowLoc-V_npnts/5, V_minRowLoc+V_npnts/5] w //wavestats close to the transition (in mV, not dat points)
-					//Amp,   			Const, 	Theta, 							Mid,	Linear
-	w_coef[0] = {-(v_max-v_min), v_avg, 	abs((v_maxloc-v_minloc)/3), 	Vmid, 0}
-	duplicate/O/Free w_coef w_coeftemp 
-	
-	// Fit with initial param guess
-	funcFit/Q Chargetransition W_coef w 
-	wave w_sigma
-	variable scan_width = abs(rightx(w)-leftx(w))
-	if(w_sigma[3] < scan_width/10) // Check Vmid was a good fit by seeing if uncertainty is <1/10 width of scan
-		return w_coef[3]
-	endif
-	
-	// Otherwise get a better guess of the linear component
-	make/O/N=2 cm_coef = 0
-	duplicate/O/Free/R=(leftx(w), vmid-scan_width/5) w wBeforeTransition //so hopefully just the gradient of the line leading up to the transition and not including the transition
-	curvefit/Q line kwCWave = cm_coef wBeforeTransition /D
-	
-	// Fit again with better slope estimate
-	w_coef = w_coeftemp
-	w_coef[4] = cm_coef[1] // Slope
-	funcFit/Q Chargetransition W_coef w	  //try again with new set of w_coef
-	if	(w_sigma[3] < scan_width/10)
-		return w_coef[3]
-	else
-		print "Bad Vmid = " + num2str(w_coef[3]) + " +- " + num2str(w_sigma[3]) + " near Vmid = " + num2str(Vmid)
-		return NaN
-	endif
-end
+//
+//
+//function CT_TransitionCenterFromFit(w)
+//	wave w
+//	variable Vmid, smooth_width
+//	// Get rough middle from differentiating
+//	redimension/N=-1 w
+//	duplicate/FREE w wSmooth
+//	wavestats/Q/M=1 w //easy way to get num notNaNs (M=1 only calculates a few wavestats)
+//	smooth_width = V_npnts/10 //width to smooth by (relative to how many datapoints taken)
+//	smooth smooth_width, wSmooth	//Smooth wave so differentiate works better
+//	differentiate wSmooth /D=wSmoothDiff
+//	wavestats/Q/M=1 wSmoothDiff
+//	Vmid = V_minloc
+//	
+//	// Estimate fit parameters
+//	Make/D/O/N=5 W_coef
+//	wavestats/Q/M=1/R=[V_minRowLoc-V_npnts/5, V_minRowLoc+V_npnts/5] w //wavestats close to the transition (in mV, not dat points)
+//					//Amp,   			Const, 	Theta, 							Mid,	Linear
+//	w_coef[0] = {-(v_max-v_min), v_avg, 	abs((v_maxloc-v_minloc)/3), 	Vmid, 0}
+//	duplicate/O/Free w_coef w_coeftemp 
+//	
+//	// Fit with initial param guess
+//	funcFit/Q Chargetransition W_coef w 
+//	wave w_sigma
+//	variable scan_width = abs(rightx(w)-leftx(w))
+//	if(w_sigma[3] < scan_width/10) // Check Vmid was a good fit by seeing if uncertainty is <1/10 width of scan
+//		return w_coef[3]
+//	endif
+//	
+//	// Otherwise get a better guess of the linear component
+//	make/O/N=2 cm_coef = 0
+//	duplicate/O/Free/R=(leftx(w), vmid-scan_width/5) w wBeforeTransition //so hopefully just the gradient of the line leading up to the transition and not including the transition
+//	curvefit/Q line kwCWave = cm_coef wBeforeTransition /D
+//	
+//	// Fit again with better slope estimate
+//	w_coef = w_coeftemp
+//	w_coef[4] = cm_coef[1] // Slope
+//	funcFit/Q Chargetransition W_coef w	  //try again with new set of w_coef
+//	if	(w_sigma[3] < scan_width/10)
+//		return w_coef[3]
+//	else
+//		print "Bad Vmid = " + num2str(w_coef[3]) + " +- " + num2str(w_sigma[3]) + " near Vmid = " + num2str(Vmid)
+//		return NaN
+//	endif
+//end
 
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////// Dot Tuning Stuff /////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-function checkPinchOffs(instrID, channels, gate_names, ohmic_names, max_bias, [reset_zero, nosave])
-	// Helpful for checking pinch offs
-	// reset_zero: Whether to return gates to 0 bias at end of pinch off (defaults to True)
-	variable instrID, max_bias, reset_zero, nosave
-	string channels, gate_names, ohmic_names
+//////////////////////////////////////////////////////////// Dot Tuning Around ////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//function checkPinchOffsSlow(instrID, start, fin, channels, numpts, delay, ramprate, current_wave, cutoff_nA, gate_names, ohmic_names, [is_bd])
+//	/// For testing pinch off (07/2022)
+//	// Make sure current wave is in nA
+//	variable instrID, start, fin, numpts, is_bd, delay, ramprate, cutoff_nA
+//	string channels, current_wave, gate_names, ohmic_names
+//	
+//	gate_names = selectString(strlen(gate_names)>0, channels, gate_names)
+//	
+//	string comment
+//	sprintf comment, "Pinch off, Gates=%s, Ohmics=%s", gate_names, ohmic_names
+//
+//
+//	rampmultiplefdac(channels, 0, ramprate=ramprate)	
+//	scanfastDacSlow(start, fin, channels, numpts, delay, ramprate, until_checkwave=current_wave, until_stop_val=cutoff_nA, until_operator="<", y_label="Current /nA", comments=comment)
+//	rampmultiplefdac(channels, 0, ramprate=ramprate)
+//end
 
-	reset_zero = paramIsDefault(reset_zero) ? 1 : reset_zero
-	gate_names = selectString(strlen(gate_names)>0, channels, gate_names)
 
-	string buffer
-	sprintf buffer, "Pinch off, Gates=%s, Ohmics=%s", gate_names, ohmic_names
-	ScanFastDAC(0, max_bias, channels, sweeprate=300, x_label=gate_names+" /mV", y_label="Current /nA", comments=buffer, nosave=nosave, repeats=2, alternate=1)
-	if (reset_zero)
-		rampmultiplefdac(channels, 0)
-	endif
-end
 
-function checkPinchOffsSlow(instrID, start, fin, channels, numpts, delay, ramprate, current_wave, cutoff_nA, gate_names, ohmic_names, [is_bd])
-	/// For testing pinch off (07/2022)
-	// Make sure current wave is in nA
-	variable instrID, start, fin, numpts, is_bd, delay, ramprate, cutoff_nA
-	string channels, current_wave, gate_names, ohmic_names
+function DotTuneAround(x, y, width_x, width_y, channelx, channely, [sweeprate, ramprate_x, numptsy, csname, nosave, additional_comments, fadcchannel])
+	// The most basic DotTuneAround, you probably want to use DotTuneAround2
 	
-	gate_names = selectString(strlen(gate_names)>0, channels, gate_names)
+	// WHAT DO I DO
+	// Goes to x, y. 
+	// Sets charge sensor to target_current. 
+	// Scans2D around x, y +- width.
 	
-	string comment
-	sprintf comment, "Pinch off, Gates=%s, Ohmics=%s", gate_names, ohmic_names
+	// EXAMPLE USE::
+	// DotTuneAround(-950,-240,200,40,"P*2","N", numptsy=150, sweeprate=600,csname="CSQ*20", fadcchannel=4.1, natarget=1.1, gate_divider=20, display_diff=1)
 
-
-	rampmultiplefdac(channels, 0, ramprate=ramprate)	
-	scanfastDacSlow(start, fin, channels, numpts, delay, ramprate, until_checkwave=current_wave, until_stop_val=cutoff_nA, until_operator="<", y_label="Current /nA", comments=comment)
-	rampmultiplefdac(channels, 0, ramprate=ramprate)
-end
-
-function DotTuneAround(x, y, width_x, width_y, channelx, channely, [sweeprate, ramprate_x, numptsy, y_is_bd, fdy_id, csname, fdcs_id, nosave, additional_comments, fadcchannel])
-// Goes to x, y. Sets charge sensor to target_current. Scans2D around x, y +- width.
-	// Variables:
-	// fdy_id: specify if using a fastDAC other than "fd" for the y-axis
-	// fdcs_id: specify if the gate for tuning the CS is on a fastDAC other than "fd"
-	variable x, y, width_x, width_y, ramprate_x, nosave, y_is_bd, fadcchannel, fdy_id, fdcs_id
+	variable x, y, width_x, width_y, ramprate_x, nosave, fadcchannel
 	variable sweeprate, numptsy
 	string channelx, channely, csname, additional_comments
 
@@ -186,31 +177,30 @@ function DotTuneAround(x, y, width_x, width_y, channelx, channely, [sweeprate, r
 	nosave = paramisdefault(nosave) ? 0 : nosave
 	additional_comments = selectstring(numtype(strlen(additional_comments)) != 0, additional_comments, "")
 
-	nvar fd, bd
-	
-	variable fdy = paramIsDefault(fdy_id) ? fd : fdy_id
-	variable fdcs = paramIsDefault(fdcs_id) ? fd : fdcs_id
-	
 	
 	rampmultiplefdac(channelx, x, ramprate=ramprate_x)
 	rampmultiplefdac(channely, y) //***
 
-
-	//CorrectChargeSensor(fd=fd, fdchannelstr=csname, fadcID=fd, fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1)
 	CorrectChargeSensor(fdchannelstr=csname, fadcchannel=fadcchannel, check=0,  direction=1)
-	if (y_is_bd)
-		ScanFastDAC2D( x-width_x, x+width_x, channelx, y-width_y, y+width_y, channely, numptsy, bdID = bd, sweeprate=sweeprate, rampratex=ramprate_x, nosave=nosave, comments="Dot Tuning, "+additional_comments)
-	else
-		ScanFastDAC2D( x-width_x, x+width_x, channelx, y-width_y, y+width_y, channely, numptsy, sweeprate=sweeprate, rampratex=ramprate_x, nosave=nosave, comments="Dot Tuning, "+additional_comments) // CHANGE FOR FD2 ON Y-AXIS
-	endif
+	ScanFastDAC2D( x-width_x, x+width_x, channelx, y-width_y, y+width_y, channely, numptsy, sweeprate=sweeprate, rampratex=ramprate_x, nosave=nosave, comments="Dot Tuning, "+additional_comments) // CHANGE FOR FD2 ON Y-AXIS
+	
 	wave tempwave = $"cscurrent_2d"
 	nvar filenum
 	displaydiff(tempwave, filenum=filenum-1, x_label=scu_getDacLabel(scu_getChannelNumbers(channelx)), y_label=scu_getDacLabel(scu_getChannelNumbers(channely)))
 end
 
 
+
 function DotTuneAround2(x, y, width_x, width_y, channelx, channely, [sweeprate, ramprate_x, numptsy, csname, nosave, additional_comments, fadcchannel, natarget, gate_divider, display_diff, delayy, use_AWG])
-// Goes to x, y. Sets charge sensor to target_current. Scans2D around x, y +- width.
+	// A more 'simple' version of DotTuneAroundVirtual as it only accepts a single gate on the x and y axis
+	
+	// WHAT DO I DO
+	// Goes to the four corners of the scan. 
+	// Sets charge sensor to target_current. 
+	// Scans2D around x, y +- width.
+	
+	// EXAMPLE USE::
+	// DotTuneAround2(-950,-240,200,40,"P*2","N", numptsy=150, sweeprate=600,csname="CSQ*20", fadcchannel=4.1, natarget=1.1, gate_divider=20, display_diff=1)
 	variable x, y, width_x, width_y, ramprate_x, nosave, fadcchannel, gate_divider, natarget
 	variable sweeprate, numptsy, display_diff, delayy, use_AWG
 	string channelx, channely, csname, additional_comments
@@ -228,20 +218,18 @@ function DotTuneAround2(x, y, width_x, width_y, channelx, channely, [sweeprate, 
 
 	// Set up variables to record CSQ gate value etc	
 	wave fdacvalstr
-	variable csq_channel_num = str2num(scu_getChannelNumbers(csname))
+	string fdchannelstr = scu_getChannelNumbers(csname)
+	int cs_index = get_fastdac_index(fdchannelstr, return_adc_index = 0)
 	string corners = ""
 	
 	// First go to middle of scan and get charges sensor roughly right (might want to remove this later)
-//	rampmultiplefdac(fd, channelx, x, ramprate=ramprate_x)
-//	rampmultiplefdac(fdy, channely, y)
 	rampMultipleFDAC(channelx, x)
 	rampMultipleFDAC(channely, y)
 	CorrectChargeSensor(fdchannelstr=csname, fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15)
 	
 	// Then go to each corner of the scan and record the CSQ gate value required for CS to be most sensitive
-	// Corners ordered (sx|sy, fx|sy, sx|fy, fx|fy)
+	// Corners ordered (sx|sy, fx|sy, sx|fy, fx|fy) [i.e. s = start, f = fin]
 	make/o/free corner_xs = {x-width_x, x+width_x, x-width_x, x+width_x}
-//	make/o/free corner_xs = {x+width_x, x-width_x, x+width_x, x-width_x}
 	make/o/free corner_ys = {y-width_y, y-width_y, y+width_y, y+width_y}
 
 	variable i
@@ -249,14 +237,13 @@ function DotTuneAround2(x, y, width_x, width_y, channelx, channely, [sweeprate, 
 		rampMultipleFDAC(channelx, corner_xs[i]) 
 		rampMultipleFDAC(channely, corner_ys[i])
 		CorrectChargeSensor(fdchannelstr=csname, fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15) //added cutoff time so we don't have to wait while de-bugging
-		corners = AddListItem(num2str(fdacvalstr[csq_channel_num][1]), corners, ",", INF) // CSQ gate values
+		corners = AddListItem(num2str(fdacvalstr[cs_index][1]), corners, ",", INF) // CSQ gate values
 	endfor
 	
 	///// make parallelogram from corners /////
-	corners = make_parallelogram_from_corners(corners)
+	corners = virtual_make_parallelogram_from_corners(corners)
 
 	ScanFastDAC2D_virtual(x-width_x, x+width_x, channelx, y-width_y, y+width_y, channely, numptsy, corners, csname, sweeprate=sweeprate, rampratex=ramprate_x, nosave=nosave, comments="Dot Tuning, "+additional_comments, delayy=delayy, use_AWG=use_AWG)
-////	ScanFastDAC2D_virtual(fd, x+width_x, x-width_x, channelx, y-width_y, y+width_y, channely, numptsy, corners, csname, fdcs_id=fdcs_id, sweeprate=sweeprate, rampratex=ramprate_x, fdyid=fdy, nosave=nosave, comments="Dot Tuning, "+additional_comments)
 
 	wave tempwave = $"cscurrent_2d" // This parameter needs to be the same as in the ScanController ADC Wave Name. 
 	nvar filenum
@@ -267,47 +254,16 @@ end
 
 
 
-function/S make_parallelogram_from_corners(string virtual_corners)
-	// Turn any 4 corners into a parallelogram
-	// corners are defined in the order [BL, BR, TL, TR]
-	// BL: bottom left
-	// TR: top right
-	// e.g. make_parallelogram_from_corners("0,3,4,5") returns "0.5,2.5,3.5,5.5"
-	string corners
-	variable c0, c1, c2, c3
-	variable new_mid_start, new_mid_end, new_half_width
-	
-	string new_virtual_corners = ""
-	
-	variable k
-	for (k=0; k < ItemsInList(virtual_corners, ";"); k++)
-		corners = StringFromList(k, virtual_corners, ";")
-	   	c0 = str2num(StringFromList(0, corners, ","))
-   		c1 = str2num(StringFromList(1, corners, ","))
-   		c2 = str2num(StringFromList(2, corners, ","))
-   		c3 = str2num(StringFromList(3, corners, ","))
-   		
-		new_half_width = (((c1-c0) + (c3-c2)) / 2) / 2
-		new_mid_start = (c0 + c1) / 2
-		new_mid_end = (c2 + c3) / 2
-		
-		c0 = new_mid_start - new_half_width
-		c1 = new_mid_start + new_half_width
-		c2 = new_mid_end - new_half_width
-		c3 = new_mid_end + new_half_width
-		
-		new_virtual_corners = new_virtual_corners + num2str(c0) + "," + num2str(c1) + ","	 + num2str(c2) + "," + num2str(c3) + ";"							
-   	endfor
-   		
-   	///// remove trailing semicolon... could be dangerous /////
-   	new_virtual_corners = new_virtual_corners[0, strlen(new_virtual_corners) - 2]
-   		
-   	return new_virtual_corners
-end
-
-
 function DotTuneAroundVirtual(x_str, y_str, width_x_str, width_y_str, channelx_str, channely_str, [sweeprate, ramprate_x, numptsy, csname, nosave, additional_comments, fadcchannel, natarget, gate_divider, display_diff, use_AWG, use_only_corners])
-// Goes to x, y. Sets charge sensor to target_current. Scans2D around x, y +- width.
+	// A more 'flexible' version of DotTuneAround2 as it accepts a arbitrary gates on the x and y axis
+	// WHAT DO I DO
+	// Goes to the four corners of the scan. 
+	// Sets charge sensor to target_current. 
+	// Scans2D around x, y +- width.
+	
+	// EXAMPLE USE::
+	// DotTuneAroundVirtual("-680", "-295,-248", "200", "100,-86",  "P*2", "N,CSS", sweeprate=400, numptsy=51, csname="CSQ*20", fadcchannel=4.2, natarget=1, gate_divider=15, display_diff=1)
+
 	string x_str, y_str, width_x_str, width_y_str, channelx_str, channely_str
 	// OPTIONAL	
 	variable sweeprate, ramprate_x, numptsy, display_diff, use_AWG, nosave, fadcchannel, gate_divider, natarget, use_only_corners
@@ -324,30 +280,20 @@ function DotTuneAroundVirtual(x_str, y_str, width_x_str, width_y_str, channelx_s
 	use_AWG = paramisdefault(use_AWG) ? 0 : use_AWG
 	use_only_corners = paramisdefault(use_only_corners) ? 0 : use_only_corners
 
-	nvar fd=fd
-
 	// Set up variables to record CSQ gate value etc	
 	wave fdacvalstr
-	variable csq_channel_num = str2num(scu_getChannelNumbers(csname))
-	string corners = ""
+	string fdchannelstr = scu_getChannelNumbers(csname)
+	int cs_index = get_fastdac_index(fdchannelstr, return_adc_index = 0)
 	
+	string corners = ""
 
 	// First go to middle of scan and get charges sensor roughly right (might want to remove this later)
 	variable i
 	
-//	for (i=0; i<ItemsInList(channelx_str, ",");i++)
-//		rampmultipleFDAC(fd, StringFromList(i, channelx_str, ","), str2num(StringFromList(i, x_str, ",")))
-//	endfor
-//	
-//	for (i=0; i<ItemsInList(channely_str, ",");i++)
-//		rampmultipleFDAC(fd, StringFromList(i, channely_str, ","), str2num(StringFromList(i, y_str, ",")))
-//	endfor
 	rampMultipleFDAC(channelx_str, str2num(x_str))
 	rampMultipleFDAC(channely_str, str2num(y_str))
 
 	CorrectChargeSensor(fdchannelstr=csname,fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15)
-
-
 
 
   ///// START GOING TO DIFFERENT CORNERS IN SCAN /////
@@ -361,7 +307,7 @@ function DotTuneAroundVirtual(x_str, y_str, width_x_str, width_y_str, channelx_s
   endfor
   
   CorrectChargeSensor(fdchannelstr=csname,fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15) //added cutoff time so we don't have to wait while de-bugging
-  corners = AddListItem(num2str(fdacvalstr[csq_channel_num][1]), corners, ",", INF)
+  corners = AddListItem(num2str(fdacvalstr[cs_index][1]), corners, ",", INF)
   
   
   
@@ -375,7 +321,7 @@ function DotTuneAroundVirtual(x_str, y_str, width_x_str, width_y_str, channelx_s
   endfor
   
   CorrectChargeSensor(fdchannelstr=csname, fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15) //added cutoff time so we don't have to wait while de-bugging
-  corners = AddListItem(num2str(fdacvalstr[csq_channel_num][1]), corners, ",", INF)
+  corners = AddListItem(num2str(fdacvalstr[cs_index][1]), corners, ",", INF)
   
   
   
@@ -389,7 +335,7 @@ function DotTuneAroundVirtual(x_str, y_str, width_x_str, width_y_str, channelx_s
   endfor
   
   CorrectChargeSensor(fdchannelstr=csname, fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15) //added cutoff time so we don't have to wait while de-bugging
-  corners = AddListItem(num2str(fdacvalstr[csq_channel_num][1]), corners, ",", INF)
+  corners = AddListItem(num2str(fdacvalstr[cs_index][1]), corners, ",", INF)
   
   
   
@@ -403,8 +349,7 @@ function DotTuneAroundVirtual(x_str, y_str, width_x_str, width_y_str, channelx_s
   endfor
   
   CorrectChargeSensor(fdchannelstr=csname, fadcchannel=fadcchannel, check=0, natarget=natarget, direction=1, gate_divider=gate_divider, cutoff_time=15) //added cutoff time so we don't have to wait while de-bugging
-  corners = AddListItem(num2str(fdacvalstr[csq_channel_num][1]), corners, ",", INF)
-  
+  corners = AddListItem(num2str(fdacvalstr[cs_index][1]), corners, ",", INF)
   
   
   
@@ -432,7 +377,7 @@ function DotTuneAroundVirtual(x_str, y_str, width_x_str, width_y_str, channelx_s
   
   	
   	/// DOING VIRTUAL DOT TUNE ///
-	ScanFastDAC2D_virtual( 0, 0, channelx_str, 0, 0, channely_str, numptsy, corners, csname, sweeprate=sweeprate, rampratex=ramprate_x, nosave=nosave, comments="Dot Tuning Virtual, "+additional_comments, startxs=starts_x, finxs=fins_x, startys=starts_y, finys=fins_y, use_AWG=use_AWG)
+	ScanFastDAC2D_virtual(0, 0, channelx_str, 0, 0, channely_str, numptsy, corners, csname, sweeprate=sweeprate, rampratex=ramprate_x, nosave=nosave, comments="Dot Tuning Virtual, "+additional_comments, startxs=starts_x, finxs=fins_x, startys=starts_y, finys=fins_y, use_AWG=use_AWG)
 
 	wave tempwave = $"cscurrent_2d" // This parameter needs to be the same as in the ScanController ADC Wave Name. 
 	nvar filenum
@@ -440,6 +385,8 @@ function DotTuneAroundVirtual(x_str, y_str, width_x_str, width_y_str, channelx_s
 		displaydiff(tempwave, filenum=filenum-1, x_label=channelx_str, y_label=channely_str)
 	endif
 end
+
+
 
 
 function ScanFastDAC2D_virtual(startx, finx, channelsx, starty, finy, channelsy, numptsy, virtual_corners, virtual_gates, [numpts, sweeprate, bdID, rampratex, rampratey, delayy, startxs, finxs, startys, finys, comments, nosave, use_AWG, use_only_corners, interlaced_channels, interlaced_setpoints])
@@ -468,6 +415,7 @@ function ScanFastDAC2D_virtual(startx, finx, channelsx, starty, finy, channelsy,
 	
 	///// If using virtual sweeps only /////
 	///// WARNING DANGEROUS NEED TO PROPERLY DO CHECKS HERE /////
+	print "///// WARNING DANGEROUS NEED TO PROPERLY DO CHECKS HERE /////"
 	string corners, virtual_gate
    	variable c0, c1, c2, c3 
    	
@@ -500,77 +448,44 @@ function ScanFastDAC2D_virtual(startx, finx, channelsx, starty, finy, channelsy,
 	sprintf comments, "%s, virtual_sweep, [virtual_gates=%s, virtual_corners=%s]", comments, virtual_gates, virtual_corners
 
 	struct ScanVars S
- 	if (use_bd == 1)  // Using babydacs as second instrument
-		
-//		initScanVarsFD2(S, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy,\
-//		   				 rampratey=rampratey, startxs=startxs, finxs=finxs, interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints,\
-//		   				 comments=comments)
-//
-//		S.instrIDy = bdID
-//		S.channelsy = scu_getChannelNumbers(channelsy, fastdac=0)
-//		S.y_label = scu_getDacLabel(S.channelsy, fastdac=0)
-//		scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, starty, finy, S.startxs, S.finxs, startys, finys)
+	initScanVarsFD(S, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy,\
+	   				 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys,\
+	   				 interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments, x_only = 0)
 	
-	else  				// Using fastdacs as second instrument
-
-		initScanVarsFD(S, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy,\
-		   				 starty=starty, finy=finy, channelsy=channelsy, rampratey=rampratey, startxs=startxs, finxs=finxs, startys=startys, finys=finys,\
-		   				 interlaced_channels=interlaced_channels, interlaced_setpoints=interlaced_setpoints, comments=comments, x_only = 0)
-
-		s.is2d = 1		   						
-		S.starty = starty
-		S.finy = finy
-		scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, starty, finy, S.startxs, S.finxs, startys, finys)
-		
-	endif
-      
+	s.is2d = 1		   						
+	S.starty = starty
+	S.finy = finy
+	scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, starty, finy, S.startxs, S.finxs, startys, finys)
+  
    ///// Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC ///
    // NOTE: No checks of the virtual gates done here
    PreScanChecksFD(S) 
    	
-   	
-   	// sets master/slave between the devices that are used.
-//	set_master_slave(S)
 	
-	
-   	///// Check virtual gates /////
-   	variable k
-   	for (k=0; k<ItemsInList(virtual_gates, ","); k++)
-   		virtual_gate = scu_getChannelNumbers(StringFromList(k, virtual_gates, ","))
-   		corners = StringFromList(k, virtual_corners, ";")
-   		if (ItemsInList(corners, ",") != 4)
-   			abort "Must specify all 4 corner values for each virtual gate (StartX/Y, FinX/StartY, StartX/FinY, FinX/FinY)"
-   		endif
-   		c0 = str2num(StringFromList(0, corners, ","))
-   		c1 = str2num(StringFromList(1, corners, ","))
-   		c2 = str2num(StringFromList(2, corners, ","))
-   		c3 = str2num(StringFromList(3, corners, ","))
-   		scc_checkLimsSingleFD(virtual_gate, c0, c1)
-   		scc_checkLimsSingleFD(virtual_gate, c2, c3) 
-   		// NOTE: Not checking the sweeprate of virtual gates 		
-   	endfor
+	///// Check virtual gates /////
+	variable k
+	for (k=0; k<ItemsInList(virtual_gates, ","); k++)
+		virtual_gate = scu_getChannelNumbers(StringFromList(k, virtual_gates, ","))
+		corners = StringFromList(k, virtual_corners, ";")
+		if (ItemsInList(corners, ",") != 4)
+			abort "Must specify all 4 corner values for each virtual gate (StartX/Y, FinX/StartY, StartX/FinY, FinX/FinY)"
+		endif
+		c0 = str2num(StringFromList(0, corners, ","))
+		c1 = str2num(StringFromList(1, corners, ","))
+		c2 = str2num(StringFromList(2, corners, ","))
+		c3 = str2num(StringFromList(3, corners, ","))
+		scc_checkLimsSingleFD(virtual_gate, c0, c1)
+		scc_checkLimsSingleFD(virtual_gate, c2, c3) 
+		// NOTE: Not checking the sweeprate of virtual gates 		
+	endfor
 
-   	
-//  	///// If using AWG then get that now and check it /////
-//	struct AWGVars AWG
-//	if(use_AWG)	
-//		fd_getGlobalAWG(AWG)
-//		CheckAWG(AWG, S)  // Note: sets S.numptsx here and AWG.lims_checked = 1
-//	endif
-//	SetAWG(AWG, use_AWG)
-//   
-   
+
    ///// Ramp to start without checks /////
-   if(use_bd == 1)
-//	   RampStartFD(S, x_only=1, ignore_lims=1)
-//	   RampStartBD(S, y_only=1, ignore_lims=1)
-   else
-   	  RampStartFD(S, ignore_lims=1)
-   endif
+  	RampStartFD(S, ignore_lims=1)
+
    	
 
 	///// Ramp Virtual gates to start /////
-	
 	for (k=0; k<ItemsInList(virtual_gates, ","); k++)
 		virtual_gate = scu_getChannelNumbers(StringFromList(k, virtual_gates, ","))
 		string IDname = "" //scc_getDeviceIDs(channels = virtual_gate) //****
@@ -591,7 +506,7 @@ function ScanFastDAC2D_virtual(startx, finx, channelsx, starty, finy, channelsy,
 
 
 	///// Main measurement loop /////
-	variable i=0, j=0
+	variable i = 0, j = 0
 	variable setpointy, sy, fy
 	string chy
 	
@@ -620,33 +535,32 @@ function ScanFastDAC2D_virtual(startx, finx, channelsx, starty, finy, channelsy,
 		///// Calculate new Virtual gates start/end /////
 		for (k=0; k < ItemsInList(virtual_gates, ","); k++)
 			virtual_gate = scu_getChannelNumbers(StringFromList(k, virtual_gates, ","))
-   			corners = StringFromList(k, virtual_corners, ";")
-		   	c0 = str2num(StringFromList(0, corners, ","))
-	   		c1 = str2num(StringFromList(1, corners, ","))
-	   		c2 = str2num(StringFromList(2, corners, ","))
-	   		c3 = str2num(StringFromList(3, corners, ","))
-	   		
-	   		new_start = c0 + (c2-c0) * i / (S.numptsy-1)
+			corners = StringFromList(k, virtual_corners, ";")
+			c0 = str2num(StringFromList(0, corners, ","))
+			c1 = str2num(StringFromList(1, corners, ","))
+			c2 = str2num(StringFromList(2, corners, ","))
+			c3 = str2num(StringFromList(3, corners, ","))
+			
+			new_start = c0 + (c2-c0) * i / (S.numptsy-1)
 			new_fin = c1 + (c3-c1) * i / (S.numptsy-1)
 			
 			S.channelsx = AddListItem(virtual_gate, S.channelsx, ",", INF)
 			S.startxs = AddListItem(num2str(new_start), S.startxs, ",", INF)			
 			S.finxs = AddListItem(num2str(new_fin), S.finxs, ",", INF)	
 			S.dacListIDs = "" //***AddListItem(stringfromlist(0, scc_getDeviceIDs(channels=virtual_gate)), S.dacListIDs, ";", INF) // add virtual_gate device ID to S.dacListIDs (use stringfromlist to strip semicolon)
-   		endfor
+   	endfor
    		
    		
-   		///// Remove the commas Igor puts at the end of lists /////
-   		S.channelsx = S.channelsx[0, strlen(S.channelsx) - 2]  
-   		S.startxs = S.startxs[0, strlen(S.startxs) - 2]
-   		S.finxs = S.finxs[0, strlen(S.finxs) - 2]
-   		
-   		scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, starty, finy, S.startxs, S.finxs, startys, finys)
-   		
-   		///// Loop for interlaced scans ///// 
+		///// Remove the commas Igor puts at the end of lists /////
+		S.channelsx = S.channelsx[0, strlen(S.channelsx) - 2]  
+		S.startxs = S.startxs[0, strlen(S.startxs) - 2]
+		S.finxs = S.finxs[0, strlen(S.finxs) - 2]
+		
+		scv_setSetpoints(S, S.channelsx, S.startx, S.finx, S.channelsy, starty, finy, S.startxs, S.finxs, startys, finys)
+		
+		///// Loop for interlaced scans ///// 
 		if (S.interlaced_y_flag)
 			Ramp_interlaced_channels(S, mod(i, S.interlaced_num_setpoints)) // ***
-//			Set_AWG_state(S, AWG, mod(i, S.interlaced_num_setpoints)) //***
 			///// Ramp slow axis only for first of interlaced setpoints /////
 			if (mod(i, S.interlaced_num_setpoints) == 0)
 				rampToNextSetpoint(S, 0, outer_index=i, y_only=1, ignore_lims=1)
@@ -806,293 +720,282 @@ end
 //////////////////////////////////////////////////////// Generally Useful Scan Functions ////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-function ScanAlongTransition(step_gate, step_size, step_range, center_gate, sweep_gate, sweeprate, repeats, width, [center_step_ratio, centering_width, center_sweep_gate, scan_type, correct_cs_gate, sweep_gate_start, load_datnum, hqpc_bias, ramprate, num, correction_gate, corr_step_ratio, step_gate_isbd, mid, virtual_gate, natarget, additional_Setup, additional_comments])
-	// Scan at many positions along a transition, centering on transition for each scan along the way.
-	// Rather than doing a true scan along transition, this just takes a series of short repeat measurements in small steps. Will make LOTS of dats, but keeps things a lot simpler
-	//
-	// step_gate: Gate to step along transition with. These always do fixed steps, center_gate is used to center back on transition
-	// step_size: mV to step between each repeat scan
-	// step_range: How far to keep stepping in step_gate (i.e. 50 would mean 10 steps for 5mV step size)
-	// center_gate: Gate to use for centering on transition
-	// sweep_gate: Gate to sweep for scan (i.e. plunger or accumulation)
-	// center_step_ratio: Roughly the amount center_gate needs to step to counteract step_gates (will default to 0)
-	// centering_width: How wide to scan for CenterOnTransition
-	// center_sweep_gate: Whether to also center the sweep gate, or just sweep around 0
-	// width: Width of scan around center of transition in sweep_gate (actually sweeps + and - width)
-	// correct_cs_gate: Gate to use for correcting the Charge Sensor
-	// sweep_gate_start: Start point for sweepgate, useful when loading from hdf
-	// hqpc_bias: mV to apply to current bias resistor for square entropy heating
-	// num: Number of times to repeat measurement at each step
-	// correction_gate: Secondary stepping gate for something like a constant gamma scan
-	// corr_step_ratio: Proportion of step gate potential to apply to the correction gate each step
-	// step_gate_isbd: If step gate is on bd, set = 1
-	// mid: center value for sweepgate
-	// natarget: Target nA for current amp
-	// additional_setup: set to 1 to call additionalSetupAfterLoadHDF()  (i.e. useful if LoadfromHDF gets almost all the gates right, and then there a few minor tweaks after that).
-	variable step_size, step_range, center_step_ratio, sweeprate, repeats, center_sweep_gate, width, sweep_gate_start, load_datnum, centering_width, hqpc_bias, ramprate, num, corr_step_ratio, step_gate_isbd, mid, virtual_gate, natarget, additional_setup
-	string step_gate, center_gate, sweep_gate, correct_cs_gate, scan_type, correction_gate, additional_comments
-
-	center_step_ratio = paramisdefault(center_step_ratio) ? 0 : center_step_ratio
-	corr_step_ratio = paramisdefault(corr_step_ratio) ? 0 : corr_step_ratio
-	hqpc_bias = paramisdefault(hqpc_bias) ? 20 : hqpc_bias
-	centering_width = paramIsDefault(centering_width) ? 20 : centering_width
-	scan_type = selectstring(paramIsDefault(scan_type), scan_type, "transition")
-	correct_cs_gate = selectstring(paramIsDefault(correct_cs_gate), correct_cs_gate, "CSQ")
-	ramprate = paramisDefault(ramprate) ? 10*sweeprate : ramprate
-	num =  paramisDefault(num) ? 1 : num
-	step_gate_isbd =  paramisDefault(step_gate_isbd) ? 0 : step_gate_isbd
-	variable step_gate_isfd = !step_gate_isbd
-	mid =  paramisDefault(mid) ? 0 : mid
-	natarget = paramisdefault(natarget) ? 1.5 : natarget
-	
-	variable center_limit = -0  // Above this value in step gate, don't try to center (i.e. gamma broadened)
-	variable correct_cs_fadcchannel = 1
-	variable correct_cs_gate_divider = 19.7
-
-	nvar fd, bd
-
-
-	wave/T fdacvalstr
-	wave/T dacvalstr
-
-	variable sg_val, cg_val, corrg_val, csq_val
-	variable total_scan_range = 0  // To keep track of how far has been scanned
-	variable i = 0
-
-	do
-		// Get DAC val of step_gate
-		sg_val = str2num(dacvalstr[str2num(scu_getChannelNumbers(step_gate))][1])
-
-		
-		// Get DAC val of centering_gate
-		if (cmpstr(center_gate, sweep_gate) == 0)
-			cg_val = mid
-		else
-			cg_val = str2num(fdacvalstr[str2num(scu_getChannelNumbers(center_gate))][1]) //get DAC val of centering_gate
-		endif
-		
-		// Get DAC val of correction_gate
-		if (!paramIsDefault(correction_gate))
-			corrg_val = str2num(fdacvalstr[str2num(scu_getChannelNumbers(correction_gate))][1]) //get DAC val of correction_gate
-		endif
-
-		// Reset sweepgate
-		rampMultipleFDAC(sweep_gate, mid)
-
-		// Ramp step_gate (and correction_gate) to next value
-		if (i != 0)
-			RampMultiplefdac(step_gate, sg_val+step_size)
-
-			cg_val += step_size*center_step_ratio
-			RampMultiplefdac(center_gate, cg_val)
-			total_scan_range += step_size
-			if (!paramIsDefault(correction_gate))
-				RampMultiplefdac(correction_gate, corrg_val+step_size*corr_step_ratio)
-			endif
-			sg_val = sg_val+step_size
-		endif
-		
-		// Center and correct charge sensor
-		if (cmpstr(center_gate, sweep_gate) != 0)
-			RampMultiplefdac(sweep_gate, mid-50)
-		else
-			mid = cg_val
-		endif
-		
-		CorrectChargeSensor(fdchannelstr=correct_cs_gate, fadcchannel=correct_cs_fadcchannel, check=0, direction=1, natarget=natarget, gate_divider=correct_cs_gate_divider)
-		RampMultiplefdac(sweep_gate, mid)
-		if(sg_val < center_limit)
-			cg_val = CenterOnTransition(gate=center_gate, width=centering_width, single_only=1)
-			if (cmpstr(center_gate, sweep_gate) != 0)
-				RampMultiplefdac(sweep_gate, mid-200)
-				CorrectChargeSensor(fdchannelstr=correct_cs_gate, fadcchannel=correct_cs_fadcchannel, check=0, direction=1, natarget=natarget, gate_divider=correct_cs_gate_divider)
-				RampMultiplefdac(sweep_gate, mid)
-				cg_val = CenterOnTransition(gate=center_gate, width=centering_width, single_only=1)
-			else
-				CorrectChargeSensor(fdchannelstr=correct_cs_gate, fadcchannel=correct_cs_fadcchannel, check=0, direction=1, natarget=natarget, gate_divider=correct_cs_gate_divider)
-				cg_val = CenterOnTransition(gate=center_gate, width=centering_width, single_only=1)
-			endif
-		endif
-		
-		if (cmpstr(center_gate, sweep_gate) == 0)  // If center gate is also sweep gate, then need to get new mid cg_val
-			mid = cg_val
-		endif
-		
-		if (center_sweep_gate)
-			mid = CenterOnTransition(gate=sweep_gate, width=width, single_only=1)
-		endif
-
-		RampMultiplefdac(sweep_gate, mid-200)
-		CorrectChargeSensor(fdchannelstr=correct_cs_gate, fadcchannel=correct_cs_fadcchannel, check=0, direction=1, natarget=natarget, gate_divider=correct_cs_gate_divider)
-
-		string virtual_mids
-		strswitch (scan_type)
-			case "center_test":
-				ScanFastDAC( -1000, 1000, "ACC*400", sweeprate=10000, nosave=1)
-				rampmultiplefdac("ACC*400", 0)
-				break
-			case "transition":
-				ScanTransition(sweep_gate=sweep_gate, sweeprate=sweeprate, width=width, ramprate=ramprate, repeats=repeats, center_first=center_sweep_gate, mid=mid, alternate=1, additional_comments=additional_comments)
-				break
-			case "noise+transition":
-				NoiseOnOffTransition(num_repeats=1)
-				ScanTransition(sweeprate=sweeprate, width=width, ramprate=ramprate, repeats=repeats, center_first=center_sweep_gate, mid=mid, alternate=1)
-				break
-			case "noise":
-				NoiseOnOffTransition(num_repeats=1)			
-				break
-			case "dcbias_transition":
-				rampmultipleFDAC("OHC(10M)", hqpc_bias)
-				rampmultipleFDAC("OHV*1000", hqpc_bias*-1.478)
-				ScanTransition(sweeprate=sweeprate, width=width, ramprate=ramprate, repeats=repeats, center_first=center_sweep_gate, mid=mid, additional_comments="dcbias="+num2str(hqpc_bias))
-				break
-			case "entropy":
-				ScanEntropyRepeat(center_first=0, balance_multiplier=1, width=width, hqpc_bias=hqpc_bias, additional_comments=", scan along transition, scan:"+num2str(i), sweeprate=sweeprate, repeats=repeats, num=num, center=mid)
-				break
-			case "noise+entropy":
-				NoiseOnOffTransition(num_repeats=1)
-				ScanEntropyRepeat(center_first=0, balance_multiplier=1, width=width, hqpc_bias=hqpc_bias, additional_comments=", scan along transition, scan:"+num2str(i), sweeprate=sweeprate, repeats=repeats, num=num, center=mid)
-				break
-			case "entropy+transition":
-				ScanEntropyRepeat(center_first=0, balance_multiplier=1, width=width, hqpc_bias=hqpc_bias, additional_comments=", scan along transition, scan:"+num2str(i), sweeprate=sweeprate, repeats=repeats, num=num, center=mid)
-				ScanTransition(sweeprate=sweeprate*50, width=width*1.5, repeats=repeats*5, center_first=0, additional_comments=", scan along transition, scan:"+num2str(i), mid=mid)
-				break
-			case "csq only":
-				RampMultiplefdac("ACC*1000", -10000)
-				csq_val = str2num(fdacvalstr[str2num(scu_getChannelNumbers("CSQ"))][1])
-				ScanFastDAC( csq_val-50, csq_val+50, "CSQ", sweeprate=100, nosave=0, comments="charge sensor trace")
-				RampMultiplefdac("ACC*1000", 0)
-				RampMultiplefdac("CSQ", csq_val)
-				break
-			default:
-				abort scan_type + " not recognized"
-		endswitch
-		i++
-
-	while (total_scan_range + step_size <= step_range)
-
-end
+//function ScanAlongTransition(step_gate, step_size, step_range, center_gate, sweep_gate, sweeprate, repeats, width, [center_step_ratio, centering_width, center_sweep_gate, scan_type, correct_cs_gate, sweep_gate_start, load_datnum, hqpc_bias, ramprate, num, correction_gate, corr_step_ratio, step_gate_isbd, mid, virtual_gate, natarget, additional_Setup, additional_comments])
+//	// Scan at many positions along a transition, centering on transition for each scan along the way.
+//	// Rather than doing a true scan along transition, this just takes a series of short repeat measurements in small steps. Will make LOTS of dats, but keeps things a lot simpler
+//	//
+//	// step_gate: Gate to step along transition with. These always do fixed steps, center_gate is used to center back on transition
+//	// step_size: mV to step between each repeat scan
+//	// step_range: How far to keep stepping in step_gate (i.e. 50 would mean 10 steps for 5mV step size)
+//	// center_gate: Gate to use for centering on transition
+//	// sweep_gate: Gate to sweep for scan (i.e. plunger or accumulation)
+//	// center_step_ratio: Roughly the amount center_gate needs to step to counteract step_gates (will default to 0)
+//	// centering_width: How wide to scan for CenterOnTransition
+//	// center_sweep_gate: Whether to also center the sweep gate, or just sweep around 0
+//	// width: Width of scan around center of transition in sweep_gate (actually sweeps + and - width)
+//	// correct_cs_gate: Gate to use for correcting the Charge Sensor
+//	// sweep_gate_start: Start point for sweepgate, useful when loading from hdf
+//	// hqpc_bias: mV to apply to current bias resistor for square entropy heating
+//	// num: Number of times to repeat measurement at each step
+//	// correction_gate: Secondary stepping gate for something like a constant gamma scan
+//	// corr_step_ratio: Proportion of step gate potential to apply to the correction gate each step
+//	// step_gate_isbd: If step gate is on bd, set = 1
+//	// mid: center value for sweepgate
+//	// natarget: Target nA for current amp
+//	// additional_setup: set to 1 to call additionalSetupAfterLoadHDF()  (i.e. useful if LoadfromHDF gets almost all the gates right, and then there a few minor tweaks after that).
+//	variable step_size, step_range, center_step_ratio, sweeprate, repeats, center_sweep_gate, width, sweep_gate_start, load_datnum, centering_width, hqpc_bias, ramprate, num, corr_step_ratio, step_gate_isbd, mid, virtual_gate, natarget, additional_setup
+//	string step_gate, center_gate, sweep_gate, correct_cs_gate, scan_type, correction_gate, additional_comments
+//
+//	center_step_ratio = paramisdefault(center_step_ratio) ? 0 : center_step_ratio
+//	corr_step_ratio = paramisdefault(corr_step_ratio) ? 0 : corr_step_ratio
+//	hqpc_bias = paramisdefault(hqpc_bias) ? 20 : hqpc_bias
+//	centering_width = paramIsDefault(centering_width) ? 20 : centering_width
+//	scan_type = selectstring(paramIsDefault(scan_type), scan_type, "transition")
+//	correct_cs_gate = selectstring(paramIsDefault(correct_cs_gate), correct_cs_gate, "CSQ")
+//	ramprate = paramisDefault(ramprate) ? 10*sweeprate : ramprate
+//	num =  paramisDefault(num) ? 1 : num
+//	step_gate_isbd =  paramisDefault(step_gate_isbd) ? 0 : step_gate_isbd
+//	variable step_gate_isfd = !step_gate_isbd
+//	mid =  paramisDefault(mid) ? 0 : mid
+//	natarget = paramisdefault(natarget) ? 1.5 : natarget
+//	
+//	variable center_limit = -0  // Above this value in step gate, don't try to center (i.e. gamma broadened)
+//	variable correct_cs_fadcchannel = 1
+//	variable correct_cs_gate_divider = 19.7
+//
+//	nvar fd, bd
+//
+//
+//	wave/T fdacvalstr
+//	wave/T dacvalstr
+//
+//	variable sg_val, cg_val, corrg_val, csq_val
+//	variable total_scan_range = 0  // To keep track of how far has been scanned
+//	variable i = 0
+//
+//	do
+//		// Get DAC val of step_gate
+//		sg_val = str2num(dacvalstr[str2num(scu_getChannelNumbers(step_gate))][1])
+//
+//		
+//		// Get DAC val of centering_gate
+//		if (cmpstr(center_gate, sweep_gate) == 0)
+//			cg_val = mid
+//		else
+//			cg_val = str2num(fdacvalstr[str2num(scu_getChannelNumbers(center_gate))][1]) //get DAC val of centering_gate
+//		endif
+//		
+//		// Get DAC val of correction_gate
+//		if (!paramIsDefault(correction_gate))
+//			corrg_val = str2num(fdacvalstr[str2num(scu_getChannelNumbers(correction_gate))][1]) //get DAC val of correction_gate
+//		endif
+//
+//		// Reset sweepgate
+//		rampMultipleFDAC(sweep_gate, mid)
+//
+//		// Ramp step_gate (and correction_gate) to next value
+//		if (i != 0)
+//			RampMultiplefdac(step_gate, sg_val+step_size)
+//
+//			cg_val += step_size*center_step_ratio
+//			RampMultiplefdac(center_gate, cg_val)
+//			total_scan_range += step_size
+//			if (!paramIsDefault(correction_gate))
+//				RampMultiplefdac(correction_gate, corrg_val+step_size*corr_step_ratio)
+//			endif
+//			sg_val = sg_val+step_size
+//		endif
+//		
+//		// Center and correct charge sensor
+//		if (cmpstr(center_gate, sweep_gate) != 0)
+//			RampMultiplefdac(sweep_gate, mid-50)
+//		else
+//			mid = cg_val
+//		endif
+//		
+//		CorrectChargeSensor(fdchannelstr=correct_cs_gate, fadcchannel=correct_cs_fadcchannel, check=0, direction=1, natarget=natarget, gate_divider=correct_cs_gate_divider)
+//		RampMultiplefdac(sweep_gate, mid)
+//		if(sg_val < center_limit)
+//			cg_val = CenterOnTransition(gate=center_gate, width=centering_width, single_only=1)
+//			if (cmpstr(center_gate, sweep_gate) != 0)
+//				RampMultiplefdac(sweep_gate, mid-200)
+//				CorrectChargeSensor(fdchannelstr=correct_cs_gate, fadcchannel=correct_cs_fadcchannel, check=0, direction=1, natarget=natarget, gate_divider=correct_cs_gate_divider)
+//				RampMultiplefdac(sweep_gate, mid)
+//				cg_val = CenterOnTransition(gate=center_gate, width=centering_width, single_only=1)
+//			else
+//				CorrectChargeSensor(fdchannelstr=correct_cs_gate, fadcchannel=correct_cs_fadcchannel, check=0, direction=1, natarget=natarget, gate_divider=correct_cs_gate_divider)
+//				cg_val = CenterOnTransition(gate=center_gate, width=centering_width, single_only=1)
+//			endif
+//		endif
+//		
+//		if (cmpstr(center_gate, sweep_gate) == 0)  // If center gate is also sweep gate, then need to get new mid cg_val
+//			mid = cg_val
+//		endif
+//		
+//		if (center_sweep_gate)
+//			mid = CenterOnTransition(gate=sweep_gate, width=width, single_only=1)
+//		endif
+//
+//		RampMultiplefdac(sweep_gate, mid-200)
+//		CorrectChargeSensor(fdchannelstr=correct_cs_gate, fadcchannel=correct_cs_fadcchannel, check=0, direction=1, natarget=natarget, gate_divider=correct_cs_gate_divider)
+//
+//		string virtual_mids
+//		strswitch (scan_type)
+//			case "center_test":
+//				ScanFastDAC( -1000, 1000, "ACC*400", sweeprate=10000, nosave=1)
+//				rampmultiplefdac("ACC*400", 0)
+//				break
+//			case "transition":
+//				ScanTransition(sweep_gate=sweep_gate, sweeprate=sweeprate, width=width, ramprate=ramprate, repeats=repeats, center_first=center_sweep_gate, mid=mid, alternate=1, additional_comments=additional_comments)
+//				break
+//			case "dcbias_transition":
+//				rampmultipleFDAC("OHC(10M)", hqpc_bias)
+//				rampmultipleFDAC("OHV*1000", hqpc_bias*-1.478)
+//				ScanTransition(sweeprate=sweeprate, width=width, ramprate=ramprate, repeats=repeats, center_first=center_sweep_gate, mid=mid, additional_comments="dcbias="+num2str(hqpc_bias))
+//				break
+//			case "entropy":
+//				ScanEntropyRepeat(center_first=0, balance_multiplier=1, width=width, hqpc_bias=hqpc_bias, additional_comments=", scan along transition, scan:"+num2str(i), sweeprate=sweeprate, repeats=repeats, num=num, center=mid)
+//				break
+//			case "entropy+transition":
+//				ScanEntropyRepeat(center_first=0, balance_multiplier=1, width=width, hqpc_bias=hqpc_bias, additional_comments=", scan along transition, scan:"+num2str(i), sweeprate=sweeprate, repeats=repeats, num=num, center=mid)
+//				ScanTransition(sweeprate=sweeprate*50, width=width*1.5, repeats=repeats*5, center_first=0, additional_comments=", scan along transition, scan:"+num2str(i), mid=mid)
+//				break
+//			case "csq only":
+//				RampMultiplefdac("ACC*1000", -10000)
+//				csq_val = str2num(fdacvalstr[str2num(scu_getChannelNumbers("CSQ"))][1])
+//				ScanFastDAC( csq_val-50, csq_val+50, "CSQ", sweeprate=100, nosave=0, comments="charge sensor trace")
+//				RampMultiplefdac("ACC*1000", 0)
+//				RampMultiplefdac("CSQ", csq_val)
+//				break
+//			default:
+//				abort scan_type + " not recognized"
+//		endswitch
+//		i++
+//
+//	while (total_scan_range + step_size <= step_range)
+//
+//end
 
 
 
-function TimStepTempScanSomething()
-	nvar fd
-	svar ls370
-
-	make/o targettemps =  {300, 275, 250, 225, 200, 175, 150, 125, 100, 75, 50, 40, 30, 20}
-	make/o targettemps =  {300, 250, 200, 150, 100, 75, 50, 35}
-//   make/o targettemps =  {50, 100, 150, 200, 250, 300}
-	setLS370exclusivereader(ls370,"mc")
-
-   // Scan at current temp
-//	ScanTransition(sweeprate=width/5, width=width, repeats=100, center_first=1, center_gate="ACC*2", center_width=10, sweep_gate="ACC*400", csqpc_gate="CSQ", additional_comments="Temp = " + num2str(targettemps[i]) + " mK")
-   ScanTransition(sweeprate=500, width=1000, repeats=2, center_first=1, center_gate="P*2", center_width=20, sweep_gate="P*200",alternate=1)
-    
-	variable width
-	variable i=0
-	do
-		setLS370temp(ls370,targettemps[i])
-		asleep(2.0)
-		WaitTillTempStable(ls370, targettemps[i], 5, 20, 0.10)
-		asleep(60.0)
-		print "MEASURE AT: "+num2str(targettemps[i])+"mK"
-
-		// Scan Goes here
-		width = max(100, 4*targettemps[i])
-		ScanTransition(sweeprate=width/5, width=width, repeats=100, center_first=1, center_gate="ACC*2", center_width=10, sweep_gate="ACC*400", csqpc_gate="CSQ", additional_comments="Temp = " + num2str(targettemps[i]) + " mK")
-		//////////////////////
-		i+=1
-	while ( i<numpnts(targettemps) )
-
-	// kill temperature control
-
-
-//	setLS370heaterOff(ls370)
-	setLS370temp(ls370,10)
-	resetLS370exclusivereader(ls370)
-	asleep(60.0*60)
-
-	// Base T Scan goes here
-	width = 100
-	ScanTransition(sweeprate=width/5, width=width, repeats=100, center_first=1, center_gate="ACC*2", center_width=10, sweep_gate="ACC*400", csqpc_gate="CSQ", additional_comments="Temp = 10 mK")
-	/////////////////////////////////
-end
-
-
-function ScanEntropyRepeat([num, center_first, balance_multiplier, width, hqpc_bias, additional_comments, repeat_multiplier, freq, sweeprate, repeats, cs_target, center, cycles])
-	variable num, center_first, balance_multiplier, width, hqpc_bias, repeat_multiplier, freq, sweeprate, repeats, cs_target, center, cycles
-	string additional_comments
-	nvar fd
-
-	num = paramisdefault(num) ? 										INF : num
-	center_first = paramisdefault(center_first) ? 				0 : center_first
-	balance_multiplier = paramisdefault(balance_multiplier) ? 	1 : balance_multiplier
-	hqpc_bias = paramisdefault(hqpc_bias) ? 						20 : hqpc_bias
-	repeat_multiplier = paramisDefault(repeat_multiplier) ? 	1 : repeat_multiplier
-	sweeprate = paramisdefault(sweeprate) ? 						100 : sweeprate
-	freq = paramisdefault(freq) ? 									12.5 : freq
-	center = paramisdefault(center) ? 								0 : center
-	cycles = paramisdefault(cycles) ? 								1 : cycles
+//function TimStepTempScanSomething()
+//	nvar fd
+//	svar ls370
+//
+//	make/o targettemps =  {300, 275, 250, 225, 200, 175, 150, 125, 100, 75, 50, 40, 30, 20}
+//	make/o targettemps =  {300, 250, 200, 150, 100, 75, 50, 35}
+////   make/o targettemps =  {50, 100, 150, 200, 250, 300}
+//	setLS370exclusivereader(ls370,"mc")
+//
+//   // Scan at current temp
+////	ScanTransition(sweeprate=width/5, width=width, repeats=100, center_first=1, center_gate="ACC*2", center_width=10, sweep_gate="ACC*400", csqpc_gate="CSQ", additional_comments="Temp = " + num2str(targettemps[i]) + " mK")
+//   ScanTransition(sweeprate=500, width=1000, repeats=2, center_first=1, center_gate="P*2", center_width=20, sweep_gate="P*200",alternate=1)
+//    
+//	variable width
+//	variable i=0
+//	do
+//		setLS370temp(ls370,targettemps[i])
+//		asleep(2.0)
+//		WaitTillTempStable(ls370, targettemps[i], 5, 20, 0.10)
+//		asleep(60.0)
+//		print "MEASURE AT: "+num2str(targettemps[i])+"mK"
+//
+//		// Scan Goes here
+//		width = max(100, 4*targettemps[i])
+//		ScanTransition(sweeprate=width/5, width=width, repeats=100, center_first=1, center_gate="ACC*2", center_width=10, sweep_gate="ACC*400", csqpc_gate="CSQ", additional_comments="Temp = " + num2str(targettemps[i]) + " mK")
+//		//////////////////////
+//		i+=1
+//	while ( i<numpnts(targettemps) )
+//
+//	// kill temperature control
+//
+//
+////	setLS370heaterOff(ls370)
+//	setLS370temp(ls370,10)
+//	resetLS370exclusivereader(ls370)
+//	asleep(60.0*60)
+//
+//	// Base T Scan goes here
+//	width = 100
+//	ScanTransition(sweeprate=width/5, width=width, repeats=100, center_first=1, center_gate="ACC*2", center_width=10, sweep_gate="ACC*400", csqpc_gate="CSQ", additional_comments="Temp = 10 mK")
+//	/////////////////////////////////
+//end
 
 
-	string sweepgate = "ACC*400"
-	variable sweepgate_center_width = 500
-	string centergate = "ACC*2"
-	variable center_width = 30
-
-	nvar sc_ResampleFreqCheckfadc
-	variable resample_state = sc_ResampleFreqCheckfadc
-	sc_ResampleFreqCheckfadc = 0  // Resampling in entropy measurements screws things up at the moment so turn it off (2021-12-02)
-
-	variable nosave = 0
-
-	variable width1 = paramisdefault(width) ? 1000 : width
-	
-	string comments = "transition, square entropy, repeat, "
-	if (!paramisdefault(additional_comments))
-		sprintf comments, "%s%s, ", comments, additional_comments
-	endif
-
-	variable splus = hqpc_bias, sminus=-hqpc_bias
-	SetupEntropySquareWaves(freq=freq, cycles=cycles, hqpc_plus=splus, hqpc_minus=sminus, balance_multiplier=balance_multiplier)
-
-//	variable cplus=-splus*0.031 * balance_multiplier, cminus=-sminus*0.031 * balance_multiplier
-//	SetupEntropySquareWaves_unequal(freq=freq, hqpc_plus=splus, hqpc_minus=sminus, balance_multiplier=balance_multiplier)
-
-	variable mid, r
-	if (center_first)
-		rampMultipleFDAC(sweepgate, center)
-		centerontransition(gate=centergate, width=center_width)
-		rampMultipleFDAC(sweepgate, center-200)
-		if (!paramisdefault(cs_target))
-			CorrectChargeSensor(fdchannelstr="CSQ", fadcchannel=0, check=0, direction=1, natarget=cs_target)
-		else
-			CorrectChargeSensor(fdchannelstr="CSQ", fadcchannel=0, check=0, direction=1)
-		endif
-		rampMultipleFDAC(sweepgate, center)
-		mid = centerontransition(gate=sweepgate, width=sweepgate_center_width, single_only=1)
-		if (numtype(mid) == 2)
-			mid = center
-		endif
-	else
-		mid = center
-	endif
-
-	variable i=0
-	string virtual_starts_ends
-	do
-		if(paramisdefault(num))
-			printf "Starting scan %d of \u221E\r", i+1
-		else
-			printf "Starting scan %d of %d\r", i+1, num
-		endif
-		ScanFastDAC( mid-width1, mid+width1, sweepgate, repeats=repeats, sweeprate=sweeprate, delay=0.1, alternate=0, comments=comments, use_awg=1,  nosave=nosave)
-		
-		rampMultipleFDAC(sweepgate, mid)
-		i++
-	while (i<num)
-	sc_ResampleFreqCheckfadc = resample_state
-end
+//function ScanEntropyRepeat([num, center_first, balance_multiplier, width, hqpc_bias, additional_comments, repeat_multiplier, freq, sweeprate, repeats, cs_target, center, cycles])
+//	variable num, center_first, balance_multiplier, width, hqpc_bias, repeat_multiplier, freq, sweeprate, repeats, cs_target, center, cycles
+//	string additional_comments
+//	nvar fd
+//
+//	num = paramisdefault(num) ? 										INF : num
+//	center_first = paramisdefault(center_first) ? 				0 : center_first
+//	balance_multiplier = paramisdefault(balance_multiplier) ? 	1 : balance_multiplier
+//	hqpc_bias = paramisdefault(hqpc_bias) ? 						20 : hqpc_bias
+//	repeat_multiplier = paramisDefault(repeat_multiplier) ? 	1 : repeat_multiplier
+//	sweeprate = paramisdefault(sweeprate) ? 						100 : sweeprate
+//	freq = paramisdefault(freq) ? 									12.5 : freq
+//	center = paramisdefault(center) ? 								0 : center
+//	cycles = paramisdefault(cycles) ? 								1 : cycles
+//
+//
+//	string sweepgate = "ACC*400"
+//	variable sweepgate_center_width = 500
+//	string centergate = "ACC*2"
+//	variable center_width = 30
+//
+//	nvar sc_ResampleFreqCheckfadc
+//	variable resample_state = sc_ResampleFreqCheckfadc
+//	sc_ResampleFreqCheckfadc = 0  // Resampling in entropy measurements screws things up at the moment so turn it off (2021-12-02)
+//
+//	variable nosave = 0
+//
+//	variable width1 = paramisdefault(width) ? 1000 : width
+//	
+//	string comments = "transition, square entropy, repeat, "
+//	if (!paramisdefault(additional_comments))
+//		sprintf comments, "%s%s, ", comments, additional_comments
+//	endif
+//
+//	variable splus = hqpc_bias, sminus=-hqpc_bias
+//	AWG_SetupEntropySquareWaves(freq=freq, cycles=cycles, hqpc_plus=splus, hqpc_minus=sminus, balance_multiplier=balance_multiplier)
+//
+////	variable cplus=-splus*0.031 * balance_multiplier, cminus=-sminus*0.031 * balance_multiplier
+////	AWG_SetupEntropySquareWaves_unequal(freq=freq, hqpc_plus=splus, hqpc_minus=sminus, balance_multiplier=balance_multiplier)
+//
+//	variable mid, r
+//	if (center_first)
+//		rampMultipleFDAC(sweepgate, center)
+//		centerontransition(gate=centergate, width=center_width)
+//		rampMultipleFDAC(sweepgate, center-200)
+//		if (!paramisdefault(cs_target))
+//			CorrectChargeSensor(fdchannelstr="CSQ", fadcchannel=0, check=0, direction=1, natarget=cs_target)
+//		else
+//			CorrectChargeSensor(fdchannelstr="CSQ", fadcchannel=0, check=0, direction=1)
+//		endif
+//		rampMultipleFDAC(sweepgate, center)
+//		mid = centerontransition(gate=sweepgate, width=sweepgate_center_width, single_only=1)
+//		if (numtype(mid) == 2)
+//			mid = center
+//		endif
+//	else
+//		mid = center
+//	endif
+//
+//	variable i=0
+//	string virtual_starts_ends
+//	do
+//		if(paramisdefault(num))
+//			printf "Starting scan %d of \u221E\r", i+1
+//		else
+//			printf "Starting scan %d of %d\r", i+1, num
+//		endif
+//		ScanFastDAC( mid-width1, mid+width1, sweepgate, repeats=repeats, sweeprate=sweeprate, delay=0.1, alternate=0, comments=comments, use_awg=1,  nosave=nosave)
+//		
+//		rampMultipleFDAC(sweepgate, mid)
+//		i++
+//	while (i<num)
+//	sc_ResampleFreqCheckfadc = resample_state
+//end
 
 
 
@@ -1129,7 +1032,7 @@ function ScanTransition([num_scans, sweeprate, width, ramprate, repeats, center_
 			   	rampMultipleFDAC(virtual_gates, str2num(virtual_mids)) // ramp virtual gates
 			endif
 			rampMultipleFDAC(sweep_gate, mid)
-			center_gate_mid = centerontransition(gate=center_gate, width=center_width, single_only=1)
+			center_gate_mid = CT_CenterOnTransition(gate=center_gate, width=center_width, single_only=1)
 			mid = (cmpstr(center_gate, sweep_gate) == 0) ? center_gate_mid : mid  // If centering with sweepgate, update the mid value
 			
 			printf "Centered at %s=%.2f mV\r" center_gate, center_gate_mid
@@ -1156,7 +1059,7 @@ function ScanTransition([num_scans, sweeprate, width, ramprate, repeats, center_
 		
 		if (!paramisdefault(virtual_gates) && !paramisdefault(virtual_mids))
 			string starts, fins, sweep_channels
-			calculate_virtual_starts_fins_using_ratio(mid, width, sweep_gate, virtual_gates, virtual_mids, virtual_ratios, sweep_channels, starts, fins)	
+			virtual_calculate_virtual_starts_fins_using_ratio(mid, width, sweep_gate, virtual_gates, virtual_mids, virtual_ratios, sweep_channels, starts, fins)	
 		
 			ScanFastDAC(0, 0, sweep_channels, repeats=repeats, sweeprate=sweeprate, ramprate=ramprate, starts=starts, fins=fins, delay=delayy, comments=comments + additional_comments, alternate=alternate, nosave=nosave, use_AWG=use_AWG)
 			rampMultipleFDAC(virtual_gates, str2num(virtual_mids))
@@ -1171,9 +1074,14 @@ function ScanTransition([num_scans, sweeprate, width, ramprate, repeats, center_
 end
 
 
+
+
 function ScanWithVirtualRatios(mid_x, width_x, channelx, sweeprate, [comments, mid_y, width_y, channely, numptsy, virtual_x_gates, virtual_x_ratios, virtual_x_mids, virtual_y_gates, virtual_y_ratios, virtual_y_mids, delayy, repeats, alternate, interlaced_channels, interlaced_setpoints, use_awg]) 
 	// Basically a wrapper for the usual scan functions to allow for using virtual gates where the sweep ratio is known, but the exact start/end values are not
 	// Note: channelx (and channely) are intended to be a single channel only, if you want multiple channels to sweep the same, just add the second as a virtual gate with ratio 1
+	// ex USE ::
+	// ScanWithVirtualRatios(0, 10000, "P*200", sweeprate, repeats=repeats, virtual_x_gates="CSQ*20", virtual_x_ratios=num2str(-0.14), virtual_x_mids="0", delayy=0.1,  use_awg=use_awg)
+
 	variable mid_x, width_x, sweeprate, mid_y, width_y, numptsy, delayy, repeats, alternate, use_awg
 	string channelx, channely, comments, virtual_x_gates, virtual_x_ratios, virtual_x_mids, virtual_y_gates, virtual_y_ratios, virtual_y_mids, interlaced_channels, interlaced_setpoints
 
@@ -1186,7 +1094,7 @@ function ScanWithVirtualRatios(mid_x, width_x, channelx, sweeprate, [comments, m
 	//// Xs
 	string channelsx, startxs, finxs
 	if (!paramIsDefault(virtual_x_gates))
-		calculate_virtual_starts_fins_using_ratio(mid_x, width_x, channelx, virtual_x_gates, virtual_x_mids, virtual_x_ratios, channelsx, startxs, finxs)
+		virtual_calculate_virtual_starts_fins_using_ratio(mid_x, width_x, channelx, virtual_x_gates, virtual_x_mids, virtual_x_ratios, channelsx, startxs, finxs)
 	else
 		channelsx = channelx
 		startxs = num2str(mid_x - width_x)
@@ -1198,7 +1106,7 @@ function ScanWithVirtualRatios(mid_x, width_x, channelx, sweeprate, [comments, m
 		string channelsy, startys, finys	
 		//// IF USING VIRTUAL Ys ////
 		if (!paramIsDefault(virtual_y_gates))
-			calculate_virtual_starts_fins_using_ratio(mid_y, width_y, channely, virtual_y_gates, virtual_y_mids, virtual_y_ratios, channelsy, startys, finys)
+			virtual_calculate_virtual_starts_fins_using_ratio(mid_y, width_y, channely, virtual_y_gates, virtual_y_mids, virtual_y_ratios, channelsy, startys, finys)
 		else
 			channelsy = channely
 			startys = num2str(mid_y - width_y)
@@ -1238,9 +1146,7 @@ end
 
 
 
-function ScanTransitionMany()
-	nvar fd
-
+function TEMPLATE_ScanTransitionMany()
 	make/o/free Var1  = {-440, 	-410,	-400,	-385,	-356,	-331,	-307,	-281,	-257,	-231,	-205}  // ACC*2
 	make/o/free Var1b = {-25, 	-100,	-150,	-200,	-300,	-400,	-500,	-600,	-700,	-800,	-900}  // SDP
 	make/o/free Var2 = {0}
@@ -1262,17 +1168,16 @@ function ScanTransitionMany()
 
 	variable i, j, k, repeats
 	i = istart; j=jstart; k=kstart
-	for(k=kstart;k<kfin;k++)  // Loop for change k var 3
+	for(k=kstart; k<kfin; k++)  // Loop for change k var 3
 		kstart = 0
-		for(j=jstart;j<jfin;j++)	// Loop for change j var2
+		for(j=jstart; j<jfin; j++)	// Loop for change j var2
 			jstart = 0
-			for(i=istart;i<ifin;i++) // Loop for changing i var1 and running scan
+			for(i=istart; i<ifin; i++) // Loop for changing i var1 and running scan
 				istart = 0
 				printf "Starting scan at i=%d, SDP = %.1fmV \r", i, Var1b[i]
 				rampMultipleFDAC("ACC*2", Var1[i])
 				rampMultipleFDAC("SDP", Var1b[i])
 				for(repeats=0;repeats<1;repeats++)
-//					ScanEntropyRepeat(num=1, center_first=1, balance_multiplier=1, width=200, hqpc_bias=25, additional_comments="0->1 transition", repeat_multiplier=1, freq=12.5, sweeprate=25, two_part=0, repeats=5, center=0)
 					ScanTransition(sweeprate=25, width=400, repeats=2, center_first=1, center_gate="ACC*2", center_width=20, sweep_gate="ACC*400", additional_comments="rough check before entropy scans", csqpc_gate="CSQ")
 				endfor
 			endfor
@@ -1283,71 +1188,16 @@ function ScanTransitionMany()
 end
 
 
+
+
 ///////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////// MISCELLANEOUS /////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////
-
-function DCbiasRepeats(max_current, num_steps, duration, [voltage_ratio])
-	// DCBias measurements with ScanFastDACRepeat at each value (rather than a continuously changing 2D plot)
-	// Note: Assumes already lined up on transition
-	variable max_current // Max current in nA through heater
-	variable num_steps  // Number of steps from 0 -> max_current
-	variable duration  // Duration of scan at each step
-	variable voltage_ratio  // Proportional Voltage to use to offset potential created by current bias (all in mV from DAC)
-
-	voltage_ratio = paramisDefault(voltage_ratio) ? 1.478 : voltage_ratio
-	variable current_resistor = 10 // Mohms of resistance current bias is driven through
-	variable scan_width = 500
-	variable sweeprate = 2000
-	string current_channel = "OHC(10M)"
-	string voltage_channel = "OHV*1000"
-
-	string comments
-	variable repeats
-
-	repeats = round((duration/(scan_width*2/sweeprate)))  // Desired duration / (scan width/sweeprate)
-
-	// Measure with zero bias
-	rampMultipleFDAC(current_channel, 0)
-	rampMultipleFDAC(voltage_channel, 0)
-	sprintf comments, "DCbias Repeat, zero bias"
-	ScanFastDAC(-scan_width, scan_width, "ACC*400", repeats=repeats, sweeprate=sweeprate, comments=comments, nosave=0)
-
-	// Measure with non-zero bias
-	variable setpoint
-	variable i
-	for (i=1; i<num_steps+1; i++)  // Start from 1 for only non-zero bias
-		setpoint = i*(max_current*10/num_steps)
-
-		// Measure positive bias
-		rampmultipleFDAC(current_channel, setpoint)
-		rampmultipleFDAC(voltage_channel, -setpoint*voltage_ratio)
-		sprintf comments, "DCbias Repeat, %.3f nA" setpoint/current_resistor
-		ScanFastDAC(-scan_width, scan_width, "ACC*400", repeats=repeats, sweeprate=sweeprate, comments=comments, nosave=0)
-
-		// Measure negative bias
-		rampmultipleFDAC(current_channel, -setpoint)
-		rampmultipleFDAC(voltage_channel, setpoint*voltage_ratio)
-		sprintf comments, "DCbias Repeat, %.3f nA" -setpoint/current_resistor
-		ScanFastDAC(-scan_width, scan_width, "ACC*400", repeats=repeats, sweeprate=sweeprate, comments=comments, nosave=0)
-
-	endfor
-
-	// Return to zero heating
-	rampmultipleFDAC(current_channel, 0)
-	rampmultipleFDAC(voltage_channel, 0)
-end
-
-
-
-
-
 function QPCProbe(channels, [scan_time, max_voltage, steps, delay, repeats, comments])
 	// runs a scanfastdac from 0 to X
 	// where X = max_voltage/steps * [0 - steps]
 	string channels, comments
 	variable scan_time, max_voltage, steps, delay, repeats
-	
 	
 	scan_time = paramisdefault(scan_time)? 30 : scan_time
 	max_voltage = paramisdefault(max_voltage)? -1200 : max_voltage
@@ -1362,9 +1212,7 @@ function QPCProbe(channels, [scan_time, max_voltage, steps, delay, repeats, comm
        printf "Scanning 0 -> %d\r"i
        sweeprate = abs(i/scan_time)
        ScanFastDAC(0, i, channels, sweeprate=sweeprate, delay=delay, repeats=repeats, alternate=1)
-
 	endfor
-	
 	
 end
 
@@ -1382,7 +1230,7 @@ end
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////// Setting up AWG ///////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
-function makeSquareWaveAWG(instrID, v0, vP, vM, v0len, vPlen, vMlen, wave_num, [ramplen])  // TODO: move this to Tim's igor procedures
+function AWG_makeSquareWaveAWG(instrID, v0, vP, vM, v0len, vPlen, vMlen, wave_num, [ramplen])  // TODO: move this to Tim's igor procedures
    // Make square waves with form v0, +vP, v0, -vM (useful for Tim's Entropy)
    // Stores copy of wave in Igor (accessible by fd_getAWGwave(wave_num))
    // Note: Need to call, fd_setupAWG() after making new wave
@@ -1395,7 +1243,7 @@ function makeSquareWaveAWG(instrID, v0, vP, vM, v0len, vPlen, vMlen, wave_num, [
 	ramplen = paramisdefault(ramplen) ? 0.003 : ramplen
 
 	if (ramplen < 0)
-		abort "ERROR[makeSquareWaveAWG]: Cannot use a negative ramplen"
+		abort "ERROR[AWG_makeSquareWaveAWG]: Cannot use a negative ramplen"
 	endif
 
     // Open connection
@@ -1463,7 +1311,7 @@ function makeSquareWaveAWG(instrID, v0, vP, vM, v0len, vPlen, vMlen, wave_num, [
          endfor
          numSamples = round((lens[i]-ramplen)*measureFreq)  // Convert to # samples
          if(numSamples == 0)  // Prevent adding zero length setpoint
-            abort "ERROR[makeSquareWaveAWG]: trying to add setpoint with zero length, duration too short for sampleFreq"
+            abort "ERROR[AWG_makeSquareWaveAWG]: trying to add setpoint with zero length, duration too short for sampleFreq"
          endif
          awg_sqw[j][0] = {sps[i]}
          awg_sqw[j][1] = {numSamples}
@@ -1475,7 +1323,7 @@ function makeSquareWaveAWG(instrID, v0, vP, vM, v0len, vPlen, vMlen, wave_num, [
 
     // Check there is a awg_sqw to add
    if(numpnts(awg_sqw) == 0)
-      abort "ERROR[makeSquareWaveAWG]: No setpoints added to awg_sqw"
+      abort "ERROR[AWG_makeSquareWaveAWG]: No setpoints added to awg_sqw"
    endif
 
     // Clear current wave and then reset with new awg_sqw
@@ -1488,7 +1336,7 @@ end
 
 
 
-function SetupEntropySquareWaves([freq, cycles,hqpc_zero, hqpc_plus, hqpc_minus, channel_ratio, balance_multiplier, hqpc_bias_multiplier, ramplen])
+function AWG_SetupEntropySquareWaves([freq, cycles,hqpc_zero, hqpc_plus, hqpc_minus, channel_ratio, balance_multiplier, hqpc_bias_multiplier, ramplen])
 	variable freq, cycles,hqpc_zero, hqpc_plus, hqpc_minus, channel_ratio, balance_multiplier, hqpc_bias_multiplier, ramplen
 
 	balance_multiplier = paramIsDefault(balance_multiplier) ? 1 : balance_multiplier
@@ -1508,9 +1356,9 @@ function SetupEntropySquareWaves([freq, cycles,hqpc_zero, hqpc_plus, hqpc_minus,
 	variable spt
 	// Make square wave 0
 	spt = 1/(4*freq)  // Convert from freq to setpoint time /s  (4 because 4 setpoints per wave)
-	makeSquareWaveAWG(fd1, hqpc_zero, splus, sminus, spt, spt, spt, 0, ramplen=ramplen)
+	AWG_makeSquareWaveAWG(fd1, hqpc_zero, splus, sminus, spt, spt, spt, 0, ramplen=ramplen)
 	// Make square wave 1
-	makeSquareWaveAWG(fd1, hqpc_zero, cplus, cminus, spt, spt, spt, 1, ramplen=ramplen)
+	AWG_makeSquareWaveAWG(fd1, hqpc_zero, cplus, cminus, spt, spt, spt, 1, ramplen=ramplen)
 
 	// Setup AWG
 //	setupAWG(channels_AW0= "OHC(10M)", channels_AW1 = "OHV*9960", numCycles=cycles, verbose=1)
@@ -1518,7 +1366,7 @@ end
 
 
 
-function SetupEntropySquareWaves_unequal([freq, cycles, hqpc_plus, hqpc_minus, ratio_plus, ratio_minus, balance_multiplier, hqpc_bias_multiplier, ramplen])
+function AWG_SetupEntropySquareWaves_unequal([freq, cycles, hqpc_plus, hqpc_minus, ratio_plus, ratio_minus, balance_multiplier, hqpc_bias_multiplier, ramplen])
 	variable freq, cycles, hqpc_plus, hqpc_minus, ratio_plus, ratio_minus, balance_multiplier, hqpc_bias_multiplier, ramplen
 
 	balance_multiplier = paramIsDefault(balance_multiplier) ? 1 : balance_multiplier
@@ -1539,9 +1387,9 @@ function SetupEntropySquareWaves_unequal([freq, cycles, hqpc_plus, hqpc_minus, r
 	variable spt
 	// Make square wave 0
 	spt = 1/(4*freq)  // Convert from freq to setpoint time /s  (4 because 4 setpoints per wave)
-	makeSquareWaveAWG(fd, 0, splus, sminus, spt, spt, spt, 0, ramplen=ramplen)
+	AWG_makeSquareWaveAWG(fd, 0, splus, sminus, spt, spt, spt, 0, ramplen=ramplen)
 	// Make square wave 1
-	makeSquareWaveAWG(fd, 0, cplus, cminus, spt, spt, spt, 1, ramplen=ramplen)
+	AWG_makeSquareWaveAWG(fd, 0, cplus, cminus, spt, spt, spt, 1, ramplen=ramplen)
 
 	// Setup AWG
 //	setupAWG(channels_AW0="HO1/10M", channels_AW0="HO2*1000", numCycles=cycles)
@@ -1553,14 +1401,16 @@ end
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////// Charge sensor functions ///////////////////////////////////////
+////////////////////////////// Charge sensor functions /////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
 function CorrectChargeSensor([fdchannelstr, fadcchannel, i, check, natarget, direction, zero_tol, gate_divider, cutoff_time])
-//Corrects the charge sensor by ramping the CSQ in 1mV steps
-//(direction changes the direction it tries to correct in)
-	variable fadcchannel, i, check, natarget, direction, zero_tol, gate_divider, cutoff_time
+// Corrects the charge sensor by ramping the CSQ in 1mV steps
+// 'direction' changes the initial direction it tries to correct in
+// ex.
+// CorrectChargeSensor(fdchannelstr="CSQ", fadcchannel=5.1, check=0, natarget=1.2, direction=1, gate_divider=1)
 	string fdchannelstr
+	variable fadcchannel, i, check, natarget, direction, zero_tol, gate_divider, cutoff_time
 	variable cdac, cfdac, current, new_current, nextdac, j
 	wave/T dacvalstr
 	wave/T fdacvalstr
@@ -1574,7 +1424,9 @@ function CorrectChargeSensor([fdchannelstr, fadcchannel, i, check, natarget, dir
 
 	if (paramisdefault(fadcchannel))
 		abort "Must provide fdadcID if using fadc to read current"
-	elseif (paramisdefault(fdchannelstr))
+	endif
+	
+	if (paramisdefault(fdchannelstr))
 		abort "Must provide fdchannel if using fd"
 	endif
 
@@ -1590,8 +1442,9 @@ function CorrectChargeSensor([fdchannelstr, fadcchannel, i, check, natarget, dir
 	sc_openinstrconnections(0)
 
 	//get current
-	current = get_one_FADCChannel(fadcchannel) //***
-
+	current = get_one_FADCChannel(0, channel_num=fadcchannel)
+	
+	int fastdac_index
 	variable end_condition = (naTarget == 0) ? zero_tol : 0.05*naTarget   // Either 5% or just an absolute zero_tol given
 	variable step_multiplier = 1
 	variable avg_len = 0.001// Starting time to avg, will increase as it gets closer to ideal value
@@ -1599,7 +1452,8 @@ function CorrectChargeSensor([fdchannelstr, fadcchannel, i, check, natarget, dir
 		variable start_time = datetime
 		do
 			//get current dac setting
-			cdac = str2num(fdacvalstr[fdchannel][1])
+			fastdac_index = get_fastdac_index(fdchannelstr, return_adc_index = 0)
+			cdac = str2num(fdacvalstr[fastdac_index][1])
 
 
 			if (abs(current-natarget) > 15*end_condition)
@@ -1618,25 +1472,23 @@ function CorrectChargeSensor([fdchannelstr, fadcchannel, i, check, natarget, dir
 
 			if (check==0) //no user input
 				if (-1000*gate_divider < nextdac && nextdac < 100*gate_divider) //Prevent it doing something crazy
-					RampMultipleFDAC(num2str(fdchannel), nextdac) //***
+					RampMultipleFDAC(fdchannelstr, nextdac) //***
 				else
 					abort "Failed to correct charge sensor to target current"
 				endif
 			else //ask for user input
 				doAlert/T="About to change DAC" 1, "Scan wants to ramp DAC to " + num2str(nextdac) +"mV, is that OK?"
 				if (V_flag == 1)
-					RampMultipleFDAC(num2str(fdchannel), nextdac)
+					RampMultipleFDAC(fdchannelstr, nextdac)
 				else
 					abort "Aborted"
 				endif
 			endif
 
 			//get current after dac step
-			current = get_one_FDACChannel(fadcchannel) //***
-
+			current = get_one_FADCChannel(0, channel_num=fadcchannel)
 
 			doupdate  // Update scancontroller window
-
 
 			if ((abs(current-nAtarget) < end_condition*3) && avg_len < 0.2)  // If close to end, start averaging for at least 0.2
 				avg_len = 0.2
@@ -1662,8 +1514,7 @@ end
 ////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////// Centering Functions ////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////
-
-function FindTransitionMid(dat, [threshold]) //Finds mid by differentiating, returns minloc
+function CT_FindTransitionMid(dat, [threshold]) //Finds mid by differentiating, returns minloc
 	wave dat
 	variable threshold
 	variable MinVal, MinLoc, w, lower, upper
@@ -1698,32 +1549,33 @@ function FindTransitionMid(dat, [threshold]) //Finds mid by differentiating, ret
 end
 
 
-function CenterOnTransition([gate, virtual_gates, width, single_only])
+
+function CT_CenterOnTransition([gate, virtual_gates, width, single_only])
 	string gate, virtual_gates
 	variable width, single_only
 
 	gate = selectstring(paramisdefault(gate), gate, "ACC*2")
 	width = paramisdefault(width) ? 20 : width
 
-	string gate_num
-	gate_num = scu_getChannelNumbers(gate)
+	string fdchannelstr = scu_getChannelNumbers(gate)
+	int fastdac_index = get_fastdac_index(fdchannelstr, return_adc_index = 0)
 
 	variable initial, mid
 	wave/t fdacvalstr
-	initial = str2num(fdacvalstr[str2num(gate_num)][1])
+	initial = str2num(fdacvalstr[fastdac_index][1])
 
 	ScanFastDAC(initial-width, initial+width, gate, sweeprate=width, nosave=1)
-	mid = findtransitionmid($"cscurrent", threshold=2)
+	mid = CT_FindTransitionMid($"cscurrent", threshold=2)
 
 	if (single_only == 0 && numtype(mid) != 2)
 		ScanFastDAC(mid-width/10, mid+width/10, gate, sweeprate=width/10, nosave=1)
-		mid = findtransitionmid($"cscurrent", threshold=2)
+		mid = CT_FindTransitionMid($"cscurrent", threshold=2)
 	endif
 
 	if (abs(mid-initial) < width && numtype(mid) != 2)
-		rampMultipleFDAC(gate, mid)
+		rampMultipleFDAC(fdchannelstr, mid)
 	else
-		rampMultipleFDAC(gate, initial)
+		rampMultipleFDAC(fdchannelstr, initial)
 		printf "CLOSE CALL: center on transition thought mid was at %dmV\r", mid
 		mid = initial
 	endif
@@ -1734,22 +1586,10 @@ end
 
 
 //////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////// Miscellaneous ////////////////////////////////////////////////
+////////////////////////// Virtual Gate Calculations /////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
 
-
-
-function/T get_virtual_scan_params(mid, width1, virtual_mids, ratios)
-	variable mid, width1
-	string virtual_mids, ratios
-
-	abort "2021/11 -- Somehow this function got lost, will need to be remade to be used again"
-end
-
-
-
-
-function calculate_virtual_starts_fins_using_ratio(sweep_mid, sweep_width, sweep_gate, virtual_gates, virtual_mids, virtual_ratios, channels, starts, fins)
+function virtual_calculate_virtual_starts_fins_using_ratio(sweep_mid, sweep_width, sweep_gate, virtual_gates, virtual_mids, virtual_ratios, channels, starts, fins)
 	// Given the sweepgate mid/width, and the virtual gate mids/ratios, returns the full channels, starts, fins for a virtual sweep
 	// Note: channels, starts, fins will be modified to have the return values (can't return more than 1 string in Igor)
 	string sweep_gate, virtual_gates, virtual_mids, virtual_ratios
@@ -1782,71 +1622,41 @@ end
 
 
 
-function make_virtual_entropy_corners(x_start, y_start, x_len, y_len, fast_sweep_y_over_x, slow_sweep_y_over_x, [datnum, virtual_csq])
-	variable x_start, y_start, x_len, y_len, fast_sweep_y_over_x, slow_sweep_y_over_x, datnum, virtual_csq
-	// printed out 
-	// bottom left, bottom right, top left, top right
+function/S virtual_make_parallelogram_from_corners(string virtual_corners)
+	// Turn any 4 corners into a parallelogram
+	// corners are defined in the order [BL, BR, TL, TR]
+	// BL: bottom left
+	// TR: top right
+	// e.g. make_parallelogram_from_corners("0,3,4,5") returns "0.5,2.5,3.5,5.5"
+	string corners
+	variable c0, c1, c2, c3
+	variable new_mid_start, new_mid_end, new_half_width
 	
-	string xs, ys
-	variable c
+	string new_virtual_corners = ""
 	
-	///// setup xs /////
-	variable x0, x1, x2, x3
-	x0 = x_start
-	x1 = x_start + x_len
-	
-	
-	//// setup ys /////
-	variable y0, y1, y2, y3
-	y0 = y_start
-	c = y0 - fast_sweep_y_over_x*x0
-	y1 = fast_sweep_y_over_x*x1 + c
-	y2 = y_start + y_len
-	
-	
-	///// calculate xs /////
-	c = y0 - slow_sweep_y_over_x*x0
-	if (slow_sweep_y_over_x != 0)
-		x2 = (y2 - c) / slow_sweep_y_over_x
-	else
-		x2 = x0
-	endif
-	x3 = x2 + x_len
-	xs = num2str(x0) + "," + num2str(x1) + ","	 + num2str(x2) + "," + num2str(x3) + ";"
-	print xs
-	
-	
-	///// calculate ys /////
-	c = y2 - fast_sweep_y_over_x*x2
-	y3 = fast_sweep_y_over_x*x3 + c
-	ys = num2str(y0) + "," + num2str(y1) + ","	 + num2str(y2) + "," + num2str(y3) + ";"
-	print ys
-	
-	print  num2str(x0*virtual_csq) + "," + num2str(x1*virtual_csq) + ","	 + num2str(x2*virtual_csq) + "," + num2str(x3*virtual_csq) + ";"
-	
-	
-	if (ParamIsDefault(datnum) == 0)
-		displaymultiple({datnum}, "cscurrent_2d", diff=1)
-		make /o/n=2 tempfullx_start = {x0, x1}
-		make /o/n=2 tempfully_start = {y0, y1}
+	variable k
+	for (k=0; k < ItemsInList(virtual_corners, ";"); k++)
+		corners = StringFromList(k, virtual_corners, ";")
+	   	c0 = str2num(StringFromList(0, corners, ","))
+   		c1 = str2num(StringFromList(1, corners, ","))
+   		c2 = str2num(StringFromList(2, corners, ","))
+   		c3 = str2num(StringFromList(3, corners, ","))
+   		
+		new_half_width = (((c1-c0) + (c3-c2)) / 2) / 2
+		new_mid_start = (c0 + c1) / 2
+		new_mid_end = (c2 + c3) / 2
 		
-		make /o/n=2 tempfullx_end = {x2, x3}
-		make /o/n=2 tempfully_end = {y2, y3}
+		c0 = new_mid_start - new_half_width
+		c1 = new_mid_start + new_half_width
+		c2 = new_mid_end - new_half_width
+		c3 = new_mid_end + new_half_width
 		
-		AppendToGraph tempfully_start vs tempfullx_start
-		AppendToGraph tempfully_end vs tempfullx_end
-		
-		ModifyGraph mode(tempfully_start)=4, mrkThick(tempfully_start)=3, rgb(tempfully_start)=(0,65535,65535), lsize=2
-		ModifyGraph mode(tempfully_end)=4, mrkThick(tempfully_end)=3, rgb(tempfully_end)=(0,65535,65535), lsize=2
-		
-		Tag/C/N=start_x_start_row/A=MC/L=2 tempfully_start, 0, "start_x_start_row"
-		Tag/C/N=end_x_start_row/A=MC/L=2 tempfully_start, 1, "end_x_start_row"
-		
-		Tag/C/N=start_x_end_row/A=MC/L=2 tempfully_end, 0, "start_x_end_row"
-		Tag/C/N=end_x_end_row/A=MC/L=2 tempfully_end, 1, "end_x_end_row"
-
-	endif
-	
-	
+		new_virtual_corners = new_virtual_corners + num2str(c0) + "," + num2str(c1) + ","	 + num2str(c2) + "," + num2str(c3) + ";"							
+   	endfor
+   		
+   	///// remove trailing semicolon... could be dangerous /////
+   	new_virtual_corners = new_virtual_corners[0, strlen(new_virtual_corners) - 2]
+   		
+   	return new_virtual_corners
 end
 

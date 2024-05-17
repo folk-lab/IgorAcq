@@ -443,7 +443,7 @@ Function RampMultipleFDAC(string channels, variable setpoint, [variable ramprate
  
     
     // If ramprate is not specified or not a number, default to 1000 (this is mostly safe)
-	ramprate = paramisdefault(ramprate) ? 1000 : ramprate  // default is to return DAC index, return_adc_index = 1 to return adc index
+	ramprate = paramisdefault(ramprate) ? 0 : ramprate  // default is to return DAC index, return_adc_index = 1 to return adc index
 
 
     // Convert channel identifiers to numbers, supporting both numerical IDs and named channels
@@ -472,7 +472,11 @@ Function RampMultipleFDAC(string channels, variable setpoint, [variable ramprate
         channel = StringFromList(i, channels, ",")
         
         fastdac_index = get_fastdac_index(channel, return_adc_index = 0)
-//        ramprate = str2num(fdacvalstr[fastdac_index][4])
+        
+        if (ramprate == 0)
+     	   ramprate = str2num(fdacvalstr[fastdac_index][4])
+		endif
+		
         fd_rampOutputFDAC(fastdac_index, setpoint, ramprate)  // Ramp the channel to the setpoint at the specified rate
     endfor
 End
@@ -1246,20 +1250,48 @@ function get_one_fadcSpeed(int adcValue)
 end
 
 
-function get_one_FADCChannel(int channel) // Units: mV
+function get_one_FADCChannel(channel_int, [channel_num]) // Units: mV
+	// channel_int expects index of channel i.e. index 3
+	// channel_num expects number of channel i.e. channel 4.3
+	// if channel_num is not specified then channel_int is used.
+	// otherwise channel_num is used 
+	int channel_int
+	variable channel_num
+	
+	channel_num = paramisdefault(channel_num) ? 0 : channel_num
+	
 	svar fd
-	wave/t ADC_channel	 
-	string	response=getHTTP(fd,"get-adc-voltage/"+ADC_channel(channel),"");//print response
+	wave/t ADC_channel
+	string	response
+	if (channel_num == 0)
+		response=getHTTP(fd,"get-adc-voltage/" + ADC_channel(channel_int), "")
+	else
+		response=getHTTP(fd,"get-adc-voltage/" + Num2StrF(channel_num, 1), "") // ensures 1 decimal place i.e. 4 -> 4.0
+	endif
 	string adc
 	adc=getjsonvalue(response,"value")
 	return str2num(adc)
 end
 
 
-function get_one_FDACChannel(int channel) // Units: mV
+function get_one_FDACChannel(channel_int, [channel_num]) // Units: mV
+	// channel_int expects index of channel i.e. index 3
+	// channel_num expects number of channel i.e. channel 4.3
+	// if channel_num is not specified then channel_int is used.
+	// otherwise channel_num is used 
+	int channel_int
+	variable channel_num
+	
+	channel_num = paramisdefault(channel_num) ? 0 : channel_num
+	
 	svar fd
 	wave/t DAC_channel
-	string	response=getHTTP(fd,"get-dac-voltage/"+DAC_channel(channel),"");
+	string	response
+	if (channel_num == 0)
+		response=getHTTP(fd,"get-dac-voltage/" + DAC_channel(channel_int), "")
+	else
+		response=getHTTP(fd,"get-dac-voltage/" + Num2StrF(channel_num, 1), "") // ensures 1 decimal place i.e. 4 -> 4.0
+	endif
 	string dac
 	dac = getjsonvalue(response,"value")
 	return str2num(dac)
@@ -1267,12 +1299,22 @@ end
 
 
 
-function set_one_FDACChannel(int channel, variable setpoint, variable ramprate)
+function set_one_FDACChannel(int channel_int, variable setpoint, variable ramprate, [variable channel_num])
+	// channel_int expects index of channel i.e. index 3
+	// channel_num expects number of channel i.e. channel 4.3
+	// if channel_num is not specified then channel_int is used.
+	// otherwise channel_num is used 
+	channel_num = paramisdefault(channel_num) ? 0 : channel_num
+	
 	wave/t DAC_channel
 	svar fd
 	String cmd = "ramp-dac-to-target"
 	String payload
-	payload = "{\"fqpn\": \"" + Dac_channel(channel) + "\", \"ramp_rate_mv_per_s\": " + num2str(ramprate) + ", \"target\": {\"unit\": \"mV\", \"value\": " + num2str(setpoint) + "}}"
+	if (channel_num == 0)
+		payload = "{\"fqpn\": \"" + DAC_channel(channel_int) + "\", \"ramp_rate_mv_per_s\": " + num2str(ramprate) + ", \"target\": {\"unit\": \"mV\", \"value\": " + num2str(setpoint) + "}}"
+	else
+		payload = "{\"fqpn\": \"" + Num2StrF(channel_num, 1) + "\", \"ramp_rate_mv_per_s\": " + num2str(ramprate) + ", \"target\": {\"unit\": \"mV\", \"value\": " + num2str(setpoint) + "}}"
+	endif
 	String headers = "accept: application/json\nContent-Type: application/json"
 	String response = postHTTP(fd, cmd, payload, headers)
 	
@@ -1300,100 +1342,100 @@ function sample_ADC(string adclist, variable nr_samples)
 end
 
 
-function rampMultipleFDAC_parallel(channels, setpoints, ramprates)
-	string channels, setpoints, ramprates
-	
-	// calculate number of parameters
-	int num_channels = itemsInList(channels, ",")
-	int num_setpoints = itemsInList(setpoints, ",")
-	int num_ramprates = itemsInList(ramprates, ",")
-	
-	int single_setpoint
-	if (num_setpoints == 1)
-		single_setpoint = 1
-	elseif (num_channels == num_setpoints)
-		single_setpoint = 0
-	else
-		abort "Number of channels (" + num2str(num_channels) + ") and setpoints (" + num2str(num_setpoints) + ") does not match"
-	endif
-	
-	int single_ramprate
-	if (num_ramprates == 1)
-		single_ramprate = 1
-	elseif (num_channels == num_ramprates)
-		single_ramprate = 0
-	else
-		abort "Number of channels (" + num2str(num_channels) + ") and ramprates (" + num2str(num_ramprates) + ") does not match"
-	endif
-	
-	
-	
-	// start setting up the json
-	String adcList
-	Variable nr_samples = 1
-	variable chunksize=5000
-	SVar fd
-	variable level1, level2, level3
-//	variable i
-//	stringlist2wave(S.adcListIDs,"adc_list")
-	wave adc_list
-
-	JSONXOP_New; level1=V_value
-	JSONXOP_New; level2=V_value
-	JSONXOP_AddValue/I=(82) level1, "/adc_sampling_time_us"
-	JSONXOP_AddValue/T=(num2str(chunksize)) level1, "/chunk_max_samples"
-	JSONXOP_AddValue/T="temp_{{.ChunkIndex}}.dat" level1, "/chunk_file_name_template"
-	JSONXOP_AddValue/wave=adc_list level1, "/adc_list"
-	JSONXOP_AddValue/I=(nr_samples) level1, "/nr_steps"
-	string dacChannel, minvalue, maxvalue
-
-//
-//	for (i = 0; i < ItemsInList("alalalalala", ","); i += 1)
-//		JSONXOP_New; level3=V_value
-//		dacChannel = StringFromList(i, channels, ",")
-//		minValue = StringFromList(i, S.startxs, ",")
-//		maxValue = StringFromList(i, S.finxs, ",")
-//		JSONXOP_AddTree/T=0 level3, "max"
-//		JSONXOP_AddTree/T=0 level3, "min"
-//		JSONXOP_Addvalue/V=(str2num(maxvalue)) level3, "/max/value"
-//		JSONXOP_Addvalue/V=(str2num(minvalue)) level3, "/min/value"
-//		JSONXOP_Addvalue/T="mV" level3, "max/unit"
-//		JSONXOP_Addvalue/T="mV" level3, "min/unit"
-//		JSONXOP_AddValue/JOIN=(level3) level2, dacChannel
-//		JSONXOP_Release level3
-//	endfor
-//
-//	JSONXOP_AddValue/JOIN=(level2) level1, "/dac_range_map"
-//	jsonxop_dump/ind=2 level1
-//	//print "Full textual representation:\r", S_value
-//	string cmd="start-linear-ramps"
-//	String headers = "accept: application/json\nContent-Type: application/json"
-//	String response = postHTTP(fd, cmd, S_value, headers)
+//function rampMultipleFDAC_parallel(channels, setpoints, ramprates)
+//	string channels, setpoints, ramprates
 //	
-	
-	
-	
-	// loop through DAC channels to build json
-	string channel, setpoint, ramprate
-	int i
-	for (i = 0; i < num_channels; i++)
-	
-		channel = stringfromlist(i, channels, ",")
-		if (single_ramprate == 1)
-			ramprate = ramprates
-		else
-			ramprate = stringfromlist(i, ramprates, ",")
-		endif
-		if (single_setpoint == 1)
-			setpoint = setpoints
-		else
-			setpoint = stringfromlist(i, setpoints, ",")
-		endif
-		
-	endfor
-	
-	
-end
+//	// calculate number of parameters
+//	int num_channels = itemsInList(channels, ",")
+//	int num_setpoints = itemsInList(setpoints, ",")
+//	int num_ramprates = itemsInList(ramprates, ",")
+//	
+//	int single_setpoint
+//	if (num_setpoints == 1)
+//		single_setpoint = 1
+//	elseif (num_channels == num_setpoints)
+//		single_setpoint = 0
+//	else
+//		abort "Number of channels (" + num2str(num_channels) + ") and setpoints (" + num2str(num_setpoints) + ") does not match"
+//	endif
+//	
+//	int single_ramprate
+//	if (num_ramprates == 1)
+//		single_ramprate = 1
+//	elseif (num_channels == num_ramprates)
+//		single_ramprate = 0
+//	else
+//		abort "Number of channels (" + num2str(num_channels) + ") and ramprates (" + num2str(num_ramprates) + ") does not match"
+//	endif
+//	
+//	
+//	
+//	// start setting up the json
+//	String adcList
+//	Variable nr_samples = 1
+//	variable chunksize=5000
+//	SVar fd
+//	variable level1, level2, level3
+////	variable i
+////	stringlist2wave(S.adcListIDs,"adc_list")
+//	wave adc_list
+//
+//	JSONXOP_New; level1=V_value
+//	JSONXOP_New; level2=V_value
+//	JSONXOP_AddValue/I=(82) level1, "/adc_sampling_time_us"
+//	JSONXOP_AddValue/T=(num2str(chunksize)) level1, "/chunk_max_samples"
+//	JSONXOP_AddValue/T="temp_{{.ChunkIndex}}.dat" level1, "/chunk_file_name_template"
+//	JSONXOP_AddValue/wave=adc_list level1, "/adc_list"
+//	JSONXOP_AddValue/I=(nr_samples) level1, "/nr_steps"
+//	string dacChannel, minvalue, maxvalue
+//
+////
+////	for (i = 0; i < ItemsInList("alalalalala", ","); i += 1)
+////		JSONXOP_New; level3=V_value
+////		dacChannel = StringFromList(i, channels, ",")
+////		minValue = StringFromList(i, S.startxs, ",")
+////		maxValue = StringFromList(i, S.finxs, ",")
+////		JSONXOP_AddTree/T=0 level3, "max"
+////		JSONXOP_AddTree/T=0 level3, "min"
+////		JSONXOP_Addvalue/V=(str2num(maxvalue)) level3, "/max/value"
+////		JSONXOP_Addvalue/V=(str2num(minvalue)) level3, "/min/value"
+////		JSONXOP_Addvalue/T="mV" level3, "max/unit"
+////		JSONXOP_Addvalue/T="mV" level3, "min/unit"
+////		JSONXOP_AddValue/JOIN=(level3) level2, dacChannel
+////		JSONXOP_Release level3
+////	endfor
+////
+////	JSONXOP_AddValue/JOIN=(level2) level1, "/dac_range_map"
+////	jsonxop_dump/ind=2 level1
+////	//print "Full textual representation:\r", S_value
+////	string cmd="start-linear-ramps"
+////	String headers = "accept: application/json\nContent-Type: application/json"
+////	String response = postHTTP(fd, cmd, S_value, headers)
+////	
+//	
+//	
+//	
+//	// loop through DAC channels to build json
+//	string channel, setpoint, ramprate
+//	int i
+//	for (i = 0; i < num_channels; i++)
+//	
+//		channel = stringfromlist(i, channels, ",")
+//		if (single_ramprate == 1)
+//			ramprate = ramprates
+//		else
+//			ramprate = stringfromlist(i, ramprates, ",")
+//		endif
+//		if (single_setpoint == 1)
+//			setpoint = setpoints
+//		else
+//			setpoint = stringfromlist(i, setpoints, ",")
+//		endif
+//		
+//	endfor
+//	
+//	
+//end
 
 
 

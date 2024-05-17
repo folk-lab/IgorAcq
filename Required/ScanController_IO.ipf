@@ -1771,6 +1771,16 @@ function/s num2numStr(val)
 end
 
 
+Function/S Num2StrF(num,pad)
+    variable num, pad
+    
+    string fstr
+    sprintf fstr, "%.*f", pad,num
+    
+    return fstr
+end
+
+
 function/s num2bool(val)
 	variable val
 	if(val==1)
