@@ -2568,8 +2568,8 @@ function scfd_resetraw_waves()
 	variable i
 	for (i=0; i<itemsinlist(RawWaveNames1D); i++)
 		rwn = StringFromList(i, RawWaveNames1D)  // Get the current raw wave name
-		wave temp=$rwn
-		temp[][]=nan   ////****why does this suddenly give an error
+		wave temp = $rwn
+		temp[p][q] = nan   ////****
 	endfor
 end
 
