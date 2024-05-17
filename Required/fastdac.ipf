@@ -585,7 +585,7 @@ end
 
 function PreScanChecksFD(S)
 	struct ScanVars &S
-	
+	wave fadcattr
 	scc_checkRampratesFD(S)	 	// Check ramprates of x and y
 	scc_checkLimsFD(S)			// Check within software lims for x and y
 	S.lims_checked = 1  		// So record_values knows that limits have been checked!

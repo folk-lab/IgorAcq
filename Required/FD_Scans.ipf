@@ -46,9 +46,6 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 	endif
 	PreScanChecksFD(S)
 
-	if (fake==1)
-		abort
-	endif
 	
 	// Ramp to start
 	RampStartFD(S)  // Ramps to starting value
@@ -60,7 +57,9 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 	// Initiate Scan
 	initializeScan(S, y_label = y_label)
 
-abort
+	if (fake==1)
+		abort
+	endif
 	// Main measurement loop
 	int j, d = 1
 	for (j = 0; j < S.numptsy; j++)

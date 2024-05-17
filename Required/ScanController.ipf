@@ -1155,14 +1155,14 @@ function sci_initializeWaves(S)  // TODO: rename
 			wn = stringFromList(j, wavenames)
 			rwn = stringFromList(j, rawwavenames)
 			string wavenum = rwn[3,strlen(rwn)]
+			numpts = S.numptsx * S.wavelen * S.numCycles
+			sci_init1DWave(wn, numpts, S.startx, S.finx)
 
-			if (S.using_fastdac) // Workout what the frequency is based on resamp freq
-				numpts = (raw) ? S.numptsx : scfd_postFilterNumpts(S.numptsx, S.measureFreq)
-			else
-				numpts = S.numptsx * S.wavelen * S.numCycles
+
+			if (S.using_fastdac && S.use_awg==0) // Workout what the frequency is based on resamp freq
+				numpts = (raw) ? S.numptsx : scfd_postFilterNumpts(numpts, S.measureFreq)
 			endif
 
-			sci_init1DWave(wn, numpts, S.startx, S.finx)
 
 			if (S.is2d == 1)
 				sci_init2DWave(wn+"_2d", numpts, S.startx, S.finx, S.numptsy, S.starty, S.finy)
@@ -1170,17 +1170,18 @@ function sci_initializeWaves(S)  // TODO: rename
 
 
 			//initializing for hot/cold waves, not sure if i need to, if we are just saving in the end?
-			        if(sc_hotcold && raw == 0)
-			
-			             sci_init1DWave(wn+"hot", S.numptsx, S.startx, S.finx) //dont need to initialize since im not plotting
-			          	sci_init1DWave(wn+"cold", S.numptsx, S.startx, S.finx)  ///*** I don't think this will work for virtual gates
-			
-			          	if(S.is2d == 1)
-			          		sci_init2DWave(wn+"hot_2d", S.numptsx, S.startx, S.finx, S.numptsy, S.starty, S.finy)
-			          		sci_init2DWave(wn+"cold_2d", S.numptsx, S.startx, S.finx, S.numptsy, S.starty, S.finy)
-			          	endif
-			
-			        endif
+			if (S.using_fastdac && raw == 0 && fadcattr[str2num(wavenum)][8] == 48)
+				if (fadcattr[str2num(wavenum)][6] == 48)
+					abort "ERROR: Demod and hot/cold can not be clicked at the same time!"
+				endif
+
+				sci_init1DWave(wn+"hot", S.numptsx, S.startx, S.finx) //dont need to initialize since im not plotting
+				sci_init1DWave(wn+"cold", S.numptsx, S.startx, S.finx)  ///*** I don't think this will work for virtual gates
+				sci_init1DWave(wn+"entr", S.numptsx, S.startx, S.finx)  ///*** I don't think this will work for virtual gates
+				if(S.is2d == 1)
+					sci_init2DWave(wn+"entr_2d", S.numptsx, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+				endif
+			endif
 
 //			//initializing 1d waves for demodulation
 			if (S.using_fastdac && raw == 0 && fadcattr[str2num(wavenum)][6] == 48)
@@ -1234,6 +1235,7 @@ function sci_init1DWave(wn, numpts, start, fin)
     wave temp_wv = $wn; temp_wv[p] = NaN
 
     cmd = "setscale/I x " + num2str(start) + ", " + num2str(fin) + ", " + wn; execute(cmd)
+    print wn
 end
 
 
@@ -1261,6 +1263,7 @@ function sci_init2DWave(wn, numptsx, startx, finx, numptsy, starty, finy)
     wave temp_wv = $wn; temp_wv[p][q] = NaN
     cmd = "setscale/I x " + num2str(startx) + ", " + num2str(finx) + ", " + wn; execute(cmd)
 	cmd = "setscale/I y " + num2str(starty) + ", " + num2str(finy) + ", " + wn; execute(cmd)
+	print wn
 end
 
 
@@ -1513,16 +1516,12 @@ function scg_arrangeWindows(graphIDs)
     cmd = "TileWindows/O=1/A=(3,4) "  
     variable i
     for (i = 0; i<itemsInList(graphIDs); i++)
-    scu_tic()
         windowName = StringFromList(i, graphIDs)
         cmd += windowName+", "
         doWindow/F $windowName // Bring window to front 
-        scu_toc()
     endfor
-    scu_tic()
     execute(cmd)
     doupdate
-    scu_toc()
 end
 
 function scg_twosubplot(graphID, wave2name,[logy, logx, labelx, labely, append_wn, append_labely])
@@ -2256,19 +2255,20 @@ Function scfd_SendCommandAndRead(S,rowNum, [ skip_raw2calc])
 
 	// Loop to read data until the expected number of points is reached
 	Do
+		sleep/s 0.4
 		numpnts_read = loadfiles(S,numpnts_read)  // Load data from files: takes 0.006s
-		pnts2read = scfd_raw2CalcQuickDistribute(1) // 0 or 1 for if data should be displayed decimated or not during the scan: this takes 0.0016
+		pnts2read = scfd_raw2CalcQuickDistribute(0) // 0 or 1 for if data should be displayed decimated or not during the scan: this takes 0.0016
 		scfd_checkSweepstate() // takes less than 1e-5s
 		doupdate  //takes about 0.01s
 	While (numpnts_read<pnts2read)  // Continue if not all points are read
 
 //	// Update FastDAC and ADC GUI elements:
-//*** I commented this out as it slows the measurement down a lot. If we can not speed this up we should make it optional and only 
+//*** this could be commented  out as it slows the measurement down a lot. If we can not speed this up we should make it optional and only 
 //execute these commands at the end of any scan
-//	scfw_update_all_fdac(option="updatefdac")
-//	scfw_update_fadc("")  // Update FADC display with no additional specification
+	scfw_update_all_fdac(option="updatefdac")
+	scfw_update_fadc("")  // Update FADC display with no additional specification
 //	// Ramp AWGs back to zero
-//	fdawg_ramp_DACs_to_zero()
+	fdawg_ramp_DACs_to_zero()
 	
 	
 end
@@ -2283,9 +2283,6 @@ Function loadFiles(S, numPntsRead)
 	// - 'lastRead' variable must hold the index of the last file that was loaded.
 	String adcNames = S.adcLists
 	String fileList = IndexedFile(fdTest, -1, ".dat") // List all .dat files in fdTest
-
-	//sleep/s 0.4// Short pause to allow for file writing to finish
-
 	
 	String currentFile, testString
 	Variable lastRead = S.lastRead // Initialize with the last file index loaded from structure S
@@ -2299,11 +2296,8 @@ Function loadFiles(S, numPntsRead)
 
 		for (i = 0; i < numFiles; i += 1)
 			currentFile = StringFromList(i, fileList)
-			GetFileFolderInfo/Q/Z/P=fdtest currentfile
-//			or 
-			//Fstatus/P=fdtest currentfile
-			print V_logEOF
-//*** need to add a check if the file is finite size
+			//GetFileFolderInfo/Q/Z/P=fdtest currentfile
+			//print V_logEOF
 			testString = "*_" + num2str(lastRead + 1) + ".dat" // Pattern of the next file to read
 
 			if (StringMatch(currentFile, testString))
@@ -2508,7 +2502,7 @@ function scfd_resetraw_waves()
 	for (i=0; i<itemsinlist(RawWaveNames1D); i++)
 		rwn = StringFromList(i, RawWaveNames1D)  // Get the current raw wave name
 		wave temp=$rwn
-		temp=nan   ////****why does this suddenly give an error
+		temp[][]=nan   ////****why does this suddenly give an error
 	endfor
 end
 
