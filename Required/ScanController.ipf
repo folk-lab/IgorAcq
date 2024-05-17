@@ -2071,8 +2071,8 @@ function scfd_notch_filters(wave wav, variable measureFreq, [string Hzs, string 
 	tempwav -= offset // make tempwav have zero average to reduce end effects associated with padding
 	
 	//Transform
-	FFT/pad=(padnum)/OUT=1/DEST=temp_fft tempwav
-
+	//FFT/pad=(padnum)/winf=Parzen/OUT=1/DEST=temp_fft tempwav  //parzen window filter, good choice of  Q=10
+	FFT/pad=(padnum)/OUT=1/DEST=temp_fft tempwav  //no window filter
 	wave /c temp_fft
 	duplicate/c/o temp_fft fftfactor // fftfactor is the wave to multiple temp_fft by to zero our certain frequencies
    //fftfactor = 1 - exp(-(x - freq)^2 / (freq / Q)^2)
