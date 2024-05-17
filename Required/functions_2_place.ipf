@@ -4,174 +4,10 @@
 
 /// this a where all the functions that need to still be place in the proper procedure files live
 
-macro initexperiment_macro()
-	initexperiment()
-endmacro
-
-
-
-function initexperiment()
-
-	// create experiment paths
-	create_experiment_paths()
-	
-	// add custom colours
-	create_colour_wave()
-	
-	
-	create_variable("sc_abortsweep")
-	create_variable("sc_scanstarttime")
-	create_variable("sc_save_time")
-	create_variable("sc_PrintRaw")
-	create_variable("sc_PrintCalc")
-	create_variable("sc_pause")
-	create_variable("sc_instrLimit")
-	create_variable("sc_cleanup")
-	create_variable("sc_abortsweep")
-	create_variable("sc_abortnosave")
-	create_variable("sc_demody")
-	create_variable("sc_hotcold")
-	create_variable("sc_plotRaw")
-	create_variable("filenum"); 
-	create_variable("lastconfig");
-	create_variable("sc_meas_mode");
-	
-//	make /o numericwave
-	
-	variable lastconfig = scu_unixTime()
-	
-	
-	// determine the portnum
-	string home_path, separator_type
-	[home_path, separator_type] = sc_get_igor_path()
-	string master_path = ParseFilePath(1, home_path, separator_type, 1, 0)
-	string swagger_file = master_path + "start_swagger.sh"
-	//string portnum = sc_get_swagger_port(swagger_file)
-	
-	// open fastdacconnection
-	// openFastDAC(portnum, verbose = 0)
-	openFastDAC("44001", verbose = 0)
-	// openFastDAC("51011", verbose = 0)
-	
-	// initialise the scancontroller 
-	initscancontroller()
-	
-	// initialise fastdac wave
-	initfastdac()
-	
-	
-	// tick some boxes in the scancontroller
-	wave fadcattr
-	fadcattr[1][2]=48
-	
-	make/o/t/n=6 sc_awg_labels
-	sc_awg_labels={"DAC Channel", "Setpoints", "Samples", "Box #", "# Cycles", "Do not edit"} // this will be the sc_awg_labels for the AWG table
-	
-
-end
 
 
 
 
-function /t sc_get_swagger_port(S_fileName)
-    String S_fileName       // full path to file to be loaded; "" for dialog
-    
-    string DataKey = "*http-addr*" // string to match
-        
-    // full path is specified, load file directly
-    variable refNum
-    Open/R refNum as S_fileName
- 	string line
- 	
- 	int i = 0
-    do
-        // read file line by line
-        FReadLine refNum, line
-        
-        if(strlen(line) == 0)                       
-            break                                       
-        endif
-
-        // stop reading when DataKey is hit
-        if(StringMatch(line, DataKey))
-            break
-        endif
-        
-        i += 1
-        
-    while(1)
-    
-    Close refNum
- 
-	// parse out the port number
-	string httpaddress = stringfromlist(1, line, ":")
-    httpaddress = httpaddress[0,4]
-    
-    
-    return httpaddress
-end
-
-
-
-function [string home_path, string separator_type] sc_get_igor_path()
-	// assumes the experiment has been saved so that the filepath 'home' exists
-	// Windows path looks like 'D:local_measurement_data:Will:Summer2024TLDDendiTest:'
-	// USE ::
-	// string home_path, separator_type
-	// [home_path, separator_type] = sc_get_igor_path()
-	 
-	// check Mac or Windows to determine seperator
-	if (cmpstr(igorInfo(2), "Macintosh") == 0) // if mac
-		separator_type = ":"
-	elseif (cmpstr(igorInfo(2), "Windows") == 0) // if windows
-		separator_type = ":"
-	endif
-	 
-	pathinfo home // path stored in s_path
-	
-	home_path = s_path
-	
-	return [home_path, separator_type]
-end
-
-
-
-function create_experiment_paths()
-//	assumes the experiment has been saved so that the filepath 'home' exists
-//	not tested on Windows computer
-
-	string home_path, separator_type
-	[home_path, separator_type] = sc_get_igor_path()
-	
-	//////////////////////////////////////////
-	///// EXPERIMENTAL DATA MASTER PATHS /////
-	//////////////////////////////////////////
-	string master_path = home_path // ParseFilePath(1, home_path, separator_type, 1, 0)
-	
-	string data_path = master_path + "data" + separator_type
-	string tempdata_path = master_path + "temp_data" + separator_type
-	 
-	NewPath/C data data_path
-	NewPath/C fdtest tempdata_path
-	
-	
-	////////////////////////////////////
-	///// GITHUB DATA MASTER PATHS /////
-	////////////////////////////////////
-	if (cmpstr(igorInfo(2), "Macintosh") == 0) // if mac
-		master_path = ParseFilePath(1, home_path, separator_type, 0, 4)
-		master_path += "Github:IgorAcq:data:"
-	elseif (cmpstr(igorInfo(2), "Windows") == 0) // if windows
-		master_path = ParseFilePath(1, home_path, separator_type, 0, 1)
-		master_path += "local_measurement_programs:IgorAcq:data:"
-	endif
-	
-	string colour_path = master_path + "colours" + separator_type
-	
-	NewPath/C colour_data colour_path
-
-
-end
 
 
 
@@ -326,28 +162,28 @@ Window after1() : Panel
 EndMacro
 
 
-Function FindMaxRepeats(waveName)
-    Wave waveName
-    Variable maxRepeats = 1  // Minimum number of repeats is 1
-    Variable currentCount = 1  // Current count of consecutive repeats
-    Variable i
-    
-    // Loop through the wave, starting from the second element
-    For (i = 1; i < DimSize(waveName, 0); i += 1)
-        // Check if the current value is the same as the previous one
-        If (waveName[i] == waveName[i-1])
-            currentCount += 1  // Increment the count for consecutive repeats
-            // Update maxRepeats if the current count is greater
-            maxRepeats = max(maxRepeats, currentCount)
-        Else
-            currentCount = 1  // Reset the count if the current value is different
-        EndIf
-    EndFor
-    
-    // Print the maximum number of consecutive repeats
-    //Print "The maximum number of consecutive repeats is: ", maxRepeats
-    return maxrepeats
-End
+//Function FindMaxRepeats(waveName)
+//    Wave waveName
+//    Variable maxRepeats = 1  // Minimum number of repeats is 1
+//    Variable currentCount = 1  // Current count of consecutive repeats
+//    Variable i
+//    
+//    // Loop through the wave, starting from the second element
+//    For (i = 1; i < DimSize(waveName, 0); i += 1)
+//        // Check if the current value is the same as the previous one
+//        If (waveName[i] == waveName[i-1])
+//            currentCount += 1  // Increment the count for consecutive repeats
+//            // Update maxRepeats if the current count is greater
+//            maxRepeats = max(maxRepeats, currentCount)
+//        Else
+//            currentCount = 1  // Reset the count if the current value is different
+//        EndIf
+//    EndFor
+//    
+//    // Print the maximum number of consecutive repeats
+//    //Print "The maximum number of consecutive repeats is: ", maxRepeats
+//    return maxrepeats
+//End
 
 Menu "Graph"
 	"Close All Graphs/9", CloseAllGraphs()

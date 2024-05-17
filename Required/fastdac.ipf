@@ -214,9 +214,9 @@ function fd_getmaxADCs(S)
 	struct ScanVars &S
 	variable maxADCs
 	wave fadcattr
-	wave numericwave
 	string adcList = scf_getRecordedFADCinfo("channels")
 	StringToListWave(adclist)
+	wave numericwave
 	numericwave = floor(numericwave)
 	maxADCs = get_MaxRepeats_from_wave(numericwave)
 	S.numADCs = dimsize(numericwave, 0)
@@ -586,7 +586,6 @@ end
 //////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////// End of AWG stuff//////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
-
 function PreScanChecksFD(S)
 	struct ScanVars &S
 	scc_checkRampratesFD(S)	 	// Check ramprates of x and y
