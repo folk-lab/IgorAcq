@@ -149,7 +149,7 @@ Function scv_getLastScanVars(S)
 		S.readVsTime = sc_lastScanVarsVariables[16]
 		S.interlaced_y_flag = sc_lastScanVarsVariables[17]
 		S.interlaced_num_setpoints = sc_lastScanVarsVariables[18]
-		S.prevent_2d_graph_updates = sc_lastScanVarsVariables[19]
+		S.interlaced_num_setpoints = sc_lastScanVarsVariables[19]
 		S.start_time = sc_lastScanVarsVariables[20]
 		S.end_time = sc_lastScanVarsVariables[21]
 		S.using_fastdac = sc_lastScanVarsVariables[22]

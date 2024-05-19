@@ -440,10 +440,8 @@ Function RampMultipleFDAC(string channels, variable setpoint, [variable ramprate
     // Example Use ::
     // rampmultiplefDAC("11.3, 11.6", 0, setpoints_str ="10, -10")
 
- 
-    
-    // If ramprate is not specified or not a number, default to 1000 (this is mostly safe)
-	ramprate = paramisdefault(ramprate) ? 0 : ramprate  // default is to return DAC index, return_adc_index = 1 to return adc index
+	ramprate = paramisdefault(ramprate) ? 1000 : ramprate     // If ramprate is not specified or not a number, default to 1000 (this is mostly safe)
+
 
 
     // Convert channel identifiers to numbers, supporting both numerical IDs and named channels
@@ -1525,10 +1523,10 @@ Function awg_ramp(S)
 	variable chunksize=5000
 	SVar fd
 	variable level1, level2, level3,level4,level5
-	wave adc_list
 
 	jsonxop_release/a
 	stringlist2wave(S.adcListIDs,"adc_list")
+	wave adc_list
 	JSONXOP_New; level1=V_value
 	JSONXOP_New; level2=V_value
 	JSONXOP_AddValue/wave=adc_list level1, "/adcs_to_acquire"

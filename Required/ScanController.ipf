@@ -122,6 +122,15 @@ function initexperiment()
 	make/o/t/n=6 sc_awg_labels
 	sc_awg_labels={"DAC Channel", "Setpoints", "Samples", "Box #", "# Cycles", "Do not edit"} // this will be the sc_awg_labels for the AWG table
 	
+// Create a text wave with custom labels for a specific application
+Make/O/T/N=(36) ScanVars_labels // Create a text wave with 36 entries
+// Assign labels to the wave
+ScanVars_labels = {"instrIDx", "instrIDy", "lims_checked", "startx", "finx", "numptsx", "rampratex", "delayx", "is2d", "starty", "finy", "numptsy", "rampratey", "delayy", "alternate", "duration", "readvstime", "interlaced_y_flat", "interlaced_num_setpoints", "interlaced_num_setpoints", "start_time", "end_time", "using_fastdac", "numADCs", "samplingFreq", "measureFreq", "sweeprate", "lastread", "direction", "never_save", "filenum", "sync", "maxADCs", "use_AWG", "wavelen", "numCycles"}
+
+
+Make/O/T/N=(22) ScanVarsStr_labels // Create a text wave with 27 entries
+// Assign labels to the wave
+ScanVarsStr_labels = {"channelsx", "startxs", "finxs", "channelsy", "startys", "finys", "interlaced_channels", "interlaced_setpoints", "x_label", "y_label", "adcList", "raw_wave_names", "instrIDs", "adcListIDs", "dacListIDs", "fakeRecords", "adcLists", "IDstartxs", "IDfinxs", "dacListIDs_y", "comments", "AWG_DACs"}
 
 end
 
@@ -202,10 +211,13 @@ function sc_create_experiment_paths()
 	string master_path = home_path
 	
 	string data_path = master_path + "data" + separator_type
-	string tempdata_path = master_path + "temp_data" + separator_type
+	string tempdata_path = master_path + "temp_data" + separator_type /// this does not work for me
+	 tempdata_path="Macintosh HD:Users:luescher:acquired-data:"
+
+	
 	 
-	NewPath/C data data_path
-	NewPath/C fdtest tempdata_path
+	NewPath/o/C data data_path
+	NewPath/o/C fdtest tempdata_path
 	
 	
 	////////////////////////////////////
@@ -219,10 +231,9 @@ function sc_create_experiment_paths()
 		master_path += "local_measurement_programs:IgorAcq:data:"
 	endif
 	
-	string colour_path = master_path + "colours" + separator_type
-	
-	NewPath/C colour_data colour_path
-
+	string colour_path = master_path + "colours" + separator_type  /// this also does not work for me
+	 colour_path="Macintosh HD:Users:luescher:Documents:GitHub:IgorAcq:data:colours:"
+	NewPath/o/C colour_data colour_path
 
 end
 
@@ -2285,7 +2296,7 @@ end
 function scfd_sqw_analysis(wave wav, int delay, int wavelen, string wave_out)
 
 // this function separates hot (plus/minus) and cold(plus/minus) and returns  two waves for hot and cold //part of CT
-// it also assumes that the sc_awg_info' setpoints have this pattern: "0,100,0,-100"(cold1-hot1-cold2-hot2)  and that there are always 4 setpoints and 1 cycle of heating. this is 
+// it also assumes that the sc_awg_info' setpoints have this pattern: "100,0,-100,0"(hot1-cold1-hot2-cold2)  and that there are always 4 setpoints and 1 cycle of heating. this is 
 // a very entropy specific post measurement analysis 
 //*** we still need to add the option to remove the first few points in a cycle.
 
@@ -2299,10 +2310,10 @@ function scfd_sqw_analysis(wave wav, int delay, int wavelen, string wave_out)
 	Redimension/N=(wavelen/4,4,N) wav_copy //should be the dimension of fdAW AWG.Wavelen
 	DeletePoints/M=0 0,delay, wav_copy
 	reducematrixSize(wav_copy,0,-1,1,0,-1,4,1,"wav_new") // fdAW 
-	cold1 = wav_new[0][0][p] 
-	cold2 = wav_new[0][2][p] 
-	hot1 = wav_new[0][1][p]   
-	hot2 = wav_new[0][3][p]   
+	cold1 = wav_new[0][1][p] 
+	cold2 = wav_new[0][3][p] 
+	hot1 = wav_new[0][0][p]   
+	hot2 = wav_new[0][2][p]   
 	
 	duplicate/o cold1, $(wave_out + "cold")
 	duplicate/o hot1, $(wave_out + "hot") 
@@ -2745,7 +2756,7 @@ function scfd_resetraw_waves()
 	for (i=0; i<itemsinlist(RawWaveNames1D); i++)
 		rwn = StringFromList(i, RawWaveNames1D)  // Get the current raw wave name
 		wave temp_wv = $rwn
-		temp_wv[p][q] = NaN   ////****
+		temp_wv[][] = NaN   ////****
 	endfor
 end
 
@@ -2911,19 +2922,19 @@ end
 
 function scw_saveConfig()
 	nvar lastconfig
-	wave sc_Instr, AWGattr,AWGattr0,AWGattr1,AWGsetattr,fadcattr,fdacattr,instrBoxAttr,LIattr,LIattr0,	AWGsetvalstr,AWGvalstr,AWGvalstr0,AWGvalstr1,fadcvalstr,fdacvalstr,LIvalstr,LIvalstr0,old_fdacvalstr 
+	wave sc_Instr, sc_awg_info,fadcattr,fdacattr,instrBoxAttr,fadcvalstr,fdacvalstr,old_fdacvalstr 
 lastconfig=scu_unixTime()
 	string filename = "attr" + num2istr(lastconfig) + ".itx"
 	string filename1 = "valstr" + num2istr(lastconfig) + ".itx"
-	Save/T/M="\n"/p=config AWGattr,AWGattr0,AWGattr1,AWGsetattr,fadcattr,fdacattr,instrBoxAttr,LIattr,LIattr0 as filename
-	Save/T/M="\n"/P=config sc_Instr,AWGsetvalstr,AWGvalstr,AWGvalstr0,AWGvalstr1,fadcvalstr,fdacvalstr,LIvalstr,LIvalstr0,old_fdacvalstr as filename1
+	Save/T/M="\n"/p=config fadcattr,fdacattr,instrBoxAttr, as filename
+	Save/T/M="\n"/P=config sc_Instr,fadcvalstr,fdacvalstr,old_fdacvalstr as filename1
 end
 
 
 function scw_loadConfig()
 nvar lastconfig
-	wave sc_Instr, AWGattr,AWGattr0,AWGattr1,AWGsetattr,fadcattr,fdacattr,instrBoxAttr,LIattr,LIattr0,	AWGsetvalstr,AWGvalstr,AWGvalstr0,AWGvalstr1,fadcvalstr,fdacvalstr,LIvalstr,LIvalstr0,old_fdacvalstr 
-	killwaves sc_Instr AWGattr,AWGattr0,AWGattr1,AWGsetattr,fadcattr,fdacattr,instrBoxAttr,LIattr,LIattr0,	AWGsetvalstr,AWGvalstr,AWGvalstr0,AWGvalstr1,fadcvalstr,fdacvalstr,LIvalstr,LIvalstr0,old_fdacvalstr 
+	wave sc_Instr, sc_awg_info,fadcattr,fdacattr,instrBoxAttr,fadcvalstr,fdacvalstr,old_fdacvalstr 
+	killwaves sc_Instr,fadcattr,fdacattr,instrBoxAttr,fadcvalstr,fdacvalstr,old_fdacvalstr, sc_awg_info
 	string filename = "attr" + num2istr(lastconfig) + ".itx"
 	string filename1 = "valstr" + num2istr(lastconfig) + ".itx"
 	
@@ -2934,7 +2945,6 @@ nvar lastconfig
 	
 	print "then reinitialize FastDAC or scancontroller window under Menu/Panel_Macros/..."
 	
-	//execute("after1()")
 	
 end
 
@@ -3009,24 +3019,6 @@ function scw_removerow(action) : Buttoncontrol
 end
 
 
-Function scw_Show_AWG_wave(ba) : ButtonControl
-	STRUCT WMButtonAction &ba
-
-	switch( ba.eventCode )
-		case 2: // mouse up
-	string name="AWG_info"
-	DoWindow/K $name // Close the table
-	wave sc_awg_labels, sc_awg_info
-	PauseUpdate; Silent 1		// building window...
-	Edit/N=AWG_info/W=(1070,58,1486,275) sc_awg_labels, sc_awg_info
-	ModifyTable alignment=0,format(Point)=1,width(sc_awg_labels)=78,width(sc_awg_info)=78
-				break
-		case -1: // control being killed
-			break
-	endswitch
-
-	return 0
-End
 
 
 Function scw_Close_tables(ba) : ButtonControl
@@ -3066,7 +3058,45 @@ Function scw_Hide_Procs(ba) : ButtonControl
 	return 0
 End
 
+Function scw_Show_AWG_wave(ba) : ButtonControl
+	STRUCT WMButtonAction &ba
 
+	switch( ba.eventCode )
+		case 2: // mouse up
+	string name="AWG_info"
+	DoWindow/K $name // Close the table
+	wave sc_awg_labels, sc_awg_info
+	PauseUpdate; Silent 1		// building window...
+	Edit/N=AWG_info/W=(1070,58,1486,275) sc_awg_labels,sc_awg_info
+	ModifyTable alignment=0,format(Point)=1,width(sc_awg_labels)=78,width(sc_awg_info)=78
+				break
+		case -1: // control being killed
+			break
+	endswitch
+
+	return 0
+End
+
+Function scw_Show_ScanVars(ba) : ButtonControl
+	STRUCT WMButtonAction &ba
+
+	switch( ba.eventCode )
+		case 2: // mouse up
+	string name="LastScanVars"
+	DoWindow/K $name // Close the table
+	wave ScanVars_labels,sc_lastScanVarsVariables,ScanVarsStr_labels, sc_lastScanVarsStrings
+	PauseUpdate; Silent 1		// building window...
+	Edit/W=(1620,53,2560,837) ScanVars_labels,sc_lastScanVarsVariables,ScanVarsStr_labels
+	AppendToTable sc_lastScanVarsStrings
+	ModifyTable format(Point)=1,width(ScanVars_labels)=174,width(sc_lastScanVarsVariables)=190
+	ModifyTable width(ScanVarsStr_labels)=214,width(sc_lastScanVarsStrings)=248
+				break
+		case -1: // control being killed
+			break
+	endswitch
+
+	return 0
+End
 
 Window scw_AWG_info() : Table
 	PauseUpdate; Silent 1		// building window...
@@ -3109,7 +3139,7 @@ End
 
 Window after1() : Panel
 	PauseUpdate; Silent 1		// building window...
-	NewPanel /W=(258,324,1268,927)
+	NewPanel /W=(32,496,1042,1099)
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv fsize= 25,fstyle= 1
@@ -3156,7 +3186,7 @@ Window after1() : Panel
 	SetDrawEnv fsize= 14,fstyle= 1,textrot= -60
 	DrawText 965,69,"hot/cold"
 	SetDrawEnv fsize= 14,fstyle= 1,textrot= -60
-	DrawText 976,59,"0 + 0 -"
+	DrawText 976,59,"+ 0 - 0"
 	ListBox fdaclist,pos={8.00,72.00},size={356.00,428.00},fSize=14,frame=2
 	ListBox fdaclist,listWave=root:fdacvalstr,selWave=root:fdacattr
 	ListBox fdaclist,colorWave=root:colour_bent_CW,mode=1,selRow=-1
@@ -3169,28 +3199,27 @@ Window after1() : Panel
 	Button fdacrampzero,title="Ramp all 0"
 	ListBox fadclist,pos={400.00,72.00},size={600.00,180.00},fSize=14,frame=2
 	ListBox fadclist,listWave=root:fadcvalstr,selWave=root:fadcattr
-	ListBox fadclist,colorWave=root:colour_bent_CW,mode=1,selRow=3
+	ListBox fadclist,colorWave=root:colour_bent_CW,mode=1,selRow=5
 	ListBox fadclist,widths={30,70,30,95,100,30,30,20}
-	Button updatefadc,pos={396.00,268.00},size={88.00,20.00},proc=scfw_update_fadc
+	Button updatefadc,pos={394.00,262.00},size={88.00,20.00},proc=scfw_update_fadc
 	Button updatefadc,title="Update ADC"
-	CheckBox sc_plotRawBox,pos={499.00,268.00},size={72.00,17.00},proc=scw_CheckboxClicked
-	CheckBox sc_plotRawBox,title="\\Z14Plot Raw",variable=sc_plotRaw,side=1
-	CheckBox sc_demodyBox,pos={580.00,272.00},size={108.00,17.00},proc=scw_CheckboxClicked
+	CheckBox sc_demodyBox,pos={688.00,294.00},size={108.00,17.00},proc=scw_CheckboxClicked
 	CheckBox sc_demodyBox,title="\\Z14Save Demod.y",variable=sc_demody,side=1
-	SetVariable sc_hotcolddelayBox,pos={908.00,311.00},size={68.00,20.00}
+	SetVariable sc_hotcolddelayBox,pos={896.00,333.00},size={68.00,20.00}
 	SetVariable sc_hotcolddelayBox,title="\\Z14Delay",value=sc_hotcolddelay
-	SetVariable sc_FilterfadcBox,pos={824.00,264.00},size={148.00,20.00}
+	SetVariable sc_FilterfadcBox,pos={479.00,294.00},size={160.00,20.00}
 	SetVariable sc_FilterfadcBox,title="\\Z14Resamp Freq "
 	SetVariable sc_FilterfadcBox,help={"Re-samples to specified frequency, 0 Hz == no re-sampling"}
+	SetVariable sc_FilterfadcBox,labelBack=(65535,16385,16385)
 	SetVariable sc_FilterfadcBox,value=sc_ResampleFreqfadc
-	SetVariable sc_demodphiBox,pos={704.00,268.00},size={100.00,20.00}
+	SetVariable sc_demodphiBox,pos={691.00,262.00},size={100.00,20.00}
 	SetVariable sc_demodphiBox,title="\\Z14Demod \\$WMTEX$ \\Phi $/WMTEX$"
 	SetVariable sc_demodphiBox,value=sc_demodphi
-	SetVariable sc_nfreqBox,pos={500.00,312.00},size={148.00,20.00}
+	SetVariable sc_nfreqBox,pos={842.00,265.00},size={148.00,20.00}
 	SetVariable sc_nfreqBox,title="\\Z14 Notch Freqs"
 	SetVariable sc_nfreqBox,help={"seperate frequencies (Hz) with , "}
 	SetVariable sc_nfreqBox,value=sc_nfreq
-	SetVariable sc_nQsBox,pos={660.00,312.00},size={140.00,20.00}
+	SetVariable sc_nQsBox,pos={847.00,298.00},size={140.00,20.00}
 	SetVariable sc_nQsBox,title="\\Z14 Notch Qs",help={"seperate Qs with , "}
 	SetVariable sc_nQsBox,value=sc_nQs
 	ListBox sc_InstrFdac,pos={396.00,393.00},size={600.00,128.00},fSize=14,frame=2
@@ -3208,18 +3237,6 @@ Window after1() : Panel
 	TabControl tb2,pos={44.00,420.00},size={180.00,20.00},disable=1,proc=TabProc2
 	TabControl tb2,fSize=13,tabLabel(0)="Set AW",tabLabel(1)="AW0",tabLabel(2)="AW1"
 	TabControl tb2,value=0
-	ListBox awglist,pos={68.00,452.00},size={140.00,120.00},disable=1,fSize=14
-	ListBox awglist,frame=2,listWave=root:AWGvalstr,selWave=root:AWGattr,mode=1
-	ListBox awglist,selRow=0,widths={40,60}
-	ListBox awglist0,pos={68.00,452.00},size={140.00,120.00},disable=1,fSize=14
-	ListBox awglist0,frame=2,listWave=root:AWGvalstr0,selWave=root:AWGattr0,mode=1
-	ListBox awglist0,selRow=0,widths={40,60}
-	ListBox awglist1,pos={68.00,452.00},size={140.00,120.00},disable=1,fSize=14
-	ListBox awglist1,frame=2,listWave=root:AWGvalstr1,selWave=root:AWGattr1,mode=1
-	ListBox awglist1,selRow=0,widths={40,60}
-	ListBox awgsetlist,pos={220.00,476.00},size={144.00,68.00},disable=1,fSize=14
-	ListBox awgsetlist,frame=2,listWave=root:AWGsetvalstr,selWave=root:AWGsetattr
-	ListBox awgsetlist,mode=1,selRow=0,widths={50,40}
 	TitleBox freqtextbox,pos={8.00,480.00},size={100.00,20.00},disable=1
 	TitleBox freqtextbox,title="Frequency",frame=0
 	TitleBox Hztextbox,pos={48.00,500.00},size={40.00,20.00},disable=1,title="Hz"
@@ -3228,16 +3245,6 @@ Window after1() : Panel
 	Button clearAW,title="Clear"
 	Button setupAW,pos={8.00,524.00},size={52.00,20.00},disable=1,proc=scw_setupsquarewave
 	Button setupAW,title="Create"
-	SetVariable sc_wnumawgBox,pos={8.00,496.00},size={52.00,24.00},disable=1
-	SetVariable sc_wnumawgBox,title="\\Z14AW",help={"0 or 1"},value=sc_wnumawg
-	SetVariable sc_freqBox0,pos={4.00,500.00},size={40.00,20.00},disable=1
-	SetVariable sc_freqBox0,title="\\Z14 ",help={"Shows the frequency of AW0"}
-	SetVariable sc_freqBox0,value=sc_freqAW0
-	SetVariable sc_freqBox1,pos={4.00,500.00},size={40.00,20.00},disable=1
-	SetVariable sc_freqBox1,title="\\Z14 ",help={"Shows the frequency of AW1"}
-	SetVariable sc_freqBox1,value=sc_freqAW1
-	Button setupAWGfdac,pos={260.00,552.00},size={108.00,20.00},disable=1,proc=scw_setupAWG
-	Button setupAWGfdac,title="Setup AWG"
 	Button show_AWG,pos={886.00,537.00},size={60.00,40.00},proc=scw_Show_AWG_wave
 	Button show_AWG,title="show\rAWG",fColor=(52428,34958,1)
 	Button close_tables,pos={608.00,536.00},size={60.00,40.00},proc=scw_Close_tables
@@ -3246,6 +3253,10 @@ Window after1() : Panel
 	Button hide,title="Hide All\r Procs",fColor=(52428,52425,1)
 	Button maxi,pos={816.00,536.00},size={60.00,40.00},proc=scw_maximize
 	Button maxi,title="large\rwindow",fColor=(26214,26214,26214)
+	CheckBox sc_plotRawBox1,pos={528.00,263.00},size={72.00,17.00},proc=scw_CheckboxClicked
+	CheckBox sc_plotRawBox1,title="\\Z14Plot Raw",variable=sc_plotRaw,side=1
+	CheckBox save_RAW,pos={516.00,340.00},size={79.00,17.00},title="\\Z14Save Raw"
+	CheckBox save_RAW,fSize=12,variable=sc_saverawfadc,side=1
 EndMacro
 
 
@@ -3423,11 +3434,7 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 		S_.end_time = datetime
 		S_.comments = "aborted, " + S_.comments
 	endif
-	
-//	if (S_.end_time == 0 || numtype(S_.end_time) != 0) // Should have already been set, but if not, this is likely a good guess and prevents a stupid number being saved
-////		S_.end_time = datetime-date2secs(2024,04,22) 
-//		S_.comments = "end_time guessed, "+S_.comments
-//	endif
+
 	
 	nvar filenum
 	S_.filenum = filenum
@@ -4433,3 +4440,6 @@ end
 //	endif
 //
 //end
+
+
+

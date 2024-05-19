@@ -112,7 +112,7 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 	variable logs_only  // 1=Don't save any sweep information to HDF
 	make/Free/T/N=1 cconfig = {""}
 //	cconfig = prettyJSONfmt(scw_createConfig())  	//<< 2023/01 -- I think someting about this is chopping off a lot of the info
-	cconfig = scw_createConfig()  					// << This is the temporary fix -- at least the info is saved even if not perfect
+//	cconfig = scw_createConfig()  					// << This is the temporary fix -- at least the info is saved even if not perfect
 	
 	if (!logs_only)
 		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(sc_createSweepLogs(S=S))
@@ -180,7 +180,7 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 		endif
 
 		// may as well save this config file, since we already have it
-		scw_saveConfig()	
+//		scw_saveConfig()	
 		
 	endfor
 end
@@ -373,11 +373,11 @@ function saveScanWaves(hdfid, S, filtered)
 	variable filtered
 
 
-	if(filtered)
-		make/o/free/N=(scfd_postFilterNumpts(S.numptsx, S.measureFreq)) sc_xarray
-	else
+//	if(filtered)
+//		make/o/free/N=(scfd_postFilterNumpts(S.numptsx, S.measureFreq)) sc_xarray
+//	else
 		make/o/free/N=(S.numptsx) sc_xarray
-	endif
+//	endif
 
 	string cmd
 	setscale/I x S.startx, S.finx, sc_xarray
@@ -449,10 +449,12 @@ function SaveToHDF(S, [additional_wavenames])
 		saveFastdacInfoWaves(hdfids, S)
 	endif
 
-	// Save ScanWaves (e.g. x_array, y_array etc)
-	if(S.using_fastdac)
-		saveScanWaves(calc_hdf5_id, S, 1)  // Needs a different x_array size if filtered
-	endif
+//	// Save ScanWaves (e.g. x_array, y_array etc)
+//*** got rid of this, since all the wave scalings are linear anyways and the start and endpoints are saved in sweepgates_x and sweepgates_y
+//	if(S.using_fastdac)
+//		saveScanWaves(calc_hdf5_id, S, 1)  // Needs a different x_array size if filtered
+//		
+//	endif
 	
 	// Get waveList to save
 	string RawWaves, CalcWaves, rwn, cwn, ADCnum, rawWaves2, rawSaveNames
@@ -467,7 +469,7 @@ function SaveToHDF(S, [additional_wavenames])
 		RawWaves2 = RawWaves
 		
 		if(S.using_fastdac)
-			rawSaveNames = Calcwaves
+			rawSaveNames = RawWaves
 			for(i=0; i<itemsinlist(RawWaves); i++)
 				rwn = StringFromList(i, RawWaves)
 				cwn = StringFromList(i-j, CalcWaves)
@@ -476,7 +478,7 @@ function SaveToHDF(S, [additional_wavenames])
 					CalcWaves += cwn + "x;"
 					CalcWaves += cwn + "y;"
 				endif
-				if (sc_hotcold)
+				if (fadcattr[str2num(ADCnum)][8] == 48)
 					CalcWaves += cwn + "hot;"
 					CalcWaves += cwn + "cold;"
 					CalcWaves += cwn + "entr;"
@@ -497,7 +499,7 @@ function SaveToHDF(S, [additional_wavenames])
 		CalcWaves = sci_get2DWaveNames(0, S.using_fastdac)
 		RawWaves2 = RawWaves
 		if(S.using_fastdac)
-			rawSaveNames = Calcwaves
+			rawSaveNames = RawWaves
 			for(i=0; i<itemsinlist(RawWaves); i++)
 				rwn = StringFromList(i, RawWaves)
 				cwn = StringFromList(i-j, CalcWaves)
@@ -510,7 +512,7 @@ function SaveToHDF(S, [additional_wavenames])
 					endif
 				endif
 			
-				if(sc_hotcold)
+				if (fadcattr[str2num(ADCnum)][8] == 48)
 					CalcWaves += cwn[0,strlen(cwn)-4] + "entr_2d;"
 					rawWaves2  = addlistitem(stringfromList(0,calcwaves), rawWaves2) //adding notched/resamp waves to raw dat
 					rawSaveNames= addlistitem(stringfromlist(0,calcwaves) + "_cl", rawSaveNames)
