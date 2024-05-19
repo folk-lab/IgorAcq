@@ -3173,7 +3173,7 @@ End
 
 Window after1() : Panel
 	PauseUpdate; Silent 1		// building window...
-	NewPanel /W=(32,496,1042,1099)
+	NewPanel /W=(32,496,1066,1091)
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv fsize= 25,fstyle= 1
@@ -3231,10 +3231,9 @@ Window after1() : Panel
 	Button fdacramp,title="Ramp"
 	Button fdacrampzero,pos={264.00,528.00},size={80.00,20.00},proc=scfw_update_fdac
 	Button fdacrampzero,title="Ramp all 0"
-	ListBox fadclist,pos={400.00,72.00},size={600.00,180.00},fSize=14,frame=2
-	ListBox fadclist,listWave=root:fadcvalstr,selWave=root:fadcattr,proc=scw_ListboxClicked
-//	ListBox fadclist,colorWave=root:colour_bent_CW,mode=1,selRow=3
-	ListBox fadclist,widths={30,70,30,95,100,30,30,20}
+	ListBox fadclist,pos={400.00,72.00},size={600.00,180.00},proc=scw_ListboxClicked
+	ListBox fadclist,fSize=14,frame=2,listWave=root:fadcvalstr,selWave=root:fadcattr
+	ListBox fadclist,colorWave=root:colour_bent_CW,widths={30,70,30,95,100,30,30,20}
 	Button updatefadc,pos={394.00,262.00},size={88.00,20.00},proc=scfw_update_fadc
 	Button updatefadc,title="Update ADC"
 	CheckBox sc_demodyBox,pos={688.00,294.00},size={108.00,17.00},proc=scw_CheckboxClicked
@@ -3291,6 +3290,8 @@ Window after1() : Panel
 	CheckBox sc_plotRawBox1,title="\\Z14Plot Raw",variable=sc_plotRaw,side=1
 	CheckBox save_RAW,pos={516.00,340.00},size={79.00,17.00},title="\\Z14Save Raw"
 	CheckBox save_RAW,fSize=12,variable=sc_saverawfadc,side=1
+	Button show_ScanVars,pos={955.00,538.00},size={60.00,40.00},proc=scw_Show_ScanVars
+	Button show_ScanVars,title="show\rScanVars",fSize=11,fColor=(52428,1,41942)
 EndMacro
 
 
