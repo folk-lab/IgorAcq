@@ -59,15 +59,25 @@
 //////////////////// INITIALISING THE EXPERIMENT /////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
 
-macro initexperiment_macro()
-	initexperiment()
+macro initexperiment_macro([user])
+	string user
+	user = selectstring(paramisdefault(user), user, "default")
+	
+	initexperiment(user = user)
 endmacro
 
 
-function initexperiment()
+function initexperiment([user])
+	// User variable for non-default experiment paths 
+	// Current users:
+	// user = "silvia"
+	string user
+	user = selectstring(paramisdefault(user), user, "default")
+
+	
 
 	// create experiment paths
-	sc_create_experiment_paths()
+	sc_create_experiment_paths(user = user)
 	
 	// add custom colours
 	create_colour_wave()
@@ -102,11 +112,10 @@ function initexperiment()
 	string swagger_file = master_path + "start_swagger.sh"
 	//string portnum = sc_get_swagger_port(swagger_file)
 	
-	string portnum = "44001"
+	string portnum = "44001" //51011
+	
 	// open fastdacconnection
-	// openFastDAC(portnum, verbose = 0)
 	openFastDAC(portnum, verbose = 0)
-	// openFastDAC("51011", verbose = 0)
 	
 	// initialise the scancontroller 
 	initscancontroller()
@@ -122,15 +131,15 @@ function initexperiment()
 	make/o/t/n=6 sc_awg_labels
 	sc_awg_labels={"DAC Channel", "Setpoints", "Samples", "Box #", "# Cycles", "Do not edit"} // this will be the sc_awg_labels for the AWG table
 	
-// Create a text wave with custom labels for a specific application
-Make/O/T/N=(36) ScanVars_labels // Create a text wave with 36 entries
-// Assign labels to the wave
-ScanVars_labels = {"instrIDx", "instrIDy", "lims_checked", "startx", "finx", "numptsx", "rampratex", "delayx", "is2d", "starty", "finy", "numptsy", "rampratey", "delayy", "alternate", "duration", "readvstime", "interlaced_y_flat", "interlaced_num_setpoints", "interlaced_num_setpoints", "start_time", "end_time", "using_fastdac", "numADCs", "samplingFreq", "measureFreq", "sweeprate", "lastread", "direction", "never_save", "filenum", "sync", "maxADCs", "use_AWG", "wavelen", "numCycles"}
-
-
-Make/O/T/N=(22) ScanVarsStr_labels // Create a text wave with 27 entries
-// Assign labels to the wave
-ScanVarsStr_labels = {"channelsx", "startxs", "finxs", "channelsy", "startys", "finys", "interlaced_channels", "interlaced_setpoints", "x_label", "y_label", "adcList", "raw_wave_names", "instrIDs", "adcListIDs", "dacListIDs", "fakeRecords", "adcLists", "IDstartxs", "IDfinxs", "dacListIDs_y", "comments", "AWG_DACs"}
+	// Create a text wave with custom labels for a specific application
+	Make/O/T/N=(36) ScanVars_labels // Create a text wave with 36 entries
+	// Assign labels to the wave
+	ScanVars_labels = {"instrIDx", "instrIDy", "lims_checked", "startx", "finx", "numptsx", "rampratex", "delayx", "is2d", "starty", "finy", "numptsy", "rampratey", "delayy", "alternate", "duration", "readvstime", "interlaced_y_flat", "interlaced_num_setpoints", "interlaced_num_setpoints", "start_time", "end_time", "using_fastdac", "numADCs", "samplingFreq", "measureFreq", "sweeprate", "lastread", "direction", "never_save", "filenum", "sync", "maxADCs", "use_AWG", "wavelen", "numCycles"}
+	
+	
+	Make/O/T/N=(22) ScanVarsStr_labels // Create a text wave with 27 entries
+	// Assign labels to the wave
+	ScanVarsStr_labels = {"channelsx", "startxs", "finxs", "channelsy", "startys", "finys", "interlaced_channels", "interlaced_setpoints", "x_label", "y_label", "adcList", "raw_wave_names", "instrIDs", "adcListIDs", "dacListIDs", "fakeRecords", "adcLists", "IDstartxs", "IDfinxs", "dacListIDs_y", "comments", "AWG_DACs"}
 
 end
 
@@ -198,9 +207,11 @@ function [string home_path, string separator_type] sc_get_igor_path()
 end
 
 
-function sc_create_experiment_paths()
+function sc_create_experiment_paths([user])
 //	assumes the experiment has been saved so that the filepath 'home' exists
 //	not tested on Windows computer
+	string user
+	user = selectstring(paramisdefault(user), user, "default")
 
 	string home_path, separator_type
 	[home_path, separator_type] = sc_get_igor_path()
@@ -211,8 +222,11 @@ function sc_create_experiment_paths()
 	string master_path = home_path
 	
 	string data_path = master_path + "data" + separator_type
-	string tempdata_path = master_path + "temp_data" + separator_type /// this does not work for me
-	 tempdata_path="Macintosh HD:Users:luescher:acquired-data:"
+	string tempdata_path = master_path + "temp_data" + separator_type
+	
+	if (cmpstr(user, "silvia") == 0)
+		tempdata_path="Macintosh HD:Users:luescher:acquired-data:"
+	endif
 
 	
 	 
@@ -231,8 +245,12 @@ function sc_create_experiment_paths()
 		master_path += "local_measurement_programs:IgorAcq:data:"
 	endif
 	
-	string colour_path = master_path + "colours" + separator_type  /// this also does not work for me
-	 colour_path="Macintosh HD:Users:luescher:Documents:GitHub:IgorAcq:data:colours:"
+	string colour_path = master_path + "colours" + separator_type
+	
+	if (cmpstr(user, "silvia") == 0)
+		colour_path = "Macintosh HD:Users:luescher:Documents:GitHub:IgorAcq:data:colours:"
+	endif
+	
 	NewPath/o/C colour_data colour_path
 
 end
