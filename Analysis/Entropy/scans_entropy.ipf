@@ -395,6 +395,10 @@ function ScanFastDAC2D_virtual(startx, finx, channelsx, starty, finy, channelsy,
 	// Note: To ramp with babyDAC on slow axis provide the BabyDAC variable in bdID
 	// Note: channels should be a comma-separated string ex: "0,4,5"
 	// Note: Virtual corner gates MUST be on the fast axis (since they are swept during the scan)
+	
+	// EXAMPLE USE
+	// ScanFastDAC2D_virtual("-680", "-295,-248", "200", "100,-86",  "P*2", "N,CSS", sweeprate=400, numptsy=51, csname="CSQ*20", fadcchannel=4.1, natarget=1, gate_divider=15, display_diff=1)
+
 	variable startx, finx, starty, finy, numptsy, numpts, sweeprate, bdID, rampratex, rampratey, delayy, nosave, use_AWG, use_only_corners
 	string channelsx, channelsy, comments, startxs, finxs, startys, finys, interlaced_channels, interlaced_setpoints
 	string virtual_corners  // , separated list of 4 corner values for each virtual gate. ; separated for multiple virtual gates -- Corners should be specified as a single value for each of "StartX|StartY, FinX|StartY, StartX|FinY, FinX|FinY"
@@ -1405,10 +1409,11 @@ end
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
 function CorrectChargeSensor([fdchannelstr, fadcchannel, i, check, natarget, direction, zero_tol, gate_divider, cutoff_time])
-// Corrects the charge sensor by ramping the CSQ in 1mV steps
-// 'direction' changes the initial direction it tries to correct in
-// ex.
-// CorrectChargeSensor(fdchannelstr="CSQ", fadcchannel=5.1, check=0, natarget=1.2, direction=1, gate_divider=1)
+	// Corrects the charge sensor by ramping the CSQ in 1mV steps
+	// 'direction' changes the initial direction it tries to correct in
+	
+	// EXAMPLE USE
+	// CorrectChargeSensor(fdchannelstr="CSQ", fadcchannel=5.1, check=0, natarget=1.2, direction=1, gate_divider=1)
 	string fdchannelstr
 	variable fadcchannel, i, check, natarget, direction, zero_tol, gate_divider, cutoff_time
 	variable cdac, cfdac, current, new_current, nextdac, j
