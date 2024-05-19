@@ -60,8 +60,9 @@
 //////////////////////////////////////////////////////////////////////////////////////////
 
 macro initexperiment_macro()
-	string user = "default"
+//	string user = "default"
 //	string user = "silvia"
+	string user = "ld"
 
 	initexperiment(user = user)
 endmacro
@@ -71,10 +72,11 @@ function initexperiment([user])
 	// User variable for non-default experiment paths 
 	// Current users:
 	// user = "silvia"
+	// user = "ld"
+	
 	string user
 	user = selectstring(paramisdefault(user), user, "default")
 
-	
 
 	// create experiment paths
 	sc_create_experiment_paths(user = user)
@@ -225,10 +227,11 @@ function sc_create_experiment_paths([user])
 	string tempdata_path = master_path + "temp_data" + separator_type
 	
 	if (cmpstr(user, "silvia") == 0)
-		tempdata_path="Macintosh HD:Users:luescher:acquired-data:"
+		tempdata_path = "Macintosh HD:Users:luescher:acquired-data:"
+	elseif (cmpstr(user, "ld") == 0)
+		tempdata_path = "C:Users:folklab:acquired-data:"
 	endif
 
-	
 	 
 	NewPath/o/C data data_path
 	NewPath/o/C fdtest tempdata_path
@@ -249,6 +252,8 @@ function sc_create_experiment_paths([user])
 	
 	if (cmpstr(user, "silvia") == 0)
 		colour_path = "Macintosh HD:Users:luescher:Documents:GitHub:IgorAcq:data:colours:"
+	elseif (cmpstr(user, "ld") == 0)
+		colour_path = "D:local_measurement_programs:Github:IgorAcq:data:colours:"
 	endif
 	
 	NewPath/o/C colour_data colour_path
