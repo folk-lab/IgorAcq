@@ -2802,7 +2802,6 @@ end
 
 
 function scfd_checkSweepstate()
-Svar fd
   	// if abort button pressed then stops FDAC sweep then aborts
 	variable errCode
 	nvar sc_abortsweep
@@ -2823,6 +2822,42 @@ end
 //////////////////////////////////////////////////////////////////////////////
 ////////////////////// SCANCONTROLLER WINDOW FUCNTIONALITY ///////////////////
 //////////////////////////////////////////////////////////////////////////////
+
+Function scw_ListboxClicked(ControlName,row,col,event)
+	// colour the ADC row when theh check box is ticked
+	String ControlName     // name of this control
+	Variable row        // row if click in interior, -1 if click in title
+	Variable col        // column number
+	Variable event      // event code
+	
+	wave fadcattr
+	int check_val = fadcattr[row][col][0]
+	
+	variable start_percent = 0.3
+	variable end_percent = 0.45
+	variable diff_percent = end_percent - start_percent
+	variable percent = 0
+	variable adc_num = floor(row/4)
+	variable num_fastdac = dimsize(fadcattr, 0)/4
+	variable colour_index
+	
+	wave colour_val = colour_bent_CW
+	
+	if (col == 2)
+		percent = start_percent + adc_num * (end_percent - start_percent) / (num_fastdac - 1)
+		if (check_val == 48)
+			colour_index = scw_return_colour_index(colour_val, percent, 1)
+		elseif (32)
+			colour_index = scw_return_colour_index(colour_val, percent, 0)
+		endif
+		
+		fadcattr[row][][1] = colour_index
+	endif
+	
+	return 0
+End
+
+
 // Update after checkbox clicked
 function scw_CheckboxClicked(ControlName, Value)
 	string ControlName
@@ -2847,12 +2882,12 @@ function scw_CheckboxClicked(ControlName, Value)
 		expr="sc_RawPlotCheckBox([[:digit:]]+)"
 		SplitString/E=(expr) controlname, indexstring
 		index = str2num(indexstring)
-		sc_RawPlot[index] = value		
+		sc_RawPlot[index] = value	
 	elseif (stringmatch(ControlName,"sc_CalcPlotCheckBox*"))
 		expr="sc_CalcPlotCheckBox([[:digit:]]+)"
 		SplitString/E=(expr) controlname, indexstring
 		index = str2num(indexstring)
-		sc_CalcPlot[index] = value				
+		sc_CalcPlot[index] = value	
 	elseif (stringmatch(ControlName,"sc_AsyncCheckBox*"))
 		expr="sc_AsyncCheckBox([[:digit:]]+)"
 		SplitString/E=(expr) controlname, indexstring
@@ -2872,7 +2907,6 @@ function scw_CheckboxClicked(ControlName, Value)
 		sc_demody = value
 	elseif(stringmatch(ControlName,"sc_hotcoldBox")) // FastDAC window
 		sc_hotcold = value
-
 	endif
 end
 
@@ -3198,8 +3232,8 @@ Window after1() : Panel
 	Button fdacrampzero,pos={264.00,528.00},size={80.00,20.00},proc=scfw_update_fdac
 	Button fdacrampzero,title="Ramp all 0"
 	ListBox fadclist,pos={400.00,72.00},size={600.00,180.00},fSize=14,frame=2
-	ListBox fadclist,listWave=root:fadcvalstr,selWave=root:fadcattr
-	ListBox fadclist,colorWave=root:colour_bent_CW,mode=1,selRow=5
+	ListBox fadclist,listWave=root:fadcvalstr,selWave=root:fadcattr,proc=scw_ListboxClicked
+//	ListBox fadclist,colorWave=root:colour_bent_CW,mode=1,selRow=3
 	ListBox fadclist,widths={30,70,30,95,100,30,30,20}
 	Button updatefadc,pos={394.00,262.00},size={88.00,20.00},proc=scfw_update_fadc
 	Button updatefadc,title="Update ADC"
@@ -3716,6 +3750,28 @@ function scw_colour_the_table()
 end
 
 
+function scw_return_colour_index(colour_wave, percent_of_wav, upper_half)
+	wave colour_wave
+	variable percent_of_wav, upper_half
+	// colour_wave is a colour wave
+	// percent_of_wav is the percent which to return the index (assumed only taking half of the wave)
+	// upper_half looks at first half of numbers (useful for diverging waves)
+	
+	variable colour_index, num_colours
+	num_colours = dimsize(colour_wave, 0)
+	
+	if (upper_half == 0)
+		colour_index = round(num_colours * percent_of_wav)
+	elseif (upper_half == 1)
+		colour_index = num_colours - round(num_colours * percent_of_wav)
+	else
+		abort "upper_half should be 0 or 1 : it was " + num2str(upper_half)
+	endif
+	
+	return colour_index
+end
+
+
 function scw_create_colour_waves()
 	// assumes fdacattr and fadcattr already exists 
 	
@@ -3737,22 +3793,18 @@ function scw_create_colour_waves()
 	num_colours = dimsize(colour_val, 0)
 	insertpoints /M=1 /V=(65535/2) inf, 1, sc_colour_table
 
-	variable start_index = round(num_colours*0.3)
-	variable end_index = round(num_colours*0.45)
-	num_colours = end_index - start_index
-	
-//	variable start_false_index = round(num_colours/2) + start_index
-//	variable end_index = round(num_colours/2) + end_index
-	
+	variable start_percent = 0.3
+	variable end_percent = 0.45
+	variable percent = 0
+
 	
 	// colour the dac
 	int fastdac_count = 0
 	int i
 	for  (i=0; i < num_fastdac * num_dac; i++)
 		
-		fastdac_count = floor(i/8)
-		colour_index = fastdac_count * (num_colours/(num_fastdac-1)) + start_index
-		colour_index += 10
+		percent = start_percent + floor(i/8) * (end_percent - start_percent) / (num_fastdac - 1)
+		colour_index = scw_return_colour_index(colour_val, percent, 0)
 		
 		fdacattr[i][0][1] = colour_index
 		fdacattr[i][1][1] = colour_index
@@ -3767,9 +3819,8 @@ function scw_create_colour_waves()
 	fastdac_count = 0
 	for  (i=0; i < num_fastdac * num_adc; i++)
 		
-		fastdac_count = floor(i/4)
-		colour_index = fastdac_count * (num_colours/(num_fastdac-1)) + start_index
-		colour_index += 10
+		percent = start_percent + floor(i/4) * (end_percent - start_percent) / (num_fastdac - 1)
+		colour_index = scw_return_colour_index(colour_val, percent, 0)
 	
 		fadcattr[i][0][1] = colour_index
 		fadcattr[i][1][1] = colour_index
