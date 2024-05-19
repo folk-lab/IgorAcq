@@ -59,10 +59,10 @@
 //////////////////// INITIALISING THE EXPERIMENT /////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
 
-macro initexperiment_macro([user])
-	string user
-	user = selectstring(paramisdefault(user), user, "default")
-	
+macro initexperiment_macro()
+	string user = "default"
+//	string user = "silvia"
+
 	initexperiment(user = user)
 endmacro
 
