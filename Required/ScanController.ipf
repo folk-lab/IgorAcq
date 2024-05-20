@@ -1326,9 +1326,6 @@ function initializeScan(S, [init_graphs, y_label])
 	y_label = selectString(paramIsDefault(y_label), y_label, "")
 	init_graphs = paramisdefault(init_graphs) ? 1 : init_graphs
 	
-	// Open Abort window
-	scg_openAbortWindow()
-	
 	// Make sure waves exist to store data
 	sci_initializeWaves(S)  //0.00061s per wave
 	
@@ -1338,6 +1335,9 @@ function initializeScan(S, [init_graphs, y_label])
 		activeGraphs = scg_initializeGraphs(S, y_label = y_label)// 0.00045s per wave
 		scg_arrangeWindows(activeGraphs)// 2.2s per two graph
 	endif
+	
+		// Open Abort window
+	scg_openAbortWindow()
 	
 	// Save struct to globals
 	scv_setLastScanVars(S)
@@ -1446,7 +1446,9 @@ function sci_init1DWave(wn, numpts, start, fin)
 	   	abort cmd
    endif
     
-    make/O/n=(numpts) $wn = NaN
+    make/O/n=(numpts) $wn
+    wave testwave=$wn
+    MultiThread testwave = NaN
     cmd = "setscale/I x " + num2str(start) + ", " + num2str(fin) + ", " + wn; execute(cmd)
     print wn
 end
@@ -1472,7 +1474,10 @@ function sci_init2DWave(wn, numptsx, startx, finx, numptsy, starty, finy)
    endif
     
 
-    make/O/n=(numptsx, numptsy) $wn = NaN
+    make/O/n=(numptsx, numptsy) $wn
+    wave testwave=$wn
+    MultiThread testwave = NaN
+
     cmd = "setscale/I x " + num2str(startx) + ", " + num2str(finx) + ", " + wn; execute(cmd)
 	cmd = "setscale/I y " + num2str(starty) + ", " + num2str(finy) + ", " + wn; execute(cmd)
 	print wn
@@ -2099,17 +2104,28 @@ end
 ////////////////////////////
 ///// Sweep controls   ///// scs_... (ScanControlSweep...)
 ////////////////////////////
-window scs_abortmeasurementwindow() : Panel
-	//Silent 1 // building window
-	NewPanel /W=(500,700,870,750) /N=SweepControl// window size
+//window scs_abortmeasurementwindow() : Panel
+//	//Silent 1 // building window
+//	NewPanel /W=(500,700,870,750) /N=SweepControl// window size
+//	ModifyPanel frameStyle=2
+//	ModifyPanel fixedSize=1
+//	SetDrawLayer UserBack
+//	Button scs_pausesweep, pos={10,15},size={110,20},proc=scs_pausesweep,title="Pause"
+//	Button scs_stopsweep, pos={130,15},size={110,20},proc=scs_stopsweep,title="Abort and Save"
+//	Button scs_stopsweepnosave, pos={250,15},size={110,20},proc=scs_stopsweep,title="Abort"
+//	DoUpdate /W=SweepControl /E=1
+//endmacro
+
+Window scs_abortmeasurementwindow() : Panel
+	PauseUpdate; Silent 1		// building window...
+	NewPanel /W=(440,819,814,929) /N=SweepControl
 	ModifyPanel frameStyle=2
-	ModifyPanel fixedSize=1
 	SetDrawLayer UserBack
-	Button scs_pausesweep, pos={10,15},size={110,20},proc=scs_pausesweep,title="Pause"
-	Button scs_stopsweep, pos={130,15},size={110,20},proc=scs_stopsweep,title="Abort and Save"
-	Button scs_stopsweepnosave, pos={250,15},size={110,20},proc=scs_stopsweep,title="Abort"
-	DoUpdate /W=SweepControl /E=1
-endmacro
+	SetDrawEnv textxjust= 1,textyjust= 1
+	DrawText 188,53,"\\Z16\\F'Avenir' \"ESC\" to abort and save\r\"CTRL\" (PC) or \"CMD\" (Mac) to abort w/o saving \r\"SHIFT\"  to pause\n\"RIGHT ARROW\"  to unpause"
+EndMacro
+
+
 
 
 function scs_stopsweep(action) : Buttoncontrol
@@ -2150,45 +2166,65 @@ end
 
 
 function scs_checksweepstate()
-	nvar /Z sc_abortsweep, sc_pause, sc_abortnosave
-	
-	if(NVAR_Exists(sc_abortsweep) && sc_abortsweep==1)
+	variable sc_abortkey=GetKeyState(0)  // returns a number corresponding to which keys are currently pressed: 32 for ESC, 4 for SHIFT, 1 for CLTR on PC or COMM on Mac, 128 for right arrow
+	if(sc_abortkey == 32)
 		// If the Abort button is pressed during the scan, save existing data and stop the scan.
 		fd_stopFDACsweep()
-		dowindow /k SweepControl
-		sc_abortsweep=0
-		sc_abortnosave=0
-		sc_pause=0
 		EndScan(save_experiment=0, aborting=1)				
 		abort "Measurement aborted by user. Data saved automatically."
-	elseif(NVAR_Exists(sc_abortnosave) && sc_abortnosave==1)
+	elseif(sc_abortkey == 1)
 		// Abort measurement without saving anything!
 		fd_stopFDACsweep()
-		dowindow /k SweepControl
-		sc_abortnosave = 0
-		sc_abortsweep = 0
-		sc_pause=0
+		dowindow/k SweepControl // kill scan control window
 		abort "Measurement aborted by user. Data not saved automatically. Run \"EndScan(abort=1)\" if needed"
-	elseif(NVAR_Exists(sc_pause) && sc_pause==1)
+	elseif(sc_abortkey == 4)
+		print sc_abortkey
 		// Pause sweep if button is pressed
 		do
-			if(sc_abortsweep)
-				dowindow /k SweepControl
-				sc_abortsweep=0
-				sc_abortnosave=0
-				sc_pause=0
-				EndScan(save_experiment=0, aborting=1) 				
-				abort "Measurement aborted by user"
-			elseif(sc_abortnosave)
-				dowindow /k SweepControl
-				sc_abortsweep=0
-				sc_abortnosave=0
-				sc_pause=0
-				abort "Measurement aborted by user. Data NOT saved!"
-			endif
-		while(sc_pause)
+			sc_sleep(1)
+		while(!(getkeystate(0) && 128))
 	endif
 end
+//function scs_checksweepstate()
+//	nvar /Z sc_abortsweep, sc_pause, sc_abortnosave
+//	
+//	if(NVAR_Exists(sc_abortsweep) && sc_abortsweep==1)
+//		// If the Abort button is pressed during the scan, save existing data and stop the scan.
+//		fd_stopFDACsweep()
+//		dowindow /k SweepControl
+//		sc_abortsweep=0
+//		sc_abortnosave=0
+//		sc_pause=0
+//		EndScan(save_experiment=0, aborting=1)				
+//		abort "Measurement aborted by user. Data saved automatically."
+//	elseif(NVAR_Exists(sc_abortnosave) && sc_abortnosave==1)
+//		// Abort measurement without saving anything!
+//		fd_stopFDACsweep()
+//		dowindow /k SweepControl
+//		sc_abortnosave = 0
+//		sc_abortsweep = 0
+//		sc_pause=0
+//		abort "Measurement aborted by user. Data not saved automatically. Run \"EndScan(abort=1)\" if needed"
+//	elseif(NVAR_Exists(sc_pause) && sc_pause==1)
+//		// Pause sweep if button is pressed
+//		do
+//			if(sc_abortsweep)
+//				dowindow /k SweepControl
+//				sc_abortsweep=0
+//				sc_abortnosave=0
+//				sc_pause=0
+//				EndScan(save_experiment=0, aborting=1) 				
+//				abort "Measurement aborted by user"
+//			elseif(sc_abortnosave)
+//				dowindow /k SweepControl
+//				sc_abortsweep=0
+//				sc_abortnosave=0
+//				sc_pause=0
+//				abort "Measurement aborted by user. Data NOT saved!"
+//			endif
+//		while(sc_pause)
+//	endif
+//end
 
 //////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////// Taking Data and processing //////////////////////////////////  scfd_... (ScanControllerFastdacData...)
@@ -3193,6 +3229,22 @@ Function scw_Maximize(ba) : ButtonControl
 	return 0
 End
 
+
+Menu "Windows"
+	"Close All Graphs/9", CloseAllGraphs()
+End
+
+Menu "Windows"
+	"Close All Tables/8", CloseAllTables()
+End
+
+Menu "Windows"
+	"Scancontoller windows /0", Dowindow/f after1;  //Dowindow/f ScanController
+End
+
+Menu "Windows"
+	"Stop current FD sweep /1", fd_stopFDACsweep()
+End
 
 Window after1() : Panel
 	PauseUpdate; Silent 1		// building window...

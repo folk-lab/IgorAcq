@@ -1217,7 +1217,6 @@ function fd_stopFDACsweep()
 	// Perform the HTTP PUT request
 	String response = postHTTP(fd, cmd, payload, headers)
 		print "stopped FD Ramp"
-
 end
 
 
