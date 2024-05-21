@@ -39,7 +39,7 @@
 	string interlaced_channels // Channels that the scan will interlace between
 	string interlaced_setpoints // Setpoints of each channel to interlace between e.g. "0,1,2;0,10,20" will expect 2 channels (;) which interlace between 3 values each (,)
 	variable interlaced_num_setpoints // Number of setpoints for each channel (calculated in InitScanVars)
-	variable prevent_2d_graph_updates // For fast x sweeps with large numptsy (e.g. 2k x 10k) the 2D graph update time becomes significant
+	variable silent_scan // For fast x sweeps with large numptsy (e.g. 2k x 10k) the 2D graph update time becomes significant
 
 	// Other useful info
 	variable start_time // Should be recorded right before measurements begin (e.g. after all checks are carried out)
@@ -149,7 +149,7 @@ Function scv_getLastScanVars(S)
 		S.readVsTime = sc_lastScanVarsVariables[16]
 		S.interlaced_y_flag = sc_lastScanVarsVariables[17]
 		S.interlaced_num_setpoints = sc_lastScanVarsVariables[18]
-		S.prevent_2d_graph_updates = sc_lastScanVarsVariables[19]
+		S.silent_scan = sc_lastScanVarsVariables[19]
 		S.start_time = sc_lastScanVarsVariables[20]
 		S.end_time = sc_lastScanVarsVariables[21]
 		S.using_fastdac = sc_lastScanVarsVariables[22]
@@ -231,7 +231,7 @@ Function scv_setLastScanVars(S)
 	sc_lastScanVarsVariables[16] = S.readVsTime
 	sc_lastScanVarsVariables[17] = S.interlaced_y_flag
 	sc_lastScanVarsVariables[18] = S.interlaced_num_setpoints
-	sc_lastScanVarsVariables[19] = S.prevent_2d_graph_updates
+	sc_lastScanVarsVariables[19] = S.silent_scan
 	sc_lastScanVarsVariables[20] = S.start_time
 	sc_lastScanVarsVariables[21] = S.end_time
 	sc_lastScanVarsVariables[22] = S.using_fastdac

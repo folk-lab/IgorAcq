@@ -795,6 +795,7 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
     string interlaced_channels, interlaced_setpoints
     string comments
     nvar sc_hotcolddelay
+    nvar silent_scan
 	
     ///// Defaulting optional string parameters to empty if not provided /////
 	channelsy = selectString(paramIsDefault(channelsy), channelsy, "")
@@ -832,6 +833,7 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
 	S.adcLists = scf_getRecordedFADCinfo("raw_names")
 	S.fakerecords = "0"
 	S.lastread = -1
+	S.silent_scan=silent_scan
   
 	S.raw_wave_names=scf_getRecordedFADCinfo("raw_names")
 	svar fd

@@ -483,15 +483,12 @@ function SaveToHDF(S, [additional_wavenames])
 					CalcWaves += cwn + "cold;"
 					CalcWaves += cwn + "entr;"
 
-					rawWaves2  = addlistitem(stringfromList(0,calcwaves), rawWaves2) //adding notched/resamp waves to raw dat
-					rawSaveNames= addlistitem(stringfromlist(0,calcwaves) + "_cl", rawSaveNames)
+//					rawWaves2  = addlistitem(stringfromList(0,calcwaves), rawWaves2) //adding notched/resamp waves to raw dat
+//					rawSaveNames= addlistitem(stringfromlist(0,calcwaves) + "_cl", rawSaveNames)
 					calcWaves = removelistItem(0,calcWaves) // removing it from main dat
 					j++	
 				endif
 		 	endfor
-		 	if(sc_hotcold)
-		 		rawWaves = rawWaves2
-		 	endif
 		 endif
 		
 	elseif (S.is2d == 1)

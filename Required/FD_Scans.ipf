@@ -93,7 +93,6 @@ scu_toc()
 	endif
 
 	doWindow/k/z SweepControl  // Attempt to close previously open window just in case
-	doWindow/k/z SweepControl  // Attempt to close previously open window just in case
 
 end
 
