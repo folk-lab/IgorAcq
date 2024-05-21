@@ -213,7 +213,7 @@ function [string home_path, string separator_type] sc_get_igor_path()
 end
 
 
-function sc_create_experiment_paths([user])
+function/s sc_create_experiment_paths([user])
 //	assumes the experiment has been saved so that the filepath 'home' exists
 //	not tested on Windows computer
 	string user
@@ -239,6 +239,7 @@ function sc_create_experiment_paths([user])
 	 
 	NewPath/o/C data data_path
 	NewPath/o/C fdtest tempdata_path
+	newpath/o/c home_path home_path
 	
 	
 	////////////////////////////////////
@@ -261,6 +262,8 @@ function sc_create_experiment_paths([user])
 	endif
 	
 	NewPath/o/C colour_data colour_path
+	print home_path
+	return home_path
 
 end
 
