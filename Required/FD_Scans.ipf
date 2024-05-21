@@ -32,7 +32,7 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 	fins = selectstring(paramisdefault(fins), fins, "")
 	interlaced_channels = selectString(paramisdefault(interlaced_channels), interlaced_channels, "")
 	interlaced_setpoints = selectString(paramisdefault(interlaced_setpoints), interlaced_setpoints, "")
-	
+	scu_tic()
 
 	// Set sc_ScanVars struct
 	struct ScanVars S
@@ -53,7 +53,7 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 	sc_sleep_noupdate(S.delayy)
 	// Initiate Scan
 	initializeScan(S, y_label = y_label)
-
+scu_toc()
 	if (fake==1)
 		abort
 	endif

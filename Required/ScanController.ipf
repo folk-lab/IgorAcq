@@ -61,8 +61,8 @@
 
 macro initexperiment_macro()
 //	string user = "default"
-//	string user = "silvia"
-	string user = "ld"
+	string user = "silvia"
+//	string user = "ld"
 
 	initexperiment(user = user)
 endmacro
@@ -136,7 +136,7 @@ function initexperiment([user])
 	// Create a text wave with custom labels for a specific application
 	Make/O/T/N=(36) ScanVars_labels // Create a text wave with 36 entries
 	// Assign labels to the wave
-	ScanVars_labels = {"instrIDx", "instrIDy", "lims_checked", "startx", "finx", "numptsx", "rampratex", "delayx", "is2d", "starty", "finy", "numptsy", "rampratey", "delayy", "alternate", "duration", "readvstime", "interlaced_y_flat", "interlaced_num_setpoints", "interlaced_num_setpoints", "start_time", "end_time", "using_fastdac", "numADCs", "samplingFreq", "measureFreq", "sweeprate", "lastread", "direction", "never_save", "filenum", "sync", "maxADCs", "use_AWG", "wavelen", "numCycles"}
+	ScanVars_labels = {"instrIDx", "instrIDy", "lims_checked", "startx", "finx", "numptsx", "rampratex", "delayx", "is2d", "starty", "finy", "numptsy", "rampratey", "delayy", "alternate", "duration", "readvstime", "interlaced_y_flat", "interlaced_num_setpoints", "prevent_2d_graph_updates", "start_time", "end_time", "using_fastdac", "numADCs", "samplingFreq", "measureFreq", "sweeprate", "lastread", "direction", "never_save", "filenum", "sync", "maxADCs", "use_AWG", "wavelen", "numCycles","hotcolddelay"}
 	
 	
 	Make/O/T/N=(22) ScanVarsStr_labels // Create a text wave with 27 entries
@@ -1385,7 +1385,7 @@ function sci_initializeWaves(S)  // TODO: rename
 
 
 			//initializing for hot/cold waves, not sure if i need to, if we are just saving in the end?
-			if (S.using_fastdac && raw == 0 && fadcattr[str2num(wavenum)][8] == 48)
+			if (S.using_fastdac && raw == 0 && fadcattr[str2num(wavenum)][8] == 48 && S.use_awg==1)
 				if (fadcattr[str2num(wavenum)][6] == 48)
 					abort "ERROR: Demod and hot/cold can not be selected at the same time!"
 				endif
@@ -1399,16 +1399,16 @@ function sci_initializeWaves(S)  // TODO: rename
 			endif
 
 //			//initializing 1d waves for demodulation
-			if (S.using_fastdac && raw == 0 && fadcattr[str2num(wavenum)][6] == 48)
+			if (S.using_fastdac && raw == 0 && fadcattr[str2num(wavenum)][6] == 48 && S.use_awg==1)
 				sci_init1DWave(wn+"x", S.numptsx, S.startx, S.finx)
 				sci_init1DWave(wn+"y", S.numptsx, S.startx, S.finx)
 
 				//initializing 2d waves for demodulation
 				if (s.is2d == 1)
-					sci_init2DWave(wn+"x_2d", S.numptsx/S.waveLen/S.numCycles, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+					sci_init2DWave(wn+"x_2d", S.numptsx, S.startx, S.finx, S.numptsy, S.starty, S.finy)
 
 					if (sc_demody == 1)
-						sci_init2DWave(wn+"y_2d", S.numptsx/S.waveLen/S.numCycles, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+						sci_init2DWave(wn+"y_2d", S.numptsx, S.startx, S.finx, S.numptsy, S.starty, S.finy)
 					endif
 
 				endif
@@ -1431,26 +1431,30 @@ end
 end
 
 function sci_init1DWave(wn, numpts, start, fin)
-    // Overwrites waveName with scaled wave from start to fin with numpts
-    string wn
-    variable numpts, start, fin
-    string cmd
-    
-    if (numtype(numpts) != 0 || numpts==0)
+	// Overwrites waveName with scaled wave from start to fin with numpts
+	string wn
+	variable numpts, start, fin
+	string cmd
+
+	if (numtype(numpts) != 0 || numpts==0)
 		sprintf cmd "ERROR[sci_init1DWave]: Invalid numpts for wn = %s. numpts either 0 or NaN", wn
-    	abort cmd
-    elseif (numtype(start) != 0 || numtype(fin) != 0)
-    	sprintf cmd "ERROR[sci_init1DWave]: Invalid range passed for wn = %s. numtype(start) = %d, numtype(fin) = %d" wn, numtype(start), numtype(fin)
-    elseif (start == fin)
-	   	sprintf cmd "ERROR[sci_init1DWave]: Invalid range passed for wn = %s. start = %.3f, fin = %.3f", wn, start, fin
-	   	abort cmd
-   endif
-    
-    make/O/n=(numpts) $wn
-    wave testwave=$wn
-    MultiThread testwave = NaN
-    cmd = "setscale/I x " + num2str(start) + ", " + num2str(fin) + ", " + wn; execute(cmd)
-    print wn
+		abort cmd
+	elseif (numtype(start) != 0 || numtype(fin) != 0)
+		sprintf cmd "ERROR[sci_init1DWave]: Invalid range passed for wn = %s. numtype(start) = %d, numtype(fin) = %d" wn, numtype(start), numtype(fin)
+	elseif (start == fin)
+		sprintf cmd "ERROR[sci_init1DWave]: Invalid range passed for wn = %s. start = %.3f, fin = %.3f", wn, start, fin
+		abort cmd
+	endif
+
+	make/O/n=(numpts) $wn
+	wave testwave=$wn
+	if (numpts>2800)
+		MultiThread testwave = NaN
+	else
+		testwave = NaN   // multithread has overhead
+	endif
+
+	cmd = "setscale/I x " + num2str(start) + ", " + num2str(fin) + ", " + wn; execute(cmd)
 end
 
 
@@ -1474,13 +1478,18 @@ function sci_init2DWave(wn, numptsx, startx, finx, numptsy, starty, finy)
    endif
     
 
-    make/O/n=(numptsx, numptsy) $wn
-    wave testwave=$wn
-    MultiThread testwave = NaN
+	make/O/n=(numptsx, numptsy) $wn
+	wave testwave=$wn
+	if (numptsx>2800)
+		MultiThread testwave = NaN
+	else
+		testwave = NaN   // multithread has overhead
+	endif
+
+    
 
     cmd = "setscale/I x " + num2str(startx) + ", " + num2str(finx) + ", " + wn; execute(cmd)
 	cmd = "setscale/I y " + num2str(starty) + ", " + num2str(finy) + ", " + wn; execute(cmd)
-	print wn
 end
 
 
@@ -1616,16 +1625,16 @@ function/S scg_initializeGraphs(S , [y_label])
 				//		    		endfor
 				//		      	endif
 
-				// Graphing specific to using demod
+				// Graphing specific to using AWG (demod or hot/cold)
 				for (j=0; j<itemsinlist(waveNames); j++)
 					string rwn = StringFromList(j, rawWaveNames)
 					string cwn = StringFromList(j, WaveNames)
 					string ADCnum = rwn[3,INF]
 
-					if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
+					if (fadcattr[str2num(ADCnum)][6] == 48 && S.use_awg==1) // checks which demod box is checked
 						buffer += scg_initializeGraphsForWavenames(cwn, S.x_label, y_label=y_label, for_2d=0, y_label_2d = S.y_label)
 						buffer += scg_initializeGraphsForWavenames(cwn + "x", S.x_label, for_2d=S.is2d, y_label=y_label, append_wn = cwn + "y")
-					elseif (fadcattr[str2num(ADCnum)][8] == 48) // checks which hot/cold box is checked
+					elseif (fadcattr[str2num(ADCnum)][8] == 48 && S.use_awg==1) // checks which hot/cold box is checked
 						buffer += scg_initializeGraphsForWavenames(cwn, S.x_label, y_label=y_label, for_2d=0, y_label_2d = S.y_label)
 						buffer += scg_initialize_entr_graph(cwn,S.x_label,y_label=y_label)
 					else
@@ -1758,12 +1767,12 @@ function/S scg_initialize_entr_graph(wn, x_label, [y_label, append_wn, y_label_2
 	if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
 		scg_setupGraph1D(openGraphID, x_label, y_label= selectstring(cmpstr(y_label_1d, ""), wn, wn +" (" + y_label_1d + ")"))
 	else
-
-		scg_open1Dgraph(wn+"entr", x_label, y_label="entropy (a.u.)", append_wn = append_wn)
+string entr_name=wn+"entr"
+		scg_open1Dgraph(entr_name, x_label, y_label="entropy (a.u.)", append_wn = append_wn)
+		ModifyGraph lsize($entr_name)=1.5,rgb($entr_name)=(0,0,0)
+		ModifyGraph rgb($(wn+"cold"))=(0,0,65535)
 		appendtoGraph/r $(wn+"hot"),$(wn+"cold"),
 		Label right, "hot/cold (a.u.)"
-
-
 		openGraphID = winname(0,1)
 	endif
 	graphIDs=openGraphID;  // save this so it can be returned
@@ -1780,8 +1789,6 @@ function/S scg_initialize_entr_graph(wn, x_label, [y_label, append_wn, y_label_2
 	endif
 
 	graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
-
-	print graphIDs
 	return graphIDs
 end
 
@@ -2118,7 +2125,7 @@ end
 
 Window scs_abortmeasurementwindow() : Panel
 	PauseUpdate; Silent 1		// building window...
-	NewPanel /W=(440,819,814,929) /N=SweepControl
+	NewPanel /W=(1047,914,1421,1024) /N=SweepControl
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv textxjust= 1,textyjust= 1
@@ -2337,7 +2344,7 @@ function scfd_notch_filters(wave wav, variable measureFreq, [string Hzs, string 
 	for (i=0;i<num_Hz;i+=1)
 		freq = freqfactor * str2num(stringfromlist(i, Hzs, ","))
 		Q = ((num_Hz==num_Q) ? str2num(stringfromlist(i, Qs, ",")): str2num(stringfromlist(0, Qs, ","))) // this sets Q to be the ith item on the list if num_Q==num_Hz, otherwise it sets it to be the first value
-		fftfactor -= exp(-(x - freq)^2 / (freq / Q)^2)
+		MultiThread fftfactor -= exp(-(x - freq)^2 / (freq / Q)^2)
 	endfor
 	temp_fft *= fftfactor
 
@@ -2369,10 +2376,10 @@ function scfd_sqw_analysis(wave wav, int delay, int wavelen, string wave_out)
 	Redimension/N=(wavelen/4,4,N) wav_copy //should be the dimension of fdAW AWG.Wavelen
 	DeletePoints/M=0 0,delay, wav_copy
 	reducematrixSize(wav_copy,0,-1,1,0,-1,4,1,"wav_new") // fdAW 
-	cold1 = wav_new[0][1][p] 
-	cold2 = wav_new[0][3][p] 
-	hot1 = wav_new[0][0][p]   
-	hot2 = wav_new[0][2][p]   
+	MultiThread cold1 = wav_new[0][1][p] 
+	MultiThread cold2 = wav_new[0][3][p] 
+	MultiThread hot1 = wav_new[0][0][p]   
+	MultiThread hot2 = wav_new[0][2][p]   
 	
 	duplicate/o cold1, $(wave_out + "cold")
 	duplicate/o hot1, $(wave_out + "hot") 
@@ -2382,8 +2389,8 @@ function scfd_sqw_analysis(wave wav, int delay, int wavelen, string wave_out)
 	wave entrwave = $(wave_out + "entr")
 
 	
-	coldwave=(cold1+cold2)/2
-	hotwave=(hot1+hot2)/2
+	MultiThread coldwave=(cold1+cold2)/2
+	MultiThread hotwave=(hot1+hot2)/2
 
 	//matrixtranspose hotwave
 	//matrixtranspose coldwave
@@ -2391,7 +2398,7 @@ function scfd_sqw_analysis(wave wav, int delay, int wavelen, string wave_out)
 	CopyScales /I wav, coldwave, hotwave
 	
 	duplicate/o hotwave, entrwave
-	entrwave=coldwave-hotwave;
+	MultiThread entrwave=coldwave-hotwave;
 
 
 end
@@ -2414,9 +2421,9 @@ function scfd_demodulate(wav, harmonic, nofcycles, period, wnam)//, [append2hdf]
 	
 	
 	duplicate /o wav, wav_copy
-	wav_copy = x
+	MultiThread wav_copy = x
 	variable last_x = wav_copy[INF]
-	wav_copy = wav
+	MultiThread wav_copy = wav
 	Redimension/N=(-1,2) wav_copy
 	cols=dimsize(wav_copy,0)
 	rows=dimsize(wav_copy,1)
@@ -2425,22 +2432,22 @@ function scfd_demodulate(wav, harmonic, nofcycles, period, wnam)//, [append2hdf]
 
 	
 	//demodulation in x
-	sine1d=sin(2*pi*(harmonic*p/period) + sc_demodphi/180*pi)
+	MultiThread sine1d=sin(2*pi*(harmonic*p/period) + sc_demodphi/180*pi)
 	matrixop /o sinewave=colrepeat(sine1d,rows)
 	matrixop /o temp=wav_copy*sinewave
 	copyscales wav_copy, temp
-	temp=temp*pi/2;
+	MultiThread temp=temp*pi/2;
 	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,wn_x)
 	wave wav_x=$wn_x
 	Redimension/N=(-1) wav_x //demod.x wave
 	setscale/I x, 0, last_x, wav_x //Manually setting scale to be inclusive of last point
 	
 	//Demodulation in y
-	sine1d=cos(2*pi*(harmonic*p/period) + sc_demodphi /180 *pi)
+	MultiThread sine1d=cos(2*pi*(harmonic*p/period) + sc_demodphi /180 *pi)
 	matrixop /o sinewave=colrepeat(sine1d,rows)
 	matrixop /o temp=wav_copy*sinewave
 	copyscales wav_copy, temp
-	temp=temp*pi/2;
+	MultiThread temp=temp*pi/2;
 	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,wn_y)
 	wave wav_y=$wn_y
 	Redimension/N=(-1) wav_y //demod.y wave
@@ -2469,7 +2476,7 @@ function /s scfd_spectrum_analyzer(wave data, variable samp_freq, string wn)
 		duplicate /free /o/rmd=[][i,i] spectrum, slice
 		redimension /n=(dimsize(slice, 0)) slice
 		DSPPeriodogram/R=[0,(le-1)]/PARS/NODC=2/DEST=W_Periodogram slice
-		powerspec = powerspec+W_periodogram
+		MultiThread powerspec = powerspec+W_periodogram
 		i=i+1
 	while(i<dimsize(spectrum,1))
 	//powerspec[0]=nan
@@ -2627,12 +2634,12 @@ Function loadFiles(S, numPntsRead)
 
 					// copy data differently if alternate or not
 					if (S.alternate == 0)
-						oneAdc[initPts, (initPts + addPts - 1)] = dataToAdd[p - initPts] // fill wave from start
+						MultiThread oneAdc[initPts, (initPts + addPts - 1)] = dataToAdd[p - initPts] // fill wave from start
 					else
 						if (S.direction == 1)
-							oneAdc[initPts, (initPts + addPts - 1)] = dataToAdd[p - initPts] // fill wave from start
+							MultiThread oneAdc[initPts, (initPts + addPts - 1)] = dataToAdd[p - initPts] // fill wave from start
 						else
-							oneAdc[(totPts - initPts - addPts), (totPts - initPts - 1)] = dataToAdd[addPts - 1 - (p - (totPts - initPts - addPts))]  // fill wave from end
+							MultiThread oneAdc[(totPts - initPts - addPts), (totPts - initPts - 1)] = dataToAdd[addPts - 1 - (p - (totPts - initPts - addPts))]  // fill wave from end
 						endif
 					endif
 				EndFor
@@ -2691,29 +2698,31 @@ function scfd_ProcessAndDistribute(ScanVars, rowNum)
 			scfd_notch_filters(sc_tempwave, ScanVars.measureFreq,Hzs=sc_nfreq, Qs=sc_nQs)
 		endif
 
-		if (fadcattr[str2num(ADCnum)][8] == 48) // checks which hot/cold box is checked
+		if (fadcattr[str2num(ADCnum)][8] == 48 && ScanVars.use_awg==1) // checks which hot/cold box is checked
 			scfd_sqw_analysis(sc_tempwave, sc_hotcolddelay, Scanvars.waveLen, cwn)  //--> f.e. wave0hot,wave0cold,wave0entr
-			resamp=0
+			resamp=0 // do not resample after sqw analysis 
 		endif
 
 
-		if (fadcattr[str2num(ADCnum)][6] == 48) // checks which demod box is checked
+		if (fadcattr[str2num(ADCnum)][6] == 48  && ScanVars.use_awg==1) // checks which demod box is checked
 			scfd_demodulate(sc_tempwave, str2num(fadcvalstr[str2num(ADCnum)][7]), Scanvars.numCycles, Scanvars.waveLen, cwn)
 
 
 			//calc function for demod x
 			calc_str = ReplaceString(rwn, calc_string, cwn + "x")
-			execute(cwn+"x ="+calc_str)
+			//print (cwn+"x ="+calc_str)
+			//execute(cwn+"x ="+calc_str)
 
 			//calc function for demod y
 			calc_str = ReplaceString(rwn, calc_string, cwn + "y")
-			execute(cwn+"y ="+calc_str)
-			resamp=0
+			//print (cwn+"y ="+calc_str)
+
+			//execute(cwn+"y ="+calc_str)
+			resamp=0 // do not resample after demodulation
 		endif
 		
 	
 		
-		// dont resample for SQW analysis or demodulation after notch filtering resample
 		if (resamp==1)
 			numpntsx=scfd_resampleWaves(sc_tempwave, ScanVars.measureFreq, sc_ResampleFreqfadc)
 			if (rowNum==0 && (ScanVars.is2d))
@@ -2742,7 +2751,7 @@ function scfd_ProcessAndDistribute(ScanVars, rowNum)
 
 
 			//Copy 1D hotcold into 2d
-			if (fadcattr[str2num(ADCnum)][8] == 48)
+			if (fadcattr[str2num(ADCnum)][8] == 48  && ScanVars.use_awg==1)
 			//*** for now leaving population of 2d hot and cold out, may change mind about that later
 //				string cwnhot = cwn + "hot"
 //				//string cwn2dhot = cwnhot + "_2d"
@@ -2765,7 +2774,7 @@ function scfd_ProcessAndDistribute(ScanVars, rowNum)
 
 
 			// Copy 1D demod into 2D
-			if (fadcattr[str2num(ADCnum)][6] == 48)
+			if (fadcattr[str2num(ADCnum)][6] == 48  && ScanVars.use_awg==1)
 				string cwnx = cwn + "x"
 				string cwn2dx = cwnx + "_2d"
 				wave dmod2dx = $cwn2dx
@@ -3248,7 +3257,7 @@ End
 
 Window after1() : Panel
 	PauseUpdate; Silent 1		// building window...
-	NewPanel /W=(32,496,1066,1091)
+	NewPanel /W=(98,435,1132,1030)
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv fsize= 25,fstyle= 1
@@ -3298,7 +3307,7 @@ Window after1() : Panel
 	DrawText 976,59,"+ 0 - 0"
 	ListBox fdaclist,pos={8.00,72.00},size={356.00,428.00},fSize=14,frame=2
 	ListBox fdaclist,listWave=root:fdacvalstr,selWave=root:fdacattr
-	ListBox fdaclist,colorWave=root:colour_bent_CW,mode=1,selRow=-1
+	ListBox fdaclist,colorWave=root:colour_bent_CW,mode=1,selRow=2
 	ListBox fdaclist,widths={35,70,110,65}
 	Button updatefdac,pos={24.00,528.00},size={64.00,20.00},proc=scfw_update_fdac
 	Button updatefdac,title="Update"
@@ -3318,7 +3327,7 @@ Window after1() : Panel
 	SetVariable sc_FilterfadcBox,pos={479.00,294.00},size={160.00,20.00}
 	SetVariable sc_FilterfadcBox,title="\\Z14Resamp Freq "
 	SetVariable sc_FilterfadcBox,help={"Re-samples to specified frequency, 0 Hz == no re-sampling"}
-	SetVariable sc_FilterfadcBox,labelBack=(65535,16385,16385)
+	SetVariable sc_FilterfadcBox,labelBack=(65535,32768,32768)
 	SetVariable sc_FilterfadcBox,value=sc_ResampleFreqfadc
 	SetVariable sc_demodphiBox,pos={691.00,262.00},size={100.00,20.00}
 	SetVariable sc_demodphiBox,title="\\Z14Demod \\$WMTEX$ \\Phi $/WMTEX$"
@@ -3333,14 +3342,14 @@ Window after1() : Panel
 	ListBox sc_InstrFdac,pos={396.00,393.00},size={600.00,128.00},fSize=14,frame=2
 	ListBox sc_InstrFdac,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1
 	ListBox sc_InstrFdac,selRow=4,editStyle=1
-	Button connectfdac,pos={395.00,535.00},size={60.00,40.00},proc=scw_OpenInstrButton
+	Button connectfdac,pos={395.00,529.00},size={60.00,40.00},proc=scw_OpenInstrButton
 	Button connectfdac,title="Connect\rInstr",labelBack=(65535,65535,65535)
 	Button connectfdac,fColor=(65535,0,0)
-	Button killaboutfdac,pos={680.00,536.00},size={60.00,40.00},proc=sc_controlwindows
+	Button killaboutfdac,pos={675.00,529.00},size={60.00,40.00},proc=sc_controlwindows
 	Button killaboutfdac,title="Kill Sweep\r Controls",fSize=10,fColor=(3,52428,1)
-	Button killgraphsfdac,pos={536.00,535.00},size={60.00,40.00},proc=scw_killgraphs
+	Button killgraphsfdac,pos={535.00,529.00},size={60.00,40.00},proc=scw_killgraphs
 	Button killgraphsfdac,title="Close All \rGraphs",fSize=12,fColor=(1,12815,52428)
-	Button updatebuttonfdac,pos={464.00,536.00},size={60.00,40.00},proc=scw_updatewindow
+	Button updatebuttonfdac,pos={465.00,529.00},size={60.00,40.00},proc=scw_updatewindow
 	Button updatebuttonfdac,title="save\rconfig",fColor=(65535,16385,16385)
 	TabControl tb2,pos={44.00,420.00},size={180.00,20.00},disable=1,proc=TabProc2
 	TabControl tb2,fSize=13,tabLabel(0)="Set AW",tabLabel(1)="AW0",tabLabel(2)="AW1"
@@ -3353,19 +3362,19 @@ Window after1() : Panel
 	Button clearAW,title="Clear"
 	Button setupAW,pos={8.00,524.00},size={52.00,20.00},disable=1,proc=scw_setupsquarewave
 	Button setupAW,title="Create"
-	Button show_AWG,pos={886.00,537.00},size={60.00,40.00},proc=scw_Show_AWG_wave
+	Button show_AWG,pos={885.00,529.00},size={60.00,40.00},proc=scw_Show_AWG_wave
 	Button show_AWG,title="show\rAWG",fColor=(52428,34958,1)
-	Button close_tables,pos={608.00,536.00},size={60.00,40.00},proc=scw_Close_tables
+	Button close_tables,pos={605.00,529.00},size={60.00,40.00},proc=scw_Close_tables
 	Button close_tables,title="Close All \rTables",fSize=12,fColor=(26205,52428,1)
-	Button hide,pos={748.00,536.00},size={60.00,40.00},proc=scw_Hide_Procs
+	Button hide,pos={745.00,529.00},size={60.00,40.00},proc=scw_Hide_Procs
 	Button hide,title="Hide All\r Procs",fColor=(52428,52425,1)
-	Button maxi,pos={816.00,536.00},size={60.00,40.00},proc=scw_maximize
+	Button maxi,pos={815.00,529.00},size={60.00,40.00},proc=scw_maximize
 	Button maxi,title="large\rwindow",fColor=(26214,26214,26214)
 	CheckBox sc_plotRawBox1,pos={528.00,263.00},size={72.00,17.00},proc=scw_CheckboxClicked
 	CheckBox sc_plotRawBox1,title="\\Z14Plot Raw",variable=sc_plotRaw,side=1
 	CheckBox save_RAW,pos={516.00,340.00},size={79.00,17.00},title="\\Z14Save Raw"
 	CheckBox save_RAW,fSize=12,variable=sc_saverawfadc,side=1
-	Button show_ScanVars,pos={955.00,538.00},size={60.00,40.00},proc=scw_Show_ScanVars
+	Button show_ScanVars,pos={955.00,529.00},size={60.00,40.00},proc=scw_Show_ScanVars
 	Button show_ScanVars,title="show\rScanVars",fSize=11,fColor=(52428,1,41942)
 EndMacro
 

@@ -112,7 +112,7 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 	variable logs_only  // 1=Don't save any sweep information to HDF
 	make/Free/T/N=1 cconfig = {""}
 //	cconfig = prettyJSONfmt(scw_createConfig())  	//<< 2023/01 -- I think someting about this is chopping off a lot of the info
-//	cconfig = scw_createConfig()  					// << This is the temporary fix -- at least the info is saved even if not perfect
+	cconfig = scw_createConfig()  					// << This is the temporary fix -- at least the info is saved even if not perfect
 	
 	if (!logs_only)
 		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(sc_createSweepLogs(S=S))
@@ -127,6 +127,12 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 	// Check that prettyJSONfmt actually returned a valid JSON.
 	sc_confirm_JSON(sweep_logs, name="sweep_logs")
 	sc_confirm_JSON(cconfig, name="cconfig")
+
+	if (S.use_awg==0)
+		awg_json=""
+	endif
+
+
 
 	// LOOP through the given hdf5_id in list
 	variable i
@@ -154,7 +160,7 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 		if (V_flag != 0)
 				Print "HDF5SaveData Failed: ", "instr_logs"
 		endif
-		
+			
 				HDF5SaveData/z /A="AWG_waves" awg_json, hdf5_id, "metadata"
 		if (V_flag != 0)
 				Print "HDF5SaveData Failed: ", "AWG_info"
@@ -449,12 +455,6 @@ function SaveToHDF(S, [additional_wavenames])
 		saveFastdacInfoWaves(hdfids, S)
 	endif
 
-//	// Save ScanWaves (e.g. x_array, y_array etc)
-//*** got rid of this, since all the wave scalings are linear anyways and the start and endpoints are saved in sweepgates_x and sweepgates_y
-//	if(S.using_fastdac)
-//		saveScanWaves(calc_hdf5_id, S, 1)  // Needs a different x_array size if filtered
-//		
-//	endif
 	
 	// Get waveList to save
 	string RawWaves, CalcWaves, rwn, cwn, ADCnum, rawWaves2, rawSaveNames
@@ -514,9 +514,10 @@ function SaveToHDF(S, [additional_wavenames])
 			
 				if (fadcattr[str2num(ADCnum)][8] == 48)
 					CalcWaves += cwn[0,strlen(cwn)-4] + "entr_2d;"
-					rawWaves2  = addlistitem(stringfromList(0,calcwaves), rawWaves2) //adding notched/resamp waves to raw dat
-					rawSaveNames= addlistitem(stringfromlist(0,calcwaves) + "_cl", rawSaveNames)
-					calcWaves = removelistItem(0,calcWaves) // removing it from main dat
+//					rawWaves2  = addlistitem(stringfromList(0,calcwaves), rawWaves2) //adding notched/resamp waves to raw dat
+					//rawSaveNames= addlistitem(stringfromlist(0,calcwaves) + "_cl", rawSaveNames)
+					rawsavenames=rwn
+					calcWaves = removelistItem(0,calcWaves) // removing calc wave from main dat
 					j++	
 				endif
 		 	endfor
@@ -592,17 +593,6 @@ function saveFastdacInfoWaves(hdfids, S)
 			Print "HDF5SaveData failed on sweepgates_y"
 		endif
 		
-	
-		// Add AWs used to HDF file if used
-//*** not sure if we have to use this
-//		if (S.use_awg)
-//			variable j
-//			for(j=0;j<AWG.numWaves;j++)
-//				// Get IGOR AW
-//				//*wn = fd_getAWGwave(str2num(stringfromlist(j, AWG.AW_waves, ",")))
-//				SaveSingleWaveToHDF(wn, hdfid)
-//			endfor
-//		endif
 	endfor
 end
 
