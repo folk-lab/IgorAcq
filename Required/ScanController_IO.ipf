@@ -511,6 +511,10 @@ function SaveToHDF(S, [additional_wavenames])
 			
 				if (fadcattr[str2num(ADCnum)][8] == 48)
 					CalcWaves += cwn[0,strlen(cwn)-4] + "entr_2d;"
+					CalcWaves += cwn[0,strlen(cwn)-4] + "hot_2d;"
+					CalcWaves += cwn[0,strlen(cwn)-4] + "cold_2d;"
+
+
 //					rawWaves2  = addlistitem(stringfromList(0,calcwaves), rawWaves2) //adding notched/resamp waves to raw dat
 					//rawSaveNames= addlistitem(stringfromlist(0,calcwaves) + "_cl", rawSaveNames)
 					rawsavenames=rwn

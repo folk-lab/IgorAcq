@@ -262,9 +262,6 @@ function/s sc_create_experiment_paths([user])
 	endif
 	
 	NewPath/o/C colour_data colour_path
-	print home_path
-	return home_path
-
 end
 
 
@@ -1400,6 +1397,9 @@ function sci_initializeWaves(S)  // TODO: rename
 				sci_init1DWave(wn+"entr", S.numptsx, S.startx, S.finx)  ///*** I don't think this will work for virtual gates
 				if(S.is2d == 1)
 					sci_init2DWave(wn+"entr_2d", S.numptsx, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+					sci_init2DWave(wn+"hot_2d", S.numptsx, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+					sci_init2DWave(wn+"cold_2d", S.numptsx, S.startx, S.finx, S.numptsy, S.starty, S.finy)
+
 				endif
 			endif
 
@@ -2748,18 +2748,17 @@ function scfd_ProcessAndDistribute(ScanVars, rowNum)
 
 			//Copy 1D hotcold into 2d
 			if (fadcattr[str2num(ADCnum)][8] == 48  && ScanVars.use_awg==1)
-				//*** for now leaving population of 2d hot and cold out, may change mind about that later
-				//				string cwnhot = cwn + "hot"
-				//				//string cwn2dhot = cwnhot + "_2d"
-				//				//wave cw2dhot = $cwn2dhot
-				//				wave cwhot = $cwnhot
-				//				//cw2dhot[][rowNum] = cwhot[p]
+				string cwnhot = cwn + "hot"
+				string cwn2dhot = cwnhot + "_2d"
+				wave cw2dhot = $cwn2dhot
+				wave cwhot = $cwnhot
+				Multithread cw2dhot[][rowNum] = cwhot[p]
 
-				//				string cwncold = cwn + "cold"
-				//				string cwn2dcold = cwncold + "_2d"
-				//				wave cw2dcold = $cwn2dcold
-				//				wave cwcold = $cwncold
-				//				cw2dcold[][rowNum] = cwcold[p]
+				string cwncold = cwn + "cold"
+				string cwn2dcold = cwncold + "_2d"
+				wave cw2dcold = $cwn2dcold
+				wave cwcold = $cwncold
+				Multithread cw2dcold[][rowNum] = cwcold[p]
 
 				string cwnentr = cwn + "entr"
 				string cwn2dentr = cwnentr + "_2d"

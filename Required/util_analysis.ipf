@@ -777,6 +777,15 @@ function /s getsuffix(numstr)
     return suff
 end
 
+function /s getprefix(numstr)
+    string numstr
+    
+    string junk
+    variable number
+    sscanf numstr, "%[^0123456789]%d", junk, number
+    return junk
+end
+
 
 
 function/wave rowslice(wave wav, int rownumb)
