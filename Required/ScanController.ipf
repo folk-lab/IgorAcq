@@ -59,19 +59,18 @@
 //////////////////// INITIALISING THE EXPERIMENT /////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
 
-macro initexperiment_macro(newpaths)
-variable newpaths
+macro initexperiment_macro()
 
-	initexperiment(newpaths)
+	initexperiment()
 endmacro
 
 
-function initexperiment(int newpaths)
+function initexperiment()
 	
 
 
 	// create experiment paths
-	sc_create_experiment_paths(newpaths)
+	sc_create_experiment_paths()
 	
 	// add custom colours
 	create_colour_wave()
@@ -205,29 +204,39 @@ function [string home_path, string separator_type] sc_get_igor_path()
 end
 
 
-function/s sc_create_experiment_paths(int yes)
+function/s sc_create_experiment_paths()
+	string existing
 
-if (yes==1)
+	existing= pathlist("home_path",";","" )
+	if (strlen(existing)==0)
+		print "creating home path"
+		newpath/o/c home_path
+	endif
+
+	existing= pathlist("data",";","" )
+	if (strlen(existing)==0)
+		print "creating data path"
+		NewPath/o/C data
+	endif
+
+	existing= pathlist("fdtest",";","" )
+	if (strlen(existing)==0)
+		print "creating fdtest path"
+		NewPath/o/C fdtest
+	endif
+
+	existing= pathlist("colour_data",";","" )
+	if (strlen(existing)==0)
+		print "creating colour_data path"
+		NewPath/o/C colour_data
+	endif
 	
-		 print "creating home path"
-	newpath/o/c home_path
-	
-		 
-	 print "creating data path"
-	NewPath/o/C data
-	
-			 print "creating acquired data path"
-	NewPath/o/C fdtest
-	
-		 print "creating colour_path"
-	NewPath/o/C colour_data 
-	
-	else
-	newpath/o/c home_path "D:local_measurement_data:Johann:2024_05_KondoEntropyTD:"
-	newpath/o/c data "D:local_measurement_data:Johann:2024_05_KondoEntropyTD:data:"
-	newpath/o/c fdtest "D:local_measurement_data:acquired-data:"
-	newpath/o/c colour_data "D:local_measurement_programs:Github:IgorAcq:data:colours:"
-  endif 
+	existing= pathlist("server",";","" )
+	if (strlen(existing)==0)
+		print "creating server path"
+		newpath/o/c server
+	endif
+
 end
 
 //function/s sc_create_experiment_paths([user])
@@ -3602,9 +3611,9 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 		sc_save_time = datetime
 	endif
 
-//	if(sc_checkBackup())  	//*** check if a path is defined to backup data
-//		 sc_copyNewFiles(S_.filenum, save_experiment=save_experiment)		// copy data to server mount point (nvar filenum gets incremented after HDF is opened)
-//	endif
+	if(sc_checkBackup())  	//*** check if a path is defined to backup data
+		 sc_copyNewFiles(S_.filenum, save_experiment=save_experiment)		// copy data to server mount point (nvar filenum gets incremented after HDF is opened)
+	endif
 
 	// add info about scan to the scan history file in /config
 	sce_ScanVarsToJson(S_, getrtstackinfo(3), save_to_file=1)
@@ -3807,7 +3816,7 @@ function InitScanController([configFile])
 	string /g sc_hostname = getHostName() // get machine name
 
 	// check if a path is defined to backup data
-	//*sc_checkBackup()
+	sc_checkBackup()
 	
 	// check if we have the correct SQL driver
 	sc_checkSQLDriver()
