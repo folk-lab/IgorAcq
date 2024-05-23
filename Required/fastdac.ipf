@@ -1324,9 +1324,10 @@ function sample_ADC(string adclist, variable nr_samples)
 	variable chunksize=1000
 	variable level1
 	String cmd = "start-samples-acquisition"
-	wave adc_list
 	
 	stringlist2wave(adclist,"adc_list")
+		wave adc_list
+
 	JSONXOP_New; level1=V_value
 	JSONXOP_AddValue/I=(82) level1, "/adc_sampling_time_us"
 	JSONXOP_AddValue/T=(num2str(chunksize)) level1, "/chunk_max_samples"

@@ -59,27 +59,19 @@
 //////////////////// INITIALISING THE EXPERIMENT /////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
 
-macro initexperiment_macro()
-//	string user = "default"
-	string user = "silvia"
-//	string user = "ld"
+macro initexperiment_macro(newpaths)
+variable newpaths
 
-	initexperiment(user = user)
+	initexperiment(newpaths)
 endmacro
 
 
-function initexperiment([user])
-	// User variable for non-default experiment paths 
-	// Current users:
-	// user = "silvia"
-	// user = "ld"
+function initexperiment(int newpaths)
 	
-	string user
-	user = selectstring(paramisdefault(user), user, "default")
 
 
 	// create experiment paths
-	sc_create_experiment_paths(user = user)
+	sc_create_experiment_paths(newpaths)
 	
 	// add custom colours
 	create_colour_wave()
@@ -213,56 +205,81 @@ function [string home_path, string separator_type] sc_get_igor_path()
 end
 
 
-function/s sc_create_experiment_paths([user])
-//	assumes the experiment has been saved so that the filepath 'home' exists
-//	not tested on Windows computer
-	string user
-	user = selectstring(paramisdefault(user), user, "default")
+function/s sc_create_experiment_paths(int yes)
 
-	string home_path, separator_type
-	[home_path, separator_type] = sc_get_igor_path()
+if (yes==1)
 	
-	//////////////////////////////////////////
-	///// EXPERIMENTAL DATA MASTER PATHS /////
-	//////////////////////////////////////////
-	string master_path = home_path
+		 print "creating home path"
+	newpath/o/c home_path
 	
-	string data_path = master_path + "data" + separator_type
-	string tempdata_path = master_path + "temp_data" + separator_type
+		 
+	 print "creating data path"
+	NewPath/o/C data
 	
-	if (cmpstr(user, "silvia") == 0)
-		tempdata_path = "Macintosh HD:Users:luescher:acquired-data:"
-	elseif (cmpstr(user, "ld") == 0)
-		tempdata_path = "C:Users:folklab:acquired-data:"
-	endif
-
-	 
-	NewPath/o/C data data_path
-	NewPath/o/C fdtest tempdata_path
-	newpath/o/c home_path home_path
+			 print "creating acquired data path"
+	NewPath/o/C fdtest
 	
+		 print "creating colour_path"
+	NewPath/o/C colour_data 
 	
-	////////////////////////////////////
-	///// GITHUB DATA MASTER PATHS /////
-	////////////////////////////////////
-	if (cmpstr(igorInfo(2), "Macintosh") == 0) // if mac
-		master_path = ParseFilePath(1, home_path, separator_type, 0, 4)
-		master_path += "Github:IgorAcq:data:"
-	elseif (cmpstr(igorInfo(2), "Windows") == 0) // if windows
-		master_path = ParseFilePath(1, home_path, separator_type, 0, 1)
-		master_path += "local_measurement_programs:IgorAcq:data:"
-	endif
-	
-	string colour_path = master_path + "colours" + separator_type
-	
-	if (cmpstr(user, "silvia") == 0)
-		colour_path = "Macintosh HD:Users:luescher:Documents:GitHub:IgorAcq:data:colours:"
-	elseif (cmpstr(user, "ld") == 0)
-		colour_path = "D:local_measurement_programs:Github:IgorAcq:data:colours:"
-	endif
-	
-	NewPath/o/C colour_data colour_path
+	else
+	newpath/o/c home_path "D:local_measurement_data:Johann:2024_05_KondoEntropyTD:"
+	newpath/o/c data "D:local_measurement_data:Johann:2024_05_KondoEntropyTD:data:"
+	newpath/o/c fdtest "D:local_measurement_data:acquired-data:"
+	newpath/o/c colour_data "D:local_measurement_programs:Github:IgorAcq:data:colours:"
+  endif 
 end
+
+//function/s sc_create_experiment_paths([user])
+////	assumes the experiment has been saved so that the filepath 'home' exists
+////	not tested on Windows computer
+//	string user
+//	user = selectstring(paramisdefault(user), user, "default")
+//
+//	string home_path, separator_type
+//	[home_path, separator_type] = sc_get_igor_path()
+//	
+//	//////////////////////////////////////////
+//	///// EXPERIMENTAL DATA MASTER PATHS /////
+//	//////////////////////////////////////////
+//	string master_path = home_path
+//	
+//	string data_path = master_path + "data" + separator_type
+//	string tempdata_path = master_path + "temp_data" + separator_type
+//	
+//	if (cmpstr(user, "silvia") == 0)
+//		tempdata_path = "Macintosh HD:Users:luescher:acquired-data:"
+//	elseif (cmpstr(user, "ld") == 0)
+//		tempdata_path = "C:Users:folklab:acquired-data:"
+//	endif
+//
+//	 
+//	NewPath/o/C data data_path
+//	NewPath/o/C fdtest tempdata_path
+//	newpath/o/c home_path home_path
+//	
+//	
+//	////////////////////////////////////
+//	///// GITHUB DATA MASTER PATHS /////
+//	////////////////////////////////////
+//	if (cmpstr(igorInfo(2), "Macintosh") == 0) // if mac
+//		master_path = ParseFilePath(1, home_path, separator_type, 0, 4)
+//		master_path += "Github:IgorAcq:data:"
+//	elseif (cmpstr(igorInfo(2), "Windows") == 0) // if windows
+//		master_path = ParseFilePath(1, home_path, separator_type, 0, 1)
+//		master_path += "local_measurement_programs:IgorAcq:data:"
+//	endif
+//	
+//	string colour_path = master_path + "colours" + separator_type
+//	
+//	if (cmpstr(user, "silvia") == 0)
+//		colour_path = "Macintosh HD:Users:luescher:Documents:GitHub:IgorAcq:data:colours:"
+//	elseif (cmpstr(user, "ld") == 0)
+//		colour_path = "D:local_measurement_programs:Github:IgorAcq:data:colours:"
+//	endif
+//	
+//	NewPath/o/C colour_data colour_path
+//end
 
 
 
@@ -326,8 +343,8 @@ function scfw_CreateControlWaves([portnum])
 	string portnum
 	portnum = selectString(paramIsDefault(portnum), portnum, "XXX")
 //creates all waves and strings necessary for initfastDAC()
-	wave fdacvalstr, dac_table
-	wave fadcvalstr, adc_table
+	wave dac_table
+	wave adc_table
 	
 	variable numDACCh = dimsize(dac_table, 0)
 	variable numadcch = dimsize(adc_table, 0)
@@ -463,7 +480,7 @@ end
 
 function scfw_update_fadc(action) : ButtonControl
 	string action
-	svar sc_fdackeys
+	//svar sc_fdackeys
 	wave/t fadcvalstr
 	variable i=0
 

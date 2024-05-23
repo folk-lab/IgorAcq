@@ -647,15 +647,17 @@ function FDSpectrumAnalyzer(scanlength,[numAverage, raw_graphs, calc_graphs, com
 	string lin_freq_wavenames = ""
 	string int_freq_wavenames = ""	
 	variable numChannels =S.numADCs// scf_getNumRecordedADCs()
-	string adc_channels = S.adclist //list of ADC channels clicked
+	string adc_channels = S.adcList //list of ADC channels clicked
+	string wavenames = scf_getRecordedFADCinfo("calc_names")  // ";" separated list of recorded calculated waves
+
 	variable i
 	for(i=0;i<numChannels;i+=1)
-		wn_lin = "spectrum_fftADClin"+stringfromlist(i,adc_channels, ";")
+		wn_lin = "spectrum_fftADClin"+stringfromlist(i,wavenames, ";")
 		make/o/n=(S.numptsx/2) $wn_lin = nan
 		setscale/i x, 0, S.measureFreq/(2.0), $wn_lin
 		lin_freq_wavenames = addListItem(wn_lin, lin_freq_wavenames, ";", INF)
 		
-		wn_int = "spectrum_fftADCint"+stringfromlist(i,adc_channels, ";")
+		wn_int = "spectrum_fftADCint"+stringfromlist(i,wavenames, ";")
 		make/o/n=(S.numptsx/2) $wn_int = nan
 		setscale/i x, 0, S.measureFreq/(2.0), $wn_int
 		int_freq_wavenames = addListItem(wn_int, int_freq_wavenames, ";", INF)		
@@ -688,7 +690,6 @@ function FDSpectrumAnalyzer(scanlength,[numAverage, raw_graphs, calc_graphs, com
 	scg_arrangeWindows(all_graphIDs)
 
 	// Record data
-	string wavenames = scf_getRecordedFADCinfo("calc_names")  // ";" separated list of recorded calculated waves
 	variable j
 	for (i=0; i<numAverage; i++)
 		scfd_RecordValues(S, i)		
