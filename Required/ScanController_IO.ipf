@@ -116,9 +116,10 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 	
 	if (!logs_only)
 		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(sc_createSweepLogs(S=S))
-		make /free /T /N=1 instr_logs=prettyJSONfmt(sc_instrumentLogs()) // Modifies the jstr to add Instrumt Status (from ScanController Window)
+		make /free /T /N=1 instr_logs="" // Modifies the jstr to add Instrumt Status (from ScanController Window)
 		make /FREE /T /N=1 scan_vars_json = sce_ScanVarsToJson(S, getrtstackinfo(3), save_to_file = 0)
 		make/free/T/n=1 awg_json=sc_awg_log()
+		make/free/T/n=1 calc_func_log= sc_calc_log()
 		
 	else
 		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(sc_createSweepLogs(comments = comments))
@@ -166,6 +167,10 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 				Print "HDF5SaveData Failed: ", "AWG_info"
 		endif
 
+				HDF5SaveData/z /A="fadcvalstr" calc_func_log, hdf5_id, "metadata"
+		if (V_flag != 0)
+				Print "HDF5SaveData Failed: ", "calc_func"
+		endif
 
 
 		if (!logs_only)
@@ -286,51 +291,83 @@ function /s sc_awg_log()
 
 end
 
+function /s sc_calc_log()
+	wave/t	fadcvalstr
+	variable jsonid
+	variable i,N
+	string str
+	N=dimsize(fadcattr,0)
 
-function/s sc_instrumentLogs()
-	// Runs all getinstrStatus() functions, and adds results to json string (to be stored in sweeplogs)
-	// Note: all log strings must be valid JSON objects 
-    string jstr=""
-    
-	//sc_openInstrConnections(0)  // Reopen connections before asking for status in case it has been a long time (?)[Vahid: how long would be a long time??] since the beginning of the scan
-	wave /t sc_Instr
-	variable i=0, j=0, addQuotes=0
-	string command="", val=""
-	string /G sc_log_buffer=""
 
-	for(i=0;i<DimSize(sc_Instr, 0);i+=1)
-		sc_log_buffer=""
-		command = TrimString(sc_Instr[i][2])
-		if(strlen(command)>0 && cmpstr(command[0], "/") !=0) // Command and not commented out
-			Execute/Q/Z "sc_log_buffer="+command
-			if(V_flag!=0)
-				print "[ERROR] in sc_createSweepLogs: "+GetErrMessage(V_Flag,2)
-			endif
-			if(strlen(sc_log_buffer)!=0)
-			jstr=sc_log_buffer
-//				// need to get first key and value from sc_log_buffer
-//				JSONSimple sc_log_buffer
-//				wave/t t_tokentext
-//				wave w_tokentype, w_tokensize, w_tokenparent
-//				for(j=1;j<numpnts(t_tokentext)-1;j+=1)
-//					if ( w_tokentype[j]==3 && w_tokensize[j]>0 )
-//						if( w_tokenparent[j]==0 )
-//							if( w_tokentype[j+1]==3 )
-//								val = "\"" + t_tokentext[j+1] + "\""
-//							else
-//								val = t_tokentext[j+1]
-//							endif
-//							jstr = addJSONkeyval(jstr, t_tokentext[j], val)
-//							break
-//						endif
-//					endif
-//				endfor
-			else
-				print "[WARNING] command failed to log anything: "+command+"\r"
-			endif
-		endif
+	JSONXOP_New/z; jsonId=V_value
+	JSONXOP_AddTree/T=1 jsonId, "calc_func"
+	
+	for(i=0; (i<N); i=i+1)
+		JSONXOP_AddValue/T=(fadcvalstr[i][4]) jsonId, "calc_func"
 	endfor
-	return jstr
+
+	JSONXOP_Dump jsonid
+	jsonxop_release/a
+	return S_value
+
+end
+
+
+//function/s sc_instrumentLogs()
+//
+//	string command="", val=""
+//	string /G sc_log_buffer=""
+//
+//		sc_log_buffer=""
+//		command = TrimString(sc_Instr[i][2])
+//		if(strlen(command)>0 && cmpstr(command[0], "/") !=0) // Command and not commented out
+//			Execute/Q/Z "sc_log_buffer="+command
+//			if(V_flag!=0)
+//				print "[ERROR] in sc_createSweepLogs: "+GetErrMessage(V_Flag,2)
+//			endif
+//			if(strlen(sc_log_buffer)!=0)
+//
+//			else
+//				print "[WARNING] command failed to log anything: "+command+"\r"
+//			endif
+//		endif
+//	
+//	return jstr
+//end
+
+function /s sc_instr_log()
+	string jstr, command
+	variable level1, level2
+	variable i=1
+	wave /t sc_Instr
+	string/g sc_log_buffer=""
+	string json_buffer
+
+	
+			command = TrimString(sc_Instr[i][2])
+			if(strlen(command)>0 && cmpstr(command[0], "/") !=0) // Command and not commented out
+			command="sc_log_buffer="+command;
+			endif
+			Execute(command)
+			print sc_log_buffer;
+
+
+
+//	JSONXOP_New/z; level1=V_value
+//	JSONXOP_AddTree/T=1 level1, "/instr"
+	
+
+//	JSONXOP_Parse/Z/Q sc_log_buffer  /// jsonst=V_value
+//	level2=V_value
+//		JSONXOP_AddValue/JOIN=(level2) level1, "test"
+//		JSONXOP_Dump level1
+	
+
+//	JSONXOP_Dump level1
+//	jsonxop_release/a
+//	print S_value
+//	return S_value
+
 end
 
 

@@ -606,6 +606,16 @@ function checkStartsFinsChannels(starts, fins, channels)
 	return 1
 end
 
+function check_if_awg_defined()
+	wave sc_awg_info
+	if (waveexists(sc_awg_info)==0)
+		print  "sc_awg_info wave is not defined; define it by calling fdawg_create function. For example"
+		print 	 "fdawg_create(\"gate4\", \"0,50,0,50\", \"51\", overwrite = 0, print_on = 1)"
+		abort
+
+	endif
+end
+
 function scc_checkRampratesFD(S)
   // check if effective ramprate is higher than software limits
   struct ScanVars &S
@@ -814,6 +824,10 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
 	comments = selectString(paramIsDefault(comments), comments, "")
 	x_only = paramisdefault(x_only) ? 1 : x_only
 	use_awg = paramisdefault(use_awg) ? 0 : use_awg  
+	
+		if (use_awg == 1)
+			check_if_awg_defined()
+		endif
 
 
 	///// Standard initialization /////

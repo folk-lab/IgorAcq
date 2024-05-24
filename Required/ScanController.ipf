@@ -892,6 +892,7 @@ function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, ra
 	S.alternate = alternate // Allows controlling scan from start -> fin or fin -> start (with 1 or -1)
 	S.duration = NaN // Can specify duration of scan rather than numpts or sweeprate  
 	S.readVsTime = 0 // Set to 1 if doing a readVsTime
+
 	
 	
 	// For interlaced scans
@@ -928,6 +929,17 @@ function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, ra
 	S.startys = startys
 	S.finys = finys  // Similar for Y-axis
 	S.raw_wave_names = ""  // Names of waves to override the names raw data is stored in for FastDAC scans
+	S.wavelen=1
+	S.numCycles=1
+	S.InstrIDs=""
+	S.adcListIDs=""
+	S.dacListIDs=""
+	S.fakeRecords=""
+    S.adcLists=""
+	S.IDstartxs=""
+	S.IDfinxs=""
+	S.dacListIDs_y=""   // get this from S.channelsy
+
 	
 	// Backend use
 	S.direction = 1   // For keeping track of scan direction when using alternating scan
@@ -1368,7 +1380,7 @@ function initializeScan(S, [init_graphs, y_label])
 	scg_openAbortWindow()
 	
 	// Save struct to globals
-	scv_setLastScanVars(S)
+//	scv_setLastScanVars(S)
 end
 
 
@@ -1667,7 +1679,7 @@ function/S scg_initializeGraphs(S , [y_label])
 						buffer += scg_initializeGraphsForWavenames(cwn + "x", S.x_label, for_2d=S.is2d, y_label=y_label, append_wn = cwn + "y")
 					elseif (fadcattr[str2num(ADCnum)][8] == 48 && S.use_awg==1) // checks which hot/cold box is checked
 						buffer += scg_initializeGraphsForWavenames(cwn, S.x_label, y_label=y_label, for_2d=0, y_label_2d = S.y_label)
-						buffer += scg_initialize_entr_graph(cwn,S.x_label,y_label=y_label)
+						buffer += scg_initialize_entr_graph(cwn,S.x_label,S.is2d,y_label=y_label)
 					else
 						buffer += scg_initializeGraphsForWavenames(cwn, S.x_label, y_label=y_label, for_2d=S.is2d, y_label_2d = S.y_label)
 					endif
@@ -1750,9 +1762,8 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, only_2d
 		      		scg_open1Dgraph(wn, x_label, y_label=selectstring(cmpstr(y_label_1d, ""), wn, wn + " (" + y_label_1d + ")"), append_wn = append_wn)
 		      		openGraphID = winname(0,1)			
 				endif 
-				
-		   endif
 		   graphIDs = addlistItem(openGraphID, graphIDs, ";", INF) 
+		   endif
 		   
 		endif
 		
@@ -1776,12 +1787,14 @@ function/S scg_initializeGraphsForWavenames(wavenames, x_label, [for_2d, only_2d
 	return graphIDs
 end
 
-function/S scg_initialize_entr_graph(wn, x_label, [y_label, append_wn, y_label_2d])
+function/S scg_initialize_entr_graph(wn, x_label,is2d, [y_label, append_wn, y_label_2d])
 	// Ensures a graph is open and tiles graphs for each wave in comma separated wavenames
 	// Returns list of graphIDs of active graphs
 	// append_wavename would append a wave to every single wavename in wavenames (more useful for passing just one wavename)
 	// spectrum -- Also shows a noise spectrum of the data (useful for fastdac scans)
-	string wn, x_label, y_label, append_wn, y_label_2d
+	string wn, x_label, y_label
+	int is2d
+	string append_wn, y_label_2d
 
 	y_label = selectString(paramisDefault(y_label), y_label, "")
 	append_wn = selectString(paramisDefault(append_wn), append_wn, "")
@@ -1798,7 +1811,7 @@ function/S scg_initialize_entr_graph(wn, x_label, [y_label, append_wn, y_label_2
 	if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
 		scg_setupGraph1D(openGraphID, x_label, y_label= selectstring(cmpstr(y_label_1d, ""), wn, wn +" (" + y_label_1d + ")"))
 	else
-string entr_name=wn+"entr"
+		string entr_name=wn+"entr"
 		scg_open1Dgraph(entr_name, x_label, y_label="entropy (a.u.)", append_wn = append_wn)
 		ModifyGraph lsize($entr_name)=1.5,rgb($entr_name)=(0,0,0)
 		appendtoGraph/r $(wn+"hot"),$(wn+"cold"),
@@ -1807,20 +1820,24 @@ string entr_name=wn+"entr"
 
 		openGraphID = winname(0,1)
 	endif
-	graphIDs=openGraphID;  // save this so it can be returned
+//	graphIDs=openGraphID;  // save this so it can be returned
+	graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
+
 	openGraphID = ""
 
 	// 2D graphs
-	string wn2d = wn + "entr_2d"
-	openGraphID = scg_graphExistsForWavename(wn2d)
-	if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
-		scg_setupGraph2D(openGraphID, wn2d, x_label, y_label_2d, heat_label = selectstring(cmpstr(y_label_1d,""), wn, wn +" ("+y_label_1d +")"))
-	else
-		scg_open2Dgraph(wn2d, x_label, y_label_2d, heat_label = "entropy (a.u.)")
-		openGraphID = winname(0,1)
-	endif
-
+	if (is2d==1)
+		string wn2d = wn + "entr_2d"
+		openGraphID = scg_graphExistsForWavename(wn2d)
+		if (cmpstr(openGraphID, "")) // Graph is already open (str != "")
+			scg_setupGraph2D(openGraphID, wn2d, x_label, y_label_2d, heat_label = selectstring(cmpstr(y_label_1d,""), wn, wn +" ("+y_label_1d +")"))
+		else
+			scg_open2Dgraph(wn2d, x_label, y_label_2d, heat_label = "entropy (a.u.)")
+			openGraphID = winname(0,1)
+		endif
 	graphIDs = addlistItem(openGraphID, graphIDs, ";", INF)
+	endif
+	
 	return graphIDs
 end
 
@@ -3858,16 +3875,30 @@ function InitScanController([configFile])
 		make /t/o/N=(sc_instrLimit,3) sc_Instr
 		sc_Instr=""
 		
-		sc_Instr[0][0] = "openFastDAC(\"xxx\", verbose=0)"
+		sc_Instr[0][0] = "openFastDAC(\"44001\", verbose=0)"
+		sc_Instr[1][0] = "opensrsconnection(\"srs2\",\"GPIB0::2::INSTR\",verbose=1)"
+		sc_Instr[2][0] = "opensrsconnection(\"srs3\",\"GPIB0::3::INSTR\",verbose=1)"
+		sc_Instr[3][0] = "openLS370connection(\"ls\", \"10.18.101.12:49301/api/v1/\", \"bfsmall\", verbose=1)"
+		sc_Instr[4][0] = "openK2400connection(\"k2400\", \"GPIB0::6::INSTR\",verbose=1)"		
+		
+		sc_Instr[0][2] = "getFDstatus()"
+		sc_Instr[1][2] = "getsrsstatus(\"srs2\")"
+		sc_Instr[2][2] = "getsrsstatus(\"srs3\")"
+		sc_Instr[3][2] = "getls370Status(\"ls\")"
+
+
+
+
+
+		
+
+		
 		//sc_Instr[1][0] = "openLS370connection(\"ls\", \"http://lksh370-xld.qdev-b111.lab:49300/api/v1/\", \"bfbig\", verbose=1)"
 		//sc_Instr[2][0] = "openIPS120connection(\"ips1\",\"GPIB::25::INSTR\", 9.569, 9000, 182, verbose=0, hold = 1)"
-		sc_Instr[0][2] = "getFDstatus()"
-		//sc_Instr[1][2] = "getls370Status(\"ls\")"
+		sc_Instr[3][2] = "getls370Status(\"ls\")"
 		//sc_Instr[2][2] = "getipsstatus(ips1)"
 		
 		
-		//	openMultipleFDACs("13,7,4", verbose=0)
-		//	openLS370connection("ls", "http://lksh370-xld.qdev-b111.lab:49300/api/v1/", "bfbig", verbose=0)
 		//	openIPS120connection("ips1", "GPIB0::25::INSTR", 9.569, 9000, 182, verbose=0, hold = 1)
 		
 		nvar/z filenum
@@ -4005,106 +4036,113 @@ function scw_rebuildwindow()
 end
 
 
-Window ScanController(v_left,v_right,v_top,v_bottom) : Panel
-	variable v_left,v_right,v_top,v_bottom
-	variable sc_InnerBoxW = 660, sc_InnerBoxH = 32, sc_InnerBoxSpacing = 2
-
-	if (numpnts(sc_RawWaveNames) != numpnts(sc_RawRecord) ||  numpnts(sc_RawWaveNames) != numpnts(sc_RawScripts))
-		print "sc_RawWaveNames, sc_RawRecord, and sc_RawScripts waves should have the number of elements.\nGo to the beginning of InitScanController() to fix this.\n"
-		abort
-	endif
-
-	if (numpnts(sc_CalcWaveNames) != numpnts(sc_CalcRecord) ||  numpnts(sc_CalcWaveNames) != numpnts(sc_CalcScripts))
-		print "sc_CalcWaveNames, sc_CalcRecord, and sc_CalcScripts waves should have the number of elements.\n  Go to the beginning of InitScanController() to fix this.\n"
-		abort
-	endif
-
+Window ScanController() : Panel
 	PauseUpdate; Silent 1		// building window...
-	dowindow /K ScanController
-	NewPanel /W=(10,10,sc_InnerBoxW + 30,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+90) /N=ScanController
-	if(v_left+v_right+v_top+v_bottom > 0)
-		MoveWindow/w=ScanController v_left,v_top,V_right,v_bottom
-	endif
+	NewPanel /W=(61,73,741,706)
 	ModifyPanel frameStyle=2
-	ModifyPanel fixedSize=0
 	SetDrawLayer UserBack
-
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 13,29,"Wave Name"
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 130,29,"Record"
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 200,29,"Plot"
-	//SetDrawEnv fsize= 16,fstyle= 1	
-	//DrawText 250,29,"Async"
 	SetDrawEnv fsize= 16,fstyle= 1
 	DrawText 320,29,"Raw Script (ex: ReadSRSx(srs1)"
-
-	string cmd = ""
-	variable i=0
-	do
-		DrawRect 9,30+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing),5+sc_InnerBoxW,30+sc_InnerBoxH+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)
-		cmd="SetVariable sc_RawWaveNameBox" + num2istr(i) + " pos={13, 37+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={110, 0}, fsize=14, title=\" \", value=sc_RawWaveNames[i]"
-		execute(cmd)
-		cmd="CheckBox sc_RawRecordCheckBox" + num2istr(i) + ", proc=scw_CheckboxClicked, pos={150,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_RawRecord[i]) + " , title=\"\""
-		execute(cmd)
-		cmd="CheckBox sc_RawPlotCheckBox" + num2istr(i) + ", proc=scw_CheckboxClicked, pos={210,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_RawPlot[i]) + " , title=\"\""
-		execute(cmd)
-		//cmd="CheckBox sc_AsyncCheckBox" + num2istr(i) + ", proc=scw_CheckboxClicked, pos={270,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_measAsync[i]) + " , title=\"\""
-		//execute(cmd)
-		cmd="SetVariable sc_rawScriptBox" + num2istr(i) + " pos={250, 37+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={410, 0}, fsize=14, title=\" \", value=sc_rawScripts[i]"
-		execute(cmd)
-		i+=1
-	while (i<numpnts( sc_RawWaveNames ))
-	i+=1
-	button addrowraw,pos={550,i*(sc_InnerBoxH + sc_InnerBoxSpacing)},size={110,20},proc=scw_addrow,title="Add Row"
-	button removerowraw,pos={430,i*(sc_InnerBoxH + sc_InnerBoxSpacing)},size={110,20},proc=scw_removerow,title="Remove Row"
-	checkbox sc_PrintRawBox, pos={300,i*(sc_InnerBoxH + sc_InnerBoxSpacing)}, proc=scw_CheckboxClicked, value=sc_PrintRaw,side=1,title="\Z14Print filenames"
+	DrawRect 9,32,665,64
+	DrawRect 9,66,665,98
+	DrawRect 9,100,665,132
+	DrawRect 9,134,665,166
 	SetDrawEnv fsize= 16,fstyle= 1
-	DrawText 13,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Wave Name"
+	DrawText 13,220,"Wave Name"
 	SetDrawEnv fsize= 16,fstyle= 1
-	DrawText 130,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Record"
+	DrawText 130,220,"Record"
 	SetDrawEnv fsize= 16,fstyle= 1
-	DrawText 200,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Plot"	
+	DrawText 200,220,"Plot"
 	SetDrawEnv fsize= 16,fstyle= 1
-	DrawText 320,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Calc Script (ex: dmm[i]*1.5)"
-
-	i=0
-	do
-		DrawRect 9,85+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing),5+sc_InnerBoxW,85+sc_InnerBoxH+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)
-		cmd="SetVariable sc_CalcWaveNameBox" + num2istr(i) + " pos={13, 92+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={110, 0}, fsize=14, title=\" \", value=sc_CalcWaveNames[i]"
-		execute(cmd)
-		cmd="CheckBox sc_CalcRecordCheckBox" + num2istr(i) + ", proc=scw_CheckboxClicked, pos={150,95+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_CalcRecord[i]) + " , title=\"\""
-		execute(cmd)
-		cmd="CheckBox sc_CalcPlotCheckBox" + num2istr(i) + ", proc=scw_CheckboxClicked, pos={210,95+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_CalcPlot[i]) + " , title=\"\""
-		execute(cmd)
-		cmd="SetVariable sc_CalcScriptBox" + num2istr(i) + " pos={320, 92+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={340, 0}, fsize=14, title=\" \", value=sc_CalcScripts[i]"
-		execute(cmd)
-		i+=1
-	while (i<numpnts( sc_CalcWaveNames ))
-	button addrowcalc,pos={550,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=scw_addrow,title="Add Row"
-	button removerowcalc,pos={430,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=scw_removerow,title="Remove Row"
-	checkbox sc_PrintCalcBox, pos={300,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)}, proc=scw_CheckboxClicked, value=sc_PrintCalc,side=1,title="\Z14Print filenames"
-
-	// box for instrument configuration
+	DrawText 320,220,"Calc Script (ex: dmm[i]*1.5)"
+	DrawRect 9,223,665,255
+	DrawRect 9,257,665,289
 	SetDrawEnv fsize= 16,fstyle= 1
-	DrawText 13,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+20,"Connect Instrument"
+	DrawText 13,344,"Connect Instrument"
 	SetDrawEnv fsize= 16,fstyle= 1
-	DrawText 225,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+20,"Open GUI"
+	DrawText 294,344,"Open GUI"
 	SetDrawEnv fsize= 16,fstyle= 1
-	DrawText 440,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+20,"Log Status"
-	ListBox sc_Instr,pos={9,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25},size={sc_InnerBoxW,(sc_InnerBoxH+sc_InnerBoxSpacing)*3},fsize=14,frame=2,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1, editStyle=1
-
-	// buttons
-	button connect, pos={10,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=scw_OpenInstrButton,title="Connect Instr"
-	button gui, pos={140,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=scw_OpenGUIButton,title="Open All GUI"
-	button killabout, pos={270,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={140,20},proc=sc_controlwindows,title="Kill Sweep Controls"
-	button killgraphs, pos={420,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=scw_killgraphs,title="Close All Graphs"
-	button updatebutton, pos={550,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={110,20},proc=scw_updatewindow,title="Update"
-
-// helpful text
-	DrawText 13,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+70,"Press Update to save changes."
-
+	DrawText 440,344,"Log Status"
+	DrawText 11,609,"Press Update to save changes."
+	SetVariable sc_RawWaveNameBox0,pos={13.00,39.00},size={110.00,22.00},title=" "
+	SetVariable sc_RawWaveNameBox0,fSize=14,value=sc_RawWaveNames[0]
+	CheckBox sc_RawRecordCheckBox0,pos={150.00,42.00},size={14.00,14.00},proc=scw_CheckboxClicked
+	CheckBox sc_RawRecordCheckBox0,title="",value=0
+	CheckBox sc_RawPlotCheckBox0,pos={210.00,42.00},size={14.00,14.00},proc=scw_CheckboxClicked
+	CheckBox sc_RawPlotCheckBox0,title="",value=0
+	SetVariable sc_rawScriptBox0,pos={250.00,39.00},size={410.00,22.00},title=" "
+	SetVariable sc_rawScriptBox0,fSize=14,value=sc_RawScripts[0]
+	SetVariable sc_RawWaveNameBox1,pos={13.00,73.00},size={110.00,22.00},title=" "
+	SetVariable sc_RawWaveNameBox1,fSize=14,value=sc_RawWaveNames[1]
+	CheckBox sc_RawRecordCheckBox1,pos={150.00,76.00},size={14.00,14.00},proc=scw_CheckboxClicked
+	CheckBox sc_RawRecordCheckBox1,title="",value=0
+	CheckBox sc_RawPlotCheckBox1,pos={210.00,76.00},size={14.00,14.00},proc=scw_CheckboxClicked
+	CheckBox sc_RawPlotCheckBox1,title="",value=0
+	SetVariable sc_rawScriptBox1,pos={250.00,73.00},size={410.00,22.00},title=" "
+	SetVariable sc_rawScriptBox1,fSize=14,value=sc_RawScripts[1]
+	SetVariable sc_RawWaveNameBox2,pos={13.00,107.00},size={110.00,22.00},title=" "
+	SetVariable sc_RawWaveNameBox2,fSize=14,value=sc_RawWaveNames[2]
+	CheckBox sc_RawRecordCheckBox2,pos={150.00,110.00},size={14.00,14.00},proc=scw_CheckboxClicked
+	CheckBox sc_RawRecordCheckBox2,title="",value=0
+	CheckBox sc_RawPlotCheckBox2,pos={210.00,110.00},size={14.00,14.00},proc=scw_CheckboxClicked
+	CheckBox sc_RawPlotCheckBox2,title="",value=0
+	SetVariable sc_rawScriptBox2,pos={250.00,107.00},size={410.00,22.00},title=" "
+	SetVariable sc_rawScriptBox2,fSize=14,value=sc_RawScripts[2]
+	SetVariable sc_RawWaveNameBox3,pos={13.00,141.00},size={110.00,22.00},title=" "
+	SetVariable sc_RawWaveNameBox3,fSize=14,value=sc_RawWaveNames[3]
+	CheckBox sc_RawRecordCheckBox3,pos={150.00,144.00},size={14.00,14.00},proc=scw_CheckboxClicked
+	CheckBox sc_RawRecordCheckBox3,title="",value=0
+	CheckBox sc_RawPlotCheckBox3,pos={210.00,144.00},size={14.00,14.00},proc=scw_CheckboxClicked
+	CheckBox sc_RawPlotCheckBox3,title="",value=0
+	SetVariable sc_rawScriptBox3,pos={250.00,141.00},size={410.00,22.00},title=" "
+	SetVariable sc_rawScriptBox3,fSize=14,value=sc_RawScripts[3]
+	Button addrowraw,pos={550.00,170.00},size={110.00,20.00},proc=scw_addrow
+	Button addrowraw,title="Add Row"
+	Button removerowraw,pos={430.00,170.00},size={110.00,20.00},proc=scw_removerow
+	Button removerowraw,title="Remove Row"
+	CheckBox sc_PrintRawBox,pos={300.00,170.00},size={106.00,19.00},proc=scw_CheckboxClicked
+	CheckBox sc_PrintRawBox,title="\\Z14Print filenames",value=1,side=1
+	SetVariable sc_CalcWaveNameBox0,pos={13.00,230.00},size={110.00,22.00},title=" "
+	SetVariable sc_CalcWaveNameBox0,fSize=14,value=sc_CalcWaveNames[0]
+	CheckBox sc_CalcRecordCheckBox0,pos={150.00,233.00},size={14.00,14.00},proc=scw_CheckboxClicked
+	CheckBox sc_CalcRecordCheckBox0,title="",value=0
+	CheckBox sc_CalcPlotCheckBox0,pos={210.00,233.00},size={14.00,14.00},proc=scw_CheckboxClicked
+	CheckBox sc_CalcPlotCheckBox0,title="",value=0
+	SetVariable sc_CalcScriptBox0,pos={320.00,230.00},size={340.00,22.00},title=" "
+	SetVariable sc_CalcScriptBox0,fSize=14,value=sc_CalcScripts[0]
+	SetVariable sc_CalcWaveNameBox1,pos={13.00,264.00},size={110.00,22.00},title=" "
+	SetVariable sc_CalcWaveNameBox1,fSize=14,value=sc_CalcWaveNames[1]
+	CheckBox sc_CalcRecordCheckBox1,pos={150.00,267.00},size={14.00,14.00},proc=scw_CheckboxClicked
+	CheckBox sc_CalcRecordCheckBox1,title="",value=0
+	CheckBox sc_CalcPlotCheckBox1,pos={210.00,267.00},size={14.00,14.00},proc=scw_CheckboxClicked
+	CheckBox sc_CalcPlotCheckBox1,title="",value=0
+	SetVariable sc_CalcScriptBox1,pos={320.00,264.00},size={340.00,22.00},title=" "
+	SetVariable sc_CalcScriptBox1,fSize=14,value=sc_CalcScripts[1]
+	Button addrowcalc,pos={550.00,293.00},size={110.00,20.00},proc=scw_addrow
+	Button addrowcalc,title="Add Row"
+	Button removerowcalc,pos={430.00,293.00},size={110.00,20.00},proc=scw_removerow
+	Button removerowcalc,title="Remove Row"
+	CheckBox sc_PrintCalcBox,pos={300.00,293.00},size={106.00,19.00},proc=scw_CheckboxClicked
+	CheckBox sc_PrintCalcBox,title="\\Z14Print filenames",value=1,side=1
+	ListBox sc_Instr,pos={9.00,349.00},size={662.00,197.00},fSize=14,frame=2
+	ListBox sc_Instr,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1
+	ListBox sc_Instr,selRow=4,editStyle=1,widths={100,10,100}
+	Button connect,pos={10.00,558.00},size={120.00,20.00},proc=scw_OpenInstrButton
+	Button connect,title="Connect Instr"
+	Button gui,pos={140.00,558.00},size={120.00,20.00},proc=scw_OpenGUIButton
+	Button gui,title="Open All GUI"
+	Button killabout,pos={268.00,558.00},size={140.00,20.00},proc=sc_controlwindows
+	Button killabout,title="Kill Sweep Controls"
+	Button killgraphs,pos={418.00,558.00},size={120.00,20.00},proc=scw_killgraphs
+	Button killgraphs,title="Close All Graphs"
+	Button updatebutton,pos={548.00,558.00},size={110.00,20.00},proc=scw_updatewindow
+	Button updatebutton,title="Update"
 EndMacro
 
 

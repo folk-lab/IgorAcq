@@ -32,7 +32,8 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 	fins = selectstring(paramisdefault(fins), fins, "")
 	interlaced_channels = selectString(paramisdefault(interlaced_channels), interlaced_channels, "")
 	interlaced_setpoints = selectString(paramisdefault(interlaced_setpoints), interlaced_setpoints, "")
-	scu_tic()
+	
+	
 
 	// Set sc_ScanVars struct
 	struct ScanVars S
@@ -53,7 +54,6 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 	sc_sleep_noupdate(S.delayy)
 	// Initiate Scan
 	initializeScan(S, y_label = y_label)
-scu_toc()
 	if (fake==1)
 		abort
 	endif
@@ -76,7 +76,6 @@ scu_toc()
 
 
 		// Record values for 1D sweep
-		//*scfd_RecordValues(S, j, AWG_List = AWG)
 		scfd_RecordValues(S, j)
 		
 		if (alternate != 0) // If want to alternate scan scandirection for next row
@@ -226,9 +225,9 @@ function/s fd_start_sweep(S)
 	 
 //	 fake_ramp( adclist,  startxs,  finxs, numptsx)
 	 
-//syntax
-//	INT_RAMP,{DAC channels},{ADC channels},{initial DAC voltage 1},{...},{initial DAC voltage n},{final DAC voltage 1},{...},{final dac voltage n},{# of steps}
 	end
+
+
 	
 	
 function fake_ramp(string adclist, string startxs, string finxs,int numptsx)
@@ -264,133 +263,6 @@ function fake_ramp(string adclist, string startxs, string finxs,int numptsx)
 	name="test_"+num2str(j)+".dat"
 	Save/p=fdtest/J/M="\n"/O tempwave as name
 	
-end
-
-
-
-//	
-//	string fdIDname; S.adcLists = ""; S.fakeRecords = ""
-//	
-//	// the below function takes all the adcs selected to record in the fastdac Window and returns
-//		// only the adcs associated with the fdID
-//		//*string adcs = scu_getDeviceChannels(fdID, S.adclist, adc_flag=1) 
-//		if (cmpstr(adcs, "") == 0) // If adcs is an empty string
-//			string err
-//			sprintf err, "ERROR[fd_start_sweep]: ADClist = %s, Not on FD %s.\r\nRemeber, ADCs are indexed e.g. 0 - 11 for 3 fastdacs", S.adclist, fdIDname
-//			abort err
-//		endif
-//		string cmd = ""
-//	
-//		if (S.readVsTime) // this is passed at either the end of the scan (EndScan()) or it is passed
-//			// when update ADC is pressed on the fastDac window. The point here is an ADC channel is 
-//			// read for a small number of points to minimize noise and get a good average
-//			adcs = replacestring(";",adcs,"")
-//			S.adcLists = replacestringbykey(fdIDname, S.adcLists, adcs)
-//			sprintf cmd, "SPEC_ANA,%s,%s\r", adcs, num2istr(S.numptsx)
-//		else
-//			scu_assertSeparatorType(S.channelsx, ",")
-//			string starts, fins, temp
-//			
-//			// here we decide which direction the sweeps are happening in, This is for sweeps
-//			// to happen at alternating directions. Standard scans have S.direction = 1
-//			if(S.direction == 1)
-//				starts = stringByKey(fdIDname, S.IDstartxs)
-//				fins = stringByKey(fdIDname, S.IDfinxs)
-//			elseif(S.direction == -1)
-//				starts = stringByKey(fdIDname, S.IDfinxs)
-//				fins = stringByKey(fdIDname, S.startxs)
-//			else
-//				abort "ERROR[fd_start_sweep]: S.direction must be 1 or -1, not " + num2str(S.direction)
-//			endif
-//			
-//			starts = starts[1,INF] //removing the comma at the start
-//			fins = fins [1, INF]   //removing the comma at the start
-//
-//			
-//			// the below function takes all the dacs to be ramped (passed as a parameter in any scan function)
-//			// and returns only the dacs associated with the fdID
-//			string dacs = scu_getDeviceChannels(fdID, S.channelsx)
-//	   		dacs = replacestring(",",dacs,"")
-//		 	
-//		 	
-//			// checking the need for a fakeramp, the voltage is held at the current value.
-//			int fakeChRamp = 0; string AW_dacs; int j
-//			if(!cmpstr(dacs,""))
-//			
-//				// find global value of channel 0 in that ID, set it to start and fin, and dac = 0
-//				if(!paramisDefault(AWG_list) && AWG_List.use_AWG == 1 && AWG_List.lims_checked == 1)
-//					AW_dacs = scu_getDeviceChannels(fdID, AWG_list.channels_AW0)
-//					AW_dacs = addlistitem(scu_getDeviceChannels(fdID, AWG_list.channels_AW1), AW_dacs, ",", INF)
-//					AW_dacs = removeSeperator(AW_dacs, ",")
-//					for(j=0 ; j<8 ; j++)
-//						if(whichlistItem(num2str(j),AW_dacs, ",") == -1)
-//							fakeChRamp = j
-//							break
-//						endif
-//					endfor
-//				endif
-//				string value = num2str(getfdacOutput(fdID,fakeChRamp, same_as_window = 0))
-//				starts = value 
-//				fins = value 
-//				dacs = num2str(fakeChRamp)
-//			endif
-//	
-//			
-//		
-//			adcs = replacestring(";",adcs,"")
-//			S.adcLists = replacestringbykey(fdIDname, S.adcLists, adcs)
-//			
-//			///// WARNING THIS SETUP OF AWG MAY NOT WORK IN ALL CASES I JUTS WANTED TO GET A SCAN GOING ////./
-//			// this is all for AWG //////////////////////////////////////////////////////////////////////////////////////////////////////////
-//			if(!paramisDefault(AWG_list) && AWG_List.use_AWG == 1 && AWG_List.lims_checked == 1 && ((stringmatch(fdIDname, stringFromList(0,  AWG_list.channelIDs)) == 1) || (stringmatch(fdIDname, stringFromList(1,  AWG_list.channelIDs)) == 1)))
-//				int numWaves  // this numwaves must be one or two. If two, the command to the fastDAC assumes both AW0 and AW1 are being used.
-//				
-//				// we first figure out all the AW dacs corresponding to the current fdID
-//				if (stringmatch(fdIDname, stringFromList(0,  AWG_list.channelIDs)) == 1)
-//					string AW0_dacs = replacestring(",",scu_getDeviceChannels(fdID, AWG_list.channels_AW0), "")
-//				endif
-//				if (stringmatch(fdIDname, stringFromList(1,  AWG_list.channelIDs)) == 1)
-//					string AW1_dacs = replacestring(",",scu_getDeviceChannels(fdID, AWG_list.channels_AW1), "")
-//				endif
-//				// we need to run through some tests to see which one of AW0, AW1 is populated
-//				// if both are unpopulated and we are using AWG then a fake squarewave will be implemented on a channel
-//				
-//				// if only AW1 is populated, it is remapped to AW0 because the command AWG_RAMP only knows how many waves to use. So if we say
-//				// numWaves = 1, it will always assume AW0
-//				if (numtype(strlen(AW1_dacs)) == 2)
-//					AW1_dacs = ""
-//				endif
-//				if(!cmpstr(AW0_dacs,"") && !cmpstr(AW1_dacs,""))
-//					for(j=0 ; j<8 ; j++)
-//						if(strsearch(num2str(j),dacs,0) == -1)
-//							value = num2str(getfdacOutput(fdID,j, same_as_window = 0))
-//							AW_dacs = num2str(j)
-//							//setup squarewave to have this output
-//							setupfakesquarewave(fdID, str2num(value))
-//							break
-//						endif
-//					endfor
-//					AWG_list.numWaves  = 1
-//				elseif(cmpstr(AW1_dacs,"") && !cmpstr(AW0_dacs,""))  //AW1 is populated, AW0 is not
-//					AW_dacs = AW1_dacs
-//					scw_setupAWG("setupAWG", instrID = fdID, mapOnetoZero = 1)
-//					AWG_list.numWaves  = 1
-//				elseif(cmpstr(AW0_dacs,"") && !cmpstr(AW1_dacs,"")) //AW0 is populated, AW1 is not
-//					AW_dacs = AW0_dacs
-//					AWG_list.numWaves  = 1
-//				else															
-//					AW_dacs = AW0_dacs + "," + AW1_dacs
-//					AWG_list.numWaves  = 2
-//				endif
-//
-//				sprintf cmd, "AWG_RAMP,%d,%s,%s,%s,%s,%s,%d,%d\r", AWG_list.numWaves, AW_dacs, dacs, adcs, starts, fins, AWG_list.numCycles, AWG_list.numSteps
-//			else			
-//				sprintf cmd, "INT_RAMP,%s,%s,%s,%s,%d\r", dacs, adcs, starts, fins, S.numptsx
-//			endif
-//		endif
-//	
-//		writeInstr(fdID,cmd)
-//	endfor
 end
 
 
@@ -763,31 +635,6 @@ function/WAVE fd_calculate_spectrum(time_series, [scan_duration, linear])
 	return powerspec
 end
 
-
-
-
-
-//
-//function plotPowerSpectrum(w, [scan_duration, linear, powerspec_name])
-//	wave w
-//	variable scan_duration, linear
-//	string powerspec_name // Wavename to save powerspectrum in (useful if you want to display more than one at a time)
-//	
-//	linear = paramisDefault(linear) ? 1 : linear
-//	wave powerspec = fd_calculate_spectrum(w, scan_duration=scan_duration, linear=linear)
-//	
-//	if(!paramIsDefault(powerspec_name))
-//		duplicate/o powerspec $powerspec_name
-//		wave tempwave = $powerspec_name
-//	else
-//		duplicate/o powerspec tempwave
-//	endif
-//
-//	string y_label = selectString(linear, "Spectrum [dBnA/sqrt(Hz)]", "Spectrum [nA/sqrt(Hz)]")
-//	scg_initializeGraphsForWavenames(NameOfWave(tempwave), "Frequency /Hz", for_2d=0, y_label=y_label)
-//	 doWindow/F $winName(0,1)
-//end
-//
 
 
 

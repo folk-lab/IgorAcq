@@ -25,16 +25,16 @@
 // StepTempScanSomething -- Scanning at multiple fridge temperatures
 
 
-function ReadVsTime(delay, [y_label, max_time, comments]) // Units: s
-	variable delay, max_time
+function ReadVsTime(delay,N [y_label, comments]) // Units: s
+	variable delay,N
 	string y_label, comments
 	variable i = 0
 
 	comments = selectString(paramIsDefault(comments), comments, "")
 	y_label = selectString(paramIsDefault(y_label), y_label, "")	
-	max_time = paramIsDefault(max_time) ? INF : max_time
-	
+
 	Struct ScanVars S
+	initScanVars(S, numptsx=N)
 	initializeScan(S)
 	S.readVsTime = 1
 
@@ -45,9 +45,8 @@ function ReadVsTime(delay, [y_label, max_time, comments]) // Units: s
 		RecordValues(S, i, 0)
 		doupdate
 		i+=1
-	while (datetime - S.start_time < max_time)
+	while (i<N)
 	S.end_time = datetime
-	S.numptsx = i 
 	EndScan(S=S)
 end
 

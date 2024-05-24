@@ -211,6 +211,7 @@ Function scv_setLastScanVars(S)
 	sc_lastScanVarsStrings[19] = S.dacListIDs_y   // get this from S.channelsy
 	sc_lastScanVarsStrings[20] = S.comments
 
+
 	// Storing numeric fields to sc_lastScanVarsVariables wave
 	sc_lastScanVarsVariables[0] = S.instrIDx
 	sc_lastScanVarsVariables[1] = S.instrIDy
