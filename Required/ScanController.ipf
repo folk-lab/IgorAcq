@@ -94,6 +94,8 @@ function initexperiment()
 	create_variable("sc_meas_mode");
 	create_variable("silent_scan");
 	create_variable("intermediate_save");
+	create_variable("jsonvar");
+
 
 
 	

@@ -109,14 +109,18 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 	// Note: comments is only used when saving logs_only (otherwise comments are saved from ScanVars.comments)
 	string hdf5_id_list, comments
 	Struct ScanVars &S
-	variable logs_only  // 1=Don't save any sweep information to HDF
+	variable logs_only // 1=Don't save any sweep information to HDF
+	
 	make/Free/T/N=1 cconfig = {""}
 //	cconfig = prettyJSONfmt(scw_createConfig())  	//<< 2023/01 -- I think someting about this is chopping off a lot of the info
-	cconfig = scw_createConfig()  					// << This is the temporary fix -- at least the info is saved even if not perfect
+	cconfig = scw_createConfig() 
+	
+	int jsonnum 					// << This is the temporary fix -- at least the info is saved even if not perfect
 	
 	if (!logs_only)
 		make /FREE /T /N=1 sweep_logs = prettyJSONfmt(sc_createSweepLogs(S=S))
-		make /free /T /N=1 instr_logs="" // Modifies the jstr to add Instrumt Status (from ScanController Window)
+		jsonnum=sc_instr_log();jsonxOP_Dump jsonnum; 
+		make /free /T /N=1 instr_logs=S_value
 		make /FREE /T /N=1 scan_vars_json = sce_ScanVarsToJson(S, getrtstackinfo(3), save_to_file = 0)
 		make/free/T/n=1 awg_json=sc_awg_log()
 		make/free/T/n=1 calc_func_log= sc_calc_log()
@@ -313,61 +317,33 @@ function /s sc_calc_log()
 end
 
 
-//function/s sc_instrumentLogs()
-//
-//	string command="", val=""
-//	string /G sc_log_buffer=""
-//
-//		sc_log_buffer=""
-//		command = TrimString(sc_Instr[i][2])
-//		if(strlen(command)>0 && cmpstr(command[0], "/") !=0) // Command and not commented out
-//			Execute/Q/Z "sc_log_buffer="+command
-//			if(V_flag!=0)
-//				print "[ERROR] in sc_createSweepLogs: "+GetErrMessage(V_Flag,2)
-//			endif
-//			if(strlen(sc_log_buffer)!=0)
-//
-//			else
-//				print "[WARNING] command failed to log anything: "+command+"\r"
-//			endif
-//		endif
-//	
-//	return jstr
-//end
 
-function /s sc_instr_log()
+function sc_instr_log()
 	string jstr, command
-	variable level1, level2
-	variable i=1
+	variable level1, N, jsonId
+	variable i=0
 	wave /t sc_Instr
-	string/g sc_log_buffer=""
-	string json_buffer
+	nvar jsonvar
+	string status
+	N=dimsize(sc_Instr,0)
+	jsonxop_release/a
 
+	JSONXOP_New; level1 = V_value
+
+do
+	status = TrimString(sc_Instr[i][2])
+	if(strlen(status)>0 && cmpstr(status[0], "/") !=0) // Command and not commented out
+		command="jsonvar="+status;
 	
-			command = TrimString(sc_Instr[i][2])
-			if(strlen(command)>0 && cmpstr(command[0], "/") !=0) // Command and not commented out
-			command="sc_log_buffer="+command;
-			endif
-			Execute(command)
-			print sc_log_buffer;
-
-
-
-//	JSONXOP_New/z; level1=V_value
-//	JSONXOP_AddTree/T=1 level1, "/instr"
-	
-
-//	JSONXOP_Parse/Z/Q sc_log_buffer  /// jsonst=V_value
-//	level2=V_value
-//		JSONXOP_AddValue/JOIN=(level2) level1, "test"
-//		JSONXOP_Dump level1
-	
-
+	Execute(command)
+	JSONXOP_AddValue/JOIN=(jsonvar) level1, status
+	endif
+	i=i+1
+	while(i<N)
 //	JSONXOP_Dump level1
-//	jsonxop_release/a
-//	print S_value
-//	return S_value
+//	print "Full textual representation:\r", S_value
 
+	return level1
 end
 
 

@@ -949,28 +949,25 @@ end
 
 
 function getFDstatus()
-// returns jsonid of current FD status.
-struct ScanVars S
-scv_getLastScanVars(S)
-variable numDACCh, numADCCh 
+	// returns jsonid of current FD status.
+	struct ScanVars S
+	scv_getLastScanVars(S)
+	variable numDACCh, numADCCh
 
-svar fd
-	string  buffer = "", key = ""
-	wave/t fdacvalstr	
-	wave/t fadcvalstr	
+	svar fd
+	wave/t fdacvalstr
+	wave/t fadcvalstr
 	wave/t ADC_channel
 	wave/t DAC_channel
 	string FDID_list=TextWavetolist(ADC_channel)
 	string path
-	
-		variable level1, level2, jsonId
-	string jsonStr
 
+	variable level1, level2, jsonId
+	string jsonStr
 	JSONXOP_New; level1 = V_value
 	JSONXOP_AddValue/T=(fd) level1, "http_address"
 	JSONXOP_AddValue/V=(S.samplingFreq) level1, "samplingFreq"
 	JSONXOP_AddValue/V=(S.MeasureFreq) level1, "MeasureFreq"
-
 	JSONXOP_Addtree/T=0 level1, "DAC_channels"
 	JSONXOP_Addtree/T=0 level1, "ADC_channels"
 
@@ -983,19 +980,19 @@ svar fd
 		path="DAC_channels/DAC"+DAC_channel[i]
 		JSONXOP_AddValue/T=((fdacvalstr[i][1])) level1, path
 	endfor
-	
-		// update ADC values
+
+	// update ADC values
 	numADCCh=scfw_update_fadc("")
 	for(i=0;i<numADCCh;i+=1)
 		path="ADC_channels/ADC"+ADC_channel[i]
 		JSONXOP_AddValue/T=((fadcvalstr[i][1])) level1, path
 	endfor
-	
-	
-//	jsonxop_dump level1;
-//	print "Full textual representation:\r", S_value 
-	
-return level1
+
+
+	//	jsonxop_dump level1;
+	//	print "Full textual representation:\r", S_value
+
+	return level1
 end
 
 

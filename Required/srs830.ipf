@@ -339,20 +339,25 @@ end
 //// Status function ////
 ////////////////////////
 
-function/s GetSRSStatus(instrID)
+function GetSRSStatus(instrID)
 	variable instrID
-	string  buffer = ""
+	variable gpib = getAddressGPIB(instrID)
+	
+	variable level1
+	string jsonStr
+	JSONXOP_New; level1 = V_value
+	
+	JSONXOP_AddValue/V=(gpib) level1, "gpib_address"
+	JSONXOP_AddValue/V=(GetSRSAmplitude(instrID)) level1, "Amplitude V"
+	JSONXOP_AddValue/V=(GetSRSTimeConst(instrID)*1000) level1, "time constant ms"
+	JSONXOP_AddValue/V=(GetSRSFrequency(instrID)) level1, "frequency Hz"
+	JSONXOP_AddValue/V=(GetSRSPhase(instrID)) level1, "phase deg"
+	JSONXOP_AddValue/V=(GetSRSSensitivity(instrID)) level1, "sensitivity V"
+	JSONXOP_AddValue/V=(GetSRSHarmonic(instrID)) level1, "harmonic"
+	JSONXOP_AddValue/V=(Getsrsreadout(instrID, ch=1)) level1, "CH1 readout"
+	JSONXOP_AddValue/V=(Getsrsreadout(instrID, ch=2)) level1, "CH2 readout"
 
-	string gpib = num2istr(getAddressGPIB(instrID))
-	buffer = addJSONkeyval(buffer, "gpib_address", gpib)
+return level1
 
-	buffer = addJSONkeyval(buffer, "amplitude V", num2numStr(GetSRSAmplitude(instrID)))
-	buffer = addJSONkeyval(buffer, "time_const ms", num2numStr(GetSRSTimeConst(instrID)*1000))
-	buffer = addJSONkeyval(buffer, "frequency Hz", num2numStr(GetSRSFrequency(instrID)))
-	buffer = addJSONkeyval(buffer, "phase deg", num2numStr(GetSRSPhase(instrID)))
-	buffer = addJSONkeyval(buffer, "sensitivity V", num2numStr(GetSRSSensitivity(instrID)))
-	buffer = addJSONkeyval(buffer, "harmonic", num2numStr(GetSRSHarmonic(instrID)))
-	buffer = addJSONkeyval(buffer, "CH1readout", num2numstr(Getsrsreadout(instrID, ch=1)))
-	buffer = addJSONkeyval(buffer, "CH2readout", num2numstr(Getsrsreadout(instrID, ch=2)))
-	return addJSONkeyval("", "SRS_"+gpib, buffer)
+
 end
