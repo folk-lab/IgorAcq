@@ -105,11 +105,6 @@ function initexperiment()
 	
 	
 	// determine the portnum
-	string home_path, separator_type
-	[home_path, separator_type] = sc_get_igor_path()
-	string master_path = ParseFilePath(1, home_path, separator_type, 1, 0)
-	string swagger_file = master_path + "start_swagger.sh"
-	//string portnum = sc_get_swagger_port(swagger_file)
 	
 	string portnum = "44001" //51011
 	
@@ -1382,7 +1377,9 @@ function initializeScan(S, [init_graphs, y_label])
 	scg_openAbortWindow()
 	
 	// Save struct to globals
-//	scv_setLastScanVars(S)
+	scv_setLastScanVars(S)
+	Dowindow/b after1;  Dowindow/b ScanController
+
 end
 
 
@@ -2491,7 +2488,7 @@ function scfd_demodulate(wav, harmonic, nofcycles, period, wnam)//, [append2hdf]
 	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,wn_x)
 	wave wav_x=$wn_x
 	Redimension/N=(-1) wav_x //demod.x wave
-	setscale/I x, 0, last_x, wav_x //Manually setting scale to be inclusive of last point
+	CopyScales /I wav, wav_x
 	
 	//Demodulation in y
 	MultiThread sine1d=cos(2*pi*(harmonic*p/period) + sc_demodphi /180 *pi)
@@ -2502,7 +2499,8 @@ function scfd_demodulate(wav, harmonic, nofcycles, period, wnam)//, [append2hdf]
 	ReduceMatrixSize(temp, 0, -1, (cols/period/nofcycles), 0,-1, rows, 1,wn_y)
 	wave wav_y=$wn_y
 	Redimension/N=(-1) wav_y //demod.y wave
-	setscale/I x, 0, last_x, wav_y //Manually setting scale to be inclusive of last point
+	CopyScales /I wav, wav_y
+
 
 end 
 
@@ -3067,7 +3065,7 @@ end
 function scw_saveConfig()
 	nvar lastconfig
 	wave sc_Instr, sc_awg_info,fadcattr,fdacattr,instrBoxAttr,fadcvalstr,fdacvalstr,old_fdacvalstr 
-lastconfig=scu_unixTime()
+	lastconfig=scu_unixTime()
 	string filename = "attr" + num2istr(lastconfig) + ".itx"
 	string filename1 = "valstr" + num2istr(lastconfig) + ".itx"
 	Save/T/M="\n"/p=config fadcattr,fdacattr,instrBoxAttr, as filename
@@ -3636,12 +3634,13 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 
 	// add info about scan to the scan history file in /config
 	sce_ScanVarsToJson(S_, getrtstackinfo(3), save_to_file=1)
+	Dowindow/f after1;  Dowindow/f ScanController
+
 end
 
 function intermed_save()
 	Struct ScanVars S_ // Note: This will definitely exist for the rest of this function
 	scv_getLastScanVars(S_)
-	scu_tic()
 	variable hdfID
 	string cwn, rwn
 	wave fadcattr
@@ -3672,7 +3671,6 @@ function intermed_save()
 	saveWavesToHDF(RawWaves, hdfID)
 	saveWavesToHDF(CalcWaves, hdfID)
 	HDF5CloseFile /Z hdfID // close HDF5 file
-	scu_toc()
 end
 
 
@@ -4031,9 +4029,9 @@ end
 
 function scw_rebuildwindow()
 	string cmd=""
-	getwindow/z ScanController1 wsizeRM
-	dowindow /k ScanController1
-	sprintf cmd, "ScanController(%f,%f,%f,%f)", v_left,v_right,v_top,v_bottom
+	getwindow/z ScanController wsizeRM
+	dowindow /k ScanController
+	sprintf cmd, "ScanController()"
 	execute(cmd)
 end
 
@@ -4688,6 +4686,117 @@ end
 //	endif
 //
 //end
+
+//function scw_rebuildwindow()
+//	string cmd=""
+//	getwindow/z ScanController1 wsizeRM
+//	dowindow /k ScanController1
+//	sprintf cmd, "ScanController(%f,%f,%f,%f)", v_left,v_right,v_top,v_bottom
+//	execute(cmd)
+//end
+//
+//
+//Window ScanController(v_left,v_right,v_top,v_bottom) : Panel
+//	variable v_left,v_right,v_top,v_bottom
+//	variable sc_InnerBoxW = 660, sc_InnerBoxH = 32, sc_InnerBoxSpacing = 2
+//
+//	if (numpnts(sc_RawWaveNames) != numpnts(sc_RawRecord) ||  numpnts(sc_RawWaveNames) != numpnts(sc_RawScripts))
+//		print "sc_RawWaveNames, sc_RawRecord, and sc_RawScripts waves should have the number of elements.\nGo to the beginning of InitScanController() to fix this.\n"
+//		abort
+//	endif
+//
+//	if (numpnts(sc_CalcWaveNames) != numpnts(sc_CalcRecord) ||  numpnts(sc_CalcWaveNames) != numpnts(sc_CalcScripts))
+//		print "sc_CalcWaveNames, sc_CalcRecord, and sc_CalcScripts waves should have the number of elements.\n  Go to the beginning of InitScanController() to fix this.\n"
+//		abort
+//	endif
+//
+//	PauseUpdate; Silent 1		// building window...
+//	dowindow /K ScanController
+//	NewPanel /W=(10,10,sc_InnerBoxW + 30,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+90) /N=ScanController
+//	if(v_left+v_right+v_top+v_bottom > 0)
+//		MoveWindow/w=ScanController v_left,v_top,V_right,v_bottom
+//	endif
+//	ModifyPanel frameStyle=2
+//	ModifyPanel fixedSize=0
+//	SetDrawLayer UserBack
+//
+//	SetDrawEnv fsize= 16,fstyle= 1
+//	DrawText 13,29,"Wave Name"
+//	SetDrawEnv fsize= 16,fstyle= 1
+//	DrawText 130,29,"Record"
+//	SetDrawEnv fsize= 16,fstyle= 1
+//	DrawText 200,29,"Plot"
+//	//SetDrawEnv fsize= 16,fstyle= 1	
+//	//DrawText 250,29,"Async"
+//	SetDrawEnv fsize= 16,fstyle= 1
+//	DrawText 320,29,"Raw Script (ex: ReadSRSx(srs1)"
+//
+//	string cmd = ""
+//	variable i=0
+//	do
+//		DrawRect 9,30+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing),5+sc_InnerBoxW,30+sc_InnerBoxH+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)
+//		cmd="SetVariable sc_RawWaveNameBox" + num2istr(i) + " pos={13, 37+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={110, 0}, fsize=14, title=\" \", value=sc_RawWaveNames[i]"
+//		execute(cmd)
+//		cmd="CheckBox sc_RawRecordCheckBox" + num2istr(i) + ", proc=scw_CheckboxClicked, pos={150,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_RawRecord[i]) + " , title=\"\""
+//		execute(cmd)
+//		cmd="CheckBox sc_RawPlotCheckBox" + num2istr(i) + ", proc=scw_CheckboxClicked, pos={210,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_RawPlot[i]) + " , title=\"\""
+//		execute(cmd)
+//		//cmd="CheckBox sc_AsyncCheckBox" + num2istr(i) + ", proc=scw_CheckboxClicked, pos={270,40+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_measAsync[i]) + " , title=\"\""
+//		//execute(cmd)
+//		cmd="SetVariable sc_rawScriptBox" + num2istr(i) + " pos={250, 37+sc_InnerBoxSpacing+i*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={410, 0}, fsize=14, title=\" \", value=sc_rawScripts[i]"
+//		execute(cmd)
+//		i+=1
+//	while (i<numpnts( sc_RawWaveNames ))
+//	i+=1
+//	button addrowraw,pos={550,i*(sc_InnerBoxH + sc_InnerBoxSpacing)},size={110,20},proc=scw_addrow,title="Add Row"
+//	button removerowraw,pos={430,i*(sc_InnerBoxH + sc_InnerBoxSpacing)},size={110,20},proc=scw_removerow,title="Remove Row"
+//	checkbox sc_PrintRawBox, pos={300,i*(sc_InnerBoxH + sc_InnerBoxSpacing)}, proc=scw_CheckboxClicked, value=sc_PrintRaw,side=1,title="\Z14Print filenames"
+//	SetDrawEnv fsize= 16,fstyle= 1
+//	DrawText 13,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Wave Name"
+//	SetDrawEnv fsize= 16,fstyle= 1
+//	DrawText 130,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Record"
+//	SetDrawEnv fsize= 16,fstyle= 1
+//	DrawText 200,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Plot"	
+//	SetDrawEnv fsize= 16,fstyle= 1
+//	DrawText 320,i*(sc_InnerBoxH + sc_InnerBoxSpacing)+50,"Calc Script (ex: dmm[i]*1.5)"
+//
+//	i=0
+//	do
+//		DrawRect 9,85+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing),5+sc_InnerBoxW,85+sc_InnerBoxH+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)
+//		cmd="SetVariable sc_CalcWaveNameBox" + num2istr(i) + " pos={13, 92+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={110, 0}, fsize=14, title=\" \", value=sc_CalcWaveNames[i]"
+//		execute(cmd)
+//		cmd="CheckBox sc_CalcRecordCheckBox" + num2istr(i) + ", proc=scw_CheckboxClicked, pos={150,95+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_CalcRecord[i]) + " , title=\"\""
+//		execute(cmd)
+//		cmd="CheckBox sc_CalcPlotCheckBox" + num2istr(i) + ", proc=scw_CheckboxClicked, pos={210,95+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, value=" + num2str(sc_CalcPlot[i]) + " , title=\"\""
+//		execute(cmd)
+//		cmd="SetVariable sc_CalcScriptBox" + num2istr(i) + " pos={320, 92+sc_InnerBoxSpacing+(numpnts( sc_RawWaveNames )+i)*(sc_InnerBoxH+sc_InnerBoxSpacing)}, size={340, 0}, fsize=14, title=\" \", value=sc_CalcScripts[i]"
+//		execute(cmd)
+//		i+=1
+//	while (i<numpnts( sc_CalcWaveNames ))
+//	button addrowcalc,pos={550,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=scw_addrow,title="Add Row"
+//	button removerowcalc,pos={430,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)},size={110,20},proc=scw_removerow,title="Remove Row"
+//	checkbox sc_PrintCalcBox, pos={300,89+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)}, proc=scw_CheckboxClicked, value=sc_PrintCalc,side=1,title="\Z14Print filenames"
+//
+//	// box for instrument configuration
+//	SetDrawEnv fsize= 16,fstyle= 1
+//	DrawText 13,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+20,"Connect Instrument"
+//	SetDrawEnv fsize= 16,fstyle= 1
+//	DrawText 225,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+20,"Open GUI"
+//	SetDrawEnv fsize= 16,fstyle= 1
+//	DrawText 440,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+20,"Log Status"
+//	ListBox sc_Instr,pos={9,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames))*(sc_InnerBoxH+sc_InnerBoxSpacing)+25},size={sc_InnerBoxW,(sc_InnerBoxH+sc_InnerBoxSpacing)*3},fsize=14,frame=2,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1, editStyle=1
+//
+//	// buttons
+//	button connect, pos={10,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=scw_OpenInstrButton,title="Connect Instr"
+//	button gui, pos={140,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=scw_OpenGUIButton,title="Open All GUI"
+//	button killabout, pos={270,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={140,20},proc=sc_controlwindows,title="Kill Sweep Controls"
+//	button killgraphs, pos={420,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={120,20},proc=scw_killgraphs,title="Close All Graphs"
+//	button updatebutton, pos={550,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+30},size={110,20},proc=scw_updatewindow,title="Update"
+//
+//// helpful text
+//	DrawText 13,120+(numpnts( sc_RawWaveNames ) + numpnts(sc_CalcWaveNames)+3)*(sc_InnerBoxH+sc_InnerBoxSpacing)+70,"Press Update to save changes."
+//
+//EndMacro
 
 
 

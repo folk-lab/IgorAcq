@@ -791,7 +791,7 @@ function /S sc_copySingleFile(original_path, new_path, filename, [allow_overwrit
 	string original_path, new_path, filename
 	string op="", np=""
 	
-	if( cmpstr(igorinfo(2) ,"Macintosh")==0 )
+	if( cmpstr(igorinfo(2) ,"Macintosh")==1 )
 		// using rsync if the machine is a mac
 		//   should speed things up a little bit by not copying full files
 		op = getExpPath(original_path, full=2)
@@ -944,6 +944,70 @@ function get_sweeplogs(datnum, [kenner])
 	
 	HDF5OpenFile /R/P=data fileID as HDF_filename
 	HDF5LoadData /Q/O/Type=1/N=sc_sweeplogs /A="sweep_logs" fileID, "metadata"
+	HDF5CloseFile fileID
+	
+	wave/t sc_sweeplogs
+	variable sweeplogsID
+	sweeplogsID = JSON_Parse(sc_sweeplogs[0])
+
+	return sweeplogsID
+end
+
+
+function get_instr_logs(datnum, [kenner])
+	// Opens HDF5 file from current data folder and returns sweeplogs jsonID
+	// Remember to JSON_Release(jsonID) or JSONXOP_release/A to release all objects
+	// Can be converted to JSON string by using JSON_dump(jsonID)
+	variable datnum
+	string kenner
+	kenner = selectString(paramisdefault(kenner), kenner, "")
+	variable fileID, metadataID, i, result
+	string HDF_filename = "dat" + num2str(datnum) + kenner + ".h5"
+
+	HDF5OpenFile /R/P=data fileID as HDF_filename
+	HDF5LoadData /Q/O/Type=1/N=sc_sweeplogs /A="instr_logs" fileID, "metadata"
+	HDF5CloseFile fileID
+
+	wave/t sc_sweeplogs
+	variable sweeplogsID
+	
+	sweeplogsID = JSON_Parse(sc_sweeplogs[0]);
+	jsonxop_dump sweeplogsID;
+	print "instr_logs:\r", S_value
+	return sweeplogsID
+end
+	
+
+
+function goback2(datnum)
+	// Opens HDF5 file from current data folder and returns sweeplogs jsonID
+	// Remember to JSON_Release(jsonID) or JSONXOP_release/A to release all objects
+	// Can be converted to JSON string by using JSON_dump(jsonID)
+	variable datnum
+	variable sweeplogsID, i, SP
+	wave/t DAC_channel
+	int nChannels=dimsize(DAC_channel,0)
+	sweeplogsID=get_instr_logs(datnum)
+	for (i = 0; i < nChannels; i += 1)
+		SP=JSON_GetVariable(sweeplogsID, "getFDstatus()/DAC_channels/DAC"+DAC_channel[i]);
+		RampMultipleFDAC( DAC_channel[i],  SP,ramprate=0);  // ramprate=0 will force ramprate to be the same as in the FD window
+	endfor
+end
+
+
+function get_AWGinfo(datnum, [kenner])
+	// Opens HDF5 file from current data folder and returns sweeplogs jsonID
+	// Remember to JSON_Release(jsonID) or JSONXOP_release/A to release all objects
+	// Can be converted to JSON string by using JSON_dump(jsonID)
+	variable datnum
+	string kenner
+	kenner = selectString(paramisdefault(kenner), kenner, "")
+	variable fileID, metadataID, i, result
+	
+	string HDF_filename = "dat" + num2str(datnum) + kenner + ".h5"
+	
+	HDF5OpenFile /R/P=data fileID as HDF_filename
+	HDF5LoadData /Q/O/Type=1/N=sc_sweeplogs /A="AWG_waves" fileID, "metadata"
 	HDF5CloseFile fileID
 	
 	wave/t sc_sweeplogs

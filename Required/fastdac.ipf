@@ -440,7 +440,7 @@ Function RampMultipleFDAC(string channels, variable setpoint, [variable ramprate
     // Example Use ::
     // rampmultiplefDAC("11.3, 11.6", 0, setpoints_str ="10, -10")
 
-	ramprate = paramisdefault(ramprate) ? 1000 : ramprate     // If ramprate is not specified or not a number, default to 1000 (this is mostly safe)
+	ramprate = paramisdefault(ramprate) ? 10000 : ramprate     // If ramprate is not specified or not a number, default to 1000 (this is mostly safe)
 
 
 
@@ -989,8 +989,8 @@ function getFDstatus()
 	endfor
 
 
-	//	jsonxop_dump level1;
-	//	print "Full textual representation:\r", S_value
+//		jsonxop_dump level1;
+//		print "Full textual representation:\r", S_value
 
 	return level1
 end
