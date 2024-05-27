@@ -919,7 +919,7 @@ function initScanVars(S, [instrIDx, startx, finx, channelsx, numptsx, delayx, ra
 	S.numADCs = NaN  // How many ADCs are being recorded  
 	S.samplingFreq = NaN  // 
 	S.measureFreq = NaN  // measureFreq = samplingFreq/numADCs  
-	S.sweeprate = NaN  // How fast to sweep in mV/s (easier to specify than numpts for fastdac scans)  
+	S.sweeprate = NaN  // How fast to sweep in mV/s
 	S.adcList  = ""  //   
 	S.startxs = startxs
 	S.finxs = finxs  // If sweeping from different start/end points for each DAC channel
@@ -1230,14 +1230,14 @@ function scv_setNumptsSweeprateDuration(S)
 	elseif ((S.numptsx!=0 + S.sweeprate!=0 + S.duration!=0) > 1)
 	    abort "ERROR[ScanFastDac]: User must provide either numpts OR sweeprate OR duration for scan (more than 1 provided)"
 	elseif (S.numptsx!=0) // If numpts provided, just use that
-	    S.sweeprate = fd_get_sweeprate_from_numpts(S.startx, S.finx, S.numptsx, S.measureFreq)
+	    S.sweeprate = fd_get_sweeprate_from_numpts(S.startx, S.finx, S.numptsx, S.measureFreq,S.wavelen,S.numcycles)
 		S.duration = S.numptsx/S.measureFreq
 	elseif (S.sweeprate!=0) // If sweeprate provided calculate numpts required
-    	S.numptsx = fd_get_numpts_from_sweeprate(S.startx, S.finx, S.sweeprate, S.measureFreq)
+    	S.numptsx = fd_get_numpts_from_sweeprate(S.startx, S.finx, S.sweeprate, S.measureFreq,S.wavelen,S.numcycles)
 		S.duration = S.numptsx/S.measureFreq
 	elseif (S.duration!=0)  // If duration provided, calculate numpts required
 		S.numptsx = round(S.measureFreq*S.duration)
-		S.sweeprate = fd_get_sweeprate_from_numpts(S.startx, S.finx, S.numptsx, S.measureFreq)
+		S.sweeprate = fd_get_sweeprate_from_numpts(S.startx, S.finx, S.numptsx, S.measureFreq,S.wavelen,S.numcycles)
 		if (numtype(S.sweeprate) != 0)  // TODO: Is this the right check? (For a start=fin=0 scan)
 			S.sweeprate = NaN
 		endif

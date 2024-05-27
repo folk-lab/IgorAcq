@@ -171,7 +171,7 @@ function addMetaFiles(hdf5_id_list, [S, logs_only, comments])
 				Print "HDF5SaveData Failed: ", "AWG_info"
 		endif
 
-				HDF5SaveData/z /A="fadcvalstr" calc_func_log, hdf5_id, "metadata"
+				HDF5SaveData/z /A="calc_func" calc_func_log, hdf5_id, "metadata"
 		if (V_flag != 0)
 				Print "HDF5SaveData Failed: ", "calc_func"
 		endif
@@ -949,6 +949,9 @@ function get_sweeplogs(datnum, [kenner])
 	wave/t sc_sweeplogs
 	variable sweeplogsID
 	sweeplogsID = JSON_Parse(sc_sweeplogs[0])
+	
+	jsonxop_dump sweeplogsID;
+	print "instr_logs:\r", S_value
 
 	return sweeplogsID
 end
@@ -980,14 +983,12 @@ end
 
 
 function goback2(datnum)
-	// Opens HDF5 file from current data folder and returns sweeplogs jsonID
-	// Remember to JSON_Release(jsonID) or JSONXOP_release/A to release all objects
-	// Can be converted to JSON string by using JSON_dump(jsonID)
+// ramps FD channels back to the state they were in at the end of run #datnum
 	variable datnum
 	variable sweeplogsID, i, SP
 	wave/t DAC_channel
 	int nChannels=dimsize(DAC_channel,0)
-	sweeplogsID=get_instr_logs(datnum)
+	sweeplogsID=get_instr_logs(datnum)/// getting DAC values
 	for (i = 0; i < nChannels; i += 1)
 		SP=JSON_GetVariable(sweeplogsID, "getFDstatus()/DAC_channels/DAC"+DAC_channel[i]);
 		RampMultipleFDAC( DAC_channel[i],  SP,ramprate=0);  // ramprate=0 will force ramprate to be the same as in the FD window
@@ -996,7 +997,7 @@ end
 
 
 function get_AWGinfo(datnum, [kenner])
-	// Opens HDF5 file from current data folder and returns sweeplogs jsonID
+	// Opens HDF5 file from current data folder, prints and returns AWG_waves  jsonID
 	// Remember to JSON_Release(jsonID) or JSONXOP_release/A to release all objects
 	// Can be converted to JSON string by using JSON_dump(jsonID)
 	variable datnum
@@ -1013,6 +1014,8 @@ function get_AWGinfo(datnum, [kenner])
 	wave/t sc_sweeplogs
 	variable sweeplogsID
 	sweeplogsID = JSON_Parse(sc_sweeplogs[0])
+	jsonxop_dump sweeplogsID;
+	print "instr_logs:\r", S_value
 
 	return sweeplogsID
 end
@@ -2016,23 +2019,48 @@ function/s get_values(string kwListStr, [int keys, string keydel, string listdel
 end
 
 
-function/s TextWavetolist(w)
+//function/s TextWavetolist(w)
+//	// returns an array and makes sure quotes and commas are parsed correctly.
+//	// supports 1d and 2d arrays
+//	wave/t w
+//	string list=""
+//
+//	// loop over wave
+//	variable i , n = dimsize(w, 0)
+//
+//	for (i=0; i<n; i++)
+//		list += w[i] + ";"
+//
+//	endfor
+//	list = list[0,strlen(list)-2] // remove last semicolon
+//	return list
+//end
+
+Function/S TextWavetoList(w, [useComma])
 	// returns an array and makes sure quotes and commas are parsed correctly.
-	// supports 1d and 2d arrays
-	wave/t w
-	string list=""
-
+	// supports 1D and 2D arrays
+	Wave/T w
+	Variable useComma
+	if (paramisDefault(useComma)==1)
+	usecomma=0
+	endif
+	String list = ""
+	String separator = ";"
+	
+	if (useComma)
+		separator = ","
+	endif
+	
 	// loop over wave
-	variable i , n = dimsize(w, 0)
+	Variable i, n = DimSize(w, 0)
 
-	for (i=0; i<n; i++)
-		list += w[i] + ";"
-
+	for (i = 0; i < n; i += 1)
+		list += w[i] + separator
 	endfor
-	list = list[0,strlen(list)-2] // remove last semicolon
+	
+	list = list[0, strlen(list) - strlen(separator)] // remove last separator
 	return list
-end
-
+End
 
 function /s numWavetolist(w)
 	// returns an array and makes sure quotes and commas are parsed correctly.

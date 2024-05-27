@@ -876,10 +876,7 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
 	scv_setSetpoints(S, channelsx, startx, finx, channelsy, starty, finy, startxs, finxs, startys, finys)
 	
 	
-	///// Set variables with some calculation /////
-    scv_setFreq(S=S) 		// Sets S.samplingFreq/measureFreq/numADCs	
-    scv_setNumptsSweeprateDuration(S) 	// Checks that either numpts OR sweeprate OR duration was provided, and sets ScanVars accordingly
-             
+	    
                                 
 	///// Setting ramprate if zero /////
 	variable fastdac_index
@@ -940,7 +937,10 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
 		S.hotcolddelay=sc_hotcolddelay
 	endif
 	
-	
+	///// Set variables with some calculation /////
+    scv_setFreq(S=S) 		// Sets S.samplingFreq/measureFreq/numADCs	
+    scv_setNumptsSweeprateDuration(S) 	// Checks that either numpts OR sweeprate OR duration was provided, and sets ScanVars accordingly
+         
 	///// Delete all files in fdTest directory /////
 	remove_fd_files()
 	scv_setLastScanVars(S)
@@ -2230,24 +2230,24 @@ end
 ///////////////////
 //// Utilities ////
 ///////////////////
-function fd_get_numpts_from_sweeprate(start, fin, sweeprate, measureFreq)
+function fd_get_numpts_from_sweeprate(start, fin, sweeprate, measureFreq,wavelen,numCycles)
 /// Convert sweeprate in mV/s to numptsx for fdacrecordvalues
-	variable start, fin, sweeprate, measureFreq
+	variable start, fin, sweeprate, measureFreq,wavelen,numCycles
 	if (start == fin)
 		abort "ERROR[fd_get_numpts_from_sweeprate]: Start == Fin so can't calculate numpts"
 	endif
-	variable numpts = round(abs(fin-start)*measureFreq/sweeprate)   // distance * steps per second / sweeprate
+	variable numpts = round(abs(fin-start)*measureFreq/sweeprate/wavelen/numcycles)   // distance * steps per second / sweeprate
 	return numpts
 end
 
 
-function fd_get_sweeprate_from_numpts(start, fin, numpts, measureFreq)
+function fd_get_sweeprate_from_numpts(start, fin, numpts, measureFreq,wavelen,numCycles)
 	// Convert numpts into sweeprate in mV/s
-	variable start, fin, numpts, measureFreq
+	variable start, fin, numpts, measureFreq,wavelen,numCycles
 	if (numpts == 0)
 		abort "ERROR[fd_get_numpts_from_sweeprate]: numpts = 0 so can't calculate sweeprate"
 	endif
-	variable sweeprate = round(abs(fin-start)*measureFreq/numpts)   // distance * steps per second / numpts
+	variable sweeprate = round(abs(fin-start)*measureFreq/numpts/wavelen/numCycles)   // distance * steps per second / numpts
 	return sweeprate
 end
 
