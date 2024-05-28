@@ -791,7 +791,7 @@ function /S sc_copySingleFile(original_path, new_path, filename, [allow_overwrit
 	string original_path, new_path, filename
 	string op="", np=""
 	
-	if( cmpstr(igorinfo(2) ,"Macintosh")==1 )
+	if( cmpstr(igorinfo(2) ,"Macintosh")==0 )
 		// using rsync if the machine is a mac
 		//   should speed things up a little bit by not copying full files
 		op = getExpPath(original_path, full=2)
@@ -1476,6 +1476,7 @@ function/s getJSONkeyoffset(key,offset)
 	endfor
 	// if key is not found, return an empty string
 	print "[ERROR] JSON key not found: "+key
+	debugger
 	return t_tokentext[0] // Default to return everything
 end
 
