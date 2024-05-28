@@ -60,6 +60,9 @@
 //////////////////////////////////////////////////////////////////////////////////////////
 
 macro initexperiment_macro()
+//	string user = "default"
+	//string user = "silvia"
+//	string user = "ld"
 
 	initexperiment()
 endmacro
@@ -70,7 +73,8 @@ function initexperiment()
 
 
 	// create experiment paths
-	sc_create_experiment_paths()
+//	sc_create_experiment_paths(user = user)
+/// define your paths manually 
 	
 	// add custom colours
 	create_colour_wave()
