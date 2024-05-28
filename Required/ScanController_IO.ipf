@@ -791,7 +791,7 @@ function /S sc_copySingleFile(original_path, new_path, filename, [allow_overwrit
 	string original_path, new_path, filename
 	string op="", np=""
 	
-	if( cmpstr(igorinfo(2) ,"Macintosh")==1 )
+	if( cmpstr(igorinfo(2) ,"Macintosh")==0 )
 		// using rsync if the machine is a mac
 		//   should speed things up a little bit by not copying full files
 		op = getExpPath(original_path, full=2)

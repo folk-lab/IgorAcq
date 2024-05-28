@@ -682,6 +682,7 @@ function scc_checkLimsFD(S)
 	
 	// Make single list out of X's and Y's (checking if each exists first)
 	string channels = "", starts = "", fins = ""
+
 	if(numtype(strlen(s.channelsx)) == 0 && strlen(s.channelsx) != 0)  // If not NaN and not ""
 		channels = addlistitem(S.channelsx, channels,",")		
 		starts = addlistitem(S.startxs, starts, ",")
@@ -692,8 +693,8 @@ function scc_checkLimsFD(S)
 		starts = addlistitem(S.startys, starts, ",")
 		fins = addlistitem(S.finys, fins, ",")
 	endif
-	channels=ReplaceString(",,", channels, ",") //* there seems to be an issue on my Mac that channels has two ,, instead of one ,. Not sure if I am doing something different or if it is the OS. for now I remove the ,, by hand
-		//*print channels
+	channels=ReplaceString(",,", channels, ",")
+
 
 	// Check channels were concatenated correctly (Seems unnecessary, but possibly killed my device because of this...)
 	if(stringmatch(channels, "*,,*") == 1)
@@ -713,7 +714,8 @@ function scc_checkLimsSingleFD(channel, start, fin)
 	string channel // Single Channel str
 	variable start, fin  // Single start, fin val for sweep
 	variable s_out, f_out, answer
-	variable channel_num = str2num(scu_getChannelNumbers(channel))
+	variable channel_num
+	channel_num=get_fastdac_index(channel)
 	string question
 	
 	s_out=check_fd_limits(channel_num,start)	
