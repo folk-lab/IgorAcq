@@ -63,7 +63,7 @@
 	variable filenum 		// Filled when getting saved
 
 	// master/slave sync use
-	variable sync			// 1 if sync is being used, 0 if every fastDAC is independent
+	variable freeMem		// keep track of Memory usage in experiment
 	string instrIDs      	// should contain a string list of the devices being used (ramping across devices or recording across devices)
 	string adcListIDs    	// Ids for adcList (under //specific to fastDAC comment)
 	string dacListIDs    	// Ids for channelx (for now, not sure ill change this yet)
@@ -161,12 +161,13 @@ Function scv_getLastScanVars(S)
 		S.direction = sc_lastScanVarsVariables[28]
 		S.never_save = sc_lastScanVarsVariables[29]
 		S.filenum = sc_lastScanVarsVariables[30]
-		S.sync = sc_lastScanVarsVariables[31]
+		S.freeMem = sc_lastScanVarsVariables[31]
 		S.maxADCs = sc_lastScanVarsVariables[32]
 		S.use_AWG= 	sc_lastScanVarsVariables[33]	// Is AWG going to be on during the scan
 		S.wavelen=sc_lastScanVarsVariables[34]
 		S.numCycles=sc_lastScanVarsVariables[35]
 		S.hotcolddelay=sc_lastScanVarsVariables[36]
+
 
 
 		// Ensure this list matches the actual global storage structure and contents
@@ -244,7 +245,7 @@ Function scv_setLastScanVars(S)
 	sc_lastScanVarsVariables[28] = S.direction
 	sc_lastScanVarsVariables[29] = S.never_save
 	sc_lastScanVarsVariables[30] = S.filenum
-	sc_lastScanVarsVariables[31] = S.sync
+	sc_lastScanVarsVariables[31] = S.freeMem
 	sc_lastScanVarsVariables[32] = S.maxADCs
 	sc_lastScanVarsVariables[33] = S.use_AWG
 	sc_lastScanVarsVariables[34]=S.wavelen

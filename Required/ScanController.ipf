@@ -99,6 +99,8 @@ function initexperiment()
 	create_variable("silent_scan");
 	create_variable("intermediate_save");
 	create_variable("jsonvar");
+	create_variable("freeMem");
+
 
 
 
@@ -132,7 +134,7 @@ function initexperiment()
 	// Create a text wave with custom labels for a specific application
 	Make/O/T/N=(36) ScanVars_labels // Create a text wave with 36 entries
 	// Assign labels to the wave
-	ScanVars_labels = {"instrIDx", "instrIDy", "lims_checked", "startx", "finx", "numptsx", "rampratex", "delayx", "is2d", "starty", "finy", "numptsy", "rampratey", "delayy", "alternate", "duration", "readvstime", "interlaced_y_flat", "interlaced_num_setpoints", "silent_scan", "start_time", "end_time", "using_fastdac", "numADCs", "samplingFreq", "measureFreq", "sweeprate", "lastread", "direction", "never_save", "filenum", "sync", "maxADCs", "use_AWG", "wavelen", "numCycles","hotcolddelay"}
+	ScanVars_labels = {"instrIDx", "instrIDy", "lims_checked", "startx", "finx", "numptsx", "rampratex", "delayx", "is2d", "starty", "finy", "numptsy", "rampratey", "delayy", "alternate", "duration", "readvstime", "interlaced_y_flat", "interlaced_num_setpoints", "silent_scan", "start_time", "end_time", "using_fastdac", "numADCs", "samplingFreq", "measureFreq", "sweeprate", "lastread", "direction", "never_save", "filenum", "freeMem", "maxADCs", "use_AWG", "wavelen", "numCycles","hotcolddelay"}
 	
 	
 	Make/O/T/N=(22) ScanVarsStr_labels // Create a text wave with 27 entries
@@ -1383,6 +1385,13 @@ function initializeScan(S, [init_graphs, y_label])
 	// Save struct to globals
 	scv_setLastScanVars(S)
 	Dowindow/b after1;  Dowindow/b ScanController
+	nvar freeMem
+	freeMem=getfreeMemory()
+	if (freeMem<10)
+	print "less than 10GB of Memory left"
+	endif
+	S.freeMem=freeMem
+	
 
 end
 
@@ -1433,7 +1442,7 @@ function sci_initializeWaves(S)  // TODO: rename
 					abort "ERROR: Demod and hot/cold can not be selected at the same time!"
 				endif
 
-				sci_init1DWave(wn+"hot", S.numptsx, S.startx, S.finx) //dont need to initialize since im not plotting
+				sci_init1DWave(wn+"hot", S.numptsx, S.startx, S.finx) //don't need to initialize since im not plotting
 				sci_init1DWave(wn+"cold", S.numptsx, S.startx, S.finx)  ///*** I don't think this will work for virtual gates
 				sci_init1DWave(wn+"entr", S.numptsx, S.startx, S.finx)  ///*** I don't think this will work for virtual gates
 				if(S.is2d == 1)
@@ -2633,6 +2642,11 @@ Function scfd_SendCommandAndRead(S,rowNum, [ skip_raw2calc])
 		doupdate  //takes about 0.01s
 		endif
 	While (numpnts_read<pnts2read)  // Continue if not all points are read
+	scu_tic()
+	doupdate
+	scu_toc()
+	
+	sc_sleep(0.1) /// give FDmaster some time to go into indep mode
 
 //	// Update FastDAC and ADC GUI elements:
 //*** this could be commented  out as it slows the measurement down a lot. If we can not speed this up we should make it optional and only 
@@ -3628,8 +3642,11 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 
 	nvar sc_save_time
 	if(save_experiment==1 && (datetime - sc_save_time) > 60*60*24) // 24 hours
+	scu_tic()
+	print "I am saving the experiment, this will take some time"
 		saveExp()
 		sc_save_time = datetime
+		scu_toc()
 	endif
 
 	if(sc_checkBackup())  	//*** check if a path is defined to backup data
@@ -3880,15 +3897,15 @@ function InitScanController([configFile])
 		sc_Instr=""
 		
 		sc_Instr[0][0] = "openFastDAC(\"44001\", verbose=0)"
-		sc_Instr[1][0] = "opensrsconnection(\"srs2\",\"GPIB0::2::INSTR\",verbose=1)"
-		sc_Instr[2][0] = "opensrsconnection(\"srs3\",\"GPIB0::3::INSTR\",verbose=1)"
-		sc_Instr[3][0] = "openLS370connection(\"ls\", \"10.18.101.12:49301/api/v1/\", \"bfsmall\", verbose=1)"
-		sc_Instr[4][0] = "openK2400connection(\"k2400\", \"GPIB0::6::INSTR\",verbose=1)"		
+		//sc_Instr[1][0] = "opensrsconnection(\"srs2\",\"GPIB0::2::INSTR\",verbose=1)"
+		//sc_Instr[2][0] = "opensrsconnection(\"srs3\",\"GPIB0::3::INSTR\",verbose=1)"
+		//sc_Instr[3][0] = "openLS370connection(\"ls\", \"10.18.101.12:49301/api/v1/\", \"bfsmall\", verbose=1)"
+		//sc_Instr[4][0] = "openK2400connection(\"k2400\", \"GPIB0::6::INSTR\",verbose=1)"		
 		
 		sc_Instr[0][2] = "getFDstatus()"
-		sc_Instr[1][2] = "getsrsstatus(\"srs2\")"
-		sc_Instr[2][2] = "getsrsstatus(\"srs3\")"
-		sc_Instr[3][2] = "getls370Status(\"ls\")"
+		//sc_Instr[1][2] = "getsrsstatus(\"srs2\")"
+		//sc_Instr[2][2] = "getsrsstatus(\"srs3\")"
+		//sc_Instr[3][2] = "getls370Status(\"ls\")"
 
 
 
@@ -3899,7 +3916,7 @@ function InitScanController([configFile])
 		
 		//sc_Instr[1][0] = "openLS370connection(\"ls\", \"http://lksh370-xld.qdev-b111.lab:49300/api/v1/\", \"bfbig\", verbose=1)"
 		//sc_Instr[2][0] = "openIPS120connection(\"ips1\",\"GPIB::25::INSTR\", 9.569, 9000, 182, verbose=0, hold = 1)"
-		sc_Instr[3][2] = "getls370Status(\"ls\")"
+		//sc_Instr[3][2] = "getls370Status(\"ls\")"
 		//sc_Instr[2][2] = "getipsstatus(ips1)"
 		
 		
@@ -4284,8 +4301,8 @@ function RecordValues(S, i, j, [fillnan])
 				redimension /n=(innerindex+1) wref1d
 				S.numptsx = innerindex+1  // So that x_array etc will be saved correctly later
 				wref1d[innerindex] = NaN  // Prevents graph updating with a zero
-				setscale/I x 0,  datetime-date2secs(2024,04,22)  - S.start_time, wref1d
-				S.finx = datetime-date2secs(2024,04,22)  - S.start_time 	// So that x_array etc will be saved correctly later
+				setscale/I x 0,  datetime- S.start_time, wref1d
+				S.finx = datetime- S.start_time 	// So that x_array etc will be saved correctly later
 				scv_setLastScanVars(S)
 			endif
 

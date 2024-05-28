@@ -34,7 +34,7 @@ function ReadVsTime(delay,N [y_label, comments]) // Units: s
 	y_label = selectString(paramIsDefault(y_label), y_label, "")	
 
 	Struct ScanVars S
-	initScanVars(S, numptsx=N)
+	initScanVars(S, numptsx=N,finx=(N-1)*delay)
 	initializeScan(S)
 	S.readVsTime = 1
 
@@ -106,7 +106,6 @@ end
 function Scank24002D(instrIDx, startx, finx, numptsx, delayx, rampratex, instrIDy, starty, finy, numptsy, delayy, rampratey, [y_label, comments, nosave]) //Units: mV
 	variable instrIDx, startx, finx, numptsx, delayx, rampratex, instrIDy, starty, finy, numptsy, delayy, rampratey, nosave
 	string y_label, comments
-	//abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
 	
 	// Reconnect instruments
 	sc_openinstrconnections(0)
@@ -168,9 +167,6 @@ end
 
 
 function ScanFastDACK24002D(startx, finx, channelsx, keithleyID, starty, finy, numptsy, [numpts, sweeprate, rampratex, rampratey, delayy, startxs, finxs, y_label, comments, nosave, use_AWG])
-	// not tested but should likely work - master/slave updated.
-	
-	
 	// 2D Scan with Fastdac on x-axis and keithley on y-axis
 	// Note: Must provide numptsx OR sweeprate in optional parameters instead
 	// Note: channels should be a comma-separated string ex: "0,4,5"
