@@ -783,33 +783,20 @@ end
 
 
 function /S sc_copySingleFile(original_path, new_path, filename, [allow_overwrite])
-	// custom copy file function because the Igor version seems to lead to 
-	// weird corruption problems when copying from a local machine 
+	// custom copy file function because the Igor version seems to lead to
+	// weird corruption problems when copying from a local machine
 	// to a mounted server drive
 	// this assumes that all the necessary paths already exist
 	variable allow_overwrite
 	string original_path, new_path, filename
 	string op="", np=""
-	
-	if( cmpstr(igorinfo(2) ,"Macintosh")==0 )
-		// using rsync if the machine is a mac
-		//   should speed things up a little bit by not copying full files
-		op = getExpPath(original_path, full=2)
-		np = getExpPath(new_path, full=2)
-		
-		string cmd = ""
-		sprintf cmd, "rsync -a %s %s", op+filename, np
-		executeMacCmd(cmd)
+
+	op = getExpPath(original_path, full=3)
+	np = getExpPath(new_path, full=3)
+	if (allow_overwrite)
+		CopyFile/O/Z=1 (op+filename) as (np+filename)
 	else
-		// probably can use rsync here on newer windows machines
-		//   do not currently have one to test
-		op = getExpPath(original_path, full=3)
-		np = getExpPath(new_path, full=3)
-		if (allow_overwrite)
-			CopyFile/O/Z=1 (op+filename) as (np+filename)
-		else
-			CopyFile/Z=1 (op+filename) as (np+filename)
-		endif
+		CopyFile/Z=1 (op+filename) as (np+filename)
 	endif
 end
 
