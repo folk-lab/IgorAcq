@@ -624,19 +624,17 @@ function scc_checkRampratesFD(S)
 	variable kill_graphs = 0
 	// Check x's won't be swept to fast by calculated sweeprate for each channel in x ramp
 	// Should work for different start/fin values for x
-	variable eff_ramprate, answer, i, k, channo
-	string question, channel
+	variable eff_ramprate, answer, i, k, channel
+	string question
 
 	if(numtype(strlen(s.channelsx)) == 0 && strlen(s.channelsx) != 0)  // if s.Channelsx != (null or "")
 		scu_assertSeparatorType(S.channelsx, ",")
 		for(i=0;i<itemsinlist(S.channelsx,",");i+=1)
 			eff_ramprate = abs(str2num(stringfromlist(i,S.startxs,","))-str2num(stringfromlist(i,S.finxs,",")))*(S.measureFreq/S.numptsx/S.wavelen/S.numCycles)
-			channel = (stringfromlist(i, S.channelsx, ","))
-			channo=get_fastdac_index(channel)
-
-			if(eff_ramprate > str2num(fdacvalstr[channo][4])*1.05 || s.rampratex > str2num(fdacvalstr[channo][4])*1.05)  // Allow 5% too high for convenience
+			channel = str2num(stringfromlist(i, S.channelsx, ","))
+			if(eff_ramprate > str2num(fdacvalstr[channel][4])*1.05 || s.rampratex > str2num(fdacvalstr[channel][4])*1.05)  // Allow 5% too high for convenience
 				// we are going too fast
-				sprintf question, "DAC channel %d will be ramped at Sweeprate: %.1f mV/s and Ramprate: %.1f mV/s, software limit is set to %s mV/s. Continue?", channel, eff_ramprate, s.rampratex, fdacvalstr[channo][4]
+				sprintf question, "DAC channel %d will be ramped at Sweeprate: %.1f mV/s and Ramprate: %.1f mV/s, software limit is set to %s mV/s. Continue?", channel, eff_ramprate, s.rampratex, fdacvalstr[channel][4]
 				//answer = ask_user(question, type=1)
 				if(answer == 2)
 					kill_graphs = 1
@@ -650,11 +648,9 @@ function scc_checkRampratesFD(S)
 	if(numtype(strlen(s.channelsy)) == 0 && strlen(s.channelsy) != 0  && kill_graphs == 0)  // if s.Channelsy != (NaN or "") and not killing graphs yet 
 		scu_assertSeparatorType(S.channelsy, ",")
 		for(i=0;i<itemsinlist(S.channelsy,",");i+=1)
-			channel = (stringfromlist(i, S.channelsy, ","))
-			channo=get_fastdac_index(channel)
-
-			if(s.rampratey > str2num(fdacvalstr[channo][4]))
-				sprintf question, "DAC channel %d will be ramped at %.1f mV/s, software limit is set to %s mV/s. Continue?", channo, S.rampratey, fdacvalstr[channo][4]
+			channel = str2num(stringfromlist(i, S.channelsy, ","))
+			if(s.rampratey > str2num(fdacvalstr[channel][4]))
+				sprintf question, "DAC channel %d will be ramped at %.1f mV/s, software limit is set to %s mV/s. Continue?", channel, S.rampratey, fdacvalstr[channel][4]
 				//answer = ask_user(question, type=1)
 				if(answer == 2)
 					kill_graphs = 1
