@@ -73,7 +73,7 @@ function initexperiment()
 
 
 	// create experiment paths
-//	sc_create_experiment_paths(user = user)
+	sc_create_experiment_paths()
 /// define your paths manually 
 	
 	// add custom colours
@@ -399,56 +399,6 @@ function scfw_CreateControlWaves([portnum])
 	
 	// colour fastdac sc
 	scw_create_colour_waves()
-
-	
-	// create waves for LI
-	make/o/t/n=(4,2) LIvalstr
-	LIvalstr[0][0] = "Amp"
-	LIvalstr[1][0] = "Freq (Hz)"
-	LIvalstr[2][0] = "Channels"
-	LIvalstr[3][0] = "Cycles"
-	LIvalstr[][1] = ""
-	
-	make/o/n=(4,2) LIattr = 0
-	LIattr[][1] = 2
-	
-	make/o/t/n=(3,2) LIvalstr0
-	LIvalstr0[0][0] = "Amp"
-	LIvalstr0[0][1] = "Time (ms)"
-	LIvalstr0[1,2][] = ""
-	
-	make/o/n=(3,2) LIattr0 = 0
-
-	// create waves for AWG
-	make/o/t/n=(11,2) AWGvalstr
-	AWGvalstr[0][0] = "Amp"
-	AWGvalstr[0][1] = "Time (ms)"
-	AWGvalstr[1,10][] = ""
-	make/o/n=(10,2) AWGattr = 2
-	AWGattr[0][] = 0
-	
-	// AW0
-	make/o/t/n=(11,2) AWGvalstr0
-	AWGvalstr0[0][0] = "Amp"
-	AWGvalstr0[0][1] = "Time (ms)"
-	AWGvalstr0[1,10][] = ""
-	make/o/n=(10,2) AWGattr0 = 0
-	//AW1
-	make/o/t/n=(11,2) AWGvalstr1
-	AWGvalstr1[0][0] = "Amp"
-	AWGvalstr1[0][1] = "Time (ms)"
-	AWGvalstr1[1,10][] = ""
-	make/o/n=(10,2) AWGattr1 = 0
-	
-	// create waves for AWGset
-	make/o/t/n=(3,2) AWGsetvalstr
-	AWGsetvalstr[0][0] = "AW0 Chs"
-	AWGsetvalstr[1][0] = "AW1 Chs"
-	AWGsetvalstr[2][0] = "Cycles"
-	AWGsetvalstr[][1] = ""
-	
-	make/o/n=(3,2) AWGsetattr = 0
-	AWGsetattr[][1] = 2
 	
 	variable /g sc_printfadc = 0
 	variable /g sc_saverawfadc = 0
