@@ -1463,7 +1463,8 @@ function/s getJSONkeyoffset(key,offset)
 	endfor
 	// if key is not found, return an empty string
 	print "[ERROR] JSON key not found: "+key
-	debugger
+	print t_tokentext[0]
+	
 	return t_tokentext[0] // Default to return everything
 end
 

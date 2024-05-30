@@ -319,82 +319,33 @@ function/s queryInstrProgress(instrID, cmd, delay, delaymsg, [read_term])
 	return response
 end
 
-//function/s postHTTP(instrID,cmd,payload,headers)
-//	string instrID, cmd, payload, headers
-//	string response=""
-////print headers
-//	//print instrID+cmd, payload
-//	URLRequest /TIME=15.0 /DSTR=payload url=instrID+cmd, method=post, headers=headers
-//
-//	if (V_flag == 0)    // No error
-//		response = S_serverResponse // response is a JSON string
-//				fileappend(response)
-//
-//		if (V_responseCode != 200)  // 200 is the HTTP OK code
-//			print "[ERROR] HTTP response code " + num2str(V_responseCode)
-//			if(strlen(response)>0)
-//		   	printf "[MESSAGE] %s\r", getJSONvalue(response, "error")
-//		   endif
-//		   return ""
-//		else
-//			return response
-//		endif
-//   else
-//        abort "HTTP connection error."
-//   endif
-//
-//end
+function/s postHTTP(instrID,cmd,payload,headers)
+	string instrID, cmd, payload, headers
+	string response=""
+//print headers
+	//print instrID+cmd, payload
+	URLRequest /TIME=15.0 /DSTR=payload url=instrID+cmd, method=post, headers=headers
 
+	if (V_flag == 0)    // No error
+		response = S_serverResponse // response is a JSON string
+				fileappend(response)
 
-Function/S postHTTP(instrID, cmd, payload, headers)
-// added the keep trying if busy functionality here.this has not been tested.
-	String instrID, cmd, payload, headers
-	String response=""
-	Variable maxRetries, retryCount
-
-	maxRetries = 5  // Number of retry attempts
-	retryCount = 0
-
-	Do
-		// Make the HTTP request
-		URLRequest /TIME=15.0 /DSTR=payload url=instrID+cmd, method=post, headers=headers
-
-		if (V_flag == 0)    // No error
-			response = S_serverResponse // response is a JSON string
-			fileappend(response)
-			
-		if (V_responseCode == 200)  // 200 is the HTTP OK code
-                return response  // Exit function on successful response
-       endif
-
-			if (V_responseCode != 200)  // 200 is the HTTP OK code
-				Print "[ERROR] HTTP response code " + num2str(V_responseCode)
-				if(strlen(response)>0)
-					printf "[MESSAGE] %s\r", getJSONvalue(response, "error")
-				endif
-
-				// Check for "BUSY" error and retry if necessary
-				if (ParseResponseForBusyError(response)>0)
-					if (retryCount >= maxRetries)
-						Print "Max retries reached. Exiting."
-						Break
-					endif
-					Print "Server busy. Retrying..."
-					retryCount += 1
-					sleep/s 0.04
-				else
-					return ""
-				endif
-			else
-				return response
-			endif
+		if (V_responseCode != 200)  // 200 is the HTTP OK code
+			print "[ERROR] HTTP response code " + num2str(V_responseCode)
+			if(strlen(response)>0)
+		   	printf "[MESSAGE] %s\r", getJSONvalue(response, "error")
+		   endif
+		   return ""
 		else
-			abort "HTTP connection error."
+			return response
 		endif
-	While (retryCount < maxRetries)
+   else
+        abort "HTTP connection error."
+   endif
 
-	return ""
-End
+end
+
+
 
 Function ParseResponseForBusyError(responseStr)
     String responseStr
@@ -404,155 +355,58 @@ Function ParseResponseForBusyError(responseStr)
 End
 
 
-//
-//function/s putHTTP(instrID,cmd,payload,headers)
-//	string instrID, cmd, payload, headers
-//	string response=""
-//
-////	print instrID+cmd, payload
-//	URLRequest /TIME=15.0 /DSTR=payload url=instrID+cmd, method=put, headers=headers
-//
-//	if (V_flag == 0)    // No error
-//		response = S_serverResponse // response is a JSON string
-//				fileappend(response)
-//
-//		if (V_responseCode != 200)  // 200 is the HTTP OK code
-//			print "[ERROR] HTTP response code " + num2str(V_responseCode)
-//			if(strlen(response)>0)
-//		   	printf "[MESSAGE] %s\r", getJSONvalue(response, "error")
-//		   endif
-//		   return ""
-//		else
-//			return response
-//		endif
-//   else
-//        abort "HTTP connection error."
-//   endif
-//end
 
-Function/S putHTTP(instrID, cmd, payload, headers)
-// added the keep trying if busy functionality here.this has not been tested.
-	String instrID, cmd, payload, headers
-	String response=""
-	Variable maxRetries, retryCount
+function/s putHTTP(instrID,cmd,payload,headers)
+	string instrID, cmd, payload, headers
+	string response=""
 
-	maxRetries = 5  // Number of retry attempts
-	retryCount = 0
-
-	Do
-		// Make the HTTP request
+//	print instrID+cmd, payload
 	URLRequest /TIME=15.0 /DSTR=payload url=instrID+cmd, method=put, headers=headers
 
-		if (V_flag == 0)    // No error
-			response = S_serverResponse // response is a JSON string
-			fileappend(response)
-			
-		if (V_responseCode == 200)  // 200 is the HTTP OK code
-                return response  // Exit function on successful response
-       endif
+	if (V_flag == 0)    // No error
+		response = S_serverResponse // response is a JSON string
+				fileappend(response)
 
-			if (V_responseCode != 200)  // 200 is the HTTP OK code
-				Print "[ERROR] HTTP response code " + num2str(V_responseCode)
-				if(strlen(response)>0)
-					printf "[MESSAGE] %s\r", getJSONvalue(response, "error")
-				endif
-
-				// Check for "BUSY" error and retry if necessary
-				if (ParseResponseForBusyError(response)>0)
-					if (retryCount >= maxRetries)
-						Print "Max retries reached. Exiting."
-						Break
-					endif
-					Print "Server busy. Retrying..."
-					retryCount += 1
-					sleep/s 0.04
-				else
-					return ""
-				endif
-			else
-				return response
-			endif
+		if (V_responseCode != 200)  // 200 is the HTTP OK code
+			print "[ERROR] HTTP response code " + num2str(V_responseCode)
+			if(strlen(response)>0)
+		   	printf "[MESSAGE] %s\r", getJSONvalue(response, "error")
+		   endif
+		   return ""
 		else
-			abort "HTTP connection error."
+			return response
 		endif
-	While (retryCount < maxRetries)
+   else
+        abort "HTTP connection error."
+   endif
+end
 
-	return ""
-End
 
 
-//function/s getHTTP(instrID,cmd,headers)
-//	string instrID, cmd, headers
-//	string response, error
-//
-////	print instrID+cmd
-//	URLRequest /TIME=25.0 url=instrID+cmd, method=get, headers=headers
-//
-//	if (V_flag == 0)    // No error
-//		response = S_serverResponse // response is a JSON string
-//		//print response
-//		fileappend(response)
-//		if (V_responseCode != 200)  // 200 is the HTTP OK code
-//			print "[ERROR] HTTP response code " + num2str(V_responseCode)
-//		   return ""
-//		else
-//			return response
-//		endif
-//   else
-//    	print "HTTP connection error."
-//		return ""
-//   endif
-//end
 
 function/s getHTTP(instrID,cmd,headers)
-// added the keep trying if busy functionality here.This has not been tested.
-	String instrID, cmd, headers
-	String response=""
-	Variable maxRetries, retryCount
+	string instrID, cmd, headers
+	string response, error
 
-	maxRetries = 5  // Number of retry attempts
-	retryCount = 0
-
-	Do
-		// Make the HTTP request
+//	print instrID+cmd
 	URLRequest /TIME=25.0 url=instrID+cmd, method=get, headers=headers
 
-		if (V_flag == 0)    // No error
-			response = S_serverResponse // response is a JSON string
-			fileappend(response)
-			
-		if (V_responseCode == 200)  // 200 is the HTTP OK code
-                return response  // Exit function on successful response
-       endif
-
-			if (V_responseCode != 200)  // 200 is the HTTP OK code
-				Print "[ERROR] HTTP response code " + num2str(V_responseCode)
-				if(strlen(response)>0)
-					printf "[MESSAGE] %s\r", getJSONvalue(response, "error")
-				endif
-
-				// Check for "BUSY" error and retry if necessary
-				if (ParseResponseForBusyError(response)>0)
-					if (retryCount >= maxRetries)
-						Print "Max retries reached. Exiting."
-						Break
-					endif
-					Print "Server busy. Retrying..."
-					retryCount += 1
-					sleep/s 0.04
-				else
-					return ""
-				endif
-			else
-				return response
-			endif
+	if (V_flag == 0)    // No error
+		response = S_serverResponse // response is a JSON string
+		//print response
+		fileappend(response)
+		if (V_responseCode != 200)  // 200 is the HTTP OK code
+			print "[ERROR] HTTP response code " + num2str(V_responseCode)
+		   return ""
 		else
-			abort "HTTP connection error."
+			return response
 		endif
-	While (retryCount < maxRetries)
+   else
+    	print "HTTP connection error."
+		return ""
+   endif
+end
 
-	return ""
-End
 
 //// Util ////
 

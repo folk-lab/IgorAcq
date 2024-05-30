@@ -1318,6 +1318,7 @@ function get_one_FDACChannel(channel_int, [channel_num]) // Units: mV
 	endif
 	string dac
 	dac = getjsonvalue(response,"value")
+	
 	return str2num(dac)
 end
 
