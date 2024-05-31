@@ -190,22 +190,28 @@ function initFastDAC([fastdac_order, portnum])
 	execute("after1()")
 	
 	scw_colour_the_table()
-	
 
-	setadc_speed()
+	nvar sampling_time
+	sampling_time=82
+	setadc_speed(sampling_time)
 end
 
 
 
 
-function setADC_speed()
+function setADC_speed(int ADCspeed)
 	svar fd
 	wave/t ADC_channel
+	nvar sampling_time
+	variable new_speed
 	variable i = 0
 	do
-		set_one_fadcSpeed(i)
+		set_one_fadcSpeed(i,ADCspeed)
 		i = i + 1
 	while(i<dimsize(ADC_channel, 0))
+	sc_sleep(0.2)
+	sampling_time=get_one_fadcSpeed(3)
+	print "setting all ADCs to "+num2str(sampling_time)+"(uS)"
 end
 
 
@@ -427,6 +433,8 @@ function scfw_fdacAskUserUpdate(action) : ButtonControl
 			break
 	endswitch
 end
+
+
 
 
 
@@ -1206,18 +1214,17 @@ end
 ///////////////////////
 
 
-function set_one_fadcSpeed(int adcValue)
+function set_one_fadcSpeed(int channo,int adcValue)
 // this is done in initfastDAC()
 	svar fd
 	wave/t ADC_channel
 	String cmd = "set-adc-sampling-time"
 	// Convert variables to strings and construct the JSON payload dynamically
 	String payload=""
-	payload = "{\"access_token\": \"string\", \"fqpn\": \""  +ADC_channel[adcValue]+ "\", \"sampling_time_us\": " + num2str(82) + "}"
+	payload = "{\"access_token\": \"string\", \"fqpn\": \""  +ADC_channel[channo]+ "\", \"sampling_time_us\": " + num2str(adcValue) + "}"
 	String headers = "accept: application/json\nContent-Type: application/json"
 	// Perform the HTTP PUT request
-	String response = postHTTP(fd, cmd, payload, headers)
-	
+	String response = postHTTP(fd, cmd, payload, headers)	
 end
 
 function reset_adc(int adcValue)
@@ -1267,9 +1274,10 @@ function get_one_fadcSpeed(int adcValue)
 	svar fd
 	wave/t ADC_channel
 	string	response=getHTTP(fd,"get-adc-sampling-time/"+ADC_channel(adcValue),"");
+//	print response
 	string value
 	value=getjsonvalue(response,"sampling_time_us")
-	variable speed = roundNum(1.0/str2num(value)*1.0e6,0)
+	variable speed = str2num(value)
 	return speed
 end
 
@@ -1477,7 +1485,7 @@ Function linear_ramp(S)
 
 	JSONXOP_New; level1=V_value
 	JSONXOP_New; level2=V_value
-	JSONXOP_AddValue/I=(82) level1, "/adc_sampling_time_us"
+	JSONXOP_AddValue/I=(S.sampling_time) level1, "/adc_sampling_time_us"
 	JSONXOP_AddValue/T=(num2str(chunksize)) level1, "/chunk_max_samples"
 	JSONXOP_AddValue/T="temp_{{.ChunkIndex}}.dat" level1, "/chunk_file_name_template"
 	JSONXOP_AddValue/wave=adc_list level1, "/adc_list"
@@ -1559,7 +1567,7 @@ Function awg_ramp(S)
 	JSONXOP_New; level2=V_value
 	JSONXOP_AddValue/wave=adc_list level1, "/adcs_to_acquire"
 	JSONXOP_AddValue/T=(num2str(chunksize)) level1, "/chunk_max_samples"
-	JSONXOP_AddValue/I=(82) level1, "/adc_sampling_time_us"
+	JSONXOP_AddValue/I=(S.sampling_time) level1, "/adc_sampling_time_us"
 	JSONXOP_AddValue/T="temp_{{.ChunkIndex}}.dat" level1, "/chunk_file_name_template"
 
 	string dacChannel, minvalue, maxvalue
@@ -2257,3 +2265,22 @@ function fd_get_sweeprate_from_numpts(start, fin, numpts, measureFreq,wavelen,nu
 	return sweeprate
 end
 
+
+
+Function update_ADC_sampling_time(sva) : SetVariableControl
+	STRUCT WMSetVariableAction &sva
+	switch( sva.eventCode )
+		case 1: // mouse up
+		case 2: // Enter key
+		case 3: // Live update
+			Variable dval = sva.dval; print dval
+			String sval = sva.sval
+			setadc_speed(dval)
+
+			break
+		case -1: // control being killed
+			break
+	endswitch
+
+	return 0
+End

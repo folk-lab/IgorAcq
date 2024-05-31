@@ -52,6 +52,7 @@
 	// Specific to Fastdac
 	variable numADCs  // How many ADCs are being recorded
 	variable samplingFreq, measureFreq  // measureFreq = samplingFreq/numADCs
+	variable sampling_time
 	variable sweeprate  // How fast to sweep in mV/s (easier to specify than numpts for fastdac scans)
 	string adcList // Which adcs' are being recorded
 	string raw_wave_names  // Names of waves to override the names raw data is stored in for FastDAC scans
@@ -167,6 +168,7 @@ Function scv_getLastScanVars(S)
 		S.wavelen=sc_lastScanVarsVariables[34]
 		S.numCycles=sc_lastScanVarsVariables[35]
 		S.hotcolddelay=sc_lastScanVarsVariables[36]
+		S.sampling_time=sc_lastScanVarsVariables[37]
 
 
 
@@ -187,7 +189,7 @@ Function scv_setLastScanVars(S)
 
 	// Ensure global waves for storing string and numeric values exist
 	Make/o/T/N=(22) sc_lastScanVarsStrings // Adjust size for the number of string fields
-	Make/o/D/N=(37) sc_lastScanVarsVariables // Adjust size for the number of numeric fields
+	Make/o/D/N=(38) sc_lastScanVarsVariables // Adjust size for the number of numeric fields
 
 	// Storing string fields to sc_lastScanVarsStrings wave
 	sc_lastScanVarsStrings[0] = S.channelsx  //FD xchannel numbers
@@ -251,6 +253,8 @@ Function scv_setLastScanVars(S)
 	sc_lastScanVarsVariables[34]=S.wavelen
 	sc_lastScanVarsVariables[35]=S.numCycles
 	sc_lastScanVarsVariables[36]=S.hotcolddelay
+	sc_lastScanVarsVariables[37]=S.sampling_time
+
 
 End
 

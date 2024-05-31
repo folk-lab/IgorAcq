@@ -32,8 +32,7 @@ End
 
 
 
-Function AddLegend(wav, param)
-    wave wav        
+Function AddLegend( param)
     string param 
     string graphName
     
@@ -45,12 +44,8 @@ Function AddLegend(wav, param)
     Variable numItems = ItemsInList(list)
     Variable i
     for(i=0; i<numItems; i+=1)
-        String item = StringFromList(i, list)+"--"+param+num2str(wav[i])
-//        if (CmpStr(item,"wave1") == 0)
-//            continue            // Skip this trace
-//        endif
-        String itemText
-        sprintf itemText, "\\s(%s) %s", item, item
+        String itemtext ="\s("+StringFromList(i, list)+")"+StringFromList(i, list)+"="+stringfromlist(i,param,";")+"Hz"
+
         if (i > 0)
             legendText += "\r"      // Add CR
         endif
@@ -88,6 +83,9 @@ function displayplot2D(start, endnum,whichdat,[delta,xnum, shiftx, shifty])
 	i=start
 	do
 		st="dat"+num2str(i)+whichdat
+		check_calib($st)
+		st=st+"sub"
+		
 		appendtograph $st
 		wavestats /q $st
 		totoffx=shiftx*mod((i-start)/delta,xnum)
