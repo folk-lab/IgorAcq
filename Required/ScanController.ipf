@@ -2583,6 +2583,7 @@ Function scfd_SendCommandAndRead(S,rowNum, [ skip_raw2calc])
 	scfd_resetraw_waves() // this takes 0.0007s
 
 	// Loop to read data until the expected number of points is reached
+	scu_tic()
 	Do
 		sleep/s 0.4
 		numpnts_read = loadfiles(S,numpnts_read)  // Load data from files: takes 0.006s
@@ -2592,12 +2593,7 @@ Function scfd_SendCommandAndRead(S,rowNum, [ skip_raw2calc])
 		doupdate  //takes about 0.01s
 		endif
 	While (numpnts_read<pnts2read)  // Continue if not all points are read
-	scu_tic()
-	doupdate
 	scu_toc()
-	
-	sc_sleep(0.1) /// give FDmaster some time to go into indep mode
-
 //	// Update FastDAC and ADC GUI elements:
 //*** this could be commented  out as it slows the measurement down a lot. If we can not speed this up we should make it optional and only 
 //execute these commands at the end of any scan
