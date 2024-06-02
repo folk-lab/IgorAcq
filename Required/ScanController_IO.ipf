@@ -628,7 +628,7 @@ end
 
 
 function saveExp()
-	SaveExperiment /P=home_path // save current experiment as .pxp
+	SaveExperiment /P=home // save current experiment as .pxp
 	SaveFromPXP(history=1, procedure=1) // grab some useful plain text docs from the pxp
 end
 

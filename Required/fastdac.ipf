@@ -959,7 +959,7 @@ function initScanVarsFD(S, startx, finx, [channelsx, numptsx, sweeprate, duratio
     scv_setFreq(S=S) 		// Sets S.samplingFreq/measureFreq/numADCs	
     scv_setNumptsSweeprateDuration(S) 	// Checks that either numpts OR sweeprate OR duration was provided, and sets ScanVars accordingly
          
-	///// Delete all files in fdTest directory /////
+	///// Delete all files in fdtemp directory /////
 	remove_fd_files()
 	scv_setLastScanVars(S)
 //	print S
@@ -1743,12 +1743,12 @@ end
 function remove_fd_files()
 variable i
 string currentfile
-	String fileList = IndexedFile(fdTest, -1, ".dat") // List all .dat files in fdTest
+	String fileList = IndexedFile(fdtemp, -1, ".dat") // List all .dat files in fdtemp
 	Variable numFiles = ItemsInList(fileList)
 	for (i = 0; i < numFiles; i += 1)
 				currentFile = StringFromList(i, fileList)
 
-		DeleteFile/P=fdTest/Z=1 currentFile // Delete the file after processing
+		DeleteFile/P=fdtemp/Z=1 currentFile // Delete the file after processing
 	endfor
 end
 

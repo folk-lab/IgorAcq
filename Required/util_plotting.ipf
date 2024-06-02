@@ -83,8 +83,6 @@ function displayplot2D(start, endnum,whichdat,[delta,xnum, shiftx, shifty])
 	i=start
 	do
 		st="dat"+num2str(i)+whichdat
-		check_calib($st)
-		st=st+"sub"
 		
 		appendtograph $st
 		wavestats /q $st
