@@ -101,6 +101,8 @@ function initexperiment()
 	create_variable("jsonvar");
 	create_variable("freeMem");
 	create_variable("sampling_time");
+	create_variable("samplingFreq");
+
 
 
 
@@ -409,7 +411,6 @@ function scfw_CreateControlWaves([portnum])
 	variable /g sc_hotcold = 0
 	variable /g sc_hotcolddelay = 0
 	variable /g sc_plotRaw = 0
-	variable /g sc_ResampleFreqfadc = 12195.12195122 // Resampling frequency if using resampling
 	string   /g sc_nfreq = "60,180,300"
 	string   /g sc_nQs = "50,150,250"
 	
@@ -3317,49 +3318,49 @@ Window after1() : Panel
 	DrawText 696,281,"speed management"
 	ListBox fdaclist,pos={8.00,72.00},size={356.00,428.00},fSize=14,frame=2
 	ListBox fdaclist,listWave=root:fdacvalstr,selWave=root:fdacattr
-	ListBox fdaclist,colorWave=root:colour_bent_CW,mode=1,selRow=2
+	ListBox fdaclist,colorWave=root:colour_bent_CW,mode=1,selRow=-1
 	ListBox fdaclist,widths={28,56,88,52}
-	Button updatefdac,pos={22.00,504.00},size={64.00,20.00},proc=scfw_update_fdac
+	Button updatefdac,pos={20.80,504.00},size={64.00,20.00},proc=scfw_update_fdac
 	Button updatefdac,title="Update"
-	Button fdacramp,pos={146.00,504.00},size={64.00,20.00},proc=scfw_update_fdac
+	Button fdacramp,pos={144.80,504.00},size={64.00,20.00},proc=scfw_update_fdac
 	Button fdacramp,title="Ramp"
-	Button fdacrampzero,pos={262.00,504.00},size={80.00,20.00},proc=scfw_update_fdac
+	Button fdacrampzero,pos={260.80,504.00},size={80.00,20.00},proc=scfw_update_fdac
 	Button fdacrampzero,title="Ramp all 0"
 	ListBox fadclist,pos={400.00,72.00},size={600.00,180.00},proc=scw_ListboxClicked
 	ListBox fadclist,fSize=14,frame=2,listWave=root:fadcvalstr,selWave=root:fadcattr
 	ListBox fadclist,colorWave=root:colour_bent_CW,widths={24,56,24,76,80,24,24,16}
-	Button updatefadc,pos={394.00,262.00},size={88.00,20.00},proc=scfw_update_fadc
+	Button updatefadc,pos={392.80,260.80},size={88.00,20.00},proc=scfw_update_fadc
 	Button updatefadc,title="Update ADC"
-	CheckBox sc_demodyBox,pos={873.85,306.00},size={107.20,17.60},proc=scw_CheckboxClicked
+	CheckBox sc_demodyBox,pos={871.20,304.80},size={107.20,17.60},proc=scw_CheckboxClicked
 	CheckBox sc_demodyBox,title="\\Z14Save Demod.y",variable=sc_demody,side=1
-	SetVariable sc_hotcolddelayBox,pos={871.00,351.00},size={110.67,20.00}
+	SetVariable sc_hotcolddelayBox,pos={869.60,349.60},size={108.80,20.00}
 	SetVariable sc_hotcolddelayBox,title="\\Z14Delay",value=sc_hotcolddelay
-	SetVariable sc_FilterfadcBox,pos={492.00,286.00},size={160.00,20.00}
+	SetVariable sc_FilterfadcBox,pos={492.00,284.80},size={160.00,20.00}
 	SetVariable sc_FilterfadcBox,title="\\Z14Resamp Freq "
 	SetVariable sc_FilterfadcBox,help={"Re-samples to specified frequency, 0 Hz == no re-sampling"}
 	SetVariable sc_FilterfadcBox,labelBack=(65535,32768,32768)
 	SetVariable sc_FilterfadcBox,value=sc_ResampleFreqfadc
-	SetVariable sc_demodphiBox,pos={871.00,286.00},size={111.20,20.00}
+	SetVariable sc_demodphiBox,pos={869.60,284.80},size={109.60,20.00}
 	SetVariable sc_demodphiBox,title="\\Z14Demod \\$WMTEX$ \\Phi $/WMTEX$"
 	SetVariable sc_demodphiBox,value=sc_demodphi
-	SetVariable sc_ADCtime,pos={492.00,306.86},size={160.00,20.00},proc=update_ADC_sampling_time
-	SetVariable sc_ADCtime,title="\\Z14 ADC  time (us)"
+	SetVariable sc_ADCtime,pos={492.00,304.00},size={160.00,23.20},proc=update_ADC_sampling_time
+	SetVariable sc_ADCtime,title="\\Z14 F\\Bs\\M \\Z14(Hz)"
 	SetVariable sc_ADCtime,help={"seperate frequencies (Hz) with , "}
-	SetVariable sc_ADCtime,limits={82,2800,1},value=sampling_time
-	SetVariable sc_nQsBox,pos={492.00,349.71},size={160.00,20.00}
+	SetVariable sc_ADCtime,limits={30,12200,1},value=samplingFreq
+	SetVariable sc_nQsBox,pos={492.00,348.00},size={160.00,20.00}
 	SetVariable sc_nQsBox,title="\\Z14 Notch Qs",help={"seperate Qs with , "}
 	SetVariable sc_nQsBox,value=sc_nQs
-	ListBox sc_InstrFdac,pos={377.00,476.00},size={600.00,128.00},fSize=14,frame=2
+	ListBox sc_InstrFdac,pos={376.00,476.00},size={600.00,128.00},fSize=14,frame=2
 	ListBox sc_InstrFdac,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1
 	ListBox sc_InstrFdac,selRow=2,editStyle=1
-	Button connectfdac,pos={371.00,399.00},size={60.00,40.00},proc=scw_OpenInstrButton
+	Button connectfdac,pos={369.60,397.60},size={60.00,40.00},proc=scw_OpenInstrButton
 	Button connectfdac,title="Connect\rInstr",labelBack=(65535,65535,65535)
 	Button connectfdac,fColor=(65535,0,0)
-	Button killaboutfdac,pos={651.00,399.00},size={60.00,40.00},proc=sc_controlwindows
+	Button killaboutfdac,pos={649.60,397.60},size={60.00,40.00},proc=sc_controlwindows
 	Button killaboutfdac,title="Kill Sweep\r Controls",fSize=10,fColor=(3,52428,1)
-	Button killgraphsfdac,pos={511.00,399.00},size={60.00,40.00},proc=scw_killgraphs
+	Button killgraphsfdac,pos={509.60,397.60},size={60.00,40.00},proc=scw_killgraphs
 	Button killgraphsfdac,title="Close All \rGraphs",fSize=12,fColor=(1,12815,52428)
-	Button updatebuttonfdac,pos={441.00,399.00},size={60.00,40.00},proc=scw_updatewindow
+	Button updatebuttonfdac,pos={440.00,397.60},size={60.00,40.00},proc=scw_updatewindow
 	Button updatebuttonfdac,title="save\rconfig",fColor=(65535,16385,16385)
 	TabControl tb2,pos={44.00,420.00},size={180.00,20.00},disable=1,proc=TabProc2
 	TabControl tb2,fSize=13,tabLabel(0)="Set AW",tabLabel(1)="AW0",tabLabel(2)="AW1"
@@ -3372,27 +3373,27 @@ Window after1() : Panel
 	Button clearAW,title="Clear"
 	Button setupAW,pos={8.00,524.00},size={52.00,20.00},disable=1,proc=scw_setupsquarewave
 	Button setupAW,title="Create"
-	Button show_AWG,pos={861.00,399.00},size={60.00,40.00},proc=scw_Show_AWG_wave
+	Button show_AWG,pos={860.00,397.60},size={60.00,40.00},proc=scw_Show_AWG_wave
 	Button show_AWG,title="show\rAWG",fColor=(52428,34958,1)
-	Button close_tables,pos={581.00,399.00},size={60.00,40.00},proc=scw_Close_tables
+	Button close_tables,pos={580.00,397.60},size={60.00,40.00},proc=scw_Close_tables
 	Button close_tables,title="Close All \rTables",fSize=12,fColor=(26205,52428,1)
-	Button hide,pos={721.00,399.00},size={60.00,40.00},proc=scw_Hide_Procs
+	Button hide,pos={720.00,397.60},size={60.00,40.00},proc=scw_Hide_Procs
 	Button hide,title="Hide All\r Procs",fColor=(52428,52425,1)
-	Button maxi,pos={791.00,399.00},size={60.00,40.00},proc=scw_maximize
+	Button maxi,pos={789.60,397.60},size={60.00,40.00},proc=scw_maximize
 	Button maxi,title="large\rwindow",fColor=(26214,26214,26214)
-	CheckBox sc_plotRawBox1,pos={670.80,289.00},size={71.20,17.60},proc=scw_CheckboxClicked
+	CheckBox sc_plotRawBox1,pos={667.20,288.00},size={71.20,17.60},proc=scw_CheckboxClicked
 	CheckBox sc_plotRawBox1,title="\\Z14Plot Raw",variable=sc_plotRaw,side=1
-	CheckBox save_RAW,pos={670.95,312.00},size={78.40,17.60},title="\\Z14Save Raw"
+	CheckBox save_RAW,pos={667.20,312.00},size={78.40,17.60},title="\\Z14Save Raw"
 	CheckBox save_RAW,fSize=12,variable=sc_saverawfadc,side=1
-	Button show_ScanVars,pos={931.00,399.00},size={60.00,40.00},proc=scw_Show_ScanVars
+	Button show_ScanVars,pos={929.60,397.60},size={60.00,40.00},proc=scw_Show_ScanVars
 	Button show_ScanVars,title="show\rScanVars",fSize=11,fColor=(52428,1,41942)
-	SetVariable Update_every,pos={670.00,334.00},size={180.00,19.50}
+	SetVariable Update_every,pos={668.80,332.80},size={180.00,19.20}
 	SetVariable Update_every,title="update graph every",fSize=14
 	SetVariable Update_every,limits={1,1000,1},value=silent_scan,live=1
-	CheckBox intermed_save,pos={670.00,358.00},size={124.00,16.80}
+	CheckBox intermed_save,pos={668.80,356.80},size={124.00,16.80}
 	CheckBox intermed_save,title="intermediate save",fSize=14
 	CheckBox intermed_save,variable=intermediate_save,side=1
-	SetVariable sc_nfreqBox1,pos={492.00,328.00},size={160.20,19.80}
+	SetVariable sc_nfreqBox1,pos={492.00,328.00},size={160.00,20.00}
 	SetVariable sc_nfreqBox1,title="\\Z14 Notch Freqs"
 	SetVariable sc_nfreqBox1,help={"seperate frequencies (Hz) with , "}
 	SetVariable sc_nfreqBox1,value=sc_nfreq

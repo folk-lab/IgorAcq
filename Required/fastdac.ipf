@@ -191,9 +191,12 @@ function initFastDAC([fastdac_order, portnum])
 	
 	scw_colour_the_table()
 
-	nvar sampling_time
+	nvar sampling_time, samplingFreq
 	sampling_time=82
 	setadc_speed(sampling_time)
+	samplingFreq=1/sampling_time*1e6
+	variable /g sc_ResampleFreqfadc = samplingFreq // Resampling frequency if using resampling
+
 end
 
 
@@ -202,16 +205,17 @@ end
 function setADC_speed(int ADCspeed)
 	svar fd
 	wave/t ADC_channel
-	nvar sampling_time
+	nvar sampling_time, samplingFreq, sc_ResampleFreqfadc
 	variable new_speed
 	variable i = 0
 	do
 		set_one_fadcSpeed(i,ADCspeed)
 		i = i + 1
 	while(i<dimsize(ADC_channel, 0))
-	sc_sleep(0.2)
+	sc_sleep(0.1)
 	sampling_time=get_one_fadcSpeed(3)
 	print "setting all ADCs to "+num2str(sampling_time)+"(uS)"
+	samplingFreq=1/sampling_time*1e6;
 end
 
 
@@ -2268,15 +2272,17 @@ end
 
 
 
+
 Function update_ADC_sampling_time(sva) : SetVariableControl
 	STRUCT WMSetVariableAction &sva
 	switch( sva.eventCode )
 		case 1: // mouse up
 		case 2: // Enter key
 		case 3: // Live update
-			Variable dval = sva.dval; print dval
+			Variable dval = sva.dval;
 			String sval = sva.sval
-			setadc_speed(dval)
+			variable temp=1/dval*1e6
+			setadc_speed(temp)
 
 			break
 		case -1: // control being killed
