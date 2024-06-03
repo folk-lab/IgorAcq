@@ -103,11 +103,6 @@ function initexperiment()
 	create_variable("sampling_time");
 	create_variable("samplingFreq");
 
-
-
-
-
-
 	
 //	make /o numericwave
 	
@@ -127,11 +122,6 @@ function initexperiment()
 	// initialise fastdac wave
 	initfastdac(portnum = portnum)
 	
-	
-	// tick some boxes in the scancontroller
-	wave fadcattr
-	fadcattr[1][2]=48
-	
 	make/o/t/n=6 sc_awg_labels
 	sc_awg_labels={"DAC Channel", "Setpoints", "Samples", "Box #", "# Cycles", "Do not edit"} // this will be the sc_awg_labels for the AWG table
 	
@@ -145,6 +135,12 @@ function initexperiment()
 	// Assign labels to the wave
 	ScanVarsStr_labels = {"channelsx", "startxs", "finxs", "channelsy", "startys", "finys", "interlaced_channels", "interlaced_setpoints", "x_label", "y_label", "adcList", "raw_wave_names", "instrIDs", "adcListIDs", "dacListIDs", "fakeRecords", "adcLists", "IDstartxs", "IDfinxs", "dacListIDs_y", "comments", "AWG_DACs"}
 
+	// tick some boxes in the scancontroller
+	wave fadcattr
+	fadcattr[0][2]=48
+	fadcattr[4][2]=48
+
+	
 end
 
 
@@ -213,18 +209,17 @@ end
 
 function/s sc_create_experiment_paths()
 	string existing
-
-//	existing= pathlist("home_path",";","" )
-//	if (strlen(existing)==0)
-//		print "creating home path"
-//		newpath/o/c home_path
-//	endif
+	string temp
 
 	existing= pathlist("data",";","" )
 	if (strlen(existing)==0)
+		pathInfo/s home
+		temp=S_path
+		temp=temp+"data"
 		print "creating data path"
-		NewPath/o/C data
+		NewPath/o/C data temp
 	endif
+
 
 	existing= pathlist("fdtemp",";","" )
 	if (strlen(existing)==0)
@@ -234,15 +229,17 @@ function/s sc_create_experiment_paths()
 
 	existing= pathlist("colour_data",";","" )
 	if (strlen(existing)==0)
-		print "creating colour_data path"
-		NewPath/o/C colour_data
+		pathInfo/s Required
+		temp=S_path
+		temp=removelistItem(6,temp,":")+"data:colours"
+		NewPath/o/C colour_data temp
 	endif
 	
-	existing= pathlist("server",";","" )
-	if (strlen(existing)==0)
-		print "creating server path"
-		newpath/o/c server
-	endif
+//	existing= pathlist("server",";","" )
+//	if (strlen(existing)==0)
+//		print "creating server path"
+//		newpath/o/c server
+//	endif
 
 end
 
