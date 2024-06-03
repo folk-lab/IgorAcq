@@ -59,16 +59,19 @@
 //////////////////// INITIALISING THE EXPERIMENT /////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
 
-macro initexperiment_macro()
+macro initexperiment_macro(portnum)
 //	string user = "default"
 	//string user = "silvia"
 //	string user = "ld"
+	variable portnum
 
-	initexperiment()
+	initexperiment(num2str(portnum))
 endmacro
 
 
-function initexperiment()
+function initexperiment(portnum)
+	string portnum 
+
 	
 
 
@@ -111,7 +114,7 @@ function initexperiment()
 	
 	// determine the portnum
 	
-	string portnum = "44001" //51011
+//	string portnum = "44001" //51011
 	
 	// open fastdacconnection
 	openFastDAC(portnum, verbose = 0)
