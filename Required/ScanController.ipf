@@ -234,7 +234,7 @@ function/s sc_create_experiment_paths()
 	if (strlen(existing)==0)
 		pathInfo/s Required
 		temp=S_path
-		temp=removelistItem(6,temp,":")+"data:colours"
+		temp=removelistItem(4,temp,":")+"data:colours"
 		NewPath/o/C colour_data temp
 	endif
 	
