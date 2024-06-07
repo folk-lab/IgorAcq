@@ -1358,7 +1358,7 @@ function set_one_FDACChannel(int channel_int, variable setpoint, variable rampra
 end
 
 
-function sample_ADC(string adclist, variable nr_samples)
+function sample_ADC(string adclist, variable nr_samples, variable sampling_time)
 	svar fd
 	variable chunksize=1000
 	variable level1
@@ -1368,7 +1368,7 @@ function sample_ADC(string adclist, variable nr_samples)
 		wave adc_list
 
 	JSONXOP_New; level1=V_value
-	JSONXOP_AddValue/I=(82) level1, "/adc_sampling_time_us"
+	JSONXOP_AddValue/I=(sampling_time) level1, "/adc_sampling_time_us"
 	JSONXOP_AddValue/T=(num2str(chunksize)) level1, "/chunk_max_samples"
 	JSONXOP_AddValue/T="temp_{{.ChunkIndex}}.dat" level1, "/chunk_file_name_template"
 	JSONXOP_AddValue/wave=adc_list level1, "/adc_list"

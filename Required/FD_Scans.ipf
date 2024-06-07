@@ -210,7 +210,7 @@ function/s fd_start_sweep(S)
 
 	int numptsx = S.numptsx;
 	if (S.readVsTime) 
-		sample_ADC(S.adclistIDs,  S.numptsx)
+		sample_ADC(S.adclistIDs,  S.numptsx, S.sampling_time)
 	endif
 	
 	if (S.readvstime==0)
