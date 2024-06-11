@@ -1197,11 +1197,11 @@ end
 ///////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////// MISCELLANEOUS /////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////
-function QPCProbe(channels, [scan_time, max_voltage, steps, delay, repeats, comments])
+function QPCProbe(channels, [scan_time, max_voltage, sweeprate, steps, delay, repeats, comments])
 	// runs a scanfastdac from 0 to X
 	// where X = max_voltage/steps * [0 - steps]
 	string channels, comments
-	variable scan_time, max_voltage, steps, delay, repeats
+	variable scan_time, max_voltage, steps, delay, repeats, sweeprate
 	
 	scan_time = paramisdefault(scan_time)? 30 : scan_time
 	max_voltage = paramisdefault(max_voltage)? -1200 : max_voltage
@@ -1209,9 +1209,9 @@ function QPCProbe(channels, [scan_time, max_voltage, steps, delay, repeats, comm
 	delay = paramisdefault(delay)? 0 : delay
 	repeats = paramisdefault(repeats)? 6 : repeats
 	comments = selectstring(paramisdefault(comments), comments, "")
+	sweeprate = paramisdefault(sweeprate)? 100 : sweeprate
 	
 	variable i
-	variable sweeprate
 	for(i = -steps; abs(i) <= abs(max_voltage); i-=steps)
        printf "Scanning 0 -> %d\r"i
        sweeprate = abs(i/scan_time)

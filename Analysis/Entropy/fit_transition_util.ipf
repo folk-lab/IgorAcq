@@ -27,7 +27,7 @@ function master_fit_multiple(dat_min_max, refit, dotcondcentering, kenner_out, [
 	variable dat_end = str2num(StringFromList(1, dat_min_max, ";")) 
 	string wave_name
 	
-	make_scanvar_table_from_dats(dat_min_max, ignore_field=1)
+//	make_scanvar_table_from_dats(dat_min_max, ignore_field=1)
 	wave scanvar_table
 	variable scanvar_table_column_offset = 11
 	insertpoints /M=1 scanvar_table_column_offset, 6, scanvar_table

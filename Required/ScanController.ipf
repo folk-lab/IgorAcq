@@ -2584,7 +2584,6 @@ Function scfd_SendCommandAndRead(S,rowNum, [ skip_raw2calc])
 	scfd_resetraw_waves() // this takes 0.0007s
 
 	// Loop to read data until the expected number of points is reached
-	scu_tic()
 	Do
 		sleep/s 0.4
 		numpnts_read = loadfiles(S,numpnts_read)  // Load data from files: takes 0.006s
@@ -2594,10 +2593,10 @@ Function scfd_SendCommandAndRead(S,rowNum, [ skip_raw2calc])
 		doupdate  //takes about 0.01s
 		endif
 	While (numpnts_read<pnts2read)  // Continue if not all points are read
-	scu_toc()
 //	// Update FastDAC and ADC GUI elements:
 //*** this could be commented  out as it slows the measurement down a lot. If we can not speed this up we should make it optional and only 
 //execute these commands at the end of any scan
+sleep/s 0.5
 	scfw_update_all_fdac(option="updatefdac")
 	scfw_update_fadc("")  // Update FADC display with no additional specification
 //	// Ramp AWGs back to zero
@@ -3837,7 +3836,7 @@ function InitScanController([configFile])
 		//sc_Instr[1][0] = "opensrsconnection(\"srs2\",\"GPIB0::2::INSTR\",verbose=1)"
 		//sc_Instr[2][0] = "opensrsconnection(\"srs3\",\"GPIB0::3::INSTR\",verbose=1)"
 		//sc_Instr[3][0] = "openLS370connection(\"ls\", \"10.18.101.12:49301/api/v1/\", \"bfsmall\", verbose=1)"
-		//sc_Instr[4][0] = "openK2400connection(\"k2400\", \"GPIB0::6::INSTR\",verbose=1)"		
+		sc_Instr[1][0] = "openK2400connection(\"k2400\", \"GPIB0::7::INSTR\",verbose=1)"		
 		
 		sc_Instr[0][2] = "getFDstatus()"
 		//sc_Instr[1][2] = "getsrsstatus(\"srs2\")"

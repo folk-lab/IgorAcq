@@ -1519,6 +1519,8 @@ Function linear_ramp(S)
 	string cmd="start-linear-ramps"
 	String headers = "accept: application/json\nContent-Type: application/json"
 	String response = postHTTP(fd, cmd, S_value, headers)
+	command_save(S_value)
+
 
 End
 
