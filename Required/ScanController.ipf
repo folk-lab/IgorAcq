@@ -2593,12 +2593,7 @@ Function scfd_SendCommandAndRead(S,rowNum, [ skip_raw2calc])
 		doupdate  //takes about 0.01s
 		endif
 	While (numpnts_read<pnts2read)  // Continue if not all points are read
-//	// Update FastDAC and ADC GUI elements:
-//*** this could be commented  out as it slows the measurement down a lot. If we can not speed this up we should make it optional and only 
-//execute these commands at the end of any scan
-sleep/s 0.5
-	scfw_update_all_fdac(option="updatefdac")
-	scfw_update_fadc("")  // Update FADC display with no additional specification
+sleep/s 0.1
 //	// Ramp AWGs back to zero
 	fdawg_ramp_DACs_to_zero()
 	
@@ -3835,13 +3830,13 @@ function InitScanController([configFile])
 		sc_Instr[0][0] = "openFastDAC(\"44001\", verbose=0)"
 		//sc_Instr[1][0] = "opensrsconnection(\"srs2\",\"GPIB0::2::INSTR\",verbose=1)"
 		//sc_Instr[2][0] = "opensrsconnection(\"srs3\",\"GPIB0::3::INSTR\",verbose=1)"
-		//sc_Instr[3][0] = "openLS370connection(\"ls\", \"10.18.101.12:49301/api/v1/\", \"bfsmall\", verbose=1)"
+		sc_Instr[3][0] = "openLS370connection(\"ls\", \"10.18.101.12:49301/api/v1/\", \"bfsmall\", verbose=1)"
 		sc_Instr[1][0] = "openK2400connection(\"k2400\", \"GPIB0::7::INSTR\",verbose=1)"		
 		
 		sc_Instr[0][2] = "getFDstatus()"
 		//sc_Instr[1][2] = "getsrsstatus(\"srs2\")"
 		//sc_Instr[2][2] = "getsrsstatus(\"srs3\")"
-		//sc_Instr[3][2] = "getls370Status(\"ls\")"
+		sc_Instr[3][2] = "getls370Status(\"ls\")"
 
 
 

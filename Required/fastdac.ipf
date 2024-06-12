@@ -754,6 +754,7 @@ function rampToNextSetpoint(S, inner_index, [outer_index, y_only, ignore_lims])
 	variable ignore_lims  // Whether to ignore BabyDAC and FastDAC limits (makes sense if already checked previously)
 	variable k
 	svar fd
+		
 	if (!y_only)
 		checkStartsFinsChannels(S.startxs, S.finxs, S.channelsx)
 		variable sx, fx, setpointx
@@ -782,6 +783,7 @@ function rampToNextSetpoint(S, inner_index, [outer_index, y_only, ignore_lims])
 
 		endfor
 	endif
+	
 end
 
 	
@@ -1516,7 +1518,7 @@ Function linear_ramp(S)
 	JSONXOP_AddValue/JOIN=(level2) level1, "/dac_range_map"
 	jsonxop_dump/ind=2 level1
 	//print "Full textual representation:\r", S_value
-	string cmd="start-linear-ramps"
+	string cmd="run-linear-ramps"
 	String headers = "accept: application/json\nContent-Type: application/json"
 	String response = postHTTP(fd, cmd, S_value, headers)
 	command_save(S_value)
