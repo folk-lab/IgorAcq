@@ -2238,14 +2238,18 @@ end
 
 
 
-function fdawg_ramp_DACs_to_zero()
+function fdawg_ramp_DACs_to_zero(S)
+	Struct ScanVars &S
+
 	// ramps all the AWG dac channels to zero
 	// assumes sc_awg_info has been created
 	// USE ::
 	// print fdawg_ramp_DACs_to_zero()
+	if (S.use_awg==1)
 	
 	string dac_channels = fdawg_get_all_dac_channels()
 	rampmultiplefdac(dac_channels, 0)
+	endif
 	
 end
 

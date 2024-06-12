@@ -141,7 +141,7 @@ function initexperiment(portnum)
 	// tick some boxes in the scancontroller
 	wave fadcattr
 	fadcattr[0][2]=48
-	fadcattr[4][2]=48
+	//fadcattr[4][2]=48
 
 	
 end
@@ -2595,7 +2595,7 @@ Function scfd_SendCommandAndRead(S,rowNum, [ skip_raw2calc])
 	While (numpnts_read<pnts2read)  // Continue if not all points are read
 sleep/s 0.1
 //	// Ramp AWGs back to zero
-	fdawg_ramp_DACs_to_zero()
+	fdawg_ramp_DACs_to_zero(S)
 	
 	
 end
