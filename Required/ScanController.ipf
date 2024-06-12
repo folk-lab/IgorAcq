@@ -141,7 +141,7 @@ function initexperiment(portnum)
 	// tick some boxes in the scancontroller
 	wave fadcattr
 	fadcattr[0][2]=48
-	fadcattr[4][2]=48
+	//fadcattr[4][2]=48
 
 	
 end
@@ -2600,7 +2600,7 @@ sleep/s 0.5
 	scfw_update_all_fdac(option="updatefdac")
 	scfw_update_fadc("")  // Update FADC display with no additional specification
 //	// Ramp AWGs back to zero
-	fdawg_ramp_DACs_to_zero()
+	fdawg_ramp_DACs_to_zero(S)
 	
 	
 end
