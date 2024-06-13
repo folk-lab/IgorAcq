@@ -1518,7 +1518,7 @@ Function linear_ramp(S)
 	JSONXOP_AddValue/JOIN=(level2) level1, "/dac_range_map"
 	jsonxop_dump/ind=2 level1
 	//print "Full textual representation:\r", S_value
-	string cmd="run-linear-ramps"
+	string cmd="start-linear-ramps"
 	String headers = "accept: application/json\nContent-Type: application/json"
 	String response = postHTTP(fd, cmd, S_value, headers)
 	command_save(S_value)
