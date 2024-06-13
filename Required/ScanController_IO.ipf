@@ -340,7 +340,7 @@ do
 	endif
 	i=i+1
 	while(i<N)
-//	JSONXOP_Dump level1
+	JSONXOP_Dump level1
 //	print "Full textual representation:\r", S_value
 
 	return level1

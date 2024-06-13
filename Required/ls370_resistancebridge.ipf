@@ -981,9 +981,10 @@ function/s getLS370Status(instrID)
 		
 		//UNCOMMENT WHEN ABLE TO CONNECT TO DATABASE
 		timestamp = sc_SQLtimestamp(str2num(getJSONvalue(jstr,searchStr)))	
-			
-//		timestamp = sc_SQLtimestamp(3600) // Temporarily allow any old measurement of temp
-//		timestamp = sc_SQLtimestamp(1) // Temporarily always request new
+//			
+//	timestamp = sc_SQLtimestamp(3600) // Temporarily allow any old measurement of temp
+//	timestamp = sc_SQLtimestamp(1) // Temporarily always request new
+	
 
 		// Ask the database if it has a recent enough temperature		
 		sprintf statement, "SELECT temperature_k FROM %s.%s WHERE channel_label='%s' AND time > TIMESTAMP '%s' ORDER BY time DESC LIMIT 1;", database, temp_schema, stringfromlist(i,channelLabel,","), timestamp

@@ -72,11 +72,15 @@ function/s requestSQLValue(statement,[key])
 
 	// fetch data from database
 	string result=""
+
+
+	
 	result = sc_fetchSQLSingle(s,statement,key=key)
-
-	// close connection to database
+	
+// close connection to database
 	sc_closeSQLConnection(s)
-
+//	SQLHighLevelOp/CSTR={connectionStr,SQL_DRIVER_NOPROMPT}/o/e=1 statement
+	
 	return result
 end
 
@@ -100,7 +104,6 @@ function sc_openSQLConnection(s)
 
 	// get database connection parameters
 	svar sqldriver
-	string connParams = sc_readSQLConnectionParameters()
 
 	// allocate SQL handles
 	variable envRefNum=0, connRefNum=0, error=0
@@ -130,9 +133,9 @@ function sc_openSQLConnection(s)
 	// open connection to database
 	string outConnStr = ""
 	variable outConnStrLen = 0
-	string connStr = ""
-	sprintf connStr, "DRIVER=%s;SERVER=%s;PORT=%s;DATABASE=%s;UID=%s;PWD=%s;CHARSET=UTF8;", sqldriver, stringbykey("server",connParams,":",","), stringbykey("port",connParams,":",","), stringbykey("database",connParams,":",","), stringbykey("uid",connParams,":",","), stringbykey("pwd",connParams,":",",")
-	error = SQLDriverConnect(connRefNum,connStr,outConnStr,outConnStrLen,SQL_DRIVER_NOPROMPT)
+	
+		string connStr = "DSN=fridgeDB;"
+error = SQLDriverConnect(connRefNum,connStr,outConnStr,outConnStrLen,SQL_DRIVER_NOPROMPT)
 	if(error != SQL_SUCCESS)
 		SQLFreeHandle(SQL_HANDLE_DBC, connRefNum)
 		SQLFreeHandle(SQL_HANDLE_ENV, envRefNum)
