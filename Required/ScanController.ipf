@@ -2137,11 +2137,11 @@ end
 
 Window scs_abortmeasurementwindow() : Panel
 	PauseUpdate; Silent 1		// building window...
-	NewPanel /W=(1047,914,1421,1024) /N=SweepControl
+	NewPanel /W=(1557,684,1931,794)
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv textxjust= 1,textyjust= 1
-	DrawText 188,53,"\\Z16\\F'Avenir' \"ESC\" to abort and save\r\"CTRL\" (PC) or \"CMD\" (Mac) to abort w/o saving \r\"SHIFT\"  to pause\n\"RIGHT ARROW\"  to unpause"
+	DrawText 188,53,"\\Z16\\F'Avenir' \"alt +↑\" to abort and save\r\"alt +↓\" to abort w/o saving \r\"alt + ←\"  to pause\n\"alt +→\" to unpause"
 EndMacro
 
 
@@ -2197,7 +2197,7 @@ function scs_checksweepstate()
 		dowindow/k SweepControl // kill scan control window
 		abort "Measurement aborted by user. Data not saved automatically. Run \"EndScan(abort=1)\" if needed"
 	elseif(sc_abortkey == 66) // Option/Alt + leftarrow
-		print sc_abortkey
+		print "paused"
 		// Pause sweep if button is pressed
 		do
 			sc_sleep(1)
