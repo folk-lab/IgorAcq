@@ -2186,22 +2186,22 @@ end
 
 function scs_checksweepstate()
 	variable sc_abortkey=GetKeyState(0)  // returns a number corresponding to which keys are currently pressed: 32 for ESC, 4 for SHIFT, 1 for CLTR on PC or COMM on Mac, 128 for right arrow
-	if(sc_abortkey == 32)
+	if(sc_abortkey == 258) // Option/Alt + uparrow
 		// If the Abort button is pressed during the scan, save existing data and stop the scan.
 		fd_stopFDACsweep()
 		EndScan(save_experiment=0, aborting=1)				
 		abort "Measurement aborted by user. Data saved automatically."
-	elseif(sc_abortkey == 1)
+	elseif(sc_abortkey == 514) // Option/Alt + downarrow
 		// Abort measurement without saving anything!
 		fd_stopFDACsweep()
 		dowindow/k SweepControl // kill scan control window
 		abort "Measurement aborted by user. Data not saved automatically. Run \"EndScan(abort=1)\" if needed"
-	elseif(sc_abortkey == 4)
+	elseif(sc_abortkey == 66) // Option/Alt + leftarrow
 		print sc_abortkey
 		// Pause sweep if button is pressed
 		do
 			sc_sleep(1)
-		while(!(getkeystate(0) && 128))
+		while(!(getkeystate(0) && 130)) // Option/Alt + rightarrow
 	endif
 end
 //function scs_checksweepstate()
