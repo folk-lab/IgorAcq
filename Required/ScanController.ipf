@@ -2890,7 +2890,7 @@ end
 ////////////////////// SCANCONTROLLER WINDOW FUCNTIONALITY ///////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-Function scw_ListboxClicked(ControlName,row,col,event)
+Function scw_ListboxClicked(ControlName, row, col, event)
 	// colour the ADC row when theh check box is ticked
 	String ControlName     // name of this control
 	Variable row        // row if click in interior, -1 if click in title
@@ -2898,27 +2898,36 @@ Function scw_ListboxClicked(ControlName,row,col,event)
 	Variable event      // event code
 	
 	wave fadcattr
-	int check_val = fadcattr[row][col][0]
+	int num_adc = dimsize(fadcattr, 0)
+	int num_fastdac = num_adc/4
+	if (num_fastdac == 1)
+		num_fastdac += 1
+	endif
 	
 	variable start_percent = 0.3
 	variable end_percent = 0.45
 	variable diff_percent = end_percent - start_percent
-	variable percent = 0
-	variable adc_num = floor(row/4)
-	variable num_fastdac = dimsize(fadcattr, 0)/4
-	variable colour_index
+	
+	variable percent = 0, adc_num, colour_index, check_val
 	
 	wave colour_val = colour_bent_CW
 	
+	int i = 0
 	if (col == 2)
-		percent = start_percent + adc_num * (end_percent - start_percent) / (num_fastdac - 1)
-		if (check_val == 48)
-			colour_index = scw_return_colour_index(colour_val, percent, 1)
-		elseif (32)
-			colour_index = scw_return_colour_index(colour_val, percent, 0)
-		endif
-		
-		fadcattr[row][][1] = colour_index
+		for (i = 0; i < num_adc; i++)
+			adc_num = floor(i/4)
+			percent = start_percent + adc_num * (end_percent - start_percent) / (num_fastdac - 1)
+			
+			check_val = fadcattr[i][col][0]
+			if (check_val == 48)
+				colour_index = scw_return_colour_index(colour_val, percent, 1)
+			elseif (32)
+				colour_index = scw_return_colour_index(colour_val, percent, 0)
+			endif
+			
+			fadcattr[i][][1] = colour_index
+			
+		endfor
 	endif
 	
 	return 0
@@ -3927,6 +3936,12 @@ function scw_create_colour_waves()
 	int num_dac = 8
 	int num_adc = 4
 	variable num_fastdac = dimsize(fdacattr, 0) / num_dac
+	int num_dac_ch = num_dac * num_fastdac
+	int num_adc_ch = num_adc * num_fastdac
+	
+	if (num_fastdac == 1)
+		num_fastdac += 1
+	endif
 
 	
 	variable colour_index, num_colours
@@ -3941,7 +3956,7 @@ function scw_create_colour_waves()
 	// colour the dac
 	int fastdac_count = 0
 	int i
-	for  (i=0; i < num_fastdac * num_dac; i++)
+	for  (i=0; i < num_dac_ch; i++)
 		
 		percent = start_percent + floor(i/8) * (end_percent - start_percent) / (num_fastdac - 1)
 		colour_index = scw_return_colour_index(colour_val, percent, 0)
@@ -3957,7 +3972,7 @@ function scw_create_colour_waves()
 	
 	// colour the adc
 	fastdac_count = 0
-	for  (i=0; i < num_fastdac * num_adc; i++)
+	for  (i=0; i < num_adc_ch; i++)
 		
 		percent = start_percent + floor(i/4) * (end_percent - start_percent) / (num_fastdac - 1)
 		colour_index = scw_return_colour_index(colour_val, percent, 0)
