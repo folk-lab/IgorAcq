@@ -1377,7 +1377,7 @@ end
 
 
 /// read ///
-function/s getJSONvalue(jstr, key)
+Threadsafe function/s getJSONvalue(jstr, key)
 	// returns the value of the parsed key
 	// function returns can be: object, array, value
 	// expected format: "parent1:parent2:parent3:key"
@@ -1415,7 +1415,7 @@ end
 
 
 
-function/s getJSONindices(keys)
+Threadsafe function/s getJSONindices(keys)
 	// returns string list with indices of parsed keys
 	string keys
 	string indices="", key
@@ -1448,7 +1448,7 @@ function/s getJSONindices(keys)
 	return indices
 end
 
-function/s getJSONkeyoffset(key,offset)
+ Threadsafe function/s getJSONkeyoffset(key,offset)
 	string key
 	variable offset
 	wave/t t_tokentext

@@ -492,6 +492,9 @@ function scfw_update_all_fdac([option,SP])
 	wave/t old_fdacvalstr
 	wave/t DAC_channel
 	variable ramprate
+	string chan_list=TextWavetoList(Dac_channel, useComma=1)
+	string output
+
 	
 
 	if (paramisdefault(option))
@@ -499,26 +502,24 @@ function scfw_update_all_fdac([option,SP])
 	endif
 	
 	// Either ramp fastdacs or update fdacvalstr
-	variable i = 0, j = 0, output = 0, startCh = 0, numDACCh
+	variable i = 0, j = 0, startCh = 0, numDACCh
 	numDACCh = dimsize(DAC_channel, 0)
 	
 
 			try
 				strswitch(option)
 					case "fdacramp":
-						for(j = 0; j < numDACCh; j += 1)
-							output = str2num(fdacvalstr[j][1])
-							if(output != str2num(old_fdacvalstr[j]))
-								ramprate = str2num(fdacvalstr[j][4])
-								rampmultipleFDAC(DAC_channel[j], output, ramprate = ramprate)
-							endif
-						endfor
+						
+							duplicate /o/rmd=[][1] fdacvalstr, w
+							
+							output=textWavetolist(w,useComma=1)
+							
+							rampmultipleFDAC(chan_list,0 ,setpoints_str=output)
+						
 						break
 					case "fdacrampzero":
-						for(j = 0; j < numDACCh; j += 1)
-							ramprate = str2num(fdacvalstr[j][4])
-							rampmultipleFDAC(DAC_channel[j], 0, ramprate = ramprate)
-						endfor
+						rampmultipleFDAC(chan_list, 0)
+						
 						break
 
 					case "updatefdac":
@@ -529,10 +530,7 @@ function scfw_update_all_fdac([option,SP])
 						endfor
 						break
 				case "fdacramptoSP"://// this was to check speed of setDACs, but keep it in for now
-					for(j = 0; j < numDACCh; j += 1)
-						ramprate = str2num(fdacvalstr[j][4])
-						rampmultipleFDAC(DAC_channel[j], SP, ramprate = ramprate)
-					endfor
+						rampmultipleFDAC( chan_list, SP)
 					break
 				endswitch
 			catch
@@ -647,6 +645,12 @@ function scu_toc([int print_on])
     killvariables/Z tictoc
 end
 
+function scu_resetalltimers()
+variable i=0, value
+	for(i=0; i<10; i=i+1)
+		value= StopMSTimer(i)
+	endfor
+end
 
 function roundNum(number,decimalplace) 
     // to return integers, decimalplace=0

@@ -319,28 +319,31 @@ function/s queryInstrProgress(instrID, cmd, delay, delaymsg, [read_term])
 	return response
 end
 
-function/s postHTTP(instrID,cmd,payload,headers)
+Threadsafe function/s postHTTP(instrID,cmd,payload,headers)
+  //String headers = "Content-Type: application/x-www-form-urlencoded"
+//String postData = "key1=value1&key2=value2"
+//  for example : postHTTP("https://httpbin.org/", "post", postData, headers)
+
 	string instrID, cmd, payload, headers
 	string response=""
-//print headers
-	//print instrID+cmd, payload
 	URLRequest /TIME=15.0 /DSTR=payload url=instrID+cmd, method=post, headers=headers
 
 	if (V_flag == 0)    // No error
 		response = S_serverResponse // response is a JSON string
-				fileappend(response)
+//				fileappend(response)
 
 		if (V_responseCode != 200)  // 200 is the HTTP OK code
-			print "[ERROR] HTTP response code " + num2str(V_responseCode)
+			print "[ERROR] HTTP response code " + num2str(V_flag)
 			if(strlen(response)>0)
 		   	printf "[MESSAGE] %s\r", getJSONvalue(response, "error")
 		   endif
-		   return ""
+		   return "some error"
 		else
 			return response
 		endif
    else
-        abort "HTTP connection error."
+        print "HTTP  error:", V_flag
+        
    endif
 
 end
@@ -360,25 +363,25 @@ function/s putHTTP(instrID,cmd,payload,headers)
 	string instrID, cmd, payload, headers
 	string response=""
 
-//	print instrID+cmd, payload
+//		print instrID+cmd, payload
 	URLRequest /TIME=15.0 /DSTR=payload url=instrID+cmd, method=put, headers=headers
-
 	if (V_flag == 0)    // No error
 		response = S_serverResponse // response is a JSON string
-				fileappend(response)
+		fileappend(response)
 
 		if (V_responseCode != 200)  // 200 is the HTTP OK code
 			print "[ERROR] HTTP response code " + num2str(V_responseCode)
 			if(strlen(response)>0)
-		   	printf "[MESSAGE] %s\r", getJSONvalue(response, "error")
-		   endif
-		   return ""
+				printf "[MESSAGE] %s\r", getJSONvalue(response, "error")
+			endif
+			return ""
 		else
 			return response
 		endif
-   else
-        abort "HTTP connection error."
-   endif
+	else
+		abort "HTTP connection error."
+		print V_flag
+	endif
 end
 
 
