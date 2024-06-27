@@ -2137,7 +2137,7 @@ end
 
 Window scs_abortmeasurementwindow() : Panel
 	PauseUpdate; Silent 1		// building window...
-	NewPanel /W=(1557,684,1931,794)
+	NewPanel /W=(1557,684,1931,794) /N=SweepControl
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv textxjust= 1,textyjust= 1
