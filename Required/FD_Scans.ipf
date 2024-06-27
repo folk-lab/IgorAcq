@@ -91,7 +91,6 @@ function ScanFastDAC(start, fin, channels, [numptsx, sweeprate, delay, ramprate,
 		// SaveWaves(msg=comments, fastdac=1)
 	endif
 
-	doWindow/k/z SweepControl  // Attempt to close previously open window just in case
 
 end
 
@@ -194,7 +193,6 @@ function ScanFastDAC2D(startx, finx, channelsx, starty, finy, channelsy, numptsy
 	// Save by default
 	if (nosave == 0)
 		EndScan(S=S)
-  		dowindow /k SweepControl
 	endif
 	
 end
@@ -307,7 +305,6 @@ Function ReadVsTimeFastdac(duration, [y_label, comments, nosave]) // Units: seco
 	if (!nosave)
 		EndScan(S=S) // Save the scan data and clean up if nosave is not true
 	else
-		dowindow/k SweepControl // If nosave is true, keep the sweep control window open for further interaction
 	endif
 	
 	
@@ -402,7 +399,6 @@ function ScanFastDacSlow(start, fin, channels, numpts, delay, ramprate, [starts,
 	if (nosave == 0)
 		EndScan(S=S)
 	else
-		dowindow /k SweepControl
 	endif
 end
 
@@ -470,7 +466,6 @@ function ScanFastDacSlow2D(startx, finx, channelsx, numptsx, delayx, starty, fin
 	if (nosave == 0)
 		EndScan(S=S)
 	else
-		dowindow /k SweepControl
 	endif
 end
 
@@ -672,3 +667,82 @@ function Ramp_interlaced_channels(S, i)
 
 end
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////"Lockin window"
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+Window Lock_in_panel() : Panel
+	PauseUpdate; Silent 1		// building window...
+	NewPanel /W=(1611,109,2131,399)
+	SetDrawLayer UserBack
+	SetDrawEnv fsize= 16
+	DrawText 226,175,"Press \"Esc\" to stop lockin"
+	ValDisplay Lockin_var,pos={35.00,15.00},size={470.00,121.00},fSize=100,fStyle=1
+	ValDisplay Lockin_var,limits={0,0,0},barmisc={0,1000},value=#"Lockin"
+	Button start_task,pos={53.00,154.00},size={119.00,29.00},proc=ButtonProc
+	Button start_task,title="start lock_in",fSize=16
+	SetVariable LI_ampl,pos={45.00,208.00},size={153.00,23.00},bodyWidth=77
+	SetVariable LI_ampl,title="amplitude",fSize=16,value=LI_ampl
+	SetVariable LI_adc,pos={36.00,244.00},size={181.00,23.00},bodyWidth=77
+	SetVariable LI_adc,title="ADC_channel",fSize=16,value=LI_adc
+	SetVariable LI_dac,pos={253.00,208.00},size={146.00,23.00},bodyWidth=77
+	SetVariable LI_dac,title="bias DAC",fSize=16,value=LI_dac
+EndMacro
+
+macro Lock_in()
+//killvariables/z  LI_hi, LI_lo, Lockin, LI_adc, LI_ampl
+variable/g  LI_hi, LI_lo, Lockin, LI_adc, LI_ampl
+string/g LI_dac
+
+
+Lock_in_panel() 
+endmacro
+
+Function ButtonProc(ba) : ButtonControl
+	STRUCT WMButtonAction &ba
+
+	switch( ba.eventCode )
+		case 2: // mouse up
+	Variable numTicks = 0	// Run every two seconds (120 ticks)
+	CtrlNamedBackground Test, period=numTicks, proc=LI_Task
+	CtrlNamedBackground Test, start	
+			break
+		case -1: // control being killed
+			break
+	endswitch
+
+	return 0
+End
+
+function LI_Task(s)		// This is the function that will be called periodically
+	STRUCT WMBackgroundStruct &s
+	variable in
+	NVar LI_hi, LI_lo, Lockin, LI_adc, LI_ampl
+	Svar LI_dac
+	variable value,j
+	
+
+	RampMultipleFDAC(LI_dac, LI_ampl)
+	LI_hi= get_one_FADCChannel(LI_adc)
+
+	RampMultipleFDAC(LI_dac, -LI_ampl)
+	LI_lo= get_one_FADCChannel(LI_adc)+gnoise(1)	
+	Lockin=LI_hi-LI_lo
+	
+	Variable t0= ticks
+
+	if (GetKeyState(0) & 32)
+		Print "Lockin aborted by Escape"
+		abort
+	endif
+	
+
+
+	return 0	// Continue background task
+End
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

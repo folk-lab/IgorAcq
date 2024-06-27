@@ -489,6 +489,7 @@ Function RampMultipleFDAC(string channels, variable setpoint, [variable ramprate
 		
         fd_rampOutputFDAC(fastdac_index, setpoint, ramprate)  // Ramp the channel to the setpoint at the specified rate
     endfor
+    
 End
 
 
@@ -522,6 +523,7 @@ Function fd_rampOutputFDAC(variable channel, variable setpoint, variable ramprat
     // Update the DAC value in the FastDAC panel to reflect the change
     Variable currentoutput = get_one_FDACChannel(channel)
     scfw_updateFdacValStr(channel, currentoutput, update_oldValStr=1)
+    doupdate
 End
 
 function check_fd_limits(int channel, variable output)
@@ -678,7 +680,6 @@ function scc_checkRampratesFD(S)
 
 	if(kill_graphs == 1)  // If user selected do not continue, then kill graphs and abort
 		print("[ERROR] \"RecordValues\": User abort!")
-		dowindow/k SweepControl // kill scan control window
 		abort
 	endif
   
