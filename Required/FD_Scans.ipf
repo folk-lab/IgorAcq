@@ -675,28 +675,27 @@ end
 
 Window Lock_in_panel() : Panel
 	PauseUpdate; Silent 1		// building window...
-	NewPanel /W=(1017,179,1636,514)
-	ShowTools/A
+	NewPanel /W=(1177,75,1796,410)
 	SetDrawLayer UserBack
 	SetDrawEnv fsize= 16
 	DrawText 226,175,"Press \"Esc\" to stop lockin"
 	DrawText 410,225,"CA amplification (eg.  9 for 1e-9)"
 	DrawText 291.666666666667,261,"The resistance calculation assumes a 100 divider for the \rvoltage bias (standard for Basel CA)"
-	ValDisplay Lockin_var,pos={34.67,14.67},size={500.00,121.00},fSize=100
+	ValDisplay Lockin_var,pos={34.00,14.00},size={500.00,121.00},fSize=100
 	ValDisplay Lockin_var,format="%0.2f kOhm",fStyle=1
 	ValDisplay Lockin_var,limits={0,0,0},barmisc={0,1000},value=#"Lockin"
-	Button start_task,pos={52.67,154.00},size={118.67,28.67},proc=ButtonProc
+	Button start_task,pos={52.00,154.00},size={118.00,28.00},proc=ButtonProc
 	Button start_task,title="start lock_in",fSize=16
-	SetVariable LI_ampl,pos={39.67,204.67},size={153.00,23.00},bodyWidth=77
+	SetVariable LI_ampl,pos={39.00,204.00},size={153.00,23.00},bodyWidth=77
 	SetVariable LI_ampl,title="amplitude",fSize=16,value=LI_ampl
-	SetVariable LI_adc,pos={39.67,244.67},size={181.00,23.00},bodyWidth=77
+	SetVariable LI_adc,pos={39.00,244.00},size={181.00,23.00},bodyWidth=77
 	SetVariable LI_adc,title="ADC_channel",fSize=16,value=LI_adc
-	SetVariable LI_dac,pos={39.33,278.67},size={146.00,23.00},bodyWidth=77
+	SetVariable LI_dac,pos={39.00,278.00},size={146.00,23.00},bodyWidth=77
 	SetVariable LI_dac,title="bias DAC",fSize=16,value=LI_dac
-	SetVariable CA_amp,pos={289.00,202.67},size={111.00,23.00},bodyWidth=50
+	SetVariable CA_amp,pos={289.00,202.00},size={111.00,23.00},bodyWidth=50
 	SetVariable CA_amp,title="CA amp",help={"CA amplification (eg.  9 for 1e-9)"}
 	SetVariable CA_amp,fSize=16,limits={5,9,1},value=LI_CAamp
-	SetVariable update,pos={285.33,270.00},size={176.00,22.67},bodyWidth=77
+	SetVariable update,pos={285.00,270.00},size={176.00,23.00},bodyWidth=77
 	SetVariable update,title="update every",fSize=16,format="% .2f s"
 	SetVariable update,limits={0,inf,0.05},value=LI_update
 EndMacro
@@ -760,7 +759,7 @@ function LI_Task1(s)		// This is the function that will be called periodically
 	LI_hi= get_one_FADCChannel(LI_adc)
 
 	RampMultipleFDAC(LI_dac, -LI_ampl)
-	LI_lo= get_one_FADCChannel(LI_adc)+gnoise(1)
+	LI_lo= get_one_FADCChannel(LI_adc)
 	
 	Lockin=(2*LI_ampl)/(LI_hi-LI_lo)*(10^(LI_CAamp-9))
 	
