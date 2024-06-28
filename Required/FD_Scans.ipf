@@ -738,7 +738,7 @@ ScanFastDAC(-1, 1, "11.7",numptsx=4, nosave=1, use_awg=1)
 
 execute("Lockin=mean(wave0x)")
 	if (GetKeyState(0) & 32)
-		Print "Lockin aborted by Escape"
+		Print "Lockin aborted by Escape, last value:"
 		abort
 	endif
 	
@@ -768,7 +768,7 @@ function LI_Task1(s)		// This is the function that will be called periodically
 	Variable t0= ticks
 
 	if (GetKeyState(0) & 32)
-		Print "Lockin aborted by Escape"
+		Printf "Lockin aborted by Escape, last value:%.3f kOhms.\n", Lockin
 		abort
 	endif
 	
