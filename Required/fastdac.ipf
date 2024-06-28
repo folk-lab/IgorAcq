@@ -517,6 +517,18 @@ Function RampMultipleFDAC_nothreads(string channels, variable setpoint, [variabl
     EndFor
     scfw_update_all_fdac(option="updatefdac")
 
+        // Extract the channel number from the list and ramp to the setpoint
+        channel = StringFromList(i, channels, ",")
+        
+        fastdac_index = get_fastdac_index(channel, return_adc_index = 0)
+        
+        if (ramprate == 0)
+     	   ramprate = str2num(fdacvalstr[fastdac_index][4])
+		endif
+		
+        fd_rampOutputFDAC(fastdac_index, setpoint, ramprate)  // Ramp the channel to the setpoint at the specified rate
+    endfor
+    
 End
 
 
@@ -867,7 +879,6 @@ function scc_checkRampratesFD(S)
 
 	if(kill_graphs == 1)  // If user selected do not continue, then kill graphs and abort
 		print("[ERROR] \"RecordValues\": User abort!")
-		dowindow/k SweepControl // kill scan control window
 		abort
 	endif
   

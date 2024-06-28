@@ -1335,11 +1335,12 @@ function initializeScan(S, [init_graphs, y_label])
 	endif
 	
 		// Open Abort window
-	scg_openAbortWindow()
+//	scg_openAbortWindow()
 	
 	// Save struct to globals
 	scv_setLastScanVars(S)
-	Dowindow/b after1;  Dowindow/b ScanController
+//	Dowindow/b after1; 
+	 Dowindow/b ScanController
 	nvar freeMem
 	freeMem=getfreeMemory()
 	if (freeMem<10)
@@ -2019,9 +2020,7 @@ end
 function scg_openAbortWindow()
     // Opens the window which allows for pausing/aborting/abort+saving a scan
     variable/g sc_abortsweep=0, sc_pause=0, sc_abortnosave=0 // Make sure these are initialized
-    doWindow/k/z SweepControl  // Attempt to close previously open window just in case
     execute("scs_abortmeasurementwindow()")
-    doWindow/F SweepControl   // Bring Sweepcontrol to the front 
 end
 
 
@@ -2141,11 +2140,11 @@ end
 
 Window scs_abortmeasurementwindow() : Panel
 	PauseUpdate; Silent 1		// building window...
-	NewPanel /W=(1047,914,1421,1024) /N=SweepControl
+	NewPanel /W=(1557,684,1931,794) /N=SweepControl
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv textxjust= 1,textyjust= 1
-	DrawText 188,53,"\\Z16\\F'Avenir' \"ESC\" to abort and save\r\"CTRL\" (PC) or \"CMD\" (Mac) to abort w/o saving \r\"SHIFT\"  to pause\n\"RIGHT ARROW\"  to unpause"
+	DrawText 188,53,"\\Z16\\F'Avenir' \"alt +↑\" to abort and save\r\"alt +↓\" to abort w/o saving \r\"alt + ←\"  to pause\n\"alt +→\" to unpause"
 EndMacro
 
 
@@ -2198,10 +2197,9 @@ function scs_checksweepstate()
 	elseif(sc_abortkey == 514) // Option/Alt + downarrow
 		// Abort measurement without saving anything!
 		fd_stopFDACsweep()
-		dowindow/k SweepControl // kill scan control window
 		abort "Measurement aborted by user. Data not saved automatically. Run \"EndScan(abort=1)\" if needed"
 	elseif(sc_abortkey == 66) // Option/Alt + leftarrow
-		print sc_abortkey
+		print "paused"
 		// Pause sweep if button is pressed
 		do
 			sc_sleep(1)
@@ -2894,7 +2892,7 @@ end
 ////////////////////// SCANCONTROLLER WINDOW FUCNTIONALITY ///////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-Function scw_ListboxClicked(ControlName,row,col,event)
+Function scw_ListboxClicked(ControlName, row, col, event)
 	// colour the ADC row when theh check box is ticked
 	String ControlName     // name of this control
 	Variable row        // row if click in interior, -1 if click in title
@@ -2902,27 +2900,36 @@ Function scw_ListboxClicked(ControlName,row,col,event)
 	Variable event      // event code
 	
 	wave fadcattr
-	int check_val = fadcattr[row][col][0]
+	int num_adc = dimsize(fadcattr, 0)
+	int num_fastdac = num_adc/4
+	if (num_fastdac == 1)
+		num_fastdac += 1
+	endif
 	
 	variable start_percent = 0.3
 	variable end_percent = 0.45
 	variable diff_percent = end_percent - start_percent
-	variable percent = 0
-	variable adc_num = floor(row/4)
-	variable num_fastdac = dimsize(fadcattr, 0)/4
-	variable colour_index
+	
+	variable percent = 0, adc_num, colour_index, check_val
 	
 	wave colour_val = colour_bent_CW
 	
+	int i = 0
 	if (col == 2)
-		percent = start_percent + adc_num * (end_percent - start_percent) / (num_fastdac - 1)
-		if (check_val == 48)
-			colour_index = scw_return_colour_index(colour_val, percent, 1)
-		elseif (32)
-			colour_index = scw_return_colour_index(colour_val, percent, 0)
-		endif
-		
-		fadcattr[row][][1] = colour_index
+		for (i = 0; i < num_adc; i++)
+			adc_num = floor(i/4)
+			percent = start_percent + adc_num * (end_percent - start_percent) / (num_fastdac - 1)
+			
+			check_val = fadcattr[i][col][0]
+			if (check_val == 48)
+				colour_index = scw_return_colour_index(colour_val, percent, 1)
+			elseif (32)
+				colour_index = scw_return_colour_index(colour_val, percent, 0)
+			endif
+			
+			fadcattr[i][][1] = colour_index
+			
+		endfor
 	endif
 	
 	return 0
@@ -2987,7 +2994,6 @@ Function sc_controlwindows(ba) : ButtonControl
 
 	switch( ba.eventCode )
 		case 2: // mouse up
-	doWindow/k/z SweepControl  // Attempt to close previously open window just in case
 			break
 		case -1: // control being killed
 			break
@@ -3246,7 +3252,7 @@ End
 
 Window after1() : Panel
 	PauseUpdate; Silent 1		// building window...
-	NewPanel/EXP=1.25 /W=(80,62,1095.2,600.4)
+	NewPanel /W=(111,98,1144,581)
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv fsize= 25,fstyle= 1
@@ -3302,8 +3308,8 @@ Window after1() : Panel
 	DrawText 696,281,"speed management"
 	ListBox fdaclist,pos={8.00,72.00},size={356.00,428.00},fSize=14,frame=2
 	ListBox fdaclist,listWave=root:fdacvalstr,selWave=root:fdacattr
-	ListBox fdaclist,colorWave=root:colour_bent_CW,mode=1,selRow=-1
-	ListBox fdaclist,widths={28,56,88,52}
+	ListBox fdaclist,colorWave=root:colour_bent_CW,mode=1,selRow=7
+	ListBox fdaclist,widths={35,70,110,65}
 	Button updatefdac,pos={20.00,504.00},size={64.00,20.00},proc=scfw_update_fdac
 	Button updatefdac,title="Update"
 	Button fdacramp,pos={144.00,504.00},size={64.00,20.00},proc=scfw_update_fdac
@@ -3312,19 +3318,19 @@ Window after1() : Panel
 	Button fdacrampzero,title="Ramp all 0"
 	ListBox fadclist,pos={400.00,72.00},size={600.00,180.00},proc=scw_ListboxClicked
 	ListBox fadclist,fSize=14,frame=2,listWave=root:fadcvalstr,selWave=root:fadcattr
-	ListBox fadclist,colorWave=root:colour_bent_CW,widths={24,56,24,76,80,24,24,16}
+	ListBox fadclist,colorWave=root:colour_bent_CW,widths={30,70,30,95,100,30,30,20}
 	Button updatefadc,pos={392.00,260.00},size={88.00,20.00},proc=scfw_update_fadc
 	Button updatefadc,title="Update ADC"
-	CheckBox sc_demodyBox,pos={869.60,304.00},size={107.20,17.60},proc=scw_CheckboxClicked
+	CheckBox sc_demodyBox,pos={867.20,304.00},size={108.00,17.00},proc=scw_CheckboxClicked
 	CheckBox sc_demodyBox,title="\\Z14Save Demod.y",variable=sc_demody,side=1
-	SetVariable sc_hotcolddelayBox,pos={868.80,348.80},size={108.00,20.00}
+	SetVariable sc_hotcolddelayBox,pos={868.00,348.00},size={108.00,20.00}
 	SetVariable sc_hotcolddelayBox,title="\\Z14Delay",value=sc_hotcolddelay
 	SetVariable sc_FilterfadcBox,pos={492.00,284.00},size={160.00,20.00}
 	SetVariable sc_FilterfadcBox,title="\\Z14Resamp Freq "
 	SetVariable sc_FilterfadcBox,help={"Re-samples to specified frequency, 0 Hz == no re-sampling"}
 	SetVariable sc_FilterfadcBox,labelBack=(65535,32768,32768)
 	SetVariable sc_FilterfadcBox,value=sc_ResampleFreqfadc
-	SetVariable sc_demodphiBox,pos={868.80,284.00},size={108.80,20.00}
+	SetVariable sc_demodphiBox,pos={868.00,284.00},size={108.00,20.00}
 	SetVariable sc_demodphiBox,title="\\Z14Demod \\$WMTEX$ \\Phi $/WMTEX$"
 	SetVariable sc_demodphiBox,value=sc_demodphi
 	SetVariable sc_ADCtime,pos={492.00,304.00},size={160.00,23.20},proc=update_ADC_sampling_time
@@ -3336,15 +3342,15 @@ Window after1() : Panel
 	SetVariable sc_nQsBox,value=sc_nQs
 	ListBox sc_InstrFdac,pos={376.00,476.00},size={600.00,128.00},fSize=14,frame=2
 	ListBox sc_InstrFdac,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1
-	ListBox sc_InstrFdac,selRow=2,editStyle=1
-	Button connectfdac,pos={368.80,396.80},size={60.00,40.00},proc=scw_OpenInstrButton
+	ListBox sc_InstrFdac,selRow=1,editStyle=1
+	Button connectfdac,pos={368.00,396.00},size={60.00,40.00},proc=scw_OpenInstrButton
 	Button connectfdac,title="Connect\rInstr",labelBack=(65535,65535,65535)
 	Button connectfdac,fColor=(65535,0,0)
-	Button killaboutfdac,pos={648.80,396.80},size={60.00,40.00},proc=sc_controlwindows
+	Button killaboutfdac,pos={648.00,396.00},size={60.00,40.00},proc=sc_controlwindows
 	Button killaboutfdac,title="Kill Sweep\r Controls",fSize=10,fColor=(3,52428,1)
-	Button killgraphsfdac,pos={508.80,396.80},size={60.00,40.00},proc=scw_killgraphs
+	Button killgraphsfdac,pos={508.00,396.00},size={60.00,40.00},proc=scw_killgraphs
 	Button killgraphsfdac,title="Close All \rGraphs",fSize=12,fColor=(1,12815,52428)
-	Button updatebuttonfdac,pos={440.00,396.80},size={60.00,40.00},proc=scw_updatewindow
+	Button updatebuttonfdac,pos={440.00,396.00},size={60.00,40.00},proc=scw_updatewindow
 	Button updatebuttonfdac,title="save\rconfig",fColor=(65535,16385,16385)
 	TabControl tb2,pos={44.00,420.00},size={180.00,20.00},disable=1,proc=TabProc2
 	TabControl tb2,fSize=13,tabLabel(0)="Set AW",tabLabel(1)="AW0",tabLabel(2)="AW1"
@@ -3359,22 +3365,22 @@ Window after1() : Panel
 	Button setupAW,title="Create"
 	Button show_AWG,pos={860.00,396.00},size={60.00,40.00},proc=scw_Show_AWG_wave
 	Button show_AWG,title="show\rAWG",fColor=(52428,34958,1)
-	Button close_tables,pos={580.00,396.80},size={60.00,40.00},proc=scw_Close_tables
+	Button close_tables,pos={580.00,396.00},size={60.00,40.00},proc=scw_Close_tables
 	Button close_tables,title="Close All \rTables",fSize=12,fColor=(26205,52428,1)
-	Button hide,pos={720.00,396.80},size={60.00,40.00},proc=scw_Hide_Procs
+	Button hide,pos={720.00,396.00},size={60.00,40.00},proc=scw_Hide_Procs
 	Button hide,title="Hide All\r Procs",fColor=(52428,52425,1)
-	Button maxi,pos={788.80,396.80},size={60.00,40.00},proc=scw_maximize
+	Button maxi,pos={788.00,396.00},size={60.00,40.00},proc=scw_maximize
 	Button maxi,title="large\rwindow",fColor=(26214,26214,26214)
-	CheckBox sc_plotRawBox1,pos={665.60,288.00},size={71.20,17.60},proc=scw_CheckboxClicked
+	CheckBox sc_plotRawBox1,pos={671.00,288.00},size={72.00,17.00},proc=scw_CheckboxClicked
 	CheckBox sc_plotRawBox1,title="\\Z14Plot Raw",variable=sc_plotRaw,side=1
-	CheckBox save_RAW,pos={665.60,312.00},size={78.40,17.60},title="\\Z14Save Raw"
+	CheckBox save_RAW,pos={671.00,312.00},size={79.00,17.00},title="\\Z14Save Raw"
 	CheckBox save_RAW,fSize=12,variable=sc_saverawfadc,side=1
-	Button show_ScanVars,pos={928.80,396.80},size={60.00,40.00},proc=scw_Show_ScanVars
+	Button show_ScanVars,pos={928.00,396.00},size={60.00,40.00},proc=scw_Show_ScanVars
 	Button show_ScanVars,title="show\rScanVars",fSize=11,fColor=(52428,1,41942)
-	SetVariable Update_every,pos={668.00,332.00},size={180.00,19.20}
+	SetVariable Update_every,pos={671.00,332.00},size={180.00,20.00}
 	SetVariable Update_every,title="update graph every",fSize=14
 	SetVariable Update_every,limits={1,1000,1},value=silent_scan,live=1
-	CheckBox intermed_save,pos={668.00,356.00},size={124.00,16.80}
+	CheckBox intermed_save,pos={671.00,356.00},size={132.00,17.00}
 	CheckBox intermed_save,title="intermediate save",fSize=14
 	CheckBox intermed_save,variable=intermediate_save,side=1
 	SetVariable sc_nfreqBox1,pos={492.00,328.00},size={160.00,20.00}
@@ -3562,7 +3568,6 @@ function EndScan([S, save_experiment, aborting, additional_wavenames])
 	nvar filenum
 	S_.filenum = filenum
 
-	dowindow/k SweepControl // kill scan control window
 	
 	variable scan_time = S_.end_time - S_.start_time
 	printf "Time elapsed: %.02f s \r", (scan_time)
@@ -3931,6 +3936,12 @@ function scw_create_colour_waves()
 	int num_dac = 8
 	int num_adc = 4
 	variable num_fastdac = dimsize(fdacattr, 0) / num_dac
+	int num_dac_ch = num_dac * num_fastdac
+	int num_adc_ch = num_adc * num_fastdac
+	
+	if (num_fastdac == 1)
+		num_fastdac += 1
+	endif
 
 	
 	variable colour_index, num_colours
@@ -3945,7 +3956,7 @@ function scw_create_colour_waves()
 	// colour the dac
 	int fastdac_count = 0
 	int i
-	for  (i=0; i < num_fastdac * num_dac; i++)
+	for  (i=0; i < num_dac_ch; i++)
 		
 		percent = start_percent + floor(i/8) * (end_percent - start_percent) / (num_fastdac - 1)
 		colour_index = scw_return_colour_index(colour_val, percent, 0)
@@ -3961,7 +3972,7 @@ function scw_create_colour_waves()
 	
 	// colour the adc
 	fastdac_count = 0
-	for  (i=0; i < num_fastdac * num_adc; i++)
+	for  (i=0; i < num_adc_ch; i++)
 		
 		percent = start_percent + floor(i/4) * (end_percent - start_percent) / (num_fastdac - 1)
 		colour_index = scw_return_colour_index(colour_val, percent, 0)
