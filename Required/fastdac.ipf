@@ -517,17 +517,7 @@ Function RampMultipleFDAC_nothreads(string channels, variable setpoint, [variabl
     EndFor
     scfw_update_all_fdac(option="updatefdac")
 
-        // Extract the channel number from the list and ramp to the setpoint
-        channel = StringFromList(i, channels, ",")
-        
-        fastdac_index = get_fastdac_index(channel, return_adc_index = 0)
-        
-        if (ramprate == 0)
-     	   ramprate = str2num(fdacvalstr[fastdac_index][4])
-		endif
-		
-        fd_rampOutputFDAC(fastdac_index, setpoint, ramprate)  // Ramp the channel to the setpoint at the specified rate
-    endfor
+   doupdate
     
 End
 
@@ -720,7 +710,7 @@ Threadsafe Function FDbox_ramp(wave/t box_channels, wave SP, wave RR, String add
 	String headers = "accept: application/json\nContent-Type: application/json"
 
 String response = postHTTP(addr, cmd, S_value, headers)
-printf "FD %d ramp finished.\n" ,fd_num
+//printf "FD %d ramp finished.\n" ,fd_num
 return fd_num
 End
 
