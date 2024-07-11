@@ -756,14 +756,14 @@ function LI_Task1(s)		// This is the function that will be called periodically
 	
 
 	RampMultipleFDAC(LI_dac, LI_ampl)
-	LI_hi= get_one_FADCChannel(LI_adc)
+	LI_hi= get_one_FADCChannel(LI_adc); //print LI_hi
 
 	RampMultipleFDAC(LI_dac, -LI_ampl)
-	LI_lo= get_one_FADCChannel(LI_adc)
+	LI_lo= get_one_FADCChannel(LI_adc); //print LI_lo
 	
-	Lockin=(2*LI_ampl)/(LI_hi-LI_lo)*(10^(LI_CAamp-9))
+	Lockin=-(2*LI_ampl)/100/(LI_hi-LI_lo)*(10^(LI_CAamp-9))/1e-6
 	
-	//uV/nA=kOhm
+
 	
 	Variable t0= ticks
 

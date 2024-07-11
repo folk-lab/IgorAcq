@@ -62,9 +62,9 @@ function master_cond_clean_average(wav, refit, kenner_out, [alternate_bias, N, n
 		avg_wav($split_pos) // pos average
 		avg_wav($split_neg) // neg average
 	
-		get_conductance_from_current($pos_avg, $neg_avg, avg_wave_name) // XXX_dot_cleaned_avg
+		get_conductance_from_current_wc($pos_avg, $neg_avg, avg_wave_name) // XXX_dot_cleaned_avg NO FUNCITON EXISTS FOR 'get_conductance_from_current_wc'
 	else
-		zap_NaN_rows($cleaned_wave_name, overwrite = 1, percentage_cutoff_inf = 0.15)
+		zap_NaN_rows($cleaned_wave_name, overwrite = 0, percentage_cutoff_inf = 0.15)
 		avg_wav($cleaned_wave_name)
 	endif
 	
@@ -178,7 +178,7 @@ function/wave split_wave(wave wav, variable flag)
 	Duplicate/o kenner, idx
 	idx = kenner[p] > flag ? p : NaN
 	WaveTransform zapnans idx
-	
+
 	string pos_wave_name = base_wave_name + "_pos"
 	duplicate/o wav $pos_wave_name
 	wave out_wav = $pos_wave_name
@@ -448,7 +448,7 @@ function /wave fit_single_peak(current_array, [percent_width])
 
 
 	/// guesssing gamma
-	W_coef[3] = 30
+	W_coef[3] = 0.02
 
 	
 //	variable mean_of_wave = mean(temp, pnt2x(temp, V_npnts*0.4), pnt2x(temp, V_npnts*0.6))
@@ -515,7 +515,7 @@ function /wave get_cond_fit_params(wav, kenner_out, [percent_width])
 		temp_wave = wav[p][i]		
 		redimension/n=-1 temp_wave
 
-		fit_single_peak(temp_wave, percent_width = percent_width)
+		fit_single_peak_wc(temp_wave, percent_width = percent_width)
 		fit_params[i][0,3] = W_coef[q]
 		fit_params[i][4] = W_sigma[0]
 		fit_params[i][5] = W_sigma[1]
@@ -570,7 +570,7 @@ function plot_cond_figs(wavenum, N, kenner_in, kenner_out, [alternate_bias, perc
 	display $avg_wave_name;
 
 	string fit_name = "fit_" + avg_wave_name
-	fit_single_peak($avg_wave_name, percent_width = percent_width) // getting fit parameters of final averaged trace
+	fit_single_peak_wc($avg_wave_name, percent_width = percent_width) // getting fit parameters of final averaged trace
 	
 	Label bottom "gate (V)"
 	Label left "cond (2e^2/h)"; // DelayUpdate
@@ -599,7 +599,8 @@ Function cond_fit_function(w, ys, xs) : FitFunc
 	// K1 = Amplitude
 	// K2 = x offset
 	// K3 = Gamma
-	ys = w[1]*(1/pi)*(0.5*w[3] / ((xs - w[2])^2 + (0.5*w[3])^2)) + w[0]
+	ys = w[1]*(1/pi)*(0.5*w[3] / ((xs - w[2])^2 + (0.5*w[3])^2)) + w[0]	
+	
 End
 	
 //////////////////////
