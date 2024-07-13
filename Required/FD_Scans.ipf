@@ -675,68 +675,61 @@ end
 
 Window Lock_in_panel() : Panel
 	PauseUpdate; Silent 1		// building window...
-	NewPanel /W=(1177,75,1796,410)
+	NewPanel/EXP=1.5 /W=(1175,53,1817,459)
 	SetDrawLayer UserBack
 	SetDrawEnv fsize= 16
-	DrawText 226,175,"Press \"Esc\" to stop lockin"
-	DrawText 410,225,"CA amplification (eg.  9 for 1e-9)"
-	DrawText 291.666666666667,261,"The resistance calculation assumes a 100 divider for the \rvoltage bias (standard for Basel CA)"
-	ValDisplay Lockin_var,pos={34.00,14.00},size={500.00,121.00},fSize=100
+	DrawText 26.6666666666667,196.333333333334,"Press \"Esc\" to stop lockin"
+	DrawText 408.666666666667,217.666666666666,"CA amplification (eg.  9 for 1e-9)"
+	DrawText 38.3333333333341,120.999999999999,"The resistance calculation assumes a 100 divider for the voltage bias (standard for Basel CA)"
+	SetDrawEnv fsize= 14
+	DrawText 26.6666666666666,310.333333333333,"(e.g.: 11.1)"
+	SetDrawEnv fsize= 14
+	DrawText 26,370.333333333333,"(e.g.: 11.1)"
+	ValDisplay Lockin_var,pos={34.00,14.00},size={598.00,86.67},fSize=72
 	ValDisplay Lockin_var,format="%0.2f kOhm",fStyle=1
 	ValDisplay Lockin_var,limits={0,0,0},barmisc={0,1000},value=#"Lockin"
-	Button start_task,pos={52.00,154.00},size={118.00,28.00},proc=ButtonProc
+	Button start_task,pos={28.00,136.67},size={118.00,28.00},proc=StartLI
 	Button start_task,title="start lock_in",fSize=16
-	SetVariable LI_ampl,pos={39.00,204.00},size={153.00,23.00},bodyWidth=77
+	SetVariable LI_ampl,pos={21.33,214.00},size={149.33,22.67},bodyWidth=77
 	SetVariable LI_ampl,title="amplitude",fSize=16,value=LI_ampl
-	SetVariable LI_adc,pos={39.00,244.00},size={181.00,23.00},bodyWidth=77
+	SetVariable LI_adc,pos={24.00,266.00},size={177.33,22.67},bodyWidth=77
 	SetVariable LI_adc,title="ADC_channel",fSize=16,value=LI_adc
-	SetVariable LI_dac,pos={39.00,278.00},size={146.00,23.00},bodyWidth=77
+	SetVariable LI_dac,pos={24.67,328.00},size={143.33,22.67},bodyWidth=77
 	SetVariable LI_dac,title="bias DAC",fSize=16,value=LI_dac
-	SetVariable CA_amp,pos={289.00,202.00},size={111.00,23.00},bodyWidth=50
+	SetVariable CA_amp,pos={280.00,198.00},size={108.00,22.67},bodyWidth=50
 	SetVariable CA_amp,title="CA amp",help={"CA amplification (eg.  9 for 1e-9)"}
 	SetVariable CA_amp,fSize=16,limits={5,9,1},value=LI_CAamp
-	SetVariable update,pos={285.00,270.00},size={176.00,23.00},bodyWidth=77
-	SetVariable update,title="update every",fSize=16,format="% .2f s"
-	SetVariable update,limits={0,inf,0.05},value=LI_update
+	ValDisplay CA_offset,pos={274.00,270.00},size={294.00,21.33}
+	ValDisplay CA_offset,title="CA_bias_offset: ",fSize=16,format="%0.2f mV"
+	ValDisplay CA_offset,limits={0,0,0},barmisc={0,1000},value=#"CA_offset"
+	CheckBox slow_carful,pos={166.67,140.00},size={339.33,20.00},proc=slow_careful
+	CheckBox slow_carful,title="slow & careful; if enabled this will only run once."
+	CheckBox slow_carful,fSize=16,value=1
 EndMacro
 
-macro Lock_in()
-//killvariables/z  LI_hi, LI_lo, Lockin, LI_adc, LI_ampl
-variable/g  LI_hi, LI_lo, Lockin, LI_adc, LI_ampl, LI_CAamp, LI_update
-string/g LI_dac
 
 
-Lock_in_panel() 
-endmacro
-
-Function ButtonProc(ba) : ButtonControl
-	STRUCT WMButtonAction &ba
-nvar LI_update
-	switch( ba.eventCode )
-		case 2: // mouse up
-	Variable numTicks = LI_update*60	// Run every  (1 ticks)
-	CtrlNamedBackground Test, period=numTicks, proc=LI_Task1
-	CtrlNamedBackground Test, start	
-			break
-		case -1: // control being killed
-			break
-	endswitch
-
-	return 0
-End
 
 function LI_Task(s)		// This is the function that will be called periodically
 	STRUCT WMBackgroundStruct &s
 	variable in
-	NVar LI_hi, LI_lo, Lockin, LI_adc, LI_ampl
-	Svar LI_dac
-	variable value,j
-	wave wave0x
+	NVar LI_hi, LI_lo, Lockin, LI_ampl, LI_CAamp,CA_offset,LI_update
+	Svar LI_dac, LI_adc
+	variable ADCno=str2num(LI_adc)
+	variable value,j, offset, N
 	
 
-ScanFastDAC(-1, 1, "11.7",numptsx=4, nosave=1, use_awg=1)
+	RampMultipleFDAC(LI_dac, LI_ampl)
+	LI_hi= get_one_FADCChannel(-1,channel_num=ADCno); //print LI_hi
 
-execute("Lockin=mean(wave0x)")
+	RampMultipleFDAC(LI_dac, -LI_ampl)
+	LI_lo= get_one_FADCChannel(-1,channel_num=ADCno); //print LI_lo
+	
+	lockin=-(2*LI_ampl)/100/(LI_hi-LI_lo)*(10^(LI_CAamp-9))/1e-6
+	CA_offset=LI_lo*2*LI_ampl/(LI_hi-LI_lo)+LI_ampl;
+	
+	Variable t0= ticks
+
 	if (GetKeyState(0) & 32)
 		Print "Lockin aborted by Escape"
 		abort
@@ -750,18 +743,30 @@ End
 function LI_Task1(s)		// This is the function that will be called periodically
 	STRUCT WMBackgroundStruct &s
 	variable in
-	NVar LI_hi, LI_lo, Lockin, LI_adc, LI_ampl, LI_CAamp
-	Svar LI_dac
-	variable value,j
+	NVar LI_hi, LI_lo, Lockin, LI_ampl, LI_CAamp,CA_offset,LI_update
+	Svar LI_dac, LI_adc
+	variable ADCno=str2num(LI_adc)
+	variable value,j, offset, N
+	
+	N=(10)
+	make/o/N=(N) temp1,temp2 
+	
+		for(j=0; j<N; j=j+1)
 	
 
 	RampMultipleFDAC(LI_dac, LI_ampl)
-	LI_hi= get_one_FADCChannel(LI_adc); //print LI_hi
+	LI_hi= get_one_FADCChannel(-1,channel_num=ADCno); //print LI_hi
 
 	RampMultipleFDAC(LI_dac, -LI_ampl)
-	LI_lo= get_one_FADCChannel(LI_adc); //print LI_lo
+	LI_lo= get_one_FADCChannel(-1,channel_num=ADCno); //print LI_lo
 	
-	Lockin=-(2*LI_ampl)/100/(LI_hi-LI_lo)*(10^(LI_CAamp-9))/1e-6
+	temp1[j]=-(2*LI_ampl)/100/(LI_hi-LI_lo)*(10^(LI_CAamp-9))/1e-6
+	temp2[j]=LI_lo*2*LI_ampl/(LI_hi-LI_lo)+LI_ampl;
+	
+	endfor
+	Lockin=mean(temp1)
+	CA_offset=mean(temp2)
+
 	
 
 	
@@ -780,3 +785,51 @@ End
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+Function slow_careful(cba) : CheckBoxControl
+	STRUCT WMCheckboxAction &cba
+Nvar LI_method
+	switch( cba.eventCode )
+		case 2: // mouse up
+			 LI_method = cba.checked
+			print LI_method
+			break
+		case -1: // control being killed
+			break
+	endswitch
+
+	return 0
+End
+
+
+Function StartLI(ba) : ButtonControl
+	STRUCT WMButtonAction &ba
+nvar LI_update, LI_method
+	switch( ba.eventCode )
+		case 2: // mouse up
+	Variable numTicks = 1	// Run every  (1 ticks)
+	if (LI_method==0)
+	CtrlNamedBackground Test, period=numTicks, proc=LI_Task
+	CtrlNamedBackground Test, start	
+	elseif (LI_method==1)
+		
+SVar LI_dac, LI_adc
+NVar samplingFreq, Lockin, LI_CAamp, LI_ampl,CA_offset
+scanfastdac(-LI_ampl, LI_ampl, LI_dac, numptsx=round(samplingFreq/4), y_label="nA"); rampmultipleFDAC(LI_dac, 0);
+string adc="ADC"+num2str(get_fastdac_index(LI_adc, return_adc_index=1)); print adc
+execute("CurveFit/q line, "+adc+" /D")
+wave W_coef
+
+Lockin= abs((1/W_coef[1])/100*(10^(LI_CAamp-9))/1e-6);
+CA_offset=-W_coef[0]/W_coef[1]
+print CA_offset
+	endif
+			break
+		case -1: // control being killed
+			break
+	endswitch
+
+	return 0
+End
