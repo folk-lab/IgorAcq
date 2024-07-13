@@ -3315,7 +3315,6 @@ Window after1() : Panel
 	DrawText 696,281,"speed management"
 	ListBox fdaclist,pos={8.00,72.00},size={356.00,428.00},fSize=14,frame=2
 	ListBox fdaclist,listWave=root:fdacvalstr,selWave=root:fdacattr
-	ListBox fdaclist,colorWave=root:colour_bent_CW,mode=1,selRow=7
 	ListBox fdaclist,widths={35,70,110,65}
 	Button updatefdac,pos={20.00,504.00},size={64.00,20.00},proc=scfw_update_fdac
 	Button updatefdac,title="Update"
