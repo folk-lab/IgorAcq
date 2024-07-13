@@ -726,7 +726,7 @@ function LI_Task(s)		// This is the function that will be called periodically
 	LI_lo= get_one_FADCChannel(-1,channel_num=ADCno); //print LI_lo
 	
 	lockin=-(2*LI_ampl)/100/(LI_hi-LI_lo)*(10^(LI_CAamp-9))/1e-6
-	CA_offset=LI_lo*2*LI_ampl/(LI_hi-LI_lo)+LI_ampl;
+	CA_offset=-LI_lo*2*LI_ampl/(LI_hi-LI_lo)-LI_ampl;
 	
 	Variable t0= ticks
 
@@ -740,47 +740,6 @@ function LI_Task(s)		// This is the function that will be called periodically
 	return 0	// Continue background task
 End
 
-function LI_Task1(s)		// This is the function that will be called periodically
-	STRUCT WMBackgroundStruct &s
-	variable in
-	NVar LI_hi, LI_lo, Lockin, LI_ampl, LI_CAamp,CA_offset,LI_update
-	Svar LI_dac, LI_adc
-	variable ADCno=str2num(LI_adc)
-	variable value,j, offset, N
-	
-	N=(10)
-	make/o/N=(N) temp1,temp2 
-	
-		for(j=0; j<N; j=j+1)
-	
-
-	RampMultipleFDAC(LI_dac, LI_ampl)
-	LI_hi= get_one_FADCChannel(-1,channel_num=ADCno); //print LI_hi
-
-	RampMultipleFDAC(LI_dac, -LI_ampl)
-	LI_lo= get_one_FADCChannel(-1,channel_num=ADCno); //print LI_lo
-	
-	temp1[j]=-(2*LI_ampl)/100/(LI_hi-LI_lo)*(10^(LI_CAamp-9))/1e-6
-	temp2[j]=LI_lo*2*LI_ampl/(LI_hi-LI_lo)+LI_ampl;
-	
-	endfor
-	Lockin=mean(temp1)
-	CA_offset=mean(temp2)
-
-	
-
-	
-	Variable t0= ticks
-
-	if (GetKeyState(0) & 32)
-		Print "Lockin aborted by Escape"
-		abort
-	endif
-	
-
-
-	return 0	// Continue background task
-End
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -817,14 +776,14 @@ nvar LI_update, LI_method
 		
 SVar LI_dac, LI_adc
 NVar samplingFreq, Lockin, LI_CAamp, LI_ampl,CA_offset
-scanfastdac(-LI_ampl, LI_ampl, LI_dac, numptsx=round(samplingFreq/4), y_label="nA"); rampmultipleFDAC(LI_dac, 0);
-string adc="ADC"+num2str(get_fastdac_index(LI_adc, return_adc_index=1)); print adc
+scanfastdac(-LI_ampl, LI_ampl, LI_dac, numptsx=round(samplingFreq/4),nosave=1, y_label="nA"); rampmultipleFDAC(LI_dac, 0);
+string adc="ADC"+num2str(get_fastdac_index(LI_adc, return_adc_index=1)); 
 execute("CurveFit/q line, "+adc+" /D")
 wave W_coef
 
 Lockin= abs((1/W_coef[1])/100*(10^(LI_CAamp-9))/1e-6);
 CA_offset=-W_coef[0]/W_coef[1]
-print CA_offset
+
 	endif
 			break
 		case -1: // control being killed
@@ -836,9 +795,8 @@ End
 
 macro Lock_in()
 //killvariables/z  LI_hi, LI_lo, Lockin, LI_adc, LI_ampl
-variable/g  LI_hi, LI_lo, Lockin, LI_adc, LI_ampl, LI_CAamp, LI_update
-string/g LI_dac
-
+variable/g  LI_hi, LI_lo, Lockin, LI_ampl, LI_CAamp, LI_update, LI_method, CA_offset
+string/g LI_dac, LI_adc
 
 Lock_in_panel() 
 endmacro

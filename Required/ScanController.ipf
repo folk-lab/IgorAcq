@@ -2151,7 +2151,7 @@ Window scs_abortmeasurementwindow() : Panel
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv textxjust= 1,textyjust= 1
-	DrawText 188,53,"\\Z16\\F'Avenir' \"alt +↑\" to abort and save\r\"alt +↓\" to abort w/o saving \r\"alt + ←\"  to pause\n\"alt +→\" to unpause"
+	DrawText 188,53,"\\Z16\\F'Arial' \"alt +↑\" to abort and save\r\"alt +↓\" to abort w/o saving \r\"alt + ←\"  to pause\n\"alt +→\" to unpause"
 EndMacro
 
 
@@ -2996,18 +2996,7 @@ function scw_CheckboxClicked(ControlName, Value)
 end
 
 
-Function sc_controlwindows(ba) : ButtonControl
-	STRUCT WMButtonAction &ba
 
-	switch( ba.eventCode )
-		case 2: // mouse up
-			break
-		case -1: // control being killed
-			break
-	endswitch
-
-	return 0
-End
 
 
 function scw_updatewindow(action) : ButtonControl
