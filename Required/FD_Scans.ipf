@@ -833,3 +833,12 @@ print CA_offset
 
 	return 0
 End
+
+macro Lock_in()
+//killvariables/z  LI_hi, LI_lo, Lockin, LI_adc, LI_ampl
+variable/g  LI_hi, LI_lo, Lockin, LI_adc, LI_ampl, LI_CAamp, LI_update
+string/g LI_dac
+
+
+Lock_in_panel() 
+endmacro
