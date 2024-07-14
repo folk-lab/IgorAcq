@@ -719,10 +719,10 @@ function LI_Task(s)		// This is the function that will be called periodically
 	variable value,j, offset, N
 	
 
-	RampMultipleFDAC(LI_dac, LI_ampl)
+	RampMultipleFDAC_nothreads(LI_dac, LI_ampl)
 	LI_hi= get_one_FADCChannel(-1,channel_num=ADCno); //print LI_hi
 
-	RampMultipleFDAC(LI_dac, -LI_ampl)
+	RampMultipleFDAC_nothreads(LI_dac, -LI_ampl)
 	LI_lo= get_one_FADCChannel(-1,channel_num=ADCno); //print LI_lo
 	
 	lockin=-(2*LI_ampl)/100/(LI_hi-LI_lo)*(10^(LI_CAamp-9))/1e-6

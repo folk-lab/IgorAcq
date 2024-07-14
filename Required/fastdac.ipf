@@ -721,7 +721,7 @@ Threadsafe Function FDbox_ramp(wave/t box_channels, wave SP, wave RR, String add
 
 	endfor
 	jsonxop_dump/ind=2 level1
-	String cmd="ramp-dac-to-target"
+	String cmd="ramp-dacs-to-target"
 	String headers = "accept: application/json\nContent-Type: application/json"
 
 String response = postHTTP(addr, cmd, S_value, headers)
