@@ -25,7 +25,7 @@ function openFastDAC(portnum,[verbose])
 
 
 	string http_address = "http://lcmi-docs.qdev-h101.lab:"+portnum+"/api/v1/"
-	http_address="http://127.0.0.1:"+portnum+"/api/v1/"
+//	http_address="http://127.0.0.1:"+portnum+"/api/v1/"
 
 
 
@@ -85,7 +85,7 @@ function init_dac_and_adc(fastdac_string)
 		dac_table[i][1] = temp_string
 		
 		// column 2
-		temp_string = "-10000,10000"
+		temp_string = "-10000,100"
 		dac_table[i][2] = temp_string
 		
 		// column 3: label
@@ -93,7 +93,7 @@ function init_dac_and_adc(fastdac_string)
 		dac_table[i][3] = temp_string
 		
 		// column 4: ramprate
-		temp_string = "1000000"
+		temp_string = "1000"
 		dac_table[i][4] = temp_string
 		
 		
@@ -439,92 +439,296 @@ function scfw_fdacAskUserUpdate(action) : ButtonControl
 end
 
 
+Function RampMultipleFDAC_nothreads(string channels, variable setpoint, [variable ramprate, string setpoints_str])
+	// This function ramps multiple FastDAC channels to given setpoint(s) at a specified ramp rate.
+	// Parameters:
+	// channels - A comma-separated list of channels to be ramped.
+	// setpoint - A common setpoint to ramp all channels to (ignored if setpoints_str is provided).
+	// ramprate - The ramp rate in mV/s for all channels. If not specified, uses each channel's configured ramp rate.
+	// setpoints_str - An optional comma-separated list of setpoints, allowing individual setpoints for each channel.
+	// Example Use ::
+	// rampmultiplefDAC("11.3, 11.6", 0, setpoints_str="10, -10")
+
+	// If ramprate is not specified or not a number, default to 1000 (this is mostly safe)
+	ramprate = paramisdefault(ramprate) ? 1000 : ramprate
+
+	// Convert channel identifiers to numbers, supporting both numerical IDs and named channels
+	channels = scu_getChannelNumbers(channels)
+
+	// Abort if the number of channels and setpoints do not match when individual setpoints are provided
+	if (!paramIsDefault(setpoints_str) && (itemsInList(channels, ",") != itemsInList(setpoints_str, ",")))
+		abort "ERROR[RampMultipleFdac]: Number of channels does not match number of setpoints in setpoints_str"
+	endif
+
+	// Initialize variables for the loop
+	Variable j = 0, i = 0, nChannels = ItemsInList(channels, ","), n = 0
+	Variable fastdac_index, start = 0
+	Wave/T fdacvalstr
+	Wave temp, numconvert, boxnum, dacnum
+	Variable timerRefNum = StartMSTimer
+	Variable elapsedTime
+	string SP, RR,box_channels
+	Svar fd
+
+	// Create a wave for ramprate with the same dimension as channels
+	if (ramprate==0)
+		ramprate=1000
+	endif
+
+	Make/O/N=(nChannels) ramprate_wave = ramprate
+
+	// Create setpoint_wave with the dimension of channels and is numeric
+	if (paramIsDefault(setpoints_str))
+		Make/O/N=(nChannels) setpoints_wave = setpoint
+	else
+		StringList2Wave(setpoints_str, "temp", delimiter = ",")
+		ConvertTxtWvToNumWv(temp)
+		Duplicate/O numconvert setpoints_wave
+	endif
+
+	// Check and sort the limits for the FastDAC channels
+	fd_sort_check_lims(channels, setpoints_wave, ramprate_wave)
+
+	// Define waves for unique box numbers and channels
+	Wave unique_boxnum
+	Wave/T channels_wave
+	Variable fd_num
+
+	// Loop through each FD_box to send the Ramp command
+	j = 0
+	For (i = 0; i < DimSize(unique_boxnum, 0); i += 1)
+		scu_tic()
+		fd_num = unique_boxnum[i]
+		Do
+			j += 1
+			If (j >= DimSize(boxnum, 0))
+				Break
+			EndIf
+		While (boxnum[j] == fd_num)
+		SP="SP"+num2str(fd_num)
+		RR="RR"+num2str(fd_num)
+		box_channels="box_channels"+num2str(fd_num)
+
+		Duplicate/O/R=(start, j-1) setpoints_wave $SP
+		Duplicate/O/R=(start, j-1) ramprate_wave $RR
+		Duplicate/O/R=(start, j-1) channels_wave $box_channels
+		start = j
+		FDbox_ramp($box_channels, $SP, $RR, fd)
+	EndFor
+	//scfw_update_all_fdac(option="updatefdac")
+
+	variable value, fd_idx
+	for(j=0; j<dimsize(setpoints_wave,0);j=j+1)
+		fd_idx=get_fastdac_index(channels_wave[j])
+
+		scfw_updateFdacValStr(fd_idx, setpoints_wave[j], update_oldValStr = 1)
+	endfor
+	doupdate
+
+End
 
 
 
 Function RampMultipleFDAC(string channels, variable setpoint, [variable ramprate, string setpoints_str])
     // This function ramps multiple FastDAC channels to given setpoint(s) at a specified ramp rate.
     // Parameters:
-    // channels - A comma-separated list of channels to be ramped. Expects 
+    // channels - A comma-separated list of channels to be ramped.
     // setpoint - A common setpoint to ramp all channels to (ignored if setpoints_str is provided).
     // ramprate - The ramp rate in mV/s for all channels. If not specified, uses each channel's configured ramp rate.
     // setpoints_str - An optional comma-separated list of setpoints, allowing individual setpoints for each channel.
     // Example Use ::
-    // rampmultiplefDAC("11.3, 11.6", 0, setpoints_str ="10, -10")
+    // rampmultiplefDAC("11.3, 11.6", 0, setpoints_str="10, -10")
 
-	ramprate = paramisdefault(ramprate) ? 10000 : ramprate     // If ramprate is not specified or not a number, default to 1000 (this is mostly safe)
-
-
+    // If ramprate is not specified or not a number, default to 1000 (this is mostly safe)
+    ramprate = paramisdefault(ramprate) ? 1000 : ramprate 
 
     // Convert channel identifiers to numbers, supporting both numerical IDs and named channels
     channels = scu_getChannelNumbers(channels)
     
     // Abort if the number of channels and setpoints do not match when individual setpoints are provided
     if (!paramIsDefault(setpoints_str) && (itemsInList(channels, ",") != itemsInList(setpoints_str, ","))) 
-        abort "ERROR[RampMultipleFdac]: Number of channels does not match number of setpoints in setpoints_str"    
+        abort "ERROR[RampMultipleFdac]: Number of channels does not match number of setpoints in setpoints_str"
     endif
     
     // Initialize variables for the loop
-    Variable i = 0, nChannels = ItemsInList(channels, ",")
-    string channel
-    Variable channel_ramp  // Not used, consider removing if unnecessary
-    variable fastdac_index
+    Variable j = 0, i = 0, nChannels = ItemsInList(channels, ","), n = 0
+    Variable fastdac_index, start = 0
     Wave/T fdacvalstr
+    Wave temp, numconvert, boxnum, dacnum
+    	Variable timerRefNum = StartMSTimer
+	Variable elapsedTime
+	string SP, RR,box_channels
+	Svar fd
+    scu_tic()
+    // Create a wave for ramprate with the same dimension as channels
+    if (ramprate==0)
+    ramprate=1000
+    endif
     
-    // Loop through each channel to apply the ramp
-    for (i = 0; i < nChannels; i += 1)
-        // If individual setpoints are provided, override the common setpoint with the specific value for each channel
-        if (!paramIsDefault(setpoints_str)) 
-            setpoint = str2num(StringFromList(i, setpoints_str, ","))
-        endif
-        
-        // Extract the channel number from the list and ramp to the setpoint
-        channel = StringFromList(i, channels, ",")
-        
-        fastdac_index = get_fastdac_index(channel, return_adc_index = 0)
-        
-        if (ramprate == 0)
-     	   ramprate = str2num(fdacvalstr[fastdac_index][4])
-		endif
-		
-        fd_rampOutputFDAC(fastdac_index, setpoint, ramprate)  // Ramp the channel to the setpoint at the specified rate
-    endfor
+    Make/O/N=(nChannels) ramprate_wave = ramprate
     
+    // Create setpoint_wave with the dimension of channels and is numeric
+    if (paramIsDefault(setpoints_str))
+        Make/O/N=(nChannels) setpoints_wave = setpoint
+    else
+        StringList2Wave(setpoints_str, "temp", delimiter = ",")
+        ConvertTxtWvToNumWv(temp)
+        Duplicate/O numconvert setpoints_wave
+    endif
+
+    // Check and sort the limits for the FastDAC channels
+    fd_sort_check_lims(channels, setpoints_wave, ramprate_wave)
+
+    // Define waves for unique box numbers and channels
+    Wave unique_boxnum
+    Wave/T channels_wave
+    Variable fd_num
+j= ThreadGroupRelease(-2)
+
+    // Loop through each FD_box to send the Ramp command
+    Variable nthreads= dimsize(unique_boxnum,0)
+	Variable threadGroupID= ThreadGroupCreate(nthreads)
+	
+    j = 0
+    For (i = 0; i < DimSize(unique_boxnum, 0); i += 1)
+        scu_tic()
+        fd_num = unique_boxnum[i]
+        Do
+            j += 1
+            If (j >= DimSize(boxnum, 0))
+                Break
+            EndIf
+        While (boxnum[j] == fd_num)
+        SP="SP"+num2str(fd_num)
+        RR="RR"+num2str(fd_num)
+        box_channels="box_channels"+num2str(fd_num)
+        
+        Duplicate/O/R=(start, j-1) setpoints_wave $SP
+        Duplicate/O/R=(start, j-1) ramprate_wave $RR
+        Duplicate/O/R=(start, j-1) channels_wave $box_channels
+        start = j
+//print "starting thread", i
+        ThreadStart threadGroupID,i,FDbox_ramp($box_channels, $SP, $RR, fd)       
+    EndFor
+
+    
+		// Wait for threads to finish or for abort to occur
+	Variable threadGroupResult
+	
+		do
+			Variable threadGroupStatus = ThreadGroupWait(threadGroupID,100)
+			//print threadGroupStatus
+			DoUpdate // Needed for Printf output from worker to appear in history
+			
+		while(threadGroupStatus != 0)
+
+	
+	// Here if threads ran to normal completion
+	threadGroupResult = ThreadGroupRelease(threadGroupID)
+	elapsedTime = StopMSTimer(timerRefNum) / 1E6 // In seconds
+//	Print "ThreadCoordinatingFunction completed"
+	scu_toc()
+//    scfw_update_all_fdac(option="updatefdac"); doupdate
+
+	variable value, fd_idx
+	for(j=0; j<dimsize(setpoints_wave,0);j=j+1)
+		fd_idx=get_fastdac_index(channels_wave[j])
+
+		scfw_updateFdacValStr(fd_idx, setpoints_wave[j], update_oldValStr = 1)
+	endfor
+	doupdate
+
+	scu_resetalltimers()
+
+	return threadGroupResult
+	 
+
 End
 
+function fd_sort_check_lims(string channels,  wave setpoints_wave, wave ramprate)
+	// takes an input string of DAC channels, SP and RR wave and sorts them, checks limits and Rampspeed. Also returns nof FDs swept.
+
+	get_boxnum_dacnum(channels)//--> unique_boxnum, dacnum, boxnum
+	wave boxnum, dacnum, unique_boxnum
+	variable i, output
+	int fastdac_index
+
+
+	stringlist2wave(channels, "channels_wave",delimiter=",");
+	wave/t channels_wave
+	converttxtWvToNumWv(channels_wave) //--> numconvert
+	wave dest_wave, numconvert,sorted
+	duplicate/o numconvert sorted
+	SortColumns keyWaves={numconvert }, sortWaves={channels_wave,boxnum,dacnum,setpoints_wave, sorted}
+	SortColumns keyWaves={unique_boxnum }, sortWaves={unique_boxnum}
+
+	// now check limits:
+	// Access the global wave containing FDAC channel settings
+	Wave/T fdacvalstr
+	for (i = 0; i < dimsize(boxnum,0); i += 1)
+		fastdac_index = get_fastdac_index(channels_wave[i], return_adc_index = 0)
+
+		// Ensure the output is within the hardware's permissible limits
+		setpoints_wave[i] = check_fd_limits(fastdac_index, setpoints_wave[i])
+
+		// Check if the requested ramprate is within the software limit
+		// If not, the maximum permissible ramprate is used instead
+		If (ramprate[i] > str2num(fdacvalstr[fastdac_index][4]) || numtype(ramprate[i]) != 0)
+			printf "[WARNING] \"fd_rampOutputFDAC\": Ramprate of %.0fmV/s requested for channel %s. Using max_ramprate of %.0fmV/s instead\n", ramprate[i], channels_wave[i], str2num(fdacvalstr[fastdac_index][4])
+			ramprate[i] = str2num(fdacvalstr[fastdac_index][4])
+
+			// If after adjustment, the ramprate is still not a numeric type, abort the operation
+			If (numtype(ramprate[i]) != 0)
+				Abort "ERROR[fd_rampOutputFDAC]: Bad ramprate in ScanController_Fastdac window for channel " + num2str(fastdac_index)
+			EndIf
+		EndIf
+
+	endfor
+end
 
 
 
-Function fd_rampOutputFDAC(variable channel, variable setpoint, variable ramprate) // Units: mV, mV/s
-    // This function ramps one FD DAC channel to a specified setpoint at a given ramprate.
-    // It checks that both the setpoint and ramprate are within their respective limits before proceeding.
 
-    // Access the global wave containing FDAC channel settings
-    Wave/T fdacvalstr
-    
-    // Ensure the output is within the hardware's permissible limits
-    Variable output = check_fd_limits(channel, setpoint)
-    
-    // Check if the requested ramprate is within the software limit
-    // If not, the maximum permissible ramprate is used instead
-    If (ramprate > str2num(fdacvalstr[channel][4]) || numtype(ramprate) != 0)
-        printf "[WARNING] \"fd_rampOutputFDAC\": Ramprate of %.0fmV/s requested for channel %d. Using max_ramprate of %.0fmV/s instead\n", ramprate, channel, str2num(fdacvalstr[channel][4])
-        ramprate = str2num(fdacvalstr[channel][4])
-        
-        // If after adjustment, the ramprate is still not a numeric type, abort the operation
-        If (numtype(ramprate) != 0)
-            Abort "ERROR[fd_rampOutputFDAC]: Bad ramprate in ScanController_Fastdac window for channel " + num2str(channel)
-        EndIf
-    EndIf
-        
-    // Ramp the DAC channel to the desired output with the validated ramprate
-    set_one_FDACChannel(channel, output, ramprate)
-    
-    // Update the DAC value in the FastDAC panel to reflect the change
-    Variable currentoutput = get_one_FDACChannel(channel)
-    scfw_updateFdacValStr(channel, currentoutput, update_oldValStr=1)
-    doupdate
+Threadsafe Function FDbox_ramp(wave/t box_channels, wave SP, wave RR, String addr) // worker function
+	//	Struct ScanVars &S
+	//	String adcList
+	// it seems like global variables can not be defined in Threadsafe functions, so we have to pass fd
+	variable level1, level3
+	variable setpoint, ramprate, fd_num, fd_ch
+
+	//jsonxop_release/a
+	JSONXOP_New; level1=V_value
+	[fd_num, fd_ch] = get_fastdac_num_ch_variable(str2num(box_channels[0]))
+
+	string fdaq_label=num2str(fd_num);
+	JSONXOP_AddValue/T=fdaq_label level1, "fdaq_label"
+	JSONXOP_AddTree/T=0 level1, "dac_targets"
+
+	int i=1
+	for (i = 0; i < dimsize(SP,0); i++)
+
+		JSONXOP_New; level3=V_value
+		setpoint=SP[i]
+		ramprate=RR[i]
+		[fd_num, fd_ch] = get_fastdac_num_ch_variable(str2num(box_channels[i]))
+
+		jsonxop_addValue/V=(ramprate) level3, "ramp_rate_mv_per_s"
+		Jsonxop_addTree/T=0 level3, "target"
+		Jsonxop_addValue/V=(setpoint) level3, "target/value"
+		Jsonxop_addValue/T="mV" level3, "target/unit"
+		JSONXOP_AddValue/JOIN=(level3) level1, "dac_targets/"+num2str(fd_ch)
+		jsonxop_release level3
+
+	endfor
+	jsonxop_dump/ind=2 level1
+	String cmd="ramp-dacs-to-target"
+	String headers = "accept: application/json\nContent-Type: application/json"
+
+String response = postHTTP(addr, cmd, S_value, headers)
+//printf "FD %d ramp finished.\n" ,fd_num
+return fd_num
 End
+
 
 function check_fd_limits(int channel, variable output)
 	// check that output is within software limit
@@ -1080,10 +1284,14 @@ int N=ItemsInList(daclist, ",");
 		boxnum[i]=fd_num
 		dacnum[i]=fd_ch
 	endfor
-	FindDuplicates/INDX=indexWave/RN=unique_boxnum boxnum
+	if (dimsize(boxnum,0)>1)
+	FindDuplicates/q/INDX=indexWave/RN=unique_boxnum boxnum
+	else
+	duplicate/o boxnum unique_boxnum
+	endif
 end
 
-function [variable fd_num, variable fd_ch] get_fastdac_num_ch_variable(variable fd_num_ch)
+Threadsafe function [variable fd_num, variable fd_ch] get_fastdac_num_ch_variable(variable fd_num_ch)
 	// get_fastdac_num_ch_variable(6.1) returns variable [6, 1]
 	// USE :: 
 	// variable fd_num, fd_ch
@@ -1091,7 +1299,6 @@ function [variable fd_num, variable fd_ch] get_fastdac_num_ch_variable(variable 
 	// but it can not be run from the command line, only inside functions
 	fd_num = floor(fd_num_ch)
 	fd_ch = (fd_num_ch - fd_num) * 10
-
 	return [fd_num, fd_ch]
 end
 
@@ -1147,7 +1354,7 @@ end
 function /t fd_get_unique_fastdac_from_dac(dac_channels)
 	// returns a list of unique fastdac number from dac_channels
 	// USE :: 
-	// unique_fastdac_num =  fd_get_unique_gate("1,2.0',3,2.3,5.3,4.7,6.5,4.4")
+	// unique_fastdac_num =  fd_get_unique_gate("1,2.0,3,2.3,5.3,4.7,6.5,4.4")
 	string dac_channels 
 	
 	string unique_fastdac_vals = ""
@@ -1359,6 +1566,27 @@ function set_one_FDACChannel(int channel_int, variable setpoint, variable rampra
 	String response = postHTTP(fd, cmd, payload, headers)
 	
 end
+
+//function ramp_FDbox(int boxnum,string DACs, wave setpoint, wave ramprate) 
+//	svar fd
+//	String cmd = "ramp-dac-to-target"
+//	String payload
+//	JSONXOP_New; level1=V_value
+//	JSONXOP_AddValue/T=num2str(boxnum) level1, "fdaq_label"
+//	JSONXOP_AddValue/T= level1, "dac_targets"
+//
+//
+//
+//	
+//
+//	String headers = "accept: application/json\nContent-Type: application/json"
+//	String response = postHTTP(fd, cmd, payload, headers)
+//	
+//end
+
+
+
+get_boxnum_dacnum("1.0,1.2,2.1,2.3")
 
 
 function sample_ADC(string adclist, variable nr_samples, variable sampling_time)

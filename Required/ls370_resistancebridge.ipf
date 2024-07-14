@@ -1027,9 +1027,7 @@ function getls370status_local()
 string status
  status=readTXTFile("temperatures.json", "data")
 JSONXOP_Parse status
-
  return V_value
- 
 end
 
 function/s getls370status_nosql(instrID)
@@ -1057,6 +1055,9 @@ function/s getls370status_nosql(instrID)
 
 	return Buffer
 end
+
+
+
 
 
 

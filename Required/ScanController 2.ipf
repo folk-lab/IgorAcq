@@ -492,9 +492,6 @@ function scfw_update_all_fdac([option,SP])
 	wave/t old_fdacvalstr
 	wave/t DAC_channel
 	variable ramprate
-	string chan_list=TextWavetoList(Dac_channel, useComma=1)
-	string output
-
 	
 
 	if (paramisdefault(option))
@@ -502,24 +499,26 @@ function scfw_update_all_fdac([option,SP])
 	endif
 	
 	// Either ramp fastdacs or update fdacvalstr
-	variable i = 0, j = 0, startCh = 0, numDACCh
+	variable i = 0, j = 0, output = 0, startCh = 0, numDACCh
 	numDACCh = dimsize(DAC_channel, 0)
 	
 
 			try
 				strswitch(option)
 					case "fdacramp":
-						
-							duplicate /o/rmd=[][1] fdacvalstr, w
-							
-							output=textWavetolist(w,useComma=1)
-							
-							rampmultipleFDAC(chan_list,0 ,setpoints_str=output)
-						
+						for(j = 0; j < numDACCh; j += 1)
+							output = str2num(fdacvalstr[j][1])
+							if(output != str2num(old_fdacvalstr[j]))
+								ramprate = str2num(fdacvalstr[j][4])
+								rampmultipleFDAC(DAC_channel[j], output, ramprate = ramprate)
+							endif
+						endfor
 						break
 					case "fdacrampzero":
-						rampmultipleFDAC(chan_list, 0)
-						
+						for(j = 0; j < numDACCh; j += 1)
+							ramprate = str2num(fdacvalstr[j][4])
+							rampmultipleFDAC(DAC_channel[j], 0, ramprate = ramprate)
+						endfor
 						break
 
 					case "updatefdac":
@@ -530,7 +529,10 @@ function scfw_update_all_fdac([option,SP])
 						endfor
 						break
 				case "fdacramptoSP"://// this was to check speed of setDACs, but keep it in for now
-						rampmultipleFDAC( chan_list, SP)
+					for(j = 0; j < numDACCh; j += 1)
+						ramprate = str2num(fdacvalstr[j][4])
+						rampmultipleFDAC(DAC_channel[j], SP, ramprate = ramprate)
+					endfor
 					break
 				endswitch
 			catch
@@ -646,11 +648,16 @@ function scu_toc([int print_on])
 end
 
 function scu_resetalltimers()
-variable i=0, value
-	for(i=0; i<10; i=i+1)
-		value= StopMSTimer(i)
-	endfor
+
+variable i=0,temp
+
+for (i=0;i<10;i=i+1)
+temp= stopMSTimer(i)
+
+endfor
 end
+
+
 
 function roundNum(number,decimalplace) 
     // to return integers, decimalplace=0
@@ -2144,7 +2151,7 @@ Window scs_abortmeasurementwindow() : Panel
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv textxjust= 1,textyjust= 1
-	DrawText 188,53,"\\Z16\\F'Avenir' \"alt +↑\" to abort and save\r\"alt +↓\" to abort w/o saving \r\"alt + ←\"  to pause\n\"alt +→\" to unpause"
+	DrawText 188,53,"\\Z16\\F'Arial' \"alt +↑\" to abort and save\r\"alt +↓\" to abort w/o saving \r\"alt + ←\"  to pause\n\"alt +→\" to unpause"
 EndMacro
 
 
@@ -2989,18 +2996,7 @@ function scw_CheckboxClicked(ControlName, Value)
 end
 
 
-Function sc_controlwindows(ba) : ButtonControl
-	STRUCT WMButtonAction &ba
 
-	switch( ba.eventCode )
-		case 2: // mouse up
-			break
-		case -1: // control being killed
-			break
-	endswitch
-
-	return 0
-End
 
 
 function scw_updatewindow(action) : ButtonControl
@@ -3252,7 +3248,7 @@ End
 
 Window after1() : Panel
 	PauseUpdate; Silent 1		// building window...
-	NewPanel /W=(111,98,1144,581)
+	NewPanel/EXP=1.25 /W=(312,73,1326.4,696.2)
 	ModifyPanel frameStyle=2
 	SetDrawLayer UserBack
 	SetDrawEnv fsize= 25,fstyle= 1
@@ -3296,19 +3292,20 @@ Window after1() : Panel
 	SetDrawEnv fsize= 14,fstyle= 1,textrot= -60
 	DrawText 976,59,"+ 0 - 0"
 	DrawRect 867,261,987,374
-	SetDrawEnv fname= "Arial",fsize= 14,fstyle= 5
+	SetDrawEnv fsize= 14,fstyle= 5
 	DrawText 898,280,"Lock-in"
 	DrawRect 492,261,653,370.285714285714
-	SetDrawEnv fname= "Arial",fsize= 14,fstyle= 5
+	SetDrawEnv fsize= 14,fstyle= 5
 	DrawText 541,283,"Filtering"
-	SetDrawEnv fname= "Arial",fsize= 14,fstyle= 5
+	SetDrawEnv fsize= 14,fstyle= 5
 	DrawText 897,345,"hot/cold"
 	DrawRect 666,261,857,382
-	SetDrawEnv fname= "Arial",fsize= 14,fstyle= 5
+	SetDrawEnv fsize= 14,fstyle= 5
 	DrawText 696,281,"speed management"
+	DrawText 69.6,611.2,"\\Z16\\F'Arial' \"alt +↑\" to abort and save\n\"alt +↓\" to abort w/o saving \n\"alt + ←\"  to pause\n\"alt +→\" to unpause"
 	ListBox fdaclist,pos={8.00,72.00},size={356.00,428.00},fSize=14,frame=2
 	ListBox fdaclist,listWave=root:fdacvalstr,selWave=root:fdacattr
-	ListBox fdaclist,colorWave=root:colour_bent_CW,mode=1,selRow=7
+	ListBox fdaclist,colorWave=root:colour_bent_CW,mode=1,selRow=-1
 	ListBox fdaclist,widths={35,70,110,65}
 	Button updatefdac,pos={20.00,504.00},size={64.00,20.00},proc=scfw_update_fdac
 	Button updatefdac,title="Update"
@@ -3321,7 +3318,7 @@ Window after1() : Panel
 	ListBox fadclist,colorWave=root:colour_bent_CW,widths={30,70,30,95,100,30,30,20}
 	Button updatefadc,pos={392.00,260.00},size={88.00,20.00},proc=scfw_update_fadc
 	Button updatefadc,title="Update ADC"
-	CheckBox sc_demodyBox,pos={867.20,304.00},size={108.00,17.00},proc=scw_CheckboxClicked
+	CheckBox sc_demodyBox,pos={864.00,304.00},size={107.20,17.60},proc=scw_CheckboxClicked
 	CheckBox sc_demodyBox,title="\\Z14Save Demod.y",variable=sc_demody,side=1
 	SetVariable sc_hotcolddelayBox,pos={868.00,348.00},size={108.00,20.00}
 	SetVariable sc_hotcolddelayBox,title="\\Z14Delay",value=sc_hotcolddelay
@@ -3342,7 +3339,7 @@ Window after1() : Panel
 	SetVariable sc_nQsBox,value=sc_nQs
 	ListBox sc_InstrFdac,pos={376.00,476.00},size={600.00,128.00},fSize=14,frame=2
 	ListBox sc_InstrFdac,listWave=root:sc_Instr,selWave=root:instrBoxAttr,mode=1
-	ListBox sc_InstrFdac,selRow=1,editStyle=1
+	ListBox sc_InstrFdac,selRow=2,editStyle=1
 	Button connectfdac,pos={368.00,396.00},size={60.00,40.00},proc=scw_OpenInstrButton
 	Button connectfdac,title="Connect\rInstr",labelBack=(65535,65535,65535)
 	Button connectfdac,fColor=(65535,0,0)
@@ -3351,7 +3348,7 @@ Window after1() : Panel
 	Button killgraphsfdac,pos={508.00,396.00},size={60.00,40.00},proc=scw_killgraphs
 	Button killgraphsfdac,title="Close All \rGraphs",fSize=12,fColor=(1,12815,52428)
 	Button updatebuttonfdac,pos={440.00,396.00},size={60.00,40.00},proc=scw_updatewindow
-	Button updatebuttonfdac,title="save\rconfig",fColor=(65535,16385,16385)
+	Button updatebuttonfdac,title="save\rconfig",fColor=(29524,1,58982)
 	TabControl tb2,pos={44.00,420.00},size={180.00,20.00},disable=1,proc=TabProc2
 	TabControl tb2,fSize=13,tabLabel(0)="Set AW",tabLabel(1)="AW0",tabLabel(2)="AW1"
 	TabControl tb2,value=0
@@ -3371,16 +3368,16 @@ Window after1() : Panel
 	Button hide,title="Hide All\r Procs",fColor=(52428,52425,1)
 	Button maxi,pos={788.00,396.00},size={60.00,40.00},proc=scw_maximize
 	Button maxi,title="large\rwindow",fColor=(26214,26214,26214)
-	CheckBox sc_plotRawBox1,pos={671.00,288.00},size={72.00,17.00},proc=scw_CheckboxClicked
+	CheckBox sc_plotRawBox1,pos={659.20,288.00},size={71.20,17.60},proc=scw_CheckboxClicked
 	CheckBox sc_plotRawBox1,title="\\Z14Plot Raw",variable=sc_plotRaw,side=1
-	CheckBox save_RAW,pos={671.00,312.00},size={79.00,17.00},title="\\Z14Save Raw"
+	CheckBox save_RAW,pos={661.60,312.00},size={78.40,17.60},title="\\Z14Save Raw"
 	CheckBox save_RAW,fSize=12,variable=sc_saverawfadc,side=1
 	Button show_ScanVars,pos={928.00,396.00},size={60.00,40.00},proc=scw_Show_ScanVars
 	Button show_ScanVars,title="show\rScanVars",fSize=11,fColor=(52428,1,41942)
-	SetVariable Update_every,pos={671.00,332.00},size={180.00,20.00}
+	SetVariable Update_every,pos={668.00,332.00},size={180.00,19.20}
 	SetVariable Update_every,title="update graph every",fSize=14
 	SetVariable Update_every,limits={1,1000,1},value=silent_scan,live=1
-	CheckBox intermed_save,pos={671.00,356.00},size={132.00,17.00}
+	CheckBox intermed_save,pos={664.80,356.00},size={124.00,16.80}
 	CheckBox intermed_save,title="intermediate save",fSize=14
 	CheckBox intermed_save,variable=intermediate_save,side=1
 	SetVariable sc_nfreqBox1,pos={492.00,328.00},size={160.00,20.00}
