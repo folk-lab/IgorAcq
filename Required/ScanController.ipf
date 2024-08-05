@@ -1388,7 +1388,7 @@ function scg_open1Dgraph(wn, x_label, [y_label, append_wn])
     
     if (cmpstr(append_wn, ""))
     	appendtograph /r $append_wn
-    	makecolorful()
+//    	makecolorful()
     	legend
     endif
     

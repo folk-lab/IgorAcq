@@ -11,7 +11,6 @@
 /////////////////////////
 /// SRS specific COMM ///
 /////////////////////////
-
 function openSRSconnection(instrID, visa_address, [verbose])
 	// works for GPIB -- may need to add some more 'option' paramters if using serial
 	//                -- does not hurt to send extra parameters when using GPIB, they are ignored
@@ -28,16 +27,21 @@ function openSRSconnection(instrID, visa_address, [verbose])
 	
 	variable localRM
 	variable status = viOpenDefaultRM(localRM) // open local copy of resource manager
+	
 	if(status < 0)
 		VISAerrormsg("open SRS connection:", localRM, status)
-		abort
-	endif
-	
-	string comm = ""
-	sprintf comm, "name=SRS,instrID=%s,visa_address=%s" instrID, visa_address
-	string options = "test_query=*IDN?"
-	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
-	
+		killvisa()
+		print("Killed visa")
+		asleep(15)
+		killvisa()
+		print("Killed visa")
+		sc_openInstrConnections(0)	
+	else
+		string comm = ""
+		sprintf comm, "name=SRS,instrID=%s,visa_address=%s" instrID, visa_address
+		string options = "test_query=*IDN?"
+		openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
+	endif 
 end
 
 /////////////////////////////

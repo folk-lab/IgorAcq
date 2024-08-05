@@ -118,7 +118,7 @@ function getFADCchannel(fdid, channel, [len_avg])
 	// Instead of just grabbing one single datapoint which is susceptible to high f noise, this averages data over len_avg and returns a single value
 	variable fdid, channel, len_avg
 	
-	len_avg = paramisdefault(len_avg) ? 0.05 : len_avg
+	len_avg = paramisdefault(len_avg) ? 0.03 : len_avg
 	
 	variable numpts = ceil(getFADCspeed(fdid)*len_avg)
 	if(numpts <= 0)

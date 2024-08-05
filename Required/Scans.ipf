@@ -471,7 +471,7 @@ function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate,
 	RampStartFD(S, ignore_lims=1)
 
 	// Let gates settle 
-	sc_sleep(1)
+	sc_sleep(15)
 
 	// Make Waves and Display etc
 	InitializeScan(S)
@@ -925,7 +925,7 @@ function Scank2400(instrID, startx, finx, channelsx, numptsx, delayx, rampratex,
 	rampK2400Voltage(S.instrIDx, startx, ramprate = rampratex)
 	
 	// Let gates settle 
-	sc_sleep(2)
+	sc_sleep(5)
 	
 	// Make waves and graphs etc
 	initializeScan(S)
@@ -936,10 +936,12 @@ function Scank2400(instrID, startx, finx, channelsx, numptsx, delayx, rampratex,
 		setpointx = S.startx + (i*(S.finx-S.startx)/(S.numptsx-1))
 		if (ramp ==1)
 			rampK2400Voltage(S.instrIDx, setpointx, ramprate=S.rampratex)
+			asleep(S.delayx)
 		else
 		   setK2400Voltage(S.instrIDx, setpointx)
+		   sc_sleep(S.delayx)
 		endif
-		sc_sleep(S.delayx)
+		
 		RecordValues(S, i, i)
 		i+=1
 	while (i<S.numptsx)
@@ -979,7 +981,7 @@ function Scank24002D(instrIDx, startx, finx, numptsx, delayx, rampratex, instrID
 	rampK2400Voltage(S.instrIDy, starty, ramprate = rampratey)
 	
 	// Let gates settle 
-	sc_sleep(2)
+	sc_sleep(8)
 	
 	// Make waves and graphs etc
 	initializeScan(S)

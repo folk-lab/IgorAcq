@@ -27,17 +27,23 @@ function openK2400connection(instrID, visa_address, [verbose])
 	
 	variable localRM
 	variable status = viOpenDefaultRM(localRM) // open local copy of resource manager
+
 	if(status < 0)
 		VISAerrormsg("open K2400 connection:", localRM, status)
-		abort
+		killvisa()
+		print("Killed visa")
+		asleep(15)
+		killvisa()
+		print("Killed visa")
+		sc_openInstrConnections(0)	
+	else
+		string comm = ""
+		sprintf comm, "name=K2400,instrID=%s,visa_address=%s" instrID, visa_address
+		string options = "test_query=*IDN?"
+		openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
 	endif
-	
-	string comm = ""
-	sprintf comm, "name=K2400,instrID=%s,visa_address=%s" instrID, visa_address
-	string options = "test_query=*IDN?"
-	openVISAinstr(comm, options=options, localRM=localRM, verbose=verbose)
-	
 end
+
 
 ///////////////////////
 //// Set functions ////
@@ -145,7 +151,7 @@ function rampK2400Voltage(instrID,output,[ramprate]) // Units: mV, mV/s
 	variable sleeptime = 0.01 //s
 
 	if(paramisdefault(ramprate) || ramprate == 0)
-		ramprate = 1000  // mV/s
+		ramprate = 300  // mV/s
 	endif
 
 	startpoint = getK2400voltage(instrID)

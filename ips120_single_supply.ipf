@@ -33,49 +33,55 @@ function openIPS120connection(instrVarName, visa_address, amps_per_tesla, max_fi
 	variable status = viOpenDefaultRM(localRM) // open local copy of resource manager
 	if(status < 0)
 		VISAerrormsg("open IPS120 connection:", localRM, status)
-		abort
-	endif
-
-	string comm = ""
-	sprintf comm, "name=IPS120,instrID=%s,visa_address=%s" instrVarName, visa_address
-//	string options = "baudrate=9600,databits=8,stopbits=2"
-	openVISAinstr(comm, localRM=localRM, verbose=verbose)
-	nvar localID = $(instrVarName)
-
-	svar/z ips120_names
-	if(!svar_exists(ips120_names))
-		string /g ips120_names = AddListItem(instrVarName, "")
-		string /g ips120_visaIDs =AddListItem(num2istr(localID), "")
+		VISAerrormsg("open SRS connection:", localRM, status)
+		killvisa()
+		print("Killed visa")
+		asleep(15)
+		killvisa()
+		print("Killed visa")
+		sc_openInstrConnections(0)	
 	else
-		svar ips120_visaIDs
-		variable idx = WhichListItem(instrVarName, ips120_names) // lookup name
-		if(idx>-1)
-			// found an instrument with that name
-			// replace the visaID value in the other list
-			ips120_visaIDs = RemoveListItem(idx, ips120_visaIDs)
-			ips120_visaIDs = AddListItem(num2istr(localID), ips120_visaIDs, ";", idx)
+
+		string comm = ""
+		sprintf comm, "name=IPS120,instrID=%s,visa_address=%s" instrVarName, visa_address
+	//	string options = "baudrate=9600,databits=8,stopbits=2"
+		openVISAinstr(comm, localRM=localRM, verbose=verbose)
+		nvar localID = $(instrVarName)
+	
+		svar/z ips120_names
+		if(!svar_exists(ips120_names))
+			string /g ips120_names = AddListItem(instrVarName, "")
+			string /g ips120_visaIDs =AddListItem(num2istr(localID), "")
 		else
-			// this is a new variable name
-			// add additional entries to both lists
-			ips120_names = AddListItem(instrVarName, ips120_names)
-			ips120_visaIDs = AddListItem(num2istr(localID), ips120_visaIDs)
+			svar ips120_visaIDs
+			variable idx = WhichListItem(instrVarName, ips120_names) // lookup name
+			if(idx>-1)
+				// found an instrument with that name
+				// replace the visaID value in the other list
+				ips120_visaIDs = RemoveListItem(idx, ips120_visaIDs)
+				ips120_visaIDs = AddListItem(num2istr(localID), ips120_visaIDs, ";", idx)
+			else
+				// this is a new variable name
+				// add additional entries to both lists
+				ips120_names = AddListItem(instrVarName, ips120_names)
+				ips120_visaIDs = AddListItem(num2istr(localID), ips120_visaIDs)
+			endif
+		endif
+	
+		variable /g $("amps_per_tesla_"+instrVarName) = amps_per_tesla
+		variable /g $("max_field_"+instrVarName) = max_field
+		variable /g $("max_ramprate_"+instrVarName) = max_ramprate
+	
+		// a few quick setup commands to make sure this is in the right mode(s)
+		writeIPScheck(localID, "C3\r") // Remote and unlocked
+		sc_sleep(0.02)
+		writeIPScheck(localID, "M9\r") // Set display to Tesla
+		writeInstr(localID, "Q4\r")    // Use extented resolusion (0.0001 amp/0.01 mT), no response from magnet
+	
+		if(!paramisdefault(hold) && hold==1)
+			writeIPScheck(localID, "A0\r") // Set to Hold
 		endif
 	endif
-
-	variable /g $("amps_per_tesla_"+instrVarName) = amps_per_tesla
-	variable /g $("max_field_"+instrVarName) = max_field
-	variable /g $("max_ramprate_"+instrVarName) = max_ramprate
-
-	// a few quick setup commands to make sure this is in the right mode(s)
-	writeIPScheck(localID, "C3\r") // Remote and unlocked
-	sc_sleep(0.02)
-	writeIPScheck(localID, "M9\r") // Set display to Tesla
-	writeInstr(localID, "Q4\r")    // Use extented resolusion (0.0001 amp/0.01 mT), no response from magnet
-
-	if(!paramisdefault(hold) && hold==1)
-		writeIPScheck(localID, "A0\r") // Set to Hold
-	endif
-
 end
 
 function /s ips120_lookupVarName(instrID)
