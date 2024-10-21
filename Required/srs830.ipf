@@ -51,7 +51,6 @@ end
 threadsafe function ReadSRSx(instrID) //Units: mV
 	variable instrID
 	string response
-
 	response = queryInstr(instrID, "OUTP? 1\n")
 	return str2num(response)
 end
@@ -105,6 +104,14 @@ threadsafe function GetSRSPhase(instrID) // Units: AU
 	string response
 
 	response = queryInstr(instrID, "PHAS?\n")
+	return str2num(response)
+end
+
+threadsafe function GetSRSSync(instrID) // Units: AU
+	variable instrID
+	string response
+
+	response = queryInstr(instrID, "SYNC?\n")
 	return str2num(response)
 end
 
@@ -197,6 +204,13 @@ end
 ////////////////////////
 //// Set functions ////
 ///////////////////////
+
+threadsafe function SetSRSSync(instrID, sync) // Units: AU
+	variable instrID, sync
+	string response
+
+	writeInstr(instrID, "SYNC " + num2str(sync) + "\n")
+end
 
 threadsafe function SetSRSHarmonic(instrID,harm) // Units: AU
 	variable instrID,harm

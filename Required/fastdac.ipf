@@ -154,8 +154,8 @@ function getFADCvalue(fdid, channel, [len_avg])
 end
 
 
-function getFADCChannelSingle(instrID,channel) // Units: mV
-	// channel must be the channel number given by the GUI!
+function getFADCChannelSingle(instrID, channel) // Units: mV
+	//cleachannel must be the channel number given by the GUI!
 	// Gets a single FADC reading only, likely to be very noisy because no filtering of high f noise
 	// Use getFADCchannelAVG for averaged value
 	
@@ -504,7 +504,27 @@ function stopPID(instrID)
 	string cmd=""
 	sprintf cmd, "STOP_PID"
 	writeInstr(instrID, cmd+"\r")
+
 end
+
+function stopPIDClearBuffer(instrID)
+// stops the PID algorithm on DAC and ADC channels 0
+	variable instrID
+	
+	string cmd=""
+	sprintf cmd, "STOP_PID"
+	writeInstr(instrID, cmd+"\r")
+	
+	asleep(1)
+	clearfdacBuffer(instrID)
+	
+	writeInstr(instrID, cmd+"\r")
+	
+	asleep(1)
+	clearfdacBuffer(instrID)
+
+end
+	
 
 function setPIDTune(instrID, kp, ki, kd)
 	// sets the PID tuning parameters

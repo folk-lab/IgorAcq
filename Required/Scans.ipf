@@ -508,7 +508,7 @@ function ScanFastDacSlow(instrID, start, fin, channels, numpts, delay, ramprate,
 		endif
 	endfor
 	
-
+	
 	// Save by default
 	if (nosave == 0)
 		EndScan(S=S)
@@ -1505,6 +1505,74 @@ function ScanFastDACLS625Magnet2D(fdID, startx, finx, channelsx, magnetID, start
 		// Ramp slow axis
 		setpointy = sy + (i*(S.finy-S.starty)/(S.numptsy-1))	
 		setlS625fieldWait(S.instrIDy, S.starty)  // Ramprate should be set beforehand for magnets
+
+		// Ramp to start of fast axis
+		RampStartFD(S, ignore_lims=1, x_only=1)
+		sc_sleep(S.delayy)
+		
+		// Record fast axis
+		scfd_RecordValues(S, i)
+	endfor
+
+	// Save by default
+	if (nosave == 0)
+		EndScan(S=S)
+  	else
+  		dowindow /k SweepControl
+	endif
+end
+
+
+function ScanFastDACIPS120Magnet2D(fdID, startx, finx, channelsx, magnetID, starty, finy, numptsy, [numpts, sweeprate, rampratex, delayy, startxs, finxs, y_label, comments, nosave, use_AWG])
+	// 2D Scan with Fastdac on x-axis and magnet on y-axis
+	// Note: Must provide numptsx OR sweeprate in optional parameters instead
+	// Note: channels should be a comma-separated string ex: "0,4,5"
+	variable fdID, startx, finx, starty, finy, numptsy, numpts, sweeprate, magnetID, rampratex, delayy, nosave, use_AWG
+	string channelsx, y_label, comments, startxs, finxs
+	//abort "WARNING: This scan has not been tested with an instrument connected. Remove this abort and test the behavior of the scan before running on a device!"	
+
+	// Set defaults
+	delayy = ParamIsDefault(delayy) ? 0.01 : delayy
+	comments = selectstring(paramisdefault(comments), comments, "")
+	startxs = selectstring(paramisdefault(startxs), startxs, "")
+	finxs = selectstring(paramisdefault(finxs), finxs, "")
+
+	// Reconnect instruments
+	sc_openinstrconnections(0)
+
+	// Put info into scanVars struct (to more easily pass around later)
+ 	struct ScanVars S
+	// Init FastDAC part like usual, then manually set the rest
+	initScanVarsFD(S, fdID, startx, finx, channelsx=channelsx, rampratex=rampratex, numptsx=numpts, sweeprate=sweeprate, numptsy=numptsy, delayy=delayy, \
+							startxs=startxs, finxs=finxs, comments=comments)
+	S.instrIDy = magnetID
+	s.is2d = 1
+	S.starty = starty
+	S.finy = finy
+	S.y_label = selectString(paramIsDefault(y_label), y_label, "Magnet /mT")
+      
+   // Check software limits and ramprate limits and that ADCs/DACs are on same FastDAC
+	PreScanChecksFD(S, x_only=1)
+	// PreScanChecksMagnet(S, y_only=1)
+   	
+   // Ramp to start without checks
+	RampStartFD(S, x_only=1, ignore_lims=1)
+	setips120fieldWait(S.instrIDy, S.starty)  // Ramprate should be set beforehand for magnets
+   	
+   	// Let gates settle
+	sc_sleep(S.delayy*3)
+
+	// Initialize waves and graphs
+	initializeScan(S)
+
+	// Main measurement loop
+	variable setpointy
+	variable i=0, j=0
+	string chy
+	for(i=0; i<S.numptsy; i++)
+		// Ramp slow axis
+		setpointy = S.starty + (i*(S.finy-S.starty)/(S.numptsy-1))	
+		setips120fieldWait(S.instrIDy, setpointy)  // Ramprate should be set beforehand for magnets
 
 		// Ramp to start of fast axis
 		RampStartFD(S, ignore_lims=1, x_only=1)
